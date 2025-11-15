@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
@@ -124,6 +124,11 @@ export class TenantsService {
 
   async toggleStatus(id: string) {
     const tenant = await this.findOne(id);
+
+    // Bloqueia a desativação da empresa padrão (Empresa Exemplo LTDA)
+    if (tenant.email === 'empresa1@example.com' && tenant.ativo) {
+      throw new BadRequestException('A empresa padrão do sistema não pode ser desativada');
+    }
 
     return this.prisma.tenant.update({
       where: { id },

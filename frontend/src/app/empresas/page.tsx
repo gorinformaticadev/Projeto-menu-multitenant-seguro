@@ -471,7 +471,7 @@ export default function EmpresasPage() {
                       <CardDescription className="text-xs font-mono mt-1">
                         {tenant.cnpjCpf}
                       </CardDescription>
-                      <div className="mt-2">
+                      <div className="mt-2 flex flex-wrap gap-1">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
                           tenant.ativo 
                             ? 'bg-green-100 text-green-800' 
@@ -479,6 +479,11 @@ export default function EmpresasPage() {
                         }`}>
                           {tenant.ativo ? 'Ativa' : 'Inativa'}
                         </span>
+                        {tenant.email === 'empresa1@example.com' && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                            Padrão
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -547,6 +552,8 @@ export default function EmpresasPage() {
                       variant={tenant.ativo ? "destructive" : "default"}
                       size="sm"
                       onClick={() => handleToggleStatus(tenant)}
+                      disabled={tenant.email === 'empresa1@example.com' && tenant.ativo}
+                      title={tenant.email === 'empresa1@example.com' && tenant.ativo ? 'A empresa padrão não pode ser desativada' : ''}
                     >
                       <Power className="h-4 w-4 mr-1" />
                       {tenant.ativo ? 'Desativar' : 'Ativar'}
