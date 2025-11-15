@@ -250,46 +250,58 @@ export default function EmpresasPage() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {tenants.map((tenant) => (
-              <Card key={tenant.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="bg-primary/10 rounded-lg p-2">
-                        <Building2 className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg">{tenant.nomeFantasia}</CardTitle>
-                        <CardDescription className="text-xs">
-                          {tenant.cnpjCpf}
-                        </CardDescription>
-                      </div>
+              <Card key={tenant.id} className="hover:shadow-lg transition-shadow duration-200">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start gap-3">
+                    <div className="bg-gradient-to-br from-primary to-primary/80 rounded-xl p-3 shadow-sm">
+                      <Building2 className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-lg font-bold truncate">
+                        {tenant.nomeFantasia}
+                      </CardTitle>
+                      <CardDescription className="text-xs font-mono mt-1">
+                        {tenant.cnpjCpf}
+                      </CardDescription>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Mail className="h-4 w-4" />
-                      <span className="truncate">{tenant.email}</span>
+                <CardContent className="space-y-3">
+                  <div className="space-y-2.5">
+                    <div className="flex items-start gap-2.5 group">
+                      <Mail className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0 group-hover:text-primary transition-colors" />
+                      <span className="text-sm text-muted-foreground truncate group-hover:text-foreground transition-colors">
+                        {tenant.email}
+                      </span>
                     </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <User className="h-4 w-4" />
-                      <span>{tenant.nomeResponsavel}</span>
+                    <div className="flex items-start gap-2.5 group">
+                      <User className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0 group-hover:text-primary transition-colors" />
+                      <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                        {tenant.nomeResponsavel}
+                      </span>
                     </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Phone className="h-4 w-4" />
-                      <span>{tenant.telefone}</span>
+                    <div className="flex items-start gap-2.5 group">
+                      <Phone className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0 group-hover:text-primary transition-colors" />
+                      <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                        {tenant.telefone}
+                      </span>
                     </div>
-                    {tenant._count && (
-                      <div className="mt-3 pt-3 border-t">
-                        <span className="text-xs text-muted-foreground">
-                          {tenant._count.users} usuário(s)
+                  </div>
+                  
+                  {tenant._count && (
+                    <div className="pt-3 mt-3 border-t">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Usuários
+                        </span>
+                        <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary">
+                          {tenant._count.users}
                         </span>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
