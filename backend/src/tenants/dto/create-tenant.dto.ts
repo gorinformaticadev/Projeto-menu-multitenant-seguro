@@ -24,4 +24,18 @@ export class CreateTenantDto {
   @IsNotEmpty({ message: 'Telefone é obrigatório' })
   @Matches(/^[\d\s\(\)\-\+]+$/, { message: 'Telefone inválido' })
   telefone: string;
+
+  @IsEmail({}, { message: 'Email do administrador inválido' })
+  @IsNotEmpty({ message: 'Email do administrador é obrigatório' })
+  adminEmail: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Senha do administrador é obrigatória' })
+  @MinLength(6, { message: 'Senha deve ter no mínimo 6 caracteres' })
+  adminPassword: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Nome do administrador é obrigatório' })
+  @MinLength(3, { message: 'Nome do administrador deve ter no mínimo 3 caracteres' })
+  adminName: string;
 }

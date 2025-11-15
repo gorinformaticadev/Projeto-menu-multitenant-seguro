@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
-import { Plus, Building2, Mail, Phone, User, FileText } from "lucide-react";
+import { Plus, Building2, Mail, Phone, User, FileText, Eye, Edit, Power, Lock, UserPlus } from "lucide-react";
 
 interface Tenant {
   id: string;
@@ -17,6 +18,7 @@ interface Tenant {
   nomeFantasia: string;
   nomeResponsavel: string;
   telefone: string;
+  ativo: boolean;
   createdAt: string;
   _count?: {
     users: number;
@@ -27,6 +29,10 @@ export default function EmpresasPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showViewDialog, setShowViewDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
 
@@ -36,6 +42,14 @@ export default function EmpresasPage() {
     nomeFantasia: "",
     nomeResponsavel: "",
     telefone: "",
+    adminEmail: "",
+    adminPassword: "",
+    adminName: "",
+  });
+
+  const [passwordData, setPasswordData] = useState({
+    newPassword: "",
+    confirmPassword: "",
   });
 
   useEffect(() => {
@@ -60,9 +74,9 @@ export default function EmpresasPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    // Validação do lado do cliente
     if (!formData.email || !formData.cnpjCpf || !formData.nomeFantasia || 
-        !formData.nomeResponsavel || !formData.telefone) {
+        !formData.nomeResponsavel || !formData.telefone ||
+        !formData.adminEmail || !formData.adminPassword || !formData.adminName) {
       toast({
         title: "Erro",
         description: "Preencha todos os campos",
@@ -71,9 +85,8 @@ export default function EmpresasPage() {
       return;
     }
 
-    // Validação de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
+    if (!emailRegex.test(formData.email) || !emailRegex.test(formData.adminEmail)) {
       toast({
         title: "Erro",
         description: "Email inválido",
@@ -82,12 +95,10 @@ export default function EmpresasPage() {
       return;
     }
 
-    // Validação de telefone
-    const phoneRegex = /^[\d\s\(\)\-\+]+$/;
-    if (!phoneRegex.test(formData.telefone)) {
+    if (formData.adminPassword.length < 6) {
       toast({
         title: "Erro",
-        description: "Telefone inválido",
+        description: "A senha deve ter no mínimo 6 caracteres",
         variant: "destructive",
       });
       return;
@@ -100,7 +111,7 @@ export default function EmpresasPage() {
       
       toast({
         title: "Sucesso",
-        description: "Empresa cadastrada com sucesso!",
+        description: "Empresa e administrador cadastrados com sucesso!",
       });
 
       setFormData({
@@ -109,6 +120,9 @@ export default function EmpresasPage() {
         nomeFantasia: "",
         nomeResponsavel: "",
         telefone: "",
+        adminEmail: "",
+        adminPassword: "",
+        adminName: "",
       });
       setShowForm(false);
       loadTenants();
@@ -121,6 +135,132 @@ export default function EmpresasPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handleUpdate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedTenant) return;
+
+    setSubmitting(true);
+
+    try {
+      await api.put(`/tenants/${selectedTenant.id}`, {
+        email: formData.email,
+        cnpjCpf: formData.cnpjCpf,
+        nomeFantasia: formData.nomeFantasia,
+        nomeResponsavel: formData.nomeResponsavel,
+        telefone: formData.telefone,
+      });
+      
+      toast({
+        title: "Sucesso",
+        description: "Empresa atualizada com sucesso!",
+      });
+
+      setShowEditDialog(false);
+      setSelectedTenant(null);
+      loadTenants();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar empresa",
+        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedTenant) return;
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast({
+        title: "Erro",
+        description: "As senhas não coincidem",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      toast({
+        title: "Erro",
+        description: "A senha deve ter no mínimo 6 caracteres",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      await api.patch(`/tenants/${selectedTenant.id}/change-admin-password`, {
+        newPassword: passwordData.newPassword,
+      });
+      
+      toast({
+        title: "Sucesso",
+        description: "Senha do administrador alterada com sucesso!",
+      });
+
+      setShowPasswordDialog(false);
+      setPasswordData({ newPassword: "", confirmPassword: "" });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao alterar senha",
+        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleToggleStatus(tenant: Tenant) {
+    try {
+      await api.patch(`/tenants/${tenant.id}/toggle-status`);
+      
+      toast({
+        title: "Sucesso",
+        description: `Empresa ${tenant.ativo ? 'desativada' : 'ativada'} com sucesso!`,
+      });
+
+      loadTenants();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        variant: "destructive",
+      });
+    }
+  }
+
+  function openViewDialog(tenant: Tenant) {
+    setSelectedTenant(tenant);
+    setShowViewDialog(true);
+  }
+
+  function openEditDialog(tenant: Tenant) {
+    setSelectedTenant(tenant);
+    setFormData({
+      email: tenant.email,
+      cnpjCpf: tenant.cnpjCpf,
+      nomeFantasia: tenant.nomeFantasia,
+      nomeResponsavel: tenant.nomeResponsavel,
+      telefone: tenant.telefone,
+      adminEmail: "",
+      adminPassword: "",
+      adminName: "",
+    });
+    setShowEditDialog(true);
+  }
+
+  function openPasswordDialog(tenant: Tenant) {
+    setSelectedTenant(tenant);
+    setPasswordData({ newPassword: "", confirmPassword: "" });
+    setShowPasswordDialog(true);
   }
 
   return (
@@ -144,85 +284,151 @@ export default function EmpresasPage() {
             <CardHeader>
               <CardTitle>Cadastrar Nova Empresa</CardTitle>
               <CardDescription>
-                Preencha os dados da empresa para criar um novo tenant
+                Preencha os dados da empresa e do administrador
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="empresa@example.com"
-                        className="pl-10"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        disabled={submitting}
-                      />
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Dados da Empresa */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <Building2 className="h-5 w-5" />
+                    Dados da Empresa
+                  </h3>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email da Empresa</Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="empresa@example.com"
+                          className="pl-10"
+                          value={formData.email}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          disabled={submitting}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="cnpjCpf">CNPJ/CPF</Label>
+                      <div className="relative">
+                        <FileText className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="cnpjCpf"
+                          placeholder="00.000.000/0000-00"
+                          className="pl-10"
+                          value={formData.cnpjCpf}
+                          onChange={(e) => setFormData({ ...formData, cnpjCpf: e.target.value })}
+                          disabled={submitting}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="nomeFantasia">Nome Fantasia</Label>
+                      <div className="relative">
+                        <Building2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="nomeFantasia"
+                          placeholder="Empresa LTDA"
+                          className="pl-10"
+                          value={formData.nomeFantasia}
+                          onChange={(e) => setFormData({ ...formData, nomeFantasia: e.target.value })}
+                          disabled={submitting}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="nomeResponsavel">Nome do Responsável</Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="nomeResponsavel"
+                          placeholder="João Silva"
+                          className="pl-10"
+                          value={formData.nomeResponsavel}
+                          onChange={(e) => setFormData({ ...formData, nomeResponsavel: e.target.value })}
+                          disabled={submitting}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="telefone">Telefone</Label>
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="telefone"
+                          placeholder="(11) 98765-4321"
+                          className="pl-10"
+                          value={formData.telefone}
+                          onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                          disabled={submitting}
+                        />
+                      </div>
                     </div>
                   </div>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="cnpjCpf">CNPJ/CPF</Label>
-                    <div className="relative">
-                      <FileText className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="cnpjCpf"
-                        placeholder="00.000.000/0000-00"
-                        className="pl-10"
-                        value={formData.cnpjCpf}
-                        onChange={(e) => setFormData({ ...formData, cnpjCpf: e.target.value })}
-                        disabled={submitting}
-                      />
+                {/* Dados do Administrador */}
+                <div className="border-t pt-6">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <UserPlus className="h-5 w-5" />
+                    Dados do Administrador
+                  </h3>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="adminName">Nome do Administrador</Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="adminName"
+                          placeholder="Maria Santos"
+                          className="pl-10"
+                          value={formData.adminName}
+                          onChange={(e) => setFormData({ ...formData, adminName: e.target.value })}
+                          disabled={submitting}
+                        />
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="nomeFantasia">Nome Fantasia</Label>
-                    <div className="relative">
-                      <Building2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="nomeFantasia"
-                        placeholder="Empresa LTDA"
-                        className="pl-10"
-                        value={formData.nomeFantasia}
-                        onChange={(e) => setFormData({ ...formData, nomeFantasia: e.target.value })}
-                        disabled={submitting}
-                      />
+                    <div className="space-y-2">
+                      <Label htmlFor="adminEmail">Email do Administrador</Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="adminEmail"
+                          type="email"
+                          placeholder="admin@empresa.com"
+                          className="pl-10"
+                          value={formData.adminEmail}
+                          onChange={(e) => setFormData({ ...formData, adminEmail: e.target.value })}
+                          disabled={submitting}
+                        />
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="nomeResponsavel">Nome do Responsável</Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="nomeResponsavel"
-                        placeholder="João Silva"
-                        className="pl-10"
-                        value={formData.nomeResponsavel}
-                        onChange={(e) => setFormData({ ...formData, nomeResponsavel: e.target.value })}
-                        disabled={submitting}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="telefone">Telefone</Label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="telefone"
-                        placeholder="(11) 98765-4321"
-                        className="pl-10"
-                        value={formData.telefone}
-                        onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
-                        disabled={submitting}
-                      />
+                    <div className="space-y-2">
+                      <Label htmlFor="adminPassword">Senha do Administrador</Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="adminPassword"
+                          type="password"
+                          placeholder="Mínimo 6 caracteres"
+                          className="pl-10"
+                          value={formData.adminPassword}
+                          onChange={(e) => setFormData({ ...formData, adminPassword: e.target.value })}
+                          disabled={submitting}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Esta será a senha de acesso do administrador da empresa
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -255,7 +461,7 @@ export default function EmpresasPage() {
               <Card key={tenant.id} className="hover:shadow-lg transition-shadow duration-200">
                 <CardHeader className="pb-3">
                   <div className="flex items-start gap-3">
-                    <div className="bg-gradient-to-br from-primary to-primary/80 rounded-xl p-3 shadow-sm">
+                    <div className={`rounded-xl p-3 shadow-sm ${tenant.ativo ? 'bg-gradient-to-br from-primary to-primary/80' : 'bg-gray-400'}`}>
                       <Building2 className="h-6 w-6 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -265,26 +471,35 @@ export default function EmpresasPage() {
                       <CardDescription className="text-xs font-mono mt-1">
                         {tenant.cnpjCpf}
                       </CardDescription>
+                      <div className="mt-2">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          tenant.ativo 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {tenant.ativo ? 'Ativa' : 'Inativa'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="space-y-2.5">
                     <div className="flex items-start gap-2.5 group">
-                      <Mail className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0 group-hover:text-primary transition-colors" />
-                      <span className="text-sm text-muted-foreground truncate group-hover:text-foreground transition-colors">
+                      <Mail className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-muted-foreground truncate">
                         {tenant.email}
                       </span>
                     </div>
                     <div className="flex items-start gap-2.5 group">
-                      <User className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0 group-hover:text-primary transition-colors" />
-                      <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                      <User className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-muted-foreground">
                         {tenant.nomeResponsavel}
                       </span>
                     </div>
                     <div className="flex items-start gap-2.5 group">
-                      <Phone className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0 group-hover:text-primary transition-colors" />
-                      <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                      <Phone className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-muted-foreground">
                         {tenant.telefone}
                       </span>
                     </div>
@@ -302,6 +517,41 @@ export default function EmpresasPage() {
                       </div>
                     </div>
                   )}
+
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openViewDialog(tenant)}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      Ver
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditDialog(tenant)}
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Editar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openPasswordDialog(tenant)}
+                    >
+                      <Lock className="h-4 w-4 mr-1" />
+                      Senha
+                    </Button>
+                    <Button
+                      variant={tenant.ativo ? "destructive" : "default"}
+                      size="sm"
+                      onClick={() => handleToggleStatus(tenant)}
+                    >
+                      <Power className="h-4 w-4 mr-1" />
+                      {tenant.ativo ? 'Desativar' : 'Ativar'}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -320,6 +570,189 @@ export default function EmpresasPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Dialog de Visualização */}
+        <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Detalhes da Empresa</DialogTitle>
+              <DialogDescription>
+                Informações completas da empresa
+              </DialogDescription>
+            </DialogHeader>
+            {selectedTenant && (
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-muted-foreground">Nome Fantasia</Label>
+                  <p className="font-medium">{selectedTenant.nomeFantasia}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">CNPJ/CPF</Label>
+                  <p className="font-medium">{selectedTenant.cnpjCpf}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Email</Label>
+                  <p className="font-medium">{selectedTenant.email}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Responsável</Label>
+                  <p className="font-medium">{selectedTenant.nomeResponsavel}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Telefone</Label>
+                  <p className="font-medium">{selectedTenant.telefone}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Status</Label>
+                  <p className="font-medium">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      selectedTenant.ativo 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {selectedTenant.ativo ? 'Ativa' : 'Inativa'}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowViewDialog(false)}>
+                Fechar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Edição */}
+        <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Empresa</DialogTitle>
+              <DialogDescription>
+                Atualize as informações da empresa
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleUpdate} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">Email</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  disabled={submitting}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-cnpjCpf">CNPJ/CPF</Label>
+                <Input
+                  id="edit-cnpjCpf"
+                  value={formData.cnpjCpf}
+                  onChange={(e) => setFormData({ ...formData, cnpjCpf: e.target.value })}
+                  disabled={submitting}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-nomeFantasia">Nome Fantasia</Label>
+                <Input
+                  id="edit-nomeFantasia"
+                  value={formData.nomeFantasia}
+                  onChange={(e) => setFormData({ ...formData, nomeFantasia: e.target.value })}
+                  disabled={submitting}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-nomeResponsavel">Nome do Responsável</Label>
+                <Input
+                  id="edit-nomeResponsavel"
+                  value={formData.nomeResponsavel}
+                  onChange={(e) => setFormData({ ...formData, nomeResponsavel: e.target.value })}
+                  disabled={submitting}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-telefone">Telefone</Label>
+                <Input
+                  id="edit-telefone"
+                  value={formData.telefone}
+                  onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                  disabled={submitting}
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowEditDialog(false)}
+                  disabled={submitting}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={submitting}>
+                  {submitting ? "Salvando..." : "Salvar"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Alteração de Senha */}
+        <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Alterar Senha do Administrador</DialogTitle>
+              <DialogDescription>
+                Digite a nova senha para o administrador da empresa
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">Nova Senha</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    placeholder="Mínimo 6 caracteres"
+                    className="pl-10"
+                    value={passwordData.newPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                    disabled={submitting}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirmar Senha</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="Digite a senha novamente"
+                    className="pl-10"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                    disabled={submitting}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowPasswordDialog(false)}
+                  disabled={submitting}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={submitting}>
+                  {submitting ? "Alterando..." : "Alterar Senha"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </ProtectedRoute>
   );
