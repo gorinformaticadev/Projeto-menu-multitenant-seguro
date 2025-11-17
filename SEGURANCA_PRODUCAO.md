@@ -478,3 +478,4 @@ async create(@Body() dto: CreateTenantDto, @Req() req: Request) {
 - Equipe de Segurança: security@example.com
 - Equipe de DevOps: devops@example.com
 - Gerente de Projeto: manager@example.com
+

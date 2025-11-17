@@ -342,3 +342,4 @@ Priorize as funcionalidades baseado em:
 2. Segurança
 3. Experiência do usuário
 4. Escalabilidade
+

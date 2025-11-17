@@ -310,3 +310,4 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 **Documentação mantida e atualizada pela equipe de desenvolvimento.**
 
 **Última revisão:** 15/11/2024
+

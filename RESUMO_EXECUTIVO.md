@@ -139,7 +139,7 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
-**Acesse:** `http://localhost:3000`
+**Acesse:** `http://localhost:5000`
 
 ## 📈 Métricas do Projeto
 
@@ -337,3 +337,4 @@ Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalh
 ---
 
 **Desenvolvido com foco em segurança, escalabilidade e boas práticas.**
+

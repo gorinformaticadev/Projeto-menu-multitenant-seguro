@@ -124,3 +124,4 @@ src/
 ├── prisma/              # Prisma Service
 └── main.ts             # Bootstrap da aplicação
 ```
+

@@ -422,3 +422,4 @@ Para entender melhor a estrutura:
 - Instalação: `INSTALACAO.md`
 - Segurança: `ARQUITETURA_SEGURANCA.md`
 - API: `API_EXAMPLES.md`
+

@@ -312,7 +312,7 @@ export class CreateTenantDto {
 
 ```typescript
 app.enableCors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: process.env.FRONTEND_URL || 'http://localhost:5000',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
 });
@@ -460,7 +460,7 @@ GET /resources/123
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 // 2. CORS valida origem
-✅ Origin: http://localhost:3000 (permitido)
+✅ Origin: http://localhost:5000 (permitido)
 
 // 3. ValidationPipe valida params
 ✅ ID é um UUID válido
@@ -522,3 +522,4 @@ return resource;
 - [ ] Backup de banco de dados
 - [ ] Monitoramento de segurança
 - [ ] Testes de penetração
+

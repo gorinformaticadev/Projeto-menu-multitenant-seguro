@@ -33,7 +33,7 @@ cd frontend
 npm install
 npm run dev
 
-# 3. Acesse http://localhost:3000
+# 3. Acesse http://localhost:5000
 # Login: admin@system.com / admin123
 ```
 
@@ -380,3 +380,4 @@ Este projeto está sob a licença MIT. Use, modifique e distribua livremente!
 **Desenvolvido com ❤️ e foco em segurança, escalabilidade e boas práticas.**
 
 **Bom desenvolvimento! 🚀**
+

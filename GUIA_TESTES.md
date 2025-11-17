@@ -18,7 +18,7 @@ Este documento contém cenários de teste para validar todas as funcionalidades 
 **Objetivo:** Verificar se o login funciona corretamente
 
 **Passos:**
-1. Acesse `http://localhost:3000/login`
+1. Acesse `http://localhost:5000/login`
 2. Digite:
    - Email: `admin@system.com`
    - Senha: `admin123`
@@ -34,7 +34,7 @@ Este documento contém cenários de teste para validar todas as funcionalidades 
 **Objetivo:** Verificar tratamento de erro em login inválido
 
 **Passos:**
-1. Acesse `http://localhost:3000/login`
+1. Acesse `http://localhost:5000/login`
 2. Digite:
    - Email: `admin@system.com`
    - Senha: `senha_errada`
@@ -50,7 +50,7 @@ Este documento contém cenários de teste para validar todas as funcionalidades 
 **Objetivo:** Verificar validação de formato de email
 
 **Passos:**
-1. Acesse `http://localhost:3000/login`
+1. Acesse `http://localhost:5000/login`
 2. Digite:
    - Email: `email_invalido`
    - Senha: `admin123`
@@ -78,7 +78,7 @@ Este documento contém cenários de teste para validar todas as funcionalidades 
 **Objetivo:** Verificar proteção de rotas
 
 **Passos:**
-1. Sem fazer login, tente acessar `http://localhost:3000/dashboard`
+1. Sem fazer login, tente acessar `http://localhost:5000/dashboard`
 
 **Resultado Esperado:**
 - ✅ Redirecionamento automático para `/login`
@@ -105,7 +105,7 @@ Este documento contém cenários de teste para validar todas as funcionalidades 
 **Passos:**
 1. Faça login como `user@empresa1.com` / `user123`
 2. Observe que o menu "Empresas" não aparece
-3. Tente acessar `http://localhost:3000/empresas` diretamente
+3. Tente acessar `http://localhost:5000/empresas` diretamente
 
 **Resultado Esperado:**
 - ✅ Menu "Empresas" não visível
@@ -121,7 +121,7 @@ Este documento contém cenários de teste para validar todas as funcionalidades 
 2. Copie o token JWT
 3. Tente fazer requisição para `/tenants`:
    ```bash
-   curl -X GET http://localhost:3001/tenants \
+   curl -X GET http://localhost:4000/tenants \
      -H "Authorization: Bearer SEU_TOKEN"
    ```
 
@@ -176,7 +176,7 @@ Este documento contém cenários de teste para validar todas as funcionalidades 
 
 **Passos:**
 1. Faça login como `user@empresa1.com` / `user123`
-2. Tente acessar `http://localhost:3000/configuracoes`
+2. Tente acessar `http://localhost:5000/configuracoes`
 
 **Resultado Esperado:**
 - ✅ Redirecionamento para `/dashboard`
@@ -306,7 +306,7 @@ Este documento contém cenários de teste para validar todas as funcionalidades 
 **Passos:**
 1. Tente fazer requisição de uma origem diferente:
    ```javascript
-   fetch('http://localhost:3001/tenants', {
+   fetch('http://localhost:4000/tenants', {
      headers: {
        'Authorization': 'Bearer token'
      }
@@ -508,12 +508,12 @@ describe('LoginPage', () => {
 ```typescript
 // login.spec.ts
 test('should login successfully', async ({ page }) => {
-  await page.goto('http://localhost:3000/login');
+  await page.goto('http://localhost:5000/login');
   await page.fill('input[type="email"]', 'admin@system.com');
   await page.fill('input[type="password"]', 'admin123');
   await page.click('button[type="submit"]');
   
-  await expect(page).toHaveURL('http://localhost:3000/dashboard');
+  await expect(page).toHaveURL('http://localhost:5000/dashboard');
   await expect(page.locator('text=Super Admin')).toBeVisible();
 });
 ```
@@ -549,3 +549,4 @@ Após executar todos os testes, preencha:
 - [Playwright](https://playwright.dev/)
 - [Cypress](https://www.cypress.io/)
 - [OWASP Testing Guide](https://owasp.org/www-project-web-security-testing-guide/)
+

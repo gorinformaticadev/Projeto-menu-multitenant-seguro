@@ -25,7 +25,7 @@ Edite o arquivo `.env` com suas configurações do PostgreSQL:
 DATABASE_URL="postgresql://usuario:senha@localhost:5432/nome_do_banco?schema=public"
 JWT_SECRET="sua-chave-secreta-super-segura-aqui"
 JWT_EXPIRES_IN="7d"
-FRONTEND_URL="http://localhost:3000"
+FRONTEND_URL="http://localhost:5000"
 PORT=3001
 ```
 
@@ -43,7 +43,7 @@ npx ts-node prisma/seed.ts
 npm run start:dev
 ```
 
-✅ Backend rodando em `http://localhost:3001`
+✅ Backend rodando em `http://localhost:4000`
 
 ## Passo 2: Configurar Frontend
 
@@ -63,7 +63,7 @@ cp .env.local.example .env.local
 O arquivo `.env.local` já está configurado corretamente:
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_API_URL=http://localhost:4000
 ```
 
 ```bash
@@ -71,11 +71,11 @@ NEXT_PUBLIC_API_URL=http://localhost:3001
 npm run dev
 ```
 
-✅ Frontend rodando em `http://localhost:3000`
+✅ Frontend rodando em `http://localhost:5000`
 
 ## Passo 3: Acessar o Sistema
 
-Abra seu navegador em `http://localhost:3000`
+Abra seu navegador em `http://localhost:5000`
 
 ### Credenciais de Teste
 
@@ -97,7 +97,7 @@ Abra seu navegador em `http://localhost:3000`
 ## 🎯 Testando o Sistema
 
 ### 1. Testar Login
-- Acesse `http://localhost:3000/login`
+- Acesse `http://localhost:5000/login`
 - Faça login com qualquer uma das credenciais acima
 - Você será redirecionado para o dashboard
 
@@ -115,10 +115,10 @@ Abra seu navegador em `http://localhost:3000`
 - A empresa aparecerá na lista
 
 ### 4. Testar Segurança
-- Tente acessar `http://localhost:3000/empresas` sem estar logado
+- Tente acessar `http://localhost:5000/empresas` sem estar logado
   - Você será redirecionado para o login
 - Faça login como `user@empresa1.com` (USER)
-- Tente acessar `http://localhost:3000/empresas`
+- Tente acessar `http://localhost:5000/empresas`
   - Você será redirecionado para o dashboard (sem permissão)
 
 ## 🔧 Comandos Úteis
@@ -213,3 +213,4 @@ Após a instalação, você pode:
 - Verifique o `README.md` principal para documentação completa
 - Verifique o `backend/README.md` para detalhes do backend
 - Verifique o `frontend/README.md` para detalhes do frontend
+

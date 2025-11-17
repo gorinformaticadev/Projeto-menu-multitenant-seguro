@@ -37,7 +37,7 @@ npx ts-node prisma/seed.ts
 npm run start:dev
 ```
 
-✅ **Backend rodando em:** `http://localhost:3001`
+✅ **Backend rodando em:** `http://localhost:4000`
 
 ### 2️⃣ Configurar Frontend (2 minutos)
 
@@ -57,11 +57,11 @@ npm install
 npm run dev
 ```
 
-✅ **Frontend rodando em:** `http://localhost:3000`
+✅ **Frontend rodando em:** `http://localhost:5000`
 
 ### 3️⃣ Acessar o Sistema (1 minuto)
 
-1. Abra seu navegador em: `http://localhost:3000`
+1. Abra seu navegador em: `http://localhost:5000`
 2. Você será redirecionado para a página de login
 3. Use uma das credenciais abaixo:
 
@@ -114,7 +114,7 @@ Senha: user123
 1. Faça **logout** (botão no final do menu lateral)
 2. Faça login com `user@empresa1.com` / `user123`
 3. Observe que o menu **"Empresas"** não aparece
-4. Tente acessar `http://localhost:3000/empresas` diretamente
+4. Tente acessar `http://localhost:5000/empresas` diretamente
 5. Você será redirecionado para o Dashboard (sem permissão)
 
 ## 🎉 Pronto!
@@ -300,3 +300,4 @@ Parabéns! Você tem um sistema completo rodando com:
 - ✅ Interface responsiva
 
 **Agora é hora de explorar e adicionar suas próprias funcionalidades!** 🚀
+

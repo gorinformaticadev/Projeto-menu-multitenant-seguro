@@ -47,7 +47,7 @@ npm install
 cp .env.local.example .env.local
 
 # Configurar a URL da API no .env.local
-NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_API_URL=http://localhost:4000
 ```
 
 ## 🏃 Executar
@@ -151,3 +151,4 @@ src/
 5. **Token expiration**: Implementar refresh token se necessário
 6. **XSS Protection**: React já protege contra XSS por padrão
 7. **CSRF Protection**: SameSite cookies no backend
+

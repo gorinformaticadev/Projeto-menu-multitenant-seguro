@@ -116,7 +116,7 @@ npx ts-node prisma/seed.ts
 npm run start:dev
 ```
 
-O backend estará rodando em `http://localhost:3001`
+O backend estará rodando em `http://localhost:4000`
 
 ### 2. Frontend
 
@@ -134,7 +134,7 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
-O frontend estará rodando em `http://localhost:3000`
+O frontend estará rodando em `http://localhost:5000`
 
 ## 🔑 Credenciais de Teste
 
@@ -265,3 +265,4 @@ Este projeto é um exemplo educacional e pode ser usado livremente.
 ## 👨‍💻 Autor
 
 Sistema desenvolvido como demonstração de boas práticas de segurança em aplicações web.
+

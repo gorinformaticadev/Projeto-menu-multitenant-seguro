@@ -7,7 +7,7 @@ Este documento contém exemplos de requisições HTTP para testar a API do backe
 ### Login
 
 ```http
-POST http://localhost:3001/auth/login
+POST http://localhost:4000/auth/login
 Content-Type: application/json
 
 {
@@ -47,7 +47,7 @@ Content-Type: application/json
 **Requer**: SUPER_ADMIN
 
 ```http
-GET http://localhost:3001/tenants
+GET http://localhost:4000/tenants
 Authorization: Bearer SEU_TOKEN_JWT_AQUI
 ```
 
@@ -93,7 +93,7 @@ Authorization: Bearer SEU_TOKEN_JWT_AQUI
 **Requer**: SUPER_ADMIN
 
 ```http
-POST http://localhost:3001/tenants
+POST http://localhost:4000/tenants
 Authorization: Bearer SEU_TOKEN_JWT_AQUI
 Content-Type: application/json
 
@@ -146,7 +146,7 @@ Content-Type: application/json
 ### Login
 
 ```bash
-curl -X POST http://localhost:3001/auth/login \
+curl -X POST http://localhost:4000/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "admin@system.com",
@@ -158,7 +158,7 @@ curl -X POST http://localhost:3001/auth/login \
 
 ```bash
 # Substitua SEU_TOKEN pelo token recebido no login
-curl -X GET http://localhost:3001/tenants \
+curl -X GET http://localhost:4000/tenants \
   -H "Authorization: Bearer SEU_TOKEN"
 ```
 
@@ -166,7 +166,7 @@ curl -X GET http://localhost:3001/tenants \
 
 ```bash
 # Substitua SEU_TOKEN pelo token recebido no login
-curl -X POST http://localhost:3001/tenants \
+curl -X POST http://localhost:4000/tenants \
   -H "Authorization: Bearer SEU_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -184,7 +184,7 @@ curl -X POST http://localhost:3001/tenants \
 
 1. Abra o Postman
 2. Crie uma nova Collection chamada "Sistema Multitenant"
-3. Adicione uma variável `baseUrl` com valor `http://localhost:3001`
+3. Adicione uma variável `baseUrl` com valor `http://localhost:4000`
 4. Adicione uma variável `token` (será preenchida após o login)
 
 ### 2. Requisição de Login
@@ -236,7 +236,7 @@ if (pm.response.code === 200) {
 ### 1. Testar sem Token
 
 ```bash
-curl -X GET http://localhost:3001/tenants
+curl -X GET http://localhost:4000/tenants
 ```
 
 **Esperado**: Erro 401 (Unauthorized)
@@ -244,7 +244,7 @@ curl -X GET http://localhost:3001/tenants
 ### 2. Testar com Token Inválido
 
 ```bash
-curl -X GET http://localhost:3001/tenants \
+curl -X GET http://localhost:4000/tenants \
   -H "Authorization: Bearer token_invalido"
 ```
 
@@ -254,7 +254,7 @@ curl -X GET http://localhost:3001/tenants \
 
 ```bash
 # 1. Fazer login como USER
-curl -X POST http://localhost:3001/auth/login \
+curl -X POST http://localhost:4000/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@empresa1.com",
@@ -262,7 +262,7 @@ curl -X POST http://localhost:3001/auth/login \
   }'
 
 # 2. Tentar acessar /tenants com o token do USER
-curl -X GET http://localhost:3001/tenants \
+curl -X GET http://localhost:4000/tenants \
   -H "Authorization: Bearer TOKEN_DO_USER"
 ```
 
@@ -271,7 +271,7 @@ curl -X GET http://localhost:3001/tenants \
 ### 4. Testar Validação de Dados
 
 ```bash
-curl -X POST http://localhost:3001/tenants \
+curl -X POST http://localhost:4000/tenants \
   -H "Authorization: Bearer SEU_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -317,3 +317,4 @@ Ao fazer login, o JWT retornado contém o seguinte payload:
 - `exp`: Timestamp de expiração
 
 Você pode decodificar o JWT em [jwt.io](https://jwt.io) para visualizar o payload.
+
