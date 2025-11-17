@@ -562,13 +562,13 @@ export default function EmpresasPage() {
               <Card key={tenant.id} className="hover:shadow-lg transition-shadow duration-200">
                 <CardHeader className="pb-3">
                   <div className="flex items-start gap-3">
-                    <div className={`rounded-xl p-3 shadow-sm ${tenant.ativo ? 'bg-gradient-to-br from-primary to-primary/80' : 'bg-gray-400'} relative overflow-hidden flex items-center justify-center w-12 h-12`}>
+                    <div className={`rounded-full shadow-sm ${tenant.ativo ? 'bg-gradient-to-br from-primary to-primary/80' : 'bg-gray-400'} relative overflow-hidden flex items-center justify-center w-12 h-12 p-0`}>
                       {tenant.logoUrl ? (
                         <>
                           <img 
                             src={`${API_URL}/uploads/logos/${tenant.logoUrl}`} 
                             alt={tenant.nomeFantasia}
-                            className="max-h-8 max-w-8 object-contain logo-image"
+                            className="w-full h-full object-cover rounded-full logo-image"
                             onLoad={() => {
                               console.log(`Logo carregado: ${tenant.nomeFantasia} - ${tenant.logoUrl}`);
                             }}
