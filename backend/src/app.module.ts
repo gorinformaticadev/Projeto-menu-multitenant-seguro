@@ -5,6 +5,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     PrismaModule,
     AuthModule,
     TenantsModule,
+    UsersModule,
   ],
   providers: [
     {

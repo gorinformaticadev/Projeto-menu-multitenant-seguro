@@ -9,7 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import api, { API_URL } from "@/lib/api";
-import { Plus, Building2, Mail, Phone, User, FileText, Eye, Edit, Power, Lock, UserPlus, Image as ImageIcon, Upload, X } from "lucide-react";
+import { Plus, Building2, Mail, Phone, User, FileText, Eye, Edit, Power, Lock, UserPlus, Image as ImageIcon, Upload, X, Users } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface Tenant {
   id: string;
@@ -27,6 +28,7 @@ interface Tenant {
 }
 
 export default function EmpresasPage() {
+  const router = useRouter();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -679,6 +681,15 @@ export default function EmpresasPage() {
                     >
                       <Lock className="h-4 w-4 mr-1" />
                       Senha
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/usuarios?tenantId=${tenant.id}`)}
+                      className="col-span-2"
+                    >
+                      <Users className="h-4 w-4 mr-1" />
+                      Gerenciar Usuários ({tenant._count?.users || 0})
                     </Button>
                     <Button
                       variant={tenant.ativo ? "destructive" : "default"}

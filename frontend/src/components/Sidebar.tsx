@@ -5,14 +5,43 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Building2, Settings, LogOut, Shield, ChevronRight, ChevronLeft } from "lucide-react";
+import { LayoutDashboard, Building2, Settings, LogOut, Shield, ChevronRight, ChevronLeft, User } from "lucide-react";
 import { Button } from "./ui/button";
+import api, { API_URL } from "@/lib/api";
 
 export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [masterLogo, setMasterLogo] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
+
+  // Busca o logo da empresa master (primeira empresa ou empresa padrão)
+  useEffect(() => {
+    async function fetchMasterLogo() {
+      try {
+        if (user?.role === "SUPER_ADMIN") {
+          // SUPER_ADMIN: busca a empresa padrão
+          const response = await api.get("/tenants");
+          const tenants = response.data;
+          
+          // Procura pela empresa padrão ou pega a primeira
+          const masterTenant = tenants.find((t: any) => t.email === "empresa1@example.com") || tenants[0];
+          
+          if (masterTenant?.logoUrl) {
+            setMasterLogo(masterTenant.logoUrl);
+          }
+        }
+        // Para outros usuários, não exibe logo por enquanto (pode ser implementado depois)
+      } catch (error) {
+        console.error("Erro ao buscar logo:", error);
+      }
+    }
+
+    if (user) {
+      fetchMasterLogo();
+    }
+  }, [user]);
 
   // Recolhe o menu ao clicar fora dele
   useEffect(() => {
@@ -46,6 +75,12 @@ export function Sidebar() {
       show: user?.role === "SUPER_ADMIN",
     },
     {
+      name: "Usuários",
+      href: "/usuarios",
+      icon: User,
+      show: user?.role === "SUPER_ADMIN" || user?.role === "ADMIN",
+    },
+    {
       name: "Configurações",
       href: "/configuracoes",
       icon: Settings,
@@ -64,18 +99,46 @@ export function Sidebar() {
       {/* Header */}
       <div className="p-4 border-b flex items-center justify-between">
         {isExpanded ? (
-          <div className="flex items-center gap-2">
-            <div className="bg-primary rounded-lg p-2">
-              <Shield className="h-6 w-6 text-white" />
+          <div className="flex items-center gap-3">
+            <div className="bg-primary rounded-full w-10 h-10 flex items-center justify-center overflow-hidden flex-shrink-0">
+              {masterLogo ? (
+                <img 
+                  src={`${API_URL}/uploads/logos/${masterLogo}`} 
+                  alt="Logo"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.parentElement?.querySelector('.fallback-icon');
+                    if (fallback) {
+                      fallback.classList.remove('hidden');
+                    }
+                  }}
+                />
+              ) : null}
+              <Shield className={`h-6 w-6 text-white fallback-icon ${masterLogo ? 'hidden' : ''}`} />
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
               <h2 className="font-bold text-lg">Sistema</h2>
               <p className="text-xs text-muted-foreground">Multitenant</p>
             </div>
           </div>
         ) : (
-          <div className="bg-primary rounded-lg p-2 mx-auto">
-            <Shield className="h-6 w-6 text-white" />
+          <div className="bg-primary rounded-full w-10 h-10 flex items-center justify-center overflow-hidden mx-auto">
+            {masterLogo ? (
+              <img 
+                src={`${API_URL}/uploads/logos/${masterLogo}`} 
+                alt="Logo"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  const fallback = e.currentTarget.parentElement?.querySelector('.fallback-icon');
+                  if (fallback) {
+                    fallback.classList.remove('hidden');
+                  }
+                }}
+              />
+            ) : null}
+            <Shield className={`h-6 w-6 text-white fallback-icon ${masterLogo ? 'hidden' : ''}`} />
           </div>
         )}
         

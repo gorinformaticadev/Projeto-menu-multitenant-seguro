@@ -15,6 +15,7 @@
     "@nestjs/config": "^3.1.1",
     "@nestjs/core": "^10.3.0",
     "@nestjs/jwt": "^10.2.0",
+    "@nestjs/mapped-types": "*",
     "@nestjs/passport": "^10.0.3",
     "@nestjs/platform-express": "^10.4.20",
     "@prisma/client": "^5.7.1",
