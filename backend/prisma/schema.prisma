@@ -21,6 +21,7 @@ model Tenant {
   nomeFantasia    String
   nomeResponsavel String
   telefone        String
+  logoUrl         String?
   ativo           Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

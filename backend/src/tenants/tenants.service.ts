@@ -4,6 +4,8 @@ import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import * as bcrypt from 'bcrypt';
 import { Role } from '@prisma/client';
+import { unlink } from 'fs/promises';
+import { join } from 'path';
 
 @Injectable()
 export class TenantsService {
@@ -164,5 +166,47 @@ export class TenantsService {
     });
 
     return { message: 'Senha alterada com sucesso' };
+  }
+
+  async updateLogo(id: string, filename: string) {
+    const tenant = await this.findOne(id);
+
+    // Remove o logo antigo se existir
+    if (tenant.logoUrl) {
+      try {
+        const oldLogoPath = join(process.cwd(), 'uploads', 'logos', tenant.logoUrl);
+        await unlink(oldLogoPath);
+      } catch (error) {
+        // Ignora erro se o arquivo não existir
+      }
+    }
+
+    // Atualiza com o novo logo
+    return this.prisma.tenant.update({
+      where: { id },
+      data: { logoUrl: filename },
+    });
+  }
+
+  async removeLogo(id: string) {
+    const tenant = await this.findOne(id);
+
+    if (!tenant.logoUrl) {
+      throw new BadRequestException('Esta empresa não possui logo');
+    }
+
+    // Remove o arquivo físico
+    try {
+      const logoPath = join(process.cwd(), 'uploads', 'logos', tenant.logoUrl);
+      await unlink(logoPath);
+    } catch (error) {
+      // Ignora erro se o arquivo não existir
+    }
+
+    // Remove a referência do banco
+    return this.prisma.tenant.update({
+      where: { id },
+      data: { logoUrl: null },
+    });
   }
 }

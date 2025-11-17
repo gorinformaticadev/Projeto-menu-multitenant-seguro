@@ -162,7 +162,13 @@ Após executar o seed, você terá os seguintes usuários:
 
 ### Tenants (Empresas)
 - `GET /tenants` - Listar empresas (SUPER_ADMIN)
+- `GET /tenants/:id` - Buscar empresa (SUPER_ADMIN)
 - `POST /tenants` - Criar empresa (SUPER_ADMIN)
+- `PUT /tenants/:id` - Atualizar empresa (SUPER_ADMIN)
+- `PATCH /tenants/:id/toggle-status` - Ativar/Desativar empresa (SUPER_ADMIN)
+- `PATCH /tenants/:id/change-admin-password` - Alterar senha do admin (SUPER_ADMIN)
+- `POST /tenants/:id/upload-logo` - Upload de logo (SUPER_ADMIN)
+- `PATCH /tenants/:id/remove-logo` - Remover logo (SUPER_ADMIN)
 
 ## 🗺️ Rotas do Frontend
 
@@ -215,6 +221,7 @@ Request → CORS → ValidationPipe → JwtAuthGuard → RolesGuard → TenantIn
 - [x] Validação rigorosa com class-validator
 - [x] CORS configurado
 - [x] Endpoints de Tenants protegidos
+- [x] Upload de arquivos (logos de empresas)
 - [x] Seed com dados iniciais
 
 ### ✅ Frontend
@@ -223,9 +230,32 @@ Request → CORS → ValidationPipe → JwtAuthGuard → RolesGuard → TenantIn
 - [x] Sidebar com visibilidade condicional
 - [x] Página de empresas (SUPER_ADMIN)
 - [x] Formulário de cadastro de empresas
+- [x] Upload e gerenciamento de logos
 - [x] Proteção de rotas por role
 - [x] Armazenamento seguro de token
 - [x] Tratamento de erros
+
+## 📤 Upload de Arquivos
+
+O sistema suporta upload de logos para empresas com as seguintes características:
+
+### Configuração
+- **Pasta de destino**: `backend/uploads/logos/`
+- **Formatos aceitos**: JPG, JPEG, PNG, GIF, WEBP
+- **Tamanho máximo**: 5MB por arquivo
+- **Nomenclatura**: UUID único para evitar conflitos
+
+### Endpoints
+- `POST /tenants/:id/upload-logo` - Faz upload de um novo logo
+- `PATCH /tenants/:id/remove-logo` - Remove o logo atual
+- `GET /uploads/logos/:filename` - Acessa o arquivo (servido estaticamente)
+
+### Funcionalidades
+- ✅ Validação de tipo de arquivo
+- ✅ Validação de tamanho
+- ✅ Pré-visualização antes do upload
+- ✅ Remoção automática do logo antigo ao fazer novo upload
+- ✅ Exibição do logo nos cards de empresas
 
 ## 🔧 Tecnologias Utilizadas
 

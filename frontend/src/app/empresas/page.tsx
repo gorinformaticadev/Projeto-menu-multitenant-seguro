@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import api from "@/lib/api";
-import { Plus, Building2, Mail, Phone, User, FileText, Eye, Edit, Power, Lock, UserPlus } from "lucide-react";
+import api, { API_URL } from "@/lib/api";
+import { Plus, Building2, Mail, Phone, User, FileText, Eye, Edit, Power, Lock, UserPlus, Image as ImageIcon, Upload, X } from "lucide-react";
 
 interface Tenant {
   id: string;
@@ -18,6 +18,7 @@ interface Tenant {
   nomeFantasia: string;
   nomeResponsavel: string;
   telefone: string;
+  logoUrl?: string | null;
   ativo: boolean;
   createdAt: string;
   _count?: {
@@ -32,8 +33,11 @@ export default function EmpresasPage() {
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [showLogoDialog, setShowLogoDialog] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -59,6 +63,8 @@ export default function EmpresasPage() {
   async function loadTenants() {
     try {
       const response = await api.get("/tenants");
+      console.log('Tenants carregados:', response.data);
+      console.log('API_URL:', API_URL);
       setTenants(response.data);
     } catch (error: any) {
       toast({
@@ -263,6 +269,101 @@ export default function EmpresasPage() {
     setShowPasswordDialog(true);
   }
 
+  function openLogoDialog(tenant: Tenant) {
+    setSelectedTenant(tenant);
+    setLogoFile(null);
+    setLogoPreview(null);
+    setShowLogoDialog(true);
+  }
+
+  function handleLogoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Erro",
+          description: "Apenas arquivos de imagem são permitidos",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "Erro",
+          description: "O arquivo deve ter no máximo 5MB",
+          variant: "destructive",
+        });
+        return;
+      }
+      setLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  async function handleUploadLogo() {
+    if (!selectedTenant || !logoFile) return;
+
+    setSubmitting(true);
+    const formData = new FormData();
+    formData.append('logo', logoFile);
+
+    try {
+      await api.post(`/tenants/${selectedTenant.id}/upload-logo`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      toast({
+        title: "Sucesso",
+        description: "Logo atualizado com sucesso!",
+      });
+
+      setShowLogoDialog(false);
+      setLogoFile(null);
+      setLogoPreview(null);
+      loadTenants();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao fazer upload do logo",
+        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleRemoveLogo() {
+    if (!selectedTenant) return;
+
+    setSubmitting(true);
+
+    try {
+      await api.patch(`/tenants/${selectedTenant.id}/remove-logo`);
+      
+      toast({
+        title: "Sucesso",
+        description: "Logo removido com sucesso!",
+      });
+
+      setShowLogoDialog(false);
+      loadTenants();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao remover logo",
+        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
       <div className="p-8">
@@ -461,8 +562,31 @@ export default function EmpresasPage() {
               <Card key={tenant.id} className="hover:shadow-lg transition-shadow duration-200">
                 <CardHeader className="pb-3">
                   <div className="flex items-start gap-3">
-                    <div className={`rounded-xl p-3 shadow-sm ${tenant.ativo ? 'bg-gradient-to-br from-primary to-primary/80' : 'bg-gray-400'}`}>
-                      <Building2 className="h-6 w-6 text-white" />
+                    <div className={`rounded-xl p-3 shadow-sm ${tenant.ativo ? 'bg-gradient-to-br from-primary to-primary/80' : 'bg-gray-400'} relative overflow-hidden flex items-center justify-center w-12 h-12`}>
+                      {tenant.logoUrl ? (
+                        <>
+                          <img 
+                            src={`${API_URL}/uploads/logos/${tenant.logoUrl}`} 
+                            alt={tenant.nomeFantasia}
+                            className="max-h-8 max-w-8 object-contain logo-image"
+                            onLoad={() => {
+                              console.log(`Logo carregado: ${tenant.nomeFantasia} - ${tenant.logoUrl}`);
+                            }}
+                            onError={(e) => {
+                              console.error(`Erro ao carregar logo: ${tenant.nomeFantasia} - ${API_URL}/uploads/logos/${tenant.logoUrl}`);
+                              const target = e.currentTarget;
+                              target.style.display = 'none';
+                              const fallback = target.parentElement?.querySelector('.fallback-icon');
+                              if (fallback) {
+                                fallback.classList.remove('hidden');
+                              }
+                            }}
+                          />
+                          <Building2 className="h-6 w-6 text-white fallback-icon hidden absolute" />
+                        </>
+                      ) : (
+                        <Building2 className="h-6 w-6 text-white" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <CardTitle className="text-lg font-bold truncate">
@@ -543,6 +667,14 @@ export default function EmpresasPage() {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => openLogoDialog(tenant)}
+                    >
+                      <ImageIcon className="h-4 w-4 mr-1" />
+                      Logo
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => openPasswordDialog(tenant)}
                     >
                       <Lock className="h-4 w-4 mr-1" />
@@ -554,6 +686,7 @@ export default function EmpresasPage() {
                       onClick={() => handleToggleStatus(tenant)}
                       disabled={tenant.email === 'empresa1@example.com' && tenant.ativo}
                       title={tenant.email === 'empresa1@example.com' && tenant.ativo ? 'A empresa padrão não pode ser desativada' : ''}
+                      className="col-span-2"
                     >
                       <Power className="h-4 w-4 mr-1" />
                       {tenant.ativo ? 'Desativar' : 'Ativar'}
@@ -758,6 +891,91 @@ export default function EmpresasPage() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Gerenciamento de Logo */}
+        <Dialog open={showLogoDialog} onOpenChange={setShowLogoDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Gerenciar Logo da Empresa</DialogTitle>
+              <DialogDescription>
+                Faça upload ou remova o logo da empresa
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              {selectedTenant?.logoUrl && !logoPreview && (
+                <div className="space-y-2">
+                  <Label>Logo Atual</Label>
+                  <div className="flex items-center justify-center p-4 border rounded-lg bg-muted">
+                    <img 
+                      src={`${API_URL}/uploads/logos/${selectedTenant.logoUrl}`} 
+                      alt="Logo atual"
+                      className="max-h-32 object-contain"
+                    />
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleRemoveLogo}
+                    disabled={submitting}
+                    className="w-full"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    {submitting ? "Removendo..." : "Remover Logo"}
+                  </Button>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="logo-upload">
+                  {selectedTenant?.logoUrl ? "Novo Logo" : "Upload de Logo"}
+                </Label>
+                <Input
+                  id="logo-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoFileChange}
+                  disabled={submitting}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Formatos aceitos: JPG, PNG, GIF, WEBP (máx. 5MB)
+                </p>
+              </div>
+
+              {logoPreview && (
+                <div className="space-y-2">
+                  <Label>Pré-visualização</Label>
+                  <div className="flex items-center justify-center p-4 border rounded-lg bg-muted">
+                    <img 
+                      src={logoPreview} 
+                      alt="Pré-visualização"
+                      className="max-h-32 object-contain"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowLogoDialog(false);
+                  setLogoFile(null);
+                  setLogoPreview(null);
+                }}
+                disabled={submitting}
+              >
+                Cancelar
+              </Button>
+              {logoFile && (
+                <Button onClick={handleUploadLogo} disabled={submitting}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  {submitting ? "Enviando..." : "Fazer Upload"}
+                </Button>
+              )}
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

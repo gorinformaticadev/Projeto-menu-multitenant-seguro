@@ -1,9 +1,20 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Servir arquivos estáticos (logos)
+  // Em dev: __dirname = dist/src, então precisa subir 2 níveis
+  // Em prod: __dirname = dist, então precisa subir 1 nível
+  const uploadsPath = join(__dirname, '..', '..', 'uploads');
+  console.log('📁 Servindo arquivos estáticos de:', uploadsPath);
+  app.useStaticAssets(uploadsPath, {
+    prefix: '/uploads/',
+  });
 
   // CORS configurado para aceitar apenas o frontend
   app.enableCors({

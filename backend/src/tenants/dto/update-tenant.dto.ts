@@ -26,6 +26,10 @@ export class UpdateTenantDto {
   telefone?: string;
 
   @IsOptional()
+  @IsString()
+  logoUrl?: string;
+
+  @IsOptional()
   @IsBoolean()
   ativo?: boolean;
 }

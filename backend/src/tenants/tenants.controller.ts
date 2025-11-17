@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { TenantsService } from './tenants.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
@@ -8,6 +9,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { SkipTenantIsolation } from '../common/decorators/skip-tenant-isolation.decorator';
 import { Role } from '@prisma/client';
+import { multerConfig } from '../common/config/multer.config';
 
 @Controller('tenants')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -54,5 +56,23 @@ export class TenantsController {
   @SkipTenantIsolation()
   async changeAdminPassword(@Param('id') id: string, @Body() changePasswordDto: ChangeAdminPasswordDto) {
     return this.tenantsService.changeAdminPassword(id, changePasswordDto);
+  }
+
+  @Post(':id/upload-logo')
+  @Roles(Role.SUPER_ADMIN)
+  @SkipTenantIsolation()
+  @UseInterceptors(FileInterceptor('logo', multerConfig))
+  async uploadLogo(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Nenhum arquivo foi enviado');
+    }
+    return this.tenantsService.updateLogo(id, file.filename);
+  }
+
+  @Patch(':id/remove-logo')
+  @Roles(Role.SUPER_ADMIN)
+  @SkipTenantIsolation()
+  async removeLogo(@Param('id') id: string) {
+    return this.tenantsService.removeLogo(id);
   }
 }
