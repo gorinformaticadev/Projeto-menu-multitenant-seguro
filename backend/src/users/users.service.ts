@@ -198,4 +198,35 @@ export class UsersService {
 
     return { message: 'Senha alterada com sucesso' };
   }
+
+  /**
+   * Desbloquear usuário
+   */
+  async unlockUser(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    if (!user.isLocked) {
+      throw new BadRequestException('Usuário não está bloqueado');
+    }
+
+    // Desbloquear e resetar tentativas
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        isLocked: false,
+        loginAttempts: 0,
+        lockedAt: null,
+        lockedUntil: null,
+        lastFailedLoginAt: null,
+      },
+    });
+
+    return { message: 'Usuário desbloqueado com sucesso' };
+  }
 }

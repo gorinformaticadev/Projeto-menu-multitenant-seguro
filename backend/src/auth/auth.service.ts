@@ -37,10 +37,99 @@ export class AuthService {
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
+    // Verificar se o usuário está bloqueado
+    if (user.isLocked) {
+      // Verificar se o bloqueio ainda está ativo
+      if (user.lockedUntil && user.lockedUntil > new Date()) {
+        const minutesRemaining = Math.ceil(
+          (user.lockedUntil.getTime() - new Date().getTime()) / 60000,
+        );
+
+        await this.auditService.log({
+          action: 'LOGIN_BLOCKED',
+          userId: user.id,
+          tenantId: user.tenantId,
+          ipAddress,
+          userAgent,
+          details: { email, reason: 'account_locked', minutesRemaining },
+        });
+
+        throw new UnauthorizedException(
+          `Conta bloqueada por múltiplas tentativas de login. Tente novamente em ${minutesRemaining} minuto(s) ou contate um administrador.`,
+        );
+      } else {
+        // Bloqueio expirou, desbloquear automaticamente
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            isLocked: false,
+            loginAttempts: 0,
+            lockedAt: null,
+            lockedUntil: null,
+          },
+        });
+      }
+    }
+
     // Verifica a senha usando bcrypt.compare()
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
+      // Incrementar tentativas de login
+      const newAttempts = user.loginAttempts + 1;
+      const maxAttempts = 5; // Configurável via SecurityConfig
+      const lockDurationMinutes = 30; // 30 minutos de bloqueio
+
+      // Atualizar tentativas
+      const updateData: any = {
+        loginAttempts: newAttempts,
+        lastFailedLoginAt: new Date(),
+      };
+
+      // Se atingiu o máximo de tentativas, bloquear
+      if (newAttempts >= maxAttempts) {
+        const lockedUntil = new Date();
+        lockedUntil.setMinutes(lockedUntil.getMinutes() + lockDurationMinutes);
+
+        updateData.isLocked = true;
+        updateData.lockedAt = new Date();
+        updateData.lockedUntil = lockedUntil;
+
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: updateData,
+        });
+
+        await this.auditService.log({
+          action: 'ACCOUNT_LOCKED',
+          userId: user.id,
+          tenantId: user.tenantId,
+          ipAddress,
+          userAgent,
+          details: { email, attempts: newAttempts, lockedUntil },
+        });
+
+        throw new UnauthorizedException(
+          `Conta bloqueada por múltiplas tentativas de login. Tente novamente em ${lockDurationMinutes} minutos ou contate um administrador.`,
+        );
+      }
+
+      // Atualizar tentativas sem bloquear
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: updateData,
+      });
+
+      // Avisar se está próximo do bloqueio (1 tentativa restante)
+      const attemptsRemaining = maxAttempts - newAttempts;
+      let errorMessage = 'Credenciais inválidas';
+
+      if (attemptsRemaining === 1) {
+        errorMessage = `Credenciais inválidas. ATENÇÃO: Você tem apenas ${attemptsRemaining} tentativa restante antes de sua conta ser bloqueada.`;
+      } else if (attemptsRemaining <= 3) {
+        errorMessage = `Credenciais inválidas. Você tem ${attemptsRemaining} tentativas restantes.`;
+      }
+
       // Log de tentativa de login falha
       await this.auditService.log({
         action: 'LOGIN_FAILED',
@@ -48,9 +137,21 @@ export class AuthService {
         tenantId: user.tenantId,
         ipAddress,
         userAgent,
-        details: { email, reason: 'invalid_password' },
+        details: { email, reason: 'invalid_password', attempts: newAttempts, attemptsRemaining },
       });
-      throw new UnauthorizedException('Credenciais inválidas');
+
+      throw new UnauthorizedException(errorMessage);
+    }
+
+    // Login bem-sucedido - resetar tentativas
+    if (user.loginAttempts > 0) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          loginAttempts: 0,
+          lastFailedLoginAt: null,
+        },
+      });
     }
 
     // Gera tokens

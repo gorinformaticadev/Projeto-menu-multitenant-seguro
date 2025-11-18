@@ -1,0 +1,30 @@
+import { Injectable, NestMiddleware } from '@nestjs/common';
+import { Request, Response, NextFunction } from 'express';
+
+/**
+ * Middleware para forçar HTTPS em produção
+ * Redireciona requisições HTTP para HTTPS
+ */
+@Injectable()
+export class HttpsRedirectMiddleware implements NestMiddleware {
+  use(req: Request, res: Response, next: NextFunction) {
+    // Apenas em produção
+    if (process.env.NODE_ENV !== 'production') {
+      return next();
+    }
+
+    // Verificar se a requisição já é HTTPS
+    const isHttps =
+      req.secure ||
+      req.headers['x-forwarded-proto'] === 'https' ||
+      req.headers['x-forwarded-ssl'] === 'on';
+
+    if (!isHttps) {
+      // Redirecionar para HTTPS
+      const httpsUrl = `https://${req.headers.host}${req.url}`;
+      return res.redirect(301, httpsUrl);
+    }
+
+    next();
+  }
+}

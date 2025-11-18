@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -10,12 +10,15 @@ import { UsersModule } from './users/users.module';
 import { SecurityConfigModule } from './security-config/security-config.module';
 import { AuditModule } from './audit/audit.module';
 import { ValidatorsModule } from './common/validators/validators.module';
+import { HttpsRedirectMiddleware } from './common/middleware/https-redirect.middleware';
+import { SentryModule } from './common/services/sentry.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    SentryModule,
     // ============================================
     // 🛡️ RATE LIMITING - Proteção contra Brute Force
     // ============================================
@@ -51,4 +54,9 @@ import { ValidatorsModule } from './common/validators/validators.module';
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // HTTPS Redirect - Apenas em produção
+    consumer.apply(HttpsRedirectMiddleware).forRoutes('*');
+  }
+}

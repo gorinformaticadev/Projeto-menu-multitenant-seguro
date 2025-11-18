@@ -80,4 +80,16 @@ export class UsersController {
   ) {
     return this.usersService.changePassword(user.id, changePasswordDto);
   }
+
+  /**
+   * POST /users/:id/unlock
+   * Desbloquear usuário
+   * Apenas SUPER_ADMIN e ADMIN
+   */
+  @Post(':id/unlock')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @SkipTenantIsolation()
+  unlockUser(@Param('id') id: string) {
+    return this.usersService.unlockUser(id);
+  }
 }

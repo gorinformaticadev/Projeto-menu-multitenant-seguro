@@ -17,11 +17,11 @@
 - [x] **Logs de Segurança/Auditoria** ✅ FASE 2 CONCLUÍDA (Backend + Frontend)
 - [x] **Configurações de Segurança** ✅ FASE 2 CONCLUÍDA (Backend + Frontend)
 - [x] **Refresh Tokens** (tokens de curta duração) ✅ FASE 3 CONCLUÍDA (Backend + Frontend)
-- [ ] **Monitoramento** (Sentry)
-- [ ] **HTTPS Enforcement**
+- [x] **Monitoramento** (Sentry) ✅ FASE 5 CONCLUÍDA
+- [x] **HTTPS Enforcement** ✅ FASE 6 CONCLUÍDA
 - [x] **Validação de Senha Robusta** ✅ FASE 7 CONCLUÍDA
 - [ ] **Autenticação 2FA**
-- [ ] **Sanitização de Inputs**
+- [x] **Sanitização de Inputs** ✅ FASE 9 CONCLUÍDA
 - [ ] **Políticas CSP**
 
 ---

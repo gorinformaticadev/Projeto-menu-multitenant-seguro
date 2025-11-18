@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
-import { Plus, User, Mail, Shield, Edit, Trash2, Building2 } from "lucide-react";
+import { Plus, User, Mail, Shield, Edit, Trash2, Building2, Lock, Unlock, AlertTriangle } from "lucide-react";
 
 interface UserData {
   id: string;
@@ -23,6 +23,9 @@ interface UserData {
     nomeFantasia: string;
   } | null;
   createdAt: string;
+  isLocked: boolean;
+  loginAttempts: number;
+  lockedUntil: string | null;
 }
 
 interface Tenant {
@@ -162,6 +165,22 @@ export default function UsuariosPage() {
     }
   }
 
+  async function handleUnlock(id: string, userName: string) {
+    if (!confirm(`Tem certeza que deseja desbloquear o usuário ${userName}?`)) return;
+
+    try {
+      await api.post(`/users/${id}/unlock`);
+      toast({ title: "Usuário desbloqueado com sucesso!" });
+      loadUsers();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao desbloquear",
+        description: error.response?.data?.message || "Ocorreu um erro",
+        variant: "destructive",
+      });
+    }
+  }
+
   function openEditDialog(user: UserData) {
     setEditingUser(user);
     setFormData({
@@ -267,19 +286,42 @@ export default function UsuariosPage() {
             ) : (
               <div className="grid gap-4">
                 {users.map((user) => (
-                  <Card key={user.id}>
+                  <Card key={user.id} className={user.isLocked ? "border-red-300 bg-red-50/50" : ""}>
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="bg-primary rounded-full w-10 h-10 flex items-center justify-center">
-                            <User className="h-5 w-5 text-white" />
+                          <div className={`rounded-full w-10 h-10 flex items-center justify-center ${user.isLocked ? "bg-red-500" : "bg-primary"}`}>
+                            {user.isLocked ? (
+                              <Lock className="h-5 w-5 text-white" />
+                            ) : (
+                              <User className="h-5 w-5 text-white" />
+                            )}
                           </div>
                           <div>
-                            <CardTitle className="text-lg">{user.name}</CardTitle>
+                            <div className="flex items-center gap-2">
+                              <CardTitle className="text-lg">{user.name}</CardTitle>
+                              {user.isLocked && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-md bg-red-100 text-red-800 text-xs font-medium">
+                                  <Lock className="h-3 w-3 mr-1" />
+                                  BLOQUEADO
+                                </span>
+                              )}
+                              {!user.isLocked && user.loginAttempts > 0 && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-md bg-yellow-100 text-yellow-800 text-xs font-medium">
+                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                  {user.loginAttempts} tentativa(s) falha(s)
+                                </span>
+                              )}
+                            </div>
                             <CardDescription className="flex items-center gap-2 mt-1">
                               <Mail className="h-3 w-3" />
                               {user.email}
                             </CardDescription>
+                            {user.isLocked && user.lockedUntil && (
+                              <p className="text-xs text-red-600 mt-1">
+                                Bloqueado até: {new Date(user.lockedUntil).toLocaleString("pt-BR")}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <span className="inline-flex items-center px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium">
@@ -290,6 +332,17 @@ export default function UsuariosPage() {
                     </CardHeader>
                     <CardContent>
                       <div className="flex gap-2">
+                        {user.isLocked && (
+                          <Button 
+                            variant="default" 
+                            size="sm" 
+                            onClick={() => handleUnlock(user.id, user.name)}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <Unlock className="h-4 w-4 mr-1" />
+                            Desbloquear
+                          </Button>
+                        )}
                         <Button variant="outline" size="sm" onClick={() => openEditDialog(user)}>
                           <Edit className="h-4 w-4 mr-1" />
                           Editar
