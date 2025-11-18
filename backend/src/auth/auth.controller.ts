@@ -1,15 +1,21 @@
-import { Controller, Post, Body, Req, Ip, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Req, Ip, UseGuards, Get } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
+import { TwoFactorService } from './two-factor.service';
 import { LoginDto } from './dto/login.dto';
+import { Login2FADto } from './dto/login-2fa.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { LogoutDto } from './dto/logout.dto';
+import { Verify2FADto } from './dto/verify-2fa.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { Request } from 'express';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private twoFactorService: TwoFactorService,
+  ) {}
 
   /**
    * POST /auth/login
@@ -54,5 +60,50 @@ export class AuthController {
   ) {
     const userAgent = req.headers['user-agent'] || 'Unknown';
     return this.authService.logout(logoutDto.refreshToken, req.user.id, ip, userAgent);
+  }
+
+  /**
+   * POST /auth/login-2fa
+   * Login com 2FA
+   */
+  @Post('login-2fa')
+  @Throttle({ login: { limit: 5, ttl: 60000 } })
+  async login2FA(
+    @Body() login2FADto: Login2FADto,
+    @Req() req: Request,
+    @Ip() ip: string,
+  ) {
+    const userAgent = req.headers['user-agent'] || 'Unknown';
+    return this.authService.login2FA(login2FADto, ip, userAgent);
+  }
+
+  /**
+   * GET /auth/2fa/generate
+   * Gerar QR Code para 2FA
+   */
+  @Get('2fa/generate')
+  @UseGuards(JwtAuthGuard)
+  async generate2FA(@Req() req: any) {
+    return this.twoFactorService.generateSecret(req.user.id);
+  }
+
+  /**
+   * POST /auth/2fa/enable
+   * Ativar 2FA
+   */
+  @Post('2fa/enable')
+  @UseGuards(JwtAuthGuard)
+  async enable2FA(@Body() verify2FADto: Verify2FADto, @Req() req: any) {
+    return this.twoFactorService.enable(req.user.id, verify2FADto.token);
+  }
+
+  /**
+   * POST /auth/2fa/disable
+   * Desativar 2FA
+   */
+  @Post('2fa/disable')
+  @UseGuards(JwtAuthGuard)
+  async disable2FA(@Body() verify2FADto: Verify2FADto, @Req() req: any) {
+    return this.twoFactorService.disable(req.user.id, verify2FADto.token);
   }
 }

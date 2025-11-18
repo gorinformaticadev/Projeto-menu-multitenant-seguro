@@ -3,9 +3,11 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { TwoFactorService } from './two-factor.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { LoginDto } from './dto/login.dto';
+import { Login2FADto } from './dto/login-2fa.dto';
 
 @Injectable()
 export class AuthService {
@@ -15,6 +17,8 @@ export class AuthService {
     private config: ConfigService,
     @Inject(forwardRef(() => AuditService))
     private auditService: AuditService,
+    @Inject(forwardRef(() => TwoFactorService))
+    private twoFactorService: TwoFactorService,
   ) {}
 
   async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string) {
@@ -328,6 +332,113 @@ export class AuthService {
       default:
         return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     }
+  }
+
+  /**
+   * Login com 2FA
+   */
+  async login2FA(login2FADto: Login2FADto, ipAddress?: string, userAgent?: string) {
+    const { email, password, twoFactorToken } = login2FADto;
+
+    // Busca o usuário
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { tenant: true },
+    });
+
+    if (!user) {
+      await this.auditService.log({
+        action: 'LOGIN_2FA_FAILED',
+        ipAddress,
+        userAgent,
+        details: { email, reason: 'user_not_found' },
+      });
+      throw new UnauthorizedException('Credenciais inválidas');
+    }
+
+    // Verificar se está bloqueado
+    if (user.isLocked) {
+      if (user.lockedUntil && user.lockedUntil > new Date()) {
+        const minutesRemaining = Math.ceil(
+          (user.lockedUntil.getTime() - new Date().getTime()) / 60000,
+        );
+        throw new UnauthorizedException(
+          `Conta bloqueada. Tente novamente em ${minutesRemaining} minuto(s).`,
+        );
+      }
+    }
+
+    // Verificar senha
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      await this.auditService.log({
+        action: 'LOGIN_2FA_FAILED',
+        userId: user.id,
+        tenantId: user.tenantId,
+        ipAddress,
+        userAgent,
+        details: { email, reason: 'invalid_password' },
+      });
+      throw new UnauthorizedException('Credenciais inválidas');
+    }
+
+    // Verificar se 2FA está ativado
+    if (!user.twoFactorEnabled || !user.twoFactorSecret) {
+      throw new UnauthorizedException('2FA não está ativado para este usuário');
+    }
+
+    // Verificar código 2FA
+    const is2FAValid = this.twoFactorService.verify(user.twoFactorSecret, twoFactorToken);
+
+    if (!is2FAValid) {
+      await this.auditService.log({
+        action: 'LOGIN_2FA_FAILED',
+        userId: user.id,
+        tenantId: user.tenantId,
+        ipAddress,
+        userAgent,
+        details: { email, reason: 'invalid_2fa_token' },
+      });
+      throw new UnauthorizedException('Código 2FA inválido');
+    }
+
+    // Login bem-sucedido - resetar tentativas
+    if (user.loginAttempts > 0) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          loginAttempts: 0,
+          lastFailedLoginAt: null,
+        },
+      });
+    }
+
+    // Gerar tokens
+    const tokens = await this.generateTokens(user.id, user.email, user.role, user.tenantId);
+
+    // Log de login bem-sucedido
+    await this.auditService.log({
+      action: 'LOGIN_2FA_SUCCESS',
+      userId: user.id,
+      tenantId: user.tenantId,
+      ipAddress,
+      userAgent,
+      details: { email },
+    });
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        tenantId: user.tenantId,
+        tenant: user.tenant,
+      },
+    };
   }
 
   async hashPassword(password: string): Promise<string> {

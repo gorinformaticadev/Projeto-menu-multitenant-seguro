@@ -12,6 +12,7 @@ import { AuditModule } from './audit/audit.module';
 import { ValidatorsModule } from './common/validators/validators.module';
 import { HttpsRedirectMiddleware } from './common/middleware/https-redirect.middleware';
 import { SentryModule } from './common/services/sentry.module';
+import { CommonModule } from './common/common.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { SentryModule } from './common/services/sentry.module';
       isGlobal: true,
     }),
     SentryModule,
+    CommonModule,
     // ============================================
     // 🛡️ RATE LIMITING - Proteção contra Brute Force
     // ============================================

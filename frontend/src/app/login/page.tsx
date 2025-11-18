@@ -1,22 +1,30 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { TwoFactorLogin } from "@/components/TwoFactorLogin";
+import { use2FALogin } from "@/hooks/use2FALogin";
 import { Shield } from "lucide-react";
 import { API_URL } from "@/lib/api";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const [masterLogo, setMasterLogo] = useState<string | null>(null);
-  const { login } = useAuth();
   const { toast } = useToast();
+  const {
+    requires2FA,
+    loading,
+    error,
+    attemptLogin,
+    loginWith2FA,
+    reset,
+    credentials,
+  } = use2FALogin();
 
   useEffect(() => {
     // Busca o logo da tenant padrão (endpoint público)
@@ -36,6 +44,16 @@ export default function LoginPage() {
     fetchMasterLogo();
   }, []);
 
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Erro no login",
+        description: error,
+        variant: "destructive",
+      });
+    }
+  }, [error, toast]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -48,23 +66,46 @@ export default function LoginPage() {
       return;
     }
 
-    setLoading(true);
-
-    try {
-      await login(email, password);
+    const result = await attemptLogin(email, password);
+    
+    if (result.success) {
       toast({
         title: "Sucesso",
         description: "Login realizado com sucesso!",
       });
-    } catch (error: any) {
-      toast({
-        title: "Erro no login",
-        description: error.message || "Ocorreu um erro no servidor",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
     }
+  }
+
+  async function handle2FASubmit(code: string) {
+    const result = await loginWith2FA(code);
+    
+    if (result.success) {
+      toast({
+        title: "Sucesso",
+        description: "Login realizado com sucesso!",
+      });
+    }
+  }
+
+  function handleBack() {
+    reset();
+    setEmail("");
+    setPassword("");
+  }
+
+  // Se requer 2FA, mostrar componente de 2FA
+  if (requires2FA) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <TwoFactorLogin
+          email={credentials.email}
+          password={credentials.password}
+          onSubmit={handle2FASubmit}
+          onBack={handleBack}
+          loading={loading}
+        />
+      </div>
+    );
   }
 
   return (
