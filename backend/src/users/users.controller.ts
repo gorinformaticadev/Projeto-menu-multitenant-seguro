@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, Put } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -66,5 +67,17 @@ export class UsersController {
   @SkipTenantIsolation()
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
+  }
+
+  /**
+   * PUT /users/change-password
+   * Alterar senha do usuário logado
+   */
+  @Put('change-password')
+  changePassword(
+    @Body() changePasswordDto: ChangePasswordDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.usersService.changePassword(user.id, changePasswordDto);
   }
 }

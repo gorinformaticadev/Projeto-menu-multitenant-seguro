@@ -9,6 +9,7 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 import { UsersModule } from './users/users.module';
 import { SecurityConfigModule } from './security-config/security-config.module';
 import { AuditModule } from './audit/audit.module';
+import { ValidatorsModule } from './common/validators/validators.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { AuditModule } from './audit/audit.module';
       },
     ]),
     PrismaModule,
+    ValidatorsModule,
     AuthModule,
     TenantsModule,
     UsersModule,

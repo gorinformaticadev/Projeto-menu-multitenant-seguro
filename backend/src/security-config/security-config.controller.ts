@@ -35,4 +35,13 @@ export class SecurityConfigController {
   ) {
     return this.securityConfigService.updateConfig(dto, req.user.id);
   }
+
+  /**
+   * GET /security-config/password-policy
+   * Obter política de senha (público para validação no frontend)
+   */
+  @Get('password-policy')
+  async getPasswordPolicy() {
+    return this.securityConfigService.getPasswordPolicy();
+  }
 }
