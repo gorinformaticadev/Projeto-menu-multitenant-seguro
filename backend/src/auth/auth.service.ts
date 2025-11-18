@@ -1,8 +1,10 @@
 import { Injectable, UnauthorizedException, Inject, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { LoginDto } from './dto/login.dto';
 
 @Injectable()
@@ -10,6 +12,7 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private config: ConfigService,
     @Inject(forwardRef(() => AuditService))
     private auditService: AuditService,
   ) {}
@@ -50,15 +53,8 @@ export class AuthService {
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
-    // Gera o JWT com payload contendo: id, email, role, tenantId
-    const payload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-      tenantId: user.tenantId,
-    };
-
-    const accessToken = this.jwtService.sign(payload);
+    // Gera tokens
+    const tokens = await this.generateTokens(user.id, user.email, user.role, user.tenantId);
 
     // Log de login bem-sucedido
     await this.auditService.log({
@@ -71,7 +67,8 @@ export class AuthService {
     });
 
     return {
-      accessToken,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       user: {
         id: user.id,
         email: user.email,
@@ -81,6 +78,155 @@ export class AuthService {
         tenant: user.tenant,
       },
     };
+  }
+
+  /**
+   * Gera access token e refresh token
+   */
+  async generateTokens(userId: string, email: string, role: string, tenantId: string | null) {
+    const payload = {
+      sub: userId,
+      email,
+      role,
+      tenantId,
+    };
+
+    // Access Token: 15 minutos (configurável)
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: this.config.get('JWT_ACCESS_EXPIRES_IN', '15m'),
+    });
+
+    // Refresh Token: token aleatório
+    const refreshToken = crypto.randomBytes(64).toString('hex');
+
+    // Salvar refresh token no banco
+    const expiresIn = this.config.get('JWT_REFRESH_EXPIRES_IN', '7d');
+    const expiresAt = this.calculateExpirationDate(expiresIn);
+
+    await this.prisma.refreshToken.create({
+      data: {
+        token: refreshToken,
+        userId,
+        expiresAt,
+      },
+    });
+
+    return {
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  /**
+   * Renovar access token usando refresh token
+   */
+  async refreshTokens(refreshToken: string, ipAddress?: string, userAgent?: string) {
+    // Buscar refresh token no banco
+    const storedToken = await this.prisma.refreshToken.findUnique({
+      where: { token: refreshToken },
+      include: { user: { include: { tenant: true } } },
+    });
+
+    if (!storedToken) {
+      throw new UnauthorizedException('Refresh token inválido');
+    }
+
+    // Verificar se expirou
+    if (storedToken.expiresAt < new Date()) {
+      // Remover token expirado
+      await this.prisma.refreshToken.delete({
+        where: { id: storedToken.id },
+      });
+      throw new UnauthorizedException('Refresh token expirado');
+    }
+
+    // Gerar novos tokens
+    const tokens = await this.generateTokens(
+      storedToken.user.id,
+      storedToken.user.email,
+      storedToken.user.role,
+      storedToken.user.tenantId,
+    );
+
+    // Remover refresh token antigo (rotação)
+    await this.prisma.refreshToken.delete({
+      where: { id: storedToken.id },
+    });
+
+    // Log de refresh
+    await this.auditService.log({
+      action: 'TOKEN_REFRESHED',
+      userId: storedToken.user.id,
+      tenantId: storedToken.user.tenantId,
+      ipAddress,
+      userAgent,
+      details: { email: storedToken.user.email },
+    });
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user: {
+        id: storedToken.user.id,
+        email: storedToken.user.email,
+        name: storedToken.user.name,
+        role: storedToken.user.role,
+        tenantId: storedToken.user.tenantId,
+        tenant: storedToken.user.tenant,
+      },
+    };
+  }
+
+  /**
+   * Logout - invalida refresh token
+   */
+  async logout(refreshToken: string, userId: string, ipAddress?: string, userAgent?: string) {
+    // Remover refresh token
+    await this.prisma.refreshToken.deleteMany({
+      where: {
+        token: refreshToken,
+        userId,
+      },
+    });
+
+    // Log de logout
+    await this.auditService.log({
+      action: 'LOGOUT',
+      userId,
+      ipAddress,
+      userAgent,
+    });
+
+    return { message: 'Logout realizado com sucesso' };
+  }
+
+  /**
+   * Calcular data de expiração baseado em string (ex: "7d", "30d")
+   */
+  private calculateExpirationDate(expiresIn: string): Date {
+    const now = new Date();
+    const match = expiresIn.match(/^(\d+)([smhd])$/);
+
+    if (!match) {
+      // Padrão: 7 dias
+      return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    }
+
+    const value = parseInt(match[1]);
+    const unit = match[2];
+
+    switch (unit) {
+      case 's': // segundos
+        return new Date(now.getTime() + value * 1000);
+      case 'm': // minutos
+        return new Date(now.getTime() + value * 60 * 1000);
+      case 'h': // horas
+        return new Date(now.getTime() + value * 60 * 60 * 1000);
+      case 'd': // dias
+        return new Date(now.getTime() + value * 24 * 60 * 60 * 1000);
+      default:
+        return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    }
   }
 
   async hashPassword(password: string): Promise<string> {

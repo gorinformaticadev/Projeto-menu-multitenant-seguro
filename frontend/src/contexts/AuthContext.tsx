@@ -48,6 +48,25 @@ const SecureStorage = {
       sessionStorage.removeItem("@App:token");
     }
   },
+  setRefreshToken: (token: string) => {
+    // Em produção Electron, usar: keytar.setPassword('app', 'refresh', token)
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("@App:refreshToken", token);
+    }
+  },
+  getRefreshToken: (): string | null => {
+    // Em produção Electron, usar: keytar.getPassword('app', 'refresh')
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("@App:refreshToken");
+    }
+    return null;
+  },
+  removeRefreshToken: () => {
+    // Em produção Electron, usar: keytar.deletePassword('app', 'refresh')
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("@App:refreshToken");
+    }
+  },
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -83,9 +102,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function login(email: string, password: string) {
     try {
       const response = await api.post("/auth/login", { email, password });
-      const { accessToken, user: userData } = response.data;
+      const { accessToken, refreshToken, user: userData } = response.data;
 
       SecureStorage.setToken(accessToken);
+      SecureStorage.setRefreshToken(refreshToken);
       api.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
 
       setUser(userData);
@@ -97,8 +117,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  function logout() {
+  async function logout() {
+    const refreshToken = SecureStorage.getRefreshToken();
+    
+    // Invalidar refresh token no backend
+    if (refreshToken) {
+      try {
+        await api.post("/auth/logout", { refreshToken });
+      } catch (error) {
+        console.error("Erro ao fazer logout no backend:", error);
+      }
+    }
+
     SecureStorage.removeToken();
+    SecureStorage.removeRefreshToken();
     delete api.defaults.headers.common["Authorization"];
     setUser(null);
     router.push("/login");
