@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch, Delete, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { TenantsService } from './tenants.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
@@ -74,5 +74,12 @@ export class TenantsController {
   @SkipTenantIsolation()
   async removeLogo(@Param('id') id: string) {
     return this.tenantsService.removeLogo(id);
+  }
+
+  @Delete(':id')
+  @Roles(Role.SUPER_ADMIN)
+  @SkipTenantIsolation()
+  async remove(@Param('id') id: string) {
+    return this.tenantsService.remove(id);
   }
 }

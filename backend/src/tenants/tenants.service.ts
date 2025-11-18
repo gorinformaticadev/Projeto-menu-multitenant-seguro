@@ -209,4 +209,41 @@ export class TenantsService {
       data: { logoUrl: null },
     });
   }
+
+  async remove(id: string) {
+    const tenant = await this.findOne(id);
+
+    // Não permite deletar a empresa padrão
+    if (tenant.email === 'empresa1@example.com') {
+      throw new BadRequestException('A empresa padrão do sistema não pode ser deletada');
+    }
+
+    // Verifica se há usuários vinculados
+    const usersCount = await this.prisma.user.count({
+      where: { tenantId: id },
+    });
+
+    if (usersCount > 0) {
+      throw new BadRequestException(
+        `Não é possível deletar esta empresa pois existem ${usersCount} usuário(s) vinculado(s). Delete os usuários primeiro.`,
+      );
+    }
+
+    // Remove o logo se existir
+    if (tenant.logoUrl) {
+      try {
+        const logoPath = join(process.cwd(), 'uploads', 'logos', tenant.logoUrl);
+        await unlink(logoPath);
+      } catch (error) {
+        // Ignora erro se o arquivo não existir
+      }
+    }
+
+    // Deleta a empresa
+    await this.prisma.tenant.delete({
+      where: { id },
+    });
+
+    return { message: 'Empresa deletada com sucesso' };
+  }
 }

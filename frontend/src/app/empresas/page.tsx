@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import api, { API_URL } from "@/lib/api";
-import { Plus, Building2, Mail, Phone, User, FileText, Eye, Edit, Power, Lock, UserPlus, Image as ImageIcon, Upload, X, Users } from "lucide-react";
+import { Plus, Building2, Mail, Phone, User, FileText, Eye, Edit, Power, Lock, UserPlus, Image as ImageIcon, Upload, X, Users, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface Tenant {
@@ -36,10 +36,12 @@ export default function EmpresasPage() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showLogoDialog, setShowLogoDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -242,6 +244,49 @@ export default function EmpresasPage() {
         description: error.response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
+    }
+  }
+
+  function openDeleteDialog(tenant: Tenant) {
+    setSelectedTenant(tenant);
+    setDeleteConfirmText("");
+    setShowDeleteDialog(true);
+  }
+
+  async function handleDelete() {
+    if (!selectedTenant) return;
+
+    if (deleteConfirmText !== selectedTenant.nomeFantasia) {
+      toast({
+        title: "Erro",
+        description: "O nome da empresa não confere",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      await api.delete(`/tenants/${selectedTenant.id}`);
+      
+      toast({
+        title: "Sucesso",
+        description: "Empresa deletada com sucesso!",
+      });
+
+      setShowDeleteDialog(false);
+      setSelectedTenant(null);
+      setDeleteConfirmText("");
+      loadTenants();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao deletar empresa",
+        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -697,10 +742,19 @@ export default function EmpresasPage() {
                       onClick={() => handleToggleStatus(tenant)}
                       disabled={tenant.email === 'empresa1@example.com' && tenant.ativo}
                       title={tenant.email === 'empresa1@example.com' && tenant.ativo ? 'A empresa padrão não pode ser desativada' : ''}
-                      className="col-span-2"
                     >
                       <Power className="h-4 w-4 mr-1" />
                       {tenant.ativo ? 'Desativar' : 'Ativar'}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => openDeleteDialog(tenant)}
+                      disabled={tenant.email === 'empresa1@example.com'}
+                      title={tenant.email === 'empresa1@example.com' ? 'A empresa padrão não pode ser deletada' : ''}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Deletar
                     </Button>
                   </div>
                 </CardContent>
@@ -986,6 +1040,70 @@ export default function EmpresasPage() {
                   {submitting ? "Enviando..." : "Fazer Upload"}
                 </Button>
               )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Confirmação de Exclusão */}
+        <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="text-destructive">Deletar Empresa</DialogTitle>
+              <DialogDescription>
+                Esta ação é irreversível e deletará permanentemente a empresa.
+              </DialogDescription>
+            </DialogHeader>
+            {selectedTenant && (
+              <div className="space-y-4">
+                <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <p className="text-sm font-medium text-destructive mb-2">⚠️ Atenção!</p>
+                  <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                    <li>Todos os dados da empresa serão perdidos</li>
+                    <li>Esta ação não pode ser desfeita</li>
+                    <li>Certifique-se de que não há usuários vinculados</li>
+                  </ul>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirmDelete">
+                    Para confirmar, digite o nome da empresa: <strong>{selectedTenant.nomeFantasia}</strong>
+                  </Label>
+                  <Input
+                    id="confirmDelete"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder="Digite o nome da empresa"
+                    disabled={submitting}
+                  />
+                </div>
+
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-sm"><strong>Empresa:</strong> {selectedTenant.nomeFantasia}</p>
+                  <p className="text-sm"><strong>CNPJ/CPF:</strong> {selectedTenant.cnpjCpf}</p>
+                  <p className="text-sm"><strong>Usuários:</strong> {selectedTenant._count?.users || 0}</p>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowDeleteDialog(false);
+                  setDeleteConfirmText("");
+                }}
+                disabled={submitting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={submitting || deleteConfirmText !== selectedTenant?.nomeFantasia}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {submitting ? "Deletando..." : "Deletar Empresa"}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
