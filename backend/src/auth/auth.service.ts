@@ -1,6 +1,7 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Inject, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import * as bcrypt from 'bcrypt';
 import { LoginDto } from './dto/login.dto';
 
@@ -9,9 +10,11 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    @Inject(forwardRef(() => AuditService))
+    private auditService: AuditService,
   ) {}
 
-  async login(loginDto: LoginDto) {
+  async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string) {
     const { email, password } = loginDto;
 
     // Busca o usuário pelo email
@@ -21,6 +24,13 @@ export class AuthService {
     });
 
     if (!user) {
+      // Log de tentativa de login falha
+      await this.auditService.log({
+        action: 'LOGIN_FAILED',
+        ipAddress,
+        userAgent,
+        details: { email, reason: 'user_not_found' },
+      });
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
@@ -28,6 +38,15 @@ export class AuthService {
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
+      // Log de tentativa de login falha
+      await this.auditService.log({
+        action: 'LOGIN_FAILED',
+        userId: user.id,
+        tenantId: user.tenantId,
+        ipAddress,
+        userAgent,
+        details: { email, reason: 'invalid_password' },
+      });
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
@@ -40,6 +59,16 @@ export class AuthService {
     };
 
     const accessToken = this.jwtService.sign(payload);
+
+    // Log de login bem-sucedido
+    await this.auditService.log({
+      action: 'LOGIN_SUCCESS',
+      userId: user.id,
+      tenantId: user.tenantId,
+      ipAddress,
+      userAgent,
+      details: { email },
+    });
 
     return {
       accessToken,

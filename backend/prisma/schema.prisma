@@ -31,16 +31,81 @@ model Tenant {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      Role     @default(USER)
-  tenantId  String?
-  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String         @id @default(uuid())
+  email            String         @unique
+  password         String
+  name             String
+  role             Role           @default(USER)
+  tenantId         String?
+  tenant           Tenant?        @relation(fields: [tenantId], references: [id])
+  twoFactorSecret  String?
+  twoFactorEnabled Boolean        @default(false)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  auditLogs        AuditLog[]
+  refreshTokens    RefreshToken[]
 
   @@index([tenantId])
   @@map("users")
+}
+
+// Tabela de Refresh Tokens
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+// Tabela de Logs de Auditoria
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String // LOGIN, LOGOUT, CREATE_TENANT, UPDATE_USER, etc
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  tenantId  String?
+  ipAddress String?
+  userAgent String?
+  details   String? // JSON com detalhes adicionais
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([tenantId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// Tabela de Configurações de Segurança (apenas SUPER_ADMIN pode editar)
+model SecurityConfig {
+  id                      String   @id @default(uuid())
+  // Rate Limiting
+  loginMaxAttempts        Int      @default(5) // Tentativas de login
+  loginWindowMinutes      Int      @default(1) // Janela de tempo em minutos
+  globalMaxRequests       Int      @default(100) // Requisições globais
+  globalWindowMinutes     Int      @default(1) // Janela de tempo global
+  // Senha
+  passwordMinLength       Int      @default(8)
+  passwordRequireUppercase Boolean @default(true)
+  passwordRequireLowercase Boolean @default(true)
+  passwordRequireNumbers  Boolean  @default(true)
+  passwordRequireSpecial  Boolean  @default(true)
+  // JWT
+  accessTokenExpiresIn    String   @default("15m") // 15 minutos
+  refreshTokenExpiresIn   String   @default("7d") // 7 dias
+  // 2FA
+  twoFactorEnabled        Boolean  @default(false) // Habilitar 2FA globalmente
+  twoFactorRequired       Boolean  @default(false) // Tornar 2FA obrigatório
+  // Outros
+  sessionTimeout          Int      @default(30) // Timeout de sessão em minutos
+  updatedAt               DateTime @updatedAt
+  updatedBy               String? // ID do SUPER_ADMIN que atualizou
+
+  @@map("security_config")
 }
