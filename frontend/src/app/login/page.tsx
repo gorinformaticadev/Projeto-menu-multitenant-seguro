@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,13 +8,33 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Shield } from "lucide-react";
+import { API_URL } from "@/lib/api";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [masterLogo, setMasterLogo] = useState<string | null>(null);
   const { login } = useAuth();
   const { toast } = useToast();
+
+  useEffect(() => {
+    // Busca o logo da tenant padrão (endpoint público)
+    async function fetchMasterLogo() {
+      try {
+        const response = await fetch(`${API_URL}/tenants/public/master-logo`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.logoUrl) {
+            setMasterLogo(data.logoUrl);
+          }
+        }
+      } catch (error) {
+        console.error("Erro ao buscar logo:", error);
+      }
+    }
+    fetchMasterLogo();
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -52,9 +72,29 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex items-center justify-center mb-4">
-            <div className="bg-primary rounded-full p-3">
-              <Shield className="h-8 w-8 text-white" />
-            </div>
+            {masterLogo ? (
+              <div className="w-32 h-20 flex items-center justify-center">
+                <img 
+                  src={`${API_URL}/uploads/logos/${masterLogo}`} 
+                  alt="Logo"
+                  className="max-w-full max-h-full object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.parentElement?.querySelector('.fallback-icon');
+                    if (fallback) {
+                      fallback.classList.remove('hidden');
+                    }
+                  }}
+                />
+                <div className="bg-primary rounded-full w-16 h-16 flex items-center justify-center fallback-icon hidden">
+                  <Shield className="h-8 w-8 text-white" />
+                </div>
+              </div>
+            ) : (
+              <div className="bg-primary rounded-full w-16 h-16 flex items-center justify-center">
+                <Shield className="h-8 w-8 text-white" />
+              </div>
+            )}
           </div>
           <CardTitle className="text-2xl text-center">Sistema Multitenant</CardTitle>
           <CardDescription className="text-center">

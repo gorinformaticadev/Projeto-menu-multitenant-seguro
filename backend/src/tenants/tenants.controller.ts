@@ -8,6 +8,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { SkipTenantIsolation } from '../common/decorators/skip-tenant-isolation.decorator';
+import { Public } from '../common/decorators/public.decorator';
 import { Role } from '@prisma/client';
 import { multerConfig } from '../common/config/multer.config';
 
@@ -81,5 +82,11 @@ export class TenantsController {
   @SkipTenantIsolation()
   async remove(@Param('id') id: string) {
     return this.tenantsService.remove(id);
+  }
+
+  @Public()
+  @Get('public/master-logo')
+  async getMasterLogo() {
+    return this.tenantsService.getMasterLogo();
   }
 }

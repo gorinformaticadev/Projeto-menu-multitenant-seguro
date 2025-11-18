@@ -246,4 +246,26 @@ export class TenantsService {
 
     return { message: 'Empresa deletada com sucesso' };
   }
+
+  async getMasterLogo() {
+    // Busca a empresa padrão ou a primeira empresa
+    const masterTenant = await this.prisma.tenant.findFirst({
+      where: {
+        OR: [
+          { email: 'empresa1@example.com' },
+          { ativo: true },
+        ],
+      },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        logoUrl: true,
+        nomeFantasia: true,
+      },
+    });
+
+    return {
+      logoUrl: masterTenant?.logoUrl || null,
+      nomeFantasia: masterTenant?.nomeFantasia || 'Sistema',
+    };
+  }
 }

@@ -16,32 +16,21 @@ export function Sidebar() {
   const [masterLogo, setMasterLogo] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
-  // Busca o logo da empresa master (primeira empresa ou empresa padrão)
+  // Busca o logo da empresa master usando endpoint público
   useEffect(() => {
     async function fetchMasterLogo() {
       try {
-        if (user?.role === "SUPER_ADMIN") {
-          // SUPER_ADMIN: busca a empresa padrão
-          const response = await api.get("/tenants");
-          const tenants = response.data;
-          
-          // Procura pela empresa padrão ou pega a primeira
-          const masterTenant = tenants.find((t: any) => t.email === "empresa1@example.com") || tenants[0];
-          
-          if (masterTenant?.logoUrl) {
-            setMasterLogo(masterTenant.logoUrl);
-          }
+        const response = await api.get("/tenants/public/master-logo");
+        if (response.data?.logoUrl) {
+          setMasterLogo(response.data.logoUrl);
         }
-        // Para outros usuários, não exibe logo por enquanto (pode ser implementado depois)
       } catch (error) {
         console.error("Erro ao buscar logo:", error);
       }
     }
 
-    if (user) {
-      fetchMasterLogo();
-    }
-  }, [user]);
+    fetchMasterLogo();
+  }, []);
 
   // Recolhe o menu ao clicar fora dele
   useEffect(() => {
@@ -116,7 +105,7 @@ export function Sidebar() {
                 />
               ) : null}
               <Shield className={`h-6 w-6 text-white fallback-icon ${masterLogo ? 'hidden' : ''}`} />
-            </div>
+            </div> 
             <div className="flex-1 min-w-0">
               <h2 className="font-bold text-lg">Sistema</h2>
               <p className="text-xs text-muted-foreground">Multitenant</p>
