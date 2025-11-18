@@ -89,4 +89,10 @@ export class TenantsController {
   async getMasterLogo() {
     return this.tenantsService.getMasterLogo();
   }
+
+  @Public()
+  @Get('public/:id/logo')
+  async getTenantLogo(@Param('id') id: string) {
+    return this.tenantsService.getTenantLogo(id);
+  }
 }

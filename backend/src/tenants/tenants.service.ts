@@ -268,4 +268,23 @@ export class TenantsService {
       nomeFantasia: masterTenant?.nomeFantasia || 'Sistema',
     };
   }
+
+  async getTenantLogo(id: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id },
+      select: {
+        logoUrl: true,
+        nomeFantasia: true,
+      },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Empresa não encontrada');
+    }
+
+    return {
+      logoUrl: tenant.logoUrl || null,
+      nomeFantasia: tenant.nomeFantasia,
+    };
+  }
 }

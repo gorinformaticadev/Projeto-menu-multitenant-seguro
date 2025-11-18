@@ -10,8 +10,10 @@ import api from "@/lib/api";
 export function TopBar() {
   const { user, logout } = useAuth();
   const [masterLogo, setMasterLogo] = useState<string | null>(null);
+  const [userTenantLogo, setUserTenantLogo] = useState<string | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
+  // Busca logo da empresa master (para o header)
   useEffect(() => {
     async function fetchMasterLogo() {
       try {
@@ -25,6 +27,27 @@ export function TopBar() {
     }
     fetchMasterLogo();
   }, []);
+
+  // Busca logo do tenant do usuário logado
+  useEffect(() => {
+    async function fetchUserTenantLogo() {
+      if (user?.tenantId) {
+        // Usuário tem tenant (ADMIN, USER, CLIENT) - usa endpoint público
+        try {
+          const response = await api.get(`/tenants/public/${user.tenantId}/logo`);
+          if (response.data?.logoUrl) {
+            setUserTenantLogo(response.data.logoUrl);
+          }
+        } catch (error) {
+          console.error("Erro ao buscar logo do tenant:", error);
+        }
+      } else if (user?.role === "SUPER_ADMIN") {
+        // SUPER_ADMIN usa o logo master
+        setUserTenantLogo(masterLogo);
+      }
+    }
+    fetchUserTenantLogo();
+  }, [user, masterLogo]);
 
   return (
     <div className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 shadow-sm z-50">
@@ -84,9 +107,20 @@ export function TopBar() {
               className="flex items-center gap-2"
               onClick={() => setShowUserMenu(!showUserMenu)}
             >
-              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-semibold">
-                {user?.name?.charAt(0).toUpperCase()}
-              </div>
+              {/* Logo do Tenant do Usuário */}
+              {userTenantLogo ? (
+                <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-100">
+                  <img 
+                    src={`${API_URL}/uploads/logos/${userTenantLogo}`} 
+                    alt="Logo Tenant"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-semibold">
+                  {user?.name?.charAt(0).toUpperCase()}
+                </div>
+              )}
               <div className="hidden md:block text-left">
                 <p className="text-sm font-medium">{user?.name}</p>
                 <p className="text-xs text-gray-500">{user?.role}</p>
