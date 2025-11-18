@@ -14,8 +14,8 @@
 ### ❌ A IMPLEMENTAR
 - [x] **Headers de Segurança** (Helmet) ✅ FASE 1 CONCLUÍDA
 - [x] **Rate Limiting** (proteção contra brute force) ✅ FASE 2 CONCLUÍDA
-- [x] **Logs de Segurança/Auditoria** ✅ FASE 2 CONCLUÍDA
-- [x] **Configurações de Segurança** ✅ FASE 2 CONCLUÍDA
+- [x] **Logs de Segurança/Auditoria** ✅ FASE 2 CONCLUÍDA (Backend + Frontend)
+- [x] **Configurações de Segurança** ✅ FASE 2 CONCLUÍDA (Backend + Frontend)
 - [ ] **Refresh Tokens** (tokens de curta duração)
 - [ ] **Monitoramento** (Sentry)
 - [ ] **HTTPS Enforcement**

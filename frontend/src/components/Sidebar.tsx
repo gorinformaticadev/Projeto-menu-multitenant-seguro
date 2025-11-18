@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu } from "lucide-react";
+import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu, Shield, FileText } from "lucide-react";
 import { Button } from "./ui/button";
 
 export function Sidebar() {
@@ -52,10 +52,27 @@ export function Sidebar() {
       show: user?.role === "SUPER_ADMIN" || user?.role === "ADMIN",
     },
     {
+      name: "Logs de Auditoria",
+      href: "/logs",
+      icon: FileText,
+      show: user?.role === "SUPER_ADMIN",
+    },
+    {
       name: "Configurações",
       href: "/configuracoes",
       icon: Settings,
       show: user?.role === "SUPER_ADMIN" || user?.role === "ADMIN",
+      submenu: user?.role === "SUPER_ADMIN" ? [
+        {
+          name: "Geral",
+          href: "/configuracoes",
+        },
+        {
+          name: "Segurança",
+          href: "/configuracoes/seguranca",
+          icon: Shield,
+        },
+      ] : undefined,
     },
   ];
 
