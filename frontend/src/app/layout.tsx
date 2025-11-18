@@ -10,6 +10,12 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Sistema Multitenant",
   description: "Sistema com isolamento de dados e controle de acesso",
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/apple-touch-icon.svg',
+  },
 };
 
 export default function RootLayout({
@@ -19,6 +25,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.svg" />
+        <link rel="manifest" href="/manifest.json" />
+      </head>
       <body className={inter.className} suppressHydrationWarning>
         <AuthProvider>
           <AppLayout>

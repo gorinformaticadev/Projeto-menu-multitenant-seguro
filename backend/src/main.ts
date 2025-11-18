@@ -29,11 +29,20 @@ async function bootstrap() {
           defaultSrc: ["'self'"],
           styleSrc: ["'self'", "'unsafe-inline'"], // Permite estilos inline (necessário para alguns frameworks)
           scriptSrc: ["'self'"],
-          imgSrc: ["'self'", 'data:', 'https:', isProduction ? '' : 'http://localhost:4000'], // Permite imagens do próprio servidor
+          imgSrc: [
+            "'self'",
+            'data:',
+            'https:',
+            'http://localhost:4000',
+            'http://localhost:5000',
+            'http://localhost:3000',
+          ], // Permite imagens do próprio servidor e frontend
           connectSrc: [
             "'self'",
-            isProduction ? process.env.FRONTEND_URL || '' : 'http://localhost:4000',
-            isProduction ? '' : 'http://localhost:5000',
+            'http://localhost:4000',
+            'http://localhost:5000',
+            'http://localhost:3000',
+            isProduction ? process.env.FRONTEND_URL || '' : '',
           ].filter(Boolean), // Remove strings vazias
           fontSrc: ["'self'", 'data:'],
           objectSrc: ["'none'"],
@@ -84,6 +93,11 @@ async function bootstrap() {
   console.log('📁 Servindo arquivos estáticos de:', uploadsPath);
   app.useStaticAssets(uploadsPath, {
     prefix: '/uploads/',
+    setHeaders: (res) => {
+      // Adicionar headers CORS para arquivos estáticos
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    },
   });
 
   // ============================================
@@ -94,9 +108,11 @@ async function bootstrap() {
       process.env.FRONTEND_URL || 'http://localhost:5000',
       'http://127.0.0.1:5000',
       'http://localhost:5000',
+      'http://localhost:3000', // Next.js dev server
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    exposedHeaders: ['Content-Type', 'Content-Length'],
   });
 
   // ============================================

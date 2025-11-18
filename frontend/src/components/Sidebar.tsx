@@ -58,12 +58,6 @@ export function Sidebar() {
       show: user?.role === "SUPER_ADMIN",
     },
     {
-      name: "Meu Perfil",
-      href: "/perfil",
-      icon: User,
-      show: true,
-    },
-    {
       name: "Configurações",
       href: "/configuracoes",
       icon: Settings,

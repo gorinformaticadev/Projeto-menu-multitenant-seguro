@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { AppLayout } from "@/components/AppLayout";
 import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -101,49 +100,44 @@ export default function SecurityConfigPage() {
 
   if (loading) {
     return (
-      <AppLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">Carregando configurações...</div>
-        </div>
-      </AppLayout>
+      <div className="p-6 flex items-center justify-center h-64">
+        <div className="text-center">Carregando configurações...</div>
+      </div>
     );
   }
 
   if (!config) {
     return (
-      <AppLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center text-muted-foreground">
-            Erro ao carregar configurações
-          </div>
+      <div className="p-6 flex items-center justify-center h-64">
+        <div className="text-center text-muted-foreground">
+          Erro ao carregar configurações
         </div>
-      </AppLayout>
+      </div>
     );
   }
 
   return (
-    <AppLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Shield className="h-8 w-8" />
-              Configurações de Segurança
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              Gerencie as políticas de segurança do sistema
-            </p>
-          </div>
-          <Button onClick={handleSave} disabled={saving}>
-            <Save className="h-4 w-4 mr-2" />
-            {saving ? "Salvando..." : "Salvar Alterações"}
-          </Button>
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Shield className="h-8 w-8" />
+            Configurações de Segurança
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Gerencie as políticas de segurança do sistema
+          </p>
         </div>
+        <Button onClick={handleSave} disabled={saving}>
+          <Save className="h-4 w-4 mr-2" />
+          {saving ? "Salvando..." : "Salvar Alterações"}
+        </Button>
+      </div>
 
-        {/* Aviso */}
-        <Card className="border-yellow-200 bg-yellow-50">
-          <CardContent className="pt-6">
+      {/* Aviso */}
+      <Card className="border-yellow-200 bg-yellow-50">
+        <CardContent className="pt-6">
             <div className="flex gap-3">
               <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-yellow-800">
@@ -466,14 +460,13 @@ export default function SecurityConfigPage() {
           </CardContent>
         </Card>
 
-        {/* Botão de Salvar */}
-        <div className="flex justify-end">
-          <Button onClick={handleSave} disabled={saving} size="lg">
-            <Save className="h-4 w-4 mr-2" />
-            {saving ? "Salvando..." : "Salvar Todas as Alterações"}
-          </Button>
-        </div>
+      {/* Botão de Salvar */}
+      <div className="flex justify-end">
+        <Button onClick={handleSave} disabled={saving} size="lg">
+          <Save className="h-4 w-4 mr-2" />
+          {saving ? "Salvando..." : "Salvar Todas as Alterações"}
+        </Button>
       </div>
-    </AppLayout>
+    </div>
   );
 }

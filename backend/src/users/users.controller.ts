@@ -3,6 +3,7 @@ import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -67,6 +68,18 @@ export class UsersController {
   @SkipTenantIsolation()
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
+  }
+
+  /**
+   * PUT /users/profile
+   * Atualizar perfil do usuário logado
+   */
+  @Put('profile')
+  updateProfile(
+    @Body() updateProfileDto: UpdateProfileDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.usersService.updateProfile(user.id, updateProfileDto);
   }
 
   /**

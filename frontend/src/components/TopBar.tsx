@@ -129,21 +129,19 @@ export function TopBar() {
 
             {/* Dropdown Menu */}
             {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2">
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
                 <div className="px-4 py-2 border-b border-gray-200">
                   <p className="text-sm font-medium text-gray-900">{user?.name}</p>
                   <p className="text-xs text-gray-500">{user?.email}</p>
                 </div>
-                <button
-                  onClick={() => {
-                    setShowUserMenu(false);
-                    // Navegar para perfil
-                  }}
+                <a
+                  href="/perfil"
+                  onClick={() => setShowUserMenu(false)}
                   className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
                 >
                   <User className="h-4 w-4" />
                   Meu Perfil
-                </button>
+                </a>
                 <div className="border-t border-gray-200 mt-2 pt-2">
                   <button
                     onClick={() => {

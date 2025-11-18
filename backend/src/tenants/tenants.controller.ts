@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch, Delete, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { SkipThrottle } from '@nestjs/throttler';
 import { TenantsService } from './tenants.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
@@ -85,12 +86,16 @@ export class TenantsController {
   }
 
   @Public()
+  @SkipThrottle()
+  @Public()
+  @SkipThrottle()
   @Get('public/master-logo')
   async getMasterLogo() {
     return this.tenantsService.getMasterLogo();
   }
 
   @Public()
+  @SkipThrottle()
   @Get('public/:id/logo')
   async getTenantLogo(@Param('id') id: string) {
     return this.tenantsService.getTenantLogo(id);

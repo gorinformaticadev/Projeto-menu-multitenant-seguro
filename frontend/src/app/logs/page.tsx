@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { AppLayout } from "@/components/AppLayout";
 import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -122,22 +121,21 @@ export default function LogsPage() {
   }
 
   return (
-    <AppLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <FileText className="h-8 w-8" />
-            Logs de Auditoria
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Visualize todas as ações realizadas no sistema
-          </p>
-        </div>
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold flex items-center gap-2">
+          <FileText className="h-8 w-8" />
+          Logs de Auditoria
+        </h1>
+        <p className="text-muted-foreground mt-2">
+          Visualize todas as ações realizadas no sistema
+        </p>
+      </div>
 
-        {/* Estatísticas */}
-        {stats && (
-          <div className="grid gap-4 md:grid-cols-3">
+      {/* Estatísticas */}
+      {stats && (
+        <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total de Logs</CardTitle>
@@ -174,12 +172,12 @@ export default function LogsPage() {
                   Usuários com atividade
                 </p>
               </CardContent>
-            </Card>
-          </div>
-        )}
+          </Card>
+        </div>
+      )}
 
-        {/* Filtros */}
-        <Card>
+      {/* Filtros */}
+      <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Search className="h-5 w-5" />
@@ -225,11 +223,11 @@ export default function LogsPage() {
                 </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
+        </CardContent>
+      </Card>
 
-        {/* Tabela de Logs */}
-        <Card>
+      {/* Tabela de Logs */}
+      <Card>
           <CardHeader>
             <CardTitle>Registros de Auditoria</CardTitle>
             <CardDescription>
@@ -322,10 +320,9 @@ export default function LogsPage() {
                   Próxima
                 </Button>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </AppLayout>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

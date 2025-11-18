@@ -229,4 +229,33 @@ export class UsersService {
 
     return { message: 'Usuário desbloqueado com sucesso' };
   }
+
+  /**
+   * Atualizar perfil do próprio usuário
+   */
+  async updateProfile(userId: string, updateProfileDto: { name: string; email: string }) {
+    const { name, email } = updateProfileDto;
+
+    // Verificar se o email já está em uso por outro usuário
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser && existingUser.id !== userId) {
+      throw new ConflictException('Este email já está em uso');
+    }
+
+    // Atualizar usuário
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { name, email },
+      include: {
+        tenant: true,
+      },
+    });
+
+    // Remove a senha do retorno
+    const { password, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  }
 }
