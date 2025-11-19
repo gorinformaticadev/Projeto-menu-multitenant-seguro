@@ -87,8 +87,6 @@ export class TenantsController {
 
   @Public()
   @SkipThrottle()
-  @Public()
-  @SkipThrottle()
   @Get('public/master-logo')
   async getMasterLogo() {
     return this.tenantsService.getMasterLogo();
