@@ -106,4 +106,13 @@ export class AuthController {
   async disable2FA(@Body() verify2FADto: Verify2FADto, @Req() req: any) {
     return this.twoFactorService.disable(req.user.id, verify2FADto.token);
   }
+  /**
+   * GET /auth/me
+   * Retornar dados do usuário logado
+   */
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  async getProfile(@Req() req: any) {
+    return this.authService.getProfile(req.user.id);
+  }
 }

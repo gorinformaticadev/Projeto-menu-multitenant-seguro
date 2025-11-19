@@ -15,14 +15,15 @@ export function useTokenExpiration() {
     const checkExpiration = () => {
       if (typeof window === "undefined") return;
 
-      const token = sessionStorage.getItem("@App:token");
-      if (!token) {
+      const encryptedToken = localStorage.getItem("@App:token");
+      if (!encryptedToken) {
         setTimeRemaining(null);
         return;
       }
 
       try {
-        // Decodificar payload do JWT
+        // Descriptografar e decodificar payload do JWT
+        const token = atob(encryptedToken);
         const payload = JSON.parse(atob(token.split(".")[1]));
         const exp = payload.exp * 1000; // Converter para milliseconds
         const now = Date.now();

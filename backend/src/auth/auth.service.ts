@@ -19,7 +19,7 @@ export class AuthService {
     private auditService: AuditService,
     @Inject(forwardRef(() => TwoFactorService))
     private twoFactorService: TwoFactorService,
-  ) {}
+  ) { }
 
   async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string) {
     const { email, password } = loginDto;
@@ -447,5 +447,29 @@ export class AuthService {
   async hashPassword(password: string): Promise<string> {
     const saltRounds = 10;
     return bcrypt.hash(password, saltRounds);
+  }
+
+  /**
+   * Buscar dados do perfil do usuário
+   */
+  async getProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { tenant: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Usuário não encontrado');
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      tenantId: user.tenantId,
+      tenant: user.tenant,
+      twoFactorEnabled: user.twoFactorEnabled,
+    };
   }
 }

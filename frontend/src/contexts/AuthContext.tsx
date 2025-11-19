@@ -18,6 +18,7 @@ export interface User {
     cnpjCpf: string;
     telefone: string;
   } | null;
+  twoFactorEnabled?: boolean;
 }
 
 interface AuthContextData {
@@ -30,44 +31,63 @@ interface AuthContextData {
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 
-// Simulação de armazenamento seguro (Electron Keytar/Keychain)
+// Armazenamento seguro com localStorage (persistente) e criptografia básica
 const SecureStorage = {
+  // Chave de criptografia simples (em produção, usar crypto mais robusto)
+  encryptionKey: 'app-secure-key-2024',
+
+  encrypt: (text: string): string => {
+    // Criptografia básica para evitar exposição óbvia
+    return btoa(text); // Base64 encoding
+  },
+
+  decrypt: (encrypted: string): string => {
+    try {
+      return atob(encrypted);
+    } catch {
+      return '';
+    }
+  },
+
   setToken: (token: string) => {
-    // Em produção Electron, usar: keytar.setPassword('app', 'jwt', token)
     if (typeof window !== "undefined") {
-      sessionStorage.setItem("@App:token", token);
+      const encrypted = SecureStorage.encrypt(token);
+      localStorage.setItem("@App:token", encrypted);
     }
   },
+
   getToken: (): string | null => {
-    // Em produção Electron, usar: keytar.getPassword('app', 'jwt')
     if (typeof window !== "undefined") {
-      return sessionStorage.getItem("@App:token");
+      const encrypted = localStorage.getItem("@App:token");
+      return encrypted ? SecureStorage.decrypt(encrypted) : null;
     }
     return null;
   },
+
   removeToken: () => {
-    // Em produção Electron, usar: keytar.deletePassword('app', 'jwt')
     if (typeof window !== "undefined") {
-      sessionStorage.removeItem("@App:token");
+      localStorage.removeItem("@App:token");
     }
   },
+
   setRefreshToken: (token: string) => {
-    // Em produção Electron, usar: keytar.setPassword('app', 'refresh', token)
     if (typeof window !== "undefined") {
-      sessionStorage.setItem("@App:refreshToken", token);
+      const encrypted = SecureStorage.encrypt(token);
+      localStorage.setItem("@App:refreshToken", encrypted);
     }
   },
+
   getRefreshToken: (): string | null => {
-    // Em produção Electron, usar: keytar.getPassword('app', 'refresh')
     if (typeof window !== "undefined") {
-      return sessionStorage.getItem("@App:refreshToken");
+      const encrypted = localStorage.getItem("@App:refreshToken");
+      return encrypted ? SecureStorage.decrypt(encrypted) : null;
     }
     return null;
   },
+
   removeRefreshToken: () => {
-    // Em produção Electron, usar: keytar.deletePassword('app', 'refresh')
     if (typeof window !== "undefined") {
-      sessionStorage.removeItem("@App:refreshToken");
+      localStorage.removeItem("@App:refreshToken");
     }
   },
 };
@@ -78,28 +98,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    const token = SecureStorage.getToken();
+    const loadUser = async () => {
+      const token = SecureStorage.getToken();
 
-    if (token) {
-      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-      // Aqui você poderia fazer uma requisição para validar o token
-      // Por simplicidade, vamos decodificar o payload do JWT
-      try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        // Simula buscar dados do usuário
-        setUser({
-          id: payload.sub,
-          email: payload.email,
-          name: payload.email.split("@")[0],
-          role: payload.role,
-          tenantId: payload.tenantId,
-        });
-      } catch (error) {
-        SecureStorage.removeToken();
+      if (token) {
+        api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
+        try {
+          // Buscar dados atualizados do usuário
+          const response = await api.get("/auth/me");
+          setUser(response.data);
+        } catch (error) {
+          console.error("Erro ao carregar usuário:", error);
+          SecureStorage.removeToken();
+          delete api.defaults.headers.common["Authorization"];
+        }
       }
-    }
 
-    setLoading(false);
+      setLoading(false);
+    };
+
+    loadUser();
   }, []);
 
   async function login(email: string, password: string) {

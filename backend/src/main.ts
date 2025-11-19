@@ -28,11 +28,12 @@ async function bootstrap() {
         directives: {
           defaultSrc: ["'self'"],
           styleSrc: ["'self'", "'unsafe-inline'"], // Permite estilos inline (necessário para alguns frameworks)
-          scriptSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-eval'"], // Permite eval para desenvolvimento
           imgSrc: [
             "'self'",
             'data:',
             'https:',
+            'blob:',
             'http://localhost:4000',
             'http://localhost:5000',
             'http://localhost:3000',
@@ -42,12 +43,17 @@ async function bootstrap() {
             'http://localhost:4000',
             'http://localhost:5000',
             'http://localhost:3000',
+            'ws://localhost:4000', // WebSocket para hot reload
+            'ws://localhost:5000',
             isProduction ? process.env.FRONTEND_URL || '' : '',
           ].filter(Boolean), // Remove strings vazias
-          fontSrc: ["'self'", 'data:'],
+          fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
           objectSrc: ["'none'"],
           mediaSrc: ["'self'"],
           frameSrc: ["'none'"], // Previne clickjacking
+          baseUri: ["'self'"],
+          formAction: ["'self'"],
+          frameAncestors: ["'none'"], // Previne clickjacking adicional
         },
       },
       // HTTP Strict Transport Security - Força HTTPS (apenas em produção)
@@ -78,6 +84,28 @@ async function bootstrap() {
       },
     }),
   );
+
+  // ============================================
+  // 🛡️ Headers de Segurança Adicionais
+  // ============================================
+  app.use((req, res, next) => {
+    // Cross-Origin Embedder Policy - Protege contra certos ataques
+    res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+
+    // Cross-Origin Opener Policy - Protege contra certos ataques
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+
+    // Cross-Origin Resource Policy
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
+    // Origin-Agent-Cluster - Melhora isolamento
+    res.setHeader('Origin-Agent-Cluster', '?1');
+
+    // DNS Prefetch Control
+    res.setHeader('X-DNS-Prefetch-Control', 'off');
+
+    next();
+  });
 
   // ============================================
   // 🔒 HTTPS ENFORCEMENT - Apenas em produção
@@ -111,8 +139,9 @@ async function bootstrap() {
       'http://localhost:3000', // Next.js dev server
     ],
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    exposedHeaders: ['Content-Type', 'Content-Length'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    exposedHeaders: ['Content-Type', 'Content-Length', 'X-Total-Count'],
+    maxAge: parseInt(process.env.CORS_MAX_AGE) || 86400, // Cache preflight por 24h
   });
 
   // ============================================
