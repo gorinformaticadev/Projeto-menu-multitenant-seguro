@@ -13,6 +13,7 @@ import { Public } from '../common/decorators/public.decorator';
 import { Role } from '@prisma/client';
 import { multerConfig } from '../common/config/multer.config';
 
+@SkipThrottle()
 @Controller('tenants')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class TenantsController {

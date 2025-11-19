@@ -38,16 +38,47 @@ export default function PerfilPage() {
     }
   }, [user?.id]);
 
-  async function loadUserData() {
+  async function loadUserData(force = false) {
     if (!user?.id) return;
-    
+
+    const cacheKey = `user-profile-${user.id}`;
+    const cacheTTL = 2 * 60 * 1000; // 2 minutos
+
+    // Verificar cache se não for forçado
+    if (!force) {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const { data, timestamp } = JSON.parse(cached);
+          if (Date.now() - timestamp < cacheTTL) {
+            setTwoFactorEnabled(data.twoFactorEnabled || false);
+            setProfileData({
+              name: data.name || "",
+              email: data.email || "",
+            });
+            return;
+          }
+        } catch (e) {
+          // Cache inválido, continua
+        }
+      }
+    }
+
     try {
       const response = await api.get(`/users/${user.id}`);
-      setTwoFactorEnabled(response.data.twoFactorEnabled || false);
+      const userData = response.data;
+
+      setTwoFactorEnabled(userData.twoFactorEnabled || false);
       setProfileData({
-        name: response.data.name || "",
-        email: response.data.email || "",
+        name: userData.name || "",
+        email: userData.email || "",
       });
+
+      // Cache o resultado
+      localStorage.setItem(cacheKey, JSON.stringify({
+        data: userData,
+        timestamp: Date.now()
+      }));
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
     }
@@ -76,8 +107,8 @@ export default function PerfilPage() {
         description: "Suas informações foram atualizadas com sucesso",
       });
       setShowEditProfile(false);
-      // Recarregar dados do usuário
-      await loadUserData();
+      // Recarregar dados do usuário (forçar refresh do cache)
+      await loadUserData(true);
     } catch (error: any) {
       toast({
         title: "Erro ao atualizar perfil",

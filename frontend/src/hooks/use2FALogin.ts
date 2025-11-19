@@ -31,7 +31,17 @@ export function use2FALogin() {
       
       api.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
       
-      router.push("/dashboard");
+      // Usar setTimeout para garantir que o estado seja atualizado antes do redirect
+      setTimeout(() => {
+        router.push("/dashboard");
+        // Fallback caso router.push não funcione
+        setTimeout(() => {
+          if (typeof window !== "undefined" && window.location.pathname === "/login") {
+            window.location.href = "/dashboard";
+          }
+        }, 500);
+      }, 100);
+      
       return { success: true };
     } catch (err: any) {
       // Se o erro for que precisa de 2FA
@@ -69,7 +79,17 @@ export function use2FALogin() {
 
       api.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
 
-      router.push("/dashboard");
+      // Usar setTimeout para garantir que o estado seja atualizado antes do redirect
+      setTimeout(() => {
+        router.push("/dashboard");
+        // Fallback caso router.push não funcione
+        setTimeout(() => {
+          if (typeof window !== "undefined" && window.location.pathname === "/login") {
+            window.location.href = "/dashboard";
+          }
+        }, 500);
+      }, 100);
+      
       return { success: true };
     } catch (err: any) {
       setError(err.response?.data?.message || "Código inválido");

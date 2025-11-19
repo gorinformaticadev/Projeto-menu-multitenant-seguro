@@ -1,11 +1,14 @@
 import { Controller, Get, Put, Body, UseGuards, Request } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { SecurityConfigService } from './security-config.service';
 import { UpdateSecurityConfigDto } from './dto/update-security-config.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { Public } from '../common/decorators/public.decorator';
 import { Role } from '@prisma/client';
 
+@SkipThrottle()
 @Controller('security-config')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SecurityConfigController {
@@ -16,6 +19,7 @@ export class SecurityConfigController {
    * Obter configurações de segurança
    * Apenas SUPER_ADMIN
    */
+  @SkipThrottle()
   @Get()
   @Roles(Role.SUPER_ADMIN)
   async getConfig() {
@@ -27,6 +31,7 @@ export class SecurityConfigController {
    * Atualizar configurações de segurança
    * Apenas SUPER_ADMIN
    */
+  @SkipThrottle()
   @Put()
   @Roles(Role.SUPER_ADMIN)
   async updateConfig(
@@ -40,8 +45,39 @@ export class SecurityConfigController {
    * GET /security-config/password-policy
    * Obter política de senha (público para validação no frontend)
    */
+  @Public()
+  @SkipThrottle()
   @Get('password-policy')
   async getPasswordPolicy() {
     return this.securityConfigService.getPasswordPolicy();
+  }
+
+  /**
+   * GET /security-config/2fa-status
+   * Verificar se 2FA está habilitado globalmente (público)
+   */
+  @Public()
+  @SkipThrottle()
+  @Get('2fa-status')
+  async get2FAStatus() {
+    const config = await this.securityConfigService.getConfig();
+    return {
+      enabled: config.twoFactorEnabled,
+      required: config.twoFactorRequired,
+    };
+  }
+
+  /**
+   * GET /security-config/session-timeout
+   * Obter timeout de sessão (público para aplicar logout automático)
+   */
+  @Public()
+  @SkipThrottle()
+  @Get('session-timeout')
+  async getSessionTimeout() {
+    const config = await this.securityConfigService.getConfig();
+    return {
+      sessionTimeoutMinutes: config.sessionTimeoutMinutes,
+    };
   }
 }

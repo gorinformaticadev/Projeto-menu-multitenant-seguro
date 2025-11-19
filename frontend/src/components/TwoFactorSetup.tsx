@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useSecurityConfig } from "@/contexts/SecurityConfigContext";
 import api from "@/lib/api";
 import { Shield, QrCode, Lock, Unlock, AlertCircle } from "lucide-react";
 import Image from "next/image";
@@ -17,11 +18,14 @@ interface TwoFactorSetupProps {
 
 export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProps) {
   const { toast } = useToast();
+  const { config: securityConfig, loading: loadingConfig } = useSecurityConfig();
   const [loading, setLoading] = useState(false);
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
   const [verificationCode, setVerificationCode] = useState("");
   const [showSetup, setShowSetup] = useState(false);
+
+  const twoFactorGloballyEnabled = securityConfig?.twoFactorEnabled ?? false;
 
   async function handleGenerate() {
     try {
@@ -108,6 +112,11 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
     }
   }
 
+  // Não exibir se ainda carregando
+  if (loadingConfig) {
+    return null; // Ou um skeleton loader
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -120,6 +129,16 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Aviso se 2FA estiver desabilitado globalmente */}
+        {!twoFactorGloballyEnabled && (
+          <div className="flex items-start gap-2 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-yellow-800">
+              <p className="font-medium mb-1">2FA Desabilitado pelo Administrador</p>
+              <p>A autenticação de dois fatores está temporariamente desabilitada nas configurações do sistema. Entre em contato com o administrador para habilitar esta funcionalidade.</p>
+            </div>
+          </div>
+        )}
         {/* Status */}
         <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
           <div className="flex items-center gap-3">
@@ -135,7 +154,9 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
               <p className="text-sm text-muted-foreground">
                 {isEnabled
                   ? "Sua conta está protegida com 2FA"
-                  : "Ative o 2FA para maior segurança"}
+                  : twoFactorGloballyEnabled
+                  ? "Ative o 2FA para maior segurança"
+                  : "2FA desabilitado pelo administrador"}
               </p>
             </div>
           </div>
@@ -143,120 +164,133 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
             className={`px-3 py-1 rounded-full text-sm font-medium ${
               isEnabled
                 ? "bg-green-100 text-green-800"
-                : "bg-gray-100 text-gray-800"
+                : twoFactorGloballyEnabled
+                ? "bg-gray-100 text-gray-800"
+                : "bg-yellow-100 text-yellow-800"
             }`}
           >
-            {isEnabled ? "Ativo" : "Inativo"}
+            {isEnabled ? "Ativo" : twoFactorGloballyEnabled ? "Inativo" : "Bloqueado"}
           </div>
         </div>
 
-        {/* Ativar 2FA */}
-        {!isEnabled && !showSetup && (
-          <div className="space-y-4">
-            <div className="flex items-start gap-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-blue-800">
-                <p className="font-medium mb-1">Como funciona?</p>
-                <ol className="list-decimal list-inside space-y-1">
-                  <li>Clique em "Ativar 2FA"</li>
-                  <li>Escaneie o QR Code com Google Authenticator</li>
-                  <li>Digite o código de 6 dígitos para confirmar</li>
-                  <li>Pronto! Sua conta está mais segura</li>
-                </ol>
+        {/* Conteúdo apenas se 2FA estiver habilitado globalmente */}
+        {twoFactorGloballyEnabled ? (
+          <>
+            {/* Ativar 2FA */}
+            {!isEnabled && !showSetup && (
+              <div className="space-y-4">
+                <div className="flex items-start gap-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-blue-800">
+                    <p className="font-medium mb-1">Como funciona?</p>
+                    <ol className="list-decimal list-inside space-y-1">
+                      <li>Clique em "Ativar 2FA"</li>
+                      <li>Escaneie o QR Code com Google Authenticator</li>
+                      <li>Digite o código de 6 dígitos para confirmar</li>
+                      <li>Pronto! Sua conta está mais segura</li>
+                    </ol>
+                  </div>
+                </div>
+                <Button onClick={handleGenerate} disabled={loading} className="w-full">
+                  <QrCode className="h-4 w-4 mr-2" />
+                  {loading ? "Gerando..." : "Ativar 2FA"}
+                </Button>
               </div>
-            </div>
-            <Button onClick={handleGenerate} disabled={loading} className="w-full">
-              <QrCode className="h-4 w-4 mr-2" />
-              {loading ? "Gerando..." : "Ativar 2FA"}
-            </Button>
-          </div>
-        )}
+            )}
 
-        {/* Setup do 2FA */}
-        {!isEnabled && showSetup && qrCode && (
-          <div className="space-y-4">
-            <div className="text-center space-y-4">
-              <p className="text-sm font-medium">
-                1. Escaneie este QR Code no Google Authenticator
-              </p>
-              <div className="flex justify-center">
-                <div className="p-4 bg-white rounded-lg border">
-                  <Image
-                    src={qrCode}
-                    alt="QR Code 2FA"
-                    width={200}
-                    height={200}
+            {/* Setup do 2FA */}
+            {!isEnabled && showSetup && qrCode && (
+              <div className="space-y-4">
+                <div className="text-center space-y-4">
+                  <p className="text-sm font-medium">
+                    1. Escaneie este QR Code no Google Authenticator
+                  </p>
+                  <div className="flex justify-center">
+                    <div className="p-4 bg-white rounded-lg border">
+                      <Image
+                        src={qrCode}
+                        alt="QR Code 2FA"
+                        width={200}
+                        height={200}
+                      />
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    <p>Ou digite manualmente o código:</p>
+                    <code className="bg-muted px-2 py-1 rounded">{secret}</code>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="code">2. Digite o código de 6 dígitos</Label>
+                  <Input
+                    id="code"
+                    type="text"
+                    placeholder="000000"
+                    maxLength={6}
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ""))}
+                    className="text-center text-2xl tracking-widest"
                   />
                 </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowSetup(false);
+                      setQrCode(null);
+                      setSecret(null);
+                      setVerificationCode("");
+                    }}
+                    className="flex-1"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handleEnable}
+                    disabled={loading || verificationCode.length !== 6}
+                    className="flex-1"
+                  >
+                    {loading ? "Ativando..." : "Confirmar"}
+                  </Button>
+                </div>
               </div>
-              <div className="text-xs text-muted-foreground">
-                <p>Ou digite manualmente o código:</p>
-                <code className="bg-muted px-2 py-1 rounded">{secret}</code>
+            )}
+
+            {/* Desativar 2FA */}
+            {isEnabled && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="disable-code">
+                    Digite o código do seu app para desativar
+                  </Label>
+                  <Input
+                    id="disable-code"
+                    type="text"
+                    placeholder="000000"
+                    maxLength={6}
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ""))}
+                    className="text-center text-2xl tracking-widest"
+                  />
+                </div>
+                <Button
+                  variant="destructive"
+                  onClick={handleDisable}
+                  disabled={loading || verificationCode.length !== 6}
+                  className="w-full"
+                >
+                  {loading ? "Desativando..." : "Desativar 2FA"}
+                </Button>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="code">2. Digite o código de 6 dígitos</Label>
-              <Input
-                id="code"
-                type="text"
-                placeholder="000000"
-                maxLength={6}
-                value={verificationCode}
-                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ""))}
-                className="text-center text-2xl tracking-widest"
-              />
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowSetup(false);
-                  setQrCode(null);
-                  setSecret(null);
-                  setVerificationCode("");
-                }}
-                className="flex-1"
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleEnable}
-                disabled={loading || verificationCode.length !== 6}
-                className="flex-1"
-              >
-                {loading ? "Ativando..." : "Confirmar"}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Desativar 2FA */}
-        {isEnabled && (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="disable-code">
-                Digite o código do seu app para desativar
-              </Label>
-              <Input
-                id="disable-code"
-                type="text"
-                placeholder="000000"
-                maxLength={6}
-                value={verificationCode}
-                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ""))}
-                className="text-center text-2xl tracking-widest"
-              />
-            </div>
-            <Button
-              variant="destructive"
-              onClick={handleDisable}
-              disabled={loading || verificationCode.length !== 6}
-              className="w-full"
-            >
-              {loading ? "Desativando..." : "Desativar 2FA"}
-            </Button>
+            )}
+          </>
+        ) : (
+          <div className="text-center py-4">
+            <p className="text-sm text-muted-foreground">
+              A funcionalidade de 2FA está desabilitada pelo administrador do sistema.
+            </p>
           </div>
         )}
       </CardContent>

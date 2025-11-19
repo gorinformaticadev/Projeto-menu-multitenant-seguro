@@ -26,9 +26,9 @@ import { CommonModule } from './common/common.module';
     // ============================================
     ThrottlerModule.forRoot([
       {
-        name: 'global',
+        name: 'default',
         ttl: 60000, // 60 segundos (1 minuto)
-        limit: 100, // 100 requisições por minuto
+        limit: 1000, // 1000 requisições por minuto (aumentado para evitar bloqueios)
       },
       {
         name: 'login',

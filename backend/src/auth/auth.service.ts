@@ -79,10 +79,13 @@ export class AuthService {
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
+      // Buscar configurações de segurança
+      const securityConfig = await this.prisma.securityConfig.findFirst();
+      const maxAttempts = securityConfig?.loginMaxAttempts || 5;
+      const lockDurationMinutes = securityConfig?.loginLockDurationMinutes || 30;
+
       // Incrementar tentativas de login
       const newAttempts = user.loginAttempts + 1;
-      const maxAttempts = 5; // Configurável via SecurityConfig
-      const lockDurationMinutes = 30; // 30 minutos de bloqueio
 
       // Atualizar tentativas
       const updateData: any = {
@@ -110,7 +113,7 @@ export class AuthService {
           tenantId: user.tenantId,
           ipAddress,
           userAgent,
-          details: { email, attempts: newAttempts, lockedUntil },
+          details: { email, attempts: newAttempts, lockedUntil, maxAttempts, lockDurationMinutes },
         });
 
         throw new UnauthorizedException(
@@ -129,7 +132,7 @@ export class AuthService {
       let errorMessage = 'Credenciais inválidas';
 
       if (attemptsRemaining === 1) {
-        errorMessage = `Credenciais inválidas. ATENÇÃO: Você tem apenas ${attemptsRemaining} tentativa restante antes de sua conta ser bloqueada.`;
+        errorMessage = `Credenciais inválidas. ATENÇÃO: Você tem apenas ${attemptsRemaining} tentativa restante antes de sua conta ser bloqueada por ${lockDurationMinutes} minutos.`;
       } else if (attemptsRemaining <= 3) {
         errorMessage = `Credenciais inválidas. Você tem ${attemptsRemaining} tentativas restantes.`;
       }
@@ -141,7 +144,7 @@ export class AuthService {
         tenantId: user.tenantId,
         ipAddress,
         userAgent,
-        details: { email, reason: 'invalid_password', attempts: newAttempts, attemptsRemaining },
+        details: { email, reason: 'invalid_password', attempts: newAttempts, attemptsRemaining, maxAttempts },
       });
 
       throw new UnauthorizedException(errorMessage);

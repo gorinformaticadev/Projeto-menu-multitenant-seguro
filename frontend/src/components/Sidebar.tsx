@@ -59,20 +59,9 @@ export function Sidebar() {
     },
     {
       name: "Configurações",
-      href: "/configuracoes",
+      href: user?.role === "SUPER_ADMIN" ? "/configuracoes/seguranca" : "/configuracoes",
       icon: Settings,
       show: user?.role === "SUPER_ADMIN" || user?.role === "ADMIN",
-      submenu: user?.role === "SUPER_ADMIN" ? [
-        {
-          name: "Geral",
-          href: "/configuracoes",
-        },
-        {
-          name: "Segurança",
-          href: "/configuracoes/seguranca",
-          icon: Shield,
-        },
-      ] : undefined,
     },
   ];
 

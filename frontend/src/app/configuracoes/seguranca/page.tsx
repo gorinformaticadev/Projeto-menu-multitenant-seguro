@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSecurityConfig } from "@/contexts/SecurityConfigContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import { Shield, Save, AlertTriangle } from "lucide-react";
 interface SecurityConfig {
   id: string;
   loginMaxAttempts: number;
+  loginLockDurationMinutes: number;
   loginWindowMinutes: number;
   globalMaxRequests: number;
   globalWindowMinutes: number;
@@ -26,7 +28,7 @@ interface SecurityConfig {
   refreshTokenExpiresIn: string;
   twoFactorEnabled: boolean;
   twoFactorRequired: boolean;
-  sessionTimeout: number;
+  sessionTimeoutMinutes: number;
   updatedAt: string;
   updatedBy: string | null;
 }
@@ -34,6 +36,7 @@ interface SecurityConfig {
 export default function SecurityConfigPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { refreshConfig } = useSecurityConfig();
   const [config, setConfig] = useState<SecurityConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -48,10 +51,34 @@ export default function SecurityConfigPage() {
   // Carregar configurações
   useEffect(() => {
     const fetchConfig = async () => {
+      const cacheKey = 'security-config-full-cache';
+      const cacheTTL = 5 * 60 * 1000; // 5 minutos
+
+      // Verificar cache
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const { data, timestamp } = JSON.parse(cached);
+          if (Date.now() - timestamp < cacheTTL) {
+            setConfig(data);
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          // Cache inválido, continua
+        }
+      }
+
       try {
         setLoading(true);
         const response = await api.get("/security-config");
         setConfig(response.data);
+
+        // Cache o resultado
+        localStorage.setItem(cacheKey, JSON.stringify({
+          data: response.data,
+          timestamp: Date.now()
+        }));
       } catch (error: any) {
         toast({
           title: "Erro ao carregar configurações",
@@ -73,7 +100,37 @@ export default function SecurityConfigPage() {
 
     try {
       setSaving(true);
-      await api.put("/security-config", config);
+      
+      // Enviar apenas os campos permitidos (sem id, updatedAt, updatedBy)
+      const updateData = {
+        loginMaxAttempts: config.loginMaxAttempts,
+        loginLockDurationMinutes: config.loginLockDurationMinutes,
+        loginWindowMinutes: config.loginWindowMinutes,
+        globalMaxRequests: config.globalMaxRequests,
+        globalWindowMinutes: config.globalWindowMinutes,
+        passwordMinLength: config.passwordMinLength,
+        passwordRequireUppercase: config.passwordRequireUppercase,
+        passwordRequireLowercase: config.passwordRequireLowercase,
+        passwordRequireNumbers: config.passwordRequireNumbers,
+        passwordRequireSpecial: config.passwordRequireSpecial,
+        accessTokenExpiresIn: config.accessTokenExpiresIn,
+        refreshTokenExpiresIn: config.refreshTokenExpiresIn,
+        twoFactorEnabled: config.twoFactorEnabled,
+        twoFactorRequired: config.twoFactorRequired,
+        sessionTimeoutMinutes: config.sessionTimeoutMinutes,
+      };
+      
+      const response = await api.put("/security-config", updateData);
+
+      // Atualizar cache local
+      localStorage.setItem('security-config-full-cache', JSON.stringify({
+        data: response.data,
+        timestamp: Date.now()
+      }));
+
+      // Atualizar configuração global no contexto
+      await refreshConfig();
+
       toast({
         title: "Configurações salvas",
         description: "As configurações de segurança foram atualizadas com sucesso",
@@ -151,19 +208,19 @@ export default function SecurityConfigPage() {
           </CardContent>
         </Card>
 
-        {/* Rate Limiting */}
+        {/* Controle de Login */}
         <Card>
           <CardHeader>
-            <CardTitle>Rate Limiting</CardTitle>
+            <CardTitle>Controle de Tentativas de Login</CardTitle>
             <CardDescription>
-              Controle o número de requisições permitidas para prevenir ataques de força bruta
+              Configure o bloqueio automático de contas após múltiplas tentativas de login falhas
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <Label htmlFor="loginMaxAttempts">
-                  Tentativas de Login (por período)
+                  Máximo de Tentativas de Login
                 </Label>
                 <Input
                   id="loginMaxAttempts"
@@ -176,29 +233,42 @@ export default function SecurityConfigPage() {
                   }
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Número máximo de tentativas de login permitidas
+                  Número de tentativas antes de bloquear a conta (1-100)
                 </p>
               </div>
 
               <div>
-                <Label htmlFor="loginWindowMinutes">
-                  Janela de Tempo (minutos)
+                <Label htmlFor="loginLockDurationMinutes">
+                  Duração do Bloqueio (minutos)
                 </Label>
                 <Input
-                  id="loginWindowMinutes"
+                  id="loginLockDurationMinutes"
                   type="number"
-                  min="1"
-                  max="60"
-                  value={config.loginWindowMinutes}
+                  min="5"
+                  max="1440"
+                  value={config.loginLockDurationMinutes}
                   onChange={(e) =>
-                    updateConfig("loginWindowMinutes", parseInt(e.target.value))
+                    updateConfig("loginLockDurationMinutes", parseInt(e.target.value))
                   }
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Período de tempo para contagem de tentativas
+                  Tempo que a conta ficará bloqueada (5-1440 minutos / até 24h)
                 </p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
 
+        {/* Rate Limiting Global */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Rate Limiting Global</CardTitle>
+            <CardDescription>
+              Controle o número de requisições permitidas para prevenir ataques DDoS
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <Label htmlFor="globalMaxRequests">
                   Requisições Globais (por período)
@@ -214,7 +284,7 @@ export default function SecurityConfigPage() {
                   }
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Número máximo de requisições globais
+                  Número máximo de requisições globais (10-1000)
                 </p>
               </div>
 
@@ -233,7 +303,7 @@ export default function SecurityConfigPage() {
                   }
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Período para contagem de requisições globais
+                  Período para contagem de requisições globais (1-60 minutos)
                 </p>
               </div>
             </div>
@@ -344,12 +414,88 @@ export default function SecurityConfigPage() {
           </CardContent>
         </Card>
 
+        {/* Autenticação de Dois Fatores */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Autenticação de Dois Fatores (2FA)</CardTitle>
+            <CardDescription>
+              Configure se o 2FA está disponível para usuários e se deve ser obrigatório
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="twoFactorEnabled">
+                    Habilitar 2FA Globalmente
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Permite que usuários configurem autenticação de dois fatores em suas contas
+                  </p>
+                </div>
+                <Switch
+                  id="twoFactorEnabled"
+                  checked={config.twoFactorEnabled}
+                  onCheckedChange={(checked) =>
+                    updateConfig("twoFactorEnabled", checked)
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="twoFactorRequired">
+                    Tornar 2FA Obrigatório
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Todos os usuários devem configurar 2FA para acessar o sistema
+                  </p>
+                </div>
+                <Switch
+                  id="twoFactorRequired"
+                  checked={config.twoFactorRequired}
+                  disabled={!config.twoFactorEnabled}
+                  onCheckedChange={(checked) =>
+                    updateConfig("twoFactorRequired", checked)
+                  }
+                />
+              </div>
+
+              {!config.twoFactorEnabled && (
+                <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-xs text-yellow-800">
+                    <p className="font-medium mb-1">2FA Desabilitado</p>
+                    <p>
+                      Quando o 2FA estiver desabilitado, os usuários não poderão configurar
+                      autenticação de dois fatores em suas contas.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {config.twoFactorEnabled && config.twoFactorRequired && (
+                <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <Shield className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-xs text-blue-800">
+                    <p className="font-medium mb-1">2FA Obrigatório</p>
+                    <p>
+                      Todos os usuários serão obrigados a configurar 2FA no próximo login.
+                      Usuários existentes sem 2FA configurado serão redirecionados para configuração.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* JWT e Sessão */}
         <Card>
           <CardHeader>
             <CardTitle>Tokens e Sessão</CardTitle>
             <CardDescription>
-              Configure o tempo de expiração de tokens e sessões
+              Configure o tempo de expiração de tokens e logout automático por inatividade
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -391,71 +537,23 @@ export default function SecurityConfigPage() {
               </div>
 
               <div>
-                <Label htmlFor="sessionTimeout">
-                  Timeout de Sessão (minutos)
+                <Label htmlFor="sessionTimeoutMinutes">
+                  Logout por Inatividade (minutos)
                 </Label>
                 <Input
-                  id="sessionTimeout"
+                  id="sessionTimeoutMinutes"
                   type="number"
                   min="5"
-                  max="120"
-                  value={config.sessionTimeout}
+                  max="1440"
+                  value={config.sessionTimeoutMinutes}
                   onChange={(e) =>
-                    updateConfig("sessionTimeout", parseInt(e.target.value))
+                    updateConfig("sessionTimeoutMinutes", parseInt(e.target.value))
                   }
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Tempo de inatividade antes de deslogar (5-120 minutos)
+                  Tempo de inatividade antes de deslogar automaticamente (5-1440 minutos / até 24h)
                 </p>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Autenticação 2FA */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Autenticação de Dois Fatores (2FA)</CardTitle>
-            <CardDescription>
-              Configure a autenticação de dois fatores para maior segurança
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="twoFactorEnabled">
-                  Habilitar 2FA
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Permite que usuários ativem autenticação de dois fatores
-                </p>
-              </div>
-              <Switch
-                id="twoFactorEnabled"
-                checked={config.twoFactorEnabled}
-                onCheckedChange={(checked) =>
-                  updateConfig("twoFactorEnabled", checked)
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="twoFactorRequired">
-                  Tornar 2FA Obrigatório
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Todos os usuários devem usar autenticação de dois fatores
-                </p>
-              </div>
-              <Switch
-                id="twoFactorRequired"
-                checked={config.twoFactorRequired}
-                onCheckedChange={(checked) =>
-                  updateConfig("twoFactorRequired", checked)
-                }
-                disabled={!config.twoFactorEnabled}
-              />
             </div>
           </CardContent>
         </Card>

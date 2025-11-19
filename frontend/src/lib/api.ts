@@ -25,11 +25,62 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
+// Interceptor de request para adicionar token
+api.interceptors.request.use(
+  (config) => {
+    const token = typeof window !== "undefined" 
+      ? sessionStorage.getItem("@App:token") 
+      : null;
+    
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Função para fazer logout
+const doLogout = () => {
+  if (typeof window !== "undefined") {
+    sessionStorage.removeItem("@App:token");
+    sessionStorage.removeItem("@App:refreshToken");
+    delete api.defaults.headers.common["Authorization"];
+    
+    // Redirecionar apenas se não estiver já na página de login
+    if (window.location.pathname !== "/login") {
+      window.location.href = "/login";
+    }
+  }
+};
+
 // Interceptor para renovação automática de tokens
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // Erros que devem causar logout imediato
+    const shouldLogout = 
+      error.response?.status === 401 || // Não autorizado
+      error.response?.status === 403 || // Proibido (token inválido)
+      error.response?.data?.message?.includes("token") || // Mensagens relacionadas a token
+      error.response?.data?.message?.includes("expirado") ||
+      error.response?.data?.message?.includes("expired") ||
+      error.response?.data?.message?.includes("invalid");
+
+    // Se for erro de autenticação em endpoints de login/refresh, não tentar renovar
+    if (
+      shouldLogout &&
+      (originalRequest.url === "/auth/refresh" || 
+       originalRequest.url === "/auth/login")
+    ) {
+      doLogout();
+      return Promise.reject(error);
+    }
 
     // Se o erro for 401 e não for uma tentativa de refresh
     if (
@@ -61,12 +112,8 @@ api.interceptors.response.use(
           : null;
 
       if (!refreshToken) {
-        // Sem refresh token, redirecionar para login
-        if (typeof window !== "undefined") {
-          sessionStorage.removeItem("@App:token");
-          sessionStorage.removeItem("@App:refreshToken");
-          window.location.href = "/login";
-        }
+        // Sem refresh token, fazer logout
+        doLogout();
         return Promise.reject(error);
       }
 
@@ -93,16 +140,10 @@ api.interceptors.response.use(
         // Retentar requisição original
         originalRequest.headers["Authorization"] = `Bearer ${accessToken}`;
         return api(originalRequest);
-      } catch (refreshError) {
+      } catch (refreshError: any) {
         // Falha ao renovar, fazer logout
         processQueue(refreshError, null);
-
-        if (typeof window !== "undefined") {
-          sessionStorage.removeItem("@App:token");
-          sessionStorage.removeItem("@App:refreshToken");
-          window.location.href = "/login";
-        }
-
+        doLogout();
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

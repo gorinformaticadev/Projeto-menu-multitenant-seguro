@@ -10,6 +10,12 @@ export class UpdateSecurityConfigDto {
 
   @IsOptional()
   @IsInt()
+  @Min(5)
+  @Max(1440) // Até 24 horas
+  loginLockDurationMinutes?: number;
+
+  @IsOptional()
+  @IsInt()
   @Min(1)
   @Max(60)
   loginWindowMinutes?: number;
@@ -67,10 +73,10 @@ export class UpdateSecurityConfigDto {
   @IsBoolean()
   twoFactorRequired?: boolean;
 
-  // Outros
+  // Sessão
   @IsOptional()
   @IsInt()
   @Min(5)
-  @Max(120)
-  sessionTimeout?: number;
+  @Max(1440) // Até 24 horas
+  sessionTimeoutMinutes?: number;
 }

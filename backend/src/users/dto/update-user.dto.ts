@@ -1,5 +1,6 @@
 import { IsEmail, IsString, IsOptional, MinLength, IsEnum, IsBoolean } from 'class-validator';
 import { Role } from '@prisma/client';
+import { IsStrongPassword } from '../../common/validators/password.validator';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -17,7 +18,7 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsString()
-  @MinLength(6, { message: 'Senha deve ter no mínimo 6 caracteres' })
+  @IsStrongPassword()
   password?: string;
 }
 

@@ -16,10 +16,33 @@ export function TopBar() {
   // Busca logo da empresa master (para o header)
   useEffect(() => {
     async function fetchMasterLogo() {
+      const cacheKey = 'master-logo-cache';
+      const cacheTTL = 10 * 60 * 1000; // 10 minutos
+
+      // Verificar cache
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const { logoUrl, timestamp } = JSON.parse(cached);
+          if (Date.now() - timestamp < cacheTTL) {
+            setMasterLogo(logoUrl);
+            return;
+          }
+        } catch (e) {
+          // Cache inválido, continua
+        }
+      }
+
       try {
         const response = await api.get("/tenants/public/master-logo");
-        if (response.data?.logoUrl) {
-          setMasterLogo(response.data.logoUrl);
+        const logoUrl = response.data?.logoUrl;
+        if (logoUrl) {
+          setMasterLogo(logoUrl);
+          // Cache o resultado
+          localStorage.setItem(cacheKey, JSON.stringify({
+            logoUrl,
+            timestamp: Date.now()
+          }));
         }
       } catch (error) {
         console.error("Erro ao buscar logo:", error);
@@ -33,10 +56,33 @@ export function TopBar() {
     async function fetchUserTenantLogo() {
       if (user?.tenantId) {
         // Usuário tem tenant (ADMIN, USER, CLIENT) - usa endpoint público
+        const cacheKey = `tenant-logo-${user.tenantId}`;
+        const cacheTTL = 10 * 60 * 1000; // 10 minutos
+
+        // Verificar cache
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          try {
+            const { logoUrl, timestamp } = JSON.parse(cached);
+            if (Date.now() - timestamp < cacheTTL) {
+              setUserTenantLogo(logoUrl);
+              return;
+            }
+          } catch (e) {
+            // Cache inválido, continua
+          }
+        }
+
         try {
           const response = await api.get(`/tenants/public/${user.tenantId}/logo`);
-          if (response.data?.logoUrl) {
-            setUserTenantLogo(response.data.logoUrl);
+          const logoUrl = response.data?.logoUrl;
+          if (logoUrl) {
+            setUserTenantLogo(logoUrl);
+            // Cache o resultado
+            localStorage.setItem(cacheKey, JSON.stringify({
+              logoUrl,
+              timestamp: Date.now()
+            }));
           }
         } catch (error) {
           console.error("Erro ao buscar logo do tenant:", error);

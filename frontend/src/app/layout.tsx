@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SecurityConfigProvider } from "@/contexts/SecurityConfigContext";
 import { Toaster } from "@/components/ui/toaster";
 import { AppLayout } from "@/components/AppLayout";
+import { InactivityLogout } from "@/components/InactivityLogout";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -32,10 +34,13 @@ export default function RootLayout({
       </head>
       <body className={inter.className} suppressHydrationWarning>
         <AuthProvider>
-          <AppLayout>
-            {children}
-          </AppLayout>
-          <Toaster />
+          <SecurityConfigProvider>
+            <InactivityLogout />
+            <AppLayout>
+              {children}
+            </AppLayout>
+            <Toaster />
+          </SecurityConfigProvider>
         </AuthProvider>
       </body>
     </html>

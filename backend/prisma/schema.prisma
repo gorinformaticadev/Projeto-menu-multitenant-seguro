@@ -92,7 +92,8 @@ model AuditLog {
 model SecurityConfig {
   id                      String   @id @default(uuid())
   // Rate Limiting
-  loginMaxAttempts        Int      @default(5) // Tentativas de login
+  loginMaxAttempts        Int      @default(5) // Tentativas de login antes de bloquear
+  loginLockDurationMinutes Int     @default(30) // Duração do bloqueio em minutos
   loginWindowMinutes      Int      @default(1) // Janela de tempo em minutos
   globalMaxRequests       Int      @default(100) // Requisições globais
   globalWindowMinutes     Int      @default(1) // Janela de tempo global
@@ -108,8 +109,8 @@ model SecurityConfig {
   // 2FA
   twoFactorEnabled        Boolean  @default(false) // Habilitar 2FA globalmente
   twoFactorRequired       Boolean  @default(false) // Tornar 2FA obrigatório
-  // Outros
-  sessionTimeout          Int      @default(30) // Timeout de sessão em minutos
+  // Sessão
+  sessionTimeoutMinutes   Int      @default(30) // Timeout de inatividade em minutos (logout automático)
   updatedAt               DateTime @updatedAt
   updatedBy               String? // ID do SUPER_ADMIN que atualizou
 
