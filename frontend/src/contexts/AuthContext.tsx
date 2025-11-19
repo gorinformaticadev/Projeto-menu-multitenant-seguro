@@ -23,6 +23,7 @@ interface AuthContextData {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  updateUser: (userData: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
@@ -119,7 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function logout() {
     const refreshToken = SecureStorage.getRefreshToken();
-    
+
     // Invalidar refresh token no backend
     if (refreshToken) {
       try {
@@ -136,8 +137,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/login");
   }
 
+  function updateUser(userData: Partial<User>) {
+    if (user) {
+      setUser({ ...user, ...userData });
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

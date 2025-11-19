@@ -12,7 +12,7 @@ import api from "@/lib/api";
 import { User, Mail, Shield, Key, Edit } from "lucide-react";
 
 export default function PerfilPage() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
@@ -102,6 +102,12 @@ export default function PerfilPage() {
         name: profileData.name,
         email: profileData.email,
       });
+      // Atualizar contexto de autenticação
+      updateUser({
+        name: profileData.name,
+        email: profileData.email,
+      });
+
       toast({
         title: "Perfil atualizado!",
         description: "Suas informações foram atualizadas com sucesso",
