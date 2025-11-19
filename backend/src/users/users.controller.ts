@@ -43,9 +43,13 @@ export class UsersController {
   }
 
   @Get('tenant/:tenantId')
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @SkipTenantIsolation()
-  findByTenant(@Param('tenantId') tenantId: string) {
+  findByTenant(@Param('tenantId') tenantId: string, @CurrentUser() user: any) {
+    // ADMIN só pode acessar o próprio tenant
+    if (user.role === Role.ADMIN && user.tenantId !== tenantId) {
+      throw new Error('ADMIN não pode acessar usuários de outros tenants');
+    }
     return this.usersService.findByTenant(tenantId);
   }
 
@@ -105,4 +109,5 @@ export class UsersController {
   unlockUser(@Param('id') id: string) {
     return this.usersService.unlockUser(id);
   }
+
 }
