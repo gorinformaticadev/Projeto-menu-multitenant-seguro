@@ -15,40 +15,38 @@ export function TopBar() {
 
   // Busca logo da empresa master (para o header)
   useEffect(() => {
-    async function fetchMasterLogo() {
-      const cacheKey = 'master-logo-cache';
-      const cacheTTL = 10 * 60 * 1000; // 10 minutos
+    const cacheKey = 'master-logo-cache';
+    const cached = localStorage.getItem(cacheKey);
 
-      // Verificar cache
-      const cached = localStorage.getItem(cacheKey);
-      if (cached) {
-        try {
-          const { logoUrl, timestamp } = JSON.parse(cached);
-          if (Date.now() - timestamp < cacheTTL) {
-            setMasterLogo(logoUrl);
-            return;
-          }
-        } catch (e) {
-          // Cache inválido, continua
-        }
-      }
-
+    if (cached) {
       try {
-        const response = await api.get("/tenants/public/master-logo");
+        const { logoUrl, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < 10 * 60 * 1000) { // 10 minutos
+          console.log('🎨 Usando cache master logo:', logoUrl);
+          setMasterLogo(logoUrl);
+          return;
+        }
+      } catch (e) {
+        localStorage.removeItem(cacheKey);
+      }
+    }
+
+    console.log('🌐 Buscando master logo da API');
+    api.get("/tenants/public/master-logo")
+      .then(response => {
         const logoUrl = response.data?.logoUrl;
         if (logoUrl) {
           setMasterLogo(logoUrl);
-          // Cache o resultado
           localStorage.setItem(cacheKey, JSON.stringify({
             logoUrl,
             timestamp: Date.now()
           }));
+          console.log('💾 Master logo cacheado:', logoUrl);
         }
-      } catch (error) {
-        console.error("Erro ao buscar logo:", error);
-      }
-    }
-    fetchMasterLogo();
+      })
+      .catch(error => {
+        console.error("❌ Erro ao buscar master logo:", error);
+      });
   }, []);
 
   // Busca logo do tenant do usuário logado

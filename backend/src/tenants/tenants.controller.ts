@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch, Delete, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch, Delete, UseInterceptors, UploadedFile, BadRequestException, Req } from '@nestjs/common';
+import { Request as ExpressRequest } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SkipThrottle } from '@nestjs/throttler';
 import { TenantsService } from './tenants.service';
@@ -33,6 +34,12 @@ export class TenantsController {
     return this.tenantsService.findOne(id);
   }
 
+  @Get('my-tenant')
+  @Roles(Role.ADMIN)
+  async getMyTenant(@Req() req: ExpressRequest & { user: any }) {
+    return this.tenantsService.findOne(req.user.tenantId);
+  }
+
   @Post()
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
@@ -45,6 +52,28 @@ export class TenantsController {
   @SkipTenantIsolation()
   async update(@Param('id') id: string, @Body() updateTenantDto: UpdateTenantDto) {
     return this.tenantsService.update(id, updateTenantDto);
+  }
+
+  @Put('my-tenant')
+  @Roles(Role.ADMIN)
+  async updateMyTenant(@Body() updateTenantDto: UpdateTenantDto, @Req() req: ExpressRequest & { user: any }) {
+    return this.tenantsService.update(req.user.tenantId, updateTenantDto);
+  }
+
+  @Post('my-tenant/upload-logo')
+  @Roles(Role.ADMIN)
+  @UseInterceptors(FileInterceptor('logo', multerConfig))
+  async uploadMyTenantLogo(@Req() req: ExpressRequest & { user: any }, @UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Nenhum arquivo foi enviado');
+    }
+    return this.tenantsService.updateLogo(req.user.tenantId, file.filename);
+  }
+
+  @Patch('my-tenant/remove-logo')
+  @Roles(Role.ADMIN)
+  async removeMyTenantLogo(@Req() req: ExpressRequest & { user: any }) {
+    return this.tenantsService.removeLogo(req.user.tenantId);
   }
 
   @Patch(':id/toggle-status')

@@ -7,6 +7,13 @@ interface SecurityConfig {
   twoFactorEnabled: boolean;
   twoFactorRequired: boolean;
   sessionTimeoutMinutes: number;
+  passwordPolicy: {
+    minLength: number;
+    requireUppercase: boolean;
+    requireLowercase: boolean;
+    requireNumbers: boolean;
+    requireSpecial: boolean;
+  };
 }
 
 interface SecurityConfigContextType {
@@ -23,7 +30,7 @@ export function SecurityConfigProvider({ children }: { children: ReactNode }) {
 
   const fetchConfig = async (force = false) => {
     const cacheKey = 'security-config-cache';
-    const cacheTTL = 5 * 60 * 1000; // 5 minutos
+    const cacheTTL = 10 * 60 * 1000; // 10 minutos (aumentado)
 
     // Verificar cache se não for forçado
     if (!force) {
@@ -32,29 +39,31 @@ export function SecurityConfigProvider({ children }: { children: ReactNode }) {
         try {
           const { data, timestamp } = JSON.parse(cached);
           if (Date.now() - timestamp < cacheTTL) {
+            console.log('🔧 Usando cache de configurações de segurança');
             setConfig(data);
             setLoading(false);
             return;
           }
         } catch (e) {
-          // Cache inválido, continua
+          localStorage.removeItem(cacheKey);
         }
       }
     }
 
     try {
       setLoading(true);
+      console.log('🔧 Buscando configurações de segurança da API');
 
-      // Buscar configurações de 2FA e session timeout
-      const [twoFactorResponse, sessionResponse] = await Promise.all([
-        api.get("/security-config/2fa-status"),
-        api.get("/security-config/session-timeout")
-      ]);
+      // Buscar configurações sequencialmente para reduzir carga
+      const twoFactorResponse = await api.get("/security-config/2fa-status");
+      const sessionResponse = await api.get("/security-config/session-timeout");
+      const passwordResponse = await api.get("/security-config/password-policy");
 
       const newConfig = {
         twoFactorEnabled: twoFactorResponse.data.enabled,
         twoFactorRequired: twoFactorResponse.data.required,
         sessionTimeoutMinutes: sessionResponse.data.sessionTimeoutMinutes,
+        passwordPolicy: passwordResponse.data,
       };
 
       setConfig(newConfig);
@@ -64,17 +73,26 @@ export function SecurityConfigProvider({ children }: { children: ReactNode }) {
         data: newConfig,
         timestamp: Date.now()
       }));
+      console.log('💾 Configurações de segurança cacheadas');
 
     } catch (error) {
+      console.error('❌ Erro ao buscar configurações de segurança:', error);
       // Em caso de erro, assume valores padrão
       const defaultConfig = {
         twoFactorEnabled: true,
         twoFactorRequired: false,
         sessionTimeoutMinutes: 30,
+        passwordPolicy: {
+          minLength: 8,
+          requireUppercase: true,
+          requireLowercase: true,
+          requireNumbers: true,
+          requireSpecial: true,
+        },
       };
       setConfig(defaultConfig);
 
-      // Cache mesmo em erro
+      // Cache mesmo em erro (por menos tempo)
       localStorage.setItem(cacheKey, JSON.stringify({
         data: defaultConfig,
         timestamp: Date.now()

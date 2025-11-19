@@ -112,8 +112,11 @@ export class UsersService {
 
     // Se está atualizando senha, faz o hash
     const data: any = { ...updateUserDto };
-    if (updateUserDto.password) {
+    if (updateUserDto.password && updateUserDto.password.trim() !== '') {
       data.password = await bcrypt.hash(updateUserDto.password, 10);
+    } else {
+      // Remove password do data se estiver vazio
+      delete data.password;
     }
 
     const user = await this.prisma.user.update({

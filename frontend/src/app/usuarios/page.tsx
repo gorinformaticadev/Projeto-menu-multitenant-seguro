@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
 import { Plus, User, Mail, Shield, Edit, Trash2, Building2, Lock, Unlock, AlertTriangle } from "lucide-react";
+import { PasswordValidator } from "@/components/PasswordValidator";
 
 interface UserData {
   id: string;
@@ -46,6 +48,7 @@ export default function UsuariosPage() {
   const [editingUser, setEditingUser] = useState<UserData | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const [formData, setFormData] = useState({
     email: "",
@@ -55,15 +58,21 @@ export default function UsuariosPage() {
   });
 
   useEffect(() => {
-    loadTenants();
-  }, []);
+    // Se for ADMIN, não carrega tenants e usa o próprio tenant
+    if (user?.role === "ADMIN" && user?.tenantId) {
+      setSelectedTenantId(user.tenantId);
+      setLoading(false);
+    } else if (user?.role === "SUPER_ADMIN") {
+      loadTenants();
+    }
+  }, [user]);
 
   useEffect(() => {
     const tenantIdFromUrl = searchParams.get("tenantId");
-    if (tenantIdFromUrl) {
+    if (tenantIdFromUrl && user?.role === "SUPER_ADMIN") {
       setSelectedTenantId(tenantIdFromUrl);
     }
-  }, [searchParams]);
+  }, [searchParams, user]);
 
   useEffect(() => {
     if (selectedTenantId) {
@@ -74,9 +83,33 @@ export default function UsuariosPage() {
   }, [selectedTenantId]);
 
   async function loadTenants() {
+    const cacheKey = 'tenants-list-cache';
+    const cacheTTL = 5 * 60 * 1000; // 5 minutos
+
+    // Verificar cache
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        const { data, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < cacheTTL) {
+          setTenants(data);
+          setLoading(false);
+          return;
+        }
+      } catch (e) {
+        // Cache inválido, continua
+      }
+    }
+
     try {
       const response = await api.get("/tenants");
       setTenants(response.data);
+
+      // Cache o resultado
+      localStorage.setItem(cacheKey, JSON.stringify({
+        data: response.data,
+        timestamp: Date.now()
+      }));
     } catch (error: any) {
       toast({
         title: "Erro ao carregar empresas",
@@ -216,44 +249,69 @@ export default function UsuariosPage() {
             <h1 className="text-3xl font-bold">Gerenciar Usuários</h1>
             <p className="text-muted-foreground">Selecione uma empresa para gerenciar seus usuários</p>
           </div>
-          <Button onClick={openCreateDialog} disabled={!selectedTenantId}>
+          <Button onClick={openCreateDialog} disabled={!selectedTenantId || user?.role === "CLIENT"}>
             <Plus className="h-4 w-4 mr-2" />
             Novo Usuário
           </Button>
         </div>
 
-        {/* Seletor de Tenant */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              Selecione a Empresa
-            </CardTitle>
-            <CardDescription>
-              Escolha a empresa para visualizar e gerenciar seus usuários
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex items-center justify-center py-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        {/* Seletor de Tenant - Apenas para SUPER_ADMIN */}
+        {user?.role === "SUPER_ADMIN" && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Selecione a Empresa
+              </CardTitle>
+              <CardDescription>
+                Escolha a empresa para visualizar e gerenciar seus usuários
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex items-center justify-center py-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : (
+                <select
+                  value={selectedTenantId}
+                  onChange={(e) => setSelectedTenantId(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <option value="">Selecione uma empresa...</option>
+                  {tenants.map((tenant) => (
+                    <option key={tenant.id} value={tenant.id}>
+                      {tenant.nomeFantasia} {!tenant.ativo && "(Inativa)"}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Info da Empresa - Para ADMIN */}
+        {user?.role === "ADMIN" && user?.tenant && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Gerenciando Usuários de
+              </CardTitle>
+              <CardDescription>
+                Você está gerenciando os usuários da sua empresa
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="p-4 bg-muted rounded-lg">
+                <h3 className="font-semibold">{user.tenant.nomeFantasia}</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  CNPJ/CPF: {user.tenant.cnpjCpf}
+                </p>
               </div>
-            ) : (
-              <select
-                value={selectedTenantId}
-                onChange={(e) => setSelectedTenantId(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option value="">Selecione uma empresa...</option>
-                {tenants.map((tenant) => (
-                  <option key={tenant.id} value={tenant.id}>
-                    {tenant.nomeFantasia} {!tenant.ativo && "(Inativa)"}
-                  </option>
-                ))}
-              </select>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Lista de Usuários */}
         {selectedTenantId && (
@@ -413,6 +471,10 @@ export default function UsuariosPage() {
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   required={!editingUser}
+                />
+                <PasswordValidator
+                  password={formData.password}
+                  showRequirements={!editingUser || formData.password.length > 0}
                 />
               </div>
               <DialogFooter>

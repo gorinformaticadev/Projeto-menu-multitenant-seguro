@@ -28,12 +28,12 @@ import { CommonModule } from './common/common.module';
       {
         name: 'default',
         ttl: 60000, // 60 segundos (1 minuto)
-        limit: 1000, // 1000 requisições por minuto (aumentado para evitar bloqueios)
+        limit: 2000, // 2000 requisições por minuto (aumentado para desenvolvimento)
       },
       {
         name: 'login',
         ttl: 60000, // 60 segundos
-        limit: 5, // 5 tentativas de login por minuto
+        limit: 10, // 10 tentativas de login por minuto (aumentado para desenvolvimento)
       },
     ]),
     PrismaModule,

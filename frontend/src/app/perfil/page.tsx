@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
 import { User, Mail, Shield, Key, Edit } from "lucide-react";
+import { PasswordValidator } from "@/components/PasswordValidator";
 
 export default function PerfilPage() {
   const { user, updateUser } = useAuth();
@@ -27,6 +28,12 @@ export default function PerfilPage() {
     newPassword: "",
     confirmPassword: "",
   });
+  const [showEditTenant, setShowEditTenant] = useState(false);
+  const [tenantData, setTenantData] = useState({
+    nomeFantasia: "",
+    cnpjCpf: "",
+    telefone: "",
+  });
 
   useEffect(() => {
     if (user?.id) {
@@ -35,6 +42,15 @@ export default function PerfilPage() {
         name: user.name || "",
         email: user.email || "",
       });
+
+      // Inicializar dados da tenant se for ADMIN
+      if (user.role === "ADMIN" && user.tenant) {
+        setTenantData({
+          nomeFantasia: user.tenant.nomeFantasia || "",
+          cnpjCpf: user.tenant.cnpjCpf || "",
+          telefone: user.tenant.telefone || "",
+        });
+      }
     }
   }, [user?.id]);
 
@@ -157,6 +173,52 @@ export default function PerfilPage() {
     } catch (error: any) {
       toast({
         title: "Erro ao alterar senha",
+        description: error.response?.data?.message || "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleUpdateTenant(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!tenantData.nomeFantasia || !tenantData.cnpjCpf) {
+      toast({
+        title: "Erro",
+        description: "Nome fantasia e CNPJ/CPF são obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await api.put('/tenants/my-tenant', {
+        nomeFantasia: tenantData.nomeFantasia,
+        cnpjCpf: tenantData.cnpjCpf,
+        telefone: tenantData.telefone,
+      });
+
+      // Atualizar contexto de autenticação
+      updateUser({
+        tenant: {
+          ...user?.tenant,
+          nomeFantasia: tenantData.nomeFantasia,
+          cnpjCpf: tenantData.cnpjCpf,
+          telefone: tenantData.telefone,
+        } as any,
+      });
+
+      toast({
+        title: "Empresa atualizada!",
+        description: "Os dados da empresa foram atualizados com sucesso",
+      });
+      setShowEditTenant(false);
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar empresa",
         description: error.response?.data?.message || "Erro desconhecido",
         variant: "destructive",
       });
@@ -317,6 +379,7 @@ export default function PerfilPage() {
                     }
                     required
                   />
+                  <PasswordValidator password={passwordData.newPassword} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="confirmPassword">Confirmar Nova Senha</Label>
@@ -354,6 +417,109 @@ export default function PerfilPage() {
             )}
         </CardContent>
       </Card>
+
+      {/* Editar Empresa (apenas para ADMIN) */}
+      {user?.role === "ADMIN" && user?.tenant && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Informações da Empresa</CardTitle>
+            <CardDescription>
+              Gerencie os dados da sua empresa
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!showEditTenant ? (
+              <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label>Nome Fantasia</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <span>{user.tenant.nomeFantasia}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <Label>CNPJ/CPF</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Shield className="h-4 w-4 text-muted-foreground" />
+                      <span>{user.tenant.cnpjCpf}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Telefone</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <span>{user.tenant.telefone || "Não informado"}</span>
+                    </div>
+                  </div>
+                </div>
+                <Button onClick={() => setShowEditTenant(true)}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Editar Empresa
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={handleUpdateTenant} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="nomeFantasia">Nome Fantasia</Label>
+                  <Input
+                    id="nomeFantasia"
+                    type="text"
+                    value={tenantData.nomeFantasia}
+                    onChange={(e) =>
+                      setTenantData({ ...tenantData, nomeFantasia: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cnpjCpf">CNPJ/CPF</Label>
+                  <Input
+                    id="cnpjCpf"
+                    type="text"
+                    value={tenantData.cnpjCpf}
+                    onChange={(e) =>
+                      setTenantData({ ...tenantData, cnpjCpf: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="telefone">Telefone</Label>
+                  <Input
+                    id="telefone"
+                    type="text"
+                    value={tenantData.telefone}
+                    onChange={(e) =>
+                      setTenantData({ ...tenantData, telefone: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setShowEditTenant(false);
+                      setTenantData({
+                        nomeFantasia: user.tenant?.nomeFantasia || "",
+                        cnpjCpf: user.tenant?.cnpjCpf || "",
+                        telefone: user.tenant?.telefone || "",
+                      });
+                    }}
+                    disabled={loading}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={loading}>
+                    {loading ? "Salvando..." : "Salvar Alterações"}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* 2FA Setup */}
       <TwoFactorSetup

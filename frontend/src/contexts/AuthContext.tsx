@@ -15,6 +15,8 @@ export interface User {
   tenant?: {
     id: string;
     nomeFantasia: string;
+    cnpjCpf: string;
+    telefone: string;
   } | null;
 }
 
