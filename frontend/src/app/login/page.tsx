@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { TwoFactorLogin } from "@/components/TwoFactorLogin";
 import { use2FALogin } from "@/hooks/use2FALogin";
-import { Shield } from "lucide-react";
+import { Shield, Building2 } from "lucide-react";
 import { API_URL } from "@/lib/api";
 
 export default function LoginPage() {
@@ -100,28 +100,44 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <div className="flex items-center justify-center mb-4">
-            {masterLogo ? (
+          <div className="flex flex-col items-center justify-center mb-4 space-y-3">
+            {/* Ícone da Plataforma - Sempre Exibido */}
+            <div className="w-16 h-16 flex items-center justify-center">
+              <img 
+                src="/favicon-32x32.png" 
+                alt="Logo da Plataforma"
+                className="w-12 h-12 object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  const fallback = e.currentTarget.parentElement?.querySelector('.fallback-platform-icon');
+                  if (fallback) {
+                    fallback.classList.remove('hidden');
+                  }
+                }}
+              />
+              <div className="bg-primary rounded-full w-12 h-12 flex items-center justify-center fallback-platform-icon hidden">
+                <Shield className="h-6 w-6 text-white" />
+              </div>
+            </div>
+            
+            {/* Logo do Tenant - Exibido quando disponível */}
+            {masterLogo && (
               <div className="w-32 h-20 flex items-center justify-center">
                 <img 
                   src={`${API_URL}/uploads/logos/${masterLogo}`} 
-                  alt="Logo"
+                  alt="Logo do Tenant"
                   className="max-w-full max-h-full object-contain"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
-                    const fallback = e.currentTarget.parentElement?.querySelector('.fallback-icon');
+                    const fallback = e.currentTarget.parentElement?.querySelector('.fallback-tenant-icon');
                     if (fallback) {
                       fallback.classList.remove('hidden');
                     }
                   }}
                 />
-                <div className="bg-primary rounded-full w-16 h-16 flex items-center justify-center fallback-icon hidden">
-                  <Shield className="h-8 w-8 text-white" />
+                <div className="bg-blue-100 rounded-lg w-16 h-16 flex items-center justify-center fallback-tenant-icon hidden">
+                  <Building2 className="h-8 w-8 text-blue-600" />
                 </div>
-              </div>
-            ) : (
-              <div className="bg-primary rounded-full w-16 h-16 flex items-center justify-center">
-                <Shield className="h-8 w-8 text-white" />
               </div>
             )}
           </div>
