@@ -36,6 +36,7 @@ interface SecurityConfig {
 export default function SecurityConfigPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { refreshConfig } = useSecurityConfig();
   const [config, setConfig] = useState<SecurityConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

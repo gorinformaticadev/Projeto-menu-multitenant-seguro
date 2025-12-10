@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { TwoFactorLogin } from "@/components/TwoFactorLogin";
 import { use2FALogin } from "@/hooks/use2FALogin";
-import { Shield, Building2 } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { API_URL } from "@/lib/api";
 
 export default function LoginPage() {
@@ -101,25 +101,6 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex flex-col items-center justify-center mb-4 space-y-3">
-            {/* Ícone da Plataforma - Sempre Exibido */}
-            <div className="w-16 h-16 flex items-center justify-center">
-              <img 
-                src="/favicon-32x32.png" 
-                alt="Logo da Plataforma"
-                className="w-12 h-12 object-contain"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                  const fallback = e.currentTarget.parentElement?.querySelector('.fallback-platform-icon');
-                  if (fallback) {
-                    fallback.classList.remove('hidden');
-                  }
-                }}
-              />
-              <div className="bg-primary rounded-full w-12 h-12 flex items-center justify-center fallback-platform-icon hidden">
-                <Shield className="h-6 w-6 text-white" />
-              </div>
-            </div>
-            
             {/* Logo do Tenant - Exibido quando disponível */}
             {masterLogo && (
               <div className="w-32 h-20 flex items-center justify-center">

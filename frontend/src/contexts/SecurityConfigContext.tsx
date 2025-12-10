@@ -11,6 +11,7 @@ interface SecurityConfig {
 interface SecurityConfigContextType {
   config: SecurityConfig | null;
   loading: boolean;
+  refreshConfig: () => Promise<void>;
 }
 
 const SecurityConfigContext = createContext<SecurityConfigContextType | undefined>(undefined);
@@ -19,28 +20,32 @@ export function SecurityConfigProvider({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<SecurityConfig | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchConfig = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get("/security-config/2fa-status");
-        setConfig(response.data);
-      } catch (error) {
-        // Em caso de erro, assume valores padrão
-        setConfig({
-          twoFactorEnabled: true,
-          twoFactorRequired: false,
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchConfig = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get("/security-config/2fa-status");
+      setConfig(response.data);
+    } catch (error) {
+      // Em caso de erro, assume valores padrão
+      setConfig({
+        twoFactorEnabled: true,
+        twoFactorRequired: false,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchConfig();
   }, []);
 
+  const refreshConfig = async () => {
+    await fetchConfig();
+  };
+
   return (
-    <SecurityConfigContext.Provider value={{ config, loading }}>
+    <SecurityConfigContext.Provider value={{ config, loading, refreshConfig }}>
       {children}
     </SecurityConfigContext.Provider>
   );
