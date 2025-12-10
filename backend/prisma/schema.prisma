@@ -43,6 +43,13 @@ model User {
   tenant                Tenant?        @relation(fields: [tenantId], references: [id])
   twoFactorSecret       String?
   twoFactorEnabled      Boolean        @default(false)
+  // Verificação de email
+  emailVerified         Boolean        @default(false)
+  emailVerificationToken String?
+  emailVerificationExpires DateTime?
+  // Histórico de senhas (JSON array com últimos 5 hashes)
+  passwordHistory       String?
+  lastPasswordChange    DateTime?
   // Controle de bloqueio por tentativas de login
   loginAttempts         Int            @default(0)
   isLocked              Boolean        @default(false)
@@ -123,6 +130,13 @@ model SecurityConfig {
   // 2FA
   twoFactorEnabled        Boolean  @default(false) // Habilitar 2FA globalmente
   twoFactorRequired       Boolean  @default(false) // Tornar 2FA obrigatório
+  twoFactorRequiredForAdmins Boolean @default(false) // 2FA obrigatório apenas para ADMIN/SUPER_ADMIN
+  twoFactorSuggested      Boolean  @default(true) // Exibir avisos sugerindo ativação de 2FA
+  // Email Verification
+  emailVerificationRequired Boolean @default(false) // Exigir verificação de email
+  emailVerificationLevel  String   @default("SOFT") // Nível: SOFT, MODERATE, STRICT
+  // Password Policy
+  passwordReuseLimit      Int      @default(5) // Prevenir reutilização das últimas N senhas
   // Sessão
   sessionTimeoutMinutes   Int      @default(30) // Timeout de inatividade em minutos (logout automático)
   updatedAt               DateTime @updatedAt

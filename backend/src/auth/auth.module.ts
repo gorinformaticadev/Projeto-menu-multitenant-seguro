@@ -4,9 +4,11 @@ import { PassportModule } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { TwoFactorService } from './two-factor.service';
+import { EmailVerificationService } from './email-verification.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { AuditModule } from '../audit/audit.module';
+import { EmailModule } from '../email/email.module';
 
 @Module({
   imports: [
@@ -21,9 +23,10 @@ import { AuditModule } from '../audit/audit.module';
       }),
     }),
     forwardRef(() => AuditModule),
+    EmailModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, TwoFactorService, JwtStrategy],
-  exports: [AuthService, TwoFactorService],
+  providers: [AuthService, TwoFactorService, EmailVerificationService, JwtStrategy],
+  exports: [AuthService, TwoFactorService, EmailVerificationService],
 })
 export class AuthModule {}

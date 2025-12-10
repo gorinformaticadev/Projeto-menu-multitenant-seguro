@@ -68,16 +68,20 @@ export class SecurityConfigController {
   }
 
   /**
-   * GET /security-config/session-timeout
-   * Obter timeout de sessão (público para aplicar logout automático)
+   * GET /security-config/full
+   * Obter configurações de segurança completas (público para validação no frontend)
    */
   @Public()
   @SkipThrottle()
-  @Get('session-timeout')
-  async getSessionTimeout() {
+  @Get('full')
+  async getFullConfig() {
     const config = await this.securityConfigService.getConfig();
     return {
-      sessionTimeoutMinutes: config.sessionTimeoutMinutes,
+      twoFactorEnabled: config.twoFactorEnabled,
+      twoFactorRequired: config.twoFactorRequired,
+      twoFactorSuggested: config.twoFactorSuggested || true,
+      emailVerificationRequired: config.emailVerificationRequired || false,
+      emailVerificationLevel: config.emailVerificationLevel || 'SOFT',
     };
   }
 }

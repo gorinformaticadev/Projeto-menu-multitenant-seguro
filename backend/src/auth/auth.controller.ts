@@ -2,11 +2,13 @@ import { Controller, Post, Body, Req, Ip, UseGuards, Get } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { TwoFactorService } from './two-factor.service';
+import { EmailVerificationService } from './email-verification.service';
 import { LoginDto } from './dto/login.dto';
 import { Login2FADto } from './dto/login-2fa.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { Verify2FADto } from './dto/verify-2fa.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SkipCsrf } from '../common/decorators/skip-csrf.decorator';
 import { Request } from 'express';
@@ -16,6 +18,7 @@ export class AuthController {
   constructor(
     private authService: AuthService,
     private twoFactorService: TwoFactorService,
+    private emailVerificationService: EmailVerificationService,
   ) {}
 
   /**
@@ -114,6 +117,20 @@ export class AuthController {
     return this.twoFactorService.disable(req.user.id, verify2FADto.token);
   }
   /**
+   * GET /auth/2fa/status
+   * Verificar status de 2FA do usuário logado
+   */
+  @Get('2fa/status')
+  @UseGuards(JwtAuthGuard)
+  async get2FAStatus(@Req() req: any) {
+    const user = await this.authService.getProfile(req.user.id);
+    return {
+      enabled: user.twoFactorEnabled || false,
+      suggested: true, // Esta informação virá da configuração de segurança
+    };
+  }
+
+  /**
    * GET /auth/me
    * Retornar dados do usuário logado
    */
@@ -121,5 +138,38 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async getProfile(@Req() req: any) {
     return this.authService.getProfile(req.user.id);
+  }
+
+  /**
+   * POST /auth/email/send-verification
+   * Enviar email de verificação
+   */
+  @Post('email/send-verification')
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 3, ttl: 3600000 } }) // 3 tentativas por hora
+  async sendVerificationEmail(@Req() req: any) {
+    return this.emailVerificationService.sendVerificationEmail(req.user.id);
+  }
+
+  /**
+   * POST /auth/email/verify
+   * Verificar email com token
+   * CSRF: Desabilitado - endpoint público
+   */
+  @SkipCsrf()
+  @Post('email/verify')
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 tentativas por minuto
+  async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
+    return this.emailVerificationService.verifyEmail(verifyEmailDto.token);
+  }
+
+  /**
+   * GET /auth/email/status
+   * Verificar status de verificação de email
+   */
+  @Get('email/status')
+  @UseGuards(JwtAuthGuard)
+  async checkEmailVerification(@Req() req: any) {
+    return this.emailVerificationService.checkEmailVerification(req.user.id);
   }
 }

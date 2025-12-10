@@ -73,6 +73,30 @@ export class UpdateSecurityConfigDto {
   @IsBoolean()
   twoFactorRequired?: boolean;
 
+  @IsOptional()
+  @IsBoolean()
+  twoFactorRequiredForAdmins?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  twoFactorSuggested?: boolean;
+
+  // Email Verification
+  @IsOptional()
+  @IsBoolean()
+  emailVerificationRequired?: boolean;
+
+  @IsOptional()
+  @IsString()
+  emailVerificationLevel?: string; // SOFT, MODERATE, STRICT
+
+  // Password Policy
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  passwordReuseLimit?: number;
+
   // Sessão
   @IsOptional()
   @IsInt()

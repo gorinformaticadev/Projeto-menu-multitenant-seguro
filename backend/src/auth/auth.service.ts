@@ -161,6 +161,33 @@ export class AuthService {
       });
     }
 
+    // Verificar se 2FA é obrigatório para este usuário
+    const securityConfig = await this.prisma.securityConfig.findFirst();
+    const is2FARequired = securityConfig?.twoFactorRequired || false;
+    const is2FARequiredForAdmins = securityConfig?.twoFactorRequiredForAdmins || false;
+    const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN';
+
+    // Se 2FA é obrigatório e usuário não tem ativado
+    if ((is2FARequired || (is2FARequiredForAdmins && isAdmin)) && !user.twoFactorEnabled) {
+      // Log de aviso
+      await this.auditService.log({
+        action: 'LOGIN_2FA_REQUIRED',
+        userId: user.id,
+        tenantId: user.tenantId,
+        ipAddress,
+        userAgent,
+        details: { 
+          email, 
+          reason: is2FARequired ? '2fa_globally_required' : '2fa_required_for_admins',
+          role: user.role 
+        },
+      });
+
+      throw new UnauthorizedException(
+        '2FA é obrigatório para sua conta. Por favor, ative a autenticação de dois fatores antes de fazer login.',
+      );
+    }
+
     // Gera tokens
     const tokens = await this.generateTokens(user.id, user.email, user.role, user.tenantId);
 
