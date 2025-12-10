@@ -66,25 +66,13 @@ export default function LoginPage() {
       return;
     }
 
-    const result = await attemptLogin(email, password);
-    
-    if (result.success) {
-      toast({
-        title: "Sucesso",
-        description: "Login realizado com sucesso!",
-      });
-    }
+    await attemptLogin(email, password);
+    // Não é necessário toast de sucesso - AuthContext redireciona automaticamente
   }
 
   async function handle2FASubmit(code: string) {
-    const result = await loginWith2FA(code);
-    
-    if (result.success) {
-      toast({
-        title: "Sucesso",
-        description: "Login realizado com sucesso!",
-      });
-    }
+    await loginWith2FA(code);
+    // Não é necessário toast de sucesso - AuthContext redireciona automaticamente
   }
 
   function handleBack() {

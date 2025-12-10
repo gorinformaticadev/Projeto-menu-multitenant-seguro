@@ -21,10 +21,19 @@ export interface User {
   twoFactorEnabled?: boolean;
 }
 
+export interface LoginResult {
+  success: boolean;
+  requires2FA: boolean;
+  user?: User;
+  error?: string;
+}
+
 interface AuthContextData {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithCredentials: (email: string, password: string) => Promise<LoginResult>;
+  loginWith2FA: (email: string, password: string, code: string) => Promise<LoginResult>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
 }
@@ -139,6 +148,102 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  async function loginWithCredentials(email: string, password: string): Promise<LoginResult> {
+    try {
+      // Validar inputs
+      if (!email || !password) {
+        return {
+          success: false,
+          requires2FA: false,
+          error: "Preencha todos os campos"
+        };
+      }
+
+      // Tentar login normal
+      const response = await api.post("/auth/login", { email, password });
+      const { accessToken, refreshToken, user: userData } = response.data;
+
+      // Salvar tokens no SecureStorage
+      SecureStorage.setToken(accessToken);
+      SecureStorage.setRefreshToken(refreshToken);
+      api.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
+
+      // Atualizar estado do usuário
+      setUser(userData);
+
+      // Redirecionar para dashboard
+      router.push("/dashboard");
+
+      return {
+        success: true,
+        requires2FA: false,
+        user: userData
+      };
+    } catch (error: any) {
+      // Verificar se é erro de 2FA
+      const errorMessage = error.response?.data?.message || "";
+      if (errorMessage.includes("2FA") || errorMessage.includes("two-factor")) {
+        return {
+          success: false,
+          requires2FA: true
+        };
+      }
+
+      // Outros erros
+      return {
+        success: false,
+        requires2FA: false,
+        error: errorMessage || "Erro ao fazer login"
+      };
+    }
+  }
+
+  async function loginWith2FA(email: string, password: string, code: string): Promise<LoginResult> {
+    try {
+      // Validar inputs
+      if (!email || !password || !code) {
+        return {
+          success: false,
+          requires2FA: false,
+          error: "Preencha todos os campos"
+        };
+      }
+
+      // Login com 2FA
+      const response = await api.post("/auth/login-2fa", {
+        email,
+        password,
+        twoFactorToken: code
+      });
+
+      const { accessToken, refreshToken, user: userData } = response.data;
+
+      // Salvar tokens no SecureStorage
+      SecureStorage.setToken(accessToken);
+      SecureStorage.setRefreshToken(refreshToken);
+      api.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
+
+      // Atualizar estado do usuário
+      setUser(userData);
+
+      // Redirecionar para dashboard
+      router.push("/dashboard");
+
+      return {
+        success: true,
+        requires2FA: false,
+        user: userData
+      };
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || "Código inválido";
+      return {
+        success: false,
+        requires2FA: false,
+        error: errorMessage
+      };
+    }
+  }
+
   async function logout() {
     const refreshToken = SecureStorage.getRefreshToken();
 
@@ -165,7 +270,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithCredentials, loginWith2FA, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

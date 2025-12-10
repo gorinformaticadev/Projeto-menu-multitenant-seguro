@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import api from "@/lib/api";
-import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function use2FALogin() {
-  const router = useRouter();
+  const { loginWithCredentials, loginWith2FA } = useAuth();
   const [requires2FA, setRequires2FA] = useState(false);
   const [credentials, setCredentials] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
@@ -17,82 +16,51 @@ export function use2FALogin() {
     setError("");
 
     try {
-      // Tentar login normal primeiro
-      const response = await api.post("/auth/login", { email, password });
+      // Delegar para AuthContext
+      const result = await loginWithCredentials(email, password);
       
-      // Se chegou aqui, login normal funcionou (sem 2FA)
-      const { accessToken, refreshToken, user } = response.data;
-      
-      // Salvar tokens
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("@App:token", accessToken);
-        sessionStorage.setItem("@App:refreshToken", refreshToken);
+      if (result.success) {
+        // Login concluído com sucesso - AuthContext já redirecionou
+        return { success: true };
       }
       
-      api.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
-      
-      // Usar setTimeout para garantir que o estado seja atualizado antes do redirect
-      setTimeout(() => {
-        router.push("/dashboard");
-        // Fallback caso router.push não funcione
-        setTimeout(() => {
-          if (typeof window !== "undefined" && window.location.pathname === "/login") {
-            window.location.href = "/dashboard";
-          }
-        }, 500);
-      }, 100);
-      
-      return { success: true };
-    } catch (err: any) {
-      // Se o erro for que precisa de 2FA
-      if (err.response?.data?.message?.includes("2FA")) {
+      if (result.requires2FA) {
+        // 2FA necessário - atualizar estado da UI
         setRequires2FA(true);
         return { success: false, requires2FA: true };
       }
       
-      // Outro erro
-      setError(err.response?.data?.message || "Erro ao fazer login");
+      // Erro de login
+      setError(result.error || "Erro ao fazer login");
+      return { success: false, requires2FA: false };
+    } catch (err: any) {
+      // Erro inesperado
+      setError("Erro ao fazer login");
       return { success: false, requires2FA: false };
     } finally {
       setLoading(false);
     }
   }
 
-  async function loginWith2FA(code: string) {
+  async function loginWith2FACode(code: string) {
     setLoading(true);
     setError("");
 
     try {
-      const response = await api.post("/auth/login-2fa", {
-        email: credentials.email,
-        password: credentials.password,
-        twoFactorToken: code,
-      });
+      // Delegar para AuthContext
+      const result = await loginWith2FA(credentials.email, credentials.password, code);
 
-      const { accessToken, refreshToken, user } = response.data;
-
-      // Salvar tokens
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("@App:token", accessToken);
-        sessionStorage.setItem("@App:refreshToken", refreshToken);
+      if (result.success) {
+        // Login concluído com sucesso - AuthContext já redirecionou
+        return { success: true };
       }
 
-      api.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
-
-      // Usar setTimeout para garantir que o estado seja atualizado antes do redirect
-      setTimeout(() => {
-        router.push("/dashboard");
-        // Fallback caso router.push não funcione
-        setTimeout(() => {
-          if (typeof window !== "undefined" && window.location.pathname === "/login") {
-            window.location.href = "/dashboard";
-          }
-        }, 500);
-      }, 100);
-      
-      return { success: true };
+      // Erro no código 2FA
+      setError(result.error || "Código inválido");
+      return { success: false };
     } catch (err: any) {
-      setError(err.response?.data?.message || "Código inválido");
+      // Erro inesperado
+      setError("Erro ao validar código");
       return { success: false };
     } finally {
       setLoading(false);
@@ -110,7 +78,7 @@ export function use2FALogin() {
     loading,
     error,
     attemptLogin,
-    loginWith2FA,
+    loginWith2FA: loginWith2FACode,
     reset,
     credentials,
   };
