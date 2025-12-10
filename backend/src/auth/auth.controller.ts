@@ -8,6 +8,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { Verify2FADto } from './dto/verify-2fa.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { SkipCsrf } from '../common/decorators/skip-csrf.decorator';
 import { Request } from 'express';
 
 @Controller('auth')
@@ -20,7 +21,9 @@ export class AuthController {
   /**
    * POST /auth/login
    * Rate Limiting: 5 tentativas por minuto
+   * CSRF: Desabilitado - endpoint público de autenticação
    */
+  @SkipCsrf()
   @Post('login')
   @Throttle({ login: { limit: 5, ttl: 60000 } }) // 5 tentativas por minuto
   async login(
@@ -35,7 +38,9 @@ export class AuthController {
   /**
    * POST /auth/refresh
    * Renovar access token usando refresh token
+   * CSRF: Desabilitado - usa refresh token como autenticação
    */
+  @SkipCsrf()
   @Post('refresh')
   @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 tentativas por minuto
   async refresh(
@@ -65,7 +70,9 @@ export class AuthController {
   /**
    * POST /auth/login-2fa
    * Login com 2FA
+   * CSRF: Desabilitado - endpoint público de autenticação
    */
+  @SkipCsrf()
   @Post('login-2fa')
   @Throttle({ login: { limit: 5, ttl: 60000 } })
   async login2FA(

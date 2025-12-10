@@ -39,11 +39,7 @@ api.interceptors.request.use(
       : null;
 
     if (token) {
-      // Descriptografar token antes de usar
-      const decryptedToken = token ? atob(token) : null;
-      if (decryptedToken) {
-        config.headers.Authorization = `Bearer ${decryptedToken}`;
-      }
+      config.headers.Authorization = `Bearer ${token}`;
     }
 
     return config;
@@ -137,12 +133,10 @@ api.interceptors.response.use(
 
         const { accessToken, refreshToken: newRefreshToken } = response.data;
 
-        // Salvar novos tokens (criptografados)
+        // Salvar novos tokens diretamente (sem criptografia Base64)
         if (typeof window !== "undefined") {
-          const encryptedToken = btoa(accessToken);
-          const encryptedRefreshToken = btoa(newRefreshToken);
-          localStorage.setItem("@App:token", encryptedToken);
-          localStorage.setItem("@App:refreshToken", encryptedRefreshToken);
+          localStorage.setItem("@App:token", accessToken);
+          localStorage.setItem("@App:refreshToken", newRefreshToken);
         }
 
         // Atualizar header padrão

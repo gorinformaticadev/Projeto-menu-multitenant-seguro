@@ -2,6 +2,7 @@ import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { TenantsModule } from './tenants/tenants.module';
@@ -13,27 +14,33 @@ import { ValidatorsModule } from './common/validators/validators.module';
 import { HttpsRedirectMiddleware } from './common/middleware/https-redirect.middleware';
 import { SentryModule } from './common/services/sentry.module';
 import { CommonModule } from './common/common.module';
+import { TokenCleanupService } from './common/services/token-cleanup.service';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    // Módulo de agendamento para tarefas cron
+    ScheduleModule.forRoot(),
     SentryModule,
     CommonModule,
     // ============================================
     // 🛡️ RATE LIMITING - Proteção contra Brute Force
+    // Configurações ajustadas por ambiente
     // ============================================
     ThrottlerModule.forRoot([
       {
         name: 'default',
         ttl: 60000, // 60 segundos (1 minuto)
-        limit: 2000, // 2000 requisições por minuto (aumentado para desenvolvimento)
+        // Desenvolvimento: 2000 req/min | Produção: 100 req/min
+        limit: process.env.NODE_ENV === 'production' ? 100 : 2000,
       },
       {
         name: 'login',
         ttl: 60000, // 60 segundos
-        limit: 10, // 10 tentativas de login por minuto (aumentado para desenvolvimento)
+        // Desenvolvimento: 10 tentativas | Produção: 5 tentativas
+        limit: process.env.NODE_ENV === 'production' ? 5 : 10,
       },
     ]),
     PrismaModule,
@@ -54,6 +61,8 @@ import { CommonModule } from './common/common.module';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
+    // Serviço de limpeza de tokens
+    TokenCleanupService,
   ],
 })
 export class AppModule implements NestModule {

@@ -40,35 +40,26 @@ interface AuthContextData {
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 
-// Armazenamento seguro com localStorage (persistente) e criptografia básica
+/**
+ * SecureStorage - Gerenciamento de tokens
+ * 
+ * IMPORTANTE: localStorage não é completamente seguro contra XSS.
+ * Em produção, considere usar cookies HttpOnly com SameSite=Strict
+ * ou implementar criptografia real com Web Crypto API.
+ * 
+ * Removemos a falsa "criptografia" Base64 que apenas dava falsa sensação
+ * de segurança. Os tokens agora são armazenados diretamente.
+ */
 const SecureStorage = {
-  // Chave de criptografia simples (em produção, usar crypto mais robusto)
-  encryptionKey: 'app-secure-key-2024',
-
-  encrypt: (text: string): string => {
-    // Criptografia básica para evitar exposição óbvia
-    return btoa(text); // Base64 encoding
-  },
-
-  decrypt: (encrypted: string): string => {
-    try {
-      return atob(encrypted);
-    } catch {
-      return '';
-    }
-  },
-
   setToken: (token: string) => {
     if (typeof window !== "undefined") {
-      const encrypted = SecureStorage.encrypt(token);
-      localStorage.setItem("@App:token", encrypted);
+      localStorage.setItem("@App:token", token);
     }
   },
 
   getToken: (): string | null => {
     if (typeof window !== "undefined") {
-      const encrypted = localStorage.getItem("@App:token");
-      return encrypted ? SecureStorage.decrypt(encrypted) : null;
+      return localStorage.getItem("@App:token");
     }
     return null;
   },
@@ -81,21 +72,29 @@ const SecureStorage = {
 
   setRefreshToken: (token: string) => {
     if (typeof window !== "undefined") {
-      const encrypted = SecureStorage.encrypt(token);
-      localStorage.setItem("@App:refreshToken", encrypted);
+      localStorage.setItem("@App:refreshToken", token);
     }
   },
 
   getRefreshToken: (): string | null => {
     if (typeof window !== "undefined") {
-      const encrypted = localStorage.getItem("@App:refreshToken");
-      return encrypted ? SecureStorage.decrypt(encrypted) : null;
+      return localStorage.getItem("@App:refreshToken");
     }
     return null;
   },
 
   removeRefreshToken: () => {
     if (typeof window !== "undefined") {
+      localStorage.removeItem("@App:refreshToken");
+    }
+  },
+
+  /**
+   * Limpa todos os tokens do armazenamento
+   */
+  clear: () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("@App:token");
       localStorage.removeItem("@App:refreshToken");
     }
   },

@@ -27,6 +27,9 @@ model Tenant {
   updatedAt       DateTime @updatedAt
   users           User[]
 
+  // Índices para performance
+  @@index([ativo]) // Filtrar tenants ativos
+  @@index([createdAt]) // Ordenar por data de criação
   @@map("tenants")
 }
 
@@ -51,7 +54,12 @@ model User {
   auditLogs             AuditLog[]
   refreshTokens         RefreshToken[]
 
-  @@index([tenantId])
+  // Índices para performance e segurança
+  @@index([tenantId]) // Já existia - essencial para isolamento multitenant
+  @@index([email]) // Busca rápida por email (login)
+  @@index([role]) // Filtrar por role (RBAC)
+  @@index([isLocked]) // Encontrar contas bloqueadas
+  @@index([tenantId, role]) // Combinação comum: usuários de um tenant por role
   @@map("users")
 }
 
@@ -64,8 +72,11 @@ model RefreshToken {
   expiresAt DateTime
   createdAt DateTime @default(now())
 
-  @@index([userId])
-  @@index([token])
+  // Índices para performance de limpeza e validação
+  @@index([userId]) // Já existia - buscar tokens de um usuário
+  @@index([token]) // Já existia - validação rápida de token
+  @@index([expiresAt]) // NOVO - limpeza de tokens expirados
+  @@index([userId, expiresAt]) // NOVO - tokens ativos de um usuário
   @@map("refresh_tokens")
 }
 
@@ -81,10 +92,13 @@ model AuditLog {
   details   String? // JSON com detalhes adicionais
   createdAt DateTime @default(now())
 
-  @@index([userId])
-  @@index([tenantId])
-  @@index([action])
-  @@index([createdAt])
+  // Índices para queries de auditoria e relatórios
+  @@index([userId]) // Já existia - logs de um usuário
+  @@index([tenantId]) // Já existia - logs de um tenant
+  @@index([action]) // Já existia - filtrar por tipo de ação
+  @@index([createdAt]) // Já existia - ordenar por data
+  @@index([tenantId, action, createdAt]) // NOVO - combinação comum para relatórios
+  @@index([userId, action, createdAt]) // NOVO - histórico de ações do usuário
   @@map("audit_logs")
 }
 

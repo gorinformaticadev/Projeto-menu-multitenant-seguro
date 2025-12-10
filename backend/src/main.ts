@@ -4,11 +4,17 @@ import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import helmet from 'helmet';
+import * as cookieParser from 'cookie-parser';
 import { SentryService } from './common/services/sentry.service';
 import { SentryExceptionFilter } from './common/filters/sentry-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // ============================================
+  // 🔒 COOKIE PARSER - Necessário para CSRF protection
+  // ============================================
+  app.use(cookieParser());
 
   // ============================================
   // 📊 MONITORAMENTO - Sentry
