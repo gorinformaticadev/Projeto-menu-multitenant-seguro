@@ -5,10 +5,9 @@
     "axios": "^1.13.2"
   },
   "scripts": {
-    "commit": "cz",
-    "release": "standard-version",
-    "versao": "git add . && npx cz && npm run release && git push --follow-tags"
-  },
+  "versao": "git add . && git commit -m \"update: auto commit\" || echo Commit existente. Prosseguindo... && npm run release && git push --follow-tags",
+  "release": "standard-version"
+},
   "devDependencies": {
     "@commitlint/cli": "^20.2.0",
     "@commitlint/config-conventional": "^20.2.0",
