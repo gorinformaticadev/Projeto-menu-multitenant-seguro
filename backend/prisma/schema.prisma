@@ -169,3 +169,53 @@ model EmailConfiguration {
   @@map("email_configurations")
 }
 
+// Tabela de Configurações do Sistema de Updates (apenas SUPER_ADMIN pode editar)
+model SystemSettings {
+  id                    String    @id @default(uuid())
+  // Versão da aplicação
+  appVersion            String?   @default("1.0.0")
+  // Configurações do Git
+  gitToken              String?   // Token criptografado
+  gitUsername           String?
+  gitRepository         String?
+  gitReleaseBranch      String    @default("main")
+  // Configurações do sistema
+  packageManager        String    @default("npm")
+  updateCheckEnabled    Boolean   @default(true)
+  lastUpdateCheck       DateTime?
+  availableVersion      String?
+  updateAvailable       Boolean   @default(false)
+  // Metadados
+  updatedAt             DateTime  @updatedAt
+  updatedBy             String?   // ID do SUPER_ADMIN que atualizou
+
+  @@map("system_settings")
+}
+
+// Tabela de Logs de Atualizações (auditoria completa)
+model UpdateLog {
+  id              String    @id @default(uuid())
+  version         String    // Versão de destino
+  status          String    // STARTED, SUCCESS, FAILED, ROLLED_BACK
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+  duration        Int?      // Duração em segundos
+  // Detalhes da execução
+  packageManager  String    @default("npm")
+  backupPath      String?   // Caminho do backup criado
+  errorMessage    String?   // Mensagem de erro se falhou
+  rollbackReason  String?   // Motivo do rollback
+  // Auditoria
+  executedBy      String?   // ID do SUPER_ADMIN
+  ipAddress       String?
+  userAgent       String?
+  // Logs detalhados (JSON)
+  executionLogs   String?   // Logs completos da execução
+  
+  @@index([status])
+  @@index([startedAt])
+  @@index([version])
+  @@index([executedBy])
+  @@map("update_logs")
+}
+

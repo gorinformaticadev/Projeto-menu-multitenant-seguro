@@ -16,6 +16,7 @@ import { HttpsRedirectMiddleware } from './common/middleware/https-redirect.midd
 import { SentryModule } from './common/services/sentry.module';
 import { CommonModule } from './common/common.module';
 import { TokenCleanupService } from './common/services/token-cleanup.service';
+import { UpdateModule } from './update/update.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { TokenCleanupService } from './common/services/token-cleanup.service';
     SecurityConfigModule,
     EmailConfigModule,
     AuditModule,
+    UpdateModule,
   ],
   providers: [
     {

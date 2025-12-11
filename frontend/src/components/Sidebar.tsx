@@ -59,7 +59,7 @@ export function Sidebar() {
     },
     {
       name: "Configurações",
-      href: user?.role === "SUPER_ADMIN" ? "/configuracoes/seguranca" : "/configuracoes/empresa",
+      href: "/configuracoes",
       icon: Settings,
       show: user?.role === "SUPER_ADMIN" || user?.role === "ADMIN",
     },
