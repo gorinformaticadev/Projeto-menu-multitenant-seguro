@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.1](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.0...v0.1.1) (2025-12-11)
+
+
+### Features
+
+* **auth:** add remember me functionality to login page ([6e27e9d](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/6e27e9d5ceedc5683cc3043bf234dcadf5480805))
+
 ## [0.1.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.0.6...v0.1.0) (2025-12-11)
 
 
