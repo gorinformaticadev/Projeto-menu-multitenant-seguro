@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
+import { getPlatformName } from '../common/constants/platform.constants';
 
 @Injectable()
 export class TwoFactorService {
@@ -20,9 +21,10 @@ export class TwoFactorService {
     }
 
     // Gerar secret
+    const platformName = await getPlatformName();
     const secret = speakeasy.generateSecret({
-      name: `Sistema Multitenant (${user.email})`,
-      issuer: 'Sistema Multitenant',
+      name: `${platformName} (${user.email})`,
+      issuer: platformName,
     });
 
     // Salvar secret temporário (não ativado ainda)

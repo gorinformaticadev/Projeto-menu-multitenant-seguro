@@ -112,4 +112,17 @@ export class UpdateSecurityConfigDto {
   @IsOptional()
   @IsString()
   smtpPassword?: string;
+
+  // Platform Configuration
+  @IsOptional()
+  @IsString()
+  platformName?: string;
+
+  @IsOptional()
+  @IsString()
+  platformEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  platformPhone?: string;
 }

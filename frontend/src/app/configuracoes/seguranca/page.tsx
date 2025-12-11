@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Save, AlertTriangle } from "lucide-react";
 import EmailConfigSection from "@/components/EmailConfigSection";
+import PlatformConfigSection from "@/components/PlatformConfigSection";
 
 interface SecurityConfig {
   id: string;
@@ -558,6 +559,9 @@ export default function SecurityConfigPage() {
             </div>
           </CardContent>
         </Card>
+
+      {/* Configurações da Plataforma */}
+      <PlatformConfigSection />
 
       {/* Configurações de Email */}
       <EmailConfigSection />

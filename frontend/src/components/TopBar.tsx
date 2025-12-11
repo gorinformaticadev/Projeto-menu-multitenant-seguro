@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePlatformName } from "@/hooks/usePlatformConfig";
 import { Button } from "./ui/button";
 import { Bell, Search, User, LogOut } from "lucide-react";
 import { API_URL } from "@/lib/api";
@@ -9,6 +10,7 @@ import api from "@/lib/api";
 
 export function TopBar() {
   const { user, logout } = useAuth();
+  const { platformName } = usePlatformName();
   const [masterLogo, setMasterLogo] = useState<string | null>(null);
   const [userTenantLogo, setUserTenantLogo] = useState<string | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -112,7 +114,7 @@ export function TopBar() {
             )}
           </div>
           <div className="hidden md:block">
-            <h1 className="text-lg font-bold text-gray-900">Sistema Multitenant</h1>
+            <h1 className="text-lg font-bold text-gray-900">{platformName}</h1>
             {user?.tenant && (
               <p className="text-xs text-gray-500">{user.tenant.nomeFantasia}</p>
             )}

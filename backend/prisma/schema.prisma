@@ -142,6 +142,10 @@ model SecurityConfig {
   // Email SMTP Credentials (único para toda a plataforma)
   smtpUsername            String?  // Usuário SMTP
   smtpPassword            String?  // Senha SMTP (armazenada com criptografia)
+  // Configurações da Plataforma
+  platformName            String?  @default("Sistema Multitenant") // Nome da plataforma
+  platformEmail           String?  // Email informativo da plataforma
+  platformPhone           String?  // Telefone de contato da plataforma
   updatedAt               DateTime @updatedAt
   updatedBy               String? // ID do SUPER_ADMIN que atualizou
 

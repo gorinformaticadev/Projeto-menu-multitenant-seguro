@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SecurityConfigProvider } from "@/contexts/SecurityConfigContext";
+import { PlatformConfigProvider } from "@/contexts/PlatformConfigContext";
 import { Toaster } from "@/components/ui/toaster";
 import { AppLayout } from "@/components/AppLayout";
 import { InactivityLogout } from "@/components/InactivityLogout";
@@ -39,15 +40,17 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body className={inter.className} suppressHydrationWarning>
-        <AuthProvider>
-          <SecurityConfigProvider>
-            <InactivityLogout />
-            <AppLayout>
-              {children}
-            </AppLayout>
-            <Toaster />
-          </SecurityConfigProvider>
-        </AuthProvider>
+        <PlatformConfigProvider>
+          <AuthProvider>
+            <SecurityConfigProvider>
+              <InactivityLogout />
+              <AppLayout>
+                {children}
+              </AppLayout>
+              <Toaster />
+            </SecurityConfigProvider>
+          </AuthProvider>
+        </PlatformConfigProvider>
       </body>
     </html>
   );

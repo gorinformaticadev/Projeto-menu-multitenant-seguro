@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { TwoFactorLogin } from "@/components/TwoFactorLogin";
 import { use2FALogin } from "@/hooks/use2FALogin";
+import { PlatformName } from "@/components/PlatformInfo";
 import { Building2 } from "lucide-react";
 import { API_URL } from "@/lib/api";
 
@@ -123,7 +124,7 @@ export default function LoginPage() {
               </div>
             )}
           </div>
-          <CardTitle className="text-2xl text-center">Sistema Multitenant</CardTitle>
+          <CardTitle className="text-2xl text-center"><PlatformName /></CardTitle>
           <CardDescription className="text-center">
             Entre com suas credenciais para acessar o sistema
           </CardDescription>

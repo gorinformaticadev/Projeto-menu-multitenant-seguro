@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
 import { PrismaService } from '../prisma/prisma.service';
+import { getPlatformName } from '../common/constants/platform.constants';
 
 @Injectable()
 export class EmailService implements OnModuleInit {
@@ -110,7 +111,7 @@ export class EmailService implements OnModuleInit {
     if (this.dbConfig && smtpUser && smtpPass) {
       return this.sendEmailWithCredentials(
         email,
-        'Verifique seu email - Sistema Multitenant',
+        `Verifique seu email - ${await getPlatformName()}`,
         html,
         smtpUser,
         smtpPass
@@ -119,10 +120,11 @@ export class EmailService implements OnModuleInit {
 
     // Otherwise, use the default transporter (environment variables)
     try {
+      const platformName = await getPlatformName();
       await this.transporter.sendMail({
-        from: `"${this.config.get('EMAIL_FROM_NAME', 'Sistema Multitenant')}" <${this.config.get('EMAIL_FROM', 'noreply@example.com')}>`,
+        from: `"${this.config.get('EMAIL_FROM_NAME', platformName)}" <${this.config.get('EMAIL_FROM', 'noreply@example.com')}>`,
         to: email,
-        subject: 'Verifique seu email - Sistema Multitenant',
+        subject: `Verifique seu email - ${platformName}`,
         html,
       });
 
@@ -148,10 +150,11 @@ export class EmailService implements OnModuleInit {
     const html = this.getPasswordResetEmailTemplate(name, resetUrl);
 
     try {
+      const platformName = await getPlatformName();
       await this.transporter.sendMail({
-        from: `"${this.config.get('EMAIL_FROM_NAME', 'Sistema Multitenant')}" <${this.config.get('EMAIL_FROM', 'noreply@example.com')}>`,
+        from: `"${this.config.get('EMAIL_FROM_NAME', platformName)}" <${this.config.get('EMAIL_FROM', 'noreply@example.com')}>`,
         to: email,
-        subject: 'Recuperação de senha - Sistema Multitenant',
+        subject: `Recuperação de senha - ${platformName}`,
         html,
       });
 
@@ -175,8 +178,9 @@ export class EmailService implements OnModuleInit {
     const html = this.getSecurityAlertTemplate(name, alertType, details);
 
     try {
+      const platformName = await getPlatformName();
       await this.transporter.sendMail({
-        from: `"${this.config.get('EMAIL_FROM_NAME', 'Sistema Multitenant')}" <${this.config.get('EMAIL_FROM', 'noreply@example.com')}>`,
+        from: `"${this.config.get('EMAIL_FROM_NAME', platformName)}" <${this.config.get('EMAIL_FROM', 'noreply@example.com')}>`,
         to: email,
         subject: `Alerta de Segurança - ${alertType}`,
         html,
@@ -366,7 +370,7 @@ export class EmailService implements OnModuleInit {
 
     try {
       // Create a temporary transporter with the provided credentials
-      const transporterConfig = {
+      const transporterConfig: any = {
         host: config.smtpHost,
         port: config.smtpPort,
         secure: config.encryption === 'SSL', // true for port 465, false for other ports
@@ -388,7 +392,7 @@ export class EmailService implements OnModuleInit {
       }
 
       this.logger.log('Criando transporter temporário para teste...');
-      const tempTransporter = nodemailer.createTransporter(transporterConfig);
+      const tempTransporter = nodemailer.createTransport(transporterConfig);
 
       // Verify connection before sending
       this.logger.log('Verificando conexão SMTP...');
@@ -398,10 +402,12 @@ export class EmailService implements OnModuleInit {
       const html = this.getTestEmailTemplate(name, config);
 
       this.logger.log('Enviando email de teste...');
+      const platformName = await getPlatformName();
+      
       const info = await tempTransporter.sendMail({
-        from: `"Sistema Multitenant" <${smtpUser}>`,
+        from: `"${platformName}" <${smtpUser}>`,
         to: email,
-        subject: 'Teste de Configuração de Email - Sistema Multitenant',
+        subject: `Teste de Configuração de Email - ${platformName}`,
         html,
       });
 
@@ -488,8 +494,10 @@ export class EmailService implements OnModuleInit {
         },
       });
 
+      const platformName = await getPlatformName();
+      
       await tempTransporter.sendMail({
-        from: `"Sistema Multitenant" <${smtpUser}>`,
+        from: `"${platformName}" <${smtpUser}>`,
         to: email,
         subject: subject,
         html: html,
