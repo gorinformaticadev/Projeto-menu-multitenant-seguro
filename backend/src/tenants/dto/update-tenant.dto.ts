@@ -1,4 +1,5 @@
 import { IsEmail, IsString, IsOptional, Matches, MinLength, IsBoolean } from 'class-validator';
+import { IsValidCPFOrCNPJ } from '../../common/validators/cpf-cnpj.validator';
 
 export class UpdateTenantDto {
   @IsOptional()
@@ -7,7 +8,7 @@ export class UpdateTenantDto {
 
   @IsOptional()
   @IsString()
-  @MinLength(11, { message: 'CNPJ/CPF deve ter no mínimo 11 caracteres' })
+  @IsValidCPFOrCNPJ({ message: 'CNPJ/CPF inválido' })
   cnpjCpf?: string;
 
   @IsOptional()

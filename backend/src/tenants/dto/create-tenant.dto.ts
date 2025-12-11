@@ -1,5 +1,6 @@
 import { IsEmail, IsNotEmpty, IsString, Matches, MinLength } from 'class-validator';
 import { Trim, ToLowerCase, NormalizeSpaces } from '../../common/decorators/sanitize.decorator';
+import { IsValidCPFOrCNPJ } from '../../common/validators/cpf-cnpj.validator';
 
 export class CreateTenantDto {
   @Trim()
@@ -11,7 +12,7 @@ export class CreateTenantDto {
   @Trim()
   @IsString()
   @IsNotEmpty({ message: 'CNPJ/CPF é obrigatório' })
-  @MinLength(11, { message: 'CNPJ/CPF deve ter no mínimo 11 caracteres' })
+  @IsValidCPFOrCNPJ({ message: 'CNPJ/CPF inválido' })
   cnpjCpf: string;
 
   @Trim()

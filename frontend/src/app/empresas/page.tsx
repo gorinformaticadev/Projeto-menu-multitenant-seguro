@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from "@/hooks/use-toast";
 import api, { API_URL } from "@/lib/api";
 import { Plus, Building2, Mail, Phone, User, FileText, Eye, Edit, Power, Lock, UserPlus, Image as ImageIcon, Upload, X, Users, Trash2 } from "lucide-react";
+import { CPFCNPJInput } from "@/components/ui/cpf-cnpj-input";
 import { useRouter } from "next/navigation";
 
 interface Tenant {
@@ -460,20 +461,14 @@ export default function EmpresasPage() {
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="cnpjCpf">CNPJ/CPF</Label>
-                      <div className="relative">
-                        <FileText className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="cnpjCpf"
-                          placeholder="00.000.000/0000-00"
-                          className="pl-10"
-                          value={formData.cnpjCpf}
-                          onChange={(e) => setFormData({ ...formData, cnpjCpf: e.target.value })}
-                          disabled={submitting}
-                        />
-                      </div>
-                    </div>
+                    <CPFCNPJInput
+                      id="cnpjCpf"
+                      label="CNPJ/CPF"
+                      value={formData.cnpjCpf}
+                      onChange={(value, isValid) => setFormData({ ...formData, cnpjCpf: value })}
+                      disabled={submitting}
+                      showValidation={true}
+                    />
 
                     <div className="space-y-2">
                       <Label htmlFor="nomeFantasia">Nome Fantasia</Label>
@@ -849,15 +844,14 @@ export default function EmpresasPage() {
                   disabled={submitting}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-cnpjCpf">CNPJ/CPF</Label>
-                <Input
-                  id="edit-cnpjCpf"
-                  value={formData.cnpjCpf}
-                  onChange={(e) => setFormData({ ...formData, cnpjCpf: e.target.value })}
-                  disabled={submitting}
-                />
-              </div>
+              <CPFCNPJInput
+                id="edit-cnpjCpf"
+                label="CNPJ/CPF"
+                value={formData.cnpjCpf}
+                onChange={(value, isValid) => setFormData({ ...formData, cnpjCpf: value })}
+                disabled={submitting}
+                showValidation={true}
+              />
               <div className="space-y-2">
                 <Label htmlFor="edit-nomeFantasia">Nome Fantasia</Label>
                 <Input
