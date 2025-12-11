@@ -97,49 +97,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-
-      <div className="mt-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Recursos de Segurança Implementados</CardTitle>
-            <CardDescription>
-              Este sistema implementa os seguintes mecanismos de segurança
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2 text-sm">
-              <li className="flex items-start gap-2">
-                <span className="text-green-600 font-bold">✓</span>
-                <span><strong>Autenticação JWT:</strong> Tokens seguros com payload contendo id, email, role e tenantId</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-green-600 font-bold">✓</span>
-                <span><strong>Hash de Senhas:</strong> Bcrypt com salt rounds para armazenamento seguro</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-green-600 font-bold">✓</span>
-                <span><strong>Isolamento Multitenant:</strong> Interceptor global que filtra dados por tenantId</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-green-600 font-bold">✓</span>
-                <span><strong>Controle de Acesso (RBAC):</strong> Guards de roles protegendo rotas sensíveis</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-green-600 font-bold">✓</span>
-                <span><strong>Validação Rigorosa:</strong> ValidationPipe com class-validator em todos os endpoints</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-green-600 font-bold">✓</span>
-                <span><strong>CORS Configurado:</strong> Apenas o frontend autorizado pode acessar a API</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-green-600 font-bold">✓</span>
-                <span><strong>Prevenção IDOR:</strong> Verificação de propriedade de recursos antes do acesso</span>
-              </li>
-            </ul>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }

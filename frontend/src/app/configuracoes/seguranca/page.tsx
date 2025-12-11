@@ -210,6 +210,9 @@ export default function SecurityConfigPage() {
           </CardContent>
         </Card>
 
+      {/* Configurações da Plataforma */}
+      <PlatformConfigSection />
+
         {/* Controle de Login */}
         <Card>
           <CardHeader>
@@ -559,9 +562,6 @@ export default function SecurityConfigPage() {
             </div>
           </CardContent>
         </Card>
-
-      {/* Configurações da Plataforma */}
-      <PlatformConfigSection />
 
       {/* Configurações de Email */}
       <EmailConfigSection />
