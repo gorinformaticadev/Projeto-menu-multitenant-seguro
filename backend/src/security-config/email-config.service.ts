@@ -61,6 +61,8 @@ export class EmailConfigService {
     });
   }
 
+
+
   /**
    * Get all email configurations
    */

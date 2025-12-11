@@ -165,13 +165,3 @@ model EmailConfiguration {
   @@map("email_configurations")
 }
 
-// Tabela de Credenciais SMTP (apenas SUPER_ADMIN pode editar)
-model SmtpCredentials {
-  id        String   @id @default(uuid())
-  smtpUser  String
-  smtpPass  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("smtp_credentials")
-}

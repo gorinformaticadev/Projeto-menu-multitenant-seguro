@@ -11,6 +11,7 @@ export class EmailService implements OnModuleInit {
   private isEnabled: boolean;
   private dbConfig: any = null;
 
+
   constructor(
     private config: ConfigService,
     private prisma: PrismaService
@@ -34,6 +35,9 @@ export class EmailService implements OnModuleInit {
       });
       this.dbConfig = result;
 
+      // Get security config to access SMTP credentials
+      const securityConfig = await this.prisma.securityConfig.findFirst();
+
       let smtpConfig;
       
       if (this.dbConfig) {
@@ -46,10 +50,6 @@ export class EmailService implements OnModuleInit {
           tls: this.dbConfig.encryption === 'STARTTLS' || this.dbConfig.encryption === 'TLS' ? {
             rejectUnauthorized: false
           } : undefined,
-          auth: {
-            user: this.config.get('SMTP_USER'), // Still using env var for credentials
-            pass: this.config.get('SMTP_PASS'),
-          }
         };
       } else {
         // Fallback to environment variables
@@ -61,10 +61,6 @@ export class EmailService implements OnModuleInit {
           tls: {
             rejectUnauthorized: false
           },
-          auth: {
-            user: this.config.get('SMTP_USER'),
-            pass: this.config.get('SMTP_PASS'),
-          }
         };
       }
 
@@ -72,6 +68,21 @@ export class EmailService implements OnModuleInit {
       this.isEnabled = !!smtpConfig.host;
 
       if (this.isEnabled) {
+        // Add authentication if available
+        if ((securityConfig as any)?.smtpUsername && (securityConfig as any)?.smtpPassword) {
+          // Use database credentials from SecurityConfig
+          smtpConfig.auth = {
+            user: (securityConfig as any).smtpUsername,
+            pass: (securityConfig as any).smtpPassword,
+          };
+        } else if (this.config.get('SMTP_USER') && this.config.get('SMTP_PASS')) {
+          // Fallback to environment variables
+          smtpConfig.auth = {
+            user: this.config.get('SMTP_USER'),
+            pass: this.config.get('SMTP_PASS'),
+          };
+        }
+
         this.transporter = nodemailer.createTransport(smtpConfig);
         this.logger.log('Email service configurado e ativo');
       } else {
@@ -322,6 +333,19 @@ export class EmailService implements OnModuleInit {
    * Send test email
    */
   async sendTestEmail(email: string, name: string, config: any, smtpUser: string, smtpPass: string): Promise<boolean> {
+    // If no credentials provided, try to get from database
+    if ((!smtpUser || !smtpPass) && this.prisma) {
+      try {
+        const securityConfig = await this.prisma.securityConfig.findFirst();
+        if ((securityConfig as any)?.smtpUsername && (securityConfig as any)?.smtpPassword) {
+          smtpUser = (securityConfig as any).smtpUsername;
+          smtpPass = (securityConfig as any).smtpPassword;
+        }
+      } catch (error) {
+        this.logger.warn('Could not fetch SMTP credentials from database:', error);
+      }
+    }
+
     if (!smtpUser || !smtpPass) {
       this.logger.warn(`Email de teste não enviado (credenciais ausentes): ${email}`);
       return false;
@@ -369,6 +393,19 @@ export class EmailService implements OnModuleInit {
     smtpUser: string, 
     smtpPass: string
   ): Promise<boolean> {
+    // If no credentials provided, try to get from database
+    if ((!smtpUser || !smtpPass) && this.prisma) {
+      try {
+        const securityConfig = await this.prisma.securityConfig.findFirst();
+        if ((securityConfig as any)?.smtpUsername && (securityConfig as any)?.smtpPassword) {
+          smtpUser = (securityConfig as any).smtpUsername;
+          smtpPass = (securityConfig as any).smtpPassword;
+        }
+      } catch (error) {
+        this.logger.warn('Could not fetch SMTP credentials from database:', error);
+      }
+    }
+
     if (!this.dbConfig || !smtpUser || !smtpPass) {
       this.logger.warn(`Email não enviado (configuração ou credenciais ausentes): ${email}`);
       return false;

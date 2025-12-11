@@ -103,4 +103,13 @@ export class UpdateSecurityConfigDto {
   @Min(5)
   @Max(1440) // Até 24 horas
   sessionTimeoutMinutes?: number;
+
+  // SMTP Credentials
+  @IsOptional()
+  @IsString()
+  smtpUsername?: string;
+
+  @IsOptional()
+  @IsString()
+  smtpPassword?: string;
 }

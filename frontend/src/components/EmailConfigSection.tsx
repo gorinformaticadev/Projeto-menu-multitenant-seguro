@@ -30,11 +30,17 @@ interface EmailConfig {
   updatedAt: string;
 }
 
+interface SecurityConfig {
+  smtpUsername?: string;
+  smtpPassword?: string;
+}
+
 export default function EmailConfigSection() {
   const { toast } = useToast();
   const [providers, setProviders] = useState<EmailProvider[]>([]);
   const [configs, setConfigs] = useState<EmailConfig[]>([]);
   const [activeConfig, setActiveConfig] = useState<EmailConfig | null>(null);
+  const [securityConfig, setSecurityConfig] = useState<SecurityConfig>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -68,6 +74,10 @@ export default function EmailConfigSection() {
         const activeRes = await api.get("/email-config/active");
         setActiveConfig(activeRes.data);
         
+        // Get security config (for SMTP credentials)
+        const securityRes = await api.get("/security-config");
+        setSecurityConfig(securityRes.data);
+        
         // If there's an active config, populate the form
         if (activeRes.data) {
           setFormData({
@@ -75,8 +85,8 @@ export default function EmailConfigSection() {
             smtpPort: activeRes.data.smtpPort,
             encryption: activeRes.data.encryption,
             authMethod: activeRes.data.authMethod,
-            smtpUser: "", // Don't load password for security
-            smtpPass: "",
+            smtpUser: securityRes.data.smtpUsername || "",
+            smtpPass: "", // Don't load password for security
           });
           setSelectedProvider(activeRes.data.providerName);
         }
@@ -128,14 +138,21 @@ export default function EmailConfigSection() {
     try {
       setSaving(true);
       
-      // Prepare data for saving (without credentials for security)
+      // Save SMTP credentials in security config
+      if (formData.smtpUser || formData.smtpPass) {
+        await api.put("/security-config", {
+          smtpUsername: formData.smtpUser,
+          smtpPassword: formData.smtpPass
+        });
+      }
+      
+      // Prepare data for saving email configuration (without credentials for security)
       const saveData = {
         providerName: selectedProvider || "Custom",
         smtpHost: formData.smtpHost,
         smtpPort: formData.smtpPort,
         encryption: formData.encryption,
         authMethod: formData.authMethod,
-        // Note: We don't save credentials to the database for security
       };
       
       // Create new configuration
@@ -158,6 +175,15 @@ export default function EmailConfigSection() {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Delete SMTP credentials
+  const handleDeleteCredentials = async () => {
+    try {
+      // We're not implementing this anymore since we're using SecurityConfig
+    } catch (error: any) {
+      // Handle error silently
     }
   };
 
@@ -348,6 +374,8 @@ export default function EmailConfigSection() {
               />
             </div>
           </div>
+          
+
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 justify-between">

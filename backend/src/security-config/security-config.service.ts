@@ -85,4 +85,15 @@ export class SecurityConfigService {
       required: config.twoFactorRequired,
     };
   }
+
+  /**
+   * Obtém credenciais SMTP
+   */
+  async getSmtpCredentials() {
+    const config = await this.getConfig();
+    return {
+      smtpUsername: config.smtpUsername,
+      smtpPassword: config.smtpPassword,
+    };
+  }
 }
