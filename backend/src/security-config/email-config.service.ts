@@ -174,15 +174,20 @@ export class EmailConfigService {
    */
   async testConfig(email: string, smtpUser: string, smtpPass: string, user: any): Promise<{ success: boolean; message: string }> {
     try {
+      this.logger.log(`Testing email configuration for user ${user.id} to ${email}`);
+      
       // Get active configuration
       const config = await this.getActiveConfig();
       
       if (!config) {
+        this.logger.warn('No active email configuration found');
         return { 
           success: false, 
-          message: 'Nenhuma configuração de email ativa encontrada' 
+          message: 'Nenhuma configuração de email ativa encontrada. Configure um provedor de email primeiro.' 
         };
       }
+      
+      this.logger.log(`Using email configuration: ${config.providerName} (${config.smtpHost}:${config.smtpPort})`);
       
       // Send test email with credentials
       const sent = await this.emailService.sendTestEmail(
@@ -194,22 +199,25 @@ export class EmailConfigService {
       );
       
       if (sent) {
-        this.logger.log(`Test email sent by user ${user.id} to ${email}`);
+        this.logger.log(`✅ Test email sent successfully by user ${user.id} to ${email}`);
         return { 
           success: true, 
-          message: `Email de teste enviado com sucesso para ${email}` 
+          message: `Email de teste enviado com sucesso para ${email}. Verifique sua caixa de entrada.` 
         };
       } else {
+        this.logger.warn(`❌ Failed to send test email to ${email}`);
         return { 
           success: false, 
-          message: 'Falha ao enviar email de teste. Verifique as configurações.' 
+          message: 'Falha ao enviar email de teste. Verifique as configurações e credenciais.' 
         };
       }
     } catch (error) {
-      this.logger.error('Error testing email configuration:', error);
+      this.logger.error(`❌ Error testing email configuration for ${email}:`, error);
+      
+      // Return the specific error message from the email service
       return { 
         success: false, 
-        message: 'Erro ao testar configuração de email: ' + (error.message || 'Erro desconhecido')
+        message: error.message || 'Erro desconhecido ao testar configuração de email'
       };
     }
   }

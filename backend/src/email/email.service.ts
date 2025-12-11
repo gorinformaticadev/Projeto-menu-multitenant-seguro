@@ -333,53 +333,115 @@ export class EmailService implements OnModuleInit {
    * Send test email
    */
   async sendTestEmail(email: string, name: string, config: any, smtpUser: string, smtpPass: string): Promise<boolean> {
+    this.logger.log(`Iniciando teste de email para: ${email}`);
+    
     // If no credentials provided, try to get from database
     if ((!smtpUser || !smtpPass) && this.prisma) {
+      this.logger.log('Buscando credenciais SMTP do banco de dados...');
       try {
         const securityConfig = await this.prisma.securityConfig.findFirst();
         if ((securityConfig as any)?.smtpUsername && (securityConfig as any)?.smtpPassword) {
           smtpUser = (securityConfig as any).smtpUsername;
           smtpPass = (securityConfig as any).smtpPassword;
+          this.logger.log('Credenciais SMTP encontradas no banco de dados');
+        } else {
+          this.logger.warn('Credenciais SMTP não encontradas no banco de dados');
         }
       } catch (error) {
-        this.logger.warn('Could not fetch SMTP credentials from database:', error);
+        this.logger.error('Erro ao buscar credenciais SMTP do banco:', error);
       }
     }
 
     if (!smtpUser || !smtpPass) {
-      this.logger.warn(`Email de teste não enviado (credenciais ausentes): ${email}`);
-      return false;
+      this.logger.error(`Email de teste não enviado - credenciais ausentes para: ${email}`);
+      throw new Error('Credenciais SMTP não configuradas. Configure usuário e senha SMTP primeiro.');
     }
+
+    if (!config || !config.smtpHost || !config.smtpPort) {
+      this.logger.error('Configuração de email inválida ou ausente');
+      throw new Error('Configuração de email não encontrada. Configure um provedor de email primeiro.');
+    }
+
+    this.logger.log(`Configuração SMTP: ${config.smtpHost}:${config.smtpPort} (${config.encryption})`);
 
     try {
       // Create a temporary transporter with the provided credentials
-      const tempTransporter = nodemailer.createTransport({
+      const transporterConfig = {
         host: config.smtpHost,
         port: config.smtpPort,
         secure: config.encryption === 'SSL', // true for port 465, false for other ports
-        tls: config.encryption === 'STARTTLS' || config.encryption === 'TLS' ? {
-          rejectUnauthorized: false
-        } : undefined,
         auth: {
           user: smtpUser,
           pass: smtpPass,
         },
-      });
+        // Add debug and logger for development
+        debug: process.env.NODE_ENV === 'development',
+        logger: process.env.NODE_ENV === 'development',
+      };
+
+      // Configure TLS based on encryption type
+      if (config.encryption === 'STARTTLS' || config.encryption === 'TLS') {
+        transporterConfig.tls = {
+          rejectUnauthorized: false, // Allow self-signed certificates in development
+          ciphers: 'SSLv3'
+        };
+      }
+
+      this.logger.log('Criando transporter temporário para teste...');
+      const tempTransporter = nodemailer.createTransporter(transporterConfig);
+
+      // Verify connection before sending
+      this.logger.log('Verificando conexão SMTP...');
+      await tempTransporter.verify();
+      this.logger.log('✅ Conexão SMTP verificada com sucesso');
 
       const html = this.getTestEmailTemplate(name, config);
 
-      await tempTransporter.sendMail({
+      this.logger.log('Enviando email de teste...');
+      const info = await tempTransporter.sendMail({
         from: `"Sistema Multitenant" <${smtpUser}>`,
         to: email,
         subject: 'Teste de Configuração de Email - Sistema Multitenant',
         html,
       });
 
-      this.logger.log(`Email de teste enviado para: ${email}`);
+      this.logger.log(`✅ Email de teste enviado com sucesso para: ${email}`);
+      this.logger.log(`Message ID: ${info.messageId}`);
+      
+      if (info.response) {
+        this.logger.log(`SMTP Response: ${info.response}`);
+      }
+
       return true;
     } catch (error) {
-      this.logger.error(`Erro ao enviar email de teste para ${email}:`, error);
-      return false;
+      this.logger.error(`❌ Erro detalhado ao enviar email de teste para ${email}:`);
+      this.logger.error(`Erro: ${error.message}`);
+      
+      if (error.code) {
+        this.logger.error(`Código: ${error.code}`);
+      }
+      
+      if (error.response) {
+        this.logger.error(`Resposta SMTP: ${error.response}`);
+      }
+
+      // Provide more specific error messages
+      let errorMessage = 'Erro ao enviar email de teste: ';
+      
+      if (error.code === 'EAUTH') {
+        errorMessage += 'Falha na autenticação. Verifique usuário e senha SMTP.';
+        if (config.smtpHost?.includes('gmail')) {
+          errorMessage += ' Para Gmail, use uma "Senha de app" em vez da senha normal.';
+        }
+      } else if (error.code === 'ECONNECTION') {
+        errorMessage += 'Falha na conexão. Verifique servidor e porta SMTP.';
+      } else if (error.code === 'ETIMEDOUT') {
+        errorMessage += 'Timeout na conexão. Verifique se a porta não está bloqueada.';
+      } else {
+        errorMessage += error.message;
+      }
+
+      throw new Error(errorMessage);
     }
   }
 

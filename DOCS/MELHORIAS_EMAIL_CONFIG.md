@@ -166,4 +166,36 @@ O script testa:
 - [x] Testes implementados
 - [x] Documentação completa
 
-**Status: ✅ IMPLEMENTADO COM SUCESSO**
+## 🚨 Solução de Problemas
+
+### Emails não chegam em desenvolvimento?
+
+**Causa mais comum (90% dos casos):** Credenciais incorretas
+
+#### Para Gmail:
+1. ❌ **NÃO use** a senha normal da conta
+2. ✅ **USE** uma "Senha de app"
+3. Acesse: https://myaccount.google.com/apppasswords
+4. Ative 2FA primeiro, depois gere a senha de app
+
+#### Scripts de Diagnóstico:
+```powershell
+# Diagnóstico completo
+.\diagnostico-email.ps1
+
+# Configuração automática (Gmail)
+.\configurar-email-dev.ps1 -EmailUsuario "seu@gmail.com" -SenhaEmail "senha-de-app" -Provedor "Gmail"
+```
+
+#### Logs Melhorados:
+O serviço de email agora fornece logs detalhados para debug:
+- ✅ Conexão SMTP verificada
+- ❌ Códigos de erro específicos (EAUTH, ECONNECTION, etc.)
+- 📧 Status de envio detalhado
+
+### Documentação Completa:
+- `DOCS/SOLUCAO_PROBLEMAS_EMAIL.md` - Guia completo de troubleshooting
+- Scripts de diagnóstico e configuração automática
+- Checklist de verificação passo a passo
+
+**Status: ✅ IMPLEMENTADO COM SUCESSO + TROUBLESHOOTING COMPLETO**
