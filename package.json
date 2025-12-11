@@ -5,7 +5,9 @@
     "axios": "^1.13.2"
   },
   "scripts": {
-    "release": "standard-version"
+    "commit": "cz",
+    "release": "standard-version",
+    "versao": "git add . && npx cz && npm run release && git push --follow-tags"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.2.0",
