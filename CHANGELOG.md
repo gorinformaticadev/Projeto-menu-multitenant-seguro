@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.1.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.0.6...v0.1.0) (2025-12-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* cz
+
+### Features
+
+* **ui:** add click-outside functionality to user menu ([1ffec7d](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/1ffec7dd6b9f334379b03a9c65341b9f4fe61df1))
+
+
+### Bug Fixes
+
+* cc ([d594f27](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/d594f27fcb01f38c14cb5019bc293c253ff60781))
+
 ### [0.0.6](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.0.1...v0.0.6) (2025-12-11)
 
 
