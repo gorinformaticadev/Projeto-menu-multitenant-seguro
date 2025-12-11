@@ -16,6 +16,7 @@ interface EmailProvider {
   smtpPort: number;
   encryption: string;
   authMethod: string;
+  description?: string;
 }
 
 interface EmailConfig {
@@ -74,9 +75,9 @@ export default function EmailConfigSection() {
         const activeRes = await api.get("/email-config/active");
         setActiveConfig(activeRes.data);
         
-        // Get security config (for SMTP credentials)
-        const securityRes = await api.get("/security-config");
-        setSecurityConfig(securityRes.data);
+        // Get SMTP credentials from security config
+        const credentialsRes = await api.get("/email-config/smtp-credentials");
+        setSecurityConfig(credentialsRes.data);
         
         // If there's an active config, populate the form
         if (activeRes.data) {
@@ -85,10 +86,17 @@ export default function EmailConfigSection() {
             smtpPort: activeRes.data.smtpPort,
             encryption: activeRes.data.encryption,
             authMethod: activeRes.data.authMethod,
-            smtpUser: securityRes.data.smtpUsername || "",
+            smtpUser: credentialsRes.data.smtpUsername || "",
             smtpPass: "", // Don't load password for security
           });
           setSelectedProvider(activeRes.data.providerName);
+        } else {
+          // If no active config but credentials exist, populate only credentials
+          setFormData(prev => ({
+            ...prev,
+            smtpUser: credentialsRes.data.smtpUsername || "",
+            smtpPass: "", // Don't load password for security
+          }));
         }
       } catch (error: any) {
         toast({
@@ -259,10 +267,27 @@ export default function EmailConfigSection() {
           Configurações de Email
         </CardTitle>
         <CardDescription>
-          Configure o servidor de email padrão da plataforma
+          Configure o servidor de email padrão da plataforma. 
+          <strong>Apenas uma configuração de email pode estar ativa por vez.</strong>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Informações importantes */}
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-start gap-2">
+            <Mail className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-blue-800">
+              <p className="font-medium mb-1">Configuração de Email Principal</p>
+              <ul className="text-xs space-y-1">
+                <li>• Esta é a configuração de email principal da aplicação</li>
+                <li>• Apenas <strong>uma configuração</strong> pode existir por vez</li>
+                <li>• Ao salvar uma nova configuração, a anterior será substituída</li>
+                <li>• As credenciais (usuário e senha) são armazenadas de forma segura</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
         <div className="grid gap-4">
           <div>
             <Label htmlFor="provider-select">
@@ -270,19 +295,30 @@ export default function EmailConfigSection() {
             </Label>
             <Select value={selectedProvider} onValueChange={handleProviderSelect}>
               <SelectTrigger id="provider-select">
-                <SelectValue placeholder="Selecione um provedor" />
+                <SelectValue placeholder="Selecione um provedor (Gmail, Hotmail/Outlook, Titan)" />
               </SelectTrigger>
               <SelectContent>
                 {providers.map((provider) => (
                   <SelectItem key={provider.providerName} value={provider.providerName}>
-                    {provider.providerName}
+                    <div className="flex flex-col">
+                      <span>{provider.providerName}</span>
+                      {provider.description && (
+                        <span className="text-xs text-muted-foreground">{provider.description}</span>
+                      )}
+                    </div>
                   </SelectItem>
                 ))}
-                <SelectItem value="custom">Personalizado</SelectItem>
+                <SelectItem value="custom">
+                  <div className="flex flex-col">
+                    <span>Personalizado</span>
+                    <span className="text-xs text-muted-foreground">Configure manualmente</span>
+                  </div>
+                </SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground mt-1">
-              Selecione um provedor pré-configurado ou escolha "Personalizado" para configurar manualmente
+              <strong>Gmail, Hotmail/Outlook e Titan</strong> já estão pré-configurados. 
+              Selecione um provedor e informe apenas suas credenciais de acesso.
             </p>
           </div>
 
@@ -415,10 +451,30 @@ export default function EmailConfigSection() {
 
         {activeConfig && (
           <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-sm text-green-800">
-              <span className="font-medium">Configuração ativa:</span> {activeConfig.providerName} 
-              ({activeConfig.smtpHost}:{activeConfig.smtpPort})
-            </p>
+            <div className="flex items-start gap-2">
+              <Mail className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-green-800">
+                <p className="font-medium mb-1">Configuração Ativa</p>
+                <p><strong>Provedor:</strong> {activeConfig.providerName}</p>
+                <p><strong>Servidor:</strong> {activeConfig.smtpHost}:{activeConfig.smtpPort}</p>
+                <p><strong>Criptografia:</strong> {activeConfig.encryption}</p>
+                {securityConfig.smtpUsername && (
+                  <p><strong>Usuário:</strong> {securityConfig.smtpUsername}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!activeConfig && (
+          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <Mail className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-yellow-800">
+                <p className="font-medium mb-1">Nenhuma Configuração Ativa</p>
+                <p>Configure um provedor de email para que o sistema possa enviar mensagens.</p>
+              </div>
+            </div>
           </div>
         )}
       </CardContent>

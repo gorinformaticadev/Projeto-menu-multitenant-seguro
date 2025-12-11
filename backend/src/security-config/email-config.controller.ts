@@ -49,6 +49,18 @@ export class EmailConfigController {
   }
 
   /**
+   * GET /email-config/smtp-credentials
+   * Obter credenciais SMTP do SecurityConfig
+   * Apenas SUPER_ADMIN
+   */
+  @SkipThrottle()
+  @Get('smtp-credentials')
+  @Roles(Role.SUPER_ADMIN)
+  async getSmtpCredentials() {
+    return this.emailConfigService.getSmtpCredentials();
+  }
+
+  /**
    * POST /email-config
    * Criar nova configuração de email
    * Apenas SUPER_ADMIN

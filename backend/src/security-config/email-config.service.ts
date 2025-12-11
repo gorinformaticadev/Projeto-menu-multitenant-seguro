@@ -24,14 +24,16 @@ export class EmailConfigService {
         smtpHost: 'smtp.gmail.com',
         smtpPort: 465,
         encryption: 'SSL',
-        authMethod: 'OAuth2 / SASL',
+        authMethod: 'LOGIN',
+        description: 'Configuração recomendada para Gmail com SSL/TLS',
       },
       {
         providerName: 'Gmail (STARTTLS - Port 587)',
         smtpHost: 'smtp.gmail.com',
         smtpPort: 587,
         encryption: 'STARTTLS',
-        authMethod: 'OAuth2 / SASL',
+        authMethod: 'LOGIN',
+        description: 'Configuração alternativa para Gmail com STARTTLS',
       },
       // Hotmail/Outlook SMTP configuration
       {
@@ -39,7 +41,8 @@ export class EmailConfigService {
         smtpHost: 'smtp-mail.outlook.com',
         smtpPort: 587,
         encryption: 'STARTTLS',
-        authMethod: 'OAuth2 / Modern Auth',
+        authMethod: 'LOGIN',
+        description: 'Configuração para Hotmail e Outlook.com',
       },
       // Titan Mail SMTP configuration
       {
@@ -47,7 +50,8 @@ export class EmailConfigService {
         smtpHost: 'smtp.titan.email',
         smtpPort: 465,
         encryption: 'SSL',
-        authMethod: 'LOGIN (usuário/senha)',
+        authMethod: 'LOGIN',
+        description: 'Configuração para Titan Email',
       },
     ];
   }
@@ -74,16 +78,20 @@ export class EmailConfigService {
 
   /**
    * Create a new email configuration
+   * Only one email configuration can exist at a time (replaces the previous one)
    */
   async createConfig(dto: CreateEmailConfigDto, userId: string): Promise<EmailConfiguration> {
-    // First deactivate any existing active configuration
-    await this.prisma.emailConfiguration.updateMany({
-      where: { isActive: true },
-      data: { isActive: false },
-    });
+    this.logger.log(`Creating new email configuration for user ${userId}`);
+    
+    // Delete all existing configurations (only one email config allowed)
+    const existingConfigs = await this.prisma.emailConfiguration.findMany();
+    if (existingConfigs.length > 0) {
+      await this.prisma.emailConfiguration.deleteMany({});
+      this.logger.log(`Deleted ${existingConfigs.length} existing email configurations`);
+    }
 
     // Create new configuration and activate it
-    return this.prisma.emailConfiguration.create({
+    const newConfig = await this.prisma.emailConfiguration.create({
       data: {
         ...dto,
         createdBy: userId,
@@ -91,30 +99,29 @@ export class EmailConfigService {
         isActive: true,
       },
     });
+
+    this.logger.log(`Created new email configuration with ID: ${newConfig.id}`);
+    return newConfig;
   }
 
   /**
    * Update an email configuration
    */
   async updateConfig(id: string, dto: UpdateEmailConfigDto, userId: string): Promise<EmailConfiguration> {
-    // If activating this configuration, deactivate others
-    if (dto.isActive) {
-      await this.prisma.emailConfiguration.updateMany({
-        where: { 
-          isActive: true,
-          NOT: { id },
-        },
-        data: { isActive: false },
-      });
-    }
-
-    return this.prisma.emailConfiguration.update({
+    this.logger.log(`Updating email configuration ${id} by user ${userId}`);
+    
+    // Since only one configuration exists, just update it
+    const updatedConfig = await this.prisma.emailConfiguration.update({
       where: { id },
       data: {
         ...dto,
         updatedBy: userId,
+        isActive: true, // Always keep it active since it's the only one
       },
     });
+
+    this.logger.log(`Updated email configuration ${id}`);
+    return updatedConfig;
   }
 
   /**
@@ -128,25 +135,38 @@ export class EmailConfigService {
 
   /**
    * Activate an email configuration
+   * Since only one configuration exists, this just ensures it's active
    */
   async activateConfig(id: string, userId: string): Promise<EmailConfiguration> {
-    // Deactivate all other configurations
-    await this.prisma.emailConfiguration.updateMany({
-      where: { 
-        isActive: true,
-        NOT: { id },
-      },
-      data: { isActive: false },
-    });
-
-    // Activate the selected configuration
-    return this.prisma.emailConfiguration.update({
+    this.logger.log(`Activating email configuration ${id} by user ${userId}`);
+    
+    // Since only one configuration exists, just ensure it's active
+    const activatedConfig = await this.prisma.emailConfiguration.update({
       where: { id },
       data: {
         isActive: true,
         updatedBy: userId,
       },
     });
+
+    this.logger.log(`Activated email configuration ${id}`);
+    return activatedConfig;
+  }
+
+  /**
+   * Get SMTP credentials from SecurityConfig
+   */
+  async getSmtpCredentials(): Promise<{ smtpUsername?: string; smtpPassword?: string }> {
+    try {
+      const securityConfig = await this.prisma.securityConfig.findFirst();
+      return {
+        smtpUsername: securityConfig?.smtpUsername || undefined,
+        smtpPassword: securityConfig?.smtpPassword || undefined,
+      };
+    } catch (error) {
+      this.logger.error('Error fetching SMTP credentials:', error);
+      return {};
+    }
   }
 
   /**
