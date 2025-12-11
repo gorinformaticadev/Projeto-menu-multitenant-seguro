@@ -17,10 +17,22 @@ export function TopBar() {
   const [masterLogo, setMasterLogo] = useState<string | null>(null);
   const [userTenantLogo, setUserTenantLogo] = useState<string | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<{
+    title: string;
+    message: string;
+    time: string;
+  }[]>([]); // Lista de notificações
+
+
 
   // Hook para fechar menu ao clicar fora
   const userMenuRef = useClickOutside<HTMLDivElement>(() => {
     setShowUserMenu(false);
+  });
+
+  const notificationsRef = useClickOutside<HTMLDivElement>(() => {
+    setShowNotifications(false);
   });
 
   // Busca logo da empresa master (para o header)
@@ -103,6 +115,29 @@ export function TopBar() {
     fetchUserTenantLogo();
   }, [user, masterLogo]);
 
+  // Simular notificações (remover em produção e conectar com dados reais)
+  useEffect(() => {
+    // Exemplo de notificações - você pode remover isso e conectar com API real
+    const exampleNotifications: {
+      title: string;
+      message: string;
+      time: string;
+    }[] = [
+      // Descomente as linhas abaixo para testar com notificações
+      // {
+      //   title: "Novo usuário cadastrado",
+      //   message: "João Silva se cadastrou na plataforma",
+      //   time: "há 5 minutos"
+      // },
+      // {
+      //   title: "Backup concluído",
+      //   message: "Backup automático realizado com sucesso",
+      //   time: "há 1 hora"
+      // }
+    ];
+    setNotifications(exampleNotifications);
+  }, []);
+
   return (
     <div className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 shadow-sm z-50">
       <div className="h-full px-4 flex items-center justify-between">
@@ -149,10 +184,71 @@ export function TopBar() {
           </Button>
 
           {/* Notificações */}
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5" />
-            <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
-          </Button>
+          <div className="relative" ref={notificationsRef}>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="relative"
+              onClick={() => setShowNotifications(!showNotifications)}
+            >
+              <Bell className="h-5 w-5" />
+              {notifications.length > 0 && (
+                <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
+              )}
+            </Button>
+
+            {/* Dropdown de Notificações */}
+            {showNotifications && (
+              <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                <div className="px-4 py-2 border-b border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-900">Notificações</h3>
+                </div>
+                
+                {notifications.length === 0 ? (
+                  <div className="px-4 py-8 text-center">
+                    <Bell className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Sem notificações</p>
+                    <p className="text-xs text-gray-400 mt-1">Você está em dia!</p>
+                  </div>
+                ) : (
+                  <div className="max-h-96 overflow-y-auto">
+                    {notifications.map((notification, index) => (
+                      <div key={index} className="px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0">
+                        <div className="flex items-start gap-3">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {notification.title}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {notification.message}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              {notification.time}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {notifications.length > 0 && (
+                  <div className="px-4 py-2 border-t border-gray-200">
+                    <button 
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                      onClick={() => {
+                        setNotifications([]);
+                        setShowNotifications(false);
+                      }}
+                    >
+                      Marcar todas como lidas
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Menu do Usuário */}
           <div className="relative" ref={userMenuRef}>
@@ -188,11 +284,11 @@ export function TopBar() {
                 </div>
               )}
               <div className="hidden md:block text-left">
-                {user?.tenant && (
-                  <p className="text-xs text-blue-600 font-medium truncate">{user.tenant.nomeFantasia}</p>
+                {user?.tenant?.nomeFantasia && (
+                  <p className="text-sm text-blue-600 font-medium truncate">{user.tenant.nomeFantasia}</p>
                 )}
                 <p className="text-sm font-medium">{user?.name}</p>
-                <p className="text-xs text-gray-500">{user?.role}</p>
+                <p className="text-[10px] text-gray-500">{user?.role}</p>
               </div>
             </Button>
 
@@ -228,8 +324,8 @@ export function TopBar() {
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      {user?.tenant && (
-                        <p className="text-xs text-blue-600 font-medium truncate mb-1">{user.tenant.nomeFantasia}</p>
+                      {user?.tenant?.nomeFantasia && (
+                        <p className="text-sm text-blue-600 font-medium truncate mb-1">{user.tenant.nomeFantasia}</p>
                       )}
                       <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
                       <p className="text-xs text-gray-500 truncate">{user?.email}</p>

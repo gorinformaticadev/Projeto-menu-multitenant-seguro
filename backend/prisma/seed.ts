@@ -6,14 +6,14 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Iniciando seed do banco de dados...');
 
-  // Cria um tenant de exemplo
+  // Cria a tenant principal (empresa padrão do sistema)
   const tenant1 = await prisma.tenant.upsert({
     where: { email: 'empresa1@example.com' },
     update: {},
     create: {
       email: 'empresa1@example.com',
       cnpjCpf: '12345678901234',
-      nomeFantasia: 'Empresa Exemplo LTDA',
+      nomeFantasia: 'GOR Informatica',
       nomeResponsavel: 'João Silva',
       telefone: '(11) 98765-4321',
     },
@@ -21,7 +21,7 @@ async function main() {
 
   console.log('✅ Tenant criado:', tenant1.nomeFantasia);
 
-  // Cria um SUPER_ADMIN (sem tenant)
+  // Cria um SUPER_ADMIN (vinculado à tenant principal)
   const hashedPasswordAdmin = await bcrypt.hash('admin123', 10);
   const superAdmin = await prisma.user.upsert({
     where: { email: 'admin@system.com' },
@@ -31,6 +31,7 @@ async function main() {
       password: hashedPasswordAdmin,
       name: 'Super Admin',
       role: Role.SUPER_ADMIN,
+      tenantId: tenant1.id, // ✅ Associa à tenant principal
     },
   });
 
