@@ -10,7 +10,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
   // Páginas onde o sidebar e topbar NÃO devem aparecer
-  const publicPages = ["/", "/login"];
+  const publicPages = ["/", "/login", "/esqueci-senha", "/redefinir-senha"];
   const isPublicPage = publicPages.includes(pathname);
 
   // Se está carregando ou é página pública, não mostra sidebar nem topbar

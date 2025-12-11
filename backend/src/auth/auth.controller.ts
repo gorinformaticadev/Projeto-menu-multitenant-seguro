@@ -3,12 +3,15 @@ import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { TwoFactorService } from './two-factor.service';
 import { EmailVerificationService } from './email-verification.service';
+import { PasswordResetService } from './password-reset.service';
 import { LoginDto } from './dto/login.dto';
 import { Login2FADto } from './dto/login-2fa.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { Verify2FADto } from './dto/verify-2fa.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SkipCsrf } from '../common/decorators/skip-csrf.decorator';
 import { Request } from 'express';
@@ -19,6 +22,7 @@ export class AuthController {
     private authService: AuthService,
     private twoFactorService: TwoFactorService,
     private emailVerificationService: EmailVerificationService,
+    private passwordResetService: PasswordResetService,
   ) {}
 
   /**
@@ -171,5 +175,32 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async checkEmailVerification(@Req() req: any) {
     return this.emailVerificationService.checkEmailVerification(req.user.id);
+  }
+
+  /**
+   * POST /auth/forgot-password
+   * Solicitar recuperação de senha
+   * CSRF: Desabilitado - endpoint público
+   */
+  @SkipCsrf()
+  @Post('forgot-password')
+  @Throttle({ default: { limit: 3, ttl: 3600000 } }) // 3 tentativas por hora
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    return this.passwordResetService.requestPasswordReset(forgotPasswordDto.email);
+  }
+
+  /**
+   * POST /auth/reset-password
+   * Redefinir senha com token
+   * CSRF: Desabilitado - endpoint público
+   */
+  @SkipCsrf()
+  @Post('reset-password')
+  @Throttle({ default: { limit: 5, ttl: 3600000 } }) // 5 tentativas por hora
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    return this.passwordResetService.resetPassword(
+      resetPasswordDto.token,
+      resetPasswordDto.newPassword
+    );
   }
 }

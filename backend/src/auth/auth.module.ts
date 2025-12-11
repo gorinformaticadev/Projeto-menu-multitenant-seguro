@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { TwoFactorService } from './two-factor.service';
 import { EmailVerificationService } from './email-verification.service';
+import { PasswordResetService } from './password-reset.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { AuditModule } from '../audit/audit.module';
@@ -26,7 +27,7 @@ import { EmailModule } from '../email/email.module';
     EmailModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, TwoFactorService, EmailVerificationService, JwtStrategy],
-  exports: [AuthService, TwoFactorService, EmailVerificationService],
+  providers: [AuthService, TwoFactorService, EmailVerificationService, PasswordResetService, JwtStrategy],
+  exports: [AuthService, TwoFactorService, EmailVerificationService, PasswordResetService],
 })
 export class AuthModule {}

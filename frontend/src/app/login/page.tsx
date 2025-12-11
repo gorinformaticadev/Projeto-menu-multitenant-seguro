@@ -202,6 +202,15 @@ export default function LoginPage() {
             </Button>
           </form>
 
+          <div className="mt-4 text-center">
+            <a 
+              href="/esqueci-senha" 
+              className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+            >
+              Esqueci minha senha
+            </a>
+          </div>
+
           <div className="mt-1 p-2 bg-muted rounded-lg text-sm text-center">
             <p className="mb-0">Desenvolvido por: GOR Informática - {currentYear}</p>
             <a 
