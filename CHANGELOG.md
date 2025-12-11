@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.2.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.1...v0.2.0) (2025-12-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* Updates to seed script may require re-running database migrations for existing tenants
+
+### Features
+
+* add tenant branding and security configuration ([0f5884f](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/0f5884fe4fa0b5469a311cec9c9daf8d68806dc6))
+* **auth:** add password reset functionality ([e8b81af](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/e8b81afa54a965d57a110a558d909b5af0c9f4bf))
+* **auth:** implement password input component with enhanced validation ([347b043](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/347b0432751e1a1efa8ffbc9796e446ba271280a))
+* **cpf-cnpj:** adicionar validação para CPF/CNPJ em DTOs de locatários e formulários front-end ([6573e40](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/6573e4003bbc125b553544e9377aaa6d666183ae))
+* update tenant seeding and topbar display ([f336cb3](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/f336cb3a9f05f2906dce16514adc55de9bd3ce49))
+
 ### [0.1.1](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.0...v0.1.1) (2025-12-11)
 
 
