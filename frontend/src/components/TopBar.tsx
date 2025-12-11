@@ -3,14 +3,16 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlatformName } from "@/hooks/usePlatformConfig";
+import { useSystemVersion } from "@/hooks/useSystemVersion";
 import { Button } from "./ui/button";
-import { Bell, Search, User, LogOut } from "lucide-react";
+import { Bell, Search, User, LogOut, Info } from "lucide-react";
 import { API_URL } from "@/lib/api";
 import api from "@/lib/api";
 
 export function TopBar() {
   const { user, logout } = useAuth();
   const { platformName } = usePlatformName();
+  const { version: systemVersion } = useSystemVersion();
   const [masterLogo, setMasterLogo] = useState<string | null>(null);
   const [userTenantLogo, setUserTenantLogo] = useState<string | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -188,6 +190,31 @@ export function TopBar() {
                   <User className="h-4 w-4" />
                   Meu Perfil
                 </a>
+                
+                {/* Versão do Sistema */}
+                {user?.role === "SUPER_ADMIN" ? (
+                  <a
+                    href="/configuracoes/sistema/updates"
+                    onClick={() => setShowUserMenu(false)}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                    title="Clique para gerenciar atualizações"
+                  >
+                    <Info className="h-4 w-4" />
+                    <div>
+                      <span className="text-xs text-gray-600">Versão do Sistema</span>
+                      <div className="text-xs font-mono font-medium text-gray-800">v{systemVersion}</div>
+                    </div>
+                  </a>
+                ) : (
+                  <div className="px-4 py-2 text-left text-sm text-gray-500 flex items-center gap-2 cursor-default">
+                    <Info className="h-4 w-4" />
+                    <div>
+                      <span className="text-xs">Versão do Sistema</span>
+                      <div className="text-xs font-mono font-medium text-gray-700">v{systemVersion}</div>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="border-t border-gray-200 mt-2 pt-2">
                   <button
                     onClick={() => {
