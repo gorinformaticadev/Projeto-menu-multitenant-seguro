@@ -38,7 +38,7 @@ export function PasswordValidator({ password, showRequirements = true }: Passwor
       hasUppercase: policy.requireUppercase ? /[A-Z]/.test(password) : true,
       hasLowercase: policy.requireLowercase ? /[a-z]/.test(password) : true,
       hasNumbers: policy.requireNumbers ? /\d/.test(password) : true,
-      hasSpecial: policy.requireSpecial ? /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) : true,
+      hasSpecial: policy.requireSpecial ? /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password) : true,
       isValid: false,
     };
 
@@ -59,19 +59,19 @@ export function PasswordValidator({ password, showRequirements = true }: Passwor
     },
     {
       key: 'hasUppercase',
-      label: 'Pelo menos uma letra maiúscula',
+      label: 'Pelo menos uma letra maiúscula (A-Z)',
       valid: validation.hasUppercase,
       required: policy.requireUppercase,
     },
     {
       key: 'hasLowercase',
-      label: 'Pelo menos uma letra minúscula',
+      label: 'Pelo menos uma letra minúscula (a-z)',
       valid: validation.hasLowercase,
       required: policy.requireLowercase,
     },
     {
       key: 'hasNumbers',
-      label: 'Pelo menos um número',
+      label: 'Pelo menos um número (0-9)',
       valid: validation.hasNumbers,
       required: policy.requireNumbers,
     },
@@ -120,7 +120,7 @@ export function validatePassword(password: string, policy: any): ValidationResul
     hasUppercase: policy.requireUppercase ? /[A-Z]/.test(password) : true,
     hasLowercase: policy.requireLowercase ? /[a-z]/.test(password) : true,
     hasNumbers: policy.requireNumbers ? /\d/.test(password) : true,
-    hasSpecial: policy.requireSpecial ? /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) : true,
+    hasSpecial: policy.requireSpecial ? /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password) : true,
     isValid: false,
   };
 }

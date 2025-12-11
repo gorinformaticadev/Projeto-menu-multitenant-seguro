@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
 import { Plus, User, Mail, Shield, Edit, Trash2, Building2, Lock, Unlock, AlertTriangle } from "lucide-react";
-import { PasswordValidator } from "@/components/PasswordValidator";
+import { PasswordInput } from "@/components/ui/password-input";
 
 interface UserData {
   id: string;
@@ -462,19 +462,15 @@ export default function UsuariosPage() {
                 </select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">
-                  {editingUser ? "Nova Senha (deixe em branco para não alterar)" : "Senha"}
-                </Label>
-                <Input
+                <PasswordInput
                   id="password"
-                  type="password"
+                  label={editingUser ? "Nova Senha (deixe em branco para não alterar)" : "Senha"}
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={(value, isValid) => setFormData({ ...formData, password: value })}
+                  showValidation={!editingUser || formData.password.length > 0}
+                  showStrengthMeter={true}
+                  placeholder={editingUser ? "Digite a nova senha (opcional)" : "Digite a senha"}
                   required={!editingUser}
-                />
-                <PasswordValidator
-                  password={formData.password}
-                  showRequirements={!editingUser || formData.password.length > 0}
                 />
               </div>
               <DialogFooter>

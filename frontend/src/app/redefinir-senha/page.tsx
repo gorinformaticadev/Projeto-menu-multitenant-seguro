@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { PlatformName } from "@/components/PlatformInfo";
+import { PasswordInput } from "@/components/ui/password-input";
 import { ArrowLeft, Eye, EyeOff, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { API_URL } from "@/lib/api";
@@ -15,11 +16,11 @@ import { API_URL } from "@/lib/api";
 export default function ResetPasswordPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [token, setToken] = useState<string | null>(null);
+  const [isPasswordValid, setIsPasswordValid] = useState(false);
+  const [passwordsMatch, setPasswordsMatch] = useState(false);
   
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -39,17 +40,7 @@ export default function ResetPasswordPage() {
     setToken(tokenParam);
   }, [searchParams, router, toast]);
 
-  // Validação de senha em tempo real
-  const passwordValidation = {
-    minLength: newPassword.length >= 8,
-    hasUppercase: /[A-Z]/.test(newPassword),
-    hasLowercase: /[a-z]/.test(newPassword),
-    hasNumber: /\d/.test(newPassword),
-    hasSpecial: /[@$!%*?&]/.test(newPassword),
-  };
 
-  const isPasswordValid = Object.values(passwordValidation).every(Boolean);
-  const passwordsMatch = newPassword === confirmPassword && confirmPassword.length > 0;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -75,13 +66,13 @@ export default function ResetPasswordPage() {
     if (!isPasswordValid) {
       toast({
         title: "Erro",
-        description: "A senha não atende aos critérios de segurança",
+        description: "A senha não atende aos requisitos de segurança",
         variant: "destructive",
       });
       return;
     }
 
-    if (newPassword !== confirmPassword) {
+    if (!passwordsMatch) {
       toast({
         title: "Erro",
         description: "As senhas não coincidem",
@@ -168,83 +159,25 @@ export default function ResetPasswordPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="newPassword">Nova Senha</Label>
-              <div className="relative">
-                <Input
-                  id="newPassword"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  disabled={loading}
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              
-              {/* Indicadores de validação da senha */}
-              {newPassword && (
-                <div className="space-y-1 text-sm">
-                  <div className={`flex items-center space-x-2 ${passwordValidation.minLength ? 'text-green-600' : 'text-red-600'}`}>
-                    <div className={`w-2 h-2 rounded-full ${passwordValidation.minLength ? 'bg-green-600' : 'bg-red-600'}`} />
-                    <span>Pelo menos 8 caracteres</span>
-                  </div>
-                  <div className={`flex items-center space-x-2 ${passwordValidation.hasUppercase ? 'text-green-600' : 'text-red-600'}`}>
-                    <div className={`w-2 h-2 rounded-full ${passwordValidation.hasUppercase ? 'bg-green-600' : 'bg-red-600'}`} />
-                    <span>Uma letra maiúscula</span>
-                  </div>
-                  <div className={`flex items-center space-x-2 ${passwordValidation.hasLowercase ? 'text-green-600' : 'text-red-600'}`}>
-                    <div className={`w-2 h-2 rounded-full ${passwordValidation.hasLowercase ? 'bg-green-600' : 'bg-red-600'}`} />
-                    <span>Uma letra minúscula</span>
-                  </div>
-                  <div className={`flex items-center space-x-2 ${passwordValidation.hasNumber ? 'text-green-600' : 'text-red-600'}`}>
-                    <div className={`w-2 h-2 rounded-full ${passwordValidation.hasNumber ? 'bg-green-600' : 'bg-red-600'}`} />
-                    <span>Um número</span>
-                  </div>
-                  <div className={`flex items-center space-x-2 ${passwordValidation.hasSpecial ? 'text-green-600' : 'text-red-600'}`}>
-                    <div className={`w-2 h-2 rounded-full ${passwordValidation.hasSpecial ? 'bg-green-600' : 'bg-red-600'}`} />
-                    <span>Um caractere especial (@$!%*?&)</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirmar Nova Senha</Label>
-              <div className="relative">
-                <Input
-                  id="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  disabled={loading}
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                >
-                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              
-              {/* Indicador de confirmação de senha */}
-              {confirmPassword && (
-                <div className={`flex items-center space-x-2 text-sm ${passwordsMatch ? 'text-green-600' : 'text-red-600'}`}>
-                  <div className={`w-2 h-2 rounded-full ${passwordsMatch ? 'bg-green-600' : 'bg-red-600'}`} />
-                  <span>{passwordsMatch ? 'Senhas coincidem' : 'Senhas não coincidem'}</span>
-                </div>
-              )}
-            </div>
+            <PasswordInput
+              id="newPassword"
+              label="Nova Senha"
+              value={newPassword}
+              onChange={(value, isValid) => {
+                setNewPassword(value);
+                setIsPasswordValid(isValid);
+              }}
+              showValidation={true}
+              showStrengthMeter={true}
+              showConfirmation={true}
+              confirmPassword={confirmPassword}
+              onConfirmChange={(value, matches) => {
+                setConfirmPassword(value);
+                setPasswordsMatch(matches);
+              }}
+              placeholder="Digite sua nova senha"
+              disabled={loading}
+            />
             
             <Button 
               type="submit" 

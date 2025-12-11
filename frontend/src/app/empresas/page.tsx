@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import api, { API_URL } from "@/lib/api";
 import { Plus, Building2, Mail, Phone, User, FileText, Eye, Edit, Power, Lock, UserPlus, Image as ImageIcon, Upload, X, Users, Trash2 } from "lucide-react";
 import { CPFCNPJInput } from "@/components/ui/cpf-cnpj-input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useRouter } from "next/navigation";
 
 interface Tenant {
@@ -43,6 +44,7 @@ export default function EmpresasPage() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isAdminPasswordValid, setIsAdminPasswordValid] = useState(false);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -60,6 +62,8 @@ export default function EmpresasPage() {
     newPassword: "",
     confirmPassword: "",
   });
+  const [isPasswordValid, setIsPasswordValid] = useState(false);
+  const [passwordsMatch, setPasswordsMatch] = useState(false);
 
   useEffect(() => {
     loadTenants();
@@ -106,10 +110,10 @@ export default function EmpresasPage() {
       return;
     }
 
-    if (formData.adminPassword.length < 6) {
+    if (!isAdminPasswordValid) {
       toast({
         title: "Erro",
-        description: "A senha deve ter no mínimo 6 caracteres",
+        description: "A senha do administrador não atende aos requisitos de segurança",
         variant: "destructive",
       });
       return;
@@ -135,6 +139,7 @@ export default function EmpresasPage() {
         adminPassword: "",
         adminName: "",
       });
+      setIsAdminPasswordValid(false);
       setShowForm(false);
       loadTenants();
     } catch (error: any) {
@@ -186,19 +191,19 @@ export default function EmpresasPage() {
     e.preventDefault();
     if (!selectedTenant) return;
 
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
+    if (!isPasswordValid) {
       toast({
         title: "Erro",
-        description: "As senhas não coincidem",
+        description: "A senha não atende aos requisitos de segurança",
         variant: "destructive",
       });
       return;
     }
 
-    if (passwordData.newPassword.length < 6) {
+    if (!passwordsMatch) {
       toast({
         title: "Erro",
-        description: "A senha deve ter no mínimo 6 caracteres",
+        description: "As senhas não coincidem",
         variant: "destructive",
       });
       return;
@@ -218,6 +223,8 @@ export default function EmpresasPage() {
 
       setShowPasswordDialog(false);
       setPasswordData({ newPassword: "", confirmPassword: "" });
+      setIsPasswordValid(false);
+      setPasswordsMatch(false);
     } catch (error: any) {
       toast({
         title: "Erro ao alterar senha",
@@ -314,6 +321,8 @@ export default function EmpresasPage() {
   function openPasswordDialog(tenant: Tenant) {
     setSelectedTenant(tenant);
     setPasswordData({ newPassword: "", confirmPassword: "" });
+    setIsPasswordValid(false);
+    setPasswordsMatch(false);
     setShowPasswordDialog(true);
   }
 
@@ -556,19 +565,19 @@ export default function EmpresasPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="adminPassword">Senha do Administrador</Label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="adminPassword"
-                          type="password"
-                          placeholder="Mínimo 6 caracteres"
-                          className="pl-10"
-                          value={formData.adminPassword}
-                          onChange={(e) => setFormData({ ...formData, adminPassword: e.target.value })}
-                          disabled={submitting}
-                        />
-                      </div>
+                      <PasswordInput
+                        id="adminPassword"
+                        label="Senha do Administrador"
+                        value={formData.adminPassword}
+                        onChange={(value, isValid) => {
+                          setFormData({ ...formData, adminPassword: value });
+                          setIsAdminPasswordValid(isValid);
+                        }}
+                        showValidation={true}
+                        showStrengthMeter={true}
+                        disabled={submitting}
+                        placeholder="Digite a senha do administrador"
+                      />
                       <p className="text-xs text-muted-foreground">
                         Esta será a senha de acesso do administrador da empresa
                       </p>
@@ -906,36 +915,25 @@ export default function EmpresasPage() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleChangePassword} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="newPassword">Nova Senha</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="newPassword"
-                    type="password"
-                    placeholder="Mínimo 6 caracteres"
-                    className="pl-10"
-                    value={passwordData.newPassword}
-                    onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                    disabled={submitting}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirmar Senha</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    placeholder="Digite a senha novamente"
-                    className="pl-10"
-                    value={passwordData.confirmPassword}
-                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                    disabled={submitting}
-                  />
-                </div>
-              </div>
+              <PasswordInput
+                id="newPassword"
+                label="Nova Senha do Administrador"
+                value={passwordData.newPassword}
+                onChange={(value, isValid) => {
+                  setPasswordData({ ...passwordData, newPassword: value });
+                  setIsPasswordValid(isValid);
+                }}
+                showValidation={true}
+                showStrengthMeter={true}
+                showConfirmation={true}
+                confirmPassword={passwordData.confirmPassword}
+                onConfirmChange={(value, matches) => {
+                  setPasswordData({ ...passwordData, confirmPassword: value });
+                  setPasswordsMatch(matches);
+                }}
+                disabled={submitting}
+                placeholder="Digite a nova senha"
+              />
               <DialogFooter>
                 <Button
                   type="button"
@@ -945,7 +943,10 @@ export default function EmpresasPage() {
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={submitting}>
+                <Button 
+                  type="submit" 
+                  disabled={submitting || !isPasswordValid || !passwordsMatch}
+                >
                   {submitting ? "Alterando..." : "Alterar Senha"}
                 </Button>
               </DialogFooter>

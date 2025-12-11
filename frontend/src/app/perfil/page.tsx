@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
 import { User, Mail, Shield, Key, Edit } from "lucide-react";
-import { PasswordValidator } from "@/components/PasswordValidator";
+import { PasswordInput } from "@/components/ui/password-input";
 
 export default function PerfilPage() {
   const { user, updateUser } = useAuth();
@@ -28,6 +28,8 @@ export default function PerfilPage() {
     newPassword: "",
     confirmPassword: "",
   });
+  const [isNewPasswordValid, setIsNewPasswordValid] = useState(false);
+  const [passwordsMatch, setPasswordsMatch] = useState(false);
   const [showEditTenant, setShowEditTenant] = useState(false);
   const [tenantData, setTenantData] = useState({
     nomeFantasia: "",
@@ -145,7 +147,16 @@ export default function PerfilPage() {
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
 
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
+    if (!isNewPasswordValid) {
+      toast({
+        title: "Erro",
+        description: "A nova senha não atende aos requisitos de segurança",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!passwordsMatch) {
       toast({
         title: "Erro",
         description: "As senhas não coincidem",
@@ -169,6 +180,8 @@ export default function PerfilPage() {
         newPassword: "",
         confirmPassword: "",
       });
+      setIsNewPasswordValid(false);
+      setPasswordsMatch(false);
       setShowChangePassword(false);
     } catch (error: any) {
       toast({
@@ -368,31 +381,25 @@ export default function PerfilPage() {
                     required
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="newPassword">Nova Senha</Label>
-                  <Input
-                    id="newPassword"
-                    type="password"
-                    value={passwordData.newPassword}
-                    onChange={(e) =>
-                      setPasswordData({ ...passwordData, newPassword: e.target.value })
-                    }
-                    required
-                  />
-                  <PasswordValidator password={passwordData.newPassword} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirmar Nova Senha</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    value={passwordData.confirmPassword}
-                    onChange={(e) =>
-                      setPasswordData({ ...passwordData, confirmPassword: e.target.value })
-                    }
-                    required
-                  />
-                </div>
+                <PasswordInput
+                  id="newPassword"
+                  label="Nova Senha"
+                  value={passwordData.newPassword}
+                  onChange={(value, isValid) => {
+                    setPasswordData({ ...passwordData, newPassword: value });
+                    setIsNewPasswordValid(isValid);
+                  }}
+                  showValidation={true}
+                  showStrengthMeter={true}
+                  showConfirmation={true}
+                  confirmPassword={passwordData.confirmPassword}
+                  onConfirmChange={(value, matches) => {
+                    setPasswordData({ ...passwordData, confirmPassword: value });
+                    setPasswordsMatch(matches);
+                  }}
+                  placeholder="Digite sua nova senha"
+                  required
+                />
                 <div className="flex gap-2">
                   <Button
                     type="button"
@@ -404,12 +411,14 @@ export default function PerfilPage() {
                         newPassword: "",
                         confirmPassword: "",
                       });
+                      setIsNewPasswordValid(false);
+                      setPasswordsMatch(false);
                     }}
                     disabled={loading}
                   >
                     Cancelar
                   </Button>
-                  <Button type="submit" disabled={loading}>
+                  <Button type="submit" disabled={loading || !isNewPasswordValid || !passwordsMatch}>
                     {loading ? "Salvando..." : "Salvar Nova Senha"}
                   </Button>
                 </div>
