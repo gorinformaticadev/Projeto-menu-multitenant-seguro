@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.6](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.0.1...v0.0.6) (2025-12-11)
+
+
+### Features
+
+* **ui:** add system version display in top bar ([8e6fc5e](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/8e6fc5e4cb8791004eefd138f7ccb907d599bb56))
+
 ## 2.0.0 (2025-12-11)
 
 
