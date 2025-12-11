@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { TwoFactorLogin } from "@/components/TwoFactorLogin";
@@ -15,6 +16,7 @@ import { API_URL } from "@/lib/api";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [masterLogo, setMasterLogo] = useState<string | null>(null);
   const currentYear = new Date().getFullYear();
   const { toast } = useToast();
@@ -44,6 +46,22 @@ export default function LoginPage() {
       }
     }
     fetchMasterLogo();
+
+    // Carrega credenciais salvas se existirem
+    const savedCredentials = localStorage.getItem("loginCredentials");
+    if (savedCredentials) {
+      try {
+        const { email: savedEmail, password: savedPassword, rememberMe: savedRememberMe } = JSON.parse(savedCredentials);
+        if (savedRememberMe) {
+          setEmail(savedEmail || "");
+          setPassword(savedPassword || "");
+          setRememberMe(true);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar credenciais salvas:", error);
+        localStorage.removeItem("loginCredentials");
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -68,6 +86,17 @@ export default function LoginPage() {
       return;
     }
 
+    // Salva ou remove credenciais baseado no checkbox
+    if (rememberMe) {
+      localStorage.setItem("loginCredentials", JSON.stringify({
+        email,
+        password,
+        rememberMe: true
+      }));
+    } else {
+      localStorage.removeItem("loginCredentials");
+    }
+
     await attemptLogin(email, password);
     // Não é necessário toast de sucesso - AuthContext redireciona automaticamente
   }
@@ -81,6 +110,7 @@ export default function LoginPage() {
     reset();
     setEmail("");
     setPassword("");
+    setRememberMe(false);
   }
 
   // Se requer 2FA, mostrar componente de 2FA
@@ -152,6 +182,20 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
               />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="rememberMe"
+                checked={rememberMe}
+                onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                disabled={loading}
+              />
+              <Label 
+                htmlFor="rememberMe" 
+                className="text-sm font-normal cursor-pointer"
+              >
+                Lembrar meus dados de acesso
+              </Label>
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Entrando..." : "Entrar"}
