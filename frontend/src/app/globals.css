@@ -55,5 +55,52 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-size: 14px; /* Reduzindo o tamanho base da fonte */
+  }
+  
+  /* Ajustes específicos para elementos comuns */
+  h1 {
+    font-size: 1.75rem; /* Reduzido de 2.25rem */
+  }
+  
+  h2 {
+    font-size: 1.5rem; /* Reduzido de 1.875rem */
+  }
+  
+  h3 {
+    font-size: 1.25rem; /* Reduzido de 1.5rem */
+  }
+  
+  p, div, span {
+    font-size: 0.875rem; /* 14px */
+  }
+  
+  /* Ajustes para componentes específicos */
+  .text-3xl {
+    font-size: 1.75rem !important; /* Reduzido */
+  }
+  
+  .text-2xl {
+    font-size: 1.5rem !important; /* Reduzido */
+  }
+  
+  .text-xl {
+    font-size: 1.25rem !important; /* Reduzido */
+  }
+  
+  .text-lg {
+    font-size: 1.125rem !important; /* Reduzido */
+  }
+  
+  .text-base {
+    font-size: 0.875rem !important; /* Reduzido */
+  }
+  
+  .text-sm {
+    font-size: 0.8125rem !important; /* Reduzido */
+  }
+  
+  .text-xs {
+    font-size: 0.75rem !important; /* Mantido */
   }
 }

@@ -18,6 +18,18 @@ const config = {
       },
     },
     extend: {
+      fontSize: {
+        'xs': '0.75rem',     // 12px
+        'sm': '0.8125rem',   // 13px - reduzido
+        'base': '0.875rem',  // 14px - reduzido
+        'lg': '1.125rem',    // 18px - reduzido
+        'xl': '1.25rem',     // 20px - reduzido
+        '2xl': '1.5rem',     // 24px - reduzido
+        '3xl': '1.75rem',    // 28px - reduzido
+        '4xl': '2rem',       // 32px - reduzido
+        '5xl': '2.25rem',    // 36px - reduzido
+        '6xl': '2.5rem',     // 40px - reduzido
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
