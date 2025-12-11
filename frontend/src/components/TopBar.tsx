@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlatformName } from "@/hooks/usePlatformConfig";
 import { useSystemVersion } from "@/hooks/useSystemVersion";
+import { useClickOutside } from "@/hooks/useClickOutside";
 import { Button } from "./ui/button";
 import { Bell, Search, User, LogOut, Info } from "lucide-react";
 import { API_URL } from "@/lib/api";
@@ -16,6 +17,11 @@ export function TopBar() {
   const [masterLogo, setMasterLogo] = useState<string | null>(null);
   const [userTenantLogo, setUserTenantLogo] = useState<string | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
+
+  // Hook para fechar menu ao clicar fora
+  const userMenuRef = useClickOutside<HTMLDivElement>(() => {
+    setShowUserMenu(false);
+  });
 
   // Busca logo da empresa master (para o header)
   useEffect(() => {
@@ -149,7 +155,7 @@ export function TopBar() {
           </Button>
 
           {/* Menu do Usuário */}
-          <div className="relative">
+          <div className="relative" ref={userMenuRef}>
             <Button
               variant="ghost"
               className="flex items-center gap-2"
