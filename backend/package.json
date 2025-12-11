@@ -1,7 +1,10 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "Backend NestJS com segurança e isolamento multitenant",
+  "description": "Backend NestJS com segurança e isolamento multitenant - GOR Informática",
+  "author": "GOR Informática <contato@gorinformatica.com.br>",
+  "license": "AGPL-3.0",
+  "homepage": "https://www.gorinformatica.com.br",
   "scripts": {
     "start": "nest start",
     "start:dev": "nest start --watch",

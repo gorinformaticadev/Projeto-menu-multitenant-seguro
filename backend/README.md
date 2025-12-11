@@ -2,6 +2,13 @@
 
 Backend desenvolvido com NestJS 11, implementando segurança essencial e isolamento multitenant.
 
+## 🏢 Desenvolvido por
+
+**GOR Informática**
+- 📞 WhatsApp: (61) 3359-7358
+- 🌐 Website: www.gorinformatica.com.br
+- 📧 Email: contato@gorinformatica.com.br
+
 ## 🚀 Tecnologias
 
 - NestJS 11
@@ -125,3 +132,22 @@ src/
 └── main.ts             # Bootstrap da aplicação
 ```
 
+
+## 📄 Licença
+
+Este projeto está licenciado sob a GNU Affero General Public License v3.0 (AGPL-3.0).
+Copyright (C) 2024 GOR Informática
+
+## 💝 Apoie o Projeto
+
+Se este projeto foi útil, considere fazer uma doação via PIX:
+**Chave:** gilsonoliverr@gmail.com
+
+## 📞 Suporte
+
+Para suporte técnico:
+- 📱 WhatsApp: (61) 3359-7358
+- 🌐 Website: www.gorinformatica.com.br
+
+---
+**GOR Informática** - Soluções em Tecnologia da Informação

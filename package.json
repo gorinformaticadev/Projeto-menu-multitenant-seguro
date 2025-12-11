@@ -1,6 +1,14 @@
 {
   "name": "menu-multitenant",
   "version": "0.2.0",
+  "description": "Sistema Multitenant Seguro desenvolvido pela GOR Informática",
+  "author": "GOR Informática <contato@gorinformatica.com.br>",
+  "license": "AGPL-3.0",
+  "homepage": "https://www.gorinformatica.com.br",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gorinformatica/menu-multitenant.git"
+  },
   "dependencies": {
     "axios": "^1.13.2"
   },
