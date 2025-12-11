@@ -63,6 +63,10 @@
     "eslint": "^8.50.0",
     "eslint-plugin-security": "^1.7.1",
     "husky": "^8.0.3",
+    "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   }
 }

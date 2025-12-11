@@ -68,6 +68,28 @@ async function main() {
 
   console.log('✅ Admin do tenant criado:', tenantAdmin.email);
 
+  // Cria configurações de segurança globais (padrão)
+  const globalSecurityConfig = await prisma.securityConfig.create({
+    data: {
+      twoFactorEnabled: true,
+      twoFactorRequired: false,
+      twoFactorRequiredForAdmins: false,
+      twoFactorSuggested: true,
+      sessionTimeoutMinutes: 30,
+      passwordMinLength: 8,
+      passwordRequireUppercase: true,
+      passwordRequireLowercase: true,
+      passwordRequireNumbers: true,
+      passwordRequireSpecial: true,
+      loginMaxAttempts: 5,
+      loginLockDurationMinutes: 15,
+      platformName: 'Sistema Multitenant',
+      platformEmail: 'admin@sistema.com',
+    },
+  });
+
+  console.log('✅ Configurações de segurança globais criadas');
+
   console.log('\n📋 Credenciais de acesso:');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('SUPER_ADMIN:');
