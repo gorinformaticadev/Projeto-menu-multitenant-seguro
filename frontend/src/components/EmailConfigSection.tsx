@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Mail } from "lucide-react";
+import { Save, Mail, Send, Play } from "lucide-react";
 
 interface EmailProvider {
   providerName: string;
@@ -37,6 +37,9 @@ export default function EmailConfigSection() {
   const [activeConfig, setActiveConfig] = useState<EmailConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testEmail, setTestEmail] = useState("");
+  const [showTestInput, setShowTestInput] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string>("");
   const [formData, setFormData] = useState({
     smtpHost: "",
@@ -125,13 +128,14 @@ export default function EmailConfigSection() {
     try {
       setSaving(true);
       
-      // Prepare data for saving
+      // Prepare data for saving (without credentials for security)
       const saveData = {
         providerName: selectedProvider || "Custom",
         smtpHost: formData.smtpHost,
         smtpPort: formData.smtpPort,
         encryption: formData.encryption,
         authMethod: formData.authMethod,
+        // Note: We don't save credentials to the database for security
       };
       
       // Create new configuration
@@ -154,6 +158,49 @@ export default function EmailConfigSection() {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Test email configuration
+  const handleTestConnection = () => {
+    setShowTestInput(true);
+  };
+
+  // Send test email
+  const handleSendTestEmail = async () => {
+    if (!testEmail) {
+      toast({
+        title: "Email necessário",
+        description: "Por favor, informe um email para envio do teste",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setTesting(true);
+      
+      // Send test email with credentials
+      await api.post("/email-config/test", { 
+        email: testEmail,
+        smtpUser: formData.smtpUser,
+        smtpPass: formData.smtpPass
+      });
+      
+      toast({
+        title: "Email de teste enviado",
+        description: `Email de teste enviado com sucesso para ${testEmail}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao enviar email de teste",
+        description: error.response?.data?.message || "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setTesting(false);
+      setShowTestInput(false);
+      setTestEmail("");
     }
   };
 
@@ -266,20 +313,12 @@ export default function EmailConfigSection() {
               <Label htmlFor="auth-method">
                 Método de Autenticação
               </Label>
-              <Select 
-                value={formData.authMethod} 
-                onValueChange={(value) => handleInputChange("authMethod", value)}
-              >
-                <SelectTrigger id="auth-method">
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PLAIN">PLAIN</SelectItem>
-                  <SelectItem value="LOGIN">LOGIN</SelectItem>
-                  <SelectItem value="CRAM-MD5">CRAM-MD5</SelectItem>
-                  <SelectItem value="OAuth 2.0">OAuth 2.0</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input
+                id="auth-method"
+                value={formData.authMethod}
+                onChange={(e) => handleInputChange("authMethod", e.target.value)}
+                placeholder="Método de autenticação"
+              />
             </div>
           </div>
 
@@ -311,12 +350,40 @@ export default function EmailConfigSection() {
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex flex-col sm:flex-row gap-2 justify-between">
+          <Button onClick={handleTestConnection} variant="secondary">
+            <Play className="h-4 w-4 mr-2" />
+            Testar Conexão
+          </Button>
+          
           <Button onClick={handleSave} disabled={saving}>
             <Save className="h-4 w-4 mr-2" />
             {saving ? "Salvando..." : "Salvar Configuração"}
           </Button>
         </div>
+
+        {showTestInput && (
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-4">
+            <div>
+              <Label htmlFor="test-email">
+                Email de destino para teste
+              </Label>
+              <Input
+                id="test-email"
+                type="email"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+                placeholder="destino@teste.com"
+              />
+            </div>
+            <div className="flex justify-end">
+              <Button onClick={handleSendTestEmail} disabled={testing}>
+                <Send className="h-4 w-4 mr-2" />
+                {testing ? "Enviando..." : "Enviar Email de Teste"}
+              </Button>
+            </div>
+          </div>
+        )}
 
         {activeConfig && (
           <div className="p-4 bg-green-50 border border-green-200 rounded-lg">

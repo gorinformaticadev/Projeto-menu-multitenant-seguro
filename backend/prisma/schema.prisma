@@ -139,6 +139,9 @@ model SecurityConfig {
   passwordReuseLimit      Int      @default(5) // Prevenir reutilização das últimas N senhas
   // Sessão
   sessionTimeoutMinutes   Int      @default(30) // Timeout de inatividade em minutos (logout automático)
+  // Email SMTP Credentials (único para toda a plataforma)
+  smtpUsername            String?  // Usuário SMTP
+  smtpPassword            String?  // Senha SMTP (armazenada com criptografia)
   updatedAt               DateTime @updatedAt
   updatedBy               String? // ID do SUPER_ADMIN que atualizou
 
@@ -160,4 +163,15 @@ model EmailConfiguration {
   updatedAt    DateTime @updatedAt
 
   @@map("email_configurations")
+}
+
+// Tabela de Credenciais SMTP (apenas SUPER_ADMIN pode editar)
+model SmtpCredentials {
+  id        String   @id @default(uuid())
+  smtpUser  String
+  smtpPass  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("smtp_credentials")
 }

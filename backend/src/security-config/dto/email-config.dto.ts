@@ -1,4 +1,4 @@
-import { IsString, IsInt, IsBoolean, IsOptional, IsEnum } from 'class-validator';
+import { IsString, IsInt, IsBoolean, IsOptional } from 'class-validator';
 
 export enum EmailProvider {
   GMAIL = 'Gmail',
@@ -7,8 +7,8 @@ export enum EmailProvider {
 }
 
 export class CreateEmailConfigDto {
-  @IsEnum(EmailProvider)
-  providerName: EmailProvider;
+  @IsString()
+  providerName: string;
 
   @IsString()
   smtpHost: string;
@@ -33,8 +33,8 @@ export class CreateEmailConfigDto {
 
 export class UpdateEmailConfigDto {
   @IsOptional()
-  @IsEnum(EmailProvider)
-  providerName?: EmailProvider;
+  @IsString()
+  providerName?: string;
 
   @IsOptional()
   @IsString()

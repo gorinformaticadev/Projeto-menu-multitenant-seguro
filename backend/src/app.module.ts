@@ -9,6 +9,7 @@ import { TenantsModule } from './tenants/tenants.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 import { UsersModule } from './users/users.module';
 import { SecurityConfigModule } from './security-config/security-config.module';
+import { EmailConfigModule } from './security-config/email-config.module';
 import { AuditModule } from './audit/audit.module';
 import { ValidatorsModule } from './common/validators/validators.module';
 import { HttpsRedirectMiddleware } from './common/middleware/https-redirect.middleware';
@@ -49,6 +50,7 @@ import { TokenCleanupService } from './common/services/token-cleanup.service';
     TenantsModule,
     UsersModule,
     SecurityConfigModule,
+    EmailConfigModule,
     AuditModule,
   ],
   providers: [

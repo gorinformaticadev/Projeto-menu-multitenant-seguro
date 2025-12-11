@@ -42,7 +42,14 @@ export class EmailService implements OnModuleInit {
         smtpConfig = {
           host: this.dbConfig.smtpHost,
           port: this.dbConfig.smtpPort,
-          secure: this.dbConfig.encryption === 'SSL' || this.dbConfig.encryption === 'TLS',
+          secure: this.dbConfig.encryption === 'SSL', // true for port 465, false for other ports
+          tls: this.dbConfig.encryption === 'STARTTLS' || this.dbConfig.encryption === 'TLS' ? {
+            rejectUnauthorized: false
+          } : undefined,
+          auth: {
+            user: this.config.get('SMTP_USER'), // Still using env var for credentials
+            pass: this.config.get('SMTP_PASS'),
+          }
         };
       } else {
         // Fallback to environment variables
@@ -51,6 +58,13 @@ export class EmailService implements OnModuleInit {
           host: this.config.get('SMTP_HOST'),
           port: parseInt(this.config.get('SMTP_PORT', '587')),
           secure: this.config.get('SMTP_SECURE') === 'true',
+          tls: {
+            rejectUnauthorized: false
+          },
+          auth: {
+            user: this.config.get('SMTP_USER'),
+            pass: this.config.get('SMTP_PASS'),
+          }
         };
       }
 
@@ -58,22 +72,6 @@ export class EmailService implements OnModuleInit {
       this.isEnabled = !!smtpConfig.host;
 
       if (this.isEnabled) {
-        // Add authentication if available
-        if (this.dbConfig) {
-          // For database config, auth will be provided when sending emails
-          // This is a placeholder - actual credentials would need to be provided separately
-          smtpConfig.auth = {
-            user: this.config.get('SMTP_USER'), // Still using env var for credentials
-            pass: this.config.get('SMTP_PASS'),
-          };
-        } else {
-          // For env config, use env vars for auth
-          smtpConfig.auth = {
-            user: this.config.get('SMTP_USER'),
-            pass: this.config.get('SMTP_PASS'),
-          };
-        }
-
         this.transporter = nodemailer.createTransport(smtpConfig);
         this.logger.log('Email service configurado e ativo');
       } else {
@@ -88,16 +86,27 @@ export class EmailService implements OnModuleInit {
   /**
    * Enviar email de verificação
    */
-  async sendVerificationEmail(email: string, name: string, token: string): Promise<boolean> {
+  async sendVerificationEmail(email: string, name: string, token: string, smtpUser?: string, smtpPass?: string): Promise<boolean> {
     if (!this.isEnabled) {
       this.logger.warn(`Email de verificação não enviado (serviço desabilitado): ${email}`);
       return false;
     }
 
     const verificationUrl = `${this.config.get('FRONTEND_URL')}/verify-email?token=${token}`;
-
     const html = this.getVerificationEmailTemplate(name, verificationUrl);
 
+    // If database configuration is active and credentials are provided, use them
+    if (this.dbConfig && smtpUser && smtpPass) {
+      return this.sendEmailWithCredentials(
+        email,
+        'Verifique seu email - Sistema Multitenant',
+        html,
+        smtpUser,
+        smtpPass
+      );
+    }
+
+    // Otherwise, use the default transporter (environment variables)
     try {
       await this.transporter.sendMail({
         from: `"${this.config.get('EMAIL_FROM_NAME', 'Sistema Multitenant')}" <${this.config.get('EMAIL_FROM', 'noreply@example.com')}>`,
@@ -299,6 +308,137 @@ export class EmailService implements OnModuleInit {
               <li>Ative a autenticação de dois fatores (2FA)</li>
               <li>Entre em contato com o suporte</li>
             </ul>
+          </div>
+          <div class="footer">
+            <p>Este é um email automático. Por favor, não responda.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Send test email
+   */
+  async sendTestEmail(email: string, name: string, config: any, smtpUser: string, smtpPass: string): Promise<boolean> {
+    if (!smtpUser || !smtpPass) {
+      this.logger.warn(`Email de teste não enviado (credenciais ausentes): ${email}`);
+      return false;
+    }
+
+    try {
+      // Create a temporary transporter with the provided credentials
+      const tempTransporter = nodemailer.createTransport({
+        host: config.smtpHost,
+        port: config.smtpPort,
+        secure: config.encryption === 'SSL', // true for port 465, false for other ports
+        tls: config.encryption === 'STARTTLS' || config.encryption === 'TLS' ? {
+          rejectUnauthorized: false
+        } : undefined,
+        auth: {
+          user: smtpUser,
+          pass: smtpPass,
+        },
+      });
+
+      const html = this.getTestEmailTemplate(name, config);
+
+      await tempTransporter.sendMail({
+        from: `"Sistema Multitenant" <${smtpUser}>`,
+        to: email,
+        subject: 'Teste de Configuração de Email - Sistema Multitenant',
+        html,
+      });
+
+      this.logger.log(`Email de teste enviado para: ${email}`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Erro ao enviar email de teste para ${email}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Send email with database configuration and provided credentials
+   */
+  async sendEmailWithCredentials(
+    email: string, 
+    subject: string, 
+    html: string, 
+    smtpUser: string, 
+    smtpPass: string
+  ): Promise<boolean> {
+    if (!this.dbConfig || !smtpUser || !smtpPass) {
+      this.logger.warn(`Email não enviado (configuração ou credenciais ausentes): ${email}`);
+      return false;
+    }
+
+    try {
+      // Create a temporary transporter with the database configuration and provided credentials
+      const tempTransporter = nodemailer.createTransport({
+        host: this.dbConfig.smtpHost,
+        port: this.dbConfig.smtpPort,
+        secure: this.dbConfig.encryption === 'SSL', // true for port 465, false for other ports
+        tls: this.dbConfig.encryption === 'STARTTLS' || this.dbConfig.encryption === 'TLS' ? {
+          rejectUnauthorized: false
+        } : undefined,
+        auth: {
+          user: smtpUser,
+          pass: smtpPass,
+        },
+      });
+
+      await tempTransporter.sendMail({
+        from: `"Sistema Multitenant" <${smtpUser}>`,
+        to: email,
+        subject: subject,
+        html: html,
+      });
+
+      this.logger.log(`Email enviado para: ${email}`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Erro ao enviar email para ${email}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Template de email de teste
+   */
+  private getTestEmailTemplate(name: string, config: any): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #10B981; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
+          .config-details { background: #EFF6FF; border-left: 4px solid #3B82F6; padding: 15px; margin: 15px 0; }
+          .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>✅ Configuração de Email Confirmada</h1>
+          </div>
+          <div class="content">
+            <p>Olá <strong>${name}</strong>,</p>
+            <p>Esta é uma mensagem de teste para confirmar que sua configuração de email está funcionando corretamente.</p>
+            
+            <div class="config-details">
+              <h3>Detalhes da Configuração:</h3>
+              <p><strong>Servidor SMTP:</strong> ${config.smtpHost}:${config.smtpPort}</p>
+              <p><strong>Criptografia:</strong> ${config.encryption}</p>
+              <p><strong>Método de Autenticação:</strong> ${config.authMethod}</p>
+            </div>
+            
+            <p>Se você recebeu este email, sua configuração de email está pronta para uso!</p>
           </div>
           <div class="footer">
             <p>Este é um email automático. Por favor, não responda.</p>

@@ -105,4 +105,21 @@ export class EmailConfigController {
   async deleteConfig(@Param('id') id: string) {
     return this.emailConfigService.deleteConfig(id);
   }
+
+  /**
+   * POST /email-config/test
+   * Testar configuração de email
+   * Apenas SUPER_ADMIN
+   */
+  @SkipThrottle()
+  @Post('test')
+  @Roles(Role.SUPER_ADMIN)
+  async testConfig(
+    @Body('email') email: string,
+    @Body('smtpUser') smtpUser: string,
+    @Body('smtpPass') smtpPass: string,
+    @Request() req: any,
+  ) {
+    return this.emailConfigService.testConfig(email, smtpUser, smtpPass, req.user);
+  }
 }

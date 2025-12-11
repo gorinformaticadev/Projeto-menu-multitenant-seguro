@@ -1,39 +1,53 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateEmailConfigDto, UpdateEmailConfigDto, EmailProvider } from './dto/email-config.dto';
+import { CreateEmailConfigDto, UpdateEmailConfigDto } from './dto/email-config.dto';
 import { EmailConfiguration } from '@prisma/client';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class EmailConfigService {
   private readonly logger = new Logger(EmailConfigService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private emailService: EmailService,
+  ) {}
 
   /**
    * Get predefined email provider configurations
    */
   getPredefinedProviders() {
     return [
+      // Gmail SMTP configurations
       {
-        providerName: EmailProvider.GMAIL,
+        providerName: 'Gmail (SSL/TLS - Port 465)',
+        smtpHost: 'smtp.gmail.com',
+        smtpPort: 465,
+        encryption: 'SSL',
+        authMethod: 'OAuth2 / SASL',
+      },
+      {
+        providerName: 'Gmail (STARTTLS - Port 587)',
         smtpHost: 'smtp.gmail.com',
         smtpPort: 587,
         encryption: 'STARTTLS',
-        authMethod: 'OAuth 2.0',
+        authMethod: 'OAuth2 / SASL',
       },
+      // Hotmail/Outlook SMTP configuration
       {
-        providerName: EmailProvider.HOTMAIL,
+        providerName: 'Hotmail/Outlook (STARTTLS - Port 587)',
         smtpHost: 'smtp-mail.outlook.com',
         smtpPort: 587,
         encryption: 'STARTTLS',
-        authMethod: 'OAuth 2.0',
+        authMethod: 'OAuth2 / Modern Auth',
       },
+      // Titan Mail SMTP configuration
       {
-        providerName: EmailProvider.TITAN,
-        smtpHost: 'mail.titan.email',
-        smtpPort: 587,
-        encryption: 'STARTTLS',
-        authMethod: 'PLAIN',
+        providerName: 'Titan Mail (SSL/TLS - Port 465)',
+        smtpHost: 'smtp.titan.email',
+        smtpPort: 465,
+        encryption: 'SSL',
+        authMethod: 'LOGIN (usuário/senha)',
       },
     ];
   }
@@ -131,5 +145,50 @@ export class EmailConfigService {
         updatedBy: userId,
       },
     });
+  }
+
+  /**
+   * Test email configuration by sending a test email
+   */
+  async testConfig(email: string, smtpUser: string, smtpPass: string, user: any): Promise<{ success: boolean; message: string }> {
+    try {
+      // Get active configuration
+      const config = await this.getActiveConfig();
+      
+      if (!config) {
+        return { 
+          success: false, 
+          message: 'Nenhuma configuração de email ativa encontrada' 
+        };
+      }
+      
+      // Send test email with credentials
+      const sent = await this.emailService.sendTestEmail(
+        email,
+        user.name || user.email,
+        config,
+        smtpUser,
+        smtpPass
+      );
+      
+      if (sent) {
+        this.logger.log(`Test email sent by user ${user.id} to ${email}`);
+        return { 
+          success: true, 
+          message: `Email de teste enviado com sucesso para ${email}` 
+        };
+      } else {
+        return { 
+          success: false, 
+          message: 'Falha ao enviar email de teste. Verifique as configurações.' 
+        };
+      }
+    } catch (error) {
+      this.logger.error('Error testing email configuration:', error);
+      return { 
+        success: false, 
+        message: 'Erro ao testar configuração de email: ' + (error.message || 'Erro desconhecido')
+      };
+    }
   }
 }
