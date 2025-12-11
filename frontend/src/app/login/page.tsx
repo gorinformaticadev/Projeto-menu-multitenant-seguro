@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [masterLogo, setMasterLogo] = useState<string | null>(null);
+  const currentYear = new Date().getFullYear();
   const { toast } = useToast();
   const {
     requires2FA,
@@ -156,13 +157,16 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 p-4 bg-muted rounded-lg text-sm">
-            <p className="font-semibold mb-2">Credenciais de teste:</p>
-            <div className="space-y-1 text-muted-foreground">
-              <p><strong>SUPER_ADMIN:</strong> admin@system.com / admin123</p>
-              <p><strong>ADMIN:</strong> admin@empresa1.com / admin123</p>
-              <p><strong>USER:</strong> user@empresa1.com / user123</p>
-            </div>
+          <div className="mt-1 p-2 bg-muted rounded-lg text-sm text-center">
+            <p className="mb-0">Desenvolvido por: GOR Informática - {currentYear}</p>
+            <a 
+              href="https://wa.me/5561336597358" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="inline-block bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-full transition-colors duration-200"
+            >
+              Whatsapp: (61) 33659-7358
+            </a>
           </div>
         </CardContent>
       </Card>

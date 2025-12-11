@@ -1,30 +1,87 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
-export class EmailService {
+export class EmailService implements OnModuleInit {
   private transporter: Transporter;
   private readonly logger = new Logger(EmailService.name);
-  private readonly isEnabled: boolean;
+  private isEnabled: boolean;
+  private dbConfig: any = null;
 
-  constructor(private config: ConfigService) {
-    this.isEnabled = this.config.get('SMTP_HOST') ? true : false;
+  constructor(
+    private config: ConfigService,
+    private prisma: PrismaService
+  ) {
+    this.isEnabled = false;
+  }
 
-    if (this.isEnabled) {
-      this.transporter = nodemailer.createTransport({
-        host: this.config.get('SMTP_HOST'),
-        port: parseInt(this.config.get('SMTP_PORT', '587')),
-        secure: this.config.get('SMTP_SECURE') === 'true',
-        auth: {
-          user: this.config.get('SMTP_USER'),
-          pass: this.config.get('SMTP_PASS'),
-        },
+  async onModuleInit() {
+    // Initialize with database configuration if available
+    await this.initializeTransporter();
+  }
+
+  /**
+   * Initialize transporter with database configuration or fallback to env vars
+   */
+  private async initializeTransporter() {
+    try {
+      // Try to get active database configuration
+      const result = await this.prisma.emailConfiguration.findFirst({
+        where: { isActive: true }
       });
-      this.logger.log('Email service configurado e ativo');
-    } else {
-      this.logger.warn('Email service desabilitado - SMTP_HOST não configurado');
+      this.dbConfig = result;
+
+      let smtpConfig;
+      
+      if (this.dbConfig) {
+        // Use database configuration
+        this.logger.log('Usando configuração de email do banco de dados');
+        smtpConfig = {
+          host: this.dbConfig.smtpHost,
+          port: this.dbConfig.smtpPort,
+          secure: this.dbConfig.encryption === 'SSL' || this.dbConfig.encryption === 'TLS',
+        };
+      } else {
+        // Fallback to environment variables
+        this.logger.log('Usando configuração de email do arquivo .env');
+        smtpConfig = {
+          host: this.config.get('SMTP_HOST'),
+          port: parseInt(this.config.get('SMTP_PORT', '587')),
+          secure: this.config.get('SMTP_SECURE') === 'true',
+        };
+      }
+
+      // Check if SMTP is configured
+      this.isEnabled = !!smtpConfig.host;
+
+      if (this.isEnabled) {
+        // Add authentication if available
+        if (this.dbConfig) {
+          // For database config, auth will be provided when sending emails
+          // This is a placeholder - actual credentials would need to be provided separately
+          smtpConfig.auth = {
+            user: this.config.get('SMTP_USER'), // Still using env var for credentials
+            pass: this.config.get('SMTP_PASS'),
+          };
+        } else {
+          // For env config, use env vars for auth
+          smtpConfig.auth = {
+            user: this.config.get('SMTP_USER'),
+            pass: this.config.get('SMTP_PASS'),
+          };
+        }
+
+        this.transporter = nodemailer.createTransport(smtpConfig);
+        this.logger.log('Email service configurado e ativo');
+      } else {
+        this.logger.warn('Email service desabilitado - SMTP_HOST não configurado');
+      }
+    } catch (error) {
+      this.logger.error('Erro ao inicializar o serviço de email:', error);
+      this.isEnabled = false;
     }
   }
 
@@ -250,5 +307,12 @@ export class EmailService {
       </body>
       </html>
     `;
+  }
+
+  /**
+   * Refresh transporter with new configuration
+   */
+  async refreshTransporter() {
+    await this.initializeTransporter();
   }
 }

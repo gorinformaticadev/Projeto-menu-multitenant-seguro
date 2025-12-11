@@ -173,6 +173,8 @@ Este documento serve como índice central para toda a documentação do projeto.
 | GUIA_TESTES.md | 10 | 25 min | Intermediário |
 | CHECKLIST_IMPLEMENTACAO.md | 8 | 20 min | Avançado |
 | SEGURANCA_PRODUCAO.md | 10 | 25 min | Avançado |
+| IMPLEMENTACAO_EMAIL_CONFIG.md | 7 | 20 min | Intermediário |
+| RESUMO_EMAIL_CONFIG.md | 3 | 10 min | Iniciante |
 
 **Total:** ~120 páginas | ~4 horas de leitura
 

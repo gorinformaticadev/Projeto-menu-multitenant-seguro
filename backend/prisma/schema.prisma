@@ -144,3 +144,20 @@ model SecurityConfig {
 
   @@map("security_config")
 }
+
+// Tabela de Configurações de Email (apenas SUPER_ADMIN pode editar)
+model EmailConfiguration {
+  id           String   @id @default(uuid())
+  providerName String
+  smtpHost     String
+  smtpPort     Int
+  encryption   String
+  authMethod   String
+  isActive     Boolean  @default(false)
+  createdBy    String?
+  updatedBy    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("email_configurations")
+}

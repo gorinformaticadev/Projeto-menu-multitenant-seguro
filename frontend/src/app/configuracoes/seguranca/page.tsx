@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Save, AlertTriangle } from "lucide-react";
+import EmailConfigSection from "@/components/EmailConfigSection";
 
 interface SecurityConfig {
   id: string;
@@ -557,6 +558,9 @@ export default function SecurityConfigPage() {
             </div>
           </CardContent>
         </Card>
+
+      {/* Configurações de Email */}
+      <EmailConfigSection />
 
       {/* Botão de Salvar */}
       <div className="flex justify-end">
