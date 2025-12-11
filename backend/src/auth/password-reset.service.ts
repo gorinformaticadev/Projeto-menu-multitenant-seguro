@@ -57,7 +57,7 @@ export class PasswordResetService {
       );
 
       // Salvar o token no banco de dados para validação posterior
-      await (this.prisma as any).passwordResetToken.create({
+      await this.prisma.passwordResetToken.create({
         data: {
           userId: user.id,
           token: resetToken,
@@ -117,7 +117,7 @@ export class PasswordResetService {
       }
 
       // Verificar se o token existe no banco de dados e não foi usado
-      const resetTokenRecord = await (this.prisma as any).passwordResetToken.findFirst({
+      const resetTokenRecord = await this.prisma.passwordResetToken.findFirst({
         where: {
           token,
           userId: payload.userId,
@@ -159,12 +159,12 @@ export class PasswordResetService {
           },
         }),
         // Marcar token como usado
-        (this.prisma as any).passwordResetToken.update({
+        this.prisma.passwordResetToken.update({
           where: { id: resetTokenRecord.id },
           data: { usedAt: new Date() },
         }),
         // Invalidar todos os outros tokens de reset do usuário
-        (this.prisma as any).passwordResetToken.updateMany({
+        this.prisma.passwordResetToken.updateMany({
           where: {
             userId: resetTokenRecord.userId,
             usedAt: null,
@@ -196,7 +196,7 @@ export class PasswordResetService {
    */
   async cleanupExpiredTokens(): Promise<void> {
     try {
-      const result = await (this.prisma as any).passwordResetToken.deleteMany({
+      const result = await this.prisma.passwordResetToken.deleteMany({
         where: {
           OR: [
             { expiresAt: { lt: new Date() } }, // Tokens expirados
