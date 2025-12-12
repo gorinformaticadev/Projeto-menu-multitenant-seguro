@@ -28,7 +28,7 @@ async function main() {
   console.log('🌱 Iniciando seed do banco de dados...');
   
   // Senha padrão fixa para desenvolvimento
-  const defaultPassword = 'eRR&KnFyuo&UI6d*';
+  const defaultPassword = 'admin123';
   const adminPassword = process.env.ADMIN_DEFAULT_PASSWORD || defaultPassword;
   const userPassword = process.env.USER_DEFAULT_PASSWORD || defaultPassword;
   
