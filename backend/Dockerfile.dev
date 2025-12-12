@@ -1,0 +1,27 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Instalar dependências do sistema
+RUN apk add --no-cache bash openssl
+
+# Copiar package files
+COPY backend/package*.json ./
+
+# Instalar todas as dependências (incluindo dev)
+RUN npm ci
+
+# Copiar prisma schema para gerar client
+COPY backend/prisma ./prisma
+
+# Gerar Prisma Client
+RUN npm run prisma:generate
+
+# Criar diretórios necessários
+RUN mkdir -p uploads/logos
+
+# Expôr porta
+EXPOSE 4000
+
+# Comando padrão para desenvolvimento
+CMD ["npm", "run", "start:dev"]

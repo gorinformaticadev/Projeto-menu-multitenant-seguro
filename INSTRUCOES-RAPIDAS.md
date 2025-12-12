@@ -13,8 +13,8 @@ http://localhost:5000
 ```
 
 Login como SUPER_ADMIN:
-- Email: `superadmin@system.com`
-- Senha: `Super@123`
+- Email: `admin@system.com`
+- Senha: `eRR&KnFyuo&UI6d*`
 
 ### 3. Clicar em "Configurações" na Sidebar
 

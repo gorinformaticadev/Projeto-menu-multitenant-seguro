@@ -29,7 +29,7 @@ Este documento detalha todas as correções de segurança implementadas no siste
 
 ### 2. **SENHAS SEGURAS GERADAS AUTOMATICAMENTE** ✅
 
-**Problema:** Senhas hardcoded (`admin123`, `user123`)
+**Problema:** Senhas hardcoded (senhas simples)
 
 **Solução Implementada:**
 - **Geração automática** de senhas seguras

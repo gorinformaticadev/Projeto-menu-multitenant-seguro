@@ -99,7 +99,9 @@ projeto/
 
 ### ⚡ Início Rápido (5 minutos)
 
-#### 1️⃣ Backend
+#### Opção 1: Instalação Tradicional
+
+##### 1️⃣ Backend
 ```bash
 cd backend
 npm install
@@ -109,14 +111,53 @@ npx ts-node prisma/seed.ts
 npm run start:dev
 ```
 
-#### 2️⃣ Frontend
+##### 2️⃣ Frontend
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-#### 3️⃣ Acesse
+##### 3️⃣ Acesse
+- Frontend: `http://localhost:5000`
+- Backend: `http://localhost:4000`
+
+#### Opção 2: Instalação com Docker (Recomendado)
+
+##### 1️⃣ Configurar ambiente
+```bash
+# Backend
+cd backend
+cp .env.example .env
+# Edite o arquivo .env com suas configurações
+
+# Frontend
+cd frontend
+cp .env.local.example .env.local
+# Edite o arquivo .env.local se necessário
+```
+
+##### 2️⃣ Iniciar serviços
+```bash
+# Desenvolvimento
+docker-compose -f docker-compose.dev.yml up --build
+
+# Produção
+docker-compose up --build
+```
+
+##### 3️⃣ Executar migrações (apenas na primeira vez)
+```bash
+# Desenvolvimento
+docker-compose -f docker-compose.dev.yml exec backend npm run prisma:migrate
+docker-compose -f docker-compose.dev.yml exec backend npx ts-node prisma/seed.ts
+
+# Produção
+docker-compose exec backend npm run prisma:migrate
+docker-compose exec backend npx ts-node prisma/seed.ts
+```
+
+##### 4️⃣ Acesse
 - Frontend: `http://localhost:5000`
 - Backend: `http://localhost:4000`
 
@@ -124,17 +165,17 @@ npm run dev
 
 ### SUPER_ADMIN
 - **Email**: `admin@system.com`
-- **Senha**: `admin123`
+- **Senha**: `eRR&KnFyuo&UI6d*`
 - **Acesso**: Todas as rotas, incluindo `/tenants`
 
 ### ADMIN (Tenant)
 - **Email**: `admin@empresa1.com`
-- **Senha**: `admin123`
+- **Senha**: `eRR&KnFyuo&UI6d*`
 - **Acesso**: Dados apenas do seu tenant
 
 ### USER
 - **Email**: `user@empresa1.com`
-- **Senha**: `user123`
+- **Senha**: `eRR&KnFyuo&UI6d*`
 - **Acesso**: Dados apenas do seu tenant
 
 ## 📡 Endpoints da API

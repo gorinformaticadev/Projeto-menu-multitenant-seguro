@@ -81,17 +81,17 @@ Abra seu navegador em `http://localhost:5000`
 
 #### SUPER_ADMIN (Acesso Total)
 - **Email**: `admin@system.com`
-- **Senha**: `admin123`
+- **Senha**: `eRR&KnFyuo&UI6d*`
 - **Pode acessar**: Dashboard, Empresas, Configurações
 
 #### ADMIN (Tenant)
 - **Email**: `admin@empresa1.com`
-- **Senha**: `admin123`
+- **Senha**: `eRR&KnFyuo&UI6d*`
 - **Pode acessar**: Dashboard, Configurações (apenas do seu tenant)
 
 #### USER (Usuário Comum)
 - **Email**: `user@empresa1.com`
-- **Senha**: `user123`
+- **Senha**: `eRR&KnFyuo&UI6d*`
 - **Pode acessar**: Dashboard (apenas dados do seu tenant)
 
 ## 🎯 Testando o Sistema

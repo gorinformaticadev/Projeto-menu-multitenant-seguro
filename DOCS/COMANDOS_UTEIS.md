@@ -301,23 +301,60 @@ cp .env.local.example .env.local
 # Edite o arquivo .env.local se necessário
 ```
 
-## 🐳 Docker (A Implementar)
+## 🐳 Docker
+
+### Desenvolvimento
 
 ```bash
-# Build
-docker-compose build
+# Construir e iniciar todos os serviços (desenvolvimento)
+docker-compose -f docker-compose.dev.yml up --build
 
-# Executar
-docker-compose up
+# Executar em background (desenvolvimento)
+docker-compose -f docker-compose.dev.yml up --build -d
 
-# Executar em background
-docker-compose up -d
+# Parar os serviços (desenvolvimento)
+docker-compose -f docker-compose.dev.yml down
+```
 
-# Parar
+### Produção
+
+```bash
+# Construir e iniciar todos os serviços (produção)
+docker-compose up --build
+
+# Executar em background (produção)
+docker-compose up --build -d
+
+# Parar os serviços (produção)
 docker-compose down
+```
 
-# Ver logs
+### Comandos Úteis
+
+```bash
+# Ver logs em tempo real
 docker-compose logs -f
+
+# Ver logs de um serviço específico
+docker-compose logs -f backend
+
+# Acessar o shell do container Backend
+docker-compose exec backend sh
+
+# Acessar o shell do container Frontend
+docker-compose exec frontend sh
+
+# Executar migrações do banco de dados (desenvolvimento)
+docker-compose -f docker-compose.dev.yml exec backend npm run prisma:migrate
+
+# Executar migrações do banco de dados (produção)
+docker-compose exec backend npm run prisma:migrate
+
+# Popular o banco com dados iniciais (desenvolvimento)
+docker-compose -f docker-compose.dev.yml exec backend npx ts-node prisma/seed.ts
+
+# Popular o banco com dados iniciais (produção)
+docker-compose exec backend npx ts-node prisma/seed.ts
 ```
 
 ## 📝 Git

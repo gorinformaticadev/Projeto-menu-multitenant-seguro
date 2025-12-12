@@ -12,7 +12,9 @@ Antes de começar, certifique-se de ter:
 
 ## 🚀 Passo a Passo
 
-### 1️⃣ Configurar Backend (2 minutos)
+### Opção 1: Instalação Tradicional
+
+#### 1️⃣ Configurar Backend (2 minutos)
 
 ```bash
 # Entrar na pasta do backend
@@ -39,7 +41,7 @@ npm run start:dev
 
 ✅ **Backend rodando em:** `http://localhost:4000`
 
-### 2️⃣ Configurar Frontend (2 minutos)
+#### 2️⃣ Configurar Frontend (2 minutos)
 
 Abra um **novo terminal**:
 
@@ -58,6 +60,48 @@ npm run dev
 ```
 
 ✅ **Frontend rodando em:** `http://localhost:5000`
+
+### Opção 2: Instalação com Docker (Recomendado)
+
+#### 1️⃣ Configurar ambiente
+
+```bash
+# Backend
+cd backend
+cp .env.example .env
+# Edite o arquivo .env com suas configurações
+
+# Frontend
+cd frontend
+cp .env.local.example .env.local
+# Edite o arquivo .env.local se necessário
+```
+
+#### 2️⃣ Iniciar serviços
+
+```bash
+# Desenvolvimento
+docker-compose -f docker-compose.dev.yml up --build
+
+# Produção
+docker-compose up --build
+```
+
+#### 3️⃣ Executar migrações (apenas na primeira vez)
+
+```bash
+# Desenvolvimento
+docker-compose -f docker-compose.dev.yml exec backend npm run prisma:migrate
+docker-compose -f docker-compose.dev.yml exec backend npx ts-node prisma/seed.ts
+
+# Produção
+docker-compose exec backend npm run prisma:migrate
+docker-compose exec backend npx ts-node prisma/seed.ts
+```
+
+✅ **Serviços Docker rodando em:**
+- Frontend: `http://localhost:5000`
+- Backend: `http://localhost:4000`
 
 ### 3️⃣ Acessar o Sistema (1 minuto)
 
@@ -87,7 +131,7 @@ Senha: user123
 
 ### Teste 1: Login como SUPER_ADMIN
 
-1. Faça login com `admin@system.com` / `admin123`
+1. Faça login com `admin@system.com` / `eRR&KnFyuo&UI6d*`
 2. Você verá o **Dashboard**
 3. No menu lateral, você verá:
    - ✅ Dashboard
@@ -112,7 +156,7 @@ Senha: user123
 ### Teste 3: Login como USER
 
 1. Faça **logout** (botão no final do menu lateral)
-2. Faça login com `user@empresa1.com` / `user123`
+2. Faça login com `user@empresa1.com` / `eRR&KnFyuo&UI6d*`
 3. Observe que o menu **"Empresas"** não aparece
 4. Tente acessar `http://localhost:5000/empresas` diretamente
 5. Você será redirecionado para o Dashboard (sem permissão)

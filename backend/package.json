@@ -44,6 +44,7 @@
     "helmet": "^8.1.0",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.11",
+    "openssl": "^2.0.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "prisma": "^5.22.0",
@@ -53,7 +54,7 @@
     "sanitize-html": "^2.17.0",
     "semver": "^7.5.4",
     "speakeasy": "^2.0.0",
-    "uuid": "^13.0.0"
+    "uuid": "^8.3.2"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.12",

@@ -27,14 +27,14 @@ function generateSecurePassword(length: number = 16): string {
 async function main() {
   console.log('🌱 Iniciando seed do banco de dados...');
   
-  // Gerar senhas seguras ou usar variáveis de ambiente
-  const adminPassword = process.env.ADMIN_DEFAULT_PASSWORD || generateSecurePassword(16);
-  const userPassword = process.env.USER_DEFAULT_PASSWORD || generateSecurePassword(16);
+  // Senha padrão fixa para desenvolvimento
+  const defaultPassword = 'eRR&KnFyuo&UI6d*';
+  const adminPassword = process.env.ADMIN_DEFAULT_PASSWORD || defaultPassword;
+  const userPassword = process.env.USER_DEFAULT_PASSWORD || defaultPassword;
   
-  console.log('🔐 Senhas geradas:');
-  console.log(`   Admin: ${adminPassword}`);
-  console.log(`   User: ${userPassword}`);
-  console.log('⚠️  IMPORTANTE: Salve essas senhas em local seguro!');
+  console.log('🔐 Usando senha padrão para desenvolvimento:');
+  console.log(`   Senha: ${defaultPassword}`);
+  console.log('⚠️  IMPORTANTE: Esta é uma senha padrão para desenvolvimento!');
 
   // Cria a tenant principal (empresa padrão do sistema)
   const tenant1 = await prisma.tenant.upsert({
@@ -125,17 +125,17 @@ async function main() {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('SUPER_ADMIN:');
   console.log('  Email: admin@system.com');
-  console.log(`  Senha: ${adminPassword}`);
+  console.log(`  Senha: ${defaultPassword}`);
   console.log('  Acesso: Todas as rotas, incluindo /tenants');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('ADMIN (Tenant):');
   console.log('  Email: admin@empresa1.com');
-  console.log(`  Senha: ${adminPassword}`);
+  console.log(`  Senha: ${defaultPassword}`);
   console.log('  Acesso: Dados apenas do seu tenant');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('USER:');
   console.log('  Email: user@empresa1.com');
-  console.log(`  Senha: ${userPassword}`);
+  console.log(`  Senha: ${defaultPassword}`);
   console.log('  Acesso: Dados apenas do seu tenant');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 }

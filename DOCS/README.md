@@ -142,17 +142,17 @@ Após executar o seed, você terá os seguintes usuários:
 
 ### SUPER_ADMIN
 - **Email**: `admin@system.com`
-- **Senha**: `admin123`
+- **Senha**: `eRR&KnFyuo&UI6d*`
 - **Acesso**: Todas as rotas, incluindo `/tenants`
 
 ### ADMIN (Tenant)
 - **Email**: `admin@empresa1.com`
-- **Senha**: `admin123`
+- **Senha**: `eRR&KnFyuo&UI6d*`
 - **Acesso**: Dados apenas do seu tenant
 
 ### USER
 - **Email**: `user@empresa1.com`
-- **Senha**: `user123`
+- **Senha**: `eRR&KnFyuo&UI6d*`
 - **Acesso**: Dados apenas do seu tenant
 
 ## 📡 Endpoints da API
