@@ -9,10 +9,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import api, { API_URL } from "@/lib/api";
-import { Plus, Building2, Mail, Phone, User, FileText, Eye, Edit, Power, Lock, UserPlus, Image as ImageIcon, Upload, X, Users, Trash2 } from "lucide-react";
+import { Plus, Building2, Mail, Phone, User, FileText, Eye, Edit, Power, Lock, UserPlus, Image as ImageIcon, Upload, X, Users, Trash2, Package } from "lucide-react";
 import { CPFCNPJInput } from "@/components/ui/cpf-cnpj-input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { useRouter } from "next/navigation";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ModulesTab } from "./components/ModulesTab";
 
 interface Tenant {
   id: string;
@@ -503,7 +505,7 @@ export default function EmpresasPage() {
                           placeholder="empresa@example.com"
                           className="pl-10"
                           value={formData.email}
-                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))
                           disabled={submitting}
                         />
                       </div>
@@ -513,7 +515,7 @@ export default function EmpresasPage() {
                       id="cnpjCpf"
                       label="CNPJ/CPF"
                       value={formData.cnpjCpf}
-                      onChange={(value, isValid) => setFormData({ ...formData, cnpjCpf: value })}
+                      onChange={(value, isValid) => setFormData(prev => ({ ...prev, cnpjCpf: value }))}
                       disabled={submitting}
                       showValidation={true}
                     />
@@ -527,7 +529,7 @@ export default function EmpresasPage() {
                           placeholder="Empresa LTDA"
                           className="pl-10"
                           value={formData.nomeFantasia}
-                          onChange={(e) => setFormData({ ...formData, nomeFantasia: e.target.value })}
+                          onChange={(e) => setFormData(prev => ({ ...prev, nomeFantasia: e.target.value }))
                           disabled={submitting}
                         />
                       </div>
@@ -542,7 +544,7 @@ export default function EmpresasPage() {
                           placeholder="João Silva"
                           className="pl-10"
                           value={formData.nomeResponsavel}
-                          onChange={(e) => setFormData({ ...formData, nomeResponsavel: e.target.value })}
+                          onChange={(e) => setFormData(prev => ({ ...prev, nomeResponsavel: e.target.value }))
                           disabled={submitting}
                         />
                       </div>
@@ -557,7 +559,7 @@ export default function EmpresasPage() {
                           placeholder="(11) 98765-4321"
                           className="pl-10"
                           value={formData.telefone}
-                          onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                          onChange={(e) => setFormData(prev => ({ ...prev, telefone: e.target.value }))
                           disabled={submitting}
                         />
                       </div>
@@ -581,7 +583,7 @@ export default function EmpresasPage() {
                           placeholder="Maria Santos"
                           className="pl-10"
                           value={formData.adminName}
-                          onChange={(e) => setFormData({ ...formData, adminName: e.target.value })}
+                          onChange={(e) => setFormData(prev => ({ ...prev, adminName: e.target.value }))
                           disabled={submitting}
                         />
                       </div>
@@ -597,7 +599,7 @@ export default function EmpresasPage() {
                           placeholder="admin@empresa.com"
                           className="pl-10"
                           value={formData.adminEmail}
-                          onChange={(e) => setFormData({ ...formData, adminEmail: e.target.value })}
+                          onChange={(e) => setFormData(prev => ({ ...prev, adminEmail: e.target.value }))
                           disabled={submitting}
                         />
                       </div>
@@ -609,7 +611,7 @@ export default function EmpresasPage() {
                         label="Senha do Administrador"
                         value={formData.adminPassword}
                         onChange={(value, isValid) => {
-                          setFormData({ ...formData, adminPassword: value });
+                          setFormData(prev => ({ ...prev, adminPassword: value }));
                           setIsAdminPasswordValid(isValid);
                         }}
                         showValidation={true}
@@ -821,7 +823,7 @@ export default function EmpresasPage() {
 
         {/* Dialog de Visualização */}
         <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
-          <DialogContent>
+          <DialogContent className="max-w-3xl">
             <DialogHeader>
               <DialogTitle>Detalhes da Empresa</DialogTitle>
               <DialogDescription>
@@ -829,40 +831,51 @@ export default function EmpresasPage() {
               </DialogDescription>
             </DialogHeader>
             {selectedTenant && (
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-muted-foreground">Nome Fantasia</Label>
-                  <p className="font-medium">{selectedTenant.nomeFantasia}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">CNPJ/CPF</Label>
-                  <p className="font-medium">{selectedTenant.cnpjCpf}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Email</Label>
-                  <p className="font-medium">{selectedTenant.email}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Responsável</Label>
-                  <p className="font-medium">{selectedTenant.nomeResponsavel}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Telefone</Label>
-                  <p className="font-medium">{selectedTenant.telefone}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Status</Label>
-                  <p className="font-medium">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                      selectedTenant.ativo 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {selectedTenant.ativo ? 'Ativa' : 'Inativa'}
-                    </span>
-                  </p>
-                </div>
-              </div>
+              <Tabs defaultValue="details" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="details">Detalhes</TabsTrigger>
+                  <TabsTrigger value="modules">Módulos</TabsTrigger>
+                </TabsList>
+                <TabsContent value="details" className="mt-4">
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-muted-foreground">Nome Fantasia</Label>
+                      <p className="font-medium">{selectedTenant.nomeFantasia}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">CNPJ/CPF</Label>
+                      <p className="font-medium">{selectedTenant.cnpjCpf}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Email</Label>
+                      <p className="font-medium">{selectedTenant.email}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Responsável</Label>
+                      <p className="font-medium">{selectedTenant.nomeResponsavel}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Telefone</Label>
+                      <p className="font-medium">{selectedTenant.telefone}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Status</Label>
+                      <p className="font-medium">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          selectedTenant.ativo 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {selectedTenant.ativo ? 'Ativa' : 'Inativa'}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </TabsContent>
+                <TabsContent value="modules" className="mt-4">
+                  <ModulesTab tenantId={selectedTenant.id} />
+                </TabsContent>
+              </Tabs>
             )}
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowViewDialog(false)}>
@@ -888,7 +901,7 @@ export default function EmpresasPage() {
                   id="edit-email"
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))
                   disabled={submitting}
                 />
               </div>
@@ -896,7 +909,7 @@ export default function EmpresasPage() {
                 id="edit-cnpjCpf"
                 label="CNPJ/CPF"
                 value={formData.cnpjCpf}
-                onChange={(value, isValid) => setFormData({ ...formData, cnpjCpf: value })}
+                onChange={(value, isValid) => setFormData(prev => ({ ...prev, cnpjCpf: value }))
                 disabled={submitting}
                 showValidation={true}
               />
@@ -905,7 +918,7 @@ export default function EmpresasPage() {
                 <Input
                   id="edit-nomeFantasia"
                   value={formData.nomeFantasia}
-                  onChange={(e) => setFormData({ ...formData, nomeFantasia: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, nomeFantasia: e.target.value }))
                   disabled={submitting}
                 />
               </div>
@@ -914,7 +927,7 @@ export default function EmpresasPage() {
                 <Input
                   id="edit-nomeResponsavel"
                   value={formData.nomeResponsavel}
-                  onChange={(e) => setFormData({ ...formData, nomeResponsavel: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, nomeResponsavel: e.target.value }))
                   disabled={submitting}
                 />
               </div>
@@ -923,7 +936,7 @@ export default function EmpresasPage() {
                 <Input
                   id="edit-telefone"
                   value={formData.telefone}
-                  onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, telefone: e.target.value }))
                   disabled={submitting}
                 />
               </div>

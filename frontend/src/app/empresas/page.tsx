@@ -9,10 +9,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import api, { API_URL } from "@/lib/api";
-import { Plus, Building2, Mail, Phone, User, FileText, Eye, Edit, Power, Lock, UserPlus, Image as ImageIcon, Upload, X, Users, Trash2 } from "lucide-react";
+import { Plus, Building2, Mail, Phone, User, FileText, Eye, Edit, Power, Lock, UserPlus, Image as ImageIcon, Upload, X, Users, Trash2, Package } from "lucide-react";
 import { CPFCNPJInput } from "@/components/ui/cpf-cnpj-input";
 import { PasswordInput } from "@/components/ui/password-input";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useRouter } from "next/navigation";
+import { TestForm } from "@/components/TestForm";
+import { ModulesTab } from "./components/ModulesTab";
 
 interface Tenant {
   id: string;
@@ -45,7 +48,13 @@ export default function EmpresasPage() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isAdminPasswordValid, setIsAdminPasswordValid] = useState(false);
+  const [activeTab, setActiveTab] = useState("details");
   const { toast } = useToast();
+
+  // Debug: Log do estado submitting
+  useEffect(() => {
+    console.log('🔍 Estado submitting alterado:', submitting);
+  }, [submitting]);
 
   const [formData, setFormData] = useState({
     email: "",
@@ -58,6 +67,11 @@ export default function EmpresasPage() {
     adminName: "",
   });
 
+  // Debug: Log das mudanças no formData
+  useEffect(() => {
+    console.log('📝 FormData atualizado:', formData);
+  }, [formData]);
+
   const [passwordData, setPasswordData] = useState({
     newPassword: "",
     confirmPassword: "",
@@ -66,6 +80,9 @@ export default function EmpresasPage() {
   const [passwordsMatch, setPasswordsMatch] = useState(false);
 
   useEffect(() => {
+    // Garante que o estado submitting seja false na inicialização
+    setSubmitting(false);
+    
     // Debounce para evitar múltiplas chamadas em React StrictMode
     const timeoutId = setTimeout(() => {
       loadTenants();
@@ -333,9 +350,14 @@ export default function EmpresasPage() {
     }
   }
 
-  function openViewDialog(tenant: Tenant) {
+  function openViewDialog(tenant: Tenant, tab: string = "details") {
     setSelectedTenant(tenant);
+    setActiveTab(tab);
     setShowViewDialog(true);
+  }
+
+  function openModulesDialog(tenant: Tenant) {
+    openViewDialog(tenant, "modules");
   }
 
   function openEditDialog(tenant: Tenant) {
@@ -476,6 +498,13 @@ export default function EmpresasPage() {
           </Button>
         </div>
 
+        {/* Componente de teste para debug */}
+        {showForm && (
+          <div className="mb-8">
+            <TestForm />
+          </div>
+        )}
+
         {showForm && (
           <Card className="mb-8">
             <CardHeader>
@@ -503,7 +532,10 @@ export default function EmpresasPage() {
                           placeholder="empresa@example.com"
                           className="pl-10"
                           value={formData.email}
-                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          onChange={(e) => {
+                            console.log('📧 Email alterado:', e.target.value);
+                            setFormData({ ...formData, email: e.target.value });
+                          }}
                           disabled={submitting}
                         />
                       </div>
@@ -527,7 +559,10 @@ export default function EmpresasPage() {
                           placeholder="Empresa LTDA"
                           className="pl-10"
                           value={formData.nomeFantasia}
-                          onChange={(e) => setFormData({ ...formData, nomeFantasia: e.target.value })}
+                          onChange={(e) => {
+                            console.log('🏢 Nome fantasia alterado:', e.target.value);
+                            setFormData({ ...formData, nomeFantasia: e.target.value });
+                          }}
                           disabled={submitting}
                         />
                       </div>
@@ -604,21 +639,23 @@ export default function EmpresasPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <PasswordInput
-                        id="adminPassword"
-                        label="Senha do Administrador"
-                        value={formData.adminPassword}
-                        onChange={(value, isValid) => {
-                          setFormData({ ...formData, adminPassword: value });
-                          setIsAdminPasswordValid(isValid);
-                        }}
-                        showValidation={true}
-                        showStrengthMeter={true}
-                        disabled={submitting}
-                        placeholder="Digite a senha do administrador"
-                      />
+                      <Label htmlFor="adminPassword">Senha do Administrador</Label>
+                      <div className="relative">
+                        <Input
+                          id="adminPassword"
+                          type="password"
+                          placeholder="Digite a senha do administrador"
+                          value={formData.adminPassword}
+                          onChange={(e) => {
+                            console.log('🔑 Senha alterada:', e.target.value);
+                            setFormData({ ...formData, adminPassword: e.target.value });
+                            setIsAdminPasswordValid(e.target.value.length >= 8);
+                          }}
+                          disabled={submitting}
+                        />
+                      </div>
                       <p className="text-xs text-muted-foreground">
-                        Esta será a senha de acesso do administrador da empresa
+                        Esta será a senha de acesso do administrador da empresa (mínimo 8 caracteres)
                       </p>
                     </div>
                   </div>
@@ -635,6 +672,28 @@ export default function EmpresasPage() {
                     disabled={submitting}
                   >
                     Cancelar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      console.log('🧪 Teste de formulário:');
+                      console.log('- Submitting:', submitting);
+                      console.log('- FormData:', formData);
+                      console.log('- Inputs disabled:', document.querySelectorAll('input[disabled]').length);
+                      
+                      // Força habilitar todos os inputs para teste
+                      document.querySelectorAll('input').forEach(input => {
+                        input.disabled = false;
+                      });
+                      
+                      toast({
+                        title: "Debug",
+                        description: "Verifique o console para informações de debug",
+                      });
+                    }}
+                  >
+                    🧪 Debug
                   </Button>
                 </div>
               </form>
@@ -773,6 +832,15 @@ export default function EmpresasPage() {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => openModulesDialog(tenant)}
+                      className="col-span-2"
+                    >
+                      <Package className="h-4 w-4 mr-1" />
+                      Gerenciar Módulos
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => router.push(`/usuarios?tenantId=${tenant.id}`)}
                       className="col-span-2"
                     >
@@ -821,48 +889,59 @@ export default function EmpresasPage() {
 
         {/* Dialog de Visualização */}
         <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
-          <DialogContent>
+          <DialogContent className="max-w-4xl">
             <DialogHeader>
               <DialogTitle>Detalhes da Empresa</DialogTitle>
               <DialogDescription>
-                Informações completas da empresa
+                Informações completas da empresa e gerenciamento de módulos
               </DialogDescription>
             </DialogHeader>
             {selectedTenant && (
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-muted-foreground">Nome Fantasia</Label>
-                  <p className="font-medium">{selectedTenant.nomeFantasia}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">CNPJ/CPF</Label>
-                  <p className="font-medium">{selectedTenant.cnpjCpf}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Email</Label>
-                  <p className="font-medium">{selectedTenant.email}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Responsável</Label>
-                  <p className="font-medium">{selectedTenant.nomeResponsavel}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Telefone</Label>
-                  <p className="font-medium">{selectedTenant.telefone}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Status</Label>
-                  <p className="font-medium">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                      selectedTenant.ativo 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {selectedTenant.ativo ? 'Ativa' : 'Inativa'}
-                    </span>
-                  </p>
-                </div>
-              </div>
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="details">Detalhes</TabsTrigger>
+                  <TabsTrigger value="modules">Módulos</TabsTrigger>
+                </TabsList>
+                <TabsContent value="details" className="mt-4">
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-muted-foreground">Nome Fantasia</Label>
+                      <p className="font-medium">{selectedTenant.nomeFantasia}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">CNPJ/CPF</Label>
+                      <p className="font-medium">{selectedTenant.cnpjCpf}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Email</Label>
+                      <p className="font-medium">{selectedTenant.email}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Responsável</Label>
+                      <p className="font-medium">{selectedTenant.nomeResponsavel}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Telefone</Label>
+                      <p className="font-medium">{selectedTenant.telefone}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Status</Label>
+                      <p className="font-medium">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          selectedTenant.ativo 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {selectedTenant.ativo ? 'Ativa' : 'Inativa'}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </TabsContent>
+                <TabsContent value="modules" className="mt-4">
+                  <ModulesTab tenantId={selectedTenant.id} />
+                </TabsContent>
+              </Tabs>
             )}
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowViewDialog(false)}>

@@ -18,6 +18,7 @@ import { CommonModule } from './common/common.module';
 import { TokenCleanupService } from './common/services/token-cleanup.service';
 import { UpdateModule } from './update/update.module';
 import { ModuleEngineModule } from '../../modules/engine/backend/module-engine.module';
+import { TenantModulesModule } from './modules/tenant-modules/tenant-modules.module';
 import { HealthCheckController } from './health-check.controller';
 
 @Module({
@@ -57,6 +58,7 @@ import { HealthCheckController } from './health-check.controller';
     AuditModule,
     UpdateModule,
     ModuleEngineModule,
+    TenantModulesModule,
   ],
   controllers: [HealthCheckController],
   providers: [

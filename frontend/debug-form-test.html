@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Formulário de Empresas</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        input:disabled {
+            background-color: #f5f5f5;
+            cursor: not-allowed;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .debug-info {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug - Formulário de Empresas</h1>
+    
+    <div class="debug-info">
+        <h3>Status do Formulário:</h3>
+        <p>Estado submitting: <span id="submitting-status">false</span></p>
+        <p>Inputs habilitados: <span id="inputs-enabled">true</span></p>
+        <p>Último erro: <span id="last-error">Nenhum</span></p>
+    </div>
+
+    <form id="empresa-form">
+        <h2>Dados da Empresa</h2>
+        
+        <div class="form-group">
+            <label for="email">Email da Empresa:</label>
+            <input type="email" id="email" name="email" placeholder="empresa@example.com">
+        </div>
+
+        <div class="form-group">
+            <label for="cnpjCpf">CNPJ/CPF:</label>
+            <input type="text" id="cnpjCpf" name="cnpjCpf" placeholder="00.000.000/0000-00">
+        </div>
+
+        <div class="form-group">
+            <label for="nomeFantasia">Nome Fantasia:</label>
+            <input type="text" id="nomeFantasia" name="nomeFantasia" placeholder="Empresa LTDA">
+        </div>
+
+        <div class="form-group">
+            <label for="nomeResponsavel">Nome do Responsável:</label>
+            <input type="text" id="nomeResponsavel" name="nomeResponsavel" placeholder="João Silva">
+        </div>
+
+        <div class="form-group">
+            <label for="telefone">Telefone:</label>
+            <input type="text" id="telefone" name="telefone" placeholder="(11) 98765-4321">
+        </div>
+
+        <h2>Dados do Administrador</h2>
+
+        <div class="form-group">
+            <label for="adminName">Nome do Administrador:</label>
+            <input type="text" id="adminName" name="adminName" placeholder="Maria Santos">
+        </div>
+
+        <div class="form-group">
+            <label for="adminEmail">Email do Administrador:</label>
+            <input type="email" id="adminEmail" name="adminEmail" placeholder="admin@empresa.com">
+        </div>
+
+        <div class="form-group">
+            <label for="adminPassword">Senha do Administrador:</label>
+            <input type="password" id="adminPassword" name="adminPassword" placeholder="Digite a senha">
+        </div>
+
+        <button type="submit" id="submit-btn">Cadastrar Empresa</button>
+        <button type="button" id="toggle-disabled">Alternar Disabled</button>
+        <button type="button" id="clear-form">Limpar Formulário</button>
+    </form>
+
+    <div class="debug-info">
+        <h3>Testes de Debug:</h3>
+        <button onclick="testInputs()">Testar Inputs</button>
+        <button onclick="checkCSS()">Verificar CSS</button>
+        <button onclick="simulateError()">Simular Erro</button>
+        <button onclick="checkEventListeners()">Verificar Event Listeners</button>
+    </div>
+
+    <div id="debug-output"></div>
+
+    <script>
+        let submitting = false;
+        
+        function updateStatus() {
+            document.getElementById('submitting-status').textContent = submitting;
+            document.getElementById('inputs-enabled').textContent = !submitting;
+            
+            const inputs = document.querySelectorAll('input');
+            const submitBtn = document.getElementById('submit-btn');
+            
+            inputs.forEach(input => {
+                input.disabled = submitting;
+            });
+            submitBtn.disabled = submitting;
+        }
+
+        function testInputs() {
+            const output = document.getElementById('debug-output');
+            const inputs = document.querySelectorAll('input');
+            
+            let report = '<h3>Relatório de Inputs:</h3>';
+            inputs.forEach((input, index) => {
+                report += `<p>Input ${index + 1} (${input.name}): `;
+                report += `disabled=${input.disabled}, `;
+                report += `value="${input.value}", `;
+                report += `type="${input.type}"</p>`;
+            });
+            
+            output.innerHTML = report;
+        }
+
+        function checkCSS() {
+            const output = document.getElementById('debug-output');
+            const inputs = document.querySelectorAll('input');
+            
+            let report = '<h3>Verificação de CSS:</h3>';
+            inputs.forEach((input, index) => {
+                const styles = window.getComputedStyle(input);
+                report += `<p>Input ${index + 1}: `;
+                report += `pointer-events=${styles.pointerEvents}, `;
+                report += `display=${styles.display}, `;
+                report += `visibility=${styles.visibility}</p>`;
+            });
+            
+            output.innerHTML = report;
+        }
+
+        function simulateError() {
+            document.getElementById('last-error').textContent = 'Erro simulado para teste';
+            document.getElementById('last-error').className = 'error';
+        }
+
+        function checkEventListeners() {
+            const output = document.getElementById('debug-output');
+            const inputs = document.querySelectorAll('input');
+            
+            let report = '<h3>Event Listeners:</h3>';
+            inputs.forEach((input, index) => {
+                // Testa se o input responde a eventos
+                let canType = true;
+                try {
+                    input.focus();
+                    input.value = 'teste';
+                    if (input.value !== 'teste') {
+                        canType = false;
+                    }
+                    input.value = '';
+                } catch (e) {
+                    canType = false;
+                }
+                
+                report += `<p>Input ${index + 1}: ${canType ? '✅ Funcionando' : '❌ Não funciona'}</p>`;
+            });
+            
+            output.innerHTML = report;
+        }
+
+        // Event listeners
+        document.getElementById('empresa-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            submitting = true;
+            updateStatus();
+            
+            setTimeout(() => {
+                submitting = false;
+                updateStatus();
+                document.getElementById('last-error').textContent = 'Formulário enviado com sucesso!';
+                document.getElementById('last-error').className = 'success';
+            }, 2000);
+        });
+
+        document.getElementById('toggle-disabled').addEventListener('click', function() {
+            submitting = !submitting;
+            updateStatus();
+        });
+
+        document.getElementById('clear-form').addEventListener('click', function() {
+            document.getElementById('empresa-form').reset();
+            document.getElementById('last-error').textContent = 'Formulário limpo';
+            document.getElementById('last-error').className = '';
+        });
+
+        // Monitora mudanças nos inputs
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', function() {
+                console.log(`Input ${this.name} alterado para: ${this.value}`);
+            });
+            
+            input.addEventListener('focus', function() {
+                console.log(`Input ${this.name} focado`);
+            });
+            
+            input.addEventListener('blur', function() {
+                console.log(`Input ${this.name} perdeu foco`);
+            });
+        });
+
+        // Inicializa
+        updateStatus();
+        
+        console.log('🔍 Debug form carregado. Use os botões para testar.');
+    </script>
+</body>
+</html>
