@@ -66,15 +66,42 @@ export default function EmpresasPage() {
   const [passwordsMatch, setPasswordsMatch] = useState(false);
 
   useEffect(() => {
-    loadTenants();
+    // Debounce para evitar múltiplas chamadas em React StrictMode
+    const timeoutId = setTimeout(() => {
+      loadTenants();
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
   }, []);
 
   async function loadTenants() {
     try {
+      // Cache simples para evitar múltiplas chamadas
+      const cacheKey = 'tenants-list-cache';
+      const cacheTTL = 2 * 60 * 1000; // 2 minutos
+      const cached = localStorage.getItem(cacheKey);
+      
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < cacheTTL) {
+          console.log('🎯 Usando cache de tenants');
+          setTenants(data);
+          setLoading(false);
+          return;
+        }
+      }
+      
       const response = await api.get("/tenants");
       console.log('Tenants carregados:', response.data);
       console.log('API_URL:', API_URL);
       setTenants(response.data);
+      
+      // Salvar no cache
+      localStorage.setItem(cacheKey, JSON.stringify({
+        data: response.data,
+        timestamp: Date.now()
+      }));
+      
     } catch (error: any) {
       toast({
         title: "Erro ao carregar empresas",
@@ -141,6 +168,8 @@ export default function EmpresasPage() {
       });
       setIsAdminPasswordValid(false);
       setShowForm(false);
+      // Invalidar cache antes de recarregar
+      localStorage.removeItem('tenants-list-cache');
       loadTenants();
     } catch (error: any) {
       toast({
@@ -175,6 +204,8 @@ export default function EmpresasPage() {
 
       setShowEditDialog(false);
       setSelectedTenant(null);
+      // Invalidar cache antes de recarregar
+      localStorage.removeItem('tenants-list-cache');
       loadTenants();
     } catch (error: any) {
       toast({
@@ -245,6 +276,8 @@ export default function EmpresasPage() {
         description: `Empresa ${tenant.ativo ? 'desativada' : 'ativada'} com sucesso!`,
       });
 
+      // Invalidar cache antes de recarregar
+      localStorage.removeItem('tenants-list-cache');
       loadTenants();
     } catch (error: any) {
       toast({
@@ -286,6 +319,8 @@ export default function EmpresasPage() {
       setShowDeleteDialog(false);
       setSelectedTenant(null);
       setDeleteConfirmText("");
+      // Invalidar cache antes de recarregar
+      localStorage.removeItem('tenants-list-cache');
       loadTenants();
     } catch (error: any) {
       toast({
@@ -383,6 +418,8 @@ export default function EmpresasPage() {
       setShowLogoDialog(false);
       setLogoFile(null);
       setLogoPreview(null);
+      // Invalidar cache antes de recarregar
+      localStorage.removeItem('tenants-list-cache');
       loadTenants();
     } catch (error: any) {
       toast({
@@ -409,6 +446,8 @@ export default function EmpresasPage() {
       });
 
       setShowLogoDialog(false);
+      // Invalidar cache antes de recarregar
+      localStorage.removeItem('tenants-list-cache');
       loadTenants();
     } catch (error: any) {
       toast({

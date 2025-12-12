@@ -23,8 +23,29 @@ export function PlatformConfigProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setError(null);
       
+      // Cache simples para evitar múltiplas chamadas
+      const cacheKey = 'platform-config-cache';
+      const cacheTTL = 5 * 60 * 1000; // 5 minutos
+      const cached = localStorage.getItem(cacheKey);
+      
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < cacheTTL) {
+          setConfig(data);
+          setLoading(false);
+          return;
+        }
+      }
+      
       const response = await api.get('/platform-config');
       setConfig(response.data);
+      
+      // Salvar no cache
+      localStorage.setItem(cacheKey, JSON.stringify({
+        data: response.data,
+        timestamp: Date.now()
+      }));
+      
     } catch (err: any) {
       console.warn('Failed to fetch platform config:', err);
       setError(err.message || 'Failed to load platform configuration');
@@ -35,10 +56,17 @@ export function PlatformConfigProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    fetchConfig();
+    // Debounce para evitar múltiplas chamadas em React StrictMode
+    const timeoutId = setTimeout(() => {
+      fetchConfig();
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
   }, []);
 
   const refreshConfig = async () => {
+    // Invalidar cache antes de buscar novos dados
+    localStorage.removeItem('platform-config-cache');
     await fetchConfig();
   };
 

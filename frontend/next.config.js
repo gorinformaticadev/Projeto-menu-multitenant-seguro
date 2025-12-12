@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
+  reactStrictMode: false, // Desabilitado temporariamente para evitar rate limiting
   poweredByHeader: false, // Remove X-Powered-By header
   compress: true, // Enable gzip compression
   images: {
@@ -8,6 +8,8 @@ const nextConfig = {
     formats: ['image/webp', 'image/avif'], // Optimize image formats
   },
   async headers() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    
     return [
       {
         source: '/(.*)',
@@ -30,7 +32,7 @@ const nextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' http://localhost:4000 http://localhost:5000 ws://localhost:4000 ws://localhost:5000; font-src 'self' data: https:;",
+            value: `default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: ${apiUrl}; connect-src 'self' ${apiUrl} ${apiUrl.replace('http', 'ws')} http://localhost:5000 ws://localhost:5000; font-src 'self' data: https:;`,
           },
         ],
       },
