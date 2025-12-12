@@ -6,12 +6,16 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { EmailService } from '../email/email.service';
 
 @SkipThrottle()
 @Controller('email-config')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class EmailConfigController {
-  constructor(private readonly emailConfigService: EmailConfigService) {}
+  constructor(
+    private readonly emailConfigService: EmailConfigService,
+    private readonly emailService: EmailService,
+  ) {}
 
   /**
    * GET /email-config/providers
@@ -132,6 +136,6 @@ export class EmailConfigController {
     @Body('smtpPass') smtpPass: string,
     @Request() req: any,
   ) {
-    return this.emailConfigService.testConfig(email, smtpUser, smtpPass, req.user);
+    return this.emailConfigService.testConfig(email, smtpUser, smtpPass, req.user, this.emailService);
   }
 }

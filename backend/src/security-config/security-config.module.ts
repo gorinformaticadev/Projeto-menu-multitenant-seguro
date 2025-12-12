@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { SecurityConfigController } from './security-config.controller';
 import { SecurityConfigService } from './security-config.service';
 import { EmailConfigController } from './email-config.controller';
@@ -9,7 +9,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { EmailModule } from '../email/email.module';
 
 @Module({
-  imports: [PrismaModule, EmailModule],
+  imports: [PrismaModule, forwardRef(() => EmailModule)],
   controllers: [SecurityConfigController, EmailConfigController, PlatformConfigController],
   providers: [SecurityConfigService, EmailConfigService, PlatformConfigService],
   exports: [SecurityConfigService, EmailConfigService, PlatformConfigService],

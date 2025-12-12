@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEmailConfigDto, UpdateEmailConfigDto } from './dto/email-config.dto';
 import { EmailConfiguration } from '@prisma/client';
-import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class EmailConfigService {
@@ -10,7 +9,6 @@ export class EmailConfigService {
 
   constructor(
     private prisma: PrismaService,
-    private emailService: EmailService,
   ) {}
 
   /**
@@ -171,8 +169,9 @@ export class EmailConfigService {
 
   /**
    * Test email configuration by sending a test email
+   * Note: This method now requires the emailService to be passed in
    */
-  async testConfig(email: string, smtpUser: string, smtpPass: string, user: any): Promise<{ success: boolean; message: string }> {
+  async testConfig(email: string, smtpUser: string, smtpPass: string, user: any, emailService: any): Promise<{ success: boolean; message: string }> {
     try {
       this.logger.log(`Testing email configuration for user ${user.id} to ${email}`);
       
@@ -190,7 +189,7 @@ export class EmailConfigService {
       this.logger.log(`Using email configuration: ${config.providerName} (${config.smtpHost}:${config.smtpPort})`);
       
       // Send test email with credentials
-      const sent = await this.emailService.sendTestEmail(
+      const sent = await emailService.sendTestEmail(
         email,
         user.name || user.email,
         config,
