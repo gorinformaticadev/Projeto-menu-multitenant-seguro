@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Favicon Generator</title>
+</head>
+<body>
+  <h1>Favicon Generator</h1>
+  <p>Abra o console (F12) e copie o data URL gerado</p>
+  
+  <canvas id="canvas" width="32" height="32"></canvas>
+  
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Background gradient
+    const gradient = ctx.createLinearGradient(0, 0, 32, 32);
+    gradient.addColorStop(0, '#3b82f6');
+    gradient.addColorStop(1, '#6366f1');
+    
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(16, 16, 15, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Shield
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    ctx.moveTo(16, 6);
+    ctx.lineTo(8, 10);
+    ctx.lineTo(8, 18);
+    ctx.quadraticCurveTo(8, 24, 16, 28);
+    ctx.quadraticCurveTo(24, 24, 24, 18);
+    ctx.lineTo(24, 10);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Lock
+    ctx.fillStyle = '#3b82f6';
+    ctx.fillRect(13, 17, 6, 5);
+    
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(16, 15, 2, Math.PI, 0, true);
+    ctx.lineTo(18, 17);
+    ctx.moveTo(14, 17);
+    ctx.lineTo(14, 15);
+    ctx.stroke();
+    
+    // Generate data URL
+    const dataUrl = canvas.toDataURL('image/png');
+    console.log('Favicon Data URL:', dataUrl);
+    
+    // Download link
+    const link = document.createElement('a');
+    link.download = 'favicon.png';
+    link.href = dataUrl;
+    link.textContent = 'Download Favicon PNG';
+    document.body.appendChild(link);
+  </script>
+</body>
+</html>

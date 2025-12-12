@@ -1,0 +1,24 @@
+{
+  "navigation": {
+    "dashboard": "Panel de Control",
+    "companies": "Empresas",
+    "users": "Usuarios",
+    "auditLogs": "Registros de Auditoría",
+    "settings": "Configuraciones",
+    "profile": "Mi Perfil",
+    "logout": "Cerrar Sesión"
+  },
+  "modules": {
+    "sample": "Ejemplo",
+    "os": "Órdenes de Servicio",
+    "financial": "Financiero"
+  },
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "confirm": "Confirmar",
+    "close": "Cerrar"
+  }
+}
