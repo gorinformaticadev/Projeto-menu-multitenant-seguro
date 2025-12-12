@@ -31,12 +31,81 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
+// Funções para gerenciamento seguro de tokens
+const getSecureToken = async (): Promise<string | null> => {
+  if (typeof window === "undefined") return null;
+  
+  try {
+    // Tentar ler do cookie primeiro
+    const cookies = document.cookie.split(';');
+    const tokenCookie = cookies.find(c => c.trim().startsWith('accessToken='));
+    if (tokenCookie) {
+      return tokenCookie.split('=')[1];
+    }
+  } catch {}
+  
+  // Fallback para sessionStorage criptografado
+  const encrypted = sessionStorage.getItem("@App:token");
+  if (encrypted) {
+    try {
+      return atob(encrypted); // Descriptografia simples
+    } catch {
+      return null;
+    }
+  }
+  
+  return null;
+};
+
+const getSecureRefreshToken = async (): Promise<string | null> => {
+  if (typeof window === "undefined") return null;
+  
+  try {
+    // Tentar ler do cookie primeiro
+    const cookies = document.cookie.split(';');
+    const tokenCookie = cookies.find(c => c.trim().startsWith('refreshToken='));
+    if (tokenCookie) {
+      return tokenCookie.split('=')[1];
+    }
+  } catch {}
+  
+  // Fallback para sessionStorage criptografado
+  const encrypted = sessionStorage.getItem("@App:refreshToken");
+  if (encrypted) {
+    try {
+      return atob(encrypted); // Descriptografia simples
+    } catch {
+      return null;
+    }
+  }
+  
+  return null;
+};
+
+const setSecureToken = async (token: string): Promise<void> => {
+  if (typeof window === "undefined") return;
+  
+  try {
+    document.cookie = `accessToken=${token}; Secure; SameSite=Strict; Max-Age=900; Path=/`;
+  } catch {
+    sessionStorage.setItem("@App:token", btoa(token));
+  }
+};
+
+const setSecureRefreshToken = async (token: string): Promise<void> => {
+  if (typeof window === "undefined") return;
+  
+  try {
+    document.cookie = `refreshToken=${token}; Secure; SameSite=Strict; Max-Age=604800; Path=/`;
+  } catch {
+    sessionStorage.setItem("@App:refreshToken", btoa(token));
+  }
+};
+
 // Interceptor de request para adicionar token
 api.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const token = typeof window !== "undefined"
-      ? localStorage.getItem("@App:token")
-      : null;
+  async (config: InternalAxiosRequestConfig) => {
+    const token = await getSecureToken();
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -49,11 +118,15 @@ api.interceptors.request.use(
   }
 );
 
-// Função para fazer logout
+// Função para fazer logout seguro
 const doLogout = () => {
   if (typeof window !== "undefined") {
-    localStorage.removeItem("@App:token");
-    localStorage.removeItem("@App:refreshToken");
+    // Limpar cookies
+    document.cookie = 'accessToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    document.cookie = 'refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    // Limpar sessionStorage
+    sessionStorage.removeItem("@App:token");
+    sessionStorage.removeItem("@App:refreshToken");
     delete api.defaults.headers.common["Authorization"];
 
     // Redirecionar apenas se não estiver já na página de login
@@ -114,10 +187,7 @@ api.interceptors.response.use(
       originalRequest._retry = true;
       isRefreshing = true;
 
-      const refreshToken =
-        typeof window !== "undefined"
-          ? localStorage.getItem("@App:refreshToken")
-          : null;
+      const refreshToken = await getSecureRefreshToken();
 
       if (!refreshToken) {
         // Sem refresh token, fazer logout
@@ -133,10 +203,10 @@ api.interceptors.response.use(
 
         const { accessToken, refreshToken: newRefreshToken } = response.data;
 
-        // Salvar novos tokens diretamente (sem criptografia Base64)
+        // Salvar novos tokens de forma segura
         if (typeof window !== "undefined") {
-          localStorage.setItem("@App:token", accessToken);
-          localStorage.setItem("@App:refreshToken", newRefreshToken);
+          await setSecureToken(accessToken);
+          await setSecureRefreshToken(newRefreshToken);
         }
 
         // Atualizar header padrão

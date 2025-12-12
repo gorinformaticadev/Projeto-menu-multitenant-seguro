@@ -20,6 +20,56 @@ import { multerConfig } from '../common/config/multer.config';
 export class TenantsController {
   constructor(private tenantsService: TenantsService) {}
 
+  // Assinaturas de arquivos válidas (magic numbers)
+  private readonly FILE_SIGNATURES = {
+    'image/jpeg': [0xFF, 0xD8, 0xFF],
+    'image/png': [0x89, 0x50, 0x4E, 0x47],
+    'image/webp': [0x52, 0x49, 0x46, 0x46],
+    'image/gif': [0x47, 0x49, 0x46]
+  };
+
+  /**
+   * Valida a assinatura real do arquivo para prevenir upload de arquivos maliciosos
+   */
+  private async validateFileSignature(file: Express.Multer.File): Promise<void> {
+    const fs = await import('fs');
+    const path = await import('path');
+    
+    try {
+      // Ler os primeiros bytes do arquivo
+      const filePath = path.join(process.cwd(), 'uploads', 'logos', file.filename);
+      const buffer = fs.readFileSync(filePath);
+      
+      const signature = this.FILE_SIGNATURES[file.mimetype];
+      if (!signature) {
+        // Remover arquivo inválido
+        fs.unlinkSync(filePath);
+        throw new BadRequestException('Tipo de arquivo não suportado');
+      }
+      
+      // Verificar assinatura
+      for (let i = 0; i < signature.length; i++) {
+        if (buffer[i] !== signature[i]) {
+          // Remover arquivo com assinatura inválida
+          fs.unlinkSync(filePath);
+          throw new BadRequestException('Arquivo corrompido ou tipo inválido');
+        }
+      }
+      
+      // Verificação adicional: tamanho mínimo para ser uma imagem válida
+      if (buffer.length < 100) {
+        fs.unlinkSync(filePath);
+        throw new BadRequestException('Arquivo muito pequeno para ser uma imagem válida');
+      }
+      
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Erro ao validar arquivo');
+    }
+  }
+
   @Get()
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
@@ -67,6 +117,10 @@ export class TenantsController {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo foi enviado');
     }
+    
+    // Validação adicional de segurança: verificar assinatura do arquivo
+    await this.validateFileSignature(file);
+    
     return this.tenantsService.updateLogo(req.user.tenantId, file.filename);
   }
 
@@ -98,6 +152,10 @@ export class TenantsController {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo foi enviado');
     }
+    
+    // Validação adicional de segurança: verificar assinatura do arquivo
+    await this.validateFileSignature(file);
+    
     return this.tenantsService.updateLogo(id, file.filename);
   }
 

@@ -1,10 +1,40 @@
 import { PrismaClient, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
+// Função para gerar senha segura
+function generateSecurePassword(length: number = 16): string {
+  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+  let password = '';
+  
+  // Garantir pelo menos um de cada tipo
+  password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; // lowercase
+  password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)]; // uppercase
+  password += '0123456789'[Math.floor(Math.random() * 10)]; // number
+  password += '!@#$%^&*'[Math.floor(Math.random() * 8)]; // special
+  
+  // Preencher o resto
+  for (let i = password.length; i < length; i++) {
+    password += charset[Math.floor(Math.random() * charset.length)];
+  }
+  
+  // Embaralhar a senha
+  return password.split('').sort(() => Math.random() - 0.5).join('');
+}
+
 async function main() {
   console.log('🌱 Iniciando seed do banco de dados...');
+  
+  // Gerar senhas seguras ou usar variáveis de ambiente
+  const adminPassword = process.env.ADMIN_DEFAULT_PASSWORD || generateSecurePassword(16);
+  const userPassword = process.env.USER_DEFAULT_PASSWORD || generateSecurePassword(16);
+  
+  console.log('🔐 Senhas geradas:');
+  console.log(`   Admin: ${adminPassword}`);
+  console.log(`   User: ${userPassword}`);
+  console.log('⚠️  IMPORTANTE: Salve essas senhas em local seguro!');
 
   // Cria a tenant principal (empresa padrão do sistema)
   const tenant1 = await prisma.tenant.upsert({
@@ -22,7 +52,7 @@ async function main() {
   console.log('✅ Tenant criado:', tenant1.nomeFantasia);
 
   // Cria um SUPER_ADMIN (vinculado à tenant principal)
-  const hashedPasswordAdmin = await bcrypt.hash('admin123', 10);
+  const hashedPasswordAdmin = await bcrypt.hash(adminPassword, 12);
   const superAdmin = await prisma.user.upsert({
     where: { email: 'admin@system.com' },
     update: {},
@@ -38,7 +68,7 @@ async function main() {
   console.log('✅ Super Admin criado:', superAdmin.email);
 
   // Cria um usuário comum vinculado ao tenant
-  const hashedPasswordUser = await bcrypt.hash('user123', 10);
+  const hashedPasswordUser = await bcrypt.hash(userPassword, 12);
   const user = await prisma.user.upsert({
     where: { email: 'user@empresa1.com' },
     update: {},
@@ -54,7 +84,7 @@ async function main() {
   console.log('✅ Usuário comum criado:', user.email);
 
   // Cria um admin do tenant
-  const hashedPasswordTenantAdmin = await bcrypt.hash('admin123', 10);
+  const hashedPasswordTenantAdmin = await bcrypt.hash(adminPassword, 12);
   const tenantAdmin = await prisma.user.upsert({
     where: { email: 'admin@empresa1.com' },
     update: {},
@@ -95,17 +125,17 @@ async function main() {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('SUPER_ADMIN:');
   console.log('  Email: admin@system.com');
-  console.log('  Senha: admin123');
+  console.log(`  Senha: ${adminPassword}`);
   console.log('  Acesso: Todas as rotas, incluindo /tenants');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('ADMIN (Tenant):');
   console.log('  Email: admin@empresa1.com');
-  console.log('  Senha: admin123');
+  console.log(`  Senha: ${adminPassword}`);
   console.log('  Acesso: Dados apenas do seu tenant');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('USER:');
   console.log('  Email: user@empresa1.com');
-  console.log('  Senha: user123');
+  console.log(`  Senha: ${userPassword}`);
   console.log('  Acesso: Dados apenas do seu tenant');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 }

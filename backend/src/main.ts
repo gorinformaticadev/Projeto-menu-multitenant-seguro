@@ -7,8 +7,28 @@ import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
 import { SentryService } from './common/services/sentry.service';
 import { SentryExceptionFilter } from './common/filters/sentry-exception.filter';
+import { validateSecurityConfig } from './common/utils/security.utils';
 
 async function bootstrap() {
+  // ============================================
+  // 🔒 VALIDAÇÃO DE SEGURANÇA NA INICIALIZAÇÃO
+  // ============================================
+  console.log('🔒 Validando configurações de segurança...');
+  const securityValidation = validateSecurityConfig();
+  
+  if (!securityValidation.isValid) {
+    console.error('❌ ERRO DE SEGURANÇA: Configurações inseguras detectadas!');
+    securityValidation.errors.forEach(error => console.error(`   - ${error}`));
+    process.exit(1);
+  }
+  
+  if (securityValidation.warnings.length > 0) {
+    console.warn('⚠️  AVISOS DE SEGURANÇA:');
+    securityValidation.warnings.forEach(warning => console.warn(`   - ${warning}`));
+  }
+  
+  console.log('✅ Configurações de segurança validadas com sucesso');
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // ============================================
@@ -127,10 +147,27 @@ async function bootstrap() {
   console.log('📁 Servindo arquivos estáticos de:', uploadsPath);
   app.useStaticAssets(uploadsPath, {
     prefix: '/uploads/',
-    setHeaders: (res) => {
-      // Adicionar headers CORS para arquivos estáticos
+    setHeaders: (res, path, stat) => {
+      // Headers de segurança para arquivos estáticos
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-      res.setHeader('Access-Control-Allow-Origin', '*');
+      
+      // CORS restritivo - apenas origins permitidas
+      const allowedOrigins = [
+        process.env.FRONTEND_URL || 'http://localhost:5000',
+        'http://127.0.0.1:5000',
+        'http://localhost:5000',
+        'http://localhost:3000'
+      ].filter(Boolean);
+      
+      const origin = res.req.headers.origin;
+      if (origin && allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+      }
+      
+      // Headers de cache e segurança
+      res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache por 1 hora
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'DENY');
     },
   });
 

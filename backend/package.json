@@ -15,8 +15,11 @@
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "security:audit": "npm audit --audit-level=moderate",
-    "security:check": "npm run lint && npm run security:audit",
-    "security:snyk": "powershell -ExecutionPolicy Bypass -File ./scripts/snyk-test.ps1"
+    "security:check": "npm run lint && npm run security:audit && npm run security:validate",
+    "security:validate": "ts-node scripts/simple-security-check.ts",
+    "security:full-scan": "ts-node scripts/security-check.ts",
+    "security:snyk": "powershell -ExecutionPolicy Bypass -File ./scripts/snyk-test.ps1",
+    "pre-deploy": "npm run security:check && npm run build"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",
@@ -63,6 +66,7 @@
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "axios": "^1.13.2",
+    "dotenv": "^17.2.3",
     "eslint": "^8.50.0",
     "eslint-plugin-security": "^1.7.1",
     "husky": "^8.0.3",
