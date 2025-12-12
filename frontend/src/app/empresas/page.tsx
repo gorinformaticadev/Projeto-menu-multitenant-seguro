@@ -833,10 +833,10 @@ export default function EmpresasPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => openModulesDialog(tenant)}
-                      className="col-span-2"
+                      className="col-span-2 text-xs sm:text-sm"
                     >
-                      <Package className="h-4 w-4 mr-1" />
-                      Gerenciar Módulos
+                      <Package className="h-4 w-4 mr-1 flex-shrink-0" />
+                      <span className="truncate">Gerenciar Módulos</span>
                     </Button>
                     <Button
                       variant="outline"
@@ -889,7 +889,7 @@ export default function EmpresasPage() {
 
         {/* Dialog de Visualização */}
         <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
-          <DialogContent className="max-w-4xl">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
             <DialogHeader>
               <DialogTitle>Detalhes da Empresa</DialogTitle>
               <DialogDescription>
@@ -898,35 +898,35 @@ export default function EmpresasPage() {
             </DialogHeader>
             {selectedTenant && (
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="details">Detalhes</TabsTrigger>
-                  <TabsTrigger value="modules">Módulos</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-2 h-10">
+                  <TabsTrigger value="details" className="text-xs sm:text-sm px-2">Detalhes</TabsTrigger>
+                  <TabsTrigger value="modules" className="text-xs sm:text-sm px-2">Módulos</TabsTrigger>
                 </TabsList>
                 <TabsContent value="details" className="mt-4">
-                  <div className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <Label className="text-muted-foreground">Nome Fantasia</Label>
-                      <p className="font-medium">{selectedTenant.nomeFantasia}</p>
+                      <Label className="text-muted-foreground text-xs sm:text-sm">Nome Fantasia</Label>
+                      <p className="font-medium text-sm sm:text-base break-words">{selectedTenant.nomeFantasia}</p>
                     </div>
                     <div>
-                      <Label className="text-muted-foreground">CNPJ/CPF</Label>
-                      <p className="font-medium">{selectedTenant.cnpjCpf}</p>
+                      <Label className="text-muted-foreground text-xs sm:text-sm">CNPJ/CPF</Label>
+                      <p className="font-medium text-sm sm:text-base font-mono">{selectedTenant.cnpjCpf}</p>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <Label className="text-muted-foreground text-xs sm:text-sm">Email</Label>
+                      <p className="font-medium text-sm sm:text-base break-all">{selectedTenant.email}</p>
                     </div>
                     <div>
-                      <Label className="text-muted-foreground">Email</Label>
-                      <p className="font-medium">{selectedTenant.email}</p>
+                      <Label className="text-muted-foreground text-xs sm:text-sm">Responsável</Label>
+                      <p className="font-medium text-sm sm:text-base break-words">{selectedTenant.nomeResponsavel}</p>
                     </div>
                     <div>
-                      <Label className="text-muted-foreground">Responsável</Label>
-                      <p className="font-medium">{selectedTenant.nomeResponsavel}</p>
+                      <Label className="text-muted-foreground text-xs sm:text-sm">Telefone</Label>
+                      <p className="font-medium text-sm sm:text-base">{selectedTenant.telefone}</p>
                     </div>
-                    <div>
-                      <Label className="text-muted-foreground">Telefone</Label>
-                      <p className="font-medium">{selectedTenant.telefone}</p>
-                    </div>
-                    <div>
-                      <Label className="text-muted-foreground">Status</Label>
-                      <p className="font-medium">
+                    <div className="sm:col-span-2">
+                      <Label className="text-muted-foreground text-xs sm:text-sm">Status</Label>
+                      <div className="mt-1">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
                           selectedTenant.ativo 
                             ? 'bg-green-100 text-green-800' 
@@ -934,7 +934,7 @@ export default function EmpresasPage() {
                         }`}>
                           {selectedTenant.ativo ? 'Ativa' : 'Inativa'}
                         </span>
-                      </p>
+                      </div>
                     </div>
                   </div>
                 </TabsContent>

@@ -17,6 +17,7 @@ import { SentryModule } from './common/services/sentry.module';
 import { CommonModule } from './common/common.module';
 import { TokenCleanupService } from './common/services/token-cleanup.service';
 import { UpdateModule } from './update/update.module';
+import { ModulesModule } from './modules/modules.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { UpdateModule } from './update/update.module';
     EmailConfigModule,
     AuditModule,
     UpdateModule,
+    ModulesModule,
   ],
   providers: [
     {

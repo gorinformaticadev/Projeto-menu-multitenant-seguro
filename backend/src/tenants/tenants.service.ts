@@ -287,4 +287,141 @@ export class TenantsService {
       nomeFantasia: tenant.nomeFantasia,
     };
   }
+
+  // Métodos para gerenciamento de módulos dos tenants
+
+  async getTenantActiveModules(tenantId: string) {
+    // Verifica se o tenant existe
+    await this.findOne(tenantId);
+
+    const tenantModules = await this.prisma.tenantModule.findMany({
+      where: {
+        tenantId,
+        isActive: true,
+      },
+      include: {
+        module: true,
+      },
+    });
+
+    return {
+      activeModules: tenantModules.map(tm => tm.moduleName),
+      modules: tenantModules.map(tm => ({
+        name: tm.module.name,
+        displayName: tm.module.displayName,
+        description: tm.module.description,
+        version: tm.module.version,
+        config: tm.config ? JSON.parse(tm.config) : null,
+        activatedAt: tm.activatedAt,
+      })),
+    };
+  }
+
+  async activateModuleForTenant(tenantId: string, moduleName: string) {
+    // Verifica se o tenant existe
+    await this.findOne(tenantId);
+
+    // Verificar se o módulo existe
+    const module = await this.prisma.module.findUnique({
+      where: { name: moduleName },
+    });
+
+    if (!module) {
+      throw new NotFoundException(`Módulo '${moduleName}' não encontrado`);
+    }
+
+    if (!module.isActive) {
+      throw new BadRequestException(`Módulo '${moduleName}' está desativado no sistema`);
+    }
+
+    // Verificar se já existe uma relação
+    const existingTenantModule = await this.prisma.tenantModule.findUnique({
+      where: {
+        tenantId_moduleName: {
+          tenantId,
+          moduleName,
+        },
+      },
+    });
+
+    if (existingTenantModule) {
+      if (existingTenantModule.isActive) {
+        throw new BadRequestException(`Módulo '${moduleName}' já está ativo para este tenant`);
+      }
+
+      // Reativar módulo
+      return this.prisma.tenantModule.update({
+        where: { id: existingTenantModule.id },
+        data: {
+          isActive: true,
+          activatedAt: new Date(),
+          deactivatedAt: null,
+        },
+      });
+    }
+
+    // Criar nova relação
+    return this.prisma.tenantModule.create({
+      data: {
+        tenantId,
+        moduleName,
+        isActive: true,
+      },
+    });
+  }
+
+  async deactivateModuleForTenant(tenantId: string, moduleName: string) {
+    // Verifica se o tenant existe
+    await this.findOne(tenantId);
+
+    const tenantModule = await this.prisma.tenantModule.findUnique({
+      where: {
+        tenantId_moduleName: {
+          tenantId,
+          moduleName,
+        },
+      },
+    });
+
+    if (!tenantModule) {
+      throw new NotFoundException(`Módulo '${moduleName}' não está associado a este tenant`);
+    }
+
+    if (!tenantModule.isActive) {
+      throw new BadRequestException(`Módulo '${moduleName}' já está desativado para este tenant`);
+    }
+
+    return this.prisma.tenantModule.update({
+      where: { id: tenantModule.id },
+      data: {
+        isActive: false,
+        deactivatedAt: new Date(),
+      },
+    });
+  }
+
+  async configureTenantModule(tenantId: string, moduleName: string, config: any) {
+    // Verifica se o tenant existe
+    await this.findOne(tenantId);
+
+    const tenantModule = await this.prisma.tenantModule.findUnique({
+      where: {
+        tenantId_moduleName: {
+          tenantId,
+          moduleName,
+        },
+      },
+    });
+
+    if (!tenantModule) {
+      throw new NotFoundException(`Módulo '${moduleName}' não está associado a este tenant`);
+    }
+
+    return this.prisma.tenantModule.update({
+      where: { id: tenantModule.id },
+      data: {
+        config: JSON.stringify(config),
+      },
+    });
+  }
 }

@@ -111,39 +111,45 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <Package className="h-5 w-5" />
             Gerenciamento de Módulos
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm">
             Ative ou desative módulos específicos para este tenant
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           {modules.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              Nenhum módulo disponível no momento
+              <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+              <p>Nenhum módulo disponível no momento</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {modules.map((module) => (
-                <div key={module.name} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="space-y-1">
-                    <h3 className="font-medium">{module.displayName}</h3>
-                    <p className="text-sm text-muted-foreground">{module.description}</p>
+                <div key={module.name} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
+                  <div className="flex-1 space-y-1 min-w-0">
+                    <h3 className="font-medium text-sm sm:text-base truncate">{module.displayName}</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 overflow-hidden">{module.description}</p>
                     <div className="flex items-center gap-2 mt-2">
-                      <span className="text-xs bg-muted px-2 py-1 rounded">
+                      <span className="text-xs bg-muted px-2 py-1 rounded font-mono">
                         v{module.version}
                       </span>
                     </div>
                   </div>
-                  <Switch
-                    checked={moduleStatus[module.name] || false}
-                    onCheckedChange={(checked) => toggleModuleStatus(module.name, moduleStatus[module.name] || false)}
-                  />
+                  <div className="flex items-center justify-between sm:justify-end gap-2">
+                    <span className="text-xs text-muted-foreground sm:hidden">
+                      {moduleStatus[module.name] ? 'Ativo' : 'Inativo'}
+                    </span>
+                    <Switch
+                      checked={moduleStatus[module.name] || false}
+                      onCheckedChange={(checked) => toggleModuleStatus(module.name, moduleStatus[module.name] || false)}
+                    />
+                  </div>
                 </div>
               ))}
             </div>

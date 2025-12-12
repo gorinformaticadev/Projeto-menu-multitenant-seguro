@@ -186,4 +186,44 @@ export class TenantsController {
   async getTenantLogo(@Param('id') id: string) {
     return this.tenantsService.getTenantLogo(id);
   }
+
+  // Endpoints para gerenciamento de módulos dos tenants
+
+  @Get(':id/modules/active')
+  @Roles(Role.SUPER_ADMIN)
+  @SkipTenantIsolation()
+  async getTenantActiveModules(@Param('id') id: string) {
+    return this.tenantsService.getTenantActiveModules(id);
+  }
+
+  @Get('my-tenant/modules/active')
+  @Roles(Role.ADMIN)
+  async getMyTenantActiveModules(@Req() req: ExpressRequest & { user: any }) {
+    return this.tenantsService.getTenantActiveModules(req.user.tenantId);
+  }
+
+  @Post(':id/modules/:moduleName/activate')
+  @Roles(Role.SUPER_ADMIN)
+  @SkipTenantIsolation()
+  async activateModuleForTenant(@Param('id') id: string, @Param('moduleName') moduleName: string) {
+    return this.tenantsService.activateModuleForTenant(id, moduleName);
+  }
+
+  @Post(':id/modules/:moduleName/deactivate')
+  @Roles(Role.SUPER_ADMIN)
+  @SkipTenantIsolation()
+  async deactivateModuleForTenant(@Param('id') id: string, @Param('moduleName') moduleName: string) {
+    return this.tenantsService.deactivateModuleForTenant(id, moduleName);
+  }
+
+  @Put(':id/modules/:moduleName/config')
+  @Roles(Role.SUPER_ADMIN)
+  @SkipTenantIsolation()
+  async configureTenantModule(
+    @Param('id') id: string,
+    @Param('moduleName') moduleName: string,
+    @Body() config: any
+  ) {
+    return this.tenantsService.configureTenantModule(id, moduleName, config);
+  }
 }

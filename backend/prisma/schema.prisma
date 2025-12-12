@@ -26,6 +26,7 @@ model Tenant {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   users           User[]
+  tenantModules   TenantModule[]
 
   // Índices para performance
   @@index([ativo]) // Filtrar tenants ativos
@@ -236,5 +237,45 @@ model UpdateLog {
   @@index([version])
   @@index([executedBy])
   @@map("update_logs")
+}
+
+// Tabela de Módulos do Sistema
+model Module {
+  id          String   @id @default(uuid())
+  name        String   @unique // Nome único do módulo (ex: "sales", "reports")
+  displayName String   // Nome para exibição (ex: "Sistema de Vendas")
+  description String?  // Descrição do módulo
+  version     String   @default("1.0.0") // Versão do módulo
+  isActive    Boolean  @default(true) // Se o módulo está ativo no sistema
+  config      String?  // Configurações específicas do módulo (JSON)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relacionamento com tenants
+  tenantModules TenantModule[]
+
+  @@index([isActive])
+  @@map("modules")
+}
+
+// Tabela de Módulos por Tenant (quais módulos cada tenant tem ativo)
+model TenantModule {
+  id            String    @id @default(uuid())
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  moduleName    String
+  module        Module    @relation(fields: [moduleName], references: [name], onDelete: Cascade)
+  isActive      Boolean   @default(true) // Se o módulo está ativo para este tenant
+  config        String?   // Configurações específicas do módulo para este tenant (JSON)
+  activatedAt   DateTime  @default(now())
+  deactivatedAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([tenantId, moduleName]) // Um tenant não pode ter o mesmo módulo duplicado
+  @@index([tenantId])
+  @@index([moduleName])
+  @@index([isActive])
+  @@map("tenant_modules")
 }
 
