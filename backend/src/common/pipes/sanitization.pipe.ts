@@ -1,4 +1,5 @@
 import { PipeTransform, Injectable, ArgumentMetadata } from '@nestjs/common';
+import * as sanitizeHtml from 'sanitize-html';
 
 /**
  * Pipe para sanitização automática de inputs
@@ -54,8 +55,13 @@ export class SanitizationPipe implements PipeTransform {
     // Remove múltiplos espaços consecutivos
     sanitized = sanitized.replace(/\s+/g, ' ');
 
-    // Remove caracteres de controle perigosos
-    sanitized = sanitized.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+    // Sanitização robusta contra XSS usando sanitize-html
+    // Remove tags HTML e atributos perigosos, mas mantém texto seguro
+    sanitized = sanitizeHtml(sanitized, {
+      allowedTags: [], // Remove TODAS as tags HTML
+      allowedAttributes: {}, // Remove TODOS os atributos
+      disallowedTagsMode: 'recursiveEscape', // Escapa o conteúdo das tags em vez de remover
+    });
 
     return sanitized;
   }

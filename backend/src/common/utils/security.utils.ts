@@ -58,6 +58,10 @@ export function validateJWTSecret(secret: string): boolean {
 /**
  * Criptografa dados sensíveis usando AES-256-GCM
  */
+/**
+ * Criptografa dados sensíveis usando AES-256-GCM (Autenticado e Seguro)
+ * Formato de saída: iv:authTag:encryptedData (hex)
+ */
 export function encryptSensitiveData(data: string, key?: string): string {
   const encryptionKey = key || process.env.ENCRYPTION_KEY;
   
@@ -65,29 +69,26 @@ export function encryptSensitiveData(data: string, key?: string): string {
     throw new Error('Chave de criptografia não configurada');
   }
   
+  // Garantir que a chave tenha 32 bytes (SHA-256)
+  const keyBuffer = crypto.createHash('sha256').update(encryptionKey).digest();
+  
   const algorithm = 'aes-256-gcm';
   const iv = crypto.randomBytes(16);
   
-  // Criar hash da chave para garantir tamanho correto (32 bytes para AES-256)
-  const keyHash = crypto.createHash('sha256').update(encryptionKey).digest();
-  
-  const cipher = crypto.createCipher(algorithm, keyHash);
+  const cipher = crypto.createCipheriv(algorithm, keyBuffer, iv);
   
   let encrypted = cipher.update(data, 'utf8', 'hex');
   encrypted += cipher.final('hex');
   
-  // Para GCM, precisamos do authTag, mas createCipher não suporta
-  // Vamos usar uma abordagem mais simples com AES-256-CBC
-  const simpleCipher = crypto.createCipher('aes-256-cbc', encryptionKey);
-  let simpleEncrypted = simpleCipher.update(data, 'utf8', 'hex');
-  simpleEncrypted += simpleCipher.final('hex');
+  const authTag = cipher.getAuthTag().toString('hex');
   
-  // Retorna: iv:encryptedData (formato simplificado)
-  return `${iv.toString('hex')}:${simpleEncrypted}`;
+  // Retorna: iv:authTag:encryptedData
+  return `${iv.toString('hex')}:${authTag}:${encrypted}`;
 }
 
 /**
- * Descriptografa dados sensíveis usando AES-256-GCM
+ * Descriptografa dados sensíveis
+ * Suporta formato novo (GCM) e legado (CBC inseguro - para migração)
  */
 export function decryptSensitiveData(encryptedData: string, key?: string): string {
   const encryptionKey = key || process.env.ENCRYPTION_KEY;
@@ -96,19 +97,73 @@ export function decryptSensitiveData(encryptedData: string, key?: string): strin
     throw new Error('Chave de criptografia não configurada');
   }
   
-  const [ivHex, encrypted] = encryptedData.split(':');
+  const parts = encryptedData.split(':');
   
-  if (!ivHex || !encrypted) {
-    throw new Error('Formato de dados criptografados inválido');
+  // ============================================
+  // TENTATIVA 1: Formato NOVO (AES-256-GCM)
+  // Formato: iv:authTag:encryptedData (3 partes)
+  // ============================================
+  if (parts.length === 3) {
+    try {
+      const [ivHex, authTagHex, encryptedHex] = parts;
+      
+      const keyBuffer = crypto.createHash('sha256').update(encryptionKey).digest(); // Mesma derivação do encrypt
+      const iv = Buffer.from(ivHex, 'hex');
+      const authTag = Buffer.from(authTagHex, 'hex');
+      const algorithm = 'aes-256-gcm';
+      
+      const decipher = crypto.createDecipheriv(algorithm, keyBuffer, iv);
+      decipher.setAuthTag(authTag);
+      
+      let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      
+      return decrypted;
+    } catch (error) {
+      // Se falhar e tiver 3 partes, é corrompido ou chave errada.
+      // Mas por segurança, podemos deixar cair no fallback SE fizer sentido, 
+      // mas 3 partes é muito específico do novo modelo.
+      console.error('Falha ao descriptografar GCM:', error.message);
+      throw new Error('Falha na descriptografia (GCM)');
+    }
   }
+
+  // ============================================
+  // TENTATIVA 2: Formato LEGADO (AES-256-CBC / createCipher)
+  // Formato: iv:encryptedData (2 partes) ou antigo
+  // ============================================
+  // A versão anterior usava createCipher('aes-256-cbc', key) que é DEPECRATED.
+  // Ela usava derivação interna de chave (MD5).
+  // O código antigo gerava 'iv:encrypted' mas o createCipher NÃO usava esse IV para criptografar,
+  // ele gerava um IV interno derivado da senha. O 'iv' no output era lixo ou decorativo no código original.
+  // Vamos tentar recuperar usando a mesma lógica "torta" antiga para não perder dados.
   
-  // Usar AES-256-CBC para compatibilidade
-  const decipher = crypto.createDecipher('aes-256-cbc', encryptionKey);
-  
-  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  
-  return decrypted;
+  try {
+    const partsLegacy = encryptedData.split(':');
+    let encryptedLegacy = '';
+    
+    if (partsLegacy.length === 2) {
+      // O código antigo fazia: return `${iv.toString('hex')}:${simpleEncrypted}`;
+      encryptedLegacy = partsLegacy[1];
+    } else {
+      // Talvez formato cru?
+      encryptedLegacy = encryptedData;
+    }
+
+    if (!encryptedLegacy) throw new Error('Dados vazios');
+
+    // MODO LEGADO INSEGURO - Apenas para leitura de dados antigos
+    // @ts-ignore
+    const decipher = crypto.createDecipher('aes-256-cbc', encryptionKey);
+    
+    let decrypted = decipher.update(encryptedLegacy, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    return decrypted;
+  } catch (error) {
+    console.error('Decriptografia falhou (Novo e Legado):', error.message);
+    throw new Error('Falha na descriptografia dos dados');
+  }
 }
 
 /**

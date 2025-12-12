@@ -15,18 +15,18 @@ async function bootstrap() {
   // ============================================
   console.log('🔒 Validando configurações de segurança...');
   const securityValidation = validateSecurityConfig();
-  
+
   if (!securityValidation.isValid) {
     console.error('❌ ERRO DE SEGURANÇA: Configurações inseguras detectadas!');
     securityValidation.errors.forEach(error => console.error(`   - ${error}`));
     process.exit(1);
   }
-  
+
   if (securityValidation.warnings.length > 0) {
     console.warn('⚠️  AVISOS DE SEGURANÇA:');
     securityValidation.warnings.forEach(warning => console.warn(`   - ${warning}`));
   }
-  
+
   console.log('✅ Configurações de segurança validadas com sucesso');
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -53,8 +53,8 @@ async function bootstrap() {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'"], // Permite estilos inline (necessário para alguns frameworks)
-          scriptSrc: ["'self'", "'unsafe-eval'"], // Permite eval para desenvolvimento
+          styleSrc: ["'self'", "'unsafe-inline'"], // Mantido unsafe-inline por compatibilidade (frameworks CSS)
+          scriptSrc: ["'self'"], // Removido unsafe-eval
           imgSrc: [
             "'self'",
             'data:',
@@ -85,10 +85,10 @@ async function bootstrap() {
       // HTTP Strict Transport Security - Força HTTPS (apenas em produção)
       hsts: isProduction
         ? {
-            maxAge: 31536000, // 1 ano
-            includeSubDomains: true,
-            preload: true,
-          }
+          maxAge: 31536000, // 1 ano
+          includeSubDomains: true,
+          preload: true,
+        }
         : false,
       // Previne clickjacking
       frameguard: {
@@ -150,7 +150,7 @@ async function bootstrap() {
     setHeaders: (res, path, stat) => {
       // Headers de segurança para arquivos estáticos
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-      
+
       // CORS restritivo - apenas origins permitidas
       const allowedOrigins = [
         process.env.FRONTEND_URL || 'http://localhost:5000',
@@ -158,12 +158,12 @@ async function bootstrap() {
         'http://localhost:5000',
         'http://localhost:3000'
       ].filter(Boolean);
-      
+
       const origin = res.req.headers.origin;
       if (origin && allowedOrigins.includes(origin)) {
         res.setHeader('Access-Control-Allow-Origin', origin);
       }
-      
+
       // Headers de cache e segurança
       res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache por 1 hora
       res.setHeader('X-Content-Type-Options', 'nosniff');

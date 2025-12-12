@@ -28,6 +28,10 @@ const nextConfig = {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=()', // Restrict permissions
           },
+          {
+            key: 'Content-Security-Policy',
+            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' http://localhost:4000 http://localhost:5000 ws://localhost:4000 ws://localhost:5000; font-src 'self' data: https:;",
+          },
         ],
       },
     ];
