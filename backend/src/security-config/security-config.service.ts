@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateSecurityConfigDto } from './dto/update-security-config.dto';
+import { encryptSensitiveData, decryptSensitiveData } from '../common/utils/security.utils';
 
 @Injectable()
 export class SecurityConfigService {
@@ -29,13 +30,21 @@ export class SecurityConfigService {
    */
   async updateConfig(dto: UpdateSecurityConfigDto, userId: string) {
     const config = await this.getConfig();
+    
+    // Criptografar credenciais SMTP se fornecidas
+    const updateData: any = { ...dto, updatedBy: userId };
+    
+    if (dto.smtpPassword) {
+      updateData.smtpPassword = encryptSensitiveData(dto.smtpPassword);
+    }
+    
+    if (dto.smtpUsername) {
+      updateData.smtpUsername = encryptSensitiveData(dto.smtpUsername);
+    }
 
     return this.prisma.securityConfig.update({
       where: { id: config.id },
-      data: {
-        ...dto,
-        updatedBy: userId,
-      },
+      data: updateData,
     });
   }
 
@@ -87,13 +96,18 @@ export class SecurityConfigService {
   }
 
   /**
-   * Obtém credenciais SMTP
+   * Obtém credenciais SMTP descriptografadas
    */
   async getSmtpCredentials() {
     const config = await this.getConfig();
+    
+    // Descriptografar credenciais se existirem
+    const smtpUsername = config.smtpUsername ? decryptSensitiveData(config.smtpUsername) : null;
+    const smtpPassword = config.smtpPassword ? decryptSensitiveData(config.smtpPassword) : null;
+    
     return {
-      smtpUsername: config.smtpUsername,
-      smtpPassword: config.smtpPassword,
+      smtpUsername,
+      smtpPassword,
     };
   }
 }

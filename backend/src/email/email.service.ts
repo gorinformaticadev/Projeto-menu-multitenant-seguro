@@ -4,6 +4,7 @@ import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
 import { PrismaService } from '../prisma/prisma.service';
 import { getPlatformName } from '../common/constants/platform.constants';
+import { SecurityConfigService } from '../security-config/security-config.service';
 
 @Injectable()
 export class EmailService implements OnModuleInit {
@@ -15,7 +16,8 @@ export class EmailService implements OnModuleInit {
 
   constructor(
     private config: ConfigService,
-    private prisma: PrismaService
+    private prisma: PrismaService,
+    private securityConfigService: SecurityConfigService
   ) {
     this.isEnabled = false;
   }
@@ -37,7 +39,7 @@ export class EmailService implements OnModuleInit {
       this.dbConfig = result;
 
       // Get security config to access SMTP credentials
-      const securityConfig = await this.prisma.securityConfig.findFirst();
+      const smtpCredentials = await this.securityConfigService.getSmtpCredentials();
 
       let smtpConfig;
       
@@ -70,11 +72,11 @@ export class EmailService implements OnModuleInit {
 
       if (this.isEnabled) {
         // Add authentication if available
-        if ((securityConfig as any)?.smtpUsername && (securityConfig as any)?.smtpPassword) {
-          // Use database credentials from SecurityConfig
+        if (smtpCredentials.smtpUsername && smtpCredentials.smtpPassword) {
+          // Use database credentials from SecurityConfig (decrypted)
           smtpConfig.auth = {
-            user: (securityConfig as any).smtpUsername,
-            pass: (securityConfig as any).smtpPassword,
+            user: smtpCredentials.smtpUsername,
+            pass: smtpCredentials.smtpPassword,
           };
         } else if (this.config.get('SMTP_USER') && this.config.get('SMTP_PASS')) {
           // Fallback to environment variables
@@ -343,10 +345,10 @@ export class EmailService implements OnModuleInit {
     if ((!smtpUser || !smtpPass) && this.prisma) {
       this.logger.log('Buscando credenciais SMTP do banco de dados...');
       try {
-        const securityConfig = await this.prisma.securityConfig.findFirst();
-        if ((securityConfig as any)?.smtpUsername && (securityConfig as any)?.smtpPassword) {
-          smtpUser = (securityConfig as any).smtpUsername;
-          smtpPass = (securityConfig as any).smtpPassword;
+        const smtpCredentials = await this.securityConfigService.getSmtpCredentials();
+        if (smtpCredentials.smtpUsername && smtpCredentials.smtpPassword) {
+          smtpUser = smtpCredentials.smtpUsername;
+          smtpPass = smtpCredentials.smtpPassword;
           this.logger.log('Credenciais SMTP encontradas no banco de dados');
         } else {
           this.logger.warn('Credenciais SMTP não encontradas no banco de dados');
@@ -464,10 +466,10 @@ export class EmailService implements OnModuleInit {
     // If no credentials provided, try to get from database
     if ((!smtpUser || !smtpPass) && this.prisma) {
       try {
-        const securityConfig = await this.prisma.securityConfig.findFirst();
-        if ((securityConfig as any)?.smtpUsername && (securityConfig as any)?.smtpPassword) {
-          smtpUser = (securityConfig as any).smtpUsername;
-          smtpPass = (securityConfig as any).smtpPassword;
+        const smtpCredentials = await this.securityConfigService.getSmtpCredentials();
+        if (smtpCredentials.smtpUsername && smtpCredentials.smtpPassword) {
+          smtpUser = smtpCredentials.smtpUsername;
+          smtpPass = smtpCredentials.smtpPassword;
         }
       } catch (error) {
         this.logger.warn('Could not fetch SMTP credentials from database:', error);

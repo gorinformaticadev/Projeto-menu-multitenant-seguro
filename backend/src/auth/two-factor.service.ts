@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
 import { getPlatformName } from '../common/constants/platform.constants';
+import { encryptSensitiveData, decryptSensitiveData } from '../common/utils/security.utils';
 
 @Injectable()
 export class TwoFactorService {
@@ -27,11 +28,14 @@ export class TwoFactorService {
       issuer: platformName,
     });
 
-    // Salvar secret temporário (não ativado ainda)
+    // Criptografar o secret antes de salvar
+    const encryptedSecret = encryptSensitiveData(secret.base32);
+
+    // Salvar secret criptografado temporário (não ativado ainda)
     await this.prisma.user.update({
       where: { id: userId },
       data: {
-        twoFactorSecret: secret.base32,
+        twoFactorSecret: encryptedSecret,
       },
     });
 
@@ -56,9 +60,12 @@ export class TwoFactorService {
       throw new Error('Secret não encontrado');
     }
 
+    // Descriptografar o secret para verificação
+    const decryptedSecret = decryptSensitiveData(user.twoFactorSecret);
+
     // Verificar token
     const isValid = speakeasy.totp.verify({
-      secret: user.twoFactorSecret,
+      secret: decryptedSecret,
       encoding: 'base32',
       token,
       window: 2, // Aceita 2 códigos antes/depois (60 segundos de margem)
@@ -91,9 +98,12 @@ export class TwoFactorService {
       throw new Error('2FA não está ativado');
     }
 
+    // Descriptografar o secret para verificação
+    const decryptedSecret = decryptSensitiveData(user.twoFactorSecret);
+
     // Verificar token antes de desativar
     const isValid = speakeasy.totp.verify({
-      secret: user.twoFactorSecret,
+      secret: decryptedSecret,
       encoding: 'base32',
       token,
       window: 2,
@@ -119,8 +129,11 @@ export class TwoFactorService {
    * Verificar código 2FA
    */
   verify(secret: string, token: string): boolean {
+    // Descriptografar o secret antes da verificação
+    const decryptedSecret = decryptSensitiveData(secret);
+    
     return speakeasy.totp.verify({
-      secret,
+      secret: decryptedSecret,
       encoding: 'base32',
       token,
       window: 2,

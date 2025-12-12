@@ -211,6 +211,8 @@ export class AuthService {
         role: user.role,
         tenantId: user.tenantId,
         tenant: user.tenant,
+        // Remover dados sensíveis
+        twoFactorSecret: undefined,
       },
     };
   }
@@ -308,6 +310,8 @@ export class AuthService {
         role: storedToken.user.role,
         tenantId: storedToken.user.tenantId,
         tenant: storedToken.user.tenant,
+        // Remover dados sensíveis
+        twoFactorSecret: undefined,
       },
     };
   }
@@ -467,6 +471,8 @@ export class AuthService {
         role: user.role,
         tenantId: user.tenantId,
         tenant: user.tenant,
+        // Remover dados sensíveis
+        twoFactorSecret: undefined,
       },
     };
   }
@@ -497,6 +503,8 @@ export class AuthService {
       tenantId: user.tenantId,
       tenant: user.tenant,
       twoFactorEnabled: user.twoFactorEnabled,
+      // Remover dados sensíveis
+      twoFactorSecret: undefined,
     };
   }
 }

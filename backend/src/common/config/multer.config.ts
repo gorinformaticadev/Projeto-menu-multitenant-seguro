@@ -12,7 +12,7 @@ const FILE_SIGNATURES = {
 };
 
 // Validar assinatura do arquivo
-function validateFileSignature(buffer: Buffer, mimetype: string): boolean {
+export function validateFileSignature(buffer: Buffer, mimetype: string): boolean {
   const signature = FILE_SIGNATURES[mimetype];
   if (!signature) return false;
   
