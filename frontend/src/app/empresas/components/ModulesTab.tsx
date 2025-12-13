@@ -17,7 +17,12 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadModules();
+    // Debounce para evitar múltiplas chamadas
+    const timeoutId = setTimeout(() => {
+      loadModules();
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
   }, [tenantId]);
 
   const loadModules = async () => {
@@ -64,35 +69,24 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
 
   const toggleModuleStatus = async (moduleName: string, currentStatus: boolean) => {
     try {
-      const newStatus = !currentStatus;
+      // Usar o novo método toggle que alterna automaticamente o status
+      const result = await modulesService.toggleModuleForTenant(tenantId, moduleName);
       
-      if (newStatus) {
-        // Ativar módulo no backend
-        await modulesService.activateModuleForTenant(tenantId, moduleName);
-        
-        // Ativar no registry local (apenas se for o próprio tenant)
-        if (user?.tenantId === tenantId) {
+      const newStatus = result.isActive;
+      
+      // Atualizar registry local (apenas se for o próprio tenant)
+      if (user?.tenantId === tenantId) {
+        if (newStatus) {
           moduleRegistry.activateModule(moduleName);
-        }
-        
-        toast({
-          title: "Módulo ativado",
-          description: `O módulo ${moduleName} foi ativado com sucesso.`,
-        });
-      } else {
-        // Desativar módulo no backend
-        await modulesService.deactivateModuleForTenant(tenantId, moduleName);
-        
-        // Desativar no registry local (apenas se for o próprio tenant)
-        if (user?.tenantId === tenantId) {
+        } else {
           moduleRegistry.deactivateModule(moduleName);
         }
-        
-        toast({
-          title: "Módulo desativado",
-          description: `O módulo ${moduleName} foi desativado com sucesso.`,
-        });
       }
+      
+      toast({
+        title: newStatus ? "Módulo ativado" : "Módulo desativado",
+        description: `O módulo ${moduleName} foi ${newStatus ? 'ativado' : 'desativado'} com sucesso.`,
+      });
       
       // Atualizar lista de módulos
       await loadModules();

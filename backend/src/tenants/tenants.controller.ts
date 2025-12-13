@@ -191,6 +191,7 @@ export class TenantsController {
 
   @Get('my-tenant/modules/active')
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  @SkipThrottle()
   async getMyTenantActiveModules(@Req() req: ExpressRequest & { user: any }) {
     if (!req.user.tenantId) {
       if (req.user.role === Role.SUPER_ADMIN) {
@@ -206,6 +207,7 @@ export class TenantsController {
   @Get(':id/modules/active')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
+  @SkipThrottle()
   async getTenantActiveModules(@Param('id') id: string) {
     return this.tenantsService.getTenantActiveModules(id);
   }
@@ -222,6 +224,14 @@ export class TenantsController {
   @SkipTenantIsolation()
   async deactivateModuleForTenant(@Param('id') id: string, @Param('moduleName') moduleName: string) {
     return this.tenantsService.deactivateModuleForTenant(id, moduleName);
+  }
+
+  @Post(':id/modules/:moduleName/toggle')
+  @Roles(Role.SUPER_ADMIN)
+  @SkipTenantIsolation()
+  @SkipThrottle()
+  async toggleModuleForTenant(@Param('id') id: string, @Param('moduleName') moduleName: string) {
+    return this.tenantsService.toggleModuleForTenant(id, moduleName);
   }
 
   @Put(':id/modules/:moduleName/config')

@@ -362,8 +362,9 @@ export class TenantsService {
     });
 
     if (existingTenantModule) {
+      // Se já está ativo, retorna o registro atual sem erro
       if (existingTenantModule.isActive) {
-        throw new BadRequestException(`Módulo '${moduleName}' já está ativo para este tenant`);
+        return existingTenantModule;
       }
 
       // Reativar módulo
@@ -404,8 +405,9 @@ export class TenantsService {
       throw new NotFoundException(`Módulo '${moduleName}' não está associado a este tenant`);
     }
 
+    // Se já está desativado, retorna o registro atual sem erro
     if (!tenantModule.isActive) {
-      throw new BadRequestException(`Módulo '${moduleName}' já está desativado para este tenant`);
+      return tenantModule;
     }
 
     return this.prisma.tenantModule.update({
@@ -413,6 +415,57 @@ export class TenantsService {
       data: {
         isActive: false,
         deactivatedAt: new Date(),
+      },
+    });
+  }
+
+  async toggleModuleForTenant(tenantId: string, moduleName: string) {
+    // Verifica se o tenant existe
+    await this.findOne(tenantId);
+
+    // Verificar se o módulo existe
+    const module = await this.prisma.module.findUnique({
+      where: { name: moduleName },
+    });
+
+    if (!module) {
+      throw new NotFoundException(`Módulo '${moduleName}' não encontrado`);
+    }
+
+    if (!module.isActive) {
+      throw new BadRequestException(`Módulo '${moduleName}' está desativado no sistema`);
+    }
+
+    // Verificar se já existe uma relação
+    const existingTenantModule = await this.prisma.tenantModule.findUnique({
+      where: {
+        tenantId_moduleName: {
+          tenantId,
+          moduleName,
+        },
+      },
+    });
+
+    if (existingTenantModule) {
+      // Toggle: se está ativo, desativa; se está inativo, ativa
+      const newStatus = !existingTenantModule.isActive;
+      
+      return this.prisma.tenantModule.update({
+        where: { id: existingTenantModule.id },
+        data: {
+          isActive: newStatus,
+          activatedAt: newStatus ? new Date() : existingTenantModule.activatedAt,
+          deactivatedAt: newStatus ? null : new Date(),
+        },
+      });
+    }
+
+    // Se não existe relação, cria uma nova ativa
+    return this.prisma.tenantModule.create({
+      data: {
+        tenantId,
+        moduleName,
+        isActive: true,
       },
     });
   }

@@ -353,14 +353,37 @@ class ModuleRegistry {
     return contribution.enabled && this.isModuleActive(contribution.id);
   }
 
+  // Cache para evitar múltiplas chamadas
+  private initializationPromise: Promise<void> | null = null;
+  private lastInitialization: number = 0;
+  private readonly CACHE_DURATION = 30000; // 30 segundos
+
   /**
    * Inicializa o registry carregando estado dos módulos do backend
    */
   async initializeFromBackend(): Promise<void> {
-    if (this.isInitialized) {
+    // Se já está inicializado e o cache ainda é válido, retorna
+    const now = Date.now();
+    if (this.isInitialized && (now - this.lastInitialization) < this.CACHE_DURATION) {
       return;
     }
 
+    // Se já há uma inicialização em andamento, aguarda ela
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
+
+    // Cria nova promise de inicialização
+    this.initializationPromise = this.performInitialization();
+    
+    try {
+      await this.initializationPromise;
+    } finally {
+      this.initializationPromise = null;
+    }
+  }
+
+  private async performInitialization(): Promise<void> {
     try {
       // Importa o serviço dinamicamente para evitar dependência circular
       const { modulesService } = await import('@/services/modules.service');
@@ -383,6 +406,7 @@ class ModuleRegistry {
       });
       
       this.isInitialized = true;
+      this.lastInitialization = Date.now();
       console.log('🔄 Module Registry sincronizado com backend');
       console.log('📋 Módulos disponíveis:', allAvailableModules);
       console.log('✅ Módulos ativos:', response.activeModules);
@@ -392,6 +416,7 @@ class ModuleRegistry {
       // Em caso de erro, usa estado padrão (module-exemplo ativo)
       this.moduleActivationStatus.set('module-exemplo', true);
       this.isInitialized = true;
+      this.lastInitialization = Date.now();
     }
   }
 

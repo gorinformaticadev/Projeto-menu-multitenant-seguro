@@ -37,6 +37,12 @@ export interface ModuleFeatures {
     slots: ModuleSlotConfig[];
 }
 
+// Cache global para evitar múltiplas chamadas
+let cachedFeatures: ModuleFeatures | null = null;
+let cacheTimestamp: number = 0;
+let loadingPromise: Promise<ModuleFeatures> | null = null;
+const CACHE_DURATION = 30000; // 30 segundos
+
 export function useModuleFeatures() {
     const [features, setFeatures] = useState<ModuleFeatures>({ userMenu: [], notifications: [], dashboardWidgets: [], slots: [] });
     const [loading, setLoading] = useState(true);
@@ -46,46 +52,82 @@ export function useModuleFeatures() {
 
         async function loadFeatures() {
             try {
-                const response = await api.get('/tenants/my-tenant/modules/active');
-                console.log('🔍 [DEBUG] Module Features Response:', response.data);
-                const modules = response.data.modules || [];
-                console.log('🔍 [DEBUG] Modules List:', modules);
-
-                const userMenuItems: ModuleUserMenuItem[] = [];
-                const notificationConfigs: ModuleNotificationConfig[] = [];
-                const dashboardWidgets: ModuleDashboardWidget[] = [];
-                const slots: ModuleSlotConfig[] = [];
-
-                modules.forEach((mod: any) => {
-                    if (mod.config) {
-                        if (mod.config.userMenu && Array.isArray(mod.config.userMenu)) {
-                            userMenuItems.push(...mod.config.userMenu);
-                        }
-                        if (mod.config.notifications) {
-                            notificationConfigs.push(mod.config.notifications);
-                        }
-                        if (mod.config.dashboardWidgets && Array.isArray(mod.config.dashboardWidgets)) {
-                            dashboardWidgets.push(...mod.config.dashboardWidgets);
-                        }
-                        if (mod.config.slots && Array.isArray(mod.config.slots)) {
-                            slots.push(...mod.config.slots);
-                        }
+                // Verifica se há cache válido
+                const now = Date.now();
+                if (cachedFeatures && (now - cacheTimestamp) < CACHE_DURATION) {
+                    if (mounted) {
+                        setFeatures(cachedFeatures);
+                        setLoading(false);
                     }
-                });
+                    return;
+                }
 
+                // Se já há uma requisição em andamento, aguarda ela
+                if (loadingPromise) {
+                    const result = await loadingPromise;
+                    if (mounted) {
+                        setFeatures(result);
+                        setLoading(false);
+                    }
+                    return;
+                }
+
+                // Cria nova requisição
+                loadingPromise = performLoadFeatures();
+                const result = await loadingPromise;
+                
                 if (mounted) {
-                    setFeatures({
-                        userMenu: userMenuItems,
-                        notifications: notificationConfigs,
-                        dashboardWidgets,
-                        slots
-                    });
+                    setFeatures(result);
+                    setLoading(false);
                 }
             } catch (error) {
                 console.error('Failed to load module features', error);
-            } finally {
                 if (mounted) setLoading(false);
+            } finally {
+                loadingPromise = null;
             }
+        }
+
+        async function performLoadFeatures(): Promise<ModuleFeatures> {
+            const response = await api.get('/tenants/my-tenant/modules/active');
+            console.log('🔍 [DEBUG] Module Features Response:', response.data);
+            const modules = response.data.modules || [];
+            console.log('🔍 [DEBUG] Modules List:', modules);
+
+            const userMenuItems: ModuleUserMenuItem[] = [];
+            const notificationConfigs: ModuleNotificationConfig[] = [];
+            const dashboardWidgets: ModuleDashboardWidget[] = [];
+            const slots: ModuleSlotConfig[] = [];
+
+            modules.forEach((mod: any) => {
+                if (mod.config) {
+                    if (mod.config.userMenu && Array.isArray(mod.config.userMenu)) {
+                        userMenuItems.push(...mod.config.userMenu);
+                    }
+                    if (mod.config.notifications) {
+                        notificationConfigs.push(mod.config.notifications);
+                    }
+                    if (mod.config.dashboardWidgets && Array.isArray(mod.config.dashboardWidgets)) {
+                        dashboardWidgets.push(...mod.config.dashboardWidgets);
+                    }
+                    if (mod.config.slots && Array.isArray(mod.config.slots)) {
+                        slots.push(...mod.config.slots);
+                    }
+                }
+            });
+
+            const result = {
+                userMenu: userMenuItems,
+                notifications: notificationConfigs,
+                dashboardWidgets,
+                slots
+            };
+
+            // Atualiza cache
+            cachedFeatures = result;
+            cacheTimestamp = Date.now();
+
+            return result;
         }
 
         loadFeatures();
