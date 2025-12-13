@@ -13,6 +13,8 @@ export interface TenantModule {
   version: string;
   isActive: boolean;
   config?: any;
+  activatedAt?: string | null;
+  deactivatedAt?: string | null;
 }
 
 export interface TenantModulesResponse {

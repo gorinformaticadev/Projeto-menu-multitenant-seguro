@@ -393,22 +393,16 @@ class ModuleRegistry {
       // Limpa estado anterior
       this.moduleActivationStatus.clear();
       
-      // Define todos os módulos disponíveis como inativos inicialmente
-      const allAvailableModules = response.modules.map(m => m.name);
-      allAvailableModules.forEach(moduleId => {
-        this.moduleActivationStatus.set(moduleId, false);
-      });
-      
-      // Ativa apenas os módulos que estão ativos no backend
-      response.activeModules.forEach(moduleName => {
-        this.moduleActivationStatus.set(moduleName, true);
-        console.log(`✅ Módulo ${moduleName} carregado como ativo do backend`);
+      // Define status dos módulos baseado na resposta do backend
+      response.modules.forEach(module => {
+        this.moduleActivationStatus.set(module.name, module.isActive);
+        console.log(`${module.isActive ? '✅' : '❌'} Módulo ${module.name} carregado como ${module.isActive ? 'ativo' : 'inativo'} do backend`);
       });
       
       this.isInitialized = true;
       this.lastInitialization = Date.now();
       console.log('🔄 Module Registry sincronizado com backend');
-      console.log('📋 Módulos disponíveis:', allAvailableModules);
+      console.log('📋 Módulos disponíveis:', response.modules.map(m => m.name));
       console.log('✅ Módulos ativos:', response.activeModules);
       
     } catch (error) {

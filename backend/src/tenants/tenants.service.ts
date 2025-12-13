@@ -311,26 +311,51 @@ export class TenantsService {
     // Verifica se o tenant existe
     await this.findOne(tenantId);
 
-    const tenantModules = await this.prisma.tenantModule.findMany({
-      where: {
-        tenantId,
-        isActive: true,
-      },
-      include: {
-        module: true,
-      },
+    // Buscar todos os módulos disponíveis no sistema
+    const allModules = await this.prisma.module.findMany({
+      where: { isActive: true },
     });
 
-    return {
-      activeModules: tenantModules.map(tm => tm.moduleName),
-      modules: tenantModules.map(tm => ({
-        name: tm.module.name,
-        displayName: tm.module.displayName,
-        description: tm.module.description,
-        version: tm.module.version,
-        config: tm.config ? JSON.parse(tm.config) : (tm.module.config ? JSON.parse(tm.module.config) : null),
+    // Buscar relações do tenant com os módulos (ativas e inativas)
+    const tenantModules = await this.prisma.tenantModule.findMany({
+      where: { tenantId },
+      include: { module: true },
+    });
+
+    // Criar mapa de status dos módulos do tenant
+    const tenantModuleStatus = new Map();
+    tenantModules.forEach(tm => {
+      tenantModuleStatus.set(tm.moduleName, {
+        isActive: tm.isActive,
+        config: tm.config,
         activatedAt: tm.activatedAt,
-      })),
+        deactivatedAt: tm.deactivatedAt,
+      });
+    });
+
+    // Montar lista completa de módulos com status
+    const modules = allModules.map(module => {
+      const tenantStatus = tenantModuleStatus.get(module.name);
+      const isActive = tenantStatus ? tenantStatus.isActive : false;
+      
+      return {
+        name: module.name,
+        displayName: module.displayName,
+        description: module.description,
+        version: module.version,
+        isActive: isActive,
+        config: tenantStatus?.config ? JSON.parse(tenantStatus.config) : (module.config ? JSON.parse(module.config) : null),
+        activatedAt: tenantStatus?.activatedAt || null,
+        deactivatedAt: tenantStatus?.deactivatedAt || null,
+      };
+    });
+
+    // Lista apenas dos módulos ativos (para compatibilidade)
+    const activeModules = modules.filter(m => m.isActive).map(m => m.name);
+
+    return {
+      activeModules,
+      modules,
     };
   }
 

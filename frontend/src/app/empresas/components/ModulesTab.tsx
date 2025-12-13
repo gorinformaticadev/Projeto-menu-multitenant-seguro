@@ -59,7 +59,9 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
           displayName: 'Module Exemplo',
           description: 'Módulo de exemplo para demonstração do sistema modular',
           version: '1.0.0',
-          isActive: false
+          isActive: false,
+          activatedAt: null,
+          deactivatedAt: null
         }
       ]);
     } finally {
@@ -145,6 +147,16 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
                       <span className="text-xs bg-muted px-2 py-1 rounded font-mono">
                         v{module.version}
                       </span>
+                      {module.isActive && module.activatedAt && (
+                        <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                          Ativo desde {new Date(module.activatedAt).toLocaleDateString()}
+                        </span>
+                      )}
+                      {!module.isActive && module.deactivatedAt && (
+                        <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
+                          Desativado em {new Date(module.deactivatedAt).toLocaleDateString()}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center justify-between sm:justify-end gap-2">
