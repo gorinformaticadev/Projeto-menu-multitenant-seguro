@@ -10,6 +10,7 @@ import {
   Building2, 
   Settings, 
   Download,
+  Package,
   ChevronRight,
   Menu,
   X
@@ -27,10 +28,31 @@ export default function ConfiguracoesLayout({
 
   const menuItems = [
     {
+      name: "Visão Geral",
+      href: "/configuracoes",
+      icon: Settings,
+      description: "Configurações gerais do sistema",
+      show: true,
+    },
+    {
       name: "Segurança",
       href: "/configuracoes/seguranca",
       icon: Shield,
       description: "Políticas de segurança e autenticação",
+      show: user?.role === "SUPER_ADMIN",
+    },
+    {
+      name: "Identidade da Plataforma",
+      href: "/configuracoes/identidade",
+      icon: Building2,
+      description: "Informações básicas da plataforma",
+      show: user?.role === "SUPER_ADMIN",
+    },
+    {
+      name: "Gerenciamento de Módulos",
+      href: "/configuracoes/sistema/modulos",
+      icon: Package,
+      description: "Instalar e gerenciar módulos",
       show: user?.role === "SUPER_ADMIN",
     },
     {
@@ -41,18 +63,11 @@ export default function ConfiguracoesLayout({
       show: user?.role === "SUPER_ADMIN",
     },
     {
-      name: "Empresa",
+      name: "Configurações da Empresa",
       href: "/configuracoes/empresa",
       icon: Building2,
       description: "Informações da empresa",
       show: user?.role === "ADMIN",
-    },
-    {
-      name: "Geral",
-      href: "/configuracoes",
-      icon: Settings,
-      description: "Configurações gerais do sistema",
-      show: user?.role === "ADMIN" && pathname === "/configuracoes",
     },
   ];
 

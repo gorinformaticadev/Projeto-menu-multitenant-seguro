@@ -2,10 +2,10 @@
 
 import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { Package } from "lucide-react";
-import { ModuleManagement } from "./components/ModuleManagement";
+import { Building2 } from "lucide-react";
+import PlatformConfigSection from "@/components/PlatformConfigSection";
 
-export default function ModulosPage() {
+export default function IdentidadePage() {
   const { user } = useAuth();
 
   return (
@@ -13,15 +13,15 @@ export default function ModulosPage() {
       <div className="p-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold flex items-center gap-3">
-            <Package className="h-8 w-8" />
-            Gerenciamento de Módulos
+            <Building2 className="h-8 w-8" />
+            Identidade da Plataforma
           </h1>
           <p className="text-muted-foreground mt-2">
-            Instalar, remover e gerenciar módulos do sistema globalmente
+            Configure as informações básicas da plataforma que serão exibidas no sistema
           </p>
         </div>
 
-        <ModuleManagement />
+        <PlatformConfigSection />
       </div>
     </ProtectedRoute>
   );
