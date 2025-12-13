@@ -13,8 +13,9 @@ async function testModuleAPI() {
     const token = loginResponse.data.access_token;
     console.log('✅ Login realizado com sucesso');
     
-    // Buscar módulos ativos
-    const response = await axios.get('http://localhost:4000/tenants/my-tenant/modules/active', {
+    // Buscar módulos ativos usando endpoint do tenant específico
+    const tenantId = 'cbe50b22-d6fd-493e-aad9-86f820d8aa8b';
+    const response = await axios.get(`http://localhost:4000/tenants/${tenantId}/modules/active`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
