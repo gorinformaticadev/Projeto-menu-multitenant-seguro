@@ -78,10 +78,10 @@ class ModuleRegistry {
   private static instance: ModuleRegistry;
   private contributions: Map<string, ModuleContribution> = new Map();
   private moduleActivationStatus: Map<string, boolean> = new Map();
+  private isInitialized: boolean = false;
 
   private constructor() {
-    // Por padrão, Module Exemplo está ativo
-    this.moduleActivationStatus.set('module-exemplo', true);
+    // Estado inicial será carregado do backend
   }
 
   static getInstance(): ModuleRegistry {
@@ -354,10 +354,103 @@ class ModuleRegistry {
   }
 
   /**
+   * Inicializa o registry carregando estado dos módulos do backend
+   */
+  async initializeFromBackend(): Promise<void> {
+    if (this.isInitialized) {
+      return;
+    }
+
+    try {
+      // Importa o serviço dinamicamente para evitar dependência circular
+      const { modulesService } = await import('@/services/modules.service');
+      
+      const response = await modulesService.getMyTenantActiveModules();
+      
+      // Limpa estado anterior
+      this.moduleActivationStatus.clear();
+      
+      // Define todos os módulos disponíveis como inativos inicialmente
+      const allAvailableModules = response.modules.map(m => m.name);
+      allAvailableModules.forEach(moduleId => {
+        this.moduleActivationStatus.set(moduleId, false);
+      });
+      
+      // Ativa apenas os módulos que estão ativos no backend
+      response.activeModules.forEach(moduleName => {
+        this.moduleActivationStatus.set(moduleName, true);
+        console.log(`✅ Módulo ${moduleName} carregado como ativo do backend`);
+      });
+      
+      this.isInitialized = true;
+      console.log('🔄 Module Registry sincronizado com backend');
+      console.log('📋 Módulos disponíveis:', allAvailableModules);
+      console.log('✅ Módulos ativos:', response.activeModules);
+      
+    } catch (error) {
+      console.error('❌ Erro ao sincronizar com backend, usando estado padrão:', error);
+      // Em caso de erro, usa estado padrão (module-exemplo ativo)
+      this.moduleActivationStatus.set('module-exemplo', true);
+      this.isInitialized = true;
+    }
+  }
+
+  /**
+   * Sincroniza ativação de módulo com o backend
+   */
+  async syncActivateModule(moduleId: string, tenantId?: string): Promise<void> {
+    try {
+      const { modulesService } = await import('@/services/modules.service');
+      
+      if (tenantId) {
+        // Para SUPER_ADMIN gerenciando outros tenants
+        await modulesService.activateModuleForTenant(tenantId, moduleId);
+      } else {
+        // Para usuário gerenciando seu próprio tenant
+        // Como não há endpoint específico para o próprio tenant, 
+        // vamos usar o endpoint do SUPER_ADMIN com o tenantId do usuário
+        throw new Error('Ativação para próprio tenant não implementada ainda');
+      }
+      
+      this.moduleActivationStatus.set(moduleId, true);
+      console.log(`✅ Módulo ${moduleId} ativado e sincronizado com backend`);
+      
+    } catch (error) {
+      console.error(`❌ Erro ao sincronizar ativação do módulo ${moduleId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Sincroniza desativação de módulo com o backend
+   */
+  async syncDeactivateModule(moduleId: string, tenantId?: string): Promise<void> {
+    try {
+      const { modulesService } = await import('@/services/modules.service');
+      
+      if (tenantId) {
+        // Para SUPER_ADMIN gerenciando outros tenants
+        await modulesService.deactivateModuleForTenant(tenantId, moduleId);
+      } else {
+        // Para usuário gerenciando seu próprio tenant
+        throw new Error('Desativação para próprio tenant não implementada ainda');
+      }
+      
+      this.moduleActivationStatus.set(moduleId, false);
+      console.log(`❌ Módulo ${moduleId} desativado e sincronizado com backend`);
+      
+    } catch (error) {
+      console.error(`❌ Erro ao sincronizar desativação do módulo ${moduleId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Debug: Lista todos os módulos registrados
    */
   debug(): void {
     console.log('📋 Módulos registrados:', Array.from(this.contributions.keys()));
+    console.log('🔄 Registry inicializado:', this.isInitialized);
     for (const [id, contribution] of this.contributions.entries()) {
       const isActive = this.isModuleActive(id);
       console.log(`  - ${id}: ${isActive ? '✅' : '❌'} ${contribution.sidebar?.length || 0} sidebar, ${contribution.dashboard?.length || 0} dashboard, ${contribution.userMenu?.length || 0} userMenu, ${contribution.notifications?.length || 0} notifications, ${contribution.taskbar?.length || 0} taskbar`);

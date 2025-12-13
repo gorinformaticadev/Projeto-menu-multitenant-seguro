@@ -5,26 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import api from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import { Package } from "lucide-react";
 import { moduleRegistry } from "@/lib/module-registry";
-
-interface ModuleConfig {
-  name: string;
-  displayName: string;
-  description: string;
-  version: string;
-}
-
-interface TenantModuleStatus {
-  moduleName: string;
-  active: boolean;
-}
+import { modulesService, TenantModule } from "@/services/modules.service";
 
 export function ModulesTab({ tenantId }: { tenantId: string }) {
   const { toast } = useToast();
-  const [modules, setModules] = useState<ModuleConfig[]>([]);
-  const [moduleStatus, setModuleStatus] = useState<Record<string, boolean>>({});
+  const { user } = useAuth();
+  const [modules, setModules] = useState<TenantModule[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,31 +24,39 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
     try {
       setLoading(true);
       
-      // Módulos disponíveis (incluindo Module Exemplo)
-      const availableModules = [
-        {
-          name: 'module-exemplo',
-          displayName: 'Module Exemplo',
-          description: 'Módulo de exemplo para demonstração do sistema modular',
-          version: '1.0.0'
-        }
-      ];
+      let response;
       
-      setModules(availableModules);
+      // Se for o próprio tenant do usuário, usa endpoint específico
+      if (user?.tenantId === tenantId) {
+        response = await modulesService.getMyTenantActiveModules();
+      } else {
+        // Se for SUPER_ADMIN gerenciando outro tenant
+        response = await modulesService.getTenantActiveModules(tenantId);
+      }
       
-      // Sincronizar status com o Module Registry
-      const statusMap: Record<string, boolean> = {};
-      availableModules.forEach(module => {
-        statusMap[module.name] = moduleRegistry.isModuleActive(module.name);
-      });
+      setModules(response.modules);
       
-      setModuleStatus(statusMap);
+      console.log('📦 Módulos carregados do backend:', response.modules);
+      console.log('✅ Módulos ativos:', response.activeModules);
+      
     } catch (error: any) {
+      console.error('❌ Erro ao carregar módulos:', error);
       toast({
         title: "Erro ao carregar módulos",
         description: error.response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
+      
+      // Em caso de erro, carrega módulos padrão
+      setModules([
+        {
+          name: 'module-exemplo',
+          displayName: 'Module Exemplo',
+          description: 'Módulo de exemplo para demonstração do sistema modular',
+          version: '1.0.0',
+          isActive: false
+        }
+      ]);
     } finally {
       setLoading(false);
     }
@@ -70,36 +67,48 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
       const newStatus = !currentStatus;
       
       if (newStatus) {
-        // Ativar módulo
-        moduleRegistry.activateModule(moduleName);
+        // Ativar módulo no backend
+        await modulesService.activateModuleForTenant(tenantId, moduleName);
+        
+        // Ativar no registry local (apenas se for o próprio tenant)
+        if (user?.tenantId === tenantId) {
+          moduleRegistry.activateModule(moduleName);
+        }
+        
         toast({
           title: "Módulo ativado",
           description: `O módulo ${moduleName} foi ativado com sucesso.`,
         });
       } else {
-        // Desativar módulo
-        moduleRegistry.deactivateModule(moduleName);
+        // Desativar módulo no backend
+        await modulesService.deactivateModuleForTenant(tenantId, moduleName);
+        
+        // Desativar no registry local (apenas se for o próprio tenant)
+        if (user?.tenantId === tenantId) {
+          moduleRegistry.deactivateModule(moduleName);
+        }
+        
         toast({
           title: "Módulo desativado",
           description: `O módulo ${moduleName} foi desativado com sucesso.`,
         });
       }
       
-      // Atualizar status local
-      setModuleStatus((prev: Record<string, boolean>) => ({
-        ...prev,
-        [moduleName]: newStatus
-      }));
+      // Atualizar lista de módulos
+      await loadModules();
       
-      // Forçar atualização da sidebar e outros componentes
-      window.dispatchEvent(new CustomEvent('moduleStatusChanged', { 
-        detail: { moduleName, active: newStatus } 
-      }));
+      // Forçar atualização da sidebar e outros componentes (apenas se for o próprio tenant)
+      if (user?.tenantId === tenantId) {
+        window.dispatchEvent(new CustomEvent('moduleStatusChanged', { 
+          detail: { moduleName, active: newStatus } 
+        }));
+      }
       
     } catch (error: any) {
+      console.error('❌ Erro ao alterar status do módulo:', error);
       toast({
         title: "Erro ao atualizar módulo",
-        description: "Ocorreu um erro ao alterar o status do módulo",
+        description: error.response?.data?.message || "Ocorreu um erro ao alterar o status do módulo",
         variant: "destructive",
       });
     }
@@ -146,11 +155,11 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
                   </div>
                   <div className="flex items-center justify-between sm:justify-end gap-2">
                     <span className="text-xs text-muted-foreground sm:hidden">
-                      {moduleStatus[module.name] ? 'Ativo' : 'Inativo'}
+                      {module.isActive ? 'Ativo' : 'Inativo'}
                     </span>
                     <Switch
-                      checked={moduleStatus[module.name] || false}
-                      onCheckedChange={(checked) => toggleModuleStatus(module.name, moduleStatus[module.name] || false)}
+                      checked={module.isActive}
+                      onCheckedChange={(checked) => toggleModuleStatus(module.name, module.isActive)}
                     />
                   </div>
                 </div>

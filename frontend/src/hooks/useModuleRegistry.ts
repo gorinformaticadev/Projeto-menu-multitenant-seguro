@@ -20,7 +20,11 @@ export function useModuleRegistry() {
     try {
       console.log('🔄 Inicializando Module Registry...');
       
-      // Carrega todos os módulos de forma explícita e determinística
+      // 1. Inicializa o registry com dados do backend
+      const { moduleRegistry } = await import('@/lib/module-registry');
+      await moduleRegistry.initializeFromBackend();
+      
+      // 2. Carrega todos os módulos de forma explícita e determinística
       await loadAllModules();
 
       setIsInitialized(true);

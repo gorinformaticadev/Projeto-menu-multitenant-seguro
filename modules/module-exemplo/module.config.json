@@ -1,0 +1,56 @@
+{
+  "name": "module-exemplo",
+  "displayName": "Module Exemplo",
+  "description": "Módulo de exemplo para demonstração do sistema modular",
+  "version": "1.0.0",
+  "author": "Sistema Core",
+  "config": {
+    "menu": [
+      {
+        "label": "Página Principal",
+        "path": "/module-exemplo",
+        "icon": "Home",
+        "order": 1
+      },
+      {
+        "label": "Configurações",
+        "path": "/module-exemplo/settings",
+        "icon": "Settings",
+        "order": 2
+      }
+    ],
+    "userMenu": [
+      {
+        "label": "Acesso rápido – Module Exemplo",
+        "path": "/module-exemplo",
+        "icon": "Package"
+      }
+    ],
+    "dashboardWidgets": [
+      {
+        "title": "Widget do Module Exemplo",
+        "description": "Widget de exemplo funcionando corretamente",
+        "type": "info-card",
+        "icon": "Package",
+        "actionUrl": "/module-exemplo",
+        "actionLabel": "Acessar Módulo"
+      }
+    ],
+    "notifications": {
+      "events": [
+        {
+          "name": "module-exemplo-active",
+          "title": "Module Exemplo",
+          "message": "Notificação do Module Exemplo ativa."
+        }
+      ]
+    },
+    "slots": [
+      {
+        "position": "taskbar",
+        "content": "Atalho do Module Exemplo",
+        "type": "text"
+      }
+    ]
+  }
+}
