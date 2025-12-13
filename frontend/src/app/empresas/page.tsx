@@ -8,15 +8,17 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import api, { API_URL } from "@/lib/api";
 import { Plus, Building2, Mail, Phone, User, FileText, Eye, Edit, Power, Lock, UserPlus, Image as ImageIcon, Upload, X, Users, Trash2, Package } from "lucide-react";
 import { CPFCNPJInput } from "@/components/ui/cpf-cnpj-input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { TestForm } from "@/components/TestForm";
 import { ModulesTab } from "./components/ModulesTab";
-import { ModuleUploadTab } from "./components/ModuleUploadTab";
+
 
 interface Tenant {
   id: string;
@@ -35,6 +37,7 @@ interface Tenant {
 
 export default function EmpresasPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -902,7 +905,7 @@ export default function EmpresasPage() {
                 <TabsList className="grid w-full grid-cols-3 h-10">
                   <TabsTrigger value="details" className="text-xs sm:text-sm px-2">Detalhes</TabsTrigger>
                   <TabsTrigger value="modules" className="text-xs sm:text-sm px-2">Módulos</TabsTrigger>
-                  <TabsTrigger value="upload" className="text-xs sm:text-sm px-2">Upload</TabsTrigger>
+
                 </TabsList>
                 <TabsContent value="details" className="mt-4">
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -941,11 +944,32 @@ export default function EmpresasPage() {
                   </div>
                 </TabsContent>
                 <TabsContent value="modules" className="mt-4">
-                  <ModulesTab tenantId={selectedTenant.id} />
+                  <div className="space-y-4">
+                    <ModulesTab tenantId={selectedTenant.id} />
+                    
+                    {user?.role === "SUPER_ADMIN" && (
+                      <Card className="border-blue-200 bg-blue-50">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-medium text-blue-800">Gerenciamento Global de Módulos</h4>
+                              <p className="text-sm text-blue-600 mt-1">
+                                Instale, remova e gerencie módulos disponíveis para todo o sistema
+                              </p>
+                            </div>
+                            <Button asChild variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100">
+                              <Link href="/configuracoes/sistema/modulos">
+                                <Package className="h-4 w-4 mr-2" />
+                                Gerenciar Módulos
+                              </Link>
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
                 </TabsContent>
-                <TabsContent value="upload" className="mt-4">
-                  <ModuleUploadTab />
-                </TabsContent>
+
               </Tabs>
             )}
             <DialogFooter>

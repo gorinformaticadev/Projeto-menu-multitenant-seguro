@@ -3,7 +3,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Shield, Download, Building2, ArrowRight } from "lucide-react";
+import { Settings, Shield, Download, Building2, ArrowRight, Package } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -16,6 +16,14 @@ export default function ConfiguracoesPage() {
       description: "Políticas de segurança, autenticação e controle de acesso",
       icon: Shield,
       href: "/configuracoes/seguranca",
+      show: user?.role === "SUPER_ADMIN",
+      restricted: false,
+    },
+    {
+      title: "Gerenciamento de Módulos",
+      description: "Instalar, remover e gerenciar módulos do sistema",
+      icon: Package,
+      href: "/configuracoes/sistema/modulos",
       show: user?.role === "SUPER_ADMIN",
       restricted: false,
     },
