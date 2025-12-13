@@ -5,6 +5,7 @@ import { use2FAStatus } from "@/hooks/use2FAStatus";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Shield, Building2, Users, Settings, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DashboardWidgets } from "@/components/dashboard/DashboardWidgets";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -40,7 +41,11 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      {/* Widgets dinâmicos do Module Registry */}
+      <DashboardWidgets />
+
+      {/* Cards de informações básicas */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Seu Perfil</CardTitle>

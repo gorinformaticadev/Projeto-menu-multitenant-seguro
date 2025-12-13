@@ -7,11 +7,25 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu, Shield, FileText } from "lucide-react";
 import { Button } from "./ui/button";
+import { moduleRegistry } from "../../../shared/registry/module-registry";
+import { ModuleMenuItem } from "../../../shared/types/module.types";
+
+// Mapeamento de ícones para componentes Lucide
+const iconMap: Record<string, any> = {
+  LayoutDashboard,
+  Building2,
+  Settings,
+  User,
+  FileText,
+  Shield,
+  Menu,
+};
 
 export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [menuItems, setMenuItems] = useState<ModuleMenuItem[]>([]);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   // Recolhe o menu ao clicar fora dele
@@ -32,38 +46,30 @@ export function Sidebar() {
     };
   }, [isExpanded]);
 
-  const menuItems = [
-    {
-      name: "Dashboard",
-      href: "/dashboard",
-      icon: LayoutDashboard,
-      show: true,
-    },
-    {
-      name: "Empresas",
-      href: "/empresas",
-      icon: Building2,
-      show: user?.role === "SUPER_ADMIN",
-    },
-    {
-      name: "Usuários",
-      href: "/usuarios",
-      icon: User,
-      show: user?.role === "SUPER_ADMIN" || user?.role === "ADMIN",
-    },
-    {
-      name: "Logs de Auditoria",
-      href: "/logs",
-      icon: FileText,
-      show: user?.role === "SUPER_ADMIN",
-    },
-    {
-      name: "Configurações",
-      href: "/configuracoes",
-      icon: Settings,
-      show: user?.role === "SUPER_ADMIN" || user?.role === "ADMIN",
-    },
-  ];
+  // Carrega itens do menu do Module Registry
+  useEffect(() => {
+    loadMenuItems();
+  }, [user]);
+
+  const loadMenuItems = () => {
+    try {
+      // Core agrega itens de todos os módulos registrados
+      const items = moduleRegistry.getSidebarItems(user?.role, user?.permissions);
+      setMenuItems(items);
+    } catch (error) {
+      console.error('Erro ao carregar itens do menu:', error);
+      // Em caso de erro, carrega menu básico
+      setMenuItems([
+        {
+          id: 'dashboard',
+          name: 'Dashboard',
+          href: '/dashboard',
+          icon: 'LayoutDashboard',
+          order: 1
+        }
+      ]);
+    }
+  };
 
   return (
     <div 
@@ -93,14 +99,12 @@ export function Sidebar() {
       <div className="flex-1 p-4">
         <nav className="space-y-1">
           {menuItems.map((item) => {
-            if (!item.show) return null;
-
             const isActive = pathname === item.href;
-            const Icon = item.icon;
+            const Icon = iconMap[item.icon] || Menu; // Fallback para ícone padrão
 
             return (
               <Link
-                key={item.href}
+                key={item.id}
                 href={item.href}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",

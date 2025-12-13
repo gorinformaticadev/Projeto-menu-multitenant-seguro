@@ -4,32 +4,34 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { useModuleMenus } from "@/hooks/useModuleMenus";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu, Shield, FileText, HelpCircle, Icon } from "lucide-react";
+import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu, Shield, FileText, HelpCircle } from "lucide-react";
 import { Button } from "./ui/button";
+import { moduleRegistry, ModuleMenuItem } from "@/lib/module-registry";
 
-// Função para mapear nomes de ícones para componentes
-const getIconComponent = (iconName: string): React.ComponentType<any> => {
-  const iconMap: Record<string, React.ComponentType<any>> = {
-    'LayoutDashboard': LayoutDashboard,
-    'Building2': Building2,
-    'Settings': Settings,
-    'User': User,
-    'Shield': Shield,
-    'FileText': FileText,
-    'HelpCircle': HelpCircle,
-    'default': HelpCircle, // Ícone padrão
-  };
-
-  return iconMap[iconName] || iconMap['default'];
+// Mapeamento de ícones para componentes Lucide
+const iconMap: Record<string, any> = {
+  LayoutDashboard,
+  Building2,
+  Settings,
+  User,
+  FileText,
+  Shield,
+  HelpCircle,
+  Menu,
 };
 
 export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const { menus: moduleMenus, loading: moduleMenusLoading } = useModuleMenus();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [menuItems, setMenuItems] = useState<ModuleMenuItem[]>([]);
+  const [groupedItems, setGroupedItems] = useState<{
+    ungrouped: ModuleMenuItem[];
+    groups: Record<string, ModuleMenuItem[]>;
+    groupOrder: string[];
+  }>({ ungrouped: [], groups: {}, groupOrder: [] });
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   // Recolhe o menu ao clicar fora dele
@@ -50,49 +52,55 @@ export function Sidebar() {
     };
   }, [isExpanded]);
 
-  // Admin Group items
-  const adminItems = [
-    {
-      name: "Empresas",
-      href: "/empresas",
-      icon: Building2,
-      show: user?.role === "SUPER_ADMIN",
-    },
-    {
-      name: "Usuários",
-      href: "/usuarios",
-      icon: User,
-      show: user?.role === "SUPER_ADMIN" || user?.role === "ADMIN",
-    },
-    {
-      name: "Logs de Auditoria",
-      href: "/logs",
-      icon: FileText,
-      show: user?.role === "SUPER_ADMIN",
-    },
-    {
-      name: "Configurações",
-      href: "/configuracoes",
+  // Carrega itens do menu do Module Registry
+  useEffect(() => {
+    loadMenuItems();
+  }, [user]);
+
+  const loadMenuItems = () => {
+    try {
+      // Core agrega itens de todos os módulos registrados
+      const items = moduleRegistry.getSidebarItems(user?.role);
+      const grouped = moduleRegistry.getGroupedSidebarItems(user?.role);
+      
+      setMenuItems(items);
+      setGroupedItems(grouped);
+      
+      console.log('📋 Itens do menu carregados:', items.length);
+      console.log('📋 Grupos encontrados:', Object.keys(grouped.groups));
+    } catch (error) {
+      console.error('❌ Erro ao carregar itens do menu:', error);
+      // Em caso de erro, carrega menu básico
+      const basicItems = [
+        {
+          id: 'dashboard',
+          name: 'Dashboard',
+          href: '/dashboard',
+          icon: 'LayoutDashboard',
+          order: 1
+        }
+      ];
+      setMenuItems(basicItems);
+      setGroupedItems({ ungrouped: basicItems, groups: {}, groupOrder: [] });
+    }
+  };
+
+  // Função para alternar expansão de grupos
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [groupId]: !prev[groupId]
+    }));
+  };
+
+  // Configuração dos grupos
+  const groupConfig = {
+    administration: {
+      name: 'Administração',
       icon: Settings,
-      show: user?.role === "SUPER_ADMIN" || user?.role === "ADMIN",
-    },
-  ];
-
-  // Adicionar menus dos módulos
-  const moduleMenuItems = moduleMenus.map(menu => ({
-    name: (menu as any).label || menu.name,
-    href: menu.path,
-    // Mapear ícones dinamicamente
-    icon: getIconComponent(menu.icon),
-    show: true,
-    position: (menu as any).position || 99, // Posição padrão se não definida
-  }));
-
-  // Ordenar módulos por posição
-  const sortedModules = [...moduleMenuItems].sort((a, b) => a.position - b.position);
-
-  // Estado para controlar expansão do grupo Administração
-  const [isAdminOpen, setIsAdminOpen] = useState(false);
+      order: 2 // Logo após Dashboard (ordem 1)
+    }
+  };
 
   return (
     <div
@@ -121,103 +129,152 @@ export function Sidebar() {
       {/* Navigation */}
       <div className="flex-1 p-4 overflow-y-auto">
         <nav className="space-y-1">
-          {/* 1. Dashboard (Always Top) */}
-          <Link
-            href="/dashboard"
-            className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-              pathname === "/dashboard"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-              !isExpanded && "justify-center"
-            )}
-            title={!isExpanded ? "Dashboard" : undefined}
-          >
-            <LayoutDashboard className="h-5 w-5 flex-shrink-0" />
-            {isExpanded && <span>Dashboard</span>}
-          </Link>
+          {/* Renderiza todos os itens em ordem global: Dashboard -> Administração -> Módulos */}
+          {(() => {
+            const allRenderItems: JSX.Element[] = [];
+            
+            // Cria uma lista de todos os itens e grupos com suas ordens
+            const renderQueue: Array<{
+              type: 'item' | 'group';
+              order: number;
+              data: any;
+            }> = [];
 
-          {/* 2. Modules (Sorted) */}
-          {sortedModules.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                  pathname === item.href
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                  !isExpanded && "justify-center"
-                )}
-                title={!isExpanded ? item.name : undefined}
-              >
-                <Icon className="h-5 w-5 flex-shrink-0" />
-                {isExpanded && <span>{item.name}</span>}
-              </Link>
-            );
-          })}
+            // Adiciona itens não agrupados à fila
+            groupedItems.ungrouped.forEach((item) => {
+              renderQueue.push({
+                type: 'item',
+                order: item.order || 999,
+                data: item
+              });
+            });
 
-          {/* 3. Administration Group */}
-          <div className="pt-4">
-            {isExpanded ? (
-              <div className="space-y-1">
-                <Button
-                  variant="ghost"
-                  onClick={() => setIsAdminOpen(!isAdminOpen)}
-                  className="w-full justify-between px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
-                >
-                  <div className="flex items-center gap-3">
-                    <Settings className="h-5 w-5" />
-                    <span>Administração</span>
-                  </div>
-                  <ChevronLeft className={cn("h-4 w-4 transition-transform", isAdminOpen ? "-rotate-90" : "rotate-180")} />
-                </Button>
+            // Adiciona grupos à fila
+            groupedItems.groupOrder.forEach((groupId) => {
+              const items = groupedItems.groups[groupId];
+              const config = groupConfig[groupId as keyof typeof groupConfig];
+              
+              if (config && items && items.length > 0) {
+                // Usa a ordem do primeiro item do grupo
+                const groupOrder = items[0]?.order || 999;
+                renderQueue.push({
+                  type: 'group',
+                  order: groupOrder,
+                  data: { groupId, items, config }
+                });
+              }
+            });
 
-                {isAdminOpen && (
-                  <div className="pl-4 space-y-1 border-l ml-4 border-border">
-                    {adminItems.map(item => {
-                      if (!item.show) return null;
-                      const Icon = item.icon;
-                      const isActive = pathname === item.href;
-                      return (
-                        <Link
-                          key={item.name}
-                          href={item.href}
+            // Ordena tudo pela ordem global
+            renderQueue.sort((a, b) => a.order - b.order);
+
+            // Renderiza na ordem correta
+            renderQueue.forEach((queueItem) => {
+              if (queueItem.type === 'item') {
+                const item = queueItem.data;
+                const isActive = pathname === item.href;
+                const Icon = iconMap[item.icon] || Menu;
+
+                allRenderItems.push(
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                      !isExpanded && "justify-center"
+                    )}
+                    title={!isExpanded ? item.name : undefined}
+                  >
+                    <Icon className="h-5 w-5 flex-shrink-0" />
+                    {isExpanded && <span>{item.name}</span>}
+                  </Link>
+                );
+              } else if (queueItem.type === 'group') {
+                const { groupId, items, config } = queueItem.data;
+                const isGroupExpanded = expandedGroups[groupId];
+                const hasActiveItem = items.some((item: any) => pathname === item.href);
+
+                allRenderItems.push(
+                  <div key={groupId} className="pt-2">
+                    {isExpanded ? (
+                      <div className="space-y-1">
+                        {/* Cabeçalho do grupo */}
+                        <Button
+                          variant="ghost"
+                          onClick={() => toggleGroup(groupId)}
                           className={cn(
-                            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                            isActive
-                              ? "text-primary"
-                              : "text-muted-foreground hover:text-foreground"
+                            "w-full justify-between px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
+                            hasActiveItem && "text-primary"
                           )}
                         >
-                          <Icon className="h-4 w-4" />
-                          <span>{item.name}</span>
-                        </Link>
-                      )
-                    })}
+                          <div className="flex items-center gap-3">
+                            <config.icon className="h-5 w-5" />
+                            <span>{config.name}</span>
+                          </div>
+                          <ChevronLeft 
+                            className={cn(
+                              "h-4 w-4 transition-transform", 
+                              isGroupExpanded ? "-rotate-90" : "rotate-180"
+                            )} 
+                          />
+                        </Button>
+
+                        {/* Itens do grupo */}
+                        {isGroupExpanded && (
+                          <div className="pl-4 space-y-1 border-l ml-4 border-border">
+                            {items.map((item: any) => {
+                              const isActive = pathname === item.href;
+                              const Icon = iconMap[item.icon] || Menu;
+                              
+                              return (
+                                <Link
+                                  key={item.id}
+                                  href={item.href}
+                                  className={cn(
+                                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                                    isActive
+                                      ? "text-primary bg-accent"
+                                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                                  )}
+                                >
+                                  <Icon className="h-4 w-4" />
+                                  <span>{item.name}</span>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      // Versão colapsada do grupo
+                      <>
+                        <div className="my-2 border-t" />
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            setIsExpanded(true);
+                            setExpandedGroups(prev => ({ ...prev, [groupId]: true }));
+                          }}
+                          className={cn(
+                            "w-full justify-center px-2 py-2 hover:bg-accent hover:text-accent-foreground",
+                            hasActiveItem && "text-primary bg-accent"
+                          )}
+                          title={config.name}
+                        >
+                          <config.icon className="h-5 w-5" />
+                        </Button>
+                      </>
+                    )}
                   </div>
-                )}
-              </div>
-            ) : (
-              // Collapsed View for Administration
-              <>
-                <div className="my-2 border-t" />
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setIsExpanded(true);
-                    setIsAdminOpen(true);
-                  }}
-                  className="w-full justify-center px-2 py-2 hover:bg-accent hover:text-accent-foreground"
-                  title="Administração"
-                >
-                  <Settings className="h-5 w-5" />
-                </Button>
-              </>
-            )}
-          </div>
+                );
+              }
+            });
+
+            return allRenderItems;
+          })()}
         </nav>
       </div>
 
