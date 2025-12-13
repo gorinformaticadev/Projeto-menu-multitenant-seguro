@@ -47,7 +47,9 @@ export function useModuleFeatures() {
         async function loadFeatures() {
             try {
                 const response = await api.get('/tenants/my-tenant/modules/active');
+                console.log('🔍 [DEBUG] Module Features Response:', response.data);
                 const modules = response.data.modules || [];
+                console.log('🔍 [DEBUG] Modules List:', modules);
 
                 const userMenuItems: ModuleUserMenuItem[] = [];
                 const notificationConfigs: ModuleNotificationConfig[] = [];

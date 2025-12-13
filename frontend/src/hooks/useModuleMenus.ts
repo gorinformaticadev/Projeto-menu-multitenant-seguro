@@ -43,6 +43,7 @@ export function useModuleMenus() {
         // Obter módulos ativos do tenant atual
         console.log('Buscando módulos ativos do tenant...');
         const response = await api.get('/tenants/my-tenant/modules/active');
+        console.log('🔍 [DEBUG] Module Menus Response:', response.data);
         console.log('Resposta do endpoint /tenants/my-tenant/modules/active:', response.data);
 
         const modulesData = response.data.modules || [];

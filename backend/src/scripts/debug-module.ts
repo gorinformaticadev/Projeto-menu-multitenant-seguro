@@ -4,22 +4,24 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-    console.log('--- DEBUGGING MODULE "ajuda" ---');
+    console.log('--- DEBUGGING MODULE "modeloModel" ---');
 
     // 1. Ver se o módulo existe
     const module = await prisma.module.findUnique({
-        where: { name: 'ajuda' }
+        where: { name: 'modeloModel' }
     });
 
     if (!module) {
-        console.error('❌ Módulo "ajuda" NÃO encontrado no banco de dados!');
+        console.error('❌ Módulo "modeloModel" NÃO encontrado no banco de dados!');
+        const allModules = await prisma.module.findMany();
+        console.log('Módulos encontrados:', allModules.map(m => m.name));
         return;
     }
-    console.log('✅ Módulo "ajuda" encontrado:', {
+    console.log('✅ Módulo "modeloModel" encontrado:', {
         name: module.name,
         isActive: module.isActive,
         configLength: module.config?.length,
-        config: module.config
+        config: module.config ? JSON.parse(module.config) : null
     });
 
     // 2. Ver tenants
@@ -28,14 +30,14 @@ async function main() {
 
     // 3. Ver links TenantModule
     const links = await prisma.tenantModule.findMany({
-        where: { moduleName: 'ajuda' },
+        where: { moduleName: 'modeloModel' },
         include: { tenant: { select: { nomeFantasia: true } } }
     });
 
-    console.log(`ℹ️ Total de vínculos TenantModule para "ajuda": ${links.length}`);
+    console.log(`ℹ️ Total de vínculos TenantModule para "modeloModel": ${links.length}`);
 
     if (links.length === 0) {
-        console.error('❌ NENHUM tenant tem o módulo "ajuda" vinculado, mesmo com o AutoLoader!');
+        console.error('❌ NENHUM tenant tem o módulo "modeloModel" vinculado, mesmo com o AutoLoader!');
     } else {
         links.forEach(l => {
             console.log(`   - Link com tenant "${l.tenant.nomeFantasia}" (ID: ${l.tenantId}): Ativo=${l.isActive}`);
@@ -52,7 +54,7 @@ async function main() {
         await prisma.tenantModule.create({
             data: {
                 tenantId: t.id,
-                moduleName: 'ajuda',
+                moduleName: 'modeloModel',
                 isActive: true
             }
         });

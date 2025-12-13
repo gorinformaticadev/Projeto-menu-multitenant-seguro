@@ -18,7 +18,7 @@ import { multerConfig } from '../common/config/multer.config';
 @Controller('tenants')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class TenantsController {
-  constructor(private tenantsService: TenantsService) {}
+  constructor(private tenantsService: TenantsService) { }
 
   // Assinaturas de arquivos válidas (magic numbers)
   private readonly FILE_SIGNATURES = {
@@ -34,19 +34,19 @@ export class TenantsController {
   private async validateFileSignature(file: Express.Multer.File): Promise<void> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     try {
       // Ler os primeiros bytes do arquivo
       const filePath = path.join(process.cwd(), 'uploads', 'logos', file.filename);
       const buffer = fs.readFileSync(filePath);
-      
+
       const signature = this.FILE_SIGNATURES[file.mimetype];
       if (!signature) {
         // Remover arquivo inválido
         fs.unlinkSync(filePath);
         throw new BadRequestException('Tipo de arquivo não suportado');
       }
-      
+
       // Verificar assinatura
       for (let i = 0; i < signature.length; i++) {
         if (buffer[i] !== signature[i]) {
@@ -55,13 +55,13 @@ export class TenantsController {
           throw new BadRequestException('Arquivo corrompido ou tipo inválido');
         }
       }
-      
+
       // Verificação adicional: tamanho mínimo para ser uma imagem válida
       if (buffer.length < 100) {
         fs.unlinkSync(filePath);
         throw new BadRequestException('Arquivo muito pequeno para ser uma imagem válida');
       }
-      
+
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
@@ -117,10 +117,10 @@ export class TenantsController {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo foi enviado');
     }
-    
+
     // Validação adicional de segurança: verificar assinatura do arquivo
     await this.validateFileSignature(file);
-    
+
     return this.tenantsService.updateLogo(req.user.tenantId, file.filename);
   }
 
@@ -152,10 +152,10 @@ export class TenantsController {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo foi enviado');
     }
-    
+
     // Validação adicional de segurança: verificar assinatura do arquivo
     await this.validateFileSignature(file);
-    
+
     return this.tenantsService.updateLogo(id, file.filename);
   }
 
@@ -189,17 +189,25 @@ export class TenantsController {
 
   // Endpoints para gerenciamento de módulos dos tenants
 
+  @Get('my-tenant/modules/active')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  async getMyTenantActiveModules(@Req() req: ExpressRequest & { user: any }) {
+    if (!req.user.tenantId) {
+      if (req.user.role === Role.SUPER_ADMIN) {
+        // Se for SUPER_ADMIN sem tenant, retornamos uma lista vazia ou erro.
+        // Para facilitar o desenvolvimento, vamos lançar um aviso claro.
+        throw new BadRequestException('SUPER_ADMIN não possui contexto de tenant. Use um usuário ADMIN de tenant.');
+      }
+      throw new BadRequestException('Usuário sem vinculo com tenant.');
+    }
+    return this.tenantsService.getTenantActiveModules(req.user.tenantId);
+  }
+
   @Get(':id/modules/active')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
   async getTenantActiveModules(@Param('id') id: string) {
     return this.tenantsService.getTenantActiveModules(id);
-  }
-
-  @Get('my-tenant/modules/active')
-  @Roles(Role.ADMIN)
-  async getMyTenantActiveModules(@Req() req: ExpressRequest & { user: any }) {
-    return this.tenantsService.getTenantActiveModules(req.user.tenantId);
   }
 
   @Post(':id/modules/:moduleName/activate')
