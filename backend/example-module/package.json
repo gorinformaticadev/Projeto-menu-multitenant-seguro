@@ -1,0 +1,16 @@
+{
+  "name": "example-module",
+  "version": "1.0.0",
+  "description": "Módulo de exemplo para o sistema multitenant",
+  "main": "index.js",
+  "dependencies": {
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["module", "example", "multitenant"],
+  "author": "Sistema Multitenant",
+  "license": "MIT"
+}

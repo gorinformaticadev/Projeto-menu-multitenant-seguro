@@ -16,6 +16,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useRouter } from "next/navigation";
 import { TestForm } from "@/components/TestForm";
 import { ModulesTab } from "./components/ModulesTab";
+import { ModuleUploadTab } from "./components/ModuleUploadTab";
 
 interface Tenant {
   id: string;
@@ -898,9 +899,10 @@ export default function EmpresasPage() {
             </DialogHeader>
             {selectedTenant && (
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 h-10">
+                <TabsList className="grid w-full grid-cols-3 h-10">
                   <TabsTrigger value="details" className="text-xs sm:text-sm px-2">Detalhes</TabsTrigger>
                   <TabsTrigger value="modules" className="text-xs sm:text-sm px-2">Módulos</TabsTrigger>
+                  <TabsTrigger value="upload" className="text-xs sm:text-sm px-2">Upload</TabsTrigger>
                 </TabsList>
                 <TabsContent value="details" className="mt-4">
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -940,6 +942,9 @@ export default function EmpresasPage() {
                 </TabsContent>
                 <TabsContent value="modules" className="mt-4">
                   <ModulesTab tenantId={selectedTenant.id} />
+                </TabsContent>
+                <TabsContent value="upload" className="mt-4">
+                  <ModuleUploadTab />
                 </TabsContent>
               </Tabs>
             )}

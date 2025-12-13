@@ -9,8 +9,13 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ModulesService } from './modules.service';
+import { ModuleInstallerService } from './module-installer.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -19,7 +24,10 @@ import { Role } from '@prisma/client';
 @Controller('modules')
 @UseGuards(JwtAuthGuard)
 export class ModulesController {
-  constructor(private readonly modulesService: ModulesService) {}
+  constructor(
+    private readonly modulesService: ModulesService,
+    private readonly moduleInstallerService: ModuleInstallerService
+  ) {}
 
   // GET /modules - Listar todos os módulos disponíveis
   @Get()
@@ -75,5 +83,51 @@ export class ModulesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param('name') name: string) {
     await this.modulesService.remove(name);
+  }
+
+  // POST /modules/upload - Upload de módulo via ZIP (apenas SUPER_ADMIN)
+  @Post('upload')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  @UseInterceptors(FileInterceptor('module', {
+    limits: {
+      fileSize: 50 * 1024 * 1024, // 50MB
+    },
+    fileFilter: (req, file, callback) => {
+      if (!file.originalname.match(/\.(zip)$/)) {
+        return callback(new BadRequestException('Apenas arquivos ZIP são permitidos'), false);
+      }
+      callback(null, true);
+    },
+  }))
+  async uploadModule(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Nenhum arquivo foi enviado');
+    }
+    return this.moduleInstallerService.uploadModule(file);
+  }
+
+  // DELETE /modules/:name/uninstall - Remover módulo instalado (apenas SUPER_ADMIN)
+  @Delete(':name/uninstall')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  async uninstallModule(@Param('name') name: string) {
+    return this.moduleInstallerService.removeModule(name);
+  }
+
+  // GET /modules/installed - Listar módulos instalados (apenas SUPER_ADMIN)
+  @Get('installed')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  async getInstalledModules() {
+    return this.moduleInstallerService.listInstalledModules();
+  }
+
+  // GET /modules/:name/info - Informações detalhadas do módulo (apenas SUPER_ADMIN)
+  @Get(':name/info')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  async getModuleInfo(@Param('name') name: string) {
+    return this.moduleInstallerService.getModuleInfo(name);
   }
 }

@@ -1,0 +1,22 @@
+{
+  "name": "example_module",
+  "displayName": "Módulo de Exemplo",
+  "description": "Um módulo de exemplo para demonstrar o sistema de upload",
+  "version": "1.0.0",
+  "author": "Sistema Multitenant",
+  "dependencies": [],
+  "config": {
+    "features": [
+      "example_feature_1",
+      "example_feature_2"
+    ],
+    "permissions": [
+      "view_example",
+      "manage_example"
+    ],
+    "settings": {
+      "enableNotifications": true,
+      "maxItems": 100
+    }
+  }
+}

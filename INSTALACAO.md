@@ -176,6 +176,9 @@ sudo service postgresql status
 netstat -ano | findstr :3001
 taskkill /PID <PID> /F
 
+Ou todos os processos
+taskkill /F /IM node.exe
+
 # Linux/Mac
 lsof -ti:3001 | xargs kill -9
 ```
