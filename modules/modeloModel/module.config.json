@@ -21,24 +21,12 @@
         }
     ],
     "menu": {
+        "enabled": true,
         "position": 100,
         "icon": "Box",
         "label": "Modelo",
         "name": "Modelo",
-        "children": [
-            {
-                "label": "Geral",
-                "name": "Geral",
-                "path": "/modelo",
-                "icon": "Box"
-            },
-            {
-                "label": "Configurações",
-                "name": "Configurações",
-                "path": "/modelo/config",
-                "icon": "Settings"
-            }
-        ]
+        "path": "/modelo"
     },
     "userMenu": [
         {

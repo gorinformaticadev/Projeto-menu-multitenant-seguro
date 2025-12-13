@@ -40,7 +40,7 @@ const nextConfig = {
   },
   // Enable experimental features for better security
   experimental: {
-    // optimizeCss: true, // Disabled due to missing critters dependency
+    optimizeCss: true, // Optimize CSS
   },
   // Configure build output
   output: 'standalone', // For containerized deployments

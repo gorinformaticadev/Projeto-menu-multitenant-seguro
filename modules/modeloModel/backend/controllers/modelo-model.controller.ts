@@ -1,16 +1,16 @@
 import { Controller, Get, UseGuards, Request } from '@nestjs/common';
-import { JwtAuthGuard } from '../../../../../core/backend/src/common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../../../../core/backend/src/common/guards/roles.guard';
-import { Roles } from '../../../../../core/backend/src/common/decorators/roles.decorator';
+import { JwtAuthGuard } from '../../../../../core/backend/src/auth/jwt-auth.guard';
+import { PermissionsGuard } from '../../../../../core/backend/src/auth/permissions.guard';
+import { Permissions } from '../../../../../core/backend/src/auth/permissions.decorator';
 import { ModeloModelService } from '../services/modelo-model.service';
 
 @Controller('modelo')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ModeloModelController {
   constructor(private readonly modeloService: ModeloModelService) { }
 
   @Get()
-  @Roles('USER', 'ADMIN', 'SUPER_ADMIN')
+  @Permissions('modelo.view')
   getModeloInfo(@Request() req) {
     this.modeloService.logAccess(req.user.id);
     return {

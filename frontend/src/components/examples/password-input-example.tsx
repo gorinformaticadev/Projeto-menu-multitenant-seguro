@@ -210,19 +210,19 @@ export function PasswordInputExample() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span>Senha 1:</span>
-                  <Badge variant={isValid1 ? "default" : "secondary"} className="text-xs">
+                  <Badge variant={isValid1 ? "default" : "secondary"} size="sm">
                     {isValid1 ? "✓ Válida" : "✗ Inválida"}
                   </Badge>
                 </div>
                 <div className="flex justify-between">
                   <span>Senha 2:</span>
-                  <Badge variant={isValid2 ? "default" : "secondary"} className="text-xs">
+                  <Badge variant={isValid2 ? "default" : "secondary"} size="sm">
                     {isValid2 ? "✓ Válida" : "✗ Inválida"}
                   </Badge>
                 </div>
                 <div className="flex justify-between">
                   <span>Senha 3:</span>
-                  <Badge variant={isValid3 && confirmation.matches ? "default" : "secondary"} className="text-xs">
+                  <Badge variant={isValid3 && confirmation.matches ? "default" : "secondary"} size="sm">
                     {isValid3 && confirmation.matches ? "✓ Válida" : "✗ Inválida"}
                   </Badge>
                 </div>

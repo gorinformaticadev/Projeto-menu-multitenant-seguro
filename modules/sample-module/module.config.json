@@ -1,0 +1,31 @@
+{
+  "name": "sample-module",
+  "version": "1.0.0",
+  "description": "Módulo de exemplo para demonstração",
+  "author": "Equipe de Desenvolvimento",
+  "dependencies": [],
+  "routes": [
+    {
+      "path": "/sample",
+      "component": "SamplePage",
+      "name": "Página de Exemplo"
+    }
+  ],
+  "permissions": [
+    {
+      "name": "sample.view",
+      "description": "Visualizar módulo de exemplo"
+    },
+    {
+      "name": "sample.manage",
+      "description": "Gerenciar módulo de exemplo"
+    }
+  ],
+  "menu": [
+    {
+      "name": "Exemplo",
+      "icon": "Box",
+      "path": "/sample"
+    }
+  ]
+}
