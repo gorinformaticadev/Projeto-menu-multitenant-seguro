@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useModulesManager } from './useModulesManager';
 
 export interface ModuleUserMenuItem {
@@ -38,11 +38,10 @@ export interface ModuleFeatures {
 }
 
 export function useModuleFeatures() {
-    const [features, setFeatures] = useState<ModuleFeatures>({ userMenu: [], notifications: [], dashboardWidgets: [], slots: [] });
     const { modules, loading } = useModulesManager();
 
-    useEffect(() => {
-        // Processa features dos módulos sempre que a lista de módulos muda
+    // Usa useMemo para evitar recalcular features desnecessariamente
+    const features = useMemo<ModuleFeatures>(() => {
         const userMenuItems: ModuleUserMenuItem[] = [];
         const notificationConfigs: ModuleNotificationConfig[] = [];
         const dashboardWidgets: ModuleDashboardWidget[] = [];
@@ -66,12 +65,12 @@ export function useModuleFeatures() {
             }
         });
 
-        setFeatures({
+        const result = {
             userMenu: userMenuItems,
             notifications: notificationConfigs,
             dashboardWidgets,
             slots
-        });
+        };
 
         console.log('🔍 [DEBUG] Module Features processadas:', {
             userMenu: userMenuItems.length,
@@ -79,7 +78,9 @@ export function useModuleFeatures() {
             dashboardWidgets: dashboardWidgets.length,
             slots: slots.length
         });
-    }, [modules]);
+
+        return result;
+    }, [modules]); // Só recalcula quando modules muda
 
     return { features, loading };
 }

@@ -61,7 +61,7 @@ export function useModulesManager(tenantId?: string) {
         listeners.delete(listenerRef.current);
       }
     };
-  }, [updateState]);
+  }, []); // Remove updateState da dependência para evitar loops
 
   // Notifica todos os listeners
   const notifyListeners = useCallback(() => {
@@ -72,7 +72,7 @@ export function useModulesManager(tenantId?: string) {
   const updateGlobalState = useCallback((newState: Partial<ModulesState>) => {
     globalState = { ...globalState, ...newState };
     notifyListeners();
-  }, [notifyListeners]);
+  }, []); // Remove notifyListeners da dependência para evitar loops
 
   /**
    * Carrega módulos do backend (apenas uma vez por sessão)
@@ -99,14 +99,15 @@ export function useModulesManager(tenantId?: string) {
     } finally {
       loadingPromise = null;
     }
-  }, [updateGlobalState]);
+  }, []); // Remove updateGlobalState da dependência
 
   /**
    * Executa o carregamento real
    */
   const performLoad = async (targetTenantId?: string) => {
     try {
-      updateGlobalState({ loading: true, error: null });
+      globalState = { ...globalState, loading: true, error: null };
+      notifyListeners();
 
       let response;
       if (targetTenantId) {
@@ -115,18 +116,21 @@ export function useModulesManager(tenantId?: string) {
         response = await modulesService.getMyTenantActiveModules();
       }
 
-      updateGlobalState({
+      globalState = {
+        ...globalState,
         modules: response.modules,
         loading: false,
         lastUpdated: Date.now()
-      });
+      };
+      notifyListeners();
 
       console.log('📦 Módulos carregados:', response.modules.length);
       
     } catch (error: any) {
       console.error('❌ Erro ao carregar módulos:', error);
       
-      updateGlobalState({
+      globalState = {
+        ...globalState,
         error: error.response?.data?.message || 'Erro ao carregar módulos',
         loading: false,
         // Em caso de erro, mantém módulos existentes ou usa fallback
@@ -139,7 +143,8 @@ export function useModulesManager(tenantId?: string) {
           activatedAt: null,
           deactivatedAt: null
         }]
-      });
+      };
+      notifyListeners();
     }
   };
 
@@ -179,7 +184,8 @@ export function useModulesManager(tenantId?: string) {
         : module
     );
 
-    updateGlobalState({ modules: updatedModules });
+    globalState = { ...globalState, modules: updatedModules };
+    notifyListeners();
 
     // Atualiza registry local imediatamente
     if (newStatus) {
@@ -233,7 +239,8 @@ export function useModulesManager(tenantId?: string) {
           : module
       );
 
-      updateGlobalState({ modules: confirmedModules });
+      globalState = { ...globalState, modules: confirmedModules };
+      notifyListeners();
 
       // Dispara evento para outros componentes
       window.dispatchEvent(new CustomEvent('moduleStatusChanged', { 
@@ -252,10 +259,12 @@ export function useModulesManager(tenantId?: string) {
           : module
       );
 
-      updateGlobalState({ 
+      globalState = { 
+        ...globalState,
         modules: revertedModules,
         error: error.response?.data?.message || 'Erro ao alterar status do módulo'
-      });
+      };
+      notifyListeners();
 
       // Reverte registry
       if (currentModule.isActive) {
@@ -269,7 +278,7 @@ export function useModulesManager(tenantId?: string) {
       delete toggleLocks[moduleName];
       console.log(`🔓 [TOGGLE] Lock removido para módulo: ${moduleName}`);
     }
-  }, [updateGlobalState]);
+  }, []); // Remove updateGlobalState da dependência
 
   /**
    * Verifica se um módulo está sendo processado
@@ -283,7 +292,7 @@ export function useModulesManager(tenantId?: string) {
    */
   const refresh = useCallback(async (targetTenantId?: string) => {
     await loadModules(targetTenantId, true);
-  }, [loadModules]);
+  }, []); // Remove loadModules da dependência
 
   return {
     modules: state.modules,

@@ -1,6 +1,7 @@
 import { useModuleFeatures } from "@/hooks/useModuleFeatures";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info } from "lucide-react";
+import { useMemo } from "react";
 
 interface ModuleSlotProps {
     position: string;
@@ -8,12 +9,15 @@ interface ModuleSlotProps {
 }
 
 export function ModuleSlot({ position, className }: ModuleSlotProps) {
-    const { features } = useModuleFeatures();
+    const { features, loading } = useModuleFeatures();
 
-    // Encontrar slots para esta posição
-    const slots = features.slots.filter(s => s.position === position);
+    // Usa useMemo para evitar recalcular slots desnecessariamente
+    const slots = useMemo(() => {
+        if (loading || !features.slots) return [];
+        return features.slots.filter(s => s.position === position);
+    }, [features.slots, position, loading]);
 
-    if (slots.length === 0) return null;
+    if (loading || slots.length === 0) return null;
 
     return (
         <div className={`space-y-4 ${className || ''}`}>

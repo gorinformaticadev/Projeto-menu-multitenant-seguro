@@ -85,7 +85,7 @@ export default function ConfiguracoesLayout({
 
       {/* Sidebar */}
       <div className={cn(
-        "fixed inset-y-0 left-0 z-50 w-80 bg-card border-r transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
+        "fixed inset-y-0 left-0 z-50 w-60 bg-card border-r transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
@@ -147,24 +147,11 @@ export default function ConfiguracoesLayout({
                 );
               })}
             </nav>
-
-            {/* Info Box */}
-            <div className="mt-8 p-4 bg-muted rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Shield className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Acesso Restrito</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {user?.role === "SUPER_ADMIN" 
-                  ? "Você tem acesso completo a todas as configurações do sistema."
-                  : "Algumas configurações são restritas a SUPER_ADMIN."
-                }
-              </p>
-            </div>
           </div>
 
           {/* Footer */}
-          <div className="p-6 border-t">
+          <div className="p-6 border-t space-y-4">
+            {/* User Info */}
             <div className="text-xs text-muted-foreground">
               <div className="flex items-center justify-between">
                 <span>Usuário: {user?.name}</span>
@@ -172,6 +159,20 @@ export default function ConfiguracoesLayout({
                   {user?.role}
                 </span>
               </div>
+            </div>
+
+            {/* Access Info */}
+            <div className="p-3 bg-muted rounded-lg">
+              <div className="flex items-center gap-2 mb-1">
+                <Shield className="h-3 w-3 text-muted-foreground" />
+                <span className="text-xs font-medium">Acesso Restrito</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {user?.role === "SUPER_ADMIN" 
+                  ? "Você tem acesso completo a todas as configurações do sistema."
+                  : "Algumas configurações são restritas a SUPER_ADMIN."
+                }
+              </p>
             </div>
           </div>
         </div>

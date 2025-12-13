@@ -111,25 +111,35 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
 
       result.isValid = result.minLength && result.hasUppercase && result.hasLowercase && result.hasNumbers && result.hasSpecial;
       setValidation(result);
+    }, [value, config]); // Remove onChange da dependência para evitar loops
 
-      // Chama o callback onChange se fornecido
-      if (onChange) {
-        onChange(value, result.isValid);
+    // Usa ref para onChange para evitar dependências
+    const onChangeRef = React.useRef(onChange);
+    onChangeRef.current = onChange;
+
+    // Chama onChange quando validation muda
+    React.useEffect(() => {
+      if (onChangeRef.current) {
+        onChangeRef.current(value, validation.isValid);
       }
-    }, [value, config, onChange]);
+    }, [value, validation.isValid]);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
       setValue(e.target.value);
-    };
+    }, []);
 
-    const handleConfirmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Usa ref para onConfirmChange para evitar dependências
+    const onConfirmChangeRef = React.useRef(onConfirmChange);
+    onConfirmChangeRef.current = onConfirmChange;
+
+    const handleConfirmChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
       const newConfirmValue = e.target.value;
       setConfirmValue(newConfirmValue);
       
-      if (onConfirmChange) {
-        onConfirmChange(newConfirmValue, newConfirmValue === value);
+      if (onConfirmChangeRef.current) {
+        onConfirmChangeRef.current(newConfirmValue, newConfirmValue === value);
       }
-    };
+    }, [value]);
 
     const getStrengthColor = () => {
       switch (validation.strength) {
