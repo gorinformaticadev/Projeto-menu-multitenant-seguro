@@ -3,14 +3,17 @@
  * 
  * Responsável por inicializar o registry e registrar módulos
  * de forma determinística e controlada
+ * Agora integrado com o sistema centralizado de módulos
  */
 
 import { useEffect, useState } from 'react';
 import { loadAllModules } from '@/lib/module-loader';
+import { useModulesManager } from './useModulesManager';
 
 export function useModuleRegistry() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { loadModules } = useModulesManager();
 
   useEffect(() => {
     initializeRegistry();
@@ -20,11 +23,14 @@ export function useModuleRegistry() {
     try {
       console.log('🔄 Inicializando Module Registry...');
       
-      // 1. Inicializa o registry com dados do backend
+      // 1. Carrega módulos do backend usando o sistema centralizado
+      await loadModules();
+      
+      // 2. Inicializa o registry com dados do backend
       const { moduleRegistry } = await import('@/lib/module-registry');
       await moduleRegistry.initializeFromBackend();
       
-      // 2. Carrega todos os módulos de forma explícita e determinística
+      // 3. Carrega todos os módulos de forma explícita e determinística
       await loadAllModules();
 
       setIsInitialized(true);

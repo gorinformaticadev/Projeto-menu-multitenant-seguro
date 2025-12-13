@@ -1,110 +1,55 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { Package } from "lucide-react";
-import { moduleRegistry } from "@/lib/module-registry";
-import { modulesService, TenantModule } from "@/services/modules.service";
+import { Package, Loader2 } from "lucide-react";
+import { useModulesManager } from "@/hooks/useModulesManager";
 
 export function ModulesTab({ tenantId }: { tenantId: string }) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [modules, setModules] = useState<TenantModule[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { modules, loading, error, loadModules, toggleModule, isToggling } = useModulesManager();
 
   useEffect(() => {
-    // Debounce para evitar múltiplas chamadas
-    const timeoutId = setTimeout(() => {
-      loadModules();
-    }, 100);
+    // Carrega módulos ao montar o componente
+    const targetTenantId = user?.tenantId === tenantId ? undefined : tenantId;
+    loadModules(targetTenantId);
+  }, [tenantId, user?.tenantId, loadModules]);
 
-    return () => clearTimeout(timeoutId);
-  }, [tenantId]);
-
-  const loadModules = async () => {
-    try {
-      setLoading(true);
-      
-      let response;
-      
-      // Se for o próprio tenant do usuário, usa endpoint específico
-      if (user?.tenantId === tenantId) {
-        response = await modulesService.getMyTenantActiveModules();
-      } else {
-        // Se for SUPER_ADMIN gerenciando outro tenant
-        response = await modulesService.getTenantActiveModules(tenantId);
-      }
-      
-      setModules(response.modules);
-      
-      console.log('📦 Módulos carregados do backend:', response.modules);
-      console.log('✅ Módulos ativos:', response.activeModules);
-      
-    } catch (error: any) {
-      console.error('❌ Erro ao carregar módulos:', error);
+  // Mostra toast de erro se houver
+  useEffect(() => {
+    if (error) {
       toast({
         title: "Erro ao carregar módulos",
-        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        description: error,
         variant: "destructive",
       });
-      
-      // Em caso de erro, carrega módulos padrão
-      setModules([
-        {
-          name: 'module-exemplo',
-          displayName: 'Module Exemplo',
-          description: 'Módulo de exemplo para demonstração do sistema modular',
-          version: '1.0.0',
-          isActive: false,
-          activatedAt: null,
-          deactivatedAt: null
-        }
-      ]);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [error, toast]);
 
-  const toggleModuleStatus = async (moduleName: string, currentStatus: boolean) => {
+  const handleToggleModule = async (moduleName: string, currentStatus: boolean) => {
+    // Verifica se já está processando este módulo
+    if (isToggling(moduleName)) {
+      return;
+    }
+
     try {
-      // Usar o novo método toggle que alterna automaticamente o status
-      const result = await modulesService.toggleModuleForTenant(tenantId, moduleName);
+      const targetTenantId = user?.tenantId === tenantId ? undefined : tenantId;
+      await toggleModule(moduleName, targetTenantId);
       
-      const newStatus = result.isActive;
-      
-      // Atualizar registry local (apenas se for o próprio tenant)
-      if (user?.tenantId === tenantId) {
-        if (newStatus) {
-          moduleRegistry.activateModule(moduleName);
-        } else {
-          moduleRegistry.deactivateModule(moduleName);
-        }
-      }
-      
+      const newStatus = !currentStatus;
       toast({
         title: newStatus ? "Módulo ativado" : "Módulo desativado",
         description: `O módulo ${moduleName} foi ${newStatus ? 'ativado' : 'desativado'} com sucesso.`,
       });
       
-      // Atualizar lista de módulos
-      await loadModules();
-      
-      // Forçar atualização da sidebar e outros componentes (apenas se for o próprio tenant)
-      if (user?.tenantId === tenantId) {
-        window.dispatchEvent(new CustomEvent('moduleStatusChanged', { 
-          detail: { moduleName, active: newStatus } 
-        }));
-      }
-      
     } catch (error: any) {
-      console.error('❌ Erro ao alterar status do módulo:', error);
       toast({
         title: "Erro ao atualizar módulo",
-        description: error.response?.data?.message || "Ocorreu um erro ao alterar o status do módulo",
+        description: error.message || "Ocorreu um erro ao alterar o status do módulo",
         variant: "destructive",
       });
     }
@@ -163,10 +108,16 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
                     <span className="text-xs text-muted-foreground sm:hidden">
                       {module.isActive ? 'Ativo' : 'Inativo'}
                     </span>
-                    <Switch
-                      checked={module.isActive}
-                      onCheckedChange={(checked) => toggleModuleStatus(module.name, module.isActive)}
-                    />
+                    <div className="flex items-center gap-2">
+                      {isToggling(module.name) && (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      )}
+                      <Switch
+                        checked={module.isActive}
+                        disabled={isToggling(module.name)}
+                        onCheckedChange={() => handleToggleModule(module.name, module.isActive)}
+                      />
+                    </div>
                   </div>
                 </div>
               ))}

@@ -226,6 +226,19 @@ export class TenantsController {
     return this.tenantsService.deactivateModuleForTenant(id, moduleName);
   }
 
+  @Post('my-tenant/modules/:moduleName/toggle')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  @SkipThrottle()
+  async toggleMyTenantModule(@Param('moduleName') moduleName: string, @Req() req: ExpressRequest & { user: any }) {
+    if (!req.user.tenantId) {
+      if (req.user.role === Role.SUPER_ADMIN) {
+        throw new BadRequestException('SUPER_ADMIN não possui contexto de tenant. Use um usuário ADMIN de tenant.');
+      }
+      throw new BadRequestException('Usuário sem vinculo com tenant.');
+    }
+    return this.tenantsService.toggleModuleForTenant(req.user.tenantId, moduleName);
+  }
+
   @Post(':id/modules/:moduleName/toggle')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()

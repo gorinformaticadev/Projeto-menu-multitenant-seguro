@@ -353,39 +353,21 @@ class ModuleRegistry {
     return contribution.enabled && this.isModuleActive(contribution.id);
   }
 
-  // Cache para evitar múltiplas chamadas
-  private initializationPromise: Promise<void> | null = null;
-  private lastInitialization: number = 0;
-  private readonly CACHE_DURATION = 30000; // 30 segundos
-
   /**
    * Inicializa o registry carregando estado dos módulos do backend
+   * Agora usa o sistema centralizado de módulos
    */
   async initializeFromBackend(): Promise<void> {
-    // Se já está inicializado e o cache ainda é válido, retorna
-    const now = Date.now();
-    if (this.isInitialized && (now - this.lastInitialization) < this.CACHE_DURATION) {
+    if (this.isInitialized) {
       return;
     }
 
-    // Se já há uma inicialização em andamento, aguarda ela
-    if (this.initializationPromise) {
-      return this.initializationPromise;
-    }
-
-    // Cria nova promise de inicialização
-    this.initializationPromise = this.performInitialization();
-    
     try {
-      await this.initializationPromise;
-    } finally {
-      this.initializationPromise = null;
-    }
-  }
-
-  private async performInitialization(): Promise<void> {
-    try {
-      // Importa o serviço dinamicamente para evitar dependência circular
+      // Usa o hook centralizado para carregar módulos
+      const { useModulesManager } = await import('@/hooks/useModulesManager');
+      
+      // Como não podemos usar hooks aqui, vamos importar o serviço diretamente
+      // mas de forma mais controlada
       const { modulesService } = await import('@/services/modules.service');
       
       const response = await modulesService.getMyTenantActiveModules();
@@ -400,7 +382,6 @@ class ModuleRegistry {
       });
       
       this.isInitialized = true;
-      this.lastInitialization = Date.now();
       console.log('🔄 Module Registry sincronizado com backend');
       console.log('📋 Módulos disponíveis:', response.modules.map(m => m.name));
       console.log('✅ Módulos ativos:', response.activeModules);
@@ -410,7 +391,6 @@ class ModuleRegistry {
       // Em caso de erro, usa estado padrão (module-exemplo ativo)
       this.moduleActivationStatus.set('module-exemplo', true);
       this.isInitialized = true;
-      this.lastInitialization = Date.now();
     }
   }
 

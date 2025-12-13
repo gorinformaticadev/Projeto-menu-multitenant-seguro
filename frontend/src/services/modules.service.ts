@@ -78,6 +78,21 @@ class ModulesService {
   }
 
   /**
+   * Alterna o status de um módulo para o próprio tenant (ADMIN)
+   */
+  async toggleMyTenantModule(moduleName: string): Promise<any> {
+    try {
+      // Precisamos criar este endpoint no backend
+      const response = await api.post(`/tenants/my-tenant/modules/${moduleName}/toggle`);
+      console.log(`🔄 Status do módulo ${moduleName} alternado para meu tenant`);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Erro ao alternar status do módulo ${moduleName} para meu tenant:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Alterna o status de um módulo para um tenant específico (SUPER_ADMIN apenas)
    */
   async toggleModuleForTenant(tenantId: string, moduleName: string): Promise<any> {
