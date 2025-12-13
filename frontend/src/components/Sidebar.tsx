@@ -85,7 +85,7 @@ export function Sidebar() {
     // Mapear ícones dinamicamente
     icon: getIconComponent(menu.icon),
     show: true,
-    position: (menu as any).position || 99, // Posição padrão se não definida
+    position: (menu as any).position || 99,
   }));
 
   // Ordenar módulos por posição
@@ -137,30 +137,8 @@ export function Sidebar() {
             {isExpanded && <span>Dashboard</span>}
           </Link>
 
-          {/* 2. Modules (Sorted) */}
-          {sortedModules.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                  pathname === item.href
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                  !isExpanded && "justify-center"
-                )}
-                title={!isExpanded ? item.name : undefined}
-              >
-                <Icon className="h-5 w-5 flex-shrink-0" />
-                {isExpanded && <span>{item.name}</span>}
-              </Link>
-            );
-          })}
-
-          {/* 3. Administration Group */}
-          <div className="pt-4">
+          {/* 2. Administration Group (Now Second) */}
+          <div className="py-2">
             {isExpanded ? (
               <div className="space-y-1">
                 <Button
@@ -177,6 +155,7 @@ export function Sidebar() {
 
                 {isAdminOpen && (
                   <div className="pl-4 space-y-1 border-l ml-4 border-border">
+                    {/* Itens Fixos de Admin */}
                     {adminItems.map(item => {
                       if (!item.show) return null;
                       const Icon = item.icon;
@@ -202,22 +181,44 @@ export function Sidebar() {
               </div>
             ) : (
               // Collapsed View for Administration
-              <>
-                <div className="my-2 border-t" />
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setIsExpanded(true);
-                    setIsAdminOpen(true);
-                  }}
-                  className="w-full justify-center px-2 py-2 hover:bg-accent hover:text-accent-foreground"
-                  title="Administração"
-                >
-                  <Settings className="h-5 w-5" />
-                </Button>
-              </>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setIsExpanded(true);
+                  setIsAdminOpen(true);
+                }}
+                className="w-full justify-center px-2 py-2 hover:bg-accent hover:text-accent-foreground"
+                title="Administração"
+              >
+                <Settings className="h-5 w-5" />
+              </Button>
             )}
           </div>
+
+          <div className="my-2 border-t" />
+
+          {/* 3. Modules (Sorted, below Admin) */}
+          {sortedModules.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                  pathname === item.href
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                  !isExpanded && "justify-center"
+                )}
+                title={!isExpanded ? item.name : undefined}
+              >
+                <Icon className="h-5 w-5 flex-shrink-0" />
+                {isExpanded && <span>{item.name}</span>}
+              </Link>
+            );
+          })}
+
         </nav>
       </div>
 
