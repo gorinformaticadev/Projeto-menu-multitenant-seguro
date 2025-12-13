@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch, Delete, UseI
 import { Request as ExpressRequest } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SkipThrottle } from '@nestjs/throttler';
+import { DuplicateRequestInterceptor } from '../common/interceptors/duplicate-request.interceptor';
 import { TenantsService } from './tenants.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
@@ -215,6 +216,7 @@ export class TenantsController {
   @Post(':id/modules/:moduleName/activate')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
+  @SkipThrottle()
   async activateModuleForTenant(@Param('id') id: string, @Param('moduleName') moduleName: string) {
     return this.tenantsService.activateModuleForTenant(id, moduleName);
   }
@@ -222,6 +224,7 @@ export class TenantsController {
   @Post(':id/modules/:moduleName/deactivate')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
+  @SkipThrottle()
   async deactivateModuleForTenant(@Param('id') id: string, @Param('moduleName') moduleName: string) {
     return this.tenantsService.deactivateModuleForTenant(id, moduleName);
   }
@@ -229,6 +232,7 @@ export class TenantsController {
   @Post('my-tenant/modules/:moduleName/toggle')
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   @SkipThrottle()
+  @UseInterceptors(DuplicateRequestInterceptor)
   async toggleMyTenantModule(@Param('moduleName') moduleName: string, @Req() req: ExpressRequest & { user: any }) {
     if (!req.user.tenantId) {
       if (req.user.role === Role.SUPER_ADMIN) {
@@ -243,6 +247,7 @@ export class TenantsController {
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
   @SkipThrottle()
+  @UseInterceptors(DuplicateRequestInterceptor)
   async toggleModuleForTenant(@Param('id') id: string, @Param('moduleName') moduleName: string) {
     return this.tenantsService.toggleModuleForTenant(id, moduleName);
   }
@@ -250,6 +255,7 @@ export class TenantsController {
   @Put(':id/modules/:moduleName/config')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
+  @SkipThrottle()
   async configureTenantModule(
     @Param('id') id: string,
     @Param('moduleName') moduleName: string,

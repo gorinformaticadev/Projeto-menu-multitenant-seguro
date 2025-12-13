@@ -35,6 +35,10 @@ let globalState: ModulesState = {
 let loadingPromise: Promise<void> | null = null;
 const toggleLocks: ToggleState = {};
 
+// Cache de requisições para evitar duplicatas
+const requestCache = new Map<string, Promise<any>>();
+const REQUEST_CACHE_TTL = 5000; // 5 segundos
+
 // Listeners para notificar mudanças
 const listeners = new Set<() => void>();
 
@@ -143,9 +147,11 @@ export function useModulesManager(tenantId?: string) {
    * Toggle de módulo com controle de concorrência e optimistic update
    */
   const toggleModule = useCallback(async (moduleName: string, targetTenantId?: string) => {
+    console.log(`🔄 [TOGGLE] Iniciando toggle para módulo: ${moduleName}, tenant: ${targetTenantId || 'my-tenant'}`);
+    
     // Verifica se já existe uma operação em andamento para este módulo
     if (toggleLocks[moduleName]) {
-      console.warn(`⚠️ Toggle já em andamento para módulo ${moduleName}`);
+      console.warn(`⚠️ [TOGGLE] Toggle já em andamento para módulo ${moduleName} - IGNORANDO`);
       return;
     }
 
@@ -158,6 +164,7 @@ export function useModulesManager(tenantId?: string) {
 
     // Ativa lock
     toggleLocks[moduleName] = true;
+    console.log(`🔒 [TOGGLE] Lock ativado para módulo: ${moduleName}`);
 
     // Optimistic update - atualiza UI imediatamente
     const newStatus = !currentModule.isActive;
@@ -182,13 +189,37 @@ export function useModulesManager(tenantId?: string) {
     }
 
     try {
-      // Executa toggle no backend
-      let result;
-      if (targetTenantId) {
-        result = await modulesService.toggleModuleForTenant(targetTenantId, moduleName);
-      } else {
-        result = await modulesService.toggleMyTenantModule(moduleName);
+      // Cria chave única para a requisição
+      const requestKey = `toggle-${targetTenantId || 'my-tenant'}-${moduleName}`;
+      
+      // Verifica se já existe uma requisição idêntica em cache
+      if (requestCache.has(requestKey)) {
+        console.log(`📋 [TOGGLE] Usando requisição em cache para: ${moduleName}`);
+        const result = await requestCache.get(requestKey);
+        return result;
       }
+
+      // Executa toggle no backend
+      console.log(`📡 [TOGGLE] Enviando requisição para backend: ${moduleName}`);
+      let requestPromise;
+      
+      if (targetTenantId) {
+        console.log(`📡 [TOGGLE] Usando toggleModuleForTenant para tenant: ${targetTenantId}`);
+        requestPromise = modulesService.toggleModuleForTenant(targetTenantId, moduleName);
+      } else {
+        console.log(`📡 [TOGGLE] Usando toggleMyTenantModule`);
+        requestPromise = modulesService.toggleMyTenantModule(moduleName);
+      }
+
+      // Adiciona ao cache
+      requestCache.set(requestKey, requestPromise);
+      
+      // Remove do cache após TTL
+      setTimeout(() => {
+        requestCache.delete(requestKey);
+      }, REQUEST_CACHE_TTL);
+
+      const result = await requestPromise;
 
       // Confirma o resultado do backend (pode ser diferente do optimistic)
       const confirmedModules = globalState.modules.map(module => 
@@ -236,6 +267,7 @@ export function useModulesManager(tenantId?: string) {
     } finally {
       // Remove lock
       delete toggleLocks[moduleName];
+      console.log(`🔓 [TOGGLE] Lock removido para módulo: ${moduleName}`);
     }
   }, [updateGlobalState]);
 

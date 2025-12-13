@@ -81,13 +81,15 @@ class ModulesService {
    * Alterna o status de um módulo para o próprio tenant (ADMIN)
    */
   async toggleMyTenantModule(moduleName: string): Promise<any> {
+    const timestamp = new Date().toISOString();
+    console.log(`📡 [SERVICE] ${timestamp} - Iniciando toggleMyTenantModule para: ${moduleName}`);
+    
     try {
-      // Precisamos criar este endpoint no backend
       const response = await api.post(`/tenants/my-tenant/modules/${moduleName}/toggle`);
-      console.log(`🔄 Status do módulo ${moduleName} alternado para meu tenant`);
+      console.log(`✅ [SERVICE] ${timestamp} - Toggle bem-sucedido para ${moduleName}:`, response.data);
       return response.data;
     } catch (error) {
-      console.error(`❌ Erro ao alternar status do módulo ${moduleName} para meu tenant:`, error);
+      console.error(`❌ [SERVICE] ${timestamp} - Erro no toggle de ${moduleName}:`, error);
       throw error;
     }
   }

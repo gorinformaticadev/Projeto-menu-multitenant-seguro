@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
@@ -12,6 +12,10 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
   const { toast } = useToast();
   const { user } = useAuth();
   const { modules, loading, error, loadModules, toggleModule, isToggling } = useModulesManager();
+  
+  // Debounce para evitar cliques múltiplos
+  const lastClickTime = useRef<{ [key: string]: number }>({});
+  const DEBOUNCE_DELAY = 1000; // 1 segundo
 
   useEffect(() => {
     // Carrega módulos ao montar o componente
@@ -30,11 +34,26 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
     }
   }, [error, toast]);
 
-  const handleToggleModule = async (moduleName: string, currentStatus: boolean) => {
-    // Verifica se já está processando este módulo
-    if (isToggling(moduleName)) {
+  const handleToggleModule = useCallback(async (moduleName: string, currentStatus: boolean) => {
+    const now = Date.now();
+    const lastClick = lastClickTime.current[moduleName] || 0;
+    
+    console.log(`🖱️ [MODULES_TAB] Clique no toggle: ${moduleName}, status atual: ${currentStatus}, tempo desde último clique: ${now - lastClick}ms`);
+    
+    // Debounce - ignora cliques muito rápidos
+    if (now - lastClick < DEBOUNCE_DELAY) {
+      console.warn(`⚠️ [MODULES_TAB] Clique muito rápido em ${moduleName} - IGNORANDO (debounce)`);
       return;
     }
+    
+    // Verifica se já está processando este módulo
+    if (isToggling(moduleName)) {
+      console.warn(`⚠️ [MODULES_TAB] Módulo ${moduleName} já está sendo processado - IGNORANDO clique`);
+      return;
+    }
+
+    // Atualiza timestamp do último clique
+    lastClickTime.current[moduleName] = now;
 
     try {
       const targetTenantId = user?.tenantId === tenantId ? undefined : tenantId;
@@ -53,7 +72,7 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
         variant: "destructive",
       });
     }
-  };
+  }, [user?.tenantId, tenantId, toggleModule, isToggling, toast]);
 
   if (loading) {
     return (
@@ -115,7 +134,12 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
                       <Switch
                         checked={module.isActive}
                         disabled={isToggling(module.name)}
-                        onCheckedChange={() => handleToggleModule(module.name, module.isActive)}
+                        onCheckedChange={(checked) => {
+                          console.log(`🔄 [SWITCH] onCheckedChange disparado: ${module.name}, checked: ${checked}, disabled: ${isToggling(module.name)}`);
+                          if (!isToggling(module.name)) {
+                            handleToggleModule(module.name, module.isActive);
+                          }
+                        }}
                       />
                     </div>
                   </div>
