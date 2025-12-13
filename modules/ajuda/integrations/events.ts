@@ -1,8 +1,9 @@
 export const events = {
-  triggers: [
-    // Eventos que este módulo pode disparar
-  ],
+  triggers: [],
   listeners: [
-    // Eventos que este módulo pode ouvir
+    {
+      event: 'user.created',
+      action: 'sendWelcomeNotification',
+    },
   ],
 };

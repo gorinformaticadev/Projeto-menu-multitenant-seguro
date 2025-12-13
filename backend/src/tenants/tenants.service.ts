@@ -9,7 +9,7 @@ import { join } from 'path';
 
 @Injectable()
 export class TenantsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async findAll() {
     return this.prisma.tenant.findMany({
@@ -88,6 +88,23 @@ export class TenantsService {
           tenantId: tenant.id,
         },
       });
+
+      // Buscar todos os módulos ativos do sistema
+      const activeModules = await prisma.module.findMany({
+        where: { isActive: true },
+      });
+
+      // Vincular módulos ao novo tenant
+      if (activeModules.length > 0) {
+        await prisma.tenantModule.createMany({
+          data: activeModules.map((module) => ({
+            tenantId: tenant.id,
+            moduleName: module.name,
+            isActive: true,
+            // Não duplicamos a config aqui, pois getTenantActiveModules faz o fallback
+          })),
+        });
+      }
 
       return tenant;
     });
@@ -311,7 +328,7 @@ export class TenantsService {
         displayName: tm.module.displayName,
         description: tm.module.description,
         version: tm.module.version,
-        config: tm.config ? JSON.parse(tm.config) : null,
+        config: tm.config ? JSON.parse(tm.config) : (tm.module.config ? JSON.parse(tm.module.config) : null),
         activatedAt: tm.activatedAt,
       })),
     };

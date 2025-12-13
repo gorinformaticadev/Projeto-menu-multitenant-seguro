@@ -9,6 +9,13 @@ import { Button } from "./ui/button";
 import { Bell, Search, User, LogOut, Info } from "lucide-react";
 import { API_URL } from "@/lib/api";
 import api from "@/lib/api";
+import { useModuleFeatures } from "@/hooks/useModuleFeatures";
+import * as LucideIcons from "lucide-react";
+
+// Helper para ícones dinâmicos
+const getIconComponent = (iconName: string): any => {
+  return (LucideIcons as any)[iconName] || LucideIcons.HelpCircle;
+};
 
 export function TopBar() {
   const { user, logout } = useAuth();
@@ -18,6 +25,8 @@ export function TopBar() {
   const [userTenantLogo, setUserTenantLogo] = useState<string | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const { features: moduleFeatures } = useModuleFeatures();
+
   const [notifications, setNotifications] = useState<{
     title: string;
     message: string;
@@ -123,18 +132,18 @@ export function TopBar() {
       message: string;
       time: string;
     }[] = [
-      // Descomente as linhas abaixo para testar com notificações
-      // {
-      //   title: "Novo usuário cadastrado",
-      //   message: "João Silva se cadastrou na plataforma",
-      //   time: "há 5 minutos"
-      // },
-      // {
-      //   title: "Backup concluído",
-      //   message: "Backup automático realizado com sucesso",
-      //   time: "há 1 hora"
-      // }
-    ];
+        // Descomente as linhas abaixo para testar com notificações
+        // {
+        //   title: "Novo usuário cadastrado",
+        //   message: "João Silva se cadastrou na plataforma",
+        //   time: "há 5 minutos"
+        // },
+        // {
+        //   title: "Backup concluído",
+        //   message: "Backup automático realizado com sucesso",
+        //   time: "há 1 hora"
+        // }
+      ];
     setNotifications(exampleNotifications);
   }, []);
 
@@ -145,8 +154,8 @@ export function TopBar() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             {masterLogo ? (
-              <img 
-                src={`${API_URL}/uploads/logos/${masterLogo}`} 
+              <img
+                src={`${API_URL}/uploads/logos/${masterLogo}`}
                 alt="Logo"
                 className="h-10 w-auto object-contain"
               />
@@ -185,9 +194,9 @@ export function TopBar() {
 
           {/* Notificações */}
           <div className="relative" ref={notificationsRef}>
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               className="relative"
               onClick={() => setShowNotifications(!showNotifications)}
             >
@@ -203,7 +212,7 @@ export function TopBar() {
                 <div className="px-4 py-2 border-b border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900">Notificações</h3>
                 </div>
-                
+
                 {notifications.length === 0 ? (
                   <div className="px-4 py-8 text-center">
                     <Bell className="h-8 w-8 text-gray-300 mx-auto mb-2" />
@@ -232,10 +241,10 @@ export function TopBar() {
                     ))}
                   </div>
                 )}
-                
+
                 {notifications.length > 0 && (
                   <div className="px-4 py-2 border-t border-gray-200">
-                    <button 
+                    <button
                       className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                       onClick={() => {
                         setNotifications([]);
@@ -260,8 +269,8 @@ export function TopBar() {
               {/* Logo do Tenant do Usuário */}
               {userTenantLogo ? (
                 <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-100">
-                  <img 
-                    src={`${API_URL}/uploads/logos/${userTenantLogo}`} 
+                  <img
+                    src={`${API_URL}/uploads/logos/${userTenantLogo}`}
                     alt="Logo Tenant"
                     className="w-full h-full object-cover"
                     onError={(e) => {
@@ -300,8 +309,8 @@ export function TopBar() {
                     {/* Logo da Tenant no Menu */}
                     {userTenantLogo ? (
                       <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 flex-shrink-0">
-                        <img 
-                          src={`${API_URL}/uploads/logos/${userTenantLogo}`} 
+                        <img
+                          src={`${API_URL}/uploads/logos/${userTenantLogo}`}
                           alt="Logo Tenant"
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -340,7 +349,23 @@ export function TopBar() {
                   <User className="h-4 w-4" />
                   Meu Perfil
                 </a>
-                
+
+                {/* Itens do Menu do Usuário (Módulos) */}
+                {moduleFeatures.userMenu.map((item, index) => {
+                  const Icon = getIconComponent(item.icon);
+                  return (
+                    <a
+                      key={`module-menu-${index}`}
+                      href={item.path}
+                      onClick={() => setShowUserMenu(false)}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </a>
+                  );
+                })}
+
                 {/* Versão do Sistema */}
                 {user?.role === "SUPER_ADMIN" ? (
                   <a
@@ -364,7 +389,7 @@ export function TopBar() {
                     </div>
                   </div>
                 )}
-                
+
                 <div className="border-t border-gray-200 mt-2 pt-2">
                   <button
                     onClick={() => {

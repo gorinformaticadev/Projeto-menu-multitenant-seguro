@@ -1,11 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../../../core/backend/src/prisma/prisma.service';
 
 @Injectable()
 export class AjudaService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(AjudaService.name);
+
+  constructor(private prisma: PrismaService) { }
 
   getSobreInfo() {
+    this.logger.log('Recuperando informações sobre o sistema');
     return {
       titulo: "Sobre o Sistema",
       descricao: "Este é um sistema multitenant seguro com isolamento de dados e controle de acesso baseado em roles (RBAC).",

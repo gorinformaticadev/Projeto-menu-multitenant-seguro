@@ -55,22 +55,64 @@ export class AutoLoaderService {
   private async processModuleDirectory(moduleName: string) {
     try {
       const modulePath = path.join(this.modulesPath, moduleName);
-      
-      // Verificar se existe o arquivo module.json
-      const moduleJsonPath = path.join(modulePath, 'module.json');
+
+      // Verificar se existe o arquivo module.config.json (prioridade) ou module.json (legado)
+      let moduleJsonPath = path.join(modulePath, 'module.config.json');
+      let isLegacy = false;
+
       if (!fs.existsSync(moduleJsonPath)) {
-        this.logger.warn(`Módulo ${moduleName} não possui arquivo module.json, pulando`);
-        return;
+        moduleJsonPath = path.join(modulePath, 'module.json');
+        isLegacy = true; // Marca como legado para tratamento diferenciado se necessário
+        if (!fs.existsSync(moduleJsonPath)) {
+          this.logger.warn(`Módulo ${moduleName} não possui arquivo module.config.json ou module.json, pulando`);
+          return;
+        }
       }
 
-      // Ler e parsear o arquivo module.json
+      // Ler e parsear o arquivo
       const moduleJsonContent = fs.readFileSync(moduleJsonPath, 'utf8');
       const moduleConfig = JSON.parse(moduleJsonContent);
 
       // Validar campos obrigatórios
-      if (!moduleConfig.name || !moduleConfig.displayName || !moduleConfig.version) {
+      if (!moduleConfig.name || (!moduleConfig.displayName && !moduleConfig.name) || !moduleConfig.version) {
         this.logger.warn(`Módulo ${moduleName} possui campos obrigatórios faltando, pulando`);
         return;
+      }
+
+      // Normalizar configuração
+      // Se for module.config.json, menu/routes/permissions estão na raiz, mas o DB espera em 'config'
+      // O frontend espera 'menu' como array
+      let finalConfig = moduleConfig.config || {};
+
+      // Helper para garantir array
+      const ensureArray = (item: any) => Array.isArray(item) ? item : (item ? [item] : []);
+
+      if (moduleConfig.menu) {
+        // Se menu existe na raiz (novo formato objeto ou array), move para config e garante array
+        finalConfig.menu = ensureArray(moduleConfig.menu);
+      } else if (finalConfig.menu) {
+        // Se já estava em config (legado), garante array
+        finalConfig.menu = ensureArray(finalConfig.menu);
+      }
+
+      if (moduleConfig.routes) {
+        finalConfig.routes = moduleConfig.routes;
+      }
+
+      if (moduleConfig.permissions) {
+        finalConfig.permissions = moduleConfig.permissions;
+      }
+
+      if (moduleConfig.notifications) {
+        finalConfig.notifications = moduleConfig.notifications;
+      }
+
+      if (moduleConfig.userMenu) {
+        finalConfig.userMenu = moduleConfig.userMenu;
+      }
+
+      if (moduleConfig.dashboardWidgets) {
+        finalConfig.dashboardWidgets = moduleConfig.dashboardWidgets;
       }
 
       // Verificar se o módulo já existe no banco de dados
@@ -78,24 +120,50 @@ export class AutoLoaderService {
         where: { name: moduleConfig.name }
       });
 
+      const moduleData = {
+        name: moduleConfig.name,
+        displayName: moduleConfig.displayName || moduleConfig.name,
+        description: moduleConfig.description || '',
+        version: moduleConfig.version,
+        isActive: true,
+        config: JSON.stringify(finalConfig)
+      };
+
       if (existingModule) {
-        this.logger.log(`Módulo ${moduleName} já registrado no banco de dados`);
-        return;
+        // Opcional: Atualizar módulo existente se a versão mudou ou forçar atualização
+        // Por enquanto, apenas logamos, mas poderíamos atualizar a configuração
+        this.logger.log(`Módulo ${moduleName} já registrado. Atualizando configuração...`);
+        await this.prisma.module.update({
+          where: { name: moduleConfig.name },
+          data: moduleData
+        });
+      } else {
+        // Registrar o módulo no banco de dados
+        await this.prisma.module.create({
+          data: moduleData
+        });
+        this.logger.log(`Módulo ${moduleName} registrado automaticamente com sucesso`);
       }
 
-      // Registrar o módulo no banco de dados
-      await this.prisma.module.create({
-        data: {
-          name: moduleConfig.name,
-          displayName: moduleConfig.displayName,
-          description: moduleConfig.description || '',
-          version: moduleConfig.version,
-          isActive: true,
-          config: moduleConfig.config ? JSON.stringify(moduleConfig.config) : null
-        }
-      });
+      // Atualizar/Criar vínculo com todos os tenants existentes
+      // Isso garante que o módulo apareça para todos, conforme regra de negócio
+      const allTenants = await this.prisma.tenant.findMany({ select: { id: true } });
 
-      this.logger.log(`Módulo ${moduleName} registrado automaticamente com sucesso`);
+      if (allTenants.length > 0) {
+        // Usamos createMany com skipDuplicates para ser eficiente
+        // Se já existe, não faz nada (mantém configurações personalizadas se houver)
+        // Se não existe, cria ativo por padrão
+        await this.prisma.tenantModule.createMany({
+          data: allTenants.map(tenant => ({
+            tenantId: tenant.id,
+            moduleName: moduleConfig.name,
+            isActive: true
+          })),
+          skipDuplicates: true
+        });
+        this.logger.log(`Módulo ${moduleName} vinculado a ${allTenants.length} tenants`);
+      }
+
     } catch (error) {
       this.logger.error(`Erro ao processar módulo ${moduleName}:`, error);
     }
@@ -124,7 +192,7 @@ export class AutoLoaderService {
     try {
       const modulePath = path.join(this.modulesPath, moduleName);
       const moduleJsonPath = path.join(modulePath, 'module.json');
-      
+
       if (!fs.existsSync(moduleJsonPath)) {
         return null;
       }

@@ -21,7 +21,7 @@ const getIconComponent = (iconName: string): React.ComponentType<any> => {
     'HelpCircle': HelpCircle,
     'default': HelpCircle, // Ícone padrão
   };
-  
+
   return iconMap[iconName] || iconMap['default'];
 };
 
@@ -86,7 +86,7 @@ export function Sidebar() {
 
   // Adicionar menus dos módulos
   const moduleMenuItems = moduleMenus.map(menu => ({
-    name: menu.name,
+    name: (menu as any).label || menu.name,
     href: menu.path,
     // Mapear ícones dinamicamente
     icon: getIconComponent(menu.icon),
@@ -97,7 +97,7 @@ export function Sidebar() {
   const menuItems = [...baseMenuItems, ...moduleMenuItems];
 
   return (
-    <div 
+    <div
       ref={sidebarRef}
       className={cn(
         "flex flex-col h-full bg-card border-r transition-all duration-300",
