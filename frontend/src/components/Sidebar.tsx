@@ -27,7 +27,6 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
-  const [menuItems, setMenuItems] = useState<ModuleMenuItem[]>([]);
   const [groupedItems, setGroupedItems] = useState<{
     ungrouped: ModuleMenuItem[];
     groups: Record<string, ModuleMenuItem[]>;
@@ -59,16 +58,26 @@ export function Sidebar() {
     loadMenuItems();
   }, [user]);
 
+  // Escuta mudanças no status dos módulos
+  useEffect(() => {
+    const handleModuleStatusChange = () => {
+      loadMenuItems();
+    };
+
+    window.addEventListener('moduleStatusChanged', handleModuleStatusChange);
+    return () => {
+      window.removeEventListener('moduleStatusChanged', handleModuleStatusChange);
+    };
+  }, []);
+
   const loadMenuItems = () => {
     try {
       // Core agrega itens de todos os módulos registrados
-      const items = moduleRegistry.getSidebarItems(user?.role);
       const grouped = moduleRegistry.getGroupedSidebarItems(user?.role);
       
-      setMenuItems(items);
       setGroupedItems(grouped);
       
-      console.log('📋 Itens do menu carregados:', items.length);
+      console.log('📋 Itens do menu carregados:', grouped.ungrouped.length + Object.values(grouped.groups).flat().length);
       console.log('📋 Grupos encontrados:', Object.keys(grouped.groups));
     } catch (error) {
       console.error('❌ Erro ao carregar itens do menu:', error);
@@ -82,7 +91,6 @@ export function Sidebar() {
           order: 1
         }
       ];
-      setMenuItems(basicItems);
       setGroupedItems({ ungrouped: basicItems, groups: {}, groupOrder: [] });
     }
   };

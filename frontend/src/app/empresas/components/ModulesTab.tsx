@@ -47,10 +47,11 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
       
       setModules(availableModules);
       
-      // Status inicial dos módulos (por padrão, Module Exemplo está ativo)
-      const statusMap: Record<string, boolean> = {
-        'module-exemplo': true
-      };
+      // Sincronizar status com o Module Registry
+      const statusMap: Record<string, boolean> = {};
+      availableModules.forEach(module => {
+        statusMap[module.name] = moduleRegistry.isModuleActive(module.name);
+      });
       
       setModuleStatus(statusMap);
     } catch (error: any) {
@@ -66,27 +67,35 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
 
   const toggleModuleStatus = async (moduleName: string, currentStatus: boolean) => {
     try {
-      if (currentStatus) {
-        // Desativar módulo
-        moduleRegistry.deactivateModule(moduleName);
-        toast({
-          title: "Módulo desativado",
-          description: `O módulo ${moduleName} foi desativado. Recarregue a página para ver as alterações.`,
-        });
-      } else {
+      const newStatus = !currentStatus;
+      
+      if (newStatus) {
         // Ativar módulo
         moduleRegistry.activateModule(moduleName);
         toast({
           title: "Módulo ativado",
-          description: `O módulo ${moduleName} foi ativado. Recarregue a página para ver as alterações.`,
+          description: `O módulo ${moduleName} foi ativado com sucesso.`,
+        });
+      } else {
+        // Desativar módulo
+        moduleRegistry.deactivateModule(moduleName);
+        toast({
+          title: "Módulo desativado",
+          description: `O módulo ${moduleName} foi desativado com sucesso.`,
         });
       }
       
       // Atualizar status local
       setModuleStatus((prev: Record<string, boolean>) => ({
         ...prev,
-        [moduleName]: !currentStatus
+        [moduleName]: newStatus
       }));
+      
+      // Forçar atualização da sidebar e outros componentes
+      window.dispatchEvent(new CustomEvent('moduleStatusChanged', { 
+        detail: { moduleName, active: newStatus } 
+      }));
+      
     } catch (error: any) {
       toast({
         title: "Erro ao atualizar módulo",

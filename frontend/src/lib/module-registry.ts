@@ -344,6 +344,12 @@ class ModuleRegistry {
    * Verifica se uma contribuição deve ser considerada (módulo ativo)
    */
   private isContributionActive(contribution: ModuleContribution): boolean {
+    // Core sempre está ativo
+    if (contribution.id === 'core') {
+      return contribution.enabled;
+    }
+    
+    // Outros módulos dependem do status de ativação
     return contribution.enabled && this.isModuleActive(contribution.id);
   }
 

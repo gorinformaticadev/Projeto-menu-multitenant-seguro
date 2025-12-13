@@ -31,6 +31,18 @@ export function ModuleRegistryNotifications() {
     loadNotifications();
   }, [user]);
 
+  // Escuta mudanças no status dos módulos
+  useEffect(() => {
+    const handleModuleStatusChange = () => {
+      loadNotifications();
+    };
+
+    window.addEventListener('moduleStatusChanged', handleModuleStatusChange);
+    return () => {
+      window.removeEventListener('moduleStatusChanged', handleModuleStatusChange);
+    };
+  }, []);
+
   const loadNotifications = () => {
     try {
       const moduleNotifications = moduleRegistry.getNotifications(user?.role);

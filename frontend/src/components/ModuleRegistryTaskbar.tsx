@@ -23,6 +23,18 @@ export function ModuleRegistryTaskbar() {
     loadTaskbarItems();
   }, [user]);
 
+  // Escuta mudanças no status dos módulos
+  useEffect(() => {
+    const handleModuleStatusChange = () => {
+      loadTaskbarItems();
+    };
+
+    window.addEventListener('moduleStatusChanged', handleModuleStatusChange);
+    return () => {
+      window.removeEventListener('moduleStatusChanged', handleModuleStatusChange);
+    };
+  }, []);
+
   const loadTaskbarItems = () => {
     try {
       const items = moduleRegistry.getTaskbarItems(user?.role);

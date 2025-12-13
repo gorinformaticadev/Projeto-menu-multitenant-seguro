@@ -26,6 +26,18 @@ export function ModuleRegistryUserMenu({ onItemClick }: Props) {
     loadUserMenuItems();
   }, [user]);
 
+  // Escuta mudanças no status dos módulos
+  useEffect(() => {
+    const handleModuleStatusChange = () => {
+      loadUserMenuItems();
+    };
+
+    window.addEventListener('moduleStatusChanged', handleModuleStatusChange);
+    return () => {
+      window.removeEventListener('moduleStatusChanged', handleModuleStatusChange);
+    };
+  }, []);
+
   const loadUserMenuItems = () => {
     try {
       const items = moduleRegistry.getUserMenuItems(user?.role);
