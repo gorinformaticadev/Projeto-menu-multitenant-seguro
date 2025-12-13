@@ -87,33 +87,39 @@ export class AutoLoaderService {
       // Helper para garantir array
       const ensureArray = (item: any) => Array.isArray(item) ? item : (item ? [item] : []);
 
-      if (moduleConfig.menu) {
-        // Se menu existe na raiz (novo formato objeto ou array), move para config e garante array
-        finalConfig.menu = ensureArray(moduleConfig.menu);
-      } else if (finalConfig.menu) {
-        // Se já estava em config (legado), garante array
-        finalConfig.menu = ensureArray(finalConfig.menu);
-      }
+      // Lista de propriedades "especiais" que devem ser movidas para 'config' se existirem na raiz
+      // Adicione aqui qualquer nova propriedade que os módulos possam definir na raiz
+      const specialProps = ['menu', 'routes', 'permissions', 'notifications', 'userMenu', 'dashboardWidgets', 'slots'];
 
-      if (moduleConfig.routes) {
-        finalConfig.routes = moduleConfig.routes;
-      }
+      specialProps.forEach(prop => {
+        if (moduleConfig[prop]) {
+          // Tratamento especial para menu (garantir array)
+          if (prop === 'menu') {
+            // Lógica de compatibilidade: se já tinha menu em finalConfig, mantém, senão usa o da raiz
+            if (!finalConfig.menu) {
+              finalConfig.menu = ensureArray(moduleConfig[prop]);
+            } else {
+              finalConfig.menu = ensureArray(finalConfig.menu);
+            }
+          } else {
+            // Para outras propriedades, apenas copia se não existir em finalConfig
+            if (!finalConfig[prop]) {
+              finalConfig[prop] = moduleConfig[prop];
+            }
+          }
+        } else if (prop === 'menu' && finalConfig.menu) {
+          // Se menu está apenas em config, garante array
+          finalConfig.menu = ensureArray(finalConfig.menu);
+        }
+      });
 
-      if (moduleConfig.permissions) {
-        finalConfig.permissions = moduleConfig.permissions;
-      }
-
-      if (moduleConfig.notifications) {
-        finalConfig.notifications = moduleConfig.notifications;
-      }
-
-      if (moduleConfig.userMenu) {
-        finalConfig.userMenu = moduleConfig.userMenu;
-      }
-
-      if (moduleConfig.dashboardWidgets) {
-        finalConfig.dashboardWidgets = moduleConfig.dashboardWidgets;
-      }
+      // Fusão Genérica: Copiar quaisquer outras propriedades da raiz que não sejam metadados padrão
+      const metadataProps = ['name', 'displayName', 'description', 'version', 'author', 'dependencies', 'config'];
+      Object.keys(moduleConfig).forEach(key => {
+        if (!metadataProps.includes(key) && !specialProps.includes(key) && !finalConfig[key]) {
+          finalConfig[key] = moduleConfig[key];
+        }
+      });
 
       // Verificar se o módulo já existe no banco de dados
       const existingModule = await this.prisma.module.findUnique({

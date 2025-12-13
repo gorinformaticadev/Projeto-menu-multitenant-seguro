@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Shield, Building2, Users, Settings, AlertTriangle } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ModuleSlot } from "@/components/ModuleSlot";
 
 // Helper para ícones dinâmicos
 const getIconComponent = (iconName: string): any => {
@@ -20,6 +21,9 @@ export default function DashboardPage() {
 
   return (
     <div className="p-8">
+      {/* Slot Injetado no Topo */}
+      <ModuleSlot position="dashboard_top" className="mb-6" />
+
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground">

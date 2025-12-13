@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
 import { Plus, User, Mail, Shield, Edit, Trash2, Building2, Lock, Unlock, AlertTriangle } from "lucide-react";
 import { PasswordInput } from "@/components/ui/password-input";
+import { ModuleSlot } from "@/components/ModuleSlot";
 
 interface UserData {
   id: string;
@@ -123,7 +124,7 @@ export default function UsuariosPage() {
 
   async function loadUsers() {
     if (!selectedTenantId) return;
-    
+
     setLoadingUsers(true);
     try {
       const response = await api.get(`/users/tenant/${selectedTenantId}`);
@@ -141,7 +142,7 @@ export default function UsuariosPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    
+
     if (!selectedTenantId) {
       toast({
         title: "Erro",
@@ -166,7 +167,7 @@ export default function UsuariosPage() {
         await api.post("/users", dataToSend);
         toast({ title: "Usuário criado com sucesso!" });
       }
-      
+
       setShowDialog(false);
       setEditingUser(null);
       setFormData({ email: "", name: "", role: "USER", password: "" });
@@ -244,6 +245,9 @@ export default function UsuariosPage() {
   return (
     <ProtectedRoute allowedRoles={["SUPER_ADMIN", "ADMIN"]}>
       <div className="p-8">
+        {/* Slot Injetado no Topo */}
+        <ModuleSlot position="users_page_top" className="mb-6" />
+
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold">Gerenciar Usuários</h1>
@@ -391,9 +395,9 @@ export default function UsuariosPage() {
                     <CardContent>
                       <div className="flex gap-2">
                         {user.isLocked && (
-                          <Button 
-                            variant="default" 
-                            size="sm" 
+                          <Button
+                            variant="default"
+                            size="sm"
                             onClick={() => handleUnlock(user.id, user.name)}
                             className="bg-green-600 hover:bg-green-700"
                           >

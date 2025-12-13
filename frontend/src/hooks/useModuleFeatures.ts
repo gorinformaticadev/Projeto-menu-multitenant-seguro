@@ -15,6 +15,12 @@ export interface ModuleNotificationConfig {
     }>;
 }
 
+export interface ModuleSlotConfig {
+    position: string;
+    content: string; // HTML, Text, or Component Name? For now string (text/html)
+    type: 'text' | 'html' | 'banner' | 'alert-info' | 'text-highlight';
+}
+
 export interface ModuleDashboardWidget {
     title: string;
     description: string;
@@ -28,10 +34,11 @@ export interface ModuleFeatures {
     userMenu: ModuleUserMenuItem[];
     notifications: ModuleNotificationConfig[];
     dashboardWidgets: ModuleDashboardWidget[];
+    slots: ModuleSlotConfig[];
 }
 
 export function useModuleFeatures() {
-    const [features, setFeatures] = useState<ModuleFeatures>({ userMenu: [], notifications: [], dashboardWidgets: [] });
+    const [features, setFeatures] = useState<ModuleFeatures>({ userMenu: [], notifications: [], dashboardWidgets: [], slots: [] });
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -45,6 +52,7 @@ export function useModuleFeatures() {
                 const userMenuItems: ModuleUserMenuItem[] = [];
                 const notificationConfigs: ModuleNotificationConfig[] = [];
                 const dashboardWidgets: ModuleDashboardWidget[] = [];
+                const slots: ModuleSlotConfig[] = [];
 
                 modules.forEach((mod: any) => {
                     if (mod.config) {
@@ -57,6 +65,9 @@ export function useModuleFeatures() {
                         if (mod.config.dashboardWidgets && Array.isArray(mod.config.dashboardWidgets)) {
                             dashboardWidgets.push(...mod.config.dashboardWidgets);
                         }
+                        if (mod.config.slots && Array.isArray(mod.config.slots)) {
+                            slots.push(...mod.config.slots);
+                        }
                     }
                 });
 
@@ -64,7 +75,8 @@ export function useModuleFeatures() {
                     setFeatures({
                         userMenu: userMenuItems,
                         notifications: notificationConfigs,
-                        dashboardWidgets
+                        dashboardWidgets,
+                        slots
                     });
                 }
             } catch (error) {
