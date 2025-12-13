@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { ModuleRouteHandler } from "./ModuleRouteHandler";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -30,7 +31,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <Sidebar />
         </aside>
         <main className="flex-1 overflow-y-auto bg-background">
-          {children}
+          <ModuleRouteHandler>
+            {children}
+          </ModuleRouteHandler>
         </main>
       </div>
     </div>

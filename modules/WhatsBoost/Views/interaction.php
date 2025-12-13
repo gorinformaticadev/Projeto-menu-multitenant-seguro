@@ -1,0 +1,1802 @@
+<link rel="stylesheet" href="<?php echo base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/css/chat.css?v=' . get_setting('app_version')); ?>">
+<link rel="stylesheet" href="<?php echo base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/css/lightbox.min.css?v=' . get_setting('app_version')); ?>">
+<?php
+
+if (empty(get_setting('pusher_key')) || empty(get_setting('pusher_secret')) || empty(get_setting('pusher_app_id')) || empty(get_setting('pusher_cluster')) || get_setting('enable_push_notification') != 1) { ?>
+    <div id="main-container" class="h-100 d-flex justify-content-center align-items-center">
+        <div>
+            <div class="d-flex justify-content-center">
+                <div class="bg-white rounded p-5">
+                    <div class="text-center mb-4">
+                        <h3 class="fw-semibold text-black">Pusher Account Setup</h3>
+                    </div>
+                    <div class="text-center">
+                        <h4 class="mb-4 text-black text-lg">It seems that your Pusher account is not configured correctly.</h4>
+                        <p class="mb-4 text-black">Please configure your Pusher account:</p>
+                        <a href="<?= get_uri('settings/integration'); ?>" class="py-2 px-4 rounded w-100 block mb-4" target="_blank">RISE CRM Settings → App Settings → Integration → Pusher</a>
+                        Get your Pusher app credentials from here:<a href="https://help.perfexcrm.com/setup-realtime-notifications-with-pusher-com/" target="_blank" class="text-primary"> Pusher</a>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    </div>
+<?php
+    exit();
+}
+?>
+<?php
+$csrfToken              = $_SESSION['csrf_token'] ?? bin2hex(random_bytes(32));
+$_SESSION['csrf_token'] = $csrfToken;
+$allowd_extension       = wbGetAllowedExtension();
+?>
+
+<div id="app" class="h-100" v-cloak>
+    <div class="container-fluid" id="main-container">
+        <div class="row">
+            <div class="col-md-12">
+                <div v-if="errorMessage" class="alert alert-danger mb-2 d-flex justify-content-between" role="alert" v-cloak>
+                    <p>{{ errorMessage }}</p>
+                    <span id="crossmark" class="hideMessage"><i data-feather='x' class='icon-16'></i></span>
+                </div>
+            </div>
+        </div>
+        <div class="my-container sm d-flex gap-2 " :class="{ 'is-show-chat-menu': isShowChatMenu }" v-cloak>
+            <div class="panel p-2 overflow-hidden rounded bg-white shadow" :class="{ 'is-show-chat-menu': isShowChatMenu }" v-cloak>
+                <div class=" d-flex flex-column">
+                    <!-- Navbar -->
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center p-2 gap-4" id="navbar">
+                            <img alt="Profile Photo" class="profile-img" id="display-pic" src="<?php echo !empty(get_setting('wb_profile_picture_url')) ? get_setting('wb_profile_picture_url') : base_url('assets/images/avatar.jpg'); ?>">
+                            <div class="dark-text" id="username" v-if="wb_selectedinteraction && typeof wb_selectedinteraction === 'object'">
+                                <?php echo app_lang('from'); ?> {{ wb_selectedinteraction.wa_no }}
+                            </div>
+
+                        </div>
+                        <div class="d-flex justify-content-end align-items-center">
+                            <button
+                                type="button"
+                                class="btn btn-link text-decoration-none text-muted hide-xl"
+                                :class="{ 'btn-close-bright': darkMode }"
+                                v-on:click="isShowChatMenu = !isShowChatMenu">
+                                <i data-feather='x' class='icon-16'></i>
+                            </button>
+                            <img class="rounded-full icon-16 cursor-pointer" v-if="!darkMode" v-on:click="toggleDarkMode" src="<?php echo base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/images/moon.png'); ?>" alt="moon">
+                            <img class="rounded-full icon-18 cursor-pointer" v-if="darkMode" v-on:click="toggleDarkMode" src="<?php echo base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/images/sun.png'); ?>" alt="sun">
+                        </div>
+                    </div>
+
+                    <div class="row my-2 gap-2" v-cloak>
+                        <div class="col-12">
+                            <select class="form-select w-100 drop-darkmode" v-model="wb_selectedWaNo" v-on:change="wb_filterInteractions" id="wb_selectedWaNo">
+                                <option v-for="(interaction, index) in wb_uniqueWaNos" :key="index" :value="interaction.wa_no" :selected="wb_selectedWaNo === 'interaction.wa_no'">{{
+                                interaction.wa_no }}</option>
+                                <option value="*"><?php echo app_lang('all_chat'); ?></option>
+                            </select>
+                        </div>
+                        <div class="d-flex align-items-center" v-cloak>
+                            <div class="d-flex justify-content-around align-items-center w-100 gap-2">
+                                <!-- Searching Button -->
+                                <button
+                                    class="btn w-100 px-2 py-2 fw-semibold sf-button"
+                                    :class="[
+                                            selectedTab === 'searching'
+                                                ? 'btn-primary shadow'
+                                                : 'btn-light ',
+                                            darkMode && selectedTab !== 'searching' ? 'dark-inactive' : ''
+                                        ]"
+                                    v-on:click="resetFilters(); isShowChatMenu = false">
+                                    <?php echo app_lang('searching'); ?>
+                                </button>
+
+                                <!-- Filters Button -->
+                                <button
+                                    class="btn w-100 px-4 py-2 fw-semibold sf-button"
+                                    :class="[
+                                            selectedTab === 'filters'
+                                                ? 'btn-primary shadow'
+                                                : 'btn-light ',
+                                            darkMode && selectedTab !== 'filters' ? 'dark-inactive' : ''
+                                        ]"
+                                    v-on:click="selectedTab = 'filters'; isShowChatMenu = false">
+                                    <?php echo app_lang('filters'); ?>
+                                </button>
+                            </div>
+                        </div>
+                        <div v-if="selectedTab === 'searching'" v-cloak>
+                            <div class="col-12">
+                                <div class="input-group w-100">
+                                    <input id="wb_searchText" v-model="wb_searchText" type="text" class="form-control drop-darkmode" name="wb_searchText" placeholder="Search">
+                                    <span class="input-group-text" id="search-icon">
+                                        <i data-feather='search' class='icon-16'></i>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Tab content for filters -->
+                        <div v-if="selectedTab === 'filters'" v-cloak>
+                            <div class="d-flex align-items-center">
+                                <div class="d-flex flex-column align-items-center w-100 gap-2">
+                                    <div class="d-flex justify-content-between align-items-center gap-2 w-100">
+                                        <!-- Relation Type Dropdown -->
+                                        <div class="w-100" v-cloak>
+                                            <label for="relationType" class="form-label fw-semibold dark-text">
+                                                <?php echo app_lang('relation_type'); ?>
+                                            </label>
+                                            <select id="relationType"
+                                                v-on:change="wb_handleAllFilters"
+                                                v-model="wb_reltype_filter"
+                                                class="form-select drop-darkmode">
+                                                <option value=""><?php echo app_lang('select_type'); ?></option>
+                                                <option v-for="relType in wb_requireData?.rel_types"
+                                                    :key="relType.key"
+                                                    :value="relType.key">
+                                                    {{ relType.value }}
+                                                </option>
+                                            </select>
+                                        </div>
+
+                                        <!-- Agents Dropdown -->
+                                        <div class="w-100" v-cloak>
+                                            <label for="agents" class="form-label fw-semibold dark-text">
+                                                <?php echo app_lang('agents'); ?>
+                                            </label>
+                                            <select id="agents"
+                                                v-on:change="wb_handleAllFilters"
+                                                v-model="wb_agents_filter"
+                                                class="form-select drop-darkmode">
+                                                <option value=""><?php echo app_lang('select_agents'); ?></option>
+                                                <option v-for="agent in wb_requireData?.agents"
+                                                    :key="agent.staffid"
+                                                    :value="agent.staffid">
+                                                    {{ agent.first_name + ' ' + agent.last_name }}
+                                                </option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="d-flex justify-content-between align-items-center gap-2 w-100" v-cloak>
+                                        <!-- Groups Dropdown -->
+                                        <div class="w-100" v-if="wb_reltype_filter === 'contacts'">
+                                            <label for="groups" class="form-label fw-semibold dark-text">
+                                                <?php echo app_lang('groups'); ?>
+                                            </label>
+                                            <select id="groups"
+                                                v-on:change="wb_handleAllFilters"
+                                                v-model="wb_contact_groups"
+                                                class="form-select drop-darkmode">
+                                                <option value=""><?php echo app_lang('select_group'); ?></option>
+                                                <option v-for="groups in wb_requireData?.contact_groups"
+                                                    :key="groups.id"
+                                                    :value="groups.id">
+                                                    {{ groups.title }}
+                                                </option>
+                                            </select>
+                                        </div>
+
+                                        <!-- Source Dropdown -->
+                                        <div class="w-100" v-if="wb_reltype_filter === 'leads'" v-cloak>
+                                            <label for="source" class="form-label fw-semibold dark-text">
+                                                <?php echo app_lang('source'); ?>
+                                            </label>
+                                            <select id="source"
+                                                v-on:change="wb_handleAllFilters"
+                                                v-model="wb_lead_sources"
+                                                class="form-select drop-darkmode">
+                                                <option value=""><?php echo app_lang('select_source'); ?></option>
+                                                <option v-for="source in wb_requireData?.lead_sources"
+                                                    :key="source.id"
+                                                    :value="source.id">
+                                                    {{ source.title }}
+                                                </option>
+                                            </select>
+                                        </div>
+
+                                        <!-- Status Dropdown -->
+                                        <div class="w-100" v-if="wb_reltype_filter === 'leads'" v-cloak>
+                                            <label for="status" class="form-label fw-semibold dark-text">
+                                                <?php echo app_lang('status'); ?>
+                                            </label>
+                                            <select id="status"
+                                                v-on:change="wb_handleAllFilters"
+                                                v-model="wb_lead_status"
+                                                class="form-select drop-darkmode">
+                                                <option value=""><?php echo app_lang('select_status'); ?></option>
+                                                <option v-for="status in wb_requireData?.lead_status"
+                                                    :key="status.id"
+                                                    :value="status.id">
+                                                    {{ status.title }}
+                                                </option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <hr class="m-0" v-cloak>
+                        </hr>
+                        <div v-if="noResultsMessage" v-html="noResultsMessage" class="text-secondary" v-cloak></div>
+                    </div>
+
+                    <!-- Chat List -->
+                    <div :class="selectedTab === 'filters' ? 'side-chat-alternate' : 'side-chat'" v-cloak>
+                        <div class="drop-darkmode chat-list-item  d-flex flex-row w-100 p-2 border-bottom gap-4 align-items-center" v-for="(interaction, index) in wb_displayedInteractions" :key="interaction.id" v-on:click="wb_selectinteraction(interaction.id)" :class="{'selected-interaction': wb_selectedinteraction && wb_selectedinteraction.id === interaction.id}" v-cloak>
+
+                            <p class="img-fluid rounded-circle text-dark fw-semibold d-flex justify-content-center align-items-center my-auto" style="height:50px; width:50px; background-color:#25D366;" data-bs-toggle="tooltip" :title="interaction.receiver_id" data-bs-placement="top">
+                                {{ wb_getAvatarInitials(interaction.name) }}
+                            </p>
+
+
+                            <div class="w-50" v-cloak>
+                                <div class="d-flex justify-content-start align-items-center gap-2">
+                                    <div class="name fw-semibold text-nowrap" data-bs-toggle="tooltip" :title="interaction.receiver_id" data-bs-placement="top">{{ interaction.name }}</div>
+                                    <span :style="interaction.type === 'leads'
+                                        ? { backgroundColor: '#EDE9FE', color: '#5B21B6' }
+                                        : interaction.type === 'contacts'
+                                        ? { backgroundColor: '#fee2e2', color: '#b91c1c' }
+                                        : {}"
+                                        class="d-inline-block px-1 rounded fw-semibold small">
+                                        {{ interaction.type }}
+                                    </span>
+
+                                </div>
+                                <span class="small last-message" v-html="wb_truncateText(interaction.last_message, 2)"></span>
+                            </div>
+                            <div class="flex-grow-1 text-right" v-cloak>
+                                <div class="small time">{{ wb_formatTime(interaction.time_sent) }}</div>
+                                <a href="javascript:void(0)" class="dele-icn" v-on:click="wb_deleteInteraction(interaction.id)"><i data-feather='trash' class='icon-16 text-danger'></i></a>
+                                <span class="badge text-white bg-badge" v-if="wb_countUnreadMessages(interaction.id) > 0">{{
+                                wb_countUnreadMessages(interaction.id) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Message Area -->
+            <div class="flex-grow-1 main-panel rounded bg-white position-relative shadow" v-cloak>
+                <template v-if="!isShowUserChat" v-cloak>
+                    <div class="d-flex align-items-center justify-content-center h-full my-5 position-relative">
+                        <button
+                            type="button"
+                            class="hide-xl position-absolute btn tg-button"
+                            :class="{ 'btn-close-bright': darkMode }"
+                            v-on:click="isShowChatMenu = !isShowChatMenu">
+                            <i class="icon-18" data-feather="menu"></i>
+                        </button>
+                        <div class="align-items-center d-flex flex-column justify-content-center">
+                            <img
+                                v-if="!darkMode"
+                                class="image-container"
+                                src="<?php echo base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/images/light_mob.svg'); ?>"
+                                alt="light">
+                            <img
+                                v-if="darkMode"
+                                class="image-container"
+                                src="<?php echo base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/images/dark_mob.svg'); ?>"
+                                alt="dark">
+                            <div class="text-container d-flex align-items-center justify-content-center gap-2 p-2">
+                                <span><?= app_lang('click_user_to_chat'); ?></span>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <div class="d-flex flex-column main-panel rounded" id="message-area" v-if="wb_selectedinteraction && typeof wb_selectedinteraction === 'object'" v-cloak>
+                    <!-- Navbar -->
+
+                    <div class="d-flex justify-content-between align-items-start p-2 gap-4 rounded drop-darkmode" id="navbar" v-cloak>
+                        <!-- 1st -->
+                        <div class="d-flex align-items-center justify-content-center" v-cloak>
+                            <button
+                                type="button"
+                                class="hide-xl btn"
+                                :class="{ 'btn-close-bright': darkMode }"
+                                v-on:click="isShowChatMenu = !isShowChatMenu">
+                                <i class="icon-18" data-feather="menu"></i>
+                            </button>
+                            <div class="d-flex align-items-center gap-4">
+                                <p class="img-fluid rounded-circle text-dark fw-semibold d-flex justify-content-center align-items-center my-auto" style="height:50px; width:50px; background-color:#25D366;">
+                                    {{ wb_getAvatarInitials(wb_selectedinteraction.name) }}
+                                </p>
+                                <div class="d-flex flex-column gap-1">
+                                    <span class="fw-semibold text-nowrap" id="name">{{ wb_selectedinteraction.name }}</span>
+                                    <span class="d-flex align-items-center justify-content-start gap-2 fw-semibold" id="phonenumber"> <i data-feather='phone' class='icon-16'></i> +{{
+                                wb_selectedinteraction.receiver_id
+                                }} </span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 2nd -->
+                        <div class="flex-grow-1 align-items-start justify-content-start gap-2" v-cloak>
+                            <div class="d-flex flex-column justify-content-start align-items-start gap-2">
+                                <div class="mainsidebar-badge mt-1">
+                                    <div class="d-flex justify-content-start align-items-start gap-2">
+                                        <span :style="wb_selectedinteraction.type === 'leads'
+                                        ? { backgroundColor: '#EDE9FE', color: '#5B21B6' }
+                                        : wb_selectedinteraction.type === 'contacts'
+                                        ? { backgroundColor: '#fee2e2', color: '#b91c1c' }
+                                        : {}"
+                                            class="d-inline-block px-1 small rounded fw-semibold">
+                                            {{ wb_selectedinteraction.type }}
+                                        </span>
+                                        <span v-if="wb_selectedinteraction.type === 'leads'"
+                                            class="badge-source inline-block small px-2 rounded  fw-semibold">
+                                            {{ badgeSourceName }}
+                                        </span>
+                                        <span v-if="wb_selectedinteraction.type === 'leads'"
+                                            :style="{ color: badgeStatusColor }"
+                                            class="inline-block small fw-semibold px-2 rounded badge-status">
+                                            {{ badgeStatusName }}
+                                        </span>
+                                        <span v-if="wb_selectedinteraction.type === 'contacts'"
+                                            v-for="(groupName, index) in badgeGroupNames" :key="index"
+                                            class="inline-block small fw-semibold px-2 rounded fw-semibold badge-group">
+                                            {{ groupName }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="mainsidebar-class" v-cloak>
+                                    <div v-if="wb_selectedinteraction.last_msg_time" class="d-flex justify-content-end align-items-center lst-message">
+                                        <span style="color: green;" v-html="wb_alertTime(wb_selectedinteraction.last_msg_time)">
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php if ($login_user->is_admin && get_setting('wb_enable_supportagent') == 1) { ?>
+                            <div class="d-flex mt-2 align-items-center justify-content-end ">
+                                <div v-if="wb_selectedinteraction.agent_name.agent_name" class="d-flex align-items-center">
+                                    <div class="d-inline-flex align-items-center gap-2">
+                                        <div class="d-flex" v-html="wb_selectedinteraction.agent_icon"></div>
+                                    </div>
+                                </div>
+                                <button type="button" v-on:click="wb_initAgent" class="btn btn-sm p-2" data-bs-toggle="tooltip" data-bs-placement="top" title="<?php echo app_lang('change_support_agent'); ?>">
+                                    <i class="icon-18" data-feather="edit"></i>
+                                </button>
+                            </div>
+                        <?php } ?>
+                    </div>
+
+                    <div class="mainsidebar-class" v-cloak>
+                        <div class="position-relative d-flex justify-content-center">
+                            <div class="position-absolute" style="top: 5%; width:450px;">
+                                <div v-if="overdueAlert" v-html="overdueAlert" class="mt-2"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Messages -->
+                    <div class="overflow-y-auto h-100 bg-main rounded" v-if="wb_selectedinteraction && wb_selectedinteraction.messages" ref="wb_chatContainer" v-cloak>
+                        <div v-for="(message, index) in wb_selectedinteraction.messages" :key="index" v-cloak>
+                            <div v-if="wb_shouldShowDate(message, wb_selectedinteraction.messages[index - 1])" class="text-center my-3">
+                                <span :class="{ 'bg-secondary text-white': darkMode ,'bg-white text-black':!darkMode}" class="px-2 py-1 font-12 rounded">{{ getDate(message.time_sent) }}</span>
+                            </div>
+                            <div :class="[message.sender_id === wb_selectedinteraction.wa_no ? 'd-flex justify-content-end mb-3' : 'd-flex mb-3']" v-cloak>
+                                <div :class="[
+                                    'rounded p-1 ms-2',
+                                     message.sender_id === wb_selectedinteraction.wa_no  ? (darkMode ? 'bg-dark-custom' : 'bg-custom')
+                                                     :  (darkMode ? 'bg-dark-recived' : 'bg-white bg-opacity-10') ,
+                                     message.staff_id == 0 && message.sender_id === wb_selectedinteraction.wa_no ? (darkMode ? 'custom_message_dark' : 'custom_message')  : '' ,
+                                     message.type === 'text' && message.message.length > 50 ? 'custom_width' : ''
+                                    ]" v-bind="message.sender_id === wb_selectedinteraction.wa_no ? {
+                                         'data-bs-toggle': 'tooltip',
+                                         'title': message.staff_name,
+                                         'data-original-title': message.staff_name,
+                                         'data-bs-placement': 'left'
+                                       } : {}">
+
+                                    <template v-if="message.ref_message_id" v-cloak>
+                                        <div class="bg-light rounded-lg mb-2 reply-messagediv">
+                                            <div class="d-flex flex-column gap-2 p-2">
+                                                <p class="text-muted fw-normal"><?php echo app_lang('replying_to'); ?></p>
+                                                <p v-html="getOriginalMessage(message.ref_message_id).message"></p>
+                                                <div v-if="getOriginalMessage(message.ref_message_id).assets_url">
+                                                    <template v-if="getOriginalMessage(message.ref_message_id).type === 'image'">
+                                                        <a :href="getOriginalMessage(message.ref_message_id).asset_url" data-lightbox="image-group" target="_blank">
+                                                            <img :src="getOriginalMessage(message.ref_message_id).asset_url" class="rounded img-fluid" style="width: 240px; height: 112px;" alt="Image">
+                                                        </a>
+                                                    </template>
+                                                    <template v-if="getOriginalMessage(message.ref_message_id).type === 'video'">
+                                                        <video :src="getOriginalMessage(message.ref_message_id).asset_url" controls class="rounded" style="width: 240px; height: 112px;"></video>
+                                                    </template>
+                                                    <template v-if="getOriginalMessage(message.ref_message_id).type === 'document'">
+                                                        <a :href="getOriginalMessage(message.ref_message_id).asset_url" target="_blank" class="text-primary text-decoration-underline"><?php echo app_lang('download_document'); ?></a>
+                                                    </template>
+                                                    <template v-if="getOriginalMessage(message.ref_message_id).type === 'audio'">
+                                                        <audio controls class="w-100" style="max-width: 250px;">
+                                                            <source :src="getOriginalMessage(message.ref_message_id).asset_url" type="audio/mpeg">
+                                                        </audio>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <template v-if="message.type === 'text'">
+                                        <span :class="{ 'text-white': darkMode ,'text-black':!darkMode}" class="p-1" :style="message.staff_id == 0 && message.sender_id === wb_selectedinteraction.wa_no ? '' :{ whiteSpace: 'pre-wrap', wordBreak: 'break-word'  }" v-html="formatMessage(message.message)"></span>
+                                    </template>
+                                    <template v-if="message.type === 'interactive'">
+                                        <p class="text-black">{{ message.message }}</p>
+                                    </template>
+
+                                    <template v-if="message.type === 'button'">
+                                        <p class="text-black" v-html="message.message"></p>
+                                    </template>
+
+                                    <template v-if="message.type === 'reaction'">
+                                        <p class="text-black" v-html="message.message"></p>
+                                    </template>
+
+                                    <template v-else-if="message.type === 'image'">
+                                        <a :href="message.asset_url" data-lightbox="image-group">
+                                            <img :src="message.asset_url" alt="Image" class="img-fluid rounded" style="width: 200px;">
+                                        </a>
+                                        <p class="small mt-2" v-if="message.message">{{ message.caption }}</p>
+                                    </template>
+
+                                    <template v-else-if="message.type === 'video'">
+                                        <video :src="message.asset_url" controls class="img-fluid rounded" style="width: 200px; height: 112px;"></video>
+                                        <p class="small mt-2" v-if="message.message">{{ message.message }}</p>
+                                    </template>
+
+                                    <template v-else-if="message.type === 'document'">
+                                        <a :href="message.asset_url" target="_blank" class="text-primary"><?php echo app_lang('download_document'); ?></a>
+                                    </template>
+
+                                    <template v-else-if="message.type === 'audio'">
+                                        <audio :src="message.asset_url" controls style="max-width: 200px;"></audio>
+                                        <p class="small mt-2" v-if="message.message">{{ message.message }}</p>
+                                    </template>
+
+                                    <div class="d-flex justify-content-between gap-4 align-items-center mt-1" v-cloak>
+                                        <span :class="{ 'text-white': darkMode ,'text-black':!darkMode}" class='small'>{{
+                                        wb_getTime(message.time_sent) }}
+                                        </span>
+                                        <div>
+                                            <span v-on:click="replyToMessage(message)" :class="{ 'text-white': darkMode ,'text-black':!darkMode}" class="cursor-pointer">
+                                                <i data-feather='corner-up-left' class="icon-16"></i>
+                                            </span>
+                                            <span class="ms-2 " v-if="message.sender_id === wb_selectedinteraction.wa_no">
+                                                <i v-if="message.status === 'sent'" data-feather='check' class='icon-16 small' title="Sent"></i>
+                                                <img v-else-if="message.status === 'delivered'" src="<?php echo base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/images/delivered.png'); ?>" class="icon-16" title="Delivered" alt="Delivered">
+                                                <img v-else-if="message.status === 'read'" src="<?php echo base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/images/double-check-read.png'); ?>" class='icon-16' title="Read" alt="Read">
+                                                <i v-else-if="message.status === 'failed'" data-feather='alert-circle' class='icon-16 text-warning' title="Failed"></i>
+                                                <i v-else-if="message.status === 'deleted'" data-feather='trash' class='icon-16 text-danger' title="Deleted"></i>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-if="replyingToMessage" class=" d-flex justify-content-center" v-cloak>
+                        <div class=" w-100 p-4 rounded d-flex justify-content-between align-items-center" v-cloak>
+                            <div class=" w-100 p-4 rounded d-flex justify-content-between align-items-center border" :class="{'bg-light':!darkMode}" v-cloak>
+                                <div class="d-flex flex-column gap-2">
+                                    <p class="fw-normal" :class="{ 'text-white': darkMode ,'text-black':!darkMode}"><?php echo app_lang('replying_to'); ?></p>
+                                    <p :class=" { 'text-white' : darkMode ,'text-black':!darkMode}" v-html="replyingToMessage.message"></p>
+                                    <div v-if="replyingToMessage.asset_url">
+                                        <template v-if="replyingToMessage.type === 'image'">
+                                            <img :src="replyingToMessage.asset_url" class="rounded img-fluid" style="max-width: 240px; max-height: 112px;" alt="Image">
+                                        </template>
+                                        <template v-if="replyingToMessage.type === 'video'">
+                                            <video :src="replyingToMessage.asset_url" controls class="rounded" style="width: 240px; max-height: 112px;"></video>
+                                        </template>
+                                        <template v-if="replyingToMessage.type === 'document'">
+                                            <a :href="replyingToMessage.asset_url" target="_blank" class="text-primary text-decoration-underline"><?php echo app_lang('download_document'); ?></a>
+                                        </template>
+                                        <template v-if="replyingToMessage.type === 'audio'">
+                                            <audio controls style="max-width: 250px;">
+                                                <source :src="replyingToMessage.asset_url" type="audio/mpeg">
+                                            </audio>
+                                        </template>
+                                    </div>
+                                </div>
+                                <button v-on:click="clearReply" class="btn p-0 text-danger">
+                                    &#10006;
+                                </button>
+                            </div>
+                            <ul v-if="showQuickReplies" class="flex-grow bg-white shadow-md rounded mt-2 p-2 list-unstyled" v-cloak>
+                                <li v-for="(reply, index) in filteredQuickReplies"
+                                    :key="index"
+                                    v-on:click="selectQuickReply(index)"
+                                    :class="{
+                                            'bg-primary text-white': index === quickReplyIndex,
+                                            'hover:bg-light cursor-pointer rounded p-2 transition-all': true
+                                        }">
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div v-if="wb_imageAttachment || wb_videoAttachment || wb_documentAttachment" class="d-flex flex-wrap gap-3 p-4 attachment-section" v-cloak>
+                        <!-- Image Attachment -->
+                        <div v-if="wb_imageAttachment" class="position-relative d-flex flex-column align-items-center py-6 px-4 rounded shadow-lg" :class="{ 'bg-secondary': darkMode ,'bg-light':!darkMode}" style="max-width: 250px;" v-cloak>
+                            <!-- Preview Text -->
+                            <div class="d-flex align-items-center gap-4">
+                                <span class="text-xs fw-semibold text-muted mb-2"><?php echo app_lang('preview'); ?></span>
+                                <button v-on:click="wb_removeImageAttachment" class="btn position-absolute top-0 end-0 text-danger mt-1 ">
+                                    &#10006;
+                                </button>
+                            </div>
+                            <img :src="wb_imagePreview" alt="Selected Image" class="w-100 h-100 object-cover rounded mb-3 " />
+                            <span class="mt-2 text-sm fw-medium text-body truncate w-100 text-center">{{ wb_imageAttachment.name }}</span>
+                        </div>
+
+                        <!-- Video Attachment -->
+                        <div v-if="wb_videoAttachment" :class="{ 'bg-secondary': darkMode ,'bg-light':!darkMode}" class="position-relative d-flex flex-column align-items-center py-4 px-4 rounded shadow-lg" style="max-width: 280px;" v-cloak>
+                            <!-- Preview Text -->
+                            <div class="d-flex align-items-center gap-4">
+                                <span class="text-xs fw-semibold text-muted mb-2"><?php echo app_lang('preview'); ?></span>
+                                <button v-on:click="wb_removeVideoAttachment" class="btn position-absolute top-0 end-0 text-danger ">
+                                    &#10006;
+                                </button>
+                            </div>
+                            <video :src="wb_videoPreview" controls class="w-100 object-cover rounded"></video>
+                            <span class="mt-2 text-sm text-body truncate w-100 text-center">{{ wb_videoAttachment.name }}</span>
+                        </div>
+
+                        <!-- Document Attachment -->
+                        <div v-if="wb_documentAttachment" :class="{ 'bg-secondary': darkMode ,'bg-light':!darkMode}" class="position-relative d-flex flex-column align-items-center p-2 rounded shadow-lg" style="max-width: 250px; min-width: 200px;" v-cloak>
+                            <!-- Preview Text -->
+                            <div class="d-flex align-items-center gap-4">
+                                <span class="text-xs fw-semibold text-muted mb-2"><?php echo app_lang('preview'); ?></span>
+                                <button v-on:click="wb_removeDocumentAttachment" class="btn position-absolute top-0 end-0 text-danger ">
+                                    &#10006;
+                                </button>
+                            </div>
+                            <span class="mt-2 text-sm text-body truncate w-100 text-center">{{ wb_documentAttachment.name }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Input -->
+                    <form @submit.prevent="wb_sendMessage" class="relative" v-cloak :class="{ hide: !is_pemission_replay_input }">
+                        <div class="w-100 drop-darkmode p-2">
+                            <textarea v-model="wb_newMessage" ref="inputField" class="mentionable rounded custom-textarea" rows="2" placeholder="<?= app_lang('type_your_message') ?>" id="wb_newMessage" @keydown="handleKeyPress"></textarea>
+                        </div>
+                        <div class="justify-content-between align-items-center d-flex p-2 rounded " id="input-area" v-cloak>
+                            <div class="d-flex align-items-center">
+
+                                <?php if (get_setting('enable_wb_openai')) { ?>
+                                    <div class="dropup">
+                                        <button id="ai-dropdown" type="button" class="btn p-0 m-0 dropdown-toggle" data-bs-toggle="dropdown" role="button" aria-expanded="false" :class="{ 'disabled': !isButtonEnabled, 'btn-close-bright': darkMode  }">
+                                            <span tabindex="0" data-bs-toggle="tooltip" title="<?php echo app_lang('ai_prompt_note'); ?>">
+                                                <img src="<?= base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/images/ai.png') ?>" class="icon-18 mx-2 mb-1">
+                                            </span>
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <span class="ms-2"><img src="<?= base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/images/ai.png') ?>" class="icon-18 mx-2 mb-1"><?= app_lang('ai_prompt') ?></span>
+                                            <li role="separator" class="dropdown-divider"></li>
+                                            <!-- Change Tone Submenu -->
+                                            <li class="dropdown-submenu">
+                                                <a id="change-tone-dropdown" href="javascript:;" class="dropdown-item">
+                                                    <i class="icon-16 me-2 text-info" data-feather="headphones"></i>Change Tone
+                                                </a>
+                                                <ul class="dropdown-menu">
+                                                    <li v-on:click="wb_handleItemClick('Change Tone', '<?= app_lang('professional') ?>')">
+                                                        <a href="javascript:;" class="dropdown-item"><?= app_lang('professional') ?></a>
+                                                    </li>
+                                                    <li v-on:click="wb_handleItemClick('Change Tone', '<?= app_lang('friendly') ?>')">
+                                                        <a href="javascript:;" class="dropdown-item"><?= app_lang('friendly') ?></a>
+                                                    </li>
+                                                    <li v-on:click="wb_handleItemClick('Change Tone', '<?= app_lang('empathetic') ?>')">
+                                                        <a href="javascript:;" class="dropdown-item"><?= app_lang('empathetic') ?></a>
+                                                    </li>
+                                                    <li v-on:click="wb_handleItemClick('Change Tone', '<?= app_lang('straightforward') ?>')">
+                                                        <a href="javascript:;" class="dropdown-item"><?= app_lang('straightforward') ?></a>
+                                                    </li>
+                                                </ul>
+                                            </li>
+
+                                            <!-- Translate Submenu -->
+                                            <li class="dropdown-submenu dropup">
+                                                <a href="javascript:;" class="dropdown-item">
+                                                    <i class="icon-16 me-2 text-info" data-feather="activity"></i>Translate
+                                                </a>
+                                                <ul class="dropdown-menu custom-dropdown-menu">
+                                                    <li>
+                                                        <input type="text" class="form-control" style="border-radius: 25px;" v-model="searchQuery" placeholder="<?= app_lang('search_language') ?>" />
+                                                    </li>
+                                                    <li v-for="lang in filteredLanguages" :key="lang">
+                                                        <a href="javascript:;" class="dropdown-item" v-on:click="wb_handleItemClick('Translate', lang)">
+                                                            {{ ucfirst(lang) }}
+                                                        </a>
+                                                    </li>
+                                                </ul>
+                                            </li>
+                                            <li v-on:click="wb_handleItemClick('Fix Spelling & Grammar')">
+                                                <a href="javascript:;" class="dropdown-item"><i class="icon-16 me-2 text-info" data-feather="check"></i>Fix Spelling & Grammar</a>
+                                            </li>
+
+                                            <li v-on:click="wb_handleItemClick('Simplify Language')">
+                                                <a href="javascript:;" class="dropdown-item"><i class="icon-16 me-2 text-info" data-feather="disc"></i>Simplify Language</a>
+                                            </li>
+
+                                            <li class="dropdown-submenu dropup" v-if="customPrompts.length > 0">
+                                                <a href="javascript:;" class="dropdown-item"><i class="icon-16 me-2 text-info" data-feather="corner-up-left"></i>Custom Prompt</a>
+                                                <ul class="dropdown-menu custom-dropdown-menu">
+                                                    <li v-for="(prompt, index) in customPrompts" :key="index" v-if="shouldDisplayPrompt(prompt)" v-on:click="wb_handleItemClick('Custom Prompt', prompt.action)">
+                                                        <a href="javascript:;" class="dropdown-item">{{ prompt.label }}</a>
+                                                    </li>
+                                                </ul>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                <?php } ?>
+
+                                <button class="btn" :class="{ 'btn-close-bright': darkMode }" v-on:click="toggleEmojiPicker" id="emoji_btn" data-bs-toggle="tooltip" title="<?php echo app_lang('emojis'); ?>" data-bs-placement="top" data-container="body">
+                                    <i class="icon-18 me-2" data-feather="smile"></i>
+                                </button>
+
+                                <button v-on:click="toggleAttachmentOptions" type="button" class="btn p-0 m-0" :class="{ 'btn-close-bright': darkMode }" data-bs-toggle="tooltip" title="<?php echo app_lang('attach_image_video_docs'); ?>" data-bs-placement="top">
+                                    <i data-feather="paperclip" class="icon-18 mx-2"></i>
+                                </button>
+                                <!-- Canned Button -->
+                                <button v-if="cannedReplies.length > 0" v-on:click="toggleCannedReplies" ref="cannedRepliesDropdown" type="button" class="btn p-0 ml10 " :class="{ 'btn-close-bright': darkMode }" data-bs-toggle="tooltip" title="<?php echo app_lang('canned_reply'); ?>" data-bs-placement="top">
+                                    <img src="<?= base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/images/message.png') ?>" class="icon-18 mx-2" alt="canned reply">
+                                </button>
+
+                                <button v-on:click="wb_toggleRecording" type="button" class="btn p-0 ml10" :class="{ 'btn-close-bright': darkMode }" data-bs-toggle="tooltip" title="<?php echo app_lang('record_audio'); ?>" data-bs-placement="top">
+                                    <img v-if="!wb_recording" src="<?= base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/images/microphone.png') ?>" class="icon-18 mx-2" alt="mic">
+                                    <img v-else src="<?= base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/images/mute.png') ?>" class="icon-18 mx-2" alt="mic-off">
+                                </button>
+                            </div>
+                            <div class="d-flex align-items-center gap-4">
+                                <div class="text-sm text-muted fw-semibold mainsidebar-class" id="merge-field"><?php echo app_lang('use_@_to_add_merge_fields'); ?></div>
+                                <button v-if="wb_showSendButton " type="submit" class="rounded bg-white border-0 m-0 pt-2">
+                                    <img src="<?= base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/images/send.png') ?>" class="icon-18 mx-2 mb-1" title="Send" alt="send">
+                                </button>
+                            </div>
+                            <!-- Display the canned replies list start -->
+                            <ul v-if="cannedRepliesVisible && cannedReplies.length"
+                                class="position-absolute rounded shadow flex flex-column p-3" :class="{ 'bg-black': darkMode ,'bg-white':!darkMode}"
+                                id="canned_replies"
+                                v-cloak>
+                                <!-- Header -->
+                                <h4 class="bg-primary text-white text-lg fw-bold px-3 py-3 mb-2 rounded">
+                                    <?= app_lang('canned_reply'); ?>
+                                </h4>
+                                <div class="canned-list" v-cloak>
+                                    <!-- List Items -->
+                                    <li v-for="reply in cannedReplies"
+                                        v-if="shoud_wb_cannedReplyData(reply)"
+                                        :key="reply.title"
+                                        class="d-flex flex-column px-3 py-2 cursor-pointer rounded mb-2 shadow-sm"
+                                        v-on:click="addToMessage(reply)">
+                                        <div class="d-flex align-items-center d-flex justify-content-between">
+                                            <div class="fw-semibold">{{ reply.title }}</div>
+                                            <span v-if="reply.is_public === '1'"
+                                                class="badge bg-custom text-black fw-semibold mb-2">
+                                                <?= app_lang('public'); ?>
+                                            </span>
+                                        </div>
+                                        <div class="text-muted text-black canned-description">{{ reply.description }}</div>
+                                    </li>
+                                </div>
+                            </ul>
+                            <!-- Display the canned replies list end -->
+                            <div class="attechment-menu" id="all_atech" v-cloak>
+                                <!-- Attachment Options Dropdown (conditionally visible) -->
+                                <div v-if="showAttachmentOptions" class="d-flex flex-column gap-2 text-nowrap  shadow-lg rounded p-2" :class="{ 'bg-black': darkMode ,'bg-light':!darkMode}">
+
+                                    <input type="file" id="imageAttachmentInput" ref="imageAttachmentInput" v-on:change="wb_handleImageAttachmentChange" accept="<?php echo $allowd_extension['image']['extension']; ?>" class="d-none">
+                                    <label for="imageAttachmentInput" class="pointer d-flex align-items-center p-2 cursor-pointer"
+                                        data-bs-toggle="tooltip" title="<?php echo app_lang('send_image'); ?>" data-bs-placement="top">
+                                        <img src="<?= base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/images/icon_ImageMessage.png') ?>" class="icon-18 mx-2"><span><?= app_lang('send_image') ?></span>
+                                    </label>
+
+                                    <input type="file" id="videoAttachmentInput" ref="videoAttachmentInput" v-on:change="wb_handleVideoAttachmentChange" accept="<?php echo $allowd_extension['video']['extension']; ?>" class="d-none">
+                                    <label for="videoAttachmentInput" class="pointer d-flex align-items-center p-2 cursor-pointer"
+                                        data-bs-toggle="tooltip" title="<?php echo app_lang('send_video'); ?>" data-bs-placement="top">
+                                        <img src="<?= base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/images/icon_VideoMessage.png') ?>" class="icon-18 mx-2"><span><?= app_lang('send_video') ?></span>
+                                    </label>
+
+                                    <input type="file" id="documentAttachmentInput" ref="documentAttachmentInput" v-on:change="wb_handleDocumentAttachmentChange" accept="<?php echo $allowd_extension['document']['extension']; ?>" class="d-none">
+                                    <label for="documentAttachmentInput" class="pointer d-flex align-items-center p-2 cursor-pointer"
+                                        data-bs-toggle="tooltip" title="<?php echo app_lang('send_document'); ?>" data-bs-placement="top">
+                                        <img src="<?= base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/images/icon_Document.png') ?>" class="icon-18 mx-2"><span><?= app_lang('send_document') ?></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="emoji-picker-container" ref="emojiPickerContainer" v-cloak></div>
+                        <input type="hidden" name="rel_type" id="rel_type" value="">
+                    </form>
+                </div>
+            </div>
+        </div>
+        <?php if ($login_user->is_admin && get_setting('wb_enable_supportagent') == 1) { ?>
+            <div class="modal fade" id="AgentModal" tabindex="-1" aria-labelledby="AgentModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="AgentModalLabel"><?php echo app_lang('modal_title'); ?></h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <select name="assigned[]" id="assigned" class="form-control validate-hidden select2" data-rule-required="1" data-msg-required="<?php echo app_lang('field_required'); ?>" tabindex="-1" multiple>
+                                <?php foreach ($staff as $value) { ?>
+                                    <option value="<?php echo $value['id']; ?>"><?php echo $value['first_name'] . ' ' . $value['last_name']; ?></option>
+                                <?php } ?>
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo app_lang('close_btn'); ?></button>
+                            <button type="button" class="btn btn-primary" v-on:click="wb_handleAssignedChange"><?php echo app_lang('save_btn'); ?></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <?php } ?>
+    </div>
+</div>
+
+<script src="<?php echo base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/js/vue.min.js?v=' . get_setting('app_version')); ?>"></script>
+<script src="<?php echo base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/js/axios.min.js?v=' . get_setting('app_version')); ?>"></script>
+<script src="<?php echo base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/js/purify.min.js?v=' . get_setting('app_version')); ?>"></script>
+<script src="<?php echo base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/js/recorder-core.js?v=' . get_setting('app_version')); ?>"></script>
+<script src="<?php echo base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/js/lightbox.min.js?v=' . get_setting('app_version')); ?>"></script>
+<script src="<?php echo base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/js/mp3.js?v=' . get_setting('app_version')); ?>"></script>
+<script src="<?php echo base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/js/mp3-engine.js?v=' . get_setting('app_version')); ?>"></script>
+<script src="<?php echo base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/js/emoji-mart.min.js?v=' . get_setting('app_version')); ?>"></script>
+
+<script>
+    "use strict";
+    $(document).on('click', '.hideMessage', function() {
+        $(this).parent().addClass('hide');
+    });
+
+    $(function() {
+        $('#js-init-chat-icon').removeClass('init-chat-icon');
+        $('[data-bs-toggle="tooltip"]').tooltip();
+    })
+    var default_whatsapp_number = "<?php echo get_setting('wb_default_phone_number'); ?>";
+    new Vue({
+        el: '#app',
+        data() {
+            return {
+                interactions: [],
+                previousCounts: {},
+                wb_selectedinteractionIndex: null,
+                wb_selectedinteraction: null,
+                wb_selectedinteractionMobNo: null,
+                wb_selectedinteractionSenderNo: null,
+                wb_selectedinteractionId: null,
+                wb_newMessage: '',
+                wb_imageAttachment: null,
+                wb_videoAttachment: null,
+                wb_documentAttachment: null,
+                wb_imagePreview: '',
+                wb_videoPreview: '',
+                wb_csrfToken: '<?php echo $csrfToken; ?>',
+                wb_recording: false,
+                wb_audioBlob: null,
+                wb_recordedAudio: null,
+                errorMessage: '',
+                wb_searchText: '',
+                showAttachmentOptions: false,
+                wb_selectedWaNo: '<?php echo get_setting('wb_default_phone_number'); ?>', // Define selectedWaNo variable
+                wb_filteredInteractions: [], // Define wb_filteredInteractions to store filtered interactions
+                wb_displayedInteractions: [],
+                languages: <?= json_encode($languages->languages) ?>,
+                searchQuery: '',
+                wb_agentId: '',
+                wb_login_staff_id: '<?= $_SESSION['user_id'] ?>',
+                has_pemission_view_ai_prompts: '<?= check_wb_permission($login_user, 'wb_view_ai_prompts') ?>',
+                replyingToMessage: null,
+                showQuickReplies: false,
+                customPrompts: [],
+                //pusher
+                wb_pusher_api_key: '<?= get_setting('pusher_key') ?>',
+                wb_pusher_cluster: '<?= get_setting('pusher_cluster') ?>',
+                selectedTab: 'searching',
+                wb_reltype_filter: '',
+                wb_agents_filter: '',
+                wb_requireData: [],
+                noResultsMessage: '',
+                isShowChatMenu: false,
+                isShowUserChat: false,
+                cannedReplies: [],
+                cannedRepliesVisible: true,
+                wb_contact_groups: '',
+                wb_lead_sources: '',
+                wb_lead_status: '',
+                badgeSourceName: '',
+                badgeStatusName: '',
+                badgeStatusColor: '',
+                badgeGroupNames: [],
+                darkMode: false,
+                is_pemission_replay_input: !('<?= !$login_user->is_admin && check_wb_permission($login_user, 'wb_read_only_chat'); ?>'),
+            };
+        },
+
+        methods: {
+            toggleDarkMode() {
+                this.darkMode = !this.darkMode;
+                this.$el.classList.toggle('dark-mode', this.darkMode);
+                localStorage.setItem('darkMode', this.darkMode);
+            },
+            handlerequiredata() {
+                $.ajax({
+                    url: '<?= get_uri('whatsboost/get_chat_required_data') ?>',
+                    type: 'POST',
+                    dataType: 'json',
+                    success: (response) => {
+                        this.wb_requireData = response;
+                    },
+                })
+            },
+            handleBadgeDisplay() {
+                let filteredInteractions = [this.wb_selectedinteraction];
+                this.badgeGroupNames = [];
+                filteredInteractions.forEach(interaction => {
+                    // Check if the interaction type is 'contacts'
+                    if (interaction.type === "contacts") {
+                        if (interaction.group) {
+                            // Iterate through each group in interaction.groups
+                            const groupIds = interaction.group.map(item => item.groupid);
+                            groupIds.forEach(groupId => {
+                                const matchingContactGroup = this.wb_requireData && this.wb_requireData.contact_groups ? this.wb_requireData.contact_groups.find(contactGroup => contactGroup.id === groupId) : undefined;
+                                if (matchingContactGroup) {
+                                    this.badgeGroupNames.push(matchingContactGroup.title);
+                                }
+                            });
+
+                        }
+                    } else if (interaction.type === "leads") {
+                        // Your existing logic for leads
+
+                        let matchingSource = this.wb_requireData && this.wb_requireData.lead_sources ?
+                            this.wb_requireData.lead_sources.find(source => source.id === interaction.source) :
+                            undefined;
+                        if (matchingSource) {
+                            this.badgeSourceName = matchingSource.title;
+                        }
+
+                        let matchingStatus = this.wb_requireData && this.wb_requireData.lead_status ?
+                            this.wb_requireData.lead_status.find(status => status.id === interaction.status) :
+                            undefined;
+                        if (matchingStatus) {
+                            this.badgeStatusName = matchingStatus.title;
+                            this.badgeStatusColor = matchingStatus.color;
+                        }
+                    }
+                });
+            },
+            resetFilters() {
+                this.selectedTab = 'searching',
+                    this.noResultsMessage = '';
+                this.wb_filterInteractions();
+            },
+            wb_handleAllFilters(e) {
+                const selectedRelationType = this.wb_reltype_filter;
+                const selectedSource = this.wb_lead_sources; // For leads
+                const selectedStatus = this.wb_lead_status; // For leads
+                const selectedGroup = this.wb_contact_groups; // For contacts
+                const selectedAgent = this.wb_agents_filter; // For agents
+                // Start with all filtered interactions
+                let filteredInteractions = [...this.wb_filteredInteractions];
+                // Filter by relation type
+                if (selectedRelationType) {
+                    filteredInteractions = filteredInteractions.filter(interaction => {
+                        const isMatch = interaction.type === selectedRelationType;
+                        return isMatch;
+                    });
+                }
+                // Additional filtering for leads
+                if (selectedRelationType === 'leads') {
+                    if (selectedSource) {
+                        filteredInteractions = filteredInteractions.filter(interaction => {
+                            const isMatch = interaction.source === selectedSource;
+                            return isMatch;
+                        });
+                    }
+                    if (selectedStatus) {
+                        filteredInteractions = filteredInteractions.filter(interaction => {
+                            const isMatch = interaction.status === selectedStatus;
+                            return isMatch;
+                        });
+                    }
+                }
+                // Additional filtering for contacts
+                if (selectedRelationType === 'contacts') {
+                    if (selectedGroup) {
+                        filteredInteractions = filteredInteractions.filter(interaction => {
+                            // Check if any group in the array has the matching groupid
+                            const hasMatchingGroup = interaction.group && Array.isArray(interaction.group) &&
+                                interaction.group.some(group => group.groupid === selectedGroup);
+                            return hasMatchingGroup;
+                        });
+                    }
+                }
+                // Apply agent filtering overall if selectedAgent exists
+                if (selectedAgent) {
+                    filteredInteractions = filteredInteractions.filter(interaction => {
+                        // Check if agent_id exists and is an array
+                        const isMatch = interaction.agent && Array.isArray(interaction.agent.agent_id) &&
+                            interaction.agent.agent_id.includes(selectedAgent);
+                        return isMatch;
+                    });
+                }
+                // Assign filtered interactions to displayed interactions
+                this.wb_displayedInteractions = filteredInteractions;
+
+                if (this.wb_displayedInteractions.length === 0) {
+                    this.noResultsMessage = `<div class="align-items-center d-flex justify-content-center"><p class="fw-semibold">No chat's found for the selected filters.</p></div>`;
+                } else {
+                    this.noResultsMessage = '';
+                }
+            },
+
+            formatMessage(text) {
+                // Replace newline characters with <br> for display
+                return text.replace(/\n/g, '<br>');
+            },
+            handleKeyPress(event) {
+                if (event.keyCode === 13) { // Enter key
+                    if (event.shiftKey) {
+                        // Shift + Enter adds a newline
+                        event.preventDefault();
+                        this.wb_newMessage += '\n';
+                    } else {
+                        // Enter alone sends the message
+                        event.preventDefault();
+                        if (this.wb_newMessage.trim() !== '') {
+                            this.wb_sendMessage(); // Call your message sending function
+                            this.wb_newMessage = ''; // Clear the message after sending
+                        }
+                    }
+                }
+            },
+            wb_fetchCustomPrompts() {
+                $.ajax({
+                    url: '<?php echo get_uri('whatsboost/get_prompts'); ?>',
+                    type: 'POST',
+                    dataType: 'json',
+                    success: (response) => {
+                        if (Array.isArray(response.custom_prompts)) {
+                            this.customPrompts = response.custom_prompts.map(prompt => ({
+                                label: prompt.name,
+                                action: prompt.action,
+                                added_from: prompt.added_from
+
+                            }));
+                        } else {
+                            console.error('Invalid response structure', response);
+                        }
+                    },
+                    error: (error) => {
+                        console.error('Error fetching AI Prompts', error);
+                    }
+                });
+            },
+            shouldDisplayPrompt(prompt) {
+                return this.wb_login_staff_id === prompt.added_from || this.has_pemission_view_ai_prompts;
+            },
+            wb_selectinteraction(id) {
+                $.ajax({
+                    url: '<?php echo get_uri('whatsboost/chat_mark_as_read'); ?>',
+                    type: 'POST',
+                    dataType: 'html',
+                    data: {
+                        'interaction_id': id
+                    },
+                })
+                const index = this.interactions.findIndex(interaction => interaction.id === id);
+                if (index !== -1) {
+                    this.wb_selectedinteractionIndex = index;
+                    this.wb_selectedinteraction = this.interactions[index];
+
+                    this.wb_selectedinteraction.messages.forEach(message => {
+                        if (message.is_read == 0) {
+                            message.is_read = 1;
+                        }
+                    });
+                    this.wb_selectedinteractionId = this.wb_selectedinteraction['id'];
+
+                    this.wb_selectedinteractionMobNo = this.wb_selectedinteraction['receiver_id'];
+                    this.wb_selectedinteractionSenderNo = this.wb_selectedinteraction['wa_no'];
+                    this.wb_scrollToBottom();
+                    this.handleBadgeDisplay();
+                    this.wb_fetchCustomPrompts();
+                    this.wb_cannedReplyData();
+                    this.isShowChatMenu = false;
+                    this.isShowUserChat = true;
+                    this.$nextTick(() => {
+                        $('[data-bs-toggle="tooltip"]').tooltip();
+                        $('#rel_type').val(this.wb_selectedInteraction['type']);
+                        $('#rel_type').trigger('change');
+                    });
+                }
+            },
+            wb_deleteInteraction(id) {
+                const result = confirm("Are you sure you want to delete this chat?");
+                if (result) {
+                    $.ajax({
+                        url: '<?php echo get_uri('whatsboost/delete_chat'); ?>',
+                        type: 'POST',
+                        dataType: 'html',
+                        data: {
+                            'interaction_id': id
+                        },
+                    }).done((res) => { // Use an arrow function here
+                        if (res) {
+                            this.interactions = this.interactions.filter(interaction => interaction.id !== id);
+                            this.wb_displayedInteractions = this.interactions;
+                            if (this.wb_selectedinteractionId === id) {
+                                this.wb_selectedinteraction = null;
+                                this.wb_selectedinteractionId = null;
+                                this.wb_selectedinteractionIndex = -1;
+                                this.wb_selectedinteractionMobNo = null;
+                                this.wb_selectedinteractionSenderNo = null;
+                                this.isShowUserChat = false; // Hide the chat UI when interaction is deleted
+                            }
+                        }
+                    });
+                }
+            },
+
+            toggleAttachmentOptions() {
+                this.showAttachmentOptions = !this.showAttachmentOptions;
+            },
+            toggleCannedReplies() {
+                this.cannedRepliesVisible = !this.cannedRepliesVisible;
+            },
+            wb_cannedReplyData() {
+                $.ajax({
+                    url: '<?php echo get_uri('whatsboost/canned_replies/get'); ?>',
+                    type: 'POST',
+                    dataType: 'html',
+                    success: (response) => {
+                        const parsedResponse = JSON.parse(response);
+                        if (parsedResponse && Array.isArray(parsedResponse)) {
+                            this.cannedReplies = parsedResponse.map(reply => ({
+                                title: reply.title,
+                                description: reply.description,
+                                is_public: reply.is_public,
+                                added_from: reply.added_from
+                            }));
+                            this.cannedRepliesVisible = false;
+                        } else {
+                            console.error('Invalid response structure');
+                        }
+                    },
+                    error: (error) => {
+                        console.error('Error fetching canned replies:', error);
+                    }
+                });
+            },
+            shoud_wb_cannedReplyData(reply) {
+                return reply.is_public === '1' || this.wb_login_staff_id === reply.added_from || this.has_pemission_view_canned_reply;
+            },
+            addToMessage(reply) {
+                this.wb_newMessage = `${reply.description}`;
+                this.cannedRepliesVisible = false;
+                this.$refs.inputField.focus();
+            },
+            async wb_sendMessage() {
+                if (!this.wb_selectedinteraction) return;
+                if (default_whatsapp_number != this.wb_selectedinteraction['wa_no']) {
+                    this.errorMessage = 'Default WhatsApp number does not match the selected interaction.';
+                    return;
+                }
+                const wb_formData = new FormData();
+                wb_formData.append('id', this.wb_selectedinteraction.id);
+                wb_formData.append('to', this.wb_selectedinteraction.receiver_id);
+                wb_formData.append('csrf_token_name', this.wb_csrfToken);
+                wb_formData.append('type', this.wb_selectedinteraction.type);
+                wb_formData.append('type_id', this.wb_selectedinteraction.type_id);
+
+                const MAX_MESSAGE_LENGTH = 2000;
+                if (this.wb_newMessage.length > MAX_MESSAGE_LENGTH) {
+                    this.wb_newMessage = this.wb_newMessage.substring(0, MAX_MESSAGE_LENGTH);
+
+                }
+                // Add message if it exists
+                if (this.wb_newMessage.trim()) {
+                    wb_formData.append('message', DOMPurify.sanitize(this.wb_newMessage));
+                }
+
+                // Handle image attachment
+                if (this.wb_imageAttachment) {
+                    wb_formData.append('image', this.wb_imageAttachment);
+                }
+
+                // Handle video attachment
+                if (this.wb_videoAttachment) {
+                    wb_formData.append('video', this.wb_videoAttachment);
+                }
+
+                // Handle document attachment
+                if (this.wb_documentAttachment) {
+                    wb_formData.append('document', this.wb_documentAttachment);
+                }
+
+                // Handle audio attachment
+                if (this.wb_audioBlob) {
+                    wb_formData.append('audio', this.wb_audioBlob, 'audio.mp3');
+                }
+                if (this.replyingToMessage) {
+                    wb_formData.append('ref_message_id', this.replyingToMessage.message_id);
+                }
+                try {
+                    const wb_response = await axios.post('<?php echo get_uri('whatsboost/send_message'); ?>', wb_formData, {
+                        headers: {
+                            'Content-Type': 'multipart/form-data'
+                        }
+                    });
+
+                    // Clear attachments
+                    this.wb_newMessage = '';
+                    this.wb_imageAttachment = null;
+                    this.wb_videoAttachment = null;
+                    this.wb_documentAttachment = null;
+                    this.wb_audioBlob = null;
+                    this.wb_imagePreview = '';
+                    this.wb_videoPreview = '';
+                    this.wb_filterInteractions();
+                    this.wb_selectinteraction(this.wb_selectedinteraction.id);
+                    this.errorMessage = '';
+                    this.clearReply();
+                    this.wb_scrollToBottom();
+                    this.wb_selectedinteractionIndex = 0;
+                } catch (error) {
+                    const wb_rawErrorMessage = error.response && error.response.data ? error.response.data : 'An error occurred. Please try again.';
+                    // Define regular expressions to match the desired parts of the HTML error message
+                    const wb_typeRegex = /<p>Type: (.+)<\/p>/;
+                    const wb_messageRegex = /<p>Message: (.+)<\/p>/;
+
+                    // Extract the type and message from the HTML error message
+                    const wb_typeMatch = wb_rawErrorMessage.match(wb_typeRegex);
+                    var wb_messageMatch = wb_rawErrorMessage.match(wb_messageRegex);
+
+                    if (typeof(wb_messageMatch[1] == 'object')) {
+                        wb_messageMatch[1] = JSON.parse(wb_messageMatch[1]);
+                        wb_messageMatch[1] = wb_messageMatch[1].error.message;
+                    }
+
+                    const wb_getTypeText = wb_typeMatch ? wb_typeMatch[1] : '';
+                    const wb_getMessageText = wb_messageMatch ? wb_messageMatch[1] : '';
+
+                    // Construct the error message by concatenating the extracted text content
+                    const errorMessage = wb_getTypeText.trim() + '\n' + wb_getMessageText.trim();
+                    this.errorMessage = errorMessage;
+                }
+            },
+            replyToMessage(message) {
+                this.replyingToMessage = message || message.asset_url;
+                this.wb_scrollToBottom();
+            },
+            clearReply() {
+                this.replyingToMessage = null;
+            },
+            wb_initAgent() {
+                const agentId = this.wb_selectedinteraction.agent.agent_id;
+                this.selectedStaffId = agentId;
+                $('#AgentModal').modal('show');
+                setTimeout(function() {
+                    $('#AgentModal').find('select[name="assigned[]"]').val(agentId);
+                    $('#AgentModal').find('select[name="assigned[]"]').trigger('change');
+                }, 100);
+            },
+
+            wb_handleAssignedChange(event) {
+                const id = this.wb_selectedinteraction ? this.wb_selectedinteraction.id : null;
+                const staffId = $('select[name="assigned[]"]').val();
+                $.ajax({
+                        url: '<?= get_uri('whatsboost/assign_staff') ?>',
+                        type: 'POST',
+                        dataType: 'html',
+                        data: {
+                            'staff_id': staffId,
+                            'interaction_id': id
+                        },
+                    })
+                    .done((res) => {
+                        // After the request is successful, update the agent_id in wb_selectedinteraction
+                        if (this.wb_selectedinteraction) {
+                            res = JSON.parse(res)
+
+                            // Replace the agent_id in the current interaction's agent object
+                            this.wb_selectedinteraction.agent_icon = res.agent_icon;
+                            this.wb_selectedinteraction.agent_name = res.agent_name;
+
+                        }
+                        // Re-select the interaction to refresh the view
+                        this.wb_selectinteraction(id); // Call the method to refresh the selected interaction
+                        $('#AgentModal').modal('hide');
+                    });
+            },
+
+            sanitizeMessage(message) {
+                return DOMPurify.sanitize(message, {
+                    USE_PROFILES: {
+                        html: true
+                    }
+                });
+            },
+
+            trimMessage(message, maxLength = 100) {
+                const sanitizedMessage = this.sanitizeMessage(message);
+                if (sanitizedMessage.length > maxLength) {
+                    return sanitizedMessage.substring(0, maxLength) + '...';
+                }
+                return sanitizedMessage;
+            },
+
+            getOriginalMessage(refMessageId) {
+                const message = this.wb_selectedinteraction.messages.find(msg => msg.message_id === refMessageId) || {};
+                return {
+                    ...message,
+                    message: this.trimMessage(message.message),
+                    assets_url: message.asset_url || ''
+                };
+            },
+            wb_clearMessage() {
+                this.wb_newMessage = '';
+                this.attachment = null;
+                this.wb_audioBlob = null;
+            },
+
+            wb_handleAttachmentChange(event) {
+                const files = event.target.files;
+                this.attachment = files[0];
+            },
+
+            async wb_fetchinteractions() {
+                try {
+                    const staff_id = this.wb_login_staff_id;
+                    const wb_response = await fetch('<?php echo get_uri('whatsboost/interactions'); ?>');
+                    const data = await wb_response.json();
+                    const enable_supportagent = "<?= get_setting('wb_enable_supportagent') ?>";
+
+                    if (data && data.interactions) {
+
+                        const isAdmin = <?php echo $login_user->is_admin ? 'true' : 'false'; ?>;
+
+                        if (!isAdmin && enable_supportagent == 1) {
+                            this.interactions = data.interactions.filter(interaction => {
+
+                                const chatagent = interaction.agent;
+                                if (chatagent) {
+                                    const agentIds = Array.isArray(chatagent.agent_id) ? chatagent.agent_id : [chatagent.agent_id];
+                                    const assignIds = Array.isArray(chatagent.assign_id) ? chatagent.assign_id : [chatagent.assign_id];
+                                    // Check if `staff_id` is included in either `agentIds` or `assignIds`
+                                    return agentIds.includes(staff_id) || assignIds.includes(staff_id);
+                                }
+                                return false;
+                            });
+                        } else {
+                            this.interactions = data.interactions;
+                        }
+                    } else {
+                        this.interactions = [];
+                    }
+
+                    this.wb_filterInteractions();
+                    this.wb_updateSelectedInteraction();
+                } catch (error) {
+                    console.error('Error fetching interactions:', error);
+                }
+            },
+            initializePusher() {
+                if (!this.wb_pusher_api_key || !this.wb_pusher_cluster) {
+                    return; // Exit the method if either is null
+                }
+                // Initialize Pusher with your app key and cluster
+                const pusher = new Pusher(this.wb_pusher_api_key, {
+                    cluster: this.wb_pusher_cluster,
+                    encrypted: true,
+                });
+                // Subscribe to the 'interactions-channel'
+                const channel = pusher.subscribe('wboost-interactions-channel');
+                // Listen for the 'interaction-update' event
+                channel.bind('wboost-new-message-event', (data) => {
+                    // Update interactions based on real-time data from Pusher
+
+                    this.appendNewInteractions(JSON.parse(data.interaction));
+
+                });
+            },
+            appendNewInteractions(newInteractions) {
+                const staff_id = this.wb_login_staff_id;
+                const enable_supportagent = "<?= get_setting('wb_enable_supportagent') ?>";
+                const isAdmin = <?php echo $login_user->is_admin ? 'true' : 'false'; ?>;
+                const existingInteractions = [...this.interactions]; // Existing interactions array
+                const index = existingInteractions.findIndex(interaction => interaction.id === newInteractions.id); //matching interaction id to newInteractions id
+                if (index !== -1) { //interaction IDs match, replace the whole existing message with the new message
+                    const existingInteraction = existingInteractions[index];
+                    // Create a new object that contains all properties from newInteractions except messages
+                    const updatedInteraction = {
+                        ...existingInteraction, // Existing properties
+                        ...newInteractions, // Spread newInteractions properties
+                        messages: existingInteraction.messages // Keep the original messages for now
+                    };
+                    const find_msg_index = existingInteractions[index].messages.findIndex(interaction => interaction.id === newInteractions.messages.id); //matching interaction messages id to newInteractions messages id
+                    if (find_msg_index !== -1) {
+                        const messageIndex = newInteractions.messages.id; // Access the ID of newInteraction.messages
+                        if (messageIndex === existingInteractions[index].messages[find_msg_index].id) {
+                            // If IDs match, replace the whole existing message with the new message
+
+                            existingInteractions[index].messages[find_msg_index] = {
+                                ...newInteractions.messages
+                            };
+                        }
+                    } else {
+                        existingInteractions[index].messages.push(newInteractions.messages);
+
+                    }
+                    existingInteractions[index] = updatedInteraction;
+
+                } else {
+                    // Ensure newInteractions.messages is an array or initialize it as an empty array
+                    if (!Array.isArray(newInteractions.messages)) {
+                        newInteractions.messages = [newInteractions.messages];
+                    }
+                    // If the interaction id does not exist, push newInteractions directly
+                    existingInteractions.push({
+                        ...newInteractions,
+                        messages: [...newInteractions.messages] // Ensure messages is properly handled
+                    });
+
+                }
+
+                // Now sort the `existingInteractions` array by `time_sent`
+                existingInteractions.sort((a, b) => {
+                    const timeA = new Date(a.time_sent);
+                    const timeB = new Date(b.time_sent);
+                    return timeB - timeA; // Sort descending (latest first)
+                });
+
+                // Set the sorted array to `this.wb_displayedInteractions`
+                this.wb_displayedInteractions = existingInteractions;
+                if (!isAdmin && enable_supportagent == 1) {
+                    const filteredNewInteractions = existingInteractions.filter(interaction => {
+                        const chatagent = interaction.agent;
+                        if (chatagent) {
+                            const agentIds = Array.isArray(chatagent.agent_id) ? chatagent.agent_id : [chatagent.agent_id];
+                            const assignIds = Array.isArray(chatagent.assign_id) ? chatagent.assign_id : [chatagent.assign_id];
+                            // Check if `staff_id` is included in either `agentIds` or `assignIds`
+                            return agentIds.includes(staff_id) || assignIds.includes(staff_id);
+                        }
+                        return [];
+                    });
+
+                    // Append new interactions to the existing ones
+                    this.interactions = [...this.interactions, ...filteredNewInteractions];
+                } else {
+                    // Append new interactions for admins
+                    this.interactions = existingInteractions;
+                }
+                // Call your existing methods after updating interactions
+                this.wb_filterInteractions();
+                this.wb_updateSelectedInteraction();
+            },
+            wb_updateSelectedInteraction() {
+                const wb_new_index = this.interactions.findIndex(interaction => interaction.receiver_id === this.wb_selectedinteractionMobNo && interaction.wa_no === this.wb_selectedinteractionSenderNo && interaction.id === this.wb_selectedinteractionId);
+                this.wb_selectedinteraction = this.interactions[wb_new_index];
+            },
+
+            wb_getTime(timeString) {
+                const date = new Date(timeString);
+                const hour = date.getHours();
+                const minute = date.getMinutes();
+                const period = hour < 12 ? 'AM' : 'PM';
+                const formattedHour = hour % 12 || 12;
+                return `${formattedHour}:${minute < 10 ? '0' + minute : minute} ${period}`;
+            },
+            getDate(dateString) {
+                const wb_date = new Date(dateString);
+                const wb_options = {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                };
+                return wb_date.toLocaleDateString('en-GB', wb_options).replace(' ', '-').replace(' ', '-');
+            },
+
+            wb_shouldShowDate(currentMessage, previousMessage) {
+                if (!previousMessage) return true;
+                return this.getDate(currentMessage.time_sent) !== this.getDate(previousMessage.time_sent);
+            },
+
+            wb_scrollToBottom() {
+                this.$nextTick(() => {
+                    $('select[name="assigned[]"]').select2();
+                    const wb_chatContainer = this.$refs.wb_chatContainer;
+                    if (wb_chatContainer) {
+                        wb_chatContainer.scrollTop = wb_chatContainer.scrollHeight;
+                    }
+                });
+            },
+
+            wb_getAvatarInitials(name) {
+                const wb_words = name.split(' ');
+                const wb_initials = wb_words.slice(0, 2).map(word => word.charAt(0)).join('');
+                return wb_initials.toUpperCase();
+            },
+
+            playNotificationSound() {
+                var enableSound = "<?= get_setting('wb_enable_notification_sound') ?>";
+
+                if (enableSound == 1) {
+                    var audio = new Audio('<?= base_url(PLUGIN_URL_PATH . 'WhatsBoost/assets/audio/whatsapp_notification.mp3'); ?>');
+                    audio.play();
+                }
+            },
+
+            wb_countUnreadMessages(interactionId) {
+                const interaction = this.interactions.find(inter => inter.id === interactionId);
+                if (interaction) {
+                    return interaction.messages.filter(message => message.is_read == 0).length;
+                }
+                return 0;
+            },
+
+            async wb_toggleRecording() {
+                if (!this.wb_recording) {
+                    // Start wb_recording
+                    this.wb_startRecording();
+                } else {
+                    // Stop wb_recording
+                    this.wb_stopRecording();
+                }
+            },
+            wb_startRecording() {
+                // Initialize Recorder.js if not already initialized
+                if (!this.recorder) {
+                    this.recorder = new Recorder({
+                        type: "mp3",
+                        sampleRate: 16000,
+                        bitRate: 16,
+                        onProcess: (buffers, powerLevel, bufferDuration, bufferSampleRate) => {
+
+                        }
+                    });
+                }
+                this.recorder.open((stream) => {
+                    this.wb_recording = true;
+                    this.recorder.start();
+                }, (err) => {
+                    console.error("Failed to start wb_recording:", err);
+                });
+            },
+
+            wb_stopRecording() {
+                if (this.recorder && this.wb_recording) {
+                    this.recorder.stop((blob, duration) => {
+                        this.recorder.close();
+                        this.wb_recording = false;
+                        this.wb_audioBlob = blob;
+                        this.wb_sendMessage();
+                        this.wb_recordedAudio = URL.createObjectURL(blob);
+                    }, (err) => {
+                        console.error("Failed to stop wb_recording:", err);
+
+                    });
+                }
+            },
+
+            wb_handleItemClick(menu, submenu = null) {
+                const input_msg = this.wb_newMessage;
+                this.isLoading = true;
+                $.ajax({
+                    url: '<?= get_uri('whatsboost/get_ai_response') ?>',
+                    type: 'POST',
+                    dataType: 'json',
+                    data: {
+                        menu: menu,
+                        submenu: submenu,
+                        input_msg: input_msg,
+                    },
+                    success: (response) => {
+                        if (response.status === false) {
+                            appAlert.error(response.message, {
+                                duration: 10000
+                            });
+                        } else {
+                            this.wb_newMessage = response.message || input_msg;
+                            this.$nextTick(() => {
+                                const input = this.$refs.inputField;
+                                input.focus();
+                            });
+                        }
+                        this.isLoading = false;
+                    },
+                })
+            },
+            ucfirst(str) {
+                return str.charAt(0).toUpperCase() + str.slice(1);
+            },
+
+            wb_handleImageAttachmentChange(event) {
+                this.wb_imageAttachment = event.target.files[0];
+                this.wb_imagePreview = URL.createObjectURL(this.wb_imageAttachment);
+                this.showAttachmentOptions = false;
+            },
+            wb_handleVideoAttachmentChange(event) {
+                this.wb_videoAttachment = event.target.files[0];
+                this.videoPreview = URL.createObjectURL(this.wb_videoAttachment);
+                this.showAttachmentOptions = false;
+            },
+            wb_handleDocumentAttachmentChange(event) {
+                this.wb_documentAttachment = event.target.files[0];
+                this.showAttachmentOptions = false;
+            },
+            wb_removeImageAttachment() {
+                this.wb_imageAttachment = null;
+                this.imagePreview = '';
+            },
+            wb_removeVideoAttachment() {
+                this.wb_videoAttachment = null;
+                this.videoPreview = '';
+            },
+            wb_removeDocumentAttachment() {
+                this.wb_documentAttachment = null;
+            },
+
+            wb_formatTime(timestamp) {
+                const currentDate = new Date();
+                const messageDate = new Date(timestamp);
+                const diffInMs = currentDate - messageDate;
+                const diffInHours = diffInMs / (1000 * 60 * 60);
+
+                if (diffInHours < 24) {
+                    // Less than 24 hours, display time
+                    const hour = messageDate.getHours();
+                    const minute = messageDate.getMinutes();
+                    const period = hour < 12 ? 'AM' : 'PM';
+                    const formattedHour = hour % 12 || 12;
+                    return `${formattedHour}:${minute < 10 ? '0' + minute : minute} ${period}`;
+                } else {
+                    // More than 24 hours, display wb_date in dd-mm-yy format
+                    const day = messageDate.getDate();
+                    const month = messageDate.getMonth() + 1;
+                    const year = messageDate.getFullYear() % 100; // Get last two digits of the year
+                    return `${day}-${month < 10 ? '0' + month : month}-${year}`;
+                }
+            },
+
+            wb_alertTime(lastMsgTime) {
+                const timezone = "<?= get_setting('timezone'); ?>"; // Set the desired timezone
+                if (lastMsgTime) {
+                    // Parse the last message time in the given timezone
+                    const messageDate = new Date(lastMsgTime);
+                    // Get the current date and time in the specified timezone
+                    const currentDate = new Date(new Date().toLocaleString("en-US", {
+                        timeZone: timezone
+                    }));
+                    const diffInMs = currentDate - messageDate;
+                    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60)); // Round down to nearest hour
+                    const diffInMinutes = Math.floor((diffInMs % (1000 * 60 * 60)) / (1000 * 60)); // Calculate remaining minutes
+                    // Check if the difference is less than 24 hours
+                    if (diffInHours < 24) {
+                        // Calculate remaining time within 24 hours
+                        const remainingHours = 23 - diffInHours; // Subtract one hour from 24
+                        const remainingMinutes = 60 - diffInMinutes;
+                        return `Reply within ${remainingHours} hours and ${remainingMinutes} minutes`;
+                    } else {
+                        return null;
+                    }
+                } else {
+                    return lastMsgTime;
+                }
+            },
+            wb_stripHTMLTags(str) {
+                return str.replace(/<\/?[^>]+(>|$)/g, "");
+            },
+            wb_truncateText(text, wordLimit) {
+                text = this.formatMessage(text);
+                const strippedText = this.wb_stripHTMLTags(text);
+                const wb_words = strippedText.split(' ');
+                if (wb_words.length > wordLimit) {
+                    return wb_words.slice(0, wordLimit).join(' ') + '...';
+                }
+                return text;
+            },
+            wb_filterInteractions() {
+                let filtered = this.interactions;
+
+                if (this.wb_selectedWaNo !== "*") {
+                    filtered = filtered.filter(interaction => interaction.wa_no === this.wb_selectedWaNo);
+                }
+                this.wb_filteredInteractions = filtered;
+                this.wb_searchInteractions(); // Call wb_searchInteractions to apply the search text filter
+            },
+
+            wb_searchInteractions() {
+                if (this.wb_searchText) {
+                    const searchText = this.wb_searchText.toLowerCase();
+                    this.wb_displayedInteractions = this.wb_filteredInteractions.filter(interaction => {
+                        return Object.keys(interaction).some(key => {
+                            const value = interaction[key];
+                            return value != null && value.toString().toLowerCase().includes(searchText);
+                        });
+                    });
+                } else {
+                    this.wb_displayedInteractions = this.wb_filteredInteractions;
+                }
+            },
+
+            wb_markInteractionAsRead(interactionId) {
+                // Immediately update the UI to reflect the interaction as read
+                const interaction = this.interactions.find(interaction => interaction.id === interactionId);
+                if (interaction) {
+                    interaction.read = true; // Assuming there's a 'read' property in your interaction object
+                }
+                // Send a POST request to mark the interaction as read
+                fetch('<?php echo get_uri('whatsboost/mark_interaction_as_read'); ?>', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            interaction_id: interactionId,
+                            csrf_token_name: this.wb_csrfToken
+                        }),
+                    })
+                    .then(wb_response => {
+                        if (!wb_response.ok) {
+                            throw new Error('Network wb_response was not ok');
+                        }
+                        return wb_response.json();
+                    })
+                    .catch(error => {
+                        console.error('Error marking interaction as read:', error);
+                        // Revert the UI change if there's an error
+                        if (interaction) {
+                            interaction.read = false;
+                        }
+                    });
+            },
+
+            toggleEmojiPicker() {
+                this.wb_showEmojiPicker = !this.wb_showEmojiPicker;
+                if (this.wb_showEmojiPicker) {
+                    this.initEmojiPicker();
+                } else {
+                    this.removeEmojiPicker();
+                }
+            },
+
+            initEmojiPicker() {
+                const container = document.getElementById('emoji-picker-container');
+                container.innerHTML = '';
+
+                const pickerOptions = {
+                    onEmojiSelect: (emoji) => {
+                        this.wb_newMessage += emoji.native;
+                    }
+                };
+                const picker = new EmojiMart.Picker(pickerOptions);
+                container.appendChild(picker);
+
+                const input = document.getElementById('wb_newMessage');
+                const rect = input.getBoundingClientRect();
+                const containerRect = container.getBoundingClientRect();
+
+                document.addEventListener('click', this.handleClickOutside);
+            },
+
+            removeEmojiPicker() {
+                const container = this.$refs.emojiPickerContainer;
+                if (container) {
+                    container.innerHTML = '';
+                }
+                document.removeEventListener('click', this.handleClickOutside);
+            },
+
+            handleClickOutside(event) {
+                const container = this.$refs.emojiPickerContainer;
+                if (container && !container.contains(event.target) && !event.target.closest('#emoji_btn')) {
+                    this.wb_showEmojiPicker = false;
+                    this.removeEmojiPicker();
+                }
+            },
+        },
+        mounted() {
+            this.darkMode = localStorage.getItem('darkMode') === 'true';
+            if (this.darkMode) {
+                this.$el.classList.add('dark-mode');
+            }
+            // Add event listener to hide the dropdown when clicking outside
+            window.addEventListener('mouseup', (event) => {
+                var pol = document.getElementById('all_atech');
+                var canned = document.getElementById('canned_replies');
+                if (pol) {
+                    // Check if the clicked element is outside the attachment options and the button
+                    if (event.target !== pol && !pol.contains(event.target) && !event.target.closest('button')) {
+                        this.showAttachmentOptions = false; // Hide the dropdown
+                    }
+                }
+                if (canned) {
+                    // Check if the clicked element is outside the attachment options and the button
+                    if (event.target !== canned && !canned.contains(event.target) && !event.target.closest('button')) {
+                        this.cannedRepliesVisible = false; // Hide the dropdown
+                    }
+                }
+            });
+        },
+        watch: {
+            wb_searchText() {
+                this.wb_searchInteractions();
+            },
+            wb_displayedInteractions(newInteractions) {
+                newInteractions.forEach(interaction => {
+                    const previousCount = this.previousCounts[interaction.id] || 0;
+                    const currentCount = this.wb_countUnreadMessages(interaction.id);
+
+                    if (currentCount > previousCount) {
+                        this.playNotificationSound();
+                    }
+
+                    this.$set(this.previousCounts, interaction.id, currentCount);
+                });
+            }
+        },
+
+        created() {
+            this.wb_fetchinteractions().then(() => {
+                // After fetching data, initialize Pusher to listen for updates
+                this.initializePusher();
+                this.handlerequiredata();
+            });
+
+        },
+        computed: {
+            overdueAlert() {
+                const lastMsgTime = this.wb_selectedinteraction.last_msg_time;
+                if (lastMsgTime) {
+                    const currentDate = new Date();
+                    const messageDate = new Date(lastMsgTime);
+                    const diffInHours = Math.floor((currentDate - messageDate) / (1000 * 60 * 60));
+
+                    if (diffInHours >= 24) {
+                        const alertStyles = this.darkMode ?
+                            'background: #333; color: #fff; border-color: #555' // Dark mode styles
+                            :
+                            'background: #fff1b8; color: #b45309'; // Light mode styles
+                        return `
+							<div class="d-flex align-items-center border-0 px-4 py-2 rounded position-relative mt-2" role="alert" style="${alertStyles}">
+                            <i class="icon-40 me-2 fw-bold" data-feather="alert-triangle" tyle="color: ${this.darkMode ? '#facc15' : '#b45309'}"></i>
+                            <span class="d-block d-sm-inline" style="color: ${this.darkMode ? '#facc15' : '#b45309'}">
+                                <span class="fw-semibold"style="color: ${this.darkMode ? '#facc15' : '#b45309'}">24 hours limit</span>
+                                WhatsApp blocks messages 24 hours after the last contact, but template messages can still be sent.
+                            </span>
+                        </div>
+                        `;
+                    }
+                }
+                return null;
+            },
+            wb_selectedInteraction() {
+                return this.wb_selectedinteractionIndex !== null ? this.interactions[this.wb_selectedinteractionIndex] : null;
+            },
+            wb_showSendButton() {
+                return this.wb_imageAttachment || this.wb_videoAttachment || this.wb_documentAttachment || this.wb_newMessage.trim() || this.wb_recording;
+            },
+
+            wb_uniqueWaNos() {
+                // Create a Set to store unique wa_no values
+                const wb_uniqueWaNos = new Set();
+                // Filter out interactions with duplicate wa_no values
+                return this.interactions.filter(interaction => {
+                    if (!wb_uniqueWaNos.has(interaction.wa_no)) {
+                        wb_uniqueWaNos.add(interaction.wa_no);
+
+                        return true;
+                    }
+                    return false;
+                });
+            },
+            isButtonEnabled() {
+                return this.wb_newMessage.trim().length > 0;
+            },
+            filteredLanguages() {
+                return this.languages.filter(lang => lang.toLowerCase().includes(this.searchQuery.toLowerCase()));
+            },
+        },
+    });
+</script>

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModuleMenus } from "@/hooks/useModuleMenus";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu, Shield, FileText, HelpCircle, Icon } from "lucide-react";
+import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu, Shield, FileText, HelpCircle } from "lucide-react";
 import { Button } from "./ui/button";
 
 // Função para mapear nomes de ícones para componentes
@@ -81,11 +81,11 @@ export function Sidebar() {
   // Adicionar menus dos módulos
   const moduleMenuItems = moduleMenus.map(menu => ({
     name: (menu as any).label || menu.name,
-    href: menu.path,
-    // Mapear ícones dinamicamente
+    href: menu.path, // Pode ser undefined se tiver filhos
     icon: getIconComponent(menu.icon),
     show: true,
     position: (menu as any).position || 99,
+    children: menu.children,
   }));
 
   // Ordenar módulos por posição
@@ -93,6 +93,17 @@ export function Sidebar() {
 
   // Estado para controlar expansão do grupo Administração
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+
+  // Estado para controlar expansão dos módulos (mapa de nomes)
+  const [openModules, setOpenModules] = useState<Record<string, boolean>>({});
+
+  const toggleModule = (moduleName: string) => {
+    setOpenModules(prev => ({
+      ...prev,
+      [moduleName]: !prev[moduleName]
+    }));
+    if (!isExpanded) setIsExpanded(true);
+  };
 
   return (
     <div
@@ -200,10 +211,77 @@ export function Sidebar() {
           {/* 3. Modules (Sorted, below Admin) */}
           {sortedModules.map((item) => {
             const Icon = item.icon;
+            const hasChildren = item.children && item.children.length > 0;
+            const isOpen = openModules[item.name] || false;
+
+            // Se tiver filhos, renderiza como accordion
+            if (hasChildren) {
+              if (isExpanded) {
+                return (
+                  <div key={item.name} className="space-y-1">
+                    <Button
+                      variant="ghost"
+                      onClick={() => toggleModule(item.name)}
+                      className="w-full justify-between px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Icon className="h-5 w-5" />
+                        <span>{item.name}</span>
+                      </div>
+                      <ChevronLeft className={cn("h-4 w-4 transition-transform", isOpen ? "-rotate-90" : "rotate-180")} />
+                    </Button>
+
+                    {isOpen && (
+                      <div className="pl-4 space-y-1 border-l ml-4 border-border">
+                        {item.children!.map((child: any) => {
+                          const ChildIcon = getIconComponent(child.icon);
+                          const childPath = child.path || "#";
+                          const isChildActive = pathname === childPath;
+
+                          return (
+                            <Link
+                              key={child.name}
+                              href={childPath}
+                              className={cn(
+                                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                                isChildActive
+                                  ? "text-primary"
+                                  : "text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              <ChildIcon className="h-4 w-4" />
+                              <span>{child.label || child.name}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              } else {
+                // Collapsed view for module with children
+                return (
+                  <Button
+                    key={item.name}
+                    variant="ghost"
+                    onClick={() => {
+                      setIsExpanded(true);
+                      toggleModule(item.name);
+                    }}
+                    className="w-full justify-center px-2 py-2 hover:bg-accent hover:text-accent-foreground"
+                    title={item.name}
+                  >
+                    <Icon className="h-5 w-5 flex-shrink-0" />
+                  </Button>
+                );
+              }
+            }
+
+            // Se não tiver filhos, renderiza como link normal
             return (
               <Link
-                key={item.href}
-                href={item.href}
+                key={item.href || item.name}
+                href={item.href || '#'}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                   pathname === item.href

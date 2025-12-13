@@ -189,6 +189,7 @@ export class TenantsController {
 
   // Endpoints para gerenciamento de módulos dos tenants
 
+  @SkipThrottle()
   @Get('my-tenant/modules/active')
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   async getMyTenantActiveModules(@Req() req: ExpressRequest & { user: any }) {

@@ -7,6 +7,7 @@ import { PlatformConfigProvider } from "@/contexts/PlatformConfigContext";
 import { Toaster } from "@/components/ui/toaster";
 import { AppLayout } from "@/components/AppLayout";
 import { InactivityLogout } from "@/components/InactivityLogout";
+import { RequestLimiterDebug } from "@/components/RequestLimiterDebug";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -47,6 +48,7 @@ export default function RootLayout({
               <AppLayout>
                 {children}
               </AppLayout>
+              <RequestLimiterDebug />
               <Toaster />
             </SecurityConfigProvider>
           </AuthProvider>

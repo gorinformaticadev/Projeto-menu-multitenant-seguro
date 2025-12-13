@@ -18,6 +18,7 @@ import { CommonModule } from './common/common.module';
 import { TokenCleanupService } from './common/services/token-cleanup.service';
 import { UpdateModule } from './update/update.module';
 import { ModulesModule } from './modules/modules.module';
+import { ModeloModelModule } from './modules/modelo-model/modelo-model.module';
 
 @Module({
   imports: [
@@ -36,8 +37,8 @@ import { ModulesModule } from './modules/modules.module';
       {
         name: 'default',
         ttl: 60000, // 60 segundos (1 minuto)
-        // Desenvolvimento: 2000 req/min | Produção: 100 req/min
-        limit: process.env.NODE_ENV === 'production' ? 100 : 2000,
+        // Desenvolvimento: 10000 req/min | Produção: 1000 req/min
+        limit: process.env.NODE_ENV === 'production' ? 1000 : 10000,
       },
       {
         name: 'login',
@@ -56,6 +57,7 @@ import { ModulesModule } from './modules/modules.module';
     AuditModule,
     UpdateModule,
     ModulesModule,
+    ModeloModelModule,
   ],
   providers: [
     {

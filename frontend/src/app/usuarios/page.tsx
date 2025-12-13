@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,7 +38,7 @@ interface Tenant {
   ativo: boolean;
 }
 
-export default function UsuariosPage() {
+function UsuariosPageContent() {
   const searchParams = useSearchParams();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [selectedTenantId, setSelectedTenantId] = useState<string>("");
@@ -243,21 +243,20 @@ export default function UsuariosPage() {
   const selectedTenant = tenants.find(t => t.id === selectedTenantId);
 
   return (
-    <ProtectedRoute allowedRoles={["SUPER_ADMIN", "ADMIN"]}>
-      <div className="p-8">
-        {/* Slot Injetado no Topo */}
-        <ModuleSlot position="users_page_top" className="mb-6" />
+    <div className="p-8">
+      {/* Slot Injetado no Topo */}
+      <ModuleSlot position="users_page_top" className="mb-6" />
 
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">Gerenciar Usuários</h1>
-            <p className="text-muted-foreground">Selecione uma empresa para gerenciar seus usuários</p>
-          </div>
-          <Button onClick={openCreateDialog} disabled={!selectedTenantId || user?.role === "CLIENT"}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Usuário
-          </Button>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold">Gerenciar Usuários</h1>
+          <p className="text-muted-foreground">Selecione uma empresa para gerenciar seus usuários</p>
         </div>
+        <Button onClick={openCreateDialog} disabled={!selectedTenantId || user?.role === "CLIENT"}>
+          <Plus className="h-4 w-4 mr-2" />
+          Novo Usuário
+        </Button>
+      </div>
 
         {/* Seletor de Tenant - Apenas para SUPER_ADMIN */}
         {user?.role === "SUPER_ADMIN" && (
@@ -489,6 +488,21 @@ export default function UsuariosPage() {
           </DialogContent>
         </Dialog>
       </div>
+  );
+}
+
+export default function UsuariosPage() {
+  return (
+    <ProtectedRoute allowedRoles={["SUPER_ADMIN", "ADMIN"]}>
+      <Suspense fallback={
+        <div className="p-8">
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        </div>
+      }>
+        <UsuariosPageContent />
+      </Suspense>
     </ProtectedRoute>
   );
 }
