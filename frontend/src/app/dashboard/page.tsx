@@ -8,6 +8,8 @@ import { Shield, Building2, Users, Settings, AlertTriangle } from "lucide-react"
 import * as LucideIcons from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModuleSlot } from "@/components/ModuleSlot";
+import { ModuleRegistryWidgets } from "@/components/ModuleRegistryWidgets";
+import { ModuleRegistryNotifications } from "@/components/ModuleRegistryNotifications";
 
 // Helper para ícones dinâmicos
 const getIconComponent = (iconName: string): any => {
@@ -109,7 +111,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Widgets Dinâmicos dos Módulos */}
+        {/* Widgets Dinâmicos dos Módulos (Sistema Antigo) */}
         {moduleFeatures.dashboardWidgets.map((widget, index) => {
           const Icon = getIconComponent(widget.icon);
           return (
@@ -133,6 +135,14 @@ export default function DashboardPage() {
             </Card>
           );
         })}
+
+        {/* Widgets do Module Registry (Sistema Novo) */}
+        <ModuleRegistryWidgets />
+      </div>
+
+      {/* Notificações dos Módulos */}
+      <div className="mt-8">
+        <ModuleRegistryNotifications />
       </div>
     </div>
   );

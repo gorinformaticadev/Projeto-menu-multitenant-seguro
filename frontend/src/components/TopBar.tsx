@@ -10,6 +10,7 @@ import { Bell, Search, User, LogOut, Info } from "lucide-react";
 import { API_URL } from "@/lib/api";
 import api from "@/lib/api";
 import { useModuleFeatures } from "@/hooks/useModuleFeatures";
+import { ModuleRegistryUserMenu } from "./ModuleRegistryUserMenu";
 import * as LucideIcons from "lucide-react";
 
 // Helper para ícones dinâmicos
@@ -350,7 +351,7 @@ export function TopBar() {
                   Meu Perfil
                 </a>
 
-                {/* Itens do Menu do Usuário (Módulos) */}
+                {/* Itens do Menu do Usuário (Sistema Antigo) */}
                 {moduleFeatures.userMenu.map((item, index) => {
                   const Icon = getIconComponent(item.icon);
                   return (
@@ -365,6 +366,9 @@ export function TopBar() {
                     </a>
                   );
                 })}
+
+                {/* Itens do Menu do Usuário (Module Registry) */}
+                <ModuleRegistryUserMenu onItemClick={() => setShowUserMenu(false)} />
 
                 {/* Versão do Sistema */}
                 {user?.role === "SUPER_ADMIN" ? (

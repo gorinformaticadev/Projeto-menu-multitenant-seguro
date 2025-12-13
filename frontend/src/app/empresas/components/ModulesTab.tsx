@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
 import { Package } from "lucide-react";
+import { moduleRegistry } from "@/lib/module-registry";
 
 interface ModuleConfig {
   name: string;
@@ -34,29 +35,22 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
     try {
       setLoading(true);
       
-      // Obter lista de módulos disponíveis
-      const modulesResponse = await api.get("/modules");
-      const moduleNames = modulesResponse.data;
+      // Módulos disponíveis (incluindo Module Exemplo)
+      const availableModules = [
+        {
+          name: 'module-exemplo',
+          displayName: 'Module Exemplo',
+          description: 'Módulo de exemplo para demonstração do sistema modular',
+          version: '1.0.0'
+        }
+      ];
       
-      // Obter configuração de cada módulo
-      const moduleConfigs = await Promise.all(
-        moduleNames.map(async (moduleName: string) => {
-          const configResponse = await api.get(`/modules/${moduleName}/config`);
-          return {
-            name: moduleName,
-            ...configResponse.data
-          };
-        })
-      );
+      setModules(availableModules);
       
-      setModules(moduleConfigs);
-      
-      // Obter status dos módulos para este tenant
-      const statusResponse = await api.get(`/tenants/${tenantId}/modules/active`);
-      const statusMap: Record<string, boolean> = {};
-      statusResponse.data.activeModules.forEach((moduleName: string) => {
-        statusMap[moduleName] = true;
-      });
+      // Status inicial dos módulos (por padrão, Module Exemplo está ativo)
+      const statusMap: Record<string, boolean> = {
+        'module-exemplo': true
+      };
       
       setModuleStatus(statusMap);
     } catch (error: any) {
@@ -74,17 +68,17 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
     try {
       if (currentStatus) {
         // Desativar módulo
-        await api.post(`/tenants/${tenantId}/modules/${moduleName}/deactivate`);
+        moduleRegistry.deactivateModule(moduleName);
         toast({
           title: "Módulo desativado",
-          description: `O módulo ${moduleName} foi desativado para este tenant.`,
+          description: `O módulo ${moduleName} foi desativado. Recarregue a página para ver as alterações.`,
         });
       } else {
         // Ativar módulo
-        await api.post(`/tenants/${tenantId}/modules/${moduleName}/activate`);
+        moduleRegistry.activateModule(moduleName);
         toast({
           title: "Módulo ativado",
-          description: `O módulo ${moduleName} foi ativado para este tenant.`,
+          description: `O módulo ${moduleName} foi ativado. Recarregue a página para ver as alterações.`,
         });
       }
       
@@ -96,7 +90,7 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
     } catch (error: any) {
       toast({
         title: "Erro ao atualizar módulo",
-        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        description: "Ocorreu um erro ao alterar o status do módulo",
         variant: "destructive",
       });
     }

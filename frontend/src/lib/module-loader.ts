@@ -17,10 +17,7 @@ import { moduleRegistry, ModuleContribution } from './module-registry';
  */
 const AVAILABLE_MODULES = [
   'core',
-  'sample-module',
-  'modeloModel',
-  'exemploAssets',
-  // 'whatsboost' // Descomente para ativar
+  'module-exemplo',
 ] as const;
 
 type ModuleId = typeof AVAILABLE_MODULES[number];
@@ -53,16 +50,8 @@ async function loadModule(moduleId: ModuleId): Promise<void> {
       registerCoreModule();
       break;
     
-    case 'sample-module':
-      registerSampleModule();
-      break;
-    
-    case 'modeloModel':
-      registerModeloModelModule();
-      break;
-    
-    case 'exemploAssets':
-      registerExemploAssetsModule();
+    case 'module-exemplo':
+      registerModuleExemploModule();
       break;
     
     default:
@@ -132,75 +121,83 @@ function registerCoreModule(): void {
 }
 
 /**
- * REGISTRO DO MÓDULO SAMPLE
+ * REGISTRO DO MODULE EXEMPLO
+ * Demonstra todas as funcionalidades do sistema modular
  */
-function registerSampleModule(): void {
+function registerModuleExemploModule(): void {
   const contribution: ModuleContribution = {
-    id: 'sample-module',
-    name: 'Módulo de Exemplo',
+    id: 'module-exemplo',
+    name: 'Module Exemplo',
     version: '1.0.0',
     enabled: true,
     
+    // 1️⃣ Menu lateral - Grupo expansível "Module Exemplo"
     sidebar: [
       {
-        id: 'sample',
-        name: 'Exemplo',
-        href: '/sample',
-        icon: 'HelpCircle',
-        order: 100 // Módulos começam na ordem 100+
+        id: 'module-exemplo-main',
+        name: 'Página Principal',
+        href: '/module-exemplo',
+        icon: 'Home',
+        order: 100,
+        group: 'module-exemplo'
+      },
+      {
+        id: 'module-exemplo-settings',
+        name: 'Configurações',
+        href: '/module-exemplo/settings',
+        icon: 'Settings',
+        order: 101,
+        group: 'module-exemplo'
+      }
+    ],
+    
+    // 2️⃣ Widget para dashboard
+    dashboard: [
+      {
+        id: 'module-exemplo-widget',
+        name: 'Widget do Module Exemplo',
+        component: 'ExemploWidget',
+        order: 50,
+        size: 'medium'
+      }
+    ],
+    
+    // 3️⃣ Menu do usuário
+    userMenu: [
+      {
+        id: 'module-exemplo-quick-access',
+        name: 'Acesso rápido – Module Exemplo',
+        href: '/module-exemplo',
+        icon: 'Package',
+        order: 10
+      }
+    ],
+    
+    // 4️⃣ Notificações
+    notifications: [
+      {
+        id: 'module-exemplo-notification',
+        type: 'info',
+        title: 'Module Exemplo',
+        message: 'Notificação do Module Exemplo ativa.',
+        timestamp: new Date()
+      }
+    ],
+    
+    // 5️⃣ Taskbar
+    taskbar: [
+      {
+        id: 'module-exemplo-taskbar',
+        name: 'Atalho do Module Exemplo',
+        href: '/module-exemplo',
+        icon: 'Package',
+        order: 10
       }
     ]
   };
 
   moduleRegistry.register(contribution);
-}
-
-/**
- * REGISTRO DO MÓDULO MODELO MODEL
- */
-function registerModeloModelModule(): void {
-  const contribution: ModuleContribution = {
-    id: 'modeloModel',
-    name: 'Modelo Model',
-    version: '1.0.0',
-    enabled: true,
-    
-    sidebar: [
-      {
-        id: 'modelo',
-        name: 'Modelo',
-        href: '/modelo',
-        icon: 'FileText',
-        order: 110 // Módulos começam na ordem 100+
-      }
-    ]
-  };
-
-  moduleRegistry.register(contribution);
-}
-
-/**
- * REGISTRO DO MÓDULO EXEMPLO ASSETS
- */
-function registerExemploAssetsModule(): void {
-  const contribution: ModuleContribution = {
-    id: 'exemploAssets',
-    name: 'Exemplo Assets',
-    version: '1.0.0',
-    enabled: true,
-    
-    sidebar: [
-      {
-        id: 'assets',
-        name: 'Assets',
-        href: '/assets',
-        icon: 'Shield',
-        order: 120 // Módulos começam na ordem 100+
-      }
-    ]
-  };
-
-  moduleRegistry.register(contribution);
+  console.log('✅ Module Exemplo registrado com TODAS as funcionalidades');
 }
 
 /**

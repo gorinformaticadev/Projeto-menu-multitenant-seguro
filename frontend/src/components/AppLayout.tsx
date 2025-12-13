@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { useModuleRegistry } from "@/hooks/useModuleRegistry";
+import { ModuleRegistryTaskbar } from "./ModuleRegistryTaskbar";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -50,6 +51,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+      
+      {/* Taskbar dos Módulos */}
+      <ModuleRegistryTaskbar />
     </div>
   );
 }

@@ -30,6 +30,36 @@ export interface ModuleDashboardWidget {
   size?: 'small' | 'medium' | 'large';
 }
 
+export interface ModuleUserMenuItem {
+  id: string;
+  name: string;
+  href: string;
+  icon: string;
+  order?: number;
+  permissions?: string[];
+  roles?: string[];
+}
+
+export interface ModuleNotification {
+  id: string;
+  type: 'info' | 'warning' | 'error' | 'success';
+  title: string;
+  message: string;
+  timestamp?: Date;
+  permissions?: string[];
+  roles?: string[];
+}
+
+export interface ModuleTaskbarItem {
+  id: string;
+  name: string;
+  href: string;
+  icon: string;
+  order?: number;
+  permissions?: string[];
+  roles?: string[];
+}
+
 export interface ModuleContribution {
   id: string;
   name: string;
@@ -39,13 +69,20 @@ export interface ModuleContribution {
   // Contribuições opcionais - se não declarar, core ignora silenciosamente
   sidebar?: ModuleMenuItem[];
   dashboard?: ModuleDashboardWidget[];
+  userMenu?: ModuleUserMenuItem[];
+  notifications?: ModuleNotification[];
+  taskbar?: ModuleTaskbarItem[];
 }
 
 class ModuleRegistry {
   private static instance: ModuleRegistry;
   private contributions: Map<string, ModuleContribution> = new Map();
+  private moduleActivationStatus: Map<string, boolean> = new Map();
 
-  private constructor() {}
+  private constructor() {
+    // Por padrão, Module Exemplo está ativo
+    this.moduleActivationStatus.set('module-exemplo', true);
+  }
 
   static getInstance(): ModuleRegistry {
     if (!ModuleRegistry.instance) {
@@ -85,8 +122,8 @@ class ModuleRegistry {
     const items: ModuleMenuItem[] = [];
 
     for (const contribution of this.contributions.values()) {
-      // Se módulo não declarou sidebar → ignora silenciosamente
-      if (!contribution.enabled || !contribution.sidebar) {
+      // Se módulo não declarou sidebar ou não está ativo → ignora silenciosamente
+      if (!this.isContributionActive(contribution) || !contribution.sidebar) {
         continue;
       }
 
@@ -149,8 +186,8 @@ class ModuleRegistry {
     const widgets: ModuleDashboardWidget[] = [];
 
     for (const contribution of this.contributions.values()) {
-      // Se módulo não declarou dashboard → ignora silenciosamente
-      if (!contribution.enabled || !contribution.dashboard) {
+      // Se módulo não declarou dashboard ou não está ativo → ignora silenciosamente
+      if (!this.isContributionActive(contribution) || !contribution.dashboard) {
         continue;
       }
 
@@ -204,12 +241,120 @@ class ModuleRegistry {
   }
 
   /**
+   * FUNÇÃO DE AGREGAÇÃO: User Menu Items
+   */
+  getUserMenuItems(userRole?: string, permissions?: string[]): ModuleUserMenuItem[] {
+    const items: ModuleUserMenuItem[] = [];
+
+    for (const contribution of this.contributions.values()) {
+      if (!this.isContributionActive(contribution) || !contribution.userMenu) {
+        continue;
+      }
+
+      const filteredItems = contribution.userMenu.filter(item => 
+        this.hasAccess(item.roles, item.permissions, userRole, permissions)
+      );
+
+      items.push(...filteredItems);
+    }
+
+    return items.sort((a, b) => {
+      if (a.order !== undefined && b.order !== undefined) {
+        return a.order - b.order;
+      }
+      return a.name.localeCompare(b.name);
+    });
+  }
+
+  /**
+   * FUNÇÃO DE AGREGAÇÃO: Notifications
+   */
+  getNotifications(userRole?: string, permissions?: string[]): ModuleNotification[] {
+    const notifications: ModuleNotification[] = [];
+
+    for (const contribution of this.contributions.values()) {
+      if (!this.isContributionActive(contribution) || !contribution.notifications) {
+        continue;
+      }
+
+      const filteredNotifications = contribution.notifications.filter(notification => 
+        this.hasAccess(notification.roles, notification.permissions, userRole, permissions)
+      );
+
+      notifications.push(...filteredNotifications);
+    }
+
+    return notifications.sort((a, b) => {
+      const aTime = a.timestamp?.getTime() || 0;
+      const bTime = b.timestamp?.getTime() || 0;
+      return bTime - aTime; // Mais recentes primeiro
+    });
+  }
+
+  /**
+   * FUNÇÃO DE AGREGAÇÃO: Taskbar Items
+   */
+  getTaskbarItems(userRole?: string, permissions?: string[]): ModuleTaskbarItem[] {
+    const items: ModuleTaskbarItem[] = [];
+
+    for (const contribution of this.contributions.values()) {
+      if (!this.isContributionActive(contribution) || !contribution.taskbar) {
+        continue;
+      }
+
+      const filteredItems = contribution.taskbar.filter(item => 
+        this.hasAccess(item.roles, item.permissions, userRole, permissions)
+      );
+
+      items.push(...filteredItems);
+    }
+
+    return items.sort((a, b) => {
+      if (a.order !== undefined && b.order !== undefined) {
+        return a.order - b.order;
+      }
+      return a.name.localeCompare(b.name);
+    });
+  }
+
+  /**
+   * Ativa um módulo
+   */
+  activateModule(moduleId: string): void {
+    this.moduleActivationStatus.set(moduleId, true);
+    console.log(`✅ Módulo ativado: ${moduleId}`);
+  }
+
+  /**
+   * Desativa um módulo
+   */
+  deactivateModule(moduleId: string): void {
+    this.moduleActivationStatus.set(moduleId, false);
+    console.log(`❌ Módulo desativado: ${moduleId}`);
+  }
+
+  /**
+   * Verifica se um módulo está ativo
+   */
+  isModuleActive(moduleId: string): boolean {
+    return this.moduleActivationStatus.get(moduleId) ?? false;
+  }
+
+  /**
+   * Verifica se uma contribuição deve ser considerada (módulo ativo)
+   */
+  private isContributionActive(contribution: ModuleContribution): boolean {
+    return contribution.enabled && this.isModuleActive(contribution.id);
+  }
+
+  /**
    * Debug: Lista todos os módulos registrados
    */
   debug(): void {
     console.log('📋 Módulos registrados:', Array.from(this.contributions.keys()));
     for (const [id, contribution] of this.contributions.entries()) {
-      console.log(`  - ${id}: ${contribution.sidebar?.length || 0} sidebar items, ${contribution.dashboard?.length || 0} widgets`);
+      const isActive = this.isModuleActive(id);
+      console.log(`  - ${id}: ${isActive ? '✅' : '❌'} ${contribution.sidebar?.length || 0} sidebar, ${contribution.dashboard?.length || 0} dashboard, ${contribution.userMenu?.length || 0} userMenu, ${contribution.notifications?.length || 0} notifications, ${contribution.taskbar?.length || 0} taskbar`);
     }
   }
 }
