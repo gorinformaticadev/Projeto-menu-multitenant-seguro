@@ -1,0 +1,32 @@
+{
+  "Ajuda": {
+    "titulo": "Acerca del Sistema",
+    "descricao": "Información sobre el proyecto y sus funcionalidades",
+    "sobre_sistema": {
+      "titulo": "Acerca del Sistema",
+      "descricao": "Este es un sistema multitenant seguro desarrollado con tecnologías modernas. El sistema implementa aislamiento de datos entre tenants, control de acceso basado en roles (RBAC), autenticación JWT y diversas otras funcionalidades de seguridad."
+    },
+    "funcionalidades": {
+      "titulo": "Funcionalidades Principales",
+      "autenticacao": "Autenticación JWT con Bcrypt para hashing de contraseñas",
+      "multitenant": "Aislamiento multitenant con filtros automáticos",
+      "rbac": "Control de acceso basado en roles (RBAC)",
+      "modularidade": "Arquitectura modular con soporte para plugins",
+      "seguranca": "Protecciones de seguridad en múltiples capas"
+    },
+    "tecnologias": {
+      "titulo": "Tecnologías Utilizadas",
+      "backend": "Backend",
+      "frontend": "Frontend"
+    },
+    "seguranca": {
+      "titulo": "Recursos de Seguridad",
+      "descricao": "El sistema implementa diversos mecanismos de seguridad para proteger los datos y garantizar la integridad del sistema:",
+      "jwt": "Tokens JWT con expiración y refresco automático",
+      "bcrypt": "Hashing de contraseñas con Bcrypt (salt 10)",
+      "cors": "Configuración de CORS para protección contra solicitudes maliciosas",
+      "validacao": "Validación rigurosa de datos de entrada",
+      "isolamento": "Aislamiento automático de datos entre tenants"
+    }
+  }
+}

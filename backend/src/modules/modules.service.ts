@@ -1,12 +1,19 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AutoLoaderService } from './auto-loader.service';
 
 @Injectable()
 export class ModulesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private autoLoaderService: AutoLoaderService
+  ) {}
 
   // Listar todos os módulos disponíveis no sistema
   async findAll() {
+    // Carregar módulos do diretório automaticamente
+    await this.autoLoaderService.loadModulesFromDirectory();
+    
     const modules = await this.prisma.module.findMany({
       where: { isActive: true },
       orderBy: { displayName: 'asc' },

@@ -4,13 +4,31 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { useModuleMenus } from "@/hooks/useModuleMenus";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu, Shield, FileText } from "lucide-react";
+import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu, Shield, FileText, HelpCircle, Icon } from "lucide-react";
 import { Button } from "./ui/button";
+
+// Função para mapear nomes de ícones para componentes
+const getIconComponent = (iconName: string): React.ComponentType<any> => {
+  const iconMap: Record<string, React.ComponentType<any>> = {
+    'LayoutDashboard': LayoutDashboard,
+    'Building2': Building2,
+    'Settings': Settings,
+    'User': User,
+    'Shield': Shield,
+    'FileText': FileText,
+    'HelpCircle': HelpCircle,
+    'default': HelpCircle, // Ícone padrão
+  };
+  
+  return iconMap[iconName] || iconMap['default'];
+};
 
 export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const { menus: moduleMenus, loading: moduleMenusLoading } = useModuleMenus();
   const [isExpanded, setIsExpanded] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -32,7 +50,8 @@ export function Sidebar() {
     };
   }, [isExpanded]);
 
-  const menuItems = [
+  // Menu items base
+  const baseMenuItems = [
     {
       name: "Dashboard",
       href: "/dashboard",
@@ -64,6 +83,18 @@ export function Sidebar() {
       show: user?.role === "SUPER_ADMIN" || user?.role === "ADMIN",
     },
   ];
+
+  // Adicionar menus dos módulos
+  const moduleMenuItems = moduleMenus.map(menu => ({
+    name: menu.name,
+    href: menu.path,
+    // Mapear ícones dinamicamente
+    icon: getIconComponent(menu.icon),
+    show: true, // Por enquanto, mostrar todos os menus de módulos
+  }));
+
+  // Combinar menus base com menus de módulos
+  const menuItems = [...baseMenuItems, ...moduleMenuItems];
 
   return (
     <div 

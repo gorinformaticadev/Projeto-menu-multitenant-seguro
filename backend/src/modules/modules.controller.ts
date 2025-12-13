@@ -16,6 +16,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ModulesService } from './modules.service';
 import { ModuleInstallerService } from './module-installer.service';
+import { AutoLoaderService } from './auto-loader.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -26,7 +27,8 @@ import { Role } from '@prisma/client';
 export class ModulesController {
   constructor(
     private readonly modulesService: ModulesService,
-    private readonly moduleInstallerService: ModuleInstallerService
+    private readonly moduleInstallerService: ModuleInstallerService,
+    private readonly autoLoaderService: AutoLoaderService
   ) {}
 
   // GET /modules - Listar todos os módulos disponíveis
@@ -129,5 +131,14 @@ export class ModulesController {
   @Roles(Role.SUPER_ADMIN)
   async getModuleInfo(@Param('name') name: string) {
     return this.moduleInstallerService.getModuleInfo(name);
+  }
+
+  // GET /modules/auto-load - Forçar carregamento automático de módulos (apenas SUPER_ADMIN)
+  @Get('auto-load')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  async autoLoadModules() {
+    await this.autoLoaderService.loadModulesFromDirectory();
+    return { message: 'Módulos carregados automaticamente com sucesso' };
   }
 }
