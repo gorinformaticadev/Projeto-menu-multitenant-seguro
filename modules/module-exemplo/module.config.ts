@@ -2,35 +2,27 @@
  * CONFIGURAÇÃO DO MÓDULO DE EXEMPLO
  * 
  * Este arquivo define as configurações e metadados do módulo
+ * Seguindo o padrão do sistema de módulos robusto e independente
  */
 
 export const moduleConfig = {
-  // Identificação do módulo
-  id: 'module-exemplo',
+  // Identificação obrigatória
   name: 'Module Exemplo',
+  slug: 'module-exemplo',
   version: '1.0.0',
-  description: 'Módulo de exemplo para demonstração do sistema modular',
   
-  // Configurações de ativação
+  // Status e segurança (OBRIGATÓRIO)
   enabled: true,
-  requiresActivation: true, // Requer ativação por empresa
+  permissionsStrict: true,
+  sandboxed: true,
   
-  // Metadados
+  // Metadados opcionais
   author: 'Sistema Core',
+  description: 'Módulo de exemplo para demonstração do sistema modular robusto',
   category: 'Exemplo',
   
-  // Rotas do módulo
-  routes: {
-    base: '/module-exemplo',
-    pages: {
-      index: '/module-exemplo',
-      settings: '/module-exemplo/settings'
-    }
-  },
-  
-  // Permissões necessárias
-  permissions: [
-    'module-exemplo.view',
-    'module-exemplo.manage'
-  ]
+  // Flags de segurança adicionais
+  allowEval: false,
+  allowWindowAccess: false,
+  requiresAuth: true
 } as const;

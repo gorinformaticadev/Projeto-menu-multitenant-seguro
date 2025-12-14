@@ -1,8 +1,8 @@
 /**
- * ROTEAMENTO DINÂMICO PARA MÓDULOS HÍBRIDOS
+ * ROTEAMENTO DINÂMICO PARA MÓDULOS ROBUSTOS E INDEPENDENTES
  * 
- * Sistema híbrido que permite módulos independentes acessarem dependências do core
- * através de um componente bridge global
+ * Sistema que carrega módulos de forma segura e isolada
+ * usando o ModuleLoader para descobrir e validar módulos
  */
 
 "use client";
@@ -29,19 +29,50 @@ export default function DynamicModulePage() {
       setLoading(true);
       setError(null);
 
-      // Mapear rotas para arquivos de módulo
-      let modulePath = '';
-      let pageName = '';
+      // Primeiro, descobrir módulos disponíveis via API
+      console.log('🔍 Descobrindo módulos disponíveis...');
+      const modulesResponse = await fetch('/api/modules/discover');
+      
+      if (!modulesResponse.ok) {
+        throw new Error('Erro ao descobrir módulos disponíveis');
+      }
+      
+      const { modules } = await modulesResponse.json();
+      console.log('📦 Módulos descobertos:', modules);
 
-      if (routeKey === 'module-exemplo') {
-        modulePath = '/api/modules/module-exemplo/frontend/pages/index.js';
-        pageName = 'ModuleExemploPage';
-      } else if (routeKey === 'module-exemplo/settings') {
-        modulePath = '/api/modules/module-exemplo/frontend/pages/settings.js';
-        pageName = 'ModuleExemploSettingsPage';
-      } else {
+      // Encontrar a página correspondente à rota
+      let targetPage = null;
+      let targetModule = null;
+
+      for (const [moduleName, moduleData] of Object.entries(modules)) {
+        const module = moduleData as any;
+        if (!module.isValid || !module.config.enabled) continue;
+        
+        for (const page of module.bootstrap.pages) {
+          // Normalizar paths para comparação
+          const pagePath = page.path.replace(/^\//, '');
+          const currentRoute = routeKey.replace(/^\//, '');
+          
+          if (pagePath === currentRoute) {
+            targetPage = page;
+            targetModule = moduleName;
+            break;
+          }
+        }
+        
+        if (targetPage) break;
+      }
+
+      if (!targetPage || !targetModule) {
         throw new Error(`Rota não encontrada: ${routeKey}`);
       }
+
+      console.log('🎯 Página encontrada:', targetPage);
+      console.log('📦 Módulo:', targetModule);
+
+      // Mapear para arquivo físico
+      const modulePath = `/api/modules/${targetModule}/frontend/pages/${targetPage.id.split('.')[1]}.js`;
+      const pageName = `${targetModule.charAt(0).toUpperCase() + targetModule.slice(1).replace(/-([a-z])/g, (g) => g[1].toUpperCase())}${targetPage.id.split('.')[1].charAt(0).toUpperCase() + targetPage.id.split('.')[1].slice(1)}Page`;
 
       // Carregar o arquivo do módulo via API
       console.log('🔄 Carregando módulo:', modulePath);
