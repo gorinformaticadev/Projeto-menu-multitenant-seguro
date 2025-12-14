@@ -30,11 +30,22 @@ export class ModuleInstallerService {
 
   async uploadModule(file: Express.Multer.File): Promise<any> {
     this.logger.log(`Iniciando upload do módulo: ${file.originalname}`);
+    this.logger.log(`Tipo do arquivo: ${typeof file}`);
+    this.logger.log(`Propriedades do arquivo: ${Object.keys(file)}`);
+    this.logger.log(`Buffer existe: ${!!file.buffer}`);
+    this.logger.log(`Tipo do buffer: ${typeof file.buffer}`);
+    this.logger.log(`Buffer é Buffer: ${Buffer.isBuffer(file.buffer)}`);
+    this.logger.log(`Tamanho do buffer: ${file.buffer?.length || 'N/A'}`);
 
     try {
       // Validar arquivo ZIP
       if (!file.originalname.endsWith('.zip')) {
         throw new BadRequestException('Apenas arquivos ZIP são aceitos');
+      }
+
+      // Verificar se o buffer existe e é válido
+      if (!file.buffer || !Buffer.isBuffer(file.buffer)) {
+        throw new BadRequestException('Arquivo não contém dados válidos ou buffer inválido');
       }
 
       // Salvar arquivo temporariamente

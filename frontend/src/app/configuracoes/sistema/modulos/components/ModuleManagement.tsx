@@ -30,6 +30,7 @@ export function ModuleManagement() {
   const [showInfoDialog, setShowInfoDialog] = useState(false);
   const [selectedModule, setSelectedModule] = useState<InstalledModule | null>(null);
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   useEffect(() => {
     loadInstalledModules();
@@ -55,9 +56,12 @@ export function ModuleManagement() {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      setSelectedFile(null);
+      return;
+    }
 
     // Validar arquivo
     if (!file.name.endsWith('.zip')) {
@@ -66,6 +70,7 @@ export function ModuleManagement() {
         description: "Apenas arquivos ZIP são aceitos",
         variant: "destructive",
       });
+      setSelectedFile(null);
       return;
     }
 
@@ -75,16 +80,25 @@ export function ModuleManagement() {
         description: "O arquivo deve ter no máximo 50MB",
         variant: "destructive",
       });
+      setSelectedFile(null);
       return;
     }
 
-    await uploadModule(file);
+    // Apenas armazenar o arquivo selecionado
+    setSelectedFile(file);
+    
+    toast({
+      title: "Arquivo selecionado",
+      description: `Arquivo "${file.name}" pronto para upload`,
+    });
   };
 
-  const uploadModule = async (file: File) => {
+  const uploadModule = async () => {
+    if (!selectedFile) return;
+
     setUploading(true);
     const formData = new FormData();
-    formData.append('module', file);
+    formData.append('module', selectedFile);
 
     try {
       const response = await api.post("/modules/upload", formData, {
@@ -101,7 +115,8 @@ export function ModuleManagement() {
       // Recarregar lista de módulos
       await loadInstalledModules();
 
-      // Limpar input
+      // Limpar seleção
+      setSelectedFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -115,6 +130,21 @@ export function ModuleManagement() {
     } finally {
       setUploading(false);
     }
+  };
+
+  const clearSelectedFile = () => {
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   const handleRemoveModule = async (moduleName: string) => {
@@ -187,23 +217,108 @@ export function ModuleManagement() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
-                <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                <h3 className="text-lg font-semibold mb-2">Selecione um arquivo ZIP</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Arraste e solte ou clique para selecionar um módulo (.zip, máx. 50MB)
-                </p>
-                <Button onClick={handleFileSelect} disabled={uploading}>
-                  {uploading ? "Instalando módulo..." : "Selecionar Arquivo"}
-                </Button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".zip"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-              </div>
+              {!selectedFile ? (
+                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
+                  <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                  <h3 className="text-lg font-semibold mb-2">Selecione um arquivo ZIP</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Arraste e solte ou clique para selecionar um módulo (.zip, máx. 50MB)
+                  </p>
+                  <Button onClick={handleFileSelect} disabled={uploading}>
+                    Selecionar Arquivo
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".zip"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Informações do arquivo selecionado */}
+                  <div className="border border-green-200 bg-green-50 rounded-lg p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-green-100 rounded-lg">
+                          <Package className="h-6 w-6 text-green-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-green-800">Arquivo Selecionado</h3>
+                          <p className="text-sm text-green-700">Pronto para instalação</p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearSelectedFile}
+                        className="text-green-600 hover:text-green-700"
+                      >
+                        ✕
+                      </Button>
+                    </div>
+                    
+                    <div className="mt-4 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-green-800">Nome do arquivo:</span>
+                        <span className="text-sm font-mono text-green-700">{selectedFile.name}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-green-800">Tamanho:</span>
+                        <span className="text-sm text-green-700">{formatFileSize(selectedFile.size)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-green-800">Tipo:</span>
+                        <span className="text-sm text-green-700">{selectedFile.type || 'application/zip'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-green-800">Última modificação:</span>
+                        <span className="text-sm text-green-700">
+                          {new Date(selectedFile.lastModified).toLocaleString('pt-BR')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Botões de ação */}
+                  <div className="flex gap-3">
+                    <Button 
+                      onClick={uploadModule} 
+                      disabled={uploading}
+                      className="flex-1"
+                    >
+                      {uploading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Instalando módulo...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4 mr-2" />
+                          Instalar Módulo
+                        </>
+                      )}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={clearSelectedFile}
+                      disabled={uploading}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+
+                  {/* Input oculto para seleção de novo arquivo */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".zip"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </div>
+              )}
               
               <div className="mt-6 p-4 bg-muted/50 rounded-lg">
                 <h4 className="font-medium mb-3 flex items-center gap-2">

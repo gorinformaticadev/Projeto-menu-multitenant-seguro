@@ -1,0 +1,33 @@
+{
+  "name": "module-exemplo",
+  "displayName": "Module Exemplo",
+  "description": "Módulo de exemplo para demonstração do sistema modular",
+  "version": "1.0.0",
+  "author": "Sistema Core",
+  "category": "Exemplo",
+  "enabled": true,
+  "requiresActivation": true,
+  "routes": {
+    "base": "/module-exemplo",
+    "pages": {
+      "index": "/module-exemplo",
+      "settings": "/module-exemplo/settings"
+    }
+  },
+  "permissions": [
+    {
+      "name": "module-exemplo.view",
+      "description": "Visualizar módulo exemplo"
+    },
+    {
+      "name": "module-exemplo.manage", 
+      "description": "Gerenciar módulo exemplo"
+    }
+  ],
+  "menu": {
+    "enabled": true,
+    "position": 100,
+    "icon": "Package",
+    "label": "Module Exemplo"
+  }
+}

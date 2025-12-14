@@ -92,6 +92,7 @@ export class ModulesController {
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   @UseInterceptors(FileInterceptor('module', {
+    storage: require('multer').memoryStorage(),
     limits: {
       fileSize: 50 * 1024 * 1024, // 50MB
     },
