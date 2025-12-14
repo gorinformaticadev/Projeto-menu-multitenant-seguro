@@ -4,17 +4,37 @@
   "description": "Módulo de exemplo para demonstração do sistema modular",
   "version": "1.0.0",
   "author": "Sistema Core",
+  "category": "Exemplo",
+  "enabled": true,
+  "requiresActivation": true,
+  "routes": {
+    "base": "/modules/module-exemplo",
+    "pages": {
+      "index": "/modules/module-exemplo",
+      "settings": "/modules/module-exemplo/settings"
+    }
+  },
+  "permissions": [
+    {
+      "name": "module-exemplo.view",
+      "description": "Visualizar módulo exemplo"
+    },
+    {
+      "name": "module-exemplo.manage", 
+      "description": "Gerenciar módulo exemplo"
+    }
+  ],
   "config": {
     "menu": [
       {
         "label": "Página Principal",
-        "path": "/module-exemplo",
+        "path": "/modules/module-exemplo",
         "icon": "Home",
         "order": 1
       },
       {
         "label": "Configurações",
-        "path": "/module-exemplo/settings",
+        "path": "/modules/module-exemplo/settings",
         "icon": "Settings",
         "order": 2
       }
@@ -22,7 +42,7 @@
     "userMenu": [
       {
         "label": "Acesso rápido – Module Exemplo",
-        "path": "/module-exemplo",
+        "path": "/modules/module-exemplo",
         "icon": "Package"
       }
     ],
@@ -32,7 +52,8 @@
         "description": "Widget de exemplo funcionando corretamente",
         "type": "info-card",
         "icon": "Package",
-        "actionUrl": "/module-exemplo",
+        "component": "ExemploWidget",
+        "actionUrl": "/modules/module-exemplo",
         "actionLabel": "Acessar Módulo"
       }
     ],

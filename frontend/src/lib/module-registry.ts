@@ -24,6 +24,7 @@ export interface ModuleDashboardWidget {
   id: string;
   name: string;
   component: string;
+  module?: string; // Nome do módulo para carregamento dinâmico
   order?: number;
   permissions?: string[];
   roles?: string[];

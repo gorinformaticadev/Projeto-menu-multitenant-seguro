@@ -136,7 +136,7 @@ function registerModuleExemploModule(): void {
       {
         id: 'module-exemplo-main',
         name: 'Página Principal',
-        href: '/module-exemplo',
+        href: '/modules/module-exemplo',
         icon: 'Home',
         order: 100,
         group: 'module-exemplo'
@@ -144,7 +144,7 @@ function registerModuleExemploModule(): void {
       {
         id: 'module-exemplo-settings',
         name: 'Configurações',
-        href: '/module-exemplo/settings',
+        href: '/modules/module-exemplo/settings',
         icon: 'Settings',
         order: 101,
         group: 'module-exemplo'
@@ -157,6 +157,7 @@ function registerModuleExemploModule(): void {
         id: 'module-exemplo-widget',
         name: 'Widget do Module Exemplo',
         component: 'ExemploWidget',
+        module: 'module-exemplo',
         order: 50,
         size: 'medium'
       }
@@ -167,7 +168,7 @@ function registerModuleExemploModule(): void {
       {
         id: 'module-exemplo-quick-access',
         name: 'Acesso rápido – Module Exemplo',
-        href: '/module-exemplo',
+        href: '/modules/module-exemplo',
         icon: 'Package',
         order: 10
       }
@@ -182,7 +183,7 @@ function registerModuleExemploModule(): void {
       {
         id: 'module-exemplo-taskbar',
         name: 'Atalho do Module Exemplo',
-        href: '/module-exemplo',
+        href: '/modules/module-exemplo',
         icon: 'Package',
         order: 10
       }

@@ -8,10 +8,10 @@
   "enabled": true,
   "requiresActivation": true,
   "routes": {
-    "base": "/module-exemplo",
+    "base": "/modules/module-exemplo",
     "pages": {
-      "index": "/module-exemplo",
-      "settings": "/module-exemplo/settings"
+      "index": "/modules/module-exemplo",
+      "settings": "/modules/module-exemplo/settings"
     }
   },
   "permissions": [
