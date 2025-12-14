@@ -75,18 +75,53 @@ function ExemploWidget() {
     
     const description = createElement('p', { 
       className: 'text-xs text-green-700 mb-3' 
-    }, 'Widget do Module Exemplo carregado com sucesso.');
+    }, 'Widget independente com funcionalidades interativas.');
+    
+    // Métricas do widget
+    const metricsRow = createElement('div', { className: 'grid grid-cols-2 gap-2 mb-3 text-xs' });
+    
+    const loadTime = createElement('div', { className: 'text-center p-2 bg-green-100 rounded' });
+    const loadTimeLabel = createElement('div', { className: 'font-medium text-green-800' }, 'Carregamento');
+    const loadTimeValue = createElement('div', { className: 'text-green-600' }, '0.2s');
+    loadTime.appendChild(loadTimeLabel);
+    loadTime.appendChild(loadTimeValue);
+    
+    const memoryUsage = createElement('div', { className: 'text-center p-2 bg-blue-100 rounded' });
+    const memoryLabel = createElement('div', { className: 'font-medium text-blue-800' }, 'Memória');
+    const memoryValue = createElement('div', { className: 'text-blue-600' }, '1.8MB');
+    memoryUsage.appendChild(memoryLabel);
+    memoryUsage.appendChild(memoryValue);
+    
+    metricsRow.appendChild(loadTime);
+    metricsRow.appendChild(memoryUsage);
+    
+    // Botão de ação
+    const actionButton = createElement('button', { 
+      className: 'w-full px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors',
+      onclick: () => {
+        const stats = {
+          clicks: Math.floor(Math.random() * 100) + 1,
+          uptime: '99.9%',
+          lastUpdate: new Date().toLocaleTimeString(),
+          status: 'Operacional'
+        };
+        
+        alert('📊 Estatísticas do Widget:\n\n' + Object.entries(stats).map(([key, value]) => `${key}: ${value}`).join('\n') + '\n\n✨ Widget funcionando perfeitamente!');
+      }
+    }, '📊 Ver Estatísticas');
     
     const statusRow = createElement('div', { 
-      className: 'flex items-center justify-between text-xs' 
+      className: 'flex items-center justify-between text-xs mt-2' 
     });
-    const statusLabel = createElement('span', { className: 'text-green-600' }, 'Status:');
+    const statusLabel = createElement('span', { className: 'text-green-600' }, 'Tipo:');
     const statusValue = createElement('span', { className: 'font-medium text-green-700' }, 'Independente');
     statusRow.appendChild(statusLabel);
     statusRow.appendChild(statusValue);
     
     content.appendChild(status);
     content.appendChild(description);
+    content.appendChild(metricsRow);
+    content.appendChild(actionButton);
     content.appendChild(statusRow);
     
     // Montar widget

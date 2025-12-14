@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug do Sistema Modular</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">🔍 Debug do Sistema Modular</h1>
+        
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">🧪 Teste Manual do Sistema</h2>
+            
+            <div class="space-y-4">
+                <button onclick="testModuleCore()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                    1. Testar ModuleCore
+                </button>
+                
+                <button onclick="testModuleBridge()" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+                    2. Testar ModuleBridge
+                </button>
+                
+                <button onclick="testModuleLoad()" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700">
+                    3. Testar Carregamento do Módulo
+                </button>
+                
+                <button onclick="testFullSystem()" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">
+                    4. Testar Sistema Completo
+                </button>
+            </div>
+            
+            <div id="results" class="mt-6 p-4 bg-gray-50 rounded-lg min-h-32">
+                <p class="text-gray-600">Clique nos botões acima para executar os testes...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const results = document.getElementById('results');
+        
+        function log(message, type = 'info') {
+            const colors = {
+                info: 'text-blue-600',
+                success: 'text-green-600',
+                error: 'text-red-600',
+                warning: 'text-yellow-600'
+            };
+            
+            const div = document.createElement('div');
+            div.className = `${colors[type]} text-sm mb-1`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+        }
+        
+        function clearResults() {
+            results.innerHTML = '';
+        }
+        
+        async function testModuleCore() {
+            clearResults();
+            log('🔧 Testando ModuleCore...', 'info');
+            
+            try {
+                const response = await fetch('http://localhost:3002/api/modules/ModuleCore.js');
+                log(`Status da API: ${response.status}`, response.ok ? 'success' : 'error');
+                
+                if (response.ok) {
+                    const code = await response.text();
+                    log(`Tamanho do código: ${code.length} caracteres`, 'success');
+                    
+                    // Executar o código
+                    const func = new Function('window', 'document', code);
+                    func(window, document);
+                    
+                    if (window.ModuleCore) {
+                        log('✅ ModuleCore carregado com sucesso!', 'success');
+                        log(`Métodos disponíveis: ${Object.keys(window.ModuleCore)}`, 'info');
+                    } else {
+                        log('❌ ModuleCore não foi definido no window', 'error');
+                    }
+                } else {
+                    log('❌ Erro ao carregar ModuleCore', 'error');
+                }
+            } catch (error) {
+                log(`❌ Erro: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testModuleBridge() {
+            clearResults();
+            log('🌉 Testando ModuleBridge...', 'info');
+            
+            try {
+                // Simular o bridge (versão simplificada)
+                const bridge = {
+                    createElement: (tag, props = {}, ...children) => {
+                        const element = document.createElement(tag);
+                        Object.entries(props).forEach(([key, value]) => {
+                            if (key === 'className') {
+                                element.className = value;
+                            } else if (key.startsWith('on') && typeof value === 'function') {
+                                element.addEventListener(key.slice(2).toLowerCase(), value);
+                            } else {
+                                element.setAttribute(key, value);
+                            }
+                        });
+                        children.forEach(child => {
+                            if (typeof child === 'string') {
+                                element.appendChild(document.createTextNode(child));
+                            }
+                        });
+                        return element;
+                    },
+                    showNotification: (title, message, type) => {
+                        log(`📢 Notificação: ${title} - ${message} (${type})`, 'info');
+                    }
+                };
+                
+                window.ModuleBridge = bridge;
+                log('✅ ModuleBridge simulado criado', 'success');
+                
+                // Testar createElement
+                const testElement = bridge.createElement('div', { className: 'test-class' }, 'Teste');
+                log(`✅ createElement funcionando: ${testElement.tagName}`, 'success');
+                
+                // Testar notificação
+                bridge.showNotification('Teste', 'Mensagem de teste', 'info');
+                
+            } catch (error) {
+                log(`❌ Erro: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testModuleLoad() {
+            clearResults();
+            log('📦 Testando carregamento do módulo...', 'info');
+            
+            try {
+                const response = await fetch('http://localhost:3002/api/modules/module-exemplo/frontend/pages/index.js');
+                log(`Status da API: ${response.status}`, response.ok ? 'success' : 'error');
+                
+                if (response.ok) {
+                    const code = await response.text();
+                    log(`Tamanho do código: ${code.length} caracteres`, 'success');
+                    
+                    // Verificar se é JavaScript válido
+                    if (code.includes('function ModuleExemploPage')) {
+                        log('✅ Função ModuleExemploPage encontrada', 'success');
+                    } else {
+                        log('❌ Função ModuleExemploPage não encontrada', 'error');
+                    }
+                    
+                    // Executar o código
+                    const func = new Function('window', 'document', 'ModuleBridge', code);
+                    func(window, document, window.ModuleBridge);
+                    
+                    if (window.ModuleExemploPage) {
+                        log('✅ ModuleExemploPage carregado com sucesso!', 'success');
+                        
+                        // Testar instanciação
+                        const instance = window.ModuleExemploPage();
+                        if (instance && typeof instance.render === 'function') {
+                            log('✅ Instância criada e método render disponível', 'success');
+                        } else {
+                            log('❌ Problema na instanciação ou método render', 'error');
+                        }
+                    } else {
+                        log('❌ ModuleExemploPage não foi definido no window', 'error');
+                    }
+                } else {
+                    log('❌ Erro ao carregar módulo', 'error');
+                }
+            } catch (error) {
+                log(`❌ Erro: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testFullSystem() {
+            clearResults();
+            log('🚀 Testando sistema completo...', 'info');
+            
+            try {
+                // 1. Carregar ModuleCore
+                await testModuleCore();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // 2. Configurar Bridge
+                log('🌉 Configurando bridge...', 'info');
+                await testModuleBridge();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // 3. Carregar módulo
+                log('📦 Carregando módulo...', 'info');
+                await testModuleLoad();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // 4. Renderizar
+                if (window.ModuleExemploPage) {
+                    log('🎨 Tentando renderizar...', 'info');
+                    
+                    const instance = window.ModuleExemploPage();
+                    const rendered = instance.render();
+                    
+                    if (rendered) {
+                        log('✅ Módulo renderizado com sucesso!', 'success');
+                        
+                        // Adicionar à página para visualização
+                        const container = document.createElement('div');
+                        container.className = 'mt-6 border-2 border-green-200 rounded-lg p-4';
+                        container.appendChild(rendered);
+                        results.parentElement.appendChild(container);
+                        
+                        log('✅ Módulo adicionado à página para visualização', 'success');
+                    } else {
+                        log('❌ Falha na renderização', 'error');
+                    }
+                } else {
+                    log('❌ ModuleExemploPage não disponível', 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Erro no sistema completo: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

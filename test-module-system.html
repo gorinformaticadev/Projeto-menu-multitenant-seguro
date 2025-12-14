@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste do Sistema Modular</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">🧪 Teste do Sistema Modular Híbrido</h1>
+        
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">📋 Checklist de Funcionalidades</h2>
+            
+            <div class="space-y-3">
+                <div class="flex items-center">
+                    <span class="text-green-500 mr-2">✅</span>
+                    <span>ModuleCore criado na pasta modules/</span>
+                </div>
+                <div class="flex items-center">
+                    <span class="text-green-500 mr-2">✅</span>
+                    <span>ModuleBridge implementado no frontend</span>
+                </div>
+                <div class="flex items-center">
+                    <span class="text-green-500 mr-2">✅</span>
+                    <span>Sistema de roteamento dinâmico atualizado</span>
+                </div>
+                <div class="flex items-center">
+                    <span class="text-green-500 mr-2">✅</span>
+                    <span>Módulo exemplo atualizado para usar bridge</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">🔗 Links para Teste</h2>
+            
+            <div class="space-y-2">
+                <div>
+                    <a href="http://localhost:3002/modules/module-exemplo" 
+                       class="text-blue-600 hover:text-blue-800 underline"
+                       target="_blank">
+                        📦 Página Principal do Módulo Exemplo
+                    </a>
+                </div>
+                <div>
+                    <a href="http://localhost:3002/modules/module-exemplo/settings" 
+                       class="text-blue-600 hover:text-blue-800 underline"
+                       target="_blank">
+                        ⚙️ Configurações do Módulo Exemplo
+                    </a>
+                </div>
+                <div>
+                    <a href="http://localhost:3002/api/modules/ModuleCore.js" 
+                       class="text-blue-600 hover:text-blue-800 underline"
+                       target="_blank">
+                        🔧 ModuleCore.js (API)
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <h2 class="text-xl font-semibold mb-4 text-blue-900">🎯 O que Testar</h2>
+            
+            <div class="space-y-3 text-blue-800">
+                <div>
+                    <strong>1. Carregamento Híbrido:</strong> Verifique se o módulo carrega com ou sem o bridge
+                </div>
+                <div>
+                    <strong>2. Gerador de Notificações:</strong> Teste o formulário de notificações com diferentes tipos
+                </div>
+                <div>
+                    <strong>3. Dados do Usuário:</strong> Clique em "Carregar Dados do Usuário" para testar o bridge
+                </div>
+                <div>
+                    <strong>4. Componentes do Bridge:</strong> Verifique se botões e cards usam estilos do sistema
+                </div>
+                <div>
+                    <strong>5. Modo Independente:</strong> Desabilite o bridge e veja se funciona em modo fallback
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

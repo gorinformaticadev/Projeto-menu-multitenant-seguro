@@ -1,13 +1,38 @@
 /**
  * PÁGINA PRINCIPAL DO MODULE EXEMPLO
  * 
- * Versão standalone do módulo - completamente independente
- * JavaScript puro, sem dependências externas
+ * Versão híbrida - usa ModuleCore para acessar funcionalidades do sistema
+ * Mantém independência mas pode integrar com o core quando disponível
  */
 
 function ModuleExemploPage() {
-  // Função helper para criar elementos sem JSX
-  const createElement = (tag, props = {}, ...children) => {
+  // Inicializar o ModuleCore se disponível
+  let core = null;
+  let bridge = null;
+  
+  console.log('🔍 Verificando disponibilidade do sistema...');
+  console.log('window.ModuleCore:', typeof window !== 'undefined' ? !!window.ModuleCore : 'window não disponível');
+  console.log('ModuleBridge:', typeof ModuleBridge !== 'undefined' ? 'disponível' : 'não disponível');
+  
+  if (typeof window !== 'undefined' && window.ModuleCore) {
+    core = window.ModuleCore;
+    console.log('✅ ModuleCore encontrado');
+    
+    // Tentar inicializar com o bridge do sistema
+    if (typeof ModuleBridge !== 'undefined') {
+      core.init(ModuleBridge);
+      bridge = core.getBridge();
+      console.log('🔧 Módulo inicializado com bridge do sistema');
+    } else {
+      bridge = core.getBridge(); // Usará fallback
+      console.log('🔧 Módulo inicializado com bridge de fallback');
+    }
+  } else {
+    console.log('⚠️ ModuleCore não encontrado, usando modo básico');
+  }
+  
+  // Função para criar elementos (usa bridge se disponível)
+  const createElement = bridge ? bridge.createElement : (tag, props = {}, ...children) => {
     const element = document.createElement(tag);
     
     // Aplicar propriedades
@@ -54,7 +79,7 @@ function ModuleExemploPage() {
     
     const textDiv = createElement('div');
     const title = createElement('h1', { className: 'text-2xl font-bold text-gray-900' }, 'Module Exemplo');
-    const subtitle = createElement('p', { className: 'text-gray-600' }, 'Demonstração do sistema modular');
+    const subtitle = createElement('p', { className: 'text-gray-600' }, 'Demonstração do sistema modular independente');
     textDiv.appendChild(title);
     textDiv.appendChild(subtitle);
     
@@ -158,102 +183,290 @@ function ModuleExemploPage() {
     card3.appendChild(card3Footer);
     cardsGrid.appendChild(card3);
     
-    // Funcionalidades do Módulo
-    const featuresCard = createElement('div', { className: 'bg-white shadow overflow-hidden sm:rounded-md' });
-    const featuresContent = createElement('div', { className: 'px-4 py-5 sm:p-6' });
+    // Gerador de Notificações (usando bridge se disponível)
+    const notificationCard = bridge ? bridge.createCard(
+      '🔔 Gerador de Notificações Inteligente',
+      ''
+    ) : createElement('div', { className: 'bg-white shadow overflow-hidden sm:rounded-lg mb-6' });
     
-    const featuresTitle = createElement('h3', { 
-      className: 'text-lg leading-6 font-medium text-gray-900 mb-4' 
-    }, 'Funcionalidades do Módulo');
+    // Criar conteúdo do formulário
+    const notificationForm = createElement('div', { className: 'space-y-4' });
     
-    const featuresDesc = createElement('p', { 
+    const description = createElement('p', { 
       className: 'text-sm text-gray-600 mb-6' 
-    }, 'Este módulo demonstra a integração completa com o sistema modular');
-    
-    const featuresGrid = createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-6' });
-    
-    // Lista de funcionalidades implementadas
-    const implementedDiv = createElement('div', { className: 'space-y-3' });
-    const implementedTitle = createElement('h4', { className: 'font-medium text-gray-900' }, '✅ Implementado');
-    const implementedList = createElement('ul', { className: 'text-sm text-gray-600 space-y-2' });
-    
-    const features = [
-      'Carregamento dinâmico de páginas',
-      'Integração com menu lateral',
-      'Widget no dashboard',
-      'Sistema de notificações',
-      'Menu do usuário'
-    ];
-    
-    features.forEach(feature => {
-      const li = createElement('li', { className: 'flex items-center' });
-      const icon = createElement('span', { className: 'h-4 w-4 text-green-500 mr-2' }, '✓');
-      const text = createElement('span', {}, feature);
-      li.appendChild(icon);
-      li.appendChild(text);
-      implementedList.appendChild(li);
-    });
-    
-    implementedDiv.appendChild(implementedTitle);
-    implementedDiv.appendChild(implementedList);
-    
-    // Lista de funcionalidades automáticas
-    const automaticDiv = createElement('div', { className: 'space-y-3' });
-    const automaticTitle = createElement('h4', { className: 'font-medium text-gray-900' }, '🔄 Automático');
-    const automaticList = createElement('ul', { className: 'text-sm text-gray-600 space-y-2' });
-    
-    const automaticFeatures = [
-      'Registro automático no sistema',
-      'Ativação por tenant',
-      'Carregamento sob demanda',
-      'Cache inteligente',
-      'Isolamento por módulo'
-    ];
-    
-    automaticFeatures.forEach(feature => {
-      const li = createElement('li', { className: 'flex items-center' });
-      const icon = createElement('span', { className: 'h-4 w-4 text-blue-500 mr-2' }, '🔄');
-      const text = createElement('span', {}, feature);
-      li.appendChild(icon);
-      li.appendChild(text);
-      automaticList.appendChild(li);
-    });
-    
-    automaticDiv.appendChild(automaticTitle);
-    automaticDiv.appendChild(automaticList);
-    
-    featuresGrid.appendChild(implementedDiv);
-    featuresGrid.appendChild(automaticDiv);
-    
-    featuresContent.appendChild(featuresTitle);
-    featuresContent.appendChild(featuresDesc);
-    featuresContent.appendChild(featuresGrid);
-    featuresCard.appendChild(featuresContent);
-    
-    // Informações Técnicas
-    const infoBox = createElement('div', { className: 'mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4' });
-    const infoHeader = createElement('div', { className: 'flex' });
-    
-    const infoIcon = createElement('div', { className: 'flex-shrink-0' });
-    const infoIconSpan = createElement('span', { className: 'h-5 w-5 text-blue-400' }, 'ℹ️');
-    infoIcon.appendChild(infoIconSpan);
-    
-    const infoContent = createElement('div', { className: 'ml-3' });
-    const infoTitle = createElement('h3', { className: 'text-sm font-medium text-blue-800' }, 'Módulo Independente');
-    const infoText = createElement('p', { className: 'mt-2 text-sm text-blue-700' }, 
-      'Este módulo está sendo carregado dinamicamente da pasta modules/module-exemplo/ e é completamente independente, sem dependências externas.'
+    }, bridge && core.isReady() ? 
+      'Sistema integrado - notificações serão enviadas via bridge do sistema' : 
+      'Modo independente - simulação de notificações'
     );
     
-    infoContent.appendChild(infoTitle);
-    infoContent.appendChild(infoText);
-    infoHeader.appendChild(infoIcon);
-    infoHeader.appendChild(infoContent);
-    infoBox.appendChild(infoHeader);
+    // Campo Título
+    const titleField = createElement('div');
+    const titleLabel = createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Título da Notificação');
+    const titleInput = createElement('input', { 
+      type: 'text',
+      className: 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500',
+      placeholder: 'Digite o título...',
+      id: 'notification-title'
+    });
+    titleField.appendChild(titleLabel);
+    titleField.appendChild(titleInput);
+    
+    // Campo Mensagem
+    const messageField = createElement('div');
+    const messageLabel = createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Mensagem');
+    const messageInput = createElement('textarea', { 
+      className: 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none',
+      placeholder: 'Digite a mensagem...',
+      rows: '3',
+      id: 'notification-message'
+    });
+    messageField.appendChild(messageLabel);
+    messageField.appendChild(messageInput);
+    
+    // Campo Tipo (novo)
+    const typeField = createElement('div');
+    const typeLabel = createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Tipo de Notificação');
+    const typeSelect = createElement('select', { 
+      className: 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500',
+      id: 'notification-type'
+    });
+    
+    const types = [
+      { value: 'info', label: 'ℹ️ Informação' },
+      { value: 'success', label: '✅ Sucesso' },
+      { value: 'warning', label: '⚠️ Aviso' },
+      { value: 'error', label: '❌ Erro' }
+    ];
+    
+    types.forEach(type => {
+      const option = createElement('option', { value: type.value }, type.label);
+      typeSelect.appendChild(option);
+    });
+    
+    typeField.appendChild(typeLabel);
+    typeField.appendChild(typeSelect);
+    
+    // Botões de ação (usando bridge se disponível)
+    const actionButtons = createElement('div', { className: 'flex gap-2' });
+    
+    // Botão enviar (usa bridge se disponível)
+    const sendButton = bridge ? bridge.createButton('📤 Enviar Notificação', () => {
+      const titleEl = document.getElementById('notification-title');
+      const messageEl = document.getElementById('notification-message');
+      const typeEl = document.getElementById('notification-type');
+      
+      if (!titleEl || !messageEl || !typeEl) {
+        bridge.showNotification('Erro', 'Elementos do formulário não encontrados', 'error');
+        return;
+      }
+      
+      const title = titleEl.value;
+      const message = messageEl.value;
+      const type = typeEl.value;
+      
+      if (!title || !message) {
+        bridge.showNotification('Aviso', 'Preencha título e mensagem', 'warning');
+        return;
+      }
+      
+      // Usar bridge para enviar notificação
+      bridge.showNotification(title, message, type);
+      
+      // Limpar campos
+      titleEl.value = '';
+      messageEl.value = '';
+      typeEl.selectedIndex = 0;
+      
+    }, 'primary') : createElement('button', { 
+      className: 'px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors',
+      onclick: () => {
+        const titleEl = document.getElementById('notification-title');
+        const messageEl = document.getElementById('notification-message');
+        
+        if (!titleEl || !messageEl) {
+          alert('⚠️ Erro: Elementos não encontrados');
+          return;
+        }
+        
+        const title = titleEl.value;
+        const message = messageEl.value;
+        
+        if (!title || !message) {
+          alert('⚠️ Preencha título e mensagem');
+          return;
+        }
+        
+        alert('✅ Notificação Enviada!\n\nTítulo: ' + title + '\nMensagem: ' + message);
+        
+        titleEl.value = '';
+        messageEl.value = '';
+      }
+    }, '📤 Enviar');
+    
+    // Botão de exemplos
+    const exampleButton = bridge ? bridge.createButton('✨ Gerar Exemplos', () => {
+      const examples = [
+        { title: 'Tarefa Concluída', message: 'O relatório mensal foi processado com sucesso.', type: 'success' },
+        { title: 'Aviso de Sistema', message: 'Manutenção programada para hoje às 22h.', type: 'warning' },
+        { title: 'Exportação Finalizada', message: 'Arquivo de clientes exportado com 1.234 registros.', type: 'info' }
+      ];
+      
+      // Enviar exemplos usando bridge
+      examples.forEach((ex, i) => {
+        setTimeout(() => {
+          bridge.showNotification(ex.title, ex.message, ex.type);
+        }, i * 1000); // Delay entre notificações
+      });
+      
+    }, 'success') : createElement('button', { 
+      className: 'px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors',
+      onclick: () => {
+        alert('✨ Exemplos gerados!\n\n(Em modo independente)');
+      }
+    }, '✨ Exemplos');
+    
+    actionButtons.appendChild(sendButton);
+    actionButtons.appendChild(exampleButton);
+    
+    notificationForm.appendChild(description);
+    notificationForm.appendChild(titleField);
+    notificationForm.appendChild(messageField);
+    notificationForm.appendChild(typeField);
+    notificationForm.appendChild(actionButtons);
+    
+    // Adicionar formulário ao card
+    if (bridge) {
+      // Se usando bridge, adicionar ao card criado pelo bridge
+      const cardContent = notificationCard.querySelector('.px-4');
+      if (cardContent) {
+        cardContent.appendChild(notificationForm);
+      }
+    } else {
+      // Modo independente
+      const notificationHeader = createElement('div', { className: 'px-4 py-5 sm:p-6' });
+      const notificationTitle = createElement('h3', { 
+        className: 'text-lg leading-6 font-medium text-gray-900 mb-4 flex items-center gap-2' 
+      });
+      const bellIcon = createElement('span', { className: 'h-5 w-5' }, '🔔');
+      const titleText = createElement('span', {}, 'Gerador de Notificações');
+      notificationTitle.appendChild(bellIcon);
+      notificationTitle.appendChild(titleText);
+      
+      notificationHeader.appendChild(notificationTitle);
+      notificationHeader.appendChild(notificationForm);
+      notificationCard.appendChild(notificationHeader);
+    }
+    
+    // Seção de Dados do Usuário (usando bridge)
+    const userCard = bridge ? bridge.createCard('👤 Dados do Usuário Atual', '') : 
+      createElement('div', { className: 'bg-white shadow overflow-hidden sm:rounded-lg mb-6' });
+    
+    const userContent = createElement('div', { className: 'space-y-4' });
+    
+    // Botão para carregar dados do usuário
+    const loadUserButton = bridge ? bridge.createButton('🔄 Carregar Dados do Usuário', async () => {
+      try {
+        // Mostrar loading
+        const loadingEl = core.components.createLoader('Carregando dados do usuário...');
+        userContent.innerHTML = '';
+        userContent.appendChild(loadingEl);
+        
+        // Carregar dados via bridge
+        const user = await bridge.getCurrentUser();
+        
+        // Limpar loading
+        userContent.innerHTML = '';
+        
+        // Mostrar dados do usuário
+        const userInfo = createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4' });
+        
+        const userData = [
+          { label: 'ID', value: user.id },
+          { label: 'Nome', value: user.name },
+          { label: 'Email', value: user.email },
+          { label: 'Função', value: user.role },
+          { label: 'Tenant', value: user.tenant },
+          { label: 'Permissões', value: user.permissions.join(', ') }
+        ];
+        
+        userData.forEach(item => {
+          const field = createElement('div', { className: 'p-3 bg-gray-50 rounded-lg' });
+          const label = createElement('div', { className: 'text-sm font-medium text-gray-700' }, item.label);
+          const value = createElement('div', { className: 'text-sm text-gray-900 mt-1' }, item.value);
+          field.appendChild(label);
+          field.appendChild(value);
+          userInfo.appendChild(field);
+        });
+        
+        userContent.appendChild(userInfo);
+        
+        // Adicionar timestamp
+        const timestamp = createElement('div', { className: 'text-xs text-gray-500 mt-4' }, 
+          `Carregado em: ${bridge.formatDate(new Date())}`
+        );
+        userContent.appendChild(timestamp);
+        
+        bridge.showNotification('Sucesso', 'Dados do usuário carregados com sucesso!', 'success');
+        
+      } catch (error) {
+        userContent.innerHTML = '';
+        const errorEl = bridge.createAlert('Erro ao carregar dados do usuário: ' + error.message, 'error');
+        userContent.appendChild(errorEl);
+      }
+    }, 'primary') : createElement('button', { 
+      className: 'px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors',
+      onclick: () => alert('Funcionalidade disponível apenas com bridge do sistema')
+    }, '🔄 Carregar Dados');
+    
+    userContent.appendChild(loadUserButton);
+    
+    // Adicionar ao card
+    if (bridge) {
+      const cardContent = userCard.querySelector('.px-4');
+      if (cardContent) {
+        cardContent.appendChild(userContent);
+      }
+    } else {
+      const userHeader = createElement('div', { className: 'px-4 py-5 sm:p-6' });
+      const userTitle = createElement('h3', { className: 'text-lg leading-6 font-medium text-gray-900 mb-4' }, '👤 Dados do Usuário');
+      userHeader.appendChild(userTitle);
+      userHeader.appendChild(userContent);
+      userCard.appendChild(userHeader);
+    }
+    
+    // Informações Técnicas
+    const statusMessage = bridge && core.isReady() ? 
+      'Sistema Híbrido Ativo - Módulo integrado com bridge do sistema principal' :
+      'Modo Independente - Módulo funcionando sem dependências externas';
+      
+    const statusType = bridge && core.isReady() ? 'success' : 'info';
+    
+    const infoBox = bridge ? bridge.createAlert(statusMessage, statusType) : 
+      createElement('div', { className: 'mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4' });
+    
+    if (!bridge) {
+      const infoHeader = createElement('div', { className: 'flex' });
+      
+      const infoIcon = createElement('div', { className: 'flex-shrink-0' });
+      const infoIconSpan = createElement('span', { className: 'h-5 w-5 text-blue-400' }, 'ℹ️');
+      infoIcon.appendChild(infoIconSpan);
+      
+      const infoContent = createElement('div', { className: 'ml-3' });
+      const infoTitle = createElement('h3', { className: 'text-sm font-medium text-blue-800' }, 'Módulo Independente');
+      const infoText = createElement('p', { className: 'mt-2 text-sm text-blue-700' }, statusMessage);
+      
+      infoContent.appendChild(infoTitle);
+      infoContent.appendChild(infoText);
+      infoHeader.appendChild(infoIcon);
+      infoHeader.appendChild(infoContent);
+      infoBox.appendChild(infoHeader);
+    }
     
     // Montar tudo
     container.appendChild(header);
     container.appendChild(cardsGrid);
-    container.appendChild(featuresCard);
+    container.appendChild(notificationCard);
+    container.appendChild(userCard);
     container.appendChild(infoBox);
     
     return container;

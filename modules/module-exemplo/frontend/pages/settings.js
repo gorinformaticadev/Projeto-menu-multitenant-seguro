@@ -182,11 +182,113 @@ function ModuleExemploSettingsPage() {
     configGrid.appendChild(configCard);
     configGrid.appendChild(actionsCard);
     
+    // Simulador de Configurações Avançadas
+    const advancedCard = createElement('div', { className: 'bg-white shadow overflow-hidden sm:rounded-lg mb-6' });
+    const advancedHeader = createElement('div', { className: 'px-4 py-5 sm:p-6' });
+    const advancedTitle = createElement('h3', { className: 'text-lg leading-6 font-medium text-gray-900 mb-4' }, 'Configurações Avançadas (Mock)');
+    const advancedDesc = createElement('p', { className: 'text-sm text-gray-600 mb-6' }, 'Simula configurações que estariam disponíveis na versão integrada');
+    
+    const advancedGrid = createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4' });
+    
+    // Configurações de Notificação
+    const notifConfig = createElement('div', { className: 'p-4 border border-gray-200 rounded-lg' });
+    const notifTitle = createElement('h4', { className: 'font-medium text-sm text-gray-900 mb-3' }, '🔔 Configurações de Notificação');
+    
+    const notifOptions = createElement('div', { className: 'space-y-2' });
+    
+    const enableNotif = createElement('label', { className: 'flex items-center cursor-pointer' });
+    const enableCheckbox = createElement('input', { type: 'checkbox', className: 'mr-2', checked: true });
+    const enableText = createElement('span', { className: 'text-sm' }, 'Habilitar notificações');
+    enableNotif.appendChild(enableCheckbox);
+    enableNotif.appendChild(enableText);
+    
+    const emailNotif = createElement('label', { className: 'flex items-center cursor-pointer' });
+    const emailCheckbox = createElement('input', { type: 'checkbox', className: 'mr-2' });
+    const emailText = createElement('span', { className: 'text-sm' }, 'Notificações por email');
+    emailNotif.appendChild(emailCheckbox);
+    emailNotif.appendChild(emailText);
+    
+    const soundNotif = createElement('label', { className: 'flex items-center cursor-pointer' });
+    const soundCheckbox = createElement('input', { type: 'checkbox', className: 'mr-2', checked: true });
+    const soundText = createElement('span', { className: 'text-sm' }, 'Som de notificação');
+    soundNotif.appendChild(soundCheckbox);
+    soundNotif.appendChild(soundText);
+    
+    notifOptions.appendChild(enableNotif);
+    notifOptions.appendChild(emailNotif);
+    notifOptions.appendChild(soundNotif);
+    
+    notifConfig.appendChild(notifTitle);
+    notifConfig.appendChild(notifOptions);
+    
+    // Configurações de Interface
+    const uiConfig = createElement('div', { className: 'p-4 border border-gray-200 rounded-lg' });
+    const uiTitle = createElement('h4', { className: 'font-medium text-sm text-gray-900 mb-3' }, '🎨 Configurações de Interface');
+    
+    const uiOptions = createElement('div', { className: 'space-y-3' });
+    
+    const themeSelect = createElement('div');
+    const themeLabel = createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Tema');
+    const themeSelectEl = createElement('select', { className: 'w-full px-2 py-1 border border-gray-300 rounded text-sm' });
+    const themeOptions = ['Claro', 'Escuro', 'Automático'];
+    themeOptions.forEach(option => {
+      const optionEl = createElement('option', { value: option.toLowerCase() }, option);
+      themeSelectEl.appendChild(optionEl);
+    });
+    themeSelect.appendChild(themeLabel);
+    themeSelect.appendChild(themeSelectEl);
+    
+    const languageSelect = createElement('div');
+    const languageLabel = createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Idioma');
+    const languageSelectEl = createElement('select', { className: 'w-full px-2 py-1 border border-gray-300 rounded text-sm' });
+    const languageOptions = ['Português', 'English', 'Español'];
+    languageOptions.forEach(option => {
+      const optionEl = createElement('option', { value: option.toLowerCase() }, option);
+      languageSelectEl.appendChild(optionEl);
+    });
+    languageSelect.appendChild(languageLabel);
+    languageSelect.appendChild(languageSelectEl);
+    
+    uiOptions.appendChild(themeSelect);
+    uiOptions.appendChild(languageSelect);
+    
+    uiConfig.appendChild(uiTitle);
+    uiConfig.appendChild(uiOptions);
+    
+    advancedGrid.appendChild(notifConfig);
+    advancedGrid.appendChild(uiConfig);
+    
+    // Botão de aplicar configurações
+    const applyButton = createElement('button', { 
+      className: 'mt-4 w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors',
+      onclick: () => {
+        const settings = {
+          notifications: {
+            enabled: document.querySelector('input[type="checkbox"]:nth-of-type(1)').checked,
+            email: document.querySelector('input[type="checkbox"]:nth-of-type(2)').checked,
+            sound: document.querySelector('input[type="checkbox"]:nth-of-type(3)').checked
+          },
+          ui: {
+            theme: document.querySelector('select:nth-of-type(1)').value,
+            language: document.querySelector('select:nth-of-type(2)').value
+          }
+        };
+        
+        alert('⚙️ Configurações Aplicadas (Mock):\n\n' + JSON.stringify(settings, null, 2) + '\n\n✅ Em um sistema real, essas configurações seriam salvas no backend e aplicadas imediatamente.');
+      }
+    }, '💾 Aplicar Configurações');
+    
+    advancedHeader.appendChild(advancedTitle);
+    advancedHeader.appendChild(advancedDesc);
+    advancedHeader.appendChild(advancedGrid);
+    advancedHeader.appendChild(applyButton);
+    advancedCard.appendChild(advancedHeader);
+    
     // Informações do Sistema
     const systemCard = createElement('div', { className: 'bg-white shadow overflow-hidden sm:rounded-lg' });
     const systemHeader = createElement('div', { className: 'px-4 py-5 sm:p-6' });
     const systemTitle = createElement('h3', { className: 'text-lg leading-6 font-medium text-gray-900 mb-4' }, 'Informações do Sistema Modular');
-    const systemDesc = createElement('p', { className: 'text-sm text-gray-600 mb-6' }, 'Detalhes sobre a integração com o core');
+    const systemDesc = createElement('p', { className: 'text-sm text-gray-600 mb-6' }, 'Detalhes sobre a integração com o core (simulado)');
     
     const systemGrid = createElement('div', { className: 'grid gap-4 md:grid-cols-3' });
     
@@ -199,7 +301,7 @@ function ModuleExemploSettingsPage() {
     
     statusCards.forEach(card => {
       const statusCard = createElement('div', { className: 'text-center p-4 bg-gray-50 rounded-lg' });
-      const statusIcon = createElement('div', { className: `text-2xl font-bold text-${card.color}-600 mb-2` }, card.icon);
+      const statusIcon = createElement('div', { className: `text-2xl font-bold mb-2` }, card.icon);
       const statusTitle = createElement('div', { className: `text-sm font-medium text-gray-900 mb-1` }, card.title);
       const statusDesc = createElement('div', { className: 'text-xs text-gray-600' }, card.desc);
       
@@ -209,9 +311,29 @@ function ModuleExemploSettingsPage() {
       systemGrid.appendChild(statusCard);
     });
     
+    // Botão de diagnóstico
+    const diagnosticButton = createElement('button', { 
+      className: 'mt-4 w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors',
+      onclick: () => {
+        const diagnostic = {
+          moduleStatus: 'Ativo',
+          loadTime: '0.3s',
+          memoryUsage: '2.1MB',
+          apiCalls: 0,
+          errors: 0,
+          lastUpdate: new Date().toLocaleString(),
+          dependencies: 'Nenhuma (Independente)',
+          compatibility: '100%'
+        };
+        
+        alert('🔍 Diagnóstico do Módulo:\n\n' + Object.entries(diagnostic).map(([key, value]) => `${key}: ${value}`).join('\n') + '\n\n✅ Módulo funcionando perfeitamente!');
+      }
+    }, '🔍 Executar Diagnóstico');
+    
     systemHeader.appendChild(systemTitle);
     systemHeader.appendChild(systemDesc);
     systemHeader.appendChild(systemGrid);
+    systemHeader.appendChild(diagnosticButton);
     systemCard.appendChild(systemHeader);
     
     // Informações Técnicas
@@ -237,6 +359,7 @@ function ModuleExemploSettingsPage() {
     // Montar tudo
     container.appendChild(header);
     container.appendChild(configGrid);
+    container.appendChild(advancedCard);
     container.appendChild(systemCard);
     container.appendChild(infoBox);
     

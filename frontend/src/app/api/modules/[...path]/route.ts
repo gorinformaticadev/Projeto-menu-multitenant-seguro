@@ -8,22 +8,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
-import { existsSync } from 'fs';
+import { existsSync, readdirSync } from 'fs';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { path: string[] } }
 ) {
+  console.log('🚀 API route chamada com params:', params);
+  
   try {
     // Construir caminho do arquivo
     const filePath = params.path.join('/');
     
-    // Corrigir o caminho - a API roda no contexto do frontend, mas os módulos estão na raiz
-    const projectRoot = join(process.cwd(), '..');
+    // Determinar o caminho correto dos módulos
+    const cwd = process.cwd();
+    console.log('📂 Diretório atual:', cwd);
+    
+    // Se estamos na pasta frontend, subir um nível
+    const projectRoot = cwd.endsWith('frontend') ? join(cwd, '..') : cwd;
     const fullPath = join(projectRoot, 'modules', filePath);
     
     console.log('📁 Tentando carregar arquivo:', fullPath);
-    console.log('📂 Diretório de trabalho:', process.cwd());
     console.log('📂 Raiz do projeto:', projectRoot);
     console.log('🔍 Caminho solicitado:', filePath);
     
@@ -33,11 +38,13 @@ export async function GET(
       
       // Listar arquivos na pasta modules para debug
       try {
-        const { readdirSync } = require('fs');
         const modulesDir = join(projectRoot, 'modules');
-        console.log('📂 Conteúdo da pasta modules:', readdirSync(modulesDir, { recursive: true }));
+        console.log('📂 Pasta modules existe?', existsSync(modulesDir));
+        if (existsSync(modulesDir)) {
+          console.log('📂 Conteúdo da pasta modules:', readdirSync(modulesDir, { recursive: true }));
+        }
       } catch (e) {
-        console.error('❌ Erro ao listar pasta modules:', e.message);
+        console.error('❌ Erro ao listar pasta modules:', e instanceof Error ? e.message : 'Erro desconhecido');
       }
       
       return NextResponse.json(
@@ -87,9 +94,15 @@ export async function GET(
     });
     
   } catch (error) {
-    console.error('Erro ao servir arquivo do módulo:', error);
+    console.error('❌ Erro ao servir arquivo do módulo:', error);
+    console.error('❌ Stack trace:', error instanceof Error ? error.stack : 'N/A');
+    
     return NextResponse.json(
-      { error: 'Erro interno do servidor' },
+      { 
+        error: 'Erro interno do servidor',
+        message: error instanceof Error ? error.message : 'Erro desconhecido',
+        path: params?.path?.join('/') || 'unknown'
+      },
       { status: 500 }
     );
   }
