@@ -15,16 +15,16 @@ enum Role {
 }
 
 model Tenant {
-  id              String   @id @default(uuid())
-  email           String   @unique
-  cnpjCpf         String   @unique
+  id              String         @id @default(uuid())
+  email           String         @unique
+  cnpjCpf         String         @unique
   nomeFantasia    String
   nomeResponsavel String
   telefone        String
   logoUrl         String?
-  ativo           Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  ativo           Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
   users           User[]
   tenantModules   TenantModule[]
 
@@ -35,33 +35,33 @@ model Tenant {
 }
 
 model User {
-  id                    String         @id @default(uuid())
-  email                 String         @unique
-  password              String
-  name                  String
-  role                  Role           @default(USER)
-  tenantId              String?
-  tenant                Tenant?        @relation(fields: [tenantId], references: [id])
-  twoFactorSecret       String?
-  twoFactorEnabled      Boolean        @default(false)
+  id                       String               @id @default(uuid())
+  email                    String               @unique
+  password                 String
+  name                     String
+  role                     Role                 @default(USER)
+  tenantId                 String?
+  tenant                   Tenant?              @relation(fields: [tenantId], references: [id])
+  twoFactorSecret          String?
+  twoFactorEnabled         Boolean              @default(false)
   // Verificação de email
-  emailVerified         Boolean        @default(false)
-  emailVerificationToken String?
+  emailVerified            Boolean              @default(false)
+  emailVerificationToken   String?
   emailVerificationExpires DateTime?
   // Histórico de senhas (JSON array com últimos 5 hashes)
-  passwordHistory       String?
-  lastPasswordChange    DateTime?
+  passwordHistory          String?
+  lastPasswordChange       DateTime?
   // Controle de bloqueio por tentativas de login
-  loginAttempts         Int            @default(0)
-  isLocked              Boolean        @default(false)
-  lockedAt              DateTime?
-  lockedUntil           DateTime?
-  lastFailedLoginAt     DateTime?
-  createdAt             DateTime       @default(now())
-  updatedAt             DateTime       @updatedAt
-  auditLogs             AuditLog[]
-  refreshTokens         RefreshToken[]
-  passwordResetTokens   PasswordResetToken[]
+  loginAttempts            Int                  @default(0)
+  isLocked                 Boolean              @default(false)
+  lockedAt                 DateTime?
+  lockedUntil              DateTime?
+  lastFailedLoginAt        DateTime?
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+  auditLogs                AuditLog[]
+  refreshTokens            RefreshToken[]
+  passwordResetTokens      PasswordResetToken[]
 
   // Índices para performance e segurança
   @@index([tenantId]) // Já existia - essencial para isolamento multitenant
@@ -131,43 +131,43 @@ model AuditLog {
 
 // Tabela de Configurações de Segurança (apenas SUPER_ADMIN pode editar)
 model SecurityConfig {
-  id                      String   @id @default(uuid())
+  id                         String   @id @default(uuid())
   // Rate Limiting
-  loginMaxAttempts        Int      @default(5) // Tentativas de login antes de bloquear
-  loginLockDurationMinutes Int     @default(30) // Duração do bloqueio em minutos
-  loginWindowMinutes      Int      @default(1) // Janela de tempo em minutos
-  globalMaxRequests       Int      @default(100) // Requisições globais
-  globalWindowMinutes     Int      @default(1) // Janela de tempo global
+  loginMaxAttempts           Int      @default(5) // Tentativas de login antes de bloquear
+  loginLockDurationMinutes   Int      @default(30) // Duração do bloqueio em minutos
+  loginWindowMinutes         Int      @default(1) // Janela de tempo em minutos
+  globalMaxRequests          Int      @default(100) // Requisições globais
+  globalWindowMinutes        Int      @default(1) // Janela de tempo global
   // Senha
-  passwordMinLength       Int      @default(8)
-  passwordRequireUppercase Boolean @default(true)
-  passwordRequireLowercase Boolean @default(true)
-  passwordRequireNumbers  Boolean  @default(true)
-  passwordRequireSpecial  Boolean  @default(true)
+  passwordMinLength          Int      @default(8)
+  passwordRequireUppercase   Boolean  @default(true)
+  passwordRequireLowercase   Boolean  @default(true)
+  passwordRequireNumbers     Boolean  @default(true)
+  passwordRequireSpecial     Boolean  @default(true)
   // JWT
-  accessTokenExpiresIn    String   @default("15m") // 15 minutos
-  refreshTokenExpiresIn   String   @default("7d") // 7 dias
+  accessTokenExpiresIn       String   @default("15m") // 15 minutos
+  refreshTokenExpiresIn      String   @default("7d") // 7 dias
   // 2FA
-  twoFactorEnabled        Boolean  @default(false) // Habilitar 2FA globalmente
-  twoFactorRequired       Boolean  @default(false) // Tornar 2FA obrigatório
-  twoFactorRequiredForAdmins Boolean @default(false) // 2FA obrigatório apenas para ADMIN/SUPER_ADMIN
-  twoFactorSuggested      Boolean  @default(true) // Exibir avisos sugerindo ativação de 2FA
+  twoFactorEnabled           Boolean  @default(false) // Habilitar 2FA globalmente
+  twoFactorRequired          Boolean  @default(false) // Tornar 2FA obrigatório
+  twoFactorRequiredForAdmins Boolean  @default(false) // 2FA obrigatório apenas para ADMIN/SUPER_ADMIN
+  twoFactorSuggested         Boolean  @default(true) // Exibir avisos sugerindo ativação de 2FA
   // Email Verification
-  emailVerificationRequired Boolean @default(false) // Exigir verificação de email
-  emailVerificationLevel  String   @default("SOFT") // Nível: SOFT, MODERATE, STRICT
+  emailVerificationRequired  Boolean  @default(false) // Exigir verificação de email
+  emailVerificationLevel     String   @default("SOFT") // Nível: SOFT, MODERATE, STRICT
   // Password Policy
-  passwordReuseLimit      Int      @default(5) // Prevenir reutilização das últimas N senhas
+  passwordReuseLimit         Int      @default(5) // Prevenir reutilização das últimas N senhas
   // Sessão
-  sessionTimeoutMinutes   Int      @default(30) // Timeout de inatividade em minutos (logout automático)
+  sessionTimeoutMinutes      Int      @default(30) // Timeout de inatividade em minutos (logout automático)
   // Email SMTP Credentials (único para toda a plataforma)
-  smtpUsername            String?  // Usuário SMTP
-  smtpPassword            String?  // Senha SMTP (armazenada com criptografia)
+  smtpUsername               String? // Usuário SMTP
+  smtpPassword               String? // Senha SMTP (armazenada com criptografia)
   // Configurações da Plataforma
-  platformName            String?  @default("Sistema Multitenant") // Nome da plataforma
-  platformEmail           String?  // Email informativo da plataforma
-  platformPhone           String?  // Telefone de contato da plataforma
-  updatedAt               DateTime @updatedAt
-  updatedBy               String? // ID do SUPER_ADMIN que atualizou
+  platformName               String?  @default("Sistema Multitenant") // Nome da plataforma
+  platformEmail              String? // Email informativo da plataforma
+  platformPhone              String? // Telefone de contato da plataforma
+  updatedAt                  DateTime @updatedAt
+  updatedBy                  String? // ID do SUPER_ADMIN que atualizou
 
   @@map("security_config")
 }
@@ -191,47 +191,47 @@ model EmailConfiguration {
 
 // Tabela de Configurações do Sistema de Updates (apenas SUPER_ADMIN pode editar)
 model SystemSettings {
-  id                    String    @id @default(uuid())
+  id                 String    @id @default(uuid())
   // Versão da aplicação
-  appVersion            String?   @default("1.0.0")
+  appVersion         String?   @default("1.0.0")
   // Configurações do Git
-  gitToken              String?   // Token criptografado
-  gitUsername           String?
-  gitRepository         String?
-  gitReleaseBranch      String    @default("main")
+  gitToken           String? // Token criptografado
+  gitUsername        String?
+  gitRepository      String?
+  gitReleaseBranch   String    @default("main")
   // Configurações do sistema
-  packageManager        String    @default("npm")
-  updateCheckEnabled    Boolean   @default(true)
-  lastUpdateCheck       DateTime?
-  availableVersion      String?
-  updateAvailable       Boolean   @default(false)
+  packageManager     String    @default("npm")
+  updateCheckEnabled Boolean   @default(true)
+  lastUpdateCheck    DateTime?
+  availableVersion   String?
+  updateAvailable    Boolean   @default(false)
   // Metadados
-  updatedAt             DateTime  @updatedAt
-  updatedBy             String?   // ID do SUPER_ADMIN que atualizou
+  updatedAt          DateTime  @updatedAt
+  updatedBy          String? // ID do SUPER_ADMIN que atualizou
 
   @@map("system_settings")
 }
 
 // Tabela de Logs de Atualizações (auditoria completa)
 model UpdateLog {
-  id              String    @id @default(uuid())
-  version         String    // Versão de destino
-  status          String    // STARTED, SUCCESS, FAILED, ROLLED_BACK
-  startedAt       DateTime  @default(now())
-  completedAt     DateTime?
-  duration        Int?      // Duração em segundos
+  id             String    @id @default(uuid())
+  version        String // Versão de destino
+  status         String // STARTED, SUCCESS, FAILED, ROLLED_BACK
+  startedAt      DateTime  @default(now())
+  completedAt    DateTime?
+  duration       Int? // Duração em segundos
   // Detalhes da execução
-  packageManager  String    @default("npm")
-  backupPath      String?   // Caminho do backup criado
-  errorMessage    String?   // Mensagem de erro se falhou
-  rollbackReason  String?   // Motivo do rollback
+  packageManager String    @default("npm")
+  backupPath     String? // Caminho do backup criado
+  errorMessage   String? // Mensagem de erro se falhou
+  rollbackReason String? // Motivo do rollback
   // Auditoria
-  executedBy      String?   // ID do SUPER_ADMIN
-  ipAddress       String?
-  userAgent       String?
+  executedBy     String? // ID do SUPER_ADMIN
+  ipAddress      String?
+  userAgent      String?
   // Logs detalhados (JSON)
-  executionLogs   String?   // Logs completos da execução
-  
+  executionLogs  String? // Logs completos da execução
+
   @@index([status])
   @@index([startedAt])
   @@index([version])
@@ -243,14 +243,14 @@ model UpdateLog {
 model Module {
   id          String   @id @default(uuid())
   name        String   @unique // Nome único do módulo (ex: "sales", "reports")
-  displayName String   // Nome para exibição (ex: "Sistema de Vendas")
-  description String?  // Descrição do módulo
+  displayName String // Nome para exibição (ex: "Sistema de Vendas")
+  description String? // Descrição do módulo
   version     String   @default("1.0.0") // Versão do módulo
   isActive    Boolean  @default(true) // Se o módulo está ativo no sistema
-  config      String?  // Configurações específicas do módulo (JSON)
+  config      String? // Configurações específicas do módulo (JSON)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   // Relacionamento com tenants
   tenantModules TenantModule[]
 
@@ -266,7 +266,7 @@ model TenantModule {
   moduleName    String
   module        Module    @relation(fields: [moduleName], references: [name], onDelete: Cascade)
   isActive      Boolean   @default(true) // Se o módulo está ativo para este tenant
-  config        String?   // Configurações específicas do módulo para este tenant (JSON)
+  config        String? // Configurações específicas do módulo para este tenant (JSON)
   activatedAt   DateTime  @default(now())
   deactivatedAt DateTime?
   createdAt     DateTime  @default(now())
@@ -281,21 +281,21 @@ model TenantModule {
 
 // Tabela de Notificações
 model Notification {
-  id        String   @id @default(uuid())
-  title     String   // Título da notificação
-  message   String   // Mensagem da notificação
-  severity  String   // info, warning, critical
-  audience  String   // user, admin, super_admin
-  source    String   // core, module
-  module    String?  // Nome do módulo (se source = module)
-  tenantId  String?  // ID do tenant (null = global)
-  userId    String?  // ID do usuário específico (null = todos da audiência)
-  context   String?  // URL para redirecionamento
-  data      String   @default("{}") // Dados extras em JSON
-  read      Boolean  @default(false) // Se foi lida
+  id        String    @id @default(uuid())
+  title     String // Título da notificação
+  message   String // Mensagem da notificação
+  severity  String // info, warning, critical
+  audience  String // user, admin, super_admin
+  source    String // core, module
+  module    String? // Nome do módulo (se source = module)
+  tenantId  String? // ID do tenant (null = global)
+  userId    String? // ID do usuário específico (null = todos da audiência)
+  context   String? // URL para redirecionamento
+  data      String    @default("{}") // Dados extras em JSON
+  read      Boolean   @default(false) // Se foi lida
   readAt    DateTime? // Quando foi lida
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   // Índices para performance
   @@index([tenantId])
@@ -311,3 +311,78 @@ model Notification {
   @@map("notifications")
 }
 
+// ============================================
+// SISTEMA DE MÓDULOS ROBUSTO - NOVAS TABELAS
+// ============================================
+// INSTRUÇÕES: Copie todo este conteúdo e cole NO FINAL do arquivo schema.prisma
+// (após a tabela Notification, antes da última linha vazia)
+
+// Tabela de Uploads de Módulos
+model ModuleUpload {
+  id                String                   @id @default(uuid())
+  slug              String                   @unique
+  name              String
+  version           String
+  description       String?
+  author            String?
+  category          String?
+  enabled           Boolean                  @default(false)
+  validated         Boolean                  @default(false)
+  sandboxed         Boolean                  @default(true)
+  permissionsStrict Boolean                  @default(true)
+  uploadedAt        DateTime                 @default(now())
+  uploadedBy        String?
+  filePath          String?
+  fileHash          String?
+  configJson        String?
+  securityFlags     String?
+  validationReport  String?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  permissions       ModuleUploadPermission[]
+  pages             ModuleUploadPage[]
+
+  @@index([slug])
+  @@index([enabled])
+  @@index([validated])
+  @@index([enabled, validated])
+  @@index([uploadedBy])
+  @@index([category])
+  @@map("module_uploads")
+}
+
+model ModuleUploadPermission {
+  id          String       @id @default(uuid())
+  moduleId    String
+  module      ModuleUpload @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  name        String
+  description String
+  category    String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([moduleId, name])
+  @@index([moduleId])
+  @@index([name])
+  @@map("module_upload_permissions")
+}
+
+model ModuleUploadPage {
+  id          String       @id @default(uuid())
+  moduleId    String
+  module      ModuleUpload @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  pageId      String
+  path        String
+  title       String?
+  description String?
+  component   String?
+  protected   Boolean      @default(true)
+  permissions String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([moduleId, pageId])
+  @@index([moduleId])
+  @@index([path])
+  @@map("module_upload_pages")
+}
