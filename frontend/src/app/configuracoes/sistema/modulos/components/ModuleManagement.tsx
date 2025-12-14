@@ -31,6 +31,7 @@ export function ModuleManagement() {
   const [selectedModule, setSelectedModule] = useState<InstalledModule | null>(null);
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [activeTab, setActiveTab] = useState("upload");
 
   useEffect(() => {
     loadInstalledModules();
@@ -115,6 +116,9 @@ export function ModuleManagement() {
       // Recarregar lista de módulos
       await loadInstalledModules();
 
+      // Redirecionar para a aba "Módulos Instalados"
+      setActiveTab("installed");
+
       // Limpar seleção
       setSelectedFile(null);
       if (fileInputRef.current) {
@@ -198,7 +202,7 @@ export function ModuleManagement() {
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="upload" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="upload">Instalar Módulos</TabsTrigger>
           <TabsTrigger value="installed">Módulos Instalados</TabsTrigger>

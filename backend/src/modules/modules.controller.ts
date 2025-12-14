@@ -150,4 +150,20 @@ export class ModulesController {
     await this.autoLoaderService.loadModulesFromDirectory();
     return { message: 'Módulos carregados automaticamente com sucesso' };
   }
+
+  // POST /modules/:name/update-database - Executar migrações e seed do módulo (apenas SUPER_ADMIN)
+  @Post(':name/update-database')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  async updateModuleDatabase(@Param('name') name: string) {
+    return this.moduleInstallerService.updateModuleDatabase(name);
+  }
+
+  // GET /modules/:name/check-updates - Verificar se o módulo tem atualizações pendentes (apenas SUPER_ADMIN)
+  @Get(':name/check-updates')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  async checkModuleUpdates(@Param('name') name: string) {
+    return this.moduleInstallerService.checkModuleUpdates(name);
+  }
 }
