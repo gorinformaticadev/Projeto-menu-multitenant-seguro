@@ -9,7 +9,6 @@ import { Button } from "./ui/button";
 import { Bell, Search, User, LogOut, Info } from "lucide-react";
 import { API_URL } from "@/lib/api";
 import api from "@/lib/api";
-import { useModuleFeatures } from "@/hooks/useModuleFeatures";
 import { ModuleRegistryUserMenu } from "./ModuleRegistryUserMenu";
 import { useNotificationsDropdown } from "@/hooks/useNotificationsDropdown";
 import { AlertTriangle, AlertCircle, CheckCircle, ExternalLink } from "lucide-react";
@@ -29,7 +28,6 @@ export function TopBar() {
   const [userTenantLogo, setUserTenantLogo] = useState<string | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const { features: moduleFeatures } = useModuleFeatures();
 
   // Hook do sistema de notificações
   const {
@@ -477,22 +475,6 @@ export function TopBar() {
                   <User className="h-4 w-4" />
                   Meu Perfil
                 </a>
-
-                {/* Itens do Menu do Usuário (Sistema Antigo) */}
-                {moduleFeatures.userMenu.map((item, index) => {
-                  const Icon = getIconComponent(item.icon);
-                  return (
-                    <a
-                      key={`module-menu-${index}`}
-                      href={item.path}
-                      onClick={() => setShowUserMenu(false)}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
-                    >
-                      <Icon className="h-4 w-4" />
-                      {item.label}
-                    </a>
-                  );
-                })}
 
                 {/* Itens do Menu do Usuário (Module Registry) */}
                 <ModuleRegistryUserMenu onItemClick={() => setShowUserMenu(false)} />

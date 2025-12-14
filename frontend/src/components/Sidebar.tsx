@@ -70,6 +70,13 @@ export function Sidebar() {
     };
   }, []);
 
+  // Recolhe o sidebar quando a rota muda (especialmente útil em mobile)
+  useEffect(() => {
+    if (isExpanded) {
+      setIsExpanded(false);
+    }
+  }, [pathname]); // Dependência no pathname para reagir a mudanças de rota
+
   const loadMenuItems = () => {
     try {
       // Core agrega itens de todos os módulos registrados
@@ -101,6 +108,14 @@ export function Sidebar() {
       ...prev,
       [groupId]: !prev[groupId]
     }));
+  };
+
+  // Função para lidar com clique em item de navegação
+  const handleItemClick = () => {
+    // Recolhe o sidebar quando um item é clicado (exceto grupos expansíveis)
+    if (isExpanded) {
+      setIsExpanded(false);
+    }
   };
 
   // Configuração dos grupos
@@ -194,6 +209,7 @@ export function Sidebar() {
                   <Link
                     key={item.id}
                     href={item.href}
+                    onClick={handleItemClick}
                     className={cn(
                       "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                       isActive
@@ -248,6 +264,7 @@ export function Sidebar() {
                                 <Link
                                   key={item.id}
                                   href={item.href}
+                                  onClick={handleItemClick}
                                   className={cn(
                                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                                     isActive
@@ -301,7 +318,10 @@ export function Sidebar() {
             "w-full",
             isExpanded ? "justify-start" : "justify-center px-2"
           )}
-          onClick={logout}
+          onClick={() => {
+            handleItemClick(); // Recolhe o sidebar
+            logout(); // Faz logout
+          }}
           title={!isExpanded ? "Sair" : undefined}
         >
           <LogOut className="h-5 w-5 flex-shrink-0" />
