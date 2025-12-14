@@ -8,50 +8,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Save, Building2, Info } from "lucide-react";
-
-interface PlatformConfig {
-  platformName: string;
-  platformEmail: string;
-  platformPhone: string;
-}
+import { usePlatformConfigContext } from "@/contexts/PlatformConfigContext";
+import { PlatformConfig } from "@/hooks/usePlatformConfig";
 
 export default function PlatformConfigSection() {
   const { toast } = useToast();
+  const { config: contextConfig, loading, refreshConfig } = usePlatformConfigContext();
   const [config, setConfig] = useState<PlatformConfig>({
     platformName: "",
     platformEmail: "",
     platformPhone: "",
   });
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Load platform configuration
+  // Sync with context config
   useEffect(() => {
-    const fetchConfig = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get("/platform-config");
-        setConfig(response.data);
-      } catch (error: any) {
-        toast({
-          title: "Erro ao carregar configurações da plataforma",
-          description: error.response?.data?.message || "Erro desconhecido",
-          variant: "destructive",
-        });
-        
-        // Set default values on error
-        setConfig({
-          platformName: "Sistema Multitenant",
-          platformEmail: "contato@sistema.com",
-          platformPhone: "(11) 99999-9999",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchConfig();
-  }, [toast]);
+    if (!loading && contextConfig) {
+      setConfig(contextConfig);
+    }
+  }, [contextConfig, loading]);
 
   // Handle input changes
   const handleInputChange = (field: keyof PlatformConfig, value: string) => {
@@ -68,10 +43,14 @@ export default function PlatformConfigSection() {
       
       await api.put("/platform-config", config);
       
+      // Atualizar contexto para refletir mudanças imediatamente
+      await refreshConfig();
+      
       toast({
         title: "Configurações salvas",
         description: "As configurações da plataforma foram atualizadas com sucesso",
       });
+      
     } catch (error: any) {
       toast({
         title: "Erro ao salvar configurações",

@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { DynamicTitle } from "./DynamicTitle";
 import { useModuleRegistry } from "@/hooks/useModuleRegistry";
 import { ModuleRegistryTaskbar } from "./ModuleRegistryTaskbar";
 
@@ -39,6 +40,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   // Mostra topbar e sidebar fixos em todas as outras páginas
   return (
     <div className="flex h-screen overflow-hidden">
+      {/* Título dinâmico */}
+      <DynamicTitle />
+      
       {/* TopBar Fixa */}
       <TopBar />
       

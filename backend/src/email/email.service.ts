@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
 import { PrismaService } from '../prisma/prisma.service';
-import { getPlatformName } from '../common/constants/platform.constants';
+import { getPlatformName, getPlatformEmail } from '../common/constants/platform.constants';
 import { SecurityConfigService } from '../security-config/security-config.service';
 
 @Injectable()
@@ -107,7 +107,7 @@ export class EmailService implements OnModuleInit {
     }
 
     const verificationUrl = `${this.config.get('FRONTEND_URL')}/verify-email?token=${token}`;
-    const html = this.getVerificationEmailTemplate(name, verificationUrl);
+    const html = await this.getVerificationEmailTemplate(name, verificationUrl);
 
     // If database configuration is active and credentials are provided, use them
     if (this.dbConfig && smtpUser && smtpPass) {
@@ -149,7 +149,7 @@ export class EmailService implements OnModuleInit {
 
     const resetUrl = `${this.config.get('FRONTEND_URL')}/reset-password?token=${token}`;
 
-    const html = this.getPasswordResetEmailTemplate(name, resetUrl);
+    const html = await this.getPasswordResetEmailTemplate(name, resetUrl);
 
     try {
       const platformName = await getPlatformName();
@@ -199,7 +199,10 @@ export class EmailService implements OnModuleInit {
   /**
    * Template de email de verificação
    */
-  private getVerificationEmailTemplate(name: string, verificationUrl: string): string {
+  private async getVerificationEmailTemplate(name: string, verificationUrl: string): Promise<string> {
+    const platformName = await getPlatformName();
+    const platformEmail = await getPlatformEmail();
+    
     return `
       <!DOCTYPE html>
       <html>
@@ -217,11 +220,11 @@ export class EmailService implements OnModuleInit {
       <body>
         <div class="container">
           <div class="header">
-            <h1>Verificação de Email</h1>
+            <h1>Verificação de Email - ${platformName}</h1>
           </div>
           <div class="content">
             <p>Olá <strong>${name}</strong>,</p>
-            <p>Obrigado por se cadastrar no nosso sistema! Para completar seu cadastro, precisamos verificar seu endereço de email.</p>
+            <p>Obrigado por se cadastrar no ${platformName}! Para completar seu cadastro, precisamos verificar seu endereço de email.</p>
             <p>Clique no botão abaixo para verificar seu email:</p>
             <center>
               <a href="${verificationUrl}" class="button">Verificar Email</a>
@@ -229,10 +232,11 @@ export class EmailService implements OnModuleInit {
             <p>Ou copie e cole o link abaixo no seu navegador:</p>
             <p style="word-break: break-all; color: #666; font-size: 12px;">${verificationUrl}</p>
             <p><strong>Este link expira em 24 horas.</strong></p>
-            <p>Se você não se cadastrou no nosso sistema, ignore este email.</p>
+            <p>Se você não se cadastrou no ${platformName}, ignore este email.</p>
           </div>
           <div class="footer">
             <p>Este é um email automático. Por favor, não responda.</p>
+            <p>Para suporte, entre em contato: ${platformEmail}</p>
           </div>
         </div>
       </body>
@@ -243,7 +247,10 @@ export class EmailService implements OnModuleInit {
   /**
    * Template de email de recuperação de senha
    */
-  private getPasswordResetEmailTemplate(name: string, resetUrl: string): string {
+  private async getPasswordResetEmailTemplate(name: string, resetUrl: string): Promise<string> {
+    const platformName = await getPlatformName();
+    const platformEmail = await getPlatformEmail();
+    
     return `
       <!DOCTYPE html>
       <html>
@@ -262,13 +269,13 @@ export class EmailService implements OnModuleInit {
       <body>
         <div class="container">
           <div class="header">
-            <h1>Recuperação de Senha</h1>
+            <h1>Recuperação de Senha - ${platformName}</h1>
           </div>
           <div class="content">
             <p>Olá <strong>${name}</strong>,</p>
-            <p>Recebemos uma solicitação para redefinir a senha da sua conta.</p>
+            <p>Recebemos uma solicitação para redefinir a senha da sua conta no ${platformName}.</p>
             <div class="warning">
-              ⚠️ <strong>Atenção:</strong> Se você não solicitou a redefinição de senha, ignore este email e entre em contato com o suporte imediatamente.
+              ⚠️ <strong>Atenção:</strong> Se você não solicitou a redefinição de senha, ignore este email e entre em contato com o suporte em ${platformEmail} imediatamente.
             </div>
             <p>Clique no botão abaixo para criar uma nova senha:</p>
             <center>
@@ -401,7 +408,7 @@ export class EmailService implements OnModuleInit {
       await tempTransporter.verify();
       this.logger.log('✅ Conexão SMTP verificada com sucesso');
 
-      const html = this.getTestEmailTemplate(name, config);
+      const html = await this.getTestEmailTemplate(name, config);
 
       this.logger.log('Enviando email de teste...');
       const platformName = await getPlatformName();
@@ -516,7 +523,9 @@ export class EmailService implements OnModuleInit {
   /**
    * Template de email de teste
    */
-  private getTestEmailTemplate(name: string, config: any): string {
+  private async getTestEmailTemplate(name: string, config: any): Promise<string> {
+    const platformName = await getPlatformName();
+    const platformEmail = await getPlatformEmail();
     return `
       <!DOCTYPE html>
       <html>
@@ -534,11 +543,11 @@ export class EmailService implements OnModuleInit {
       <body>
         <div class="container">
           <div class="header">
-            <h1>✅ Configuração de Email Confirmada</h1>
+            <h1>✅ Configuração de Email Confirmada - ${platformName}</h1>
           </div>
           <div class="content">
             <p>Olá <strong>${name}</strong>,</p>
-            <p>Esta é uma mensagem de teste para confirmar que sua configuração de email está funcionando corretamente.</p>
+            <p>Esta é uma mensagem de teste para confirmar que sua configuração de email do ${platformName} está funcionando corretamente.</p>
             
             <div class="config-details">
               <h3>Detalhes da Configuração:</h3>
@@ -551,6 +560,7 @@ export class EmailService implements OnModuleInit {
           </div>
           <div class="footer">
             <p>Este é um email automático. Por favor, não responda.</p>
+            <p>Para suporte, entre em contato: ${platformEmail}</p>
           </div>
         </div>
       </body>

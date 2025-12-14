@@ -67,6 +67,32 @@ export function PlatformName({ className = "" }: { className?: string }) {
 }
 
 /**
+ * Componente simples para exibir apenas o email da plataforma
+ */
+export function PlatformEmail({ className = "" }: { className?: string }) {
+  const { platformEmail, loading } = usePlatformConfig();
+
+  if (loading) {
+    return <span className={`animate-pulse ${className}`}>Carregando...</span>;
+  }
+
+  return <span className={className}>{platformEmail}</span>;
+}
+
+/**
+ * Componente simples para exibir apenas o telefone da plataforma
+ */
+export function PlatformPhone({ className = "" }: { className?: string }) {
+  const { platformPhone, loading } = usePlatformConfig();
+
+  if (loading) {
+    return <span className={`animate-pulse ${className}`}>Carregando...</span>;
+  }
+
+  return <span className={className}>{platformPhone}</span>;
+}
+
+/**
  * Componente para exibir informações de contato completas
  */
 export function PlatformContact({ className = "" }: { className?: string }) {

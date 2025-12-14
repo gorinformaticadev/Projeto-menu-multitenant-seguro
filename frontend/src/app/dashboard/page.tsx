@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ModuleSlot } from "@/components/ModuleSlot";
 import { ModuleRegistryWidgets } from "@/components/ModuleRegistryWidgets";
 import { ModuleRegistryNotifications } from "@/components/ModuleRegistryNotifications";
+import { PlatformName } from "@/components/PlatformInfo";
 
 // Helper para ícones dinâmicos
 const getIconComponent = (iconName: string): any => {
@@ -29,7 +30,7 @@ export default function DashboardPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground">
-          Bem-vindo ao sistema, {user?.name}!
+          Bem-vindo ao <PlatformName />, {user?.name}!
         </p>
       </div>
 

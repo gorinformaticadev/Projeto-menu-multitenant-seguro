@@ -11,7 +11,7 @@ import { InactivityLogout } from "@/components/InactivityLogout";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Sistema Multitenant",
+  title: "Sistema Multitenant", // Será atualizado dinamicamente pelo DynamicTitle
   description: "Sistema com isolamento de dados e controle de acesso",
   icons: {
     icon: [

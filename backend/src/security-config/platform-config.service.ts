@@ -92,10 +92,14 @@ export class PlatformConfigService {
 
       // Clear cache
       this.cachedConfig = null;
+      this.cacheTimestamp = 0;
 
       this.logger.log(`Platform configuration updated by user ${userId}`);
       
-      return await this.getPlatformConfig();
+      // Force refresh of cache
+      const updatedConfig = await this.getPlatformConfig();
+      
+      return updatedConfig;
     } catch (error) {
       this.logger.error('Error updating platform configuration:', error);
       throw error;

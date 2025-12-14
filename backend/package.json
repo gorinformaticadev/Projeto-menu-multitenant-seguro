@@ -49,6 +49,7 @@
     "openssl": "^2.0.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "pg": "^8.16.3",
     "prisma": "^5.22.0",
     "qrcode": "^1.5.4",
     "reflect-metadata": "^0.1.13",
