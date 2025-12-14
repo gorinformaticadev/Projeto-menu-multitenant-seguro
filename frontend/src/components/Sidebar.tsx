@@ -102,12 +102,32 @@ export function Sidebar() {
     }
   };
 
-  // Função para alternar expansão de grupos
+  // Função para alternar expansão de grupos (comportamento accordion)
   const toggleGroup = (groupId: string) => {
-    setExpandedGroups(prev => ({
-      ...prev,
-      [groupId]: !prev[groupId]
-    }));
+    setExpandedGroups(prev => {
+      const isCurrentlyExpanded = prev[groupId];
+      
+      if (isCurrentlyExpanded) {
+        // Se o grupo atual está expandido, apenas o recolhe
+        return {
+          ...prev,
+          [groupId]: false
+        };
+      } else {
+        // Se o grupo atual está recolhido, recolhe todos os outros e expande este
+        const newState: Record<string, boolean> = {};
+        
+        // Recolhe todos os grupos
+        Object.keys(prev).forEach(key => {
+          newState[key] = false;
+        });
+        
+        // Expande apenas o grupo clicado
+        newState[groupId] = true;
+        
+        return newState;
+      }
+    });
   };
 
   // Função para lidar com clique em item de navegação
