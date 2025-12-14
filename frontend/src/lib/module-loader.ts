@@ -173,16 +173,9 @@ function registerModuleExemploModule(): void {
       }
     ],
     
-    // 4️⃣ Notificações
-    notifications: [
-      {
-        id: 'module-exemplo-notification',
-        type: 'info',
-        title: 'Module Exemplo',
-        message: 'Notificação do Module Exemplo ativa.',
-        timestamp: new Date()
-      }
-    ],
+    // 4️⃣ Notificações (agora integradas com o sistema centralizado)
+    // As notificações são gerenciadas pelo sistema centralizado
+    // Este módulo pode emitir notificações usando o NotificationsEmitter
     
     // 5️⃣ Taskbar
     taskbar: [

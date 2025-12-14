@@ -1,12 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AutoLoaderService } from './auto-loader.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ModulesService {
   constructor(
     private prisma: PrismaService,
-    private autoLoaderService: AutoLoaderService
+    private autoLoaderService: AutoLoaderService,
+    private notificationsService: NotificationsService
   ) {}
 
   // Listar todos os módulos disponíveis no sistema
@@ -186,7 +188,7 @@ export class ModulesService {
       }
 
       // Reativar módulo
-      return this.prisma.tenantModule.update({
+      const result = await this.prisma.tenantModule.update({
         where: { id: existingTenantModule.id },
         data: {
           isActive: true,
@@ -194,16 +196,56 @@ export class ModulesService {
           deactivatedAt: null,
         },
       });
+
+      // Emitir notificação de reativação do módulo
+      await this.notificationsService.emitEvent({
+        type: 'module_reactivated',
+        source: 'core',
+        severity: 'info',
+        tenantId,
+        payload: {
+          title: 'Módulo Reativado',
+          message: `O módulo "${module.displayName}" foi reativado para sua empresa.`,
+          context: `/module-${moduleName}`,
+          data: {
+            moduleName,
+            moduleDisplayName: module.displayName,
+            reactivatedAt: new Date().toISOString(),
+          },
+        },
+      });
+
+      return result;
     }
 
     // Criar nova relação
-    return this.prisma.tenantModule.create({
+    const result = await this.prisma.tenantModule.create({
       data: {
         tenantId,
         moduleName,
         isActive: true,
       },
     });
+
+    // Emitir notificação de ativação do módulo
+    await this.notificationsService.emitEvent({
+      type: 'module_activated',
+      source: 'core',
+      severity: 'info',
+      tenantId,
+      payload: {
+        title: 'Módulo Ativado',
+        message: `O módulo "${module.displayName}" foi ativado para sua empresa.`,
+        context: `/module-${moduleName}`,
+        data: {
+          moduleName,
+          moduleDisplayName: module.displayName,
+          activatedAt: new Date().toISOString(),
+        },
+      },
+    });
+
+    return result;
   }
 
   // Desativar um módulo para um tenant
@@ -225,13 +267,38 @@ export class ModulesService {
       throw new BadRequestException(`Módulo '${moduleName}' já está desativado para este tenant`);
     }
 
-    return this.prisma.tenantModule.update({
+    const result = await this.prisma.tenantModule.update({
       where: { id: tenantModule.id },
       data: {
         isActive: false,
         deactivatedAt: new Date(),
       },
     });
+
+    // Buscar informações do módulo para a notificação
+    const module = await this.prisma.module.findUnique({
+      where: { name: moduleName },
+    });
+
+    // Emitir notificação de desativação do módulo
+    await this.notificationsService.emitEvent({
+      type: 'module_deactivated',
+      source: 'core',
+      severity: 'warning',
+      tenantId,
+      payload: {
+        title: 'Módulo Desativado',
+        message: `O módulo "${module?.displayName || moduleName}" foi desativado para sua empresa.`,
+        context: `/empresas`,
+        data: {
+          moduleName,
+          moduleDisplayName: module?.displayName,
+          deactivatedAt: new Date().toISOString(),
+        },
+      },
+    });
+
+    return result;
   }
 
   // Configurar um módulo para um tenant

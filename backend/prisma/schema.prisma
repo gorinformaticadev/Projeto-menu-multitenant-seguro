@@ -279,3 +279,35 @@ model TenantModule {
   @@map("tenant_modules")
 }
 
+// Tabela de Notificações
+model Notification {
+  id        String   @id @default(uuid())
+  title     String   // Título da notificação
+  message   String   // Mensagem da notificação
+  severity  String   // info, warning, critical
+  audience  String   // user, admin, super_admin
+  source    String   // core, module
+  module    String?  // Nome do módulo (se source = module)
+  tenantId  String?  // ID do tenant (null = global)
+  userId    String?  // ID do usuário específico (null = todos da audiência)
+  context   String?  // URL para redirecionamento
+  data      String   @default("{}") // Dados extras em JSON
+  read      Boolean  @default(false) // Se foi lida
+  readAt    DateTime? // Quando foi lida
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Índices para performance
+  @@index([tenantId])
+  @@index([userId])
+  @@index([audience])
+  @@index([severity])
+  @@index([source])
+  @@index([module])
+  @@index([read])
+  @@index([createdAt])
+  @@index([tenantId, audience, read]) // Consultas comuns
+  @@index([userId, read]) // Notificações não lidas do usuário
+  @@map("notifications")
+}
+

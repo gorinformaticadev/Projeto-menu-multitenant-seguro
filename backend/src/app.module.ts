@@ -18,6 +18,7 @@ import { CommonModule } from './common/common.module';
 import { TokenCleanupService } from './common/services/token-cleanup.service';
 import { UpdateModule } from './update/update.module';
 import { ModulesModule } from './modules/modules.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { ModulesModule } from './modules/modules.module';
     AuditModule,
     UpdateModule,
     ModulesModule,
+    NotificationsModule,
   ],
   providers: [
     {

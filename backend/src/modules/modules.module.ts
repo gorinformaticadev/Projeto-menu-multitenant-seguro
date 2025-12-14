@@ -4,9 +4,10 @@ import { ModulesService } from './modules.service';
 import { ModuleInstallerService } from './module-installer.service';
 import { AutoLoaderService } from './auto-loader.service';
 import { PrismaModule } from '../prisma/prisma.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, NotificationsModule],
   controllers: [ModulesController],
   providers: [ModulesService, ModuleInstallerService, AutoLoaderService],
   exports: [ModulesService, ModuleInstallerService, AutoLoaderService],
