@@ -436,13 +436,68 @@ export class ModuleInstallerService {
 
       try {
         this.logger.log(`Executando migração: ${migrationFile}`);
-        await this.prisma.$executeRawUnsafe(migrationSql);
+        
+        // Dividir comandos SQL por ponto e vírgula e executar cada um separadamente
+        const sqlCommands = this.splitSqlCommands(migrationSql);
+        
+        for (const [index, sqlCommand] of sqlCommands.entries()) {
+          const cleanCommand = sqlCommand.trim();
+          if (cleanCommand) {
+            this.logger.log(`Executando comando ${index + 1}/${sqlCommands.length} da migração ${migrationFile}`);
+            await this.prisma.$executeRawUnsafe(cleanCommand);
+          }
+        }
+        
         this.logger.log(`Migração ${migrationFile} executada com sucesso`);
       } catch (error) {
         this.logger.error(`Erro ao executar migração ${migrationFile}: ${error.message}`);
         throw new BadRequestException(`Erro na migração ${migrationFile}: ${error.message}`);
       }
     }
+  }
+
+  private splitSqlCommands(sqlContent: string): string[] {
+    // Dividir por ponto e vírgula, mas preservar comentários
+    const commands: string[] = [];
+    let currentCommand = '';
+    let inComment = false;
+    let inBlockComment = false;
+    
+    for (let i = 0; i < sqlContent.length; i++) {
+      const char = sqlContent[i];
+      const nextChar = sqlContent[i + 1];
+      
+      // Verificar início/fim de comentários
+      if (!inBlockComment && char === '-' && nextChar === '-') {
+        inComment = true;
+      } else if (char === '\n') {
+        inComment = false;
+      } else if (char === '/' && nextChar === '*') {
+        inBlockComment = true;
+      } else if (char === '*' && nextChar === '/') {
+        inBlockComment = false;
+        i++; // Pular o próximo caractere
+        continue;
+      }
+      
+      // Adicionar caractere ao comando atual
+      currentCommand += char;
+      
+      // Se encontramos um ponto e vírgula e não estamos em comentário, finalizar comando
+      if (char === ';' && !inComment && !inBlockComment) {
+        if (currentCommand.trim()) {
+          commands.push(currentCommand.trim());
+        }
+        currentCommand = '';
+      }
+    }
+    
+    // Adicionar último comando se existir
+    if (currentCommand.trim()) {
+      commands.push(currentCommand.trim());
+    }
+    
+    return commands.filter(cmd => cmd.length > 0);
   }
 
   private async extractModuleFiles(zip: AdmZip, moduleInfo: any, modulePath: string): Promise<void> {
@@ -656,11 +711,53 @@ export class ModuleInstallerService {
       orderBy: { displayName: 'asc' }
     });
 
-    return modules.map(module => ({
-      ...module,
-      config: module.config ? JSON.parse(module.config) : null,
-      isInstalled: fs.existsSync(path.join(this.modulesPath, module.name))
-    }));
+    const modulesWithUpdates = await Promise.all(
+      modules.map(async (module) => {
+        const modulePath = path.join(this.modulesPath, module.name);
+        const isInstalled = fs.existsSync(modulePath);
+
+        let hasUpdates = false;
+        let databaseVersion = null;
+        
+        if (isInstalled) {
+          try {
+            // Verificar se há atualizações disponíveis
+            const updateInfo = await this.checkModuleUpdates(module.name);
+            
+            // Verificar se o banco está atualizado comparando versões
+            try {
+              databaseVersion = (module as any).databaseVersion || null;
+            } catch (error) {
+              // Se a coluna não existir ainda, assumir que nunca foi atualizada
+              databaseVersion = null;
+              this.logger.warn(`Coluna databaseVersion não existe ainda. Assumindo nunca atualizada para ${module.name}`);
+            }
+            
+            const moduleVersion = module.version;
+            
+            // Se não tem databaseVersion ou se a versão do módulo é maior que a do banco
+            if (!databaseVersion || this.compareVersions(moduleVersion, databaseVersion) > 0) {
+              hasUpdates = true;
+            } else {
+              hasUpdates = updateInfo.hasUpdates; // Usar apenas se há migrações pendentes
+            }
+            
+          } catch (error) {
+            this.logger.warn(`Erro ao verificar atualizações para ${module.name}: ${error.message}`);
+          }
+        }
+
+        return {
+          ...module,
+          config: module.config ? JSON.parse(module.config) : null,
+          isInstalled,
+          hasDatabaseUpdates: hasUpdates,
+          databaseVersion: databaseVersion
+        };
+      })
+    );
+
+    return modulesWithUpdates;
   }
 
   async getModuleInfo(moduleName: string): Promise<any> {
@@ -689,5 +786,242 @@ export class ModuleInstallerService {
       isInstalled,
       moduleJson
     };
+  }
+
+  async updateModuleDatabase(moduleName: string): Promise<any> {
+    this.logger.log(`Iniciando atualização do banco de dados para o módulo: ${moduleName}`);
+
+    try {
+      // Verificar se módulo existe
+      const module = await this.prisma.module.findUnique({
+        where: { name: moduleName }
+      });
+
+      if (!module) {
+        throw new BadRequestException(`Módulo '${moduleName}' não encontrado`);
+      }
+
+      const modulePath = path.join(this.modulesPath, moduleName);
+      if (!fs.existsSync(modulePath)) {
+        throw new BadRequestException(`Arquivos do módulo '${moduleName}' não encontrados no sistema`);
+      }
+
+      // Criar backup antes de executar as operações
+      const backupPath = await this.createDatabaseBackup(moduleName);
+
+      try {
+        // Executar migrações
+        await this.runMigrations({ name: moduleName }, modulePath);
+  
+        // Executar seed se existir
+        await this.runSeed(moduleName, modulePath);
+  
+        // Atualizar versão do banco no módulo usando SQL direto
+        try {
+          await this.prisma.$executeRawUnsafe(
+            `UPDATE modules SET databaseVersion = $1 WHERE name = $2`,
+            module.version,
+            moduleName
+          );
+          this.logger.log(`Versão do banco atualizada para: ${module.version}`);
+        } catch (error: any) {
+          // Se a coluna não existir ainda, apenas registrar no log
+          if (error.message.includes('databaseversion') || error.message.includes('does not exist')) {
+            this.logger.warn(`Coluna databaseVersion não existe ainda. Migração será aplicada posteriormente.`);
+          } else {
+            throw error; // Re-throw other errors
+          }
+        }
+  
+        this.logger.log(`Banco de dados atualizado com sucesso para o módulo ${moduleName}`);
+        this.logger.log(`Versão do banco atualizada para: ${module.version}`);
+  
+        return {
+          success: true,
+          message: `Banco de dados atualizado com sucesso para o módulo '${moduleName}' (versão ${module.version})`,
+          backupPath,
+          databaseVersion: module.version,
+          timestamp: new Date().toISOString()
+        };
+
+      } catch (error) {
+        // Em caso de erro, tentar restaurar backup
+        this.logger.error(`Erro na atualização, tentando restaurar backup: ${error.message}`);
+        await this.restoreDatabaseBackup(backupPath);
+        throw error;
+      }
+
+    } catch (error) {
+      this.logger.error(`Erro ao atualizar banco de dados do módulo ${moduleName}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async checkModuleUpdates(moduleName: string): Promise<any> {
+    this.logger.log(`Verificando atualizações para o módulo: ${moduleName}`);
+
+    try {
+      const module = await this.prisma.module.findUnique({
+        where: { name: moduleName }
+      });
+
+      if (!module) {
+        throw new BadRequestException(`Módulo '${moduleName}' não encontrado`);
+      }
+
+      const modulePath = path.join(this.modulesPath, moduleName);
+      if (!fs.existsSync(modulePath)) {
+        return {
+          hasUpdates: false,
+          reason: 'Module files not found'
+        };
+      }
+
+      // Verificar se há migrações
+      const migrationsPath = path.join(modulePath, 'migrations');
+      const hasMigrations = fs.existsSync(migrationsPath) &&
+        fs.readdirSync(migrationsPath).filter(file => file.endsWith('.sql')).length > 0;
+
+      // Verificar se há seed
+      const hasSeed = fs.existsSync(path.join(modulePath, 'seed.sql'));
+
+      return {
+        hasUpdates: hasMigrations || hasSeed,
+        migrations: hasMigrations ? this.getMigrationList(migrationsPath) : [],
+        hasSeed,
+        needsUpdate: hasMigrations || hasSeed
+      };
+
+    } catch (error) {
+      this.logger.error(`Erro ao verificar atualizações do módulo ${moduleName}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  private async createDatabaseBackup(moduleName: string): Promise<string> {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupFileName = `backup_${moduleName}_${timestamp}.sql`;
+    const backupPath = path.join(this.uploadsPath, 'backups', backupFileName);
+
+    // Criar diretório de backups se não existir
+    const backupsDir = path.dirname(backupPath);
+    if (!fs.existsSync(backupsDir)) {
+      fs.mkdirSync(backupsDir, { recursive: true });
+    }
+
+    try {
+      // Criar backup usando mysqldump (se disponível) ou método alternativo
+      const dbUrl = process.env.DATABASE_URL;
+      if (dbUrl && dbUrl.includes('mysql')) {
+        // Backup MySQL usando mysqldump
+        const dbName = dbUrl.split('/').pop()?.split('?')[0];
+        const dbUser = dbUrl.match(/mysql:\/\/([^:]+):/)?.[1] || 'root';
+        const dbHost = dbUrl.match(/mysql:\/\/[^@]+@([^:]+):/)?.[1] || 'localhost';
+        
+        const mysqldumpCmd = `mysqldump -h ${dbHost} -u ${dbUser} ${dbName} > ${backupPath}`;
+        await execAsync(mysqldumpCmd);
+      } else {
+        // Backup alternativo - criar arquivo vazio como placeholder
+        fs.writeFileSync(backupPath, `-- Backup created for module ${moduleName} at ${timestamp}\n-- Note: Automated backup requires mysqldump configuration\n`);
+      }
+
+      this.logger.log(`Backup criado: ${backupPath}`);
+      return backupPath;
+
+    } catch (error) {
+      this.logger.warn(`Aviso: Não foi possível criar backup automático: ${error.message}`);
+      // Retornar caminho mesmo com erro para não bloquear o processo
+      return backupPath;
+    }
+  }
+
+  private async restoreDatabaseBackup(backupPath: string): Promise<void> {
+    if (!fs.existsSync(backupPath)) {
+      this.logger.warn(`Backup não encontrado: ${backupPath}`);
+      return;
+    }
+
+    try {
+      const dbUrl = process.env.DATABASE_URL;
+      if (dbUrl && dbUrl.includes('mysql')) {
+        // Restaurar MySQL usando mysql
+        const dbName = dbUrl.split('/').pop()?.split('?')[0];
+        const dbUser = dbUrl.match(/mysql:\/\/([^:]+):/)?.[1] || 'root';
+        const dbHost = dbUrl.match(/mysql:\/\/[^@]+@([^:]+):/)?.[1] || 'localhost';
+        
+        const mysqlCmd = `mysql -h ${dbHost} -u ${dbUser} ${dbName} < ${backupPath}`;
+        await execAsync(mysqlCmd);
+        
+        this.logger.log(`Backup restaurado: ${backupPath}`);
+      } else {
+        this.logger.warn('Restore não suportado para este tipo de banco de dados');
+      }
+    } catch (error) {
+      this.logger.error(`Erro ao restaurar backup: ${error.message}`);
+      throw new BadRequestException(`Erro ao restaurar backup: ${error.message}`);
+    }
+  }
+
+  private async runSeed(moduleName: string, modulePath: string): Promise<void> {
+    const seedPath = path.join(modulePath, 'seed.sql');
+
+    if (!fs.existsSync(seedPath)) {
+      this.logger.log(`Nenhum seed encontrado para o módulo ${moduleName}`);
+      return;
+    }
+
+    try {
+      const seedSql = fs.readFileSync(seedPath, 'utf8');
+      this.logger.log(`Executando seed para o módulo ${moduleName}`);
+      
+      // Dividir comandos SQL por ponto e vírgula e executar cada um separadamente
+      const sqlCommands = this.splitSqlCommands(seedSql);
+      
+      for (const [index, sqlCommand] of sqlCommands.entries()) {
+        const cleanCommand = sqlCommand.trim();
+        if (cleanCommand) {
+          this.logger.log(`Executando comando ${index + 1}/${sqlCommands.length} do seed`);
+          await this.prisma.$executeRawUnsafe(cleanCommand);
+        }
+      }
+      
+      this.logger.log(`Seed executado com sucesso para o módulo ${moduleName}`);
+    } catch (error) {
+      this.logger.error(`Erro ao executar seed para o módulo ${moduleName}: ${error.message}`);
+      throw new BadRequestException(`Erro no seed: ${error.message}`);
+    }
+  }
+
+  private getMigrationList(migrationsPath: string): string[] {
+    if (!fs.existsSync(migrationsPath)) {
+      return [];
+    }
+
+    return fs.readdirSync(migrationsPath)
+      .filter(file => file.endsWith('.sql'))
+      .sort();
+  }
+
+  /**
+   * Compara duas versões semânticas
+   * @param version1 Versão atual do módulo
+   * @param version2 Versão do banco de dados
+   * @returns 1 se version1 > version2, -1 se version1 < version2, 0 se iguais
+   */
+  private compareVersions(version1: string, version2: string): number {
+    const v1Parts = version1.split('.').map(Number);
+    const v2Parts = version2.split('.').map(Number);
+    
+    const maxLength = Math.max(v1Parts.length, v2Parts.length);
+    
+    for (let i = 0; i < maxLength; i++) {
+      const v1Part = v1Parts[i] || 0;
+      const v2Part = v2Parts[i] || 0;
+      
+      if (v1Part > v2Part) return 1;
+      if (v1Part < v2Part) return -1;
+    }
+    
+    return 0;
   }
 }

@@ -1,0 +1,1 @@
+{"name": "module-exemplo-completo", "displayName": "Módulo Exemplo Completo", "description": "Exemplo de módulo com migrações e seed de dados", "version": "1.0.0", "author": "Sistema", "category": "exemplo", "config": {"enableFeature": true, "maxItems": 100}}

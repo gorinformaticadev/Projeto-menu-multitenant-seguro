@@ -241,20 +241,22 @@ model UpdateLog {
 
 // Tabela de Módulos do Sistema
 model Module {
-  id          String   @id @default(uuid())
-  name        String   @unique // Nome único do módulo (ex: "sales", "reports")
-  displayName String // Nome para exibição (ex: "Sistema de Vendas")
-  description String? // Descrição do módulo
-  version     String   @default("1.0.0") // Versão do módulo
-  isActive    Boolean  @default(true) // Se o módulo está ativo no sistema
-  config      String? // Configurações específicas do módulo (JSON)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(uuid())
+  name          String   @unique // Nome único do módulo (ex: "sales", "reports")
+  displayName   String // Nome para exibição (ex: "Sistema de Vendas")
+  description   String? // Descrição do módulo
+  version       String   @default("1.0.0") // Versão do módulo
+  databaseVersion String? // Versão do banco aplicada (null = nunca atualizou)
+  isActive      Boolean  @default(true) // Se o módulo está ativo no sistema
+  config        String? // Configurações específicas do módulo (JSON)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Relacionamento com tenants
   tenantModules TenantModule[]
 
   @@index([isActive])
+  @@index([databaseVersion])
   @@map("modules")
 }
 

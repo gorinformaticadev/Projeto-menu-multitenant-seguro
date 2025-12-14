@@ -18,6 +18,8 @@ interface InstalledModule {
   version: string;
   isActive: boolean;
   isInstalled: boolean;
+  hasDatabaseUpdates?: boolean;
+  databaseVersion?: string | null;
   config?: any;
 }
 
@@ -32,6 +34,7 @@ export function ModuleManagement() {
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState("upload");
+  const [updatingDatabase, setUpdatingDatabase] = useState<string | null>(null);
 
   useEffect(() => {
     loadInstalledModules();
@@ -190,6 +193,31 @@ export function ModuleManagement() {
   const openRemoveDialog = (module: InstalledModule) => {
     setSelectedModule(module);
     setShowRemoveDialog(true);
+  };
+
+  const updateModuleDatabase = async (moduleName: string) => {
+    setUpdatingDatabase(moduleName);
+
+    try {
+      const response = await api.post(`/modules/${moduleName}/update-database`);
+
+      toast({
+        title: "Banco de dados atualizado!",
+        description: response.data.message || "Migrações e seed executados com sucesso",
+      });
+
+      // Recarregar lista de módulos para atualizar o status
+      await loadInstalledModules();
+
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar banco de dados",
+        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingDatabase(null);
+    }
   };
 
   if (loading) {
@@ -373,52 +401,88 @@ export function ModuleManagement() {
               ) : (
                 <div className="space-y-4">
                   {modules.map((module) => (
-                    <div key={module.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-medium">{module.displayName}</h3>
-                          <Badge variant={module.isActive ? "default" : "secondary"}>
-                            {module.isActive ? "Ativo no Sistema" : "Inativo no Sistema"}
-                          </Badge>
-                          {module.isInstalled ? (
-                            <Badge variant="outline" className="text-green-600 border-green-600">
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Instalado
+                    <div key={module.id} className="p-4 border rounded-lg">
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        {/* Informações do Módulo */}
+                        <div className="flex-1 space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-medium">{module.displayName}</h3>
+                            <Badge variant={module.isActive ? "default" : "secondary"}>
+                              {module.isActive ? "Ativo no Sistema" : "Inativo no Sistema"}
                             </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-orange-600 border-orange-600">
-                              <AlertTriangle className="h-3 w-3 mr-1" />
-                              Não Instalado
-                            </Badge>
+                            {module.isInstalled ? (
+                              <Badge variant="outline" className="text-green-600 border-green-600">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Instalado
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-orange-600 border-orange-600">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                Não Instalado
+                              </Badge>
+                            )}
+                            {module.hasDatabaseUpdates && (
+                              <Badge variant="outline" className="text-blue-600 border-blue-600">
+                                <Settings className="h-3 w-3 mr-1" />
+                                Atualização Disponível
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">{module.description}</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                              v{module.version}
+                            </span>
+                            {module.databaseVersion && (
+                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-mono">
+                                DB v{module.databaseVersion}
+                              </span>
+                            )}
+                            <span className="text-xs text-muted-foreground">
+                              {module.name}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Botões de Ação */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openInfoDialog(module)}
+                          >
+                            <Info className="h-4 w-4 mr-1" />
+                            Detalhes
+                          </Button>
+                          {module.hasDatabaseUpdates && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => updateModuleDatabase(module.name)}
+                              disabled={updatingDatabase === module.name}
+                            >
+                              {updatingDatabase === module.name ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                  Atualizando...
+                                </>
+                              ) : (
+                                <>
+                                  <Settings className="h-4 w-4 mr-1" />
+                                  Atualizar Banco
+                                </>
+                              )}
+                            </Button>
                           )}
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => openRemoveDialog(module)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Desinstalar
+                          </Button>
                         </div>
-                        <p className="text-sm text-muted-foreground">{module.description}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                            v{module.version}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {module.name}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openInfoDialog(module)}
-                        >
-                          <Info className="h-4 w-4 mr-1" />
-                          Detalhes
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => openRemoveDialog(module)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Desinstalar
-                        </Button>
                       </div>
                     </div>
                   ))}
