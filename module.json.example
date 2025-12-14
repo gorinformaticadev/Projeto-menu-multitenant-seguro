@@ -1,0 +1,49 @@
+{
+  "name": "module-exemplo",
+  "displayName": "Módulo de Exemplo",
+  "version": "1.0.0",
+  "description": "Um módulo de exemplo completo para demonstrar a estrutura esperada",
+  "author": "Equipe de Desenvolvimento",
+  "category": "exemplos",
+  "config": {
+    "defaultSettings": {
+      "enableFeatureA": true,
+      "enableFeatureB": false,
+      "maxItems": 100
+    },
+    "permissions": [
+      "module-exemplo:read",
+      "module-exemplo:write",
+      "module-exemplo:delete"
+    ],
+    "routes": [
+      {
+        "path": "/exemplo",
+        "component": "ExemploPage",
+        "title": "Página de Exemplo",
+        "protected": true,
+        "permissions": ["module-exemplo:read"]
+      },
+      {
+        "path": "/exemplo/criar",
+        "component": "ExemploCriarPage",
+        "title": "Criar Exemplo",
+        "protected": true,
+        "permissions": ["module-exemplo:write"]
+      }
+    ],
+    "menuItems": [
+      {
+        "label": "Exemplo",
+        "icon": "star",
+        "path": "/exemplo",
+        "order": 100,
+        "permissions": ["module-exemplo:read"]
+      }
+    ],
+    "database": {
+      "tables": ["exemplo_items", "exemplo_categories"],
+      "migrations": true
+    }
+  }
+}

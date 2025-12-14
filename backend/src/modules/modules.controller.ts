@@ -29,7 +29,7 @@ export class ModulesController {
     private readonly modulesService: ModulesService,
     private readonly moduleInstallerService: ModuleInstallerService,
     private readonly autoLoaderService: AutoLoaderService
-  ) {}
+  ) { }
 
   // GET /modules - Listar todos os módulos disponíveis
   @Get()
@@ -132,6 +132,14 @@ export class ModulesController {
   @Roles(Role.SUPER_ADMIN)
   async getModuleInfo(@Param('name') name: string) {
     return this.moduleInstallerService.getModuleInfo(name);
+  }
+
+  // GET /modules/:name/tenants - Listar tenants que usam o módulo (apenas SUPER_ADMIN)
+  @Get(':name/tenants')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  async getModuleTenants(@Param('name') name: string) {
+    return this.moduleInstallerService.getModuleTenants(name);
   }
 
   // GET /modules/auto-load - Forçar carregamento automático de módulos (apenas SUPER_ADMIN)

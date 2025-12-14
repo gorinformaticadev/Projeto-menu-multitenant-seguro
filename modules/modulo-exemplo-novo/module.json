@@ -1,9 +1,0 @@
-{
-    "name": "modulo-exemplo-novo",
-    "displayName": "Módulo Exemplo Novo",
-    "description": "Novo módulo de exemplo",
-    "version": "1.0.0",
-    "author": "Equipe Dev",
-    "category": "Exemplo",
-    "isActive": true
-}

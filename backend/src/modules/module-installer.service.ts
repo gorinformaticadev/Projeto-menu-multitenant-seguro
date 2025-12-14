@@ -29,11 +29,11 @@ export class ModuleInstallerService {
         this.logger.log(`Criando diretório de uploads: ${this.uploadsPath}`);
         fs.mkdirSync(this.uploadsPath, { recursive: true, mode: 0o755 });
       }
-      
+
       // Verificar permissões de escrita
       fs.accessSync(this.modulesPath, fs.constants.W_OK);
       fs.accessSync(this.uploadsPath, fs.constants.W_OK);
-      
+
       this.logger.log('Diretórios verificados e com permissão de escrita');
     } catch (error) {
       this.logger.error(`Erro ao verificar diretórios: ${error.message}`);
@@ -61,11 +61,11 @@ export class ModuleInstallerService {
 
       // Salvar arquivo temporariamente
       const tempPath = path.join(this.uploadsPath, `temp_${Date.now()}_${file.originalname}`);
-      
+
       try {
         // Garantir que temos um Buffer válido
         let bufferData: Buffer;
-        
+
         if (Buffer.isBuffer(file.buffer)) {
           bufferData = file.buffer;
         } else {
@@ -89,7 +89,7 @@ export class ModuleInstallerService {
             }
           }
         }
-        
+
         fs.writeFileSync(tempPath, bufferData);
         this.logger.log(`Arquivo temporário salvo: ${tempPath} (${bufferData.length} bytes)`);
       } catch (error) {
@@ -98,17 +98,72 @@ export class ModuleInstallerService {
         throw new BadRequestException(`Erro de permissão ao salvar arquivo: ${error.message}`);
       }
 
-      // Apenas descompactar o módulo
+      // Descompactar e obter informações do módulo
       const moduleInfo = await this.extractModule(tempPath);
 
       // Limpar arquivo temporário
       fs.unlinkSync(tempPath);
 
       this.logger.log(`Módulo ${moduleInfo.name} descompactado com sucesso`);
+
+      // Verificar se o módulo já existe no banco
+      const existingModule = await this.prisma.module.findUnique({
+        where: { name: moduleInfo.name }
+      });
+
+      const modulePath = path.join(this.modulesPath, moduleInfo.name);
+
+      // Executar migrações se existirem
+      await this.runMigrations(moduleInfo, modulePath);
+
+      // Instalar dependências NPM se existir package.json
+      await this.installDependencies(modulePath);
+
+      let moduleRecord;
+
+      if (existingModule) {
+        // Atualizar módulo existente
+        this.logger.log(`Atualizando registro do módulo ${moduleInfo.name} no banco de dados...`);
+        moduleRecord = await this.prisma.module.update({
+          where: { name: moduleInfo.name },
+          data: {
+            displayName: moduleInfo.displayName,
+            description: moduleInfo.description || '',
+            version: moduleInfo.version,
+            config: moduleInfo.config ? JSON.stringify(moduleInfo.config) : null,
+            isActive: true
+          }
+        });
+        this.logger.log(`Módulo ${moduleInfo.name} atualizado com sucesso`);
+      } else {
+        // Criar novo módulo
+        this.logger.log(`Registrando novo módulo ${moduleInfo.name} no banco de dados...`);
+        moduleRecord = await this.prisma.module.create({
+          data: {
+            name: moduleInfo.name,
+            displayName: moduleInfo.displayName,
+            description: moduleInfo.description || '',
+            version: moduleInfo.version,
+            config: moduleInfo.config ? JSON.stringify(moduleInfo.config) : null,
+            isActive: true
+          }
+        });
+        this.logger.log(`Módulo ${moduleInfo.name} registrado com sucesso`);
+      }
+
       return {
         success: true,
-        module: moduleInfo,
-        message: 'Módulo descompactado com sucesso'
+        module: {
+          ...moduleInfo,
+          id: moduleRecord.id,
+          isActive: moduleRecord.isActive,
+          createdAt: moduleRecord.createdAt,
+          updatedAt: moduleRecord.updatedAt
+        },
+        message: existingModule
+          ? `Módulo '${moduleInfo.name}' atualizado com sucesso`
+          : `Módulo '${moduleInfo.name}' instalado com sucesso`,
+        action: existingModule ? 'updated' : 'installed'
       };
 
     } catch (error) {
@@ -125,7 +180,7 @@ export class ModuleInstallerService {
 
     // Procurar por module.json para obter o nome do módulo
     let moduleJsonEntry = entries.find(entry => entry.entryName === 'module.json');
-    
+
     if (!moduleJsonEntry) {
       // Procurar em subpastas
       moduleJsonEntry = entries.find(entry => entry.entryName.endsWith('/module.json'));
@@ -170,15 +225,15 @@ export class ModuleInstallerService {
 
     // Descompactar arquivos
     this.logger.log(`Descompactando para: ${modulePath}`);
-    
+
     // Verificar se há pasta pai no ZIP
     const hasParentFolder = entries.some(entry => entry.entryName.startsWith(`${moduleName}/`));
-    
+
     if (hasParentFolder) {
       // Extrair apenas o conteúdo da pasta do módulo
       const parentFolderPrefix = `${moduleName}/`;
-      const filteredEntries = entries.filter(entry => 
-        entry.entryName.startsWith(parentFolderPrefix) && 
+      const filteredEntries = entries.filter(entry =>
+        entry.entryName.startsWith(parentFolderPrefix) &&
         entry.entryName !== parentFolderPrefix
       );
 
@@ -207,7 +262,10 @@ export class ModuleInstallerService {
       name: moduleName,
       displayName: moduleConfig.displayName || moduleName,
       version: moduleConfig.version || '1.0.0',
-      description: moduleConfig.description || ''
+      description: moduleConfig.description || '',
+      config: moduleConfig.config || null,
+      author: moduleConfig.author || null,
+      category: moduleConfig.category || null
     };
   }
 
@@ -219,7 +277,7 @@ export class ModuleInstallerService {
 
     // Procurar por module.json na raiz ou em subpastas
     let moduleJsonEntry = entries.find(entry => entry.entryName === 'module.json');
-    
+
     if (!moduleJsonEntry) {
       // Procurar em subpastas (caso o ZIP tenha uma pasta pai)
       moduleJsonEntry = entries.find(entry => entry.entryName.endsWith('/module.json'));
@@ -362,7 +420,7 @@ export class ModuleInstallerService {
 
   private async runMigrations(moduleInfo: any, modulePath: string): Promise<void> {
     const migrationsPath = path.join(modulePath, 'migrations');
-    
+
     if (!fs.existsSync(migrationsPath)) {
       this.logger.log(`Nenhuma migração encontrada para o módulo ${moduleInfo.name}`);
       return;
@@ -389,16 +447,16 @@ export class ModuleInstallerService {
 
   private async extractModuleFiles(zip: AdmZip, moduleInfo: any, modulePath: string): Promise<void> {
     const entries = zip.getEntries();
-    
+
     this.logger.log(`Extraindo ${entries.length} arquivos para ${modulePath}`);
 
     if (moduleInfo._hasParentFolder) {
       // Se o ZIP tem uma pasta pai com o nome do módulo, extrair apenas o conteúdo dessa pasta
       this.logger.log(`ZIP contém pasta pai "${moduleInfo.name}", extraindo conteúdo...`);
-      
+
       const parentFolderPrefix = `${moduleInfo.name}/`;
-      const filteredEntries = entries.filter(entry => 
-        entry.entryName.startsWith(parentFolderPrefix) && 
+      const filteredEntries = entries.filter(entry =>
+        entry.entryName.startsWith(parentFolderPrefix) &&
         entry.entryName !== parentFolderPrefix
       );
 
@@ -416,7 +474,7 @@ export class ModuleInstallerService {
           if (!fs.existsSync(targetDir)) {
             fs.mkdirSync(targetDir, { recursive: true });
           }
-          
+
           // Extrair arquivo
           fs.writeFileSync(targetPath, entry.getData());
         }
@@ -441,7 +499,7 @@ export class ModuleInstallerService {
 
   private async installDependencies(modulePath: string): Promise<void> {
     const packageJsonPath = path.join(modulePath, 'package.json');
-    
+
     if (!fs.existsSync(packageJsonPath)) {
       this.logger.log('Nenhum package.json encontrado, pulando instalação de dependências');
       return;
@@ -470,14 +528,36 @@ export class ModuleInstallerService {
         throw new BadRequestException(`Módulo '${moduleName}' não encontrado`);
       }
 
-      // Verificar se há tenants usando este módulo
-      const tenantModules = await this.prisma.tenantModule.count({
-        where: { moduleName }
+      // Verificar se há tenants com este módulo ativo
+      const activeTenantModules = await this.prisma.tenantModule.findMany({
+        where: {
+          moduleName,
+          isActive: true
+        },
+        include: {
+          tenant: {
+            select: {
+              id: true,
+              nomeFantasia: true,
+              email: true
+            }
+          }
+        }
       });
 
-      if (tenantModules > 0) {
+      if (activeTenantModules.length > 0) {
+        const tenantNames = activeTenantModules
+          .map(tm => tm.tenant.nomeFantasia)
+          .join(', ');
+
+        this.logger.warn(
+          `Tentativa de remover módulo '${moduleName}' bloqueada. ` +
+          `Módulo ativo em ${activeTenantModules.length} tenant(s): ${tenantNames}`
+        );
+
         throw new BadRequestException(
-          `Não é possível remover o módulo '${moduleName}' pois está sendo usado por ${tenantModules} tenant(s)`
+          `Não é possível remover o módulo '${moduleName}' pois está ativo em ${activeTenantModules.length} tenant(s): ${tenantNames}. ` +
+          `Desative o módulo em todos os tenants antes de desinstalá-lo.`
         );
       }
 
@@ -502,6 +582,73 @@ export class ModuleInstallerService {
       this.logger.error(`Erro ao remover módulo: ${error.message}`);
       throw error;
     }
+  }
+
+  async getModuleTenants(moduleName: string): Promise<any> {
+    this.logger.log(`Buscando tenants que usam o módulo: ${moduleName}`);
+
+    // Verificar se módulo existe
+    const module = await this.prisma.module.findUnique({
+      where: { name: moduleName }
+    });
+
+    if (!module) {
+      throw new BadRequestException(`Módulo '${moduleName}' não encontrado`);
+    }
+
+    // Buscar todos os tenants que têm este módulo (ativos e inativos)
+    const tenantModules = await this.prisma.tenantModule.findMany({
+      where: {
+        moduleName
+      },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            nomeFantasia: true,
+            email: true,
+            ativo: true
+          }
+        }
+      },
+      orderBy: [
+        { isActive: 'desc' }, // Ativos primeiro
+        { tenant: { nomeFantasia: 'asc' } }
+      ]
+    });
+
+    const activeTenants = tenantModules.filter(tm => tm.isActive);
+    const inactiveTenants = tenantModules.filter(tm => !tm.isActive);
+
+    return {
+      module: {
+        name: module.name,
+        displayName: module.displayName,
+        version: module.version
+      },
+      summary: {
+        total: tenantModules.length,
+        active: activeTenants.length,
+        inactive: inactiveTenants.length,
+        canUninstall: activeTenants.length === 0
+      },
+      activeTenants: activeTenants.map(tm => ({
+        tenantId: tm.tenant.id,
+        tenantName: tm.tenant.nomeFantasia,
+        tenantEmail: tm.tenant.email,
+        tenantActive: tm.tenant.ativo,
+        activatedAt: tm.activatedAt,
+        config: tm.config ? JSON.parse(tm.config) : null
+      })),
+      inactiveTenants: inactiveTenants.map(tm => ({
+        tenantId: tm.tenant.id,
+        tenantName: tm.tenant.nomeFantasia,
+        tenantEmail: tm.tenant.email,
+        tenantActive: tm.tenant.ativo,
+        deactivatedAt: tm.deactivatedAt,
+        config: tm.config ? JSON.parse(tm.config) : null
+      }))
+    };
   }
 
   async listInstalledModules(): Promise<any[]> {
