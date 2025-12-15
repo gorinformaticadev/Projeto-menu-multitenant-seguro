@@ -34,3 +34,9 @@ next-env.d.ts
 
 # Prisma
 backend/prisma/migrations/
+/modules/module-exemplo-completo
+/modules/module-exemplo
+/modules/module-template
+/modules/modulo-exemplo-novo
+/modules/module-template
+/modules/sistema-de-vendas

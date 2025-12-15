@@ -3,6 +3,7 @@ import { MulterModule } from '@nestjs/platform-express';
 import { ModulesController } from './modules.controller';
 import { ModulesService } from './modules.service';
 import { ModuleInstallerService } from './module-installer.service';
+import { ModuleMigrationService } from './module-migration.service';
 import { AutoLoaderService } from './auto-loader.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -29,6 +30,7 @@ import { ModuleManagementController } from './upload/module-management.controlle
   providers: [
     ModulesService,
     ModuleInstallerService,
+    ModuleMigrationService,
     AutoLoaderService,
     // Novos services
     SafeConfigParser,
@@ -38,6 +40,7 @@ import { ModuleManagementController } from './upload/module-management.controlle
   exports: [
     ModulesService,
     ModuleInstallerService,
+    ModuleMigrationService,
     AutoLoaderService,
     // Exportar novos services
     SafeConfigParser,

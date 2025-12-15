@@ -1,9 +1,0 @@
-{
-    "name": "sistema-de-vendas",
-    "displayName": "Sistema de Vendas",
-    "description": "Módulo para gerenciar vendas e clientes",
-    "version": "1.0.0",
-    "author": "Equipe Dev",
-    "category": "Vendas",
-    "isActive": true
-}

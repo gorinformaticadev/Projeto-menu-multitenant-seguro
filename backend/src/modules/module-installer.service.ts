@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ModuleMigrationService } from './module-migration.service';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as AdmZip from 'adm-zip';
@@ -14,7 +15,10 @@ export class ModuleInstallerService {
   private readonly modulesPath = path.join(process.cwd(), '..', 'modules');
   private readonly uploadsPath = path.join(process.cwd(), 'uploads', 'modules');
 
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private prisma: PrismaService,
+    private moduleMigrationService: ModuleMigrationService
+  ) {
     // Criar diretórios se não existirem
     this.ensureDirectories();
   }
@@ -149,6 +153,15 @@ export class ModuleInstallerService {
           }
         });
         this.logger.log(`Módulo ${moduleInfo.name} registrado com sucesso`);
+      }
+
+      // **NOVO:** Descobrir e registrar migrations/seeds após instalação
+      try {
+        this.logger.log(`Descobrindo migrations/seeds de ${moduleInfo.name}...`);
+        await this.moduleMigrationService.discoverModuleMigrations(moduleInfo.name);
+        this.logger.log(`Migrations/seeds descobertos e registrados`);
+      } catch (error) {
+        this.logger.warn(`Erro ao descobrir migrations (não crítico): ${error.message}`);
       }
 
       return {
@@ -716,34 +729,39 @@ export class ModuleInstallerService {
         const modulePath = path.join(this.modulesPath, module.name);
         const isInstalled = fs.existsSync(modulePath);
 
-        let hasUpdates = false;
-        let databaseVersion = null;
+        // **NOVO:** Usar ModuleMigrationService para verificar pendências
+        let hasDatabaseUpdates = false;
+        let pendingMigrationsCount = 0;
+        let pendingSeedsCount = 0;
+        let failedMigrationsCount = 0;
+        let migrationStatus: 'updated' | 'pending' | 'error' | 'unknown' = 'unknown';
         
         if (isInstalled) {
           try {
-            // Verificar se há atualizações disponíveis
-            const updateInfo = await this.checkModuleUpdates(module.name);
+            // Obter contadores de migrations/seeds
+            const counts = await this.moduleMigrationService.getMigrationCounts(module.name);
             
-            // Verificar se o banco está atualizado comparando versões
-            try {
-              databaseVersion = (module as any).databaseVersion || null;
-            } catch (error) {
-              // Se a coluna não existir ainda, assumir que nunca foi atualizada
-              databaseVersion = null;
-              this.logger.warn(`Coluna databaseVersion não existe ainda. Assumindo nunca atualizada para ${module.name}`);
-            }
+            pendingMigrationsCount = counts.pendingMigrations;
+            pendingSeedsCount = counts.pendingSeeds;
+            failedMigrationsCount = counts.failedMigrations + counts.failedSeeds;
             
-            const moduleVersion = module.version;
+            // Verificar se há pendências
+            hasDatabaseUpdates = await this.moduleMigrationService.hasPendingUpdates(module.name);
             
-            // Se não tem databaseVersion ou se a versão do módulo é maior que a do banco
-            if (!databaseVersion || this.compareVersions(moduleVersion, databaseVersion) > 0) {
-              hasUpdates = true;
+            // Determinar status visual
+            if (failedMigrationsCount > 0) {
+              migrationStatus = 'error';
+            } else if (hasDatabaseUpdates) {
+              migrationStatus = 'pending';
+            } else if (counts.completedMigrations > 0 || counts.completedSeeds > 0) {
+              migrationStatus = 'updated';
             } else {
-              hasUpdates = updateInfo.hasUpdates; // Usar apenas se há migrações pendentes
+              migrationStatus = 'unknown';
             }
             
           } catch (error) {
-            this.logger.warn(`Erro ao verificar atualizações para ${module.name}: ${error.message}`);
+            this.logger.warn(`Erro ao verificar migrations de ${module.name}: ${error.message}`);
+            migrationStatus = 'unknown';
           }
         }
 
@@ -751,8 +769,12 @@ export class ModuleInstallerService {
           ...module,
           config: module.config ? JSON.parse(module.config) : null,
           isInstalled,
-          hasDatabaseUpdates: hasUpdates,
-          databaseVersion: databaseVersion
+          hasDatabaseUpdates,
+          pendingMigrationsCount,
+          pendingSeedsCount,
+          failedMigrationsCount,
+          migrationStatus,
+          databaseVersion: module.databaseVersion
         };
       })
     );
@@ -788,7 +810,7 @@ export class ModuleInstallerService {
     };
   }
 
-  async updateModuleDatabase(moduleName: string): Promise<any> {
+  async updateModuleDatabase(moduleName: string, userId?: string): Promise<any> {
     this.logger.log(`Iniciando atualização do banco de dados para o módulo: ${moduleName}`);
 
     try {
@@ -806,32 +828,39 @@ export class ModuleInstallerService {
         throw new BadRequestException(`Arquivos do módulo '${moduleName}' não encontrados no sistema`);
       }
 
+      // **NOVO:** Verificar se há pendências antes de executar
+      const hasPending = await this.moduleMigrationService.hasPendingUpdates(moduleName);
+      if (!hasPending) {
+        this.logger.log(`Nenhuma migration/seed pendente para ${moduleName}`);
+        return {
+          success: true,
+          message: `Nenhuma atualização pendente para o módulo '${moduleName}'`,
+          executed: [],
+          timestamp: new Date().toISOString()
+        };
+      }
+
       // Criar backup antes de executar as operações
       const backupPath = await this.createDatabaseBackup(moduleName);
 
       try {
-        // Executar migrações
-        await this.runMigrations({ name: moduleName }, modulePath);
+        // **NOVO:** Executar migrations usando novo service
+        const migrationResults = await this.moduleMigrationService.executePendingMigrations(
+          moduleName,
+          userId
+        );
   
-        // Executar seed se existir
-        await this.runSeed(moduleName, modulePath);
+        // **NOVO:** Executar seeds usando novo service
+        const seedResults = await this.moduleMigrationService.executePendingSeeds(
+          moduleName,
+          userId
+        );
   
-        // Atualizar versão do banco no módulo usando SQL direto
-        try {
-          await this.prisma.$executeRawUnsafe(
-            `UPDATE modules SET databaseVersion = $1 WHERE name = $2`,
-            module.version,
-            moduleName
-          );
-          this.logger.log(`Versão do banco atualizada para: ${module.version}`);
-        } catch (error: any) {
-          // Se a coluna não existir ainda, apenas registrar no log
-          if (error.message.includes('databaseversion') || error.message.includes('does not exist')) {
-            this.logger.warn(`Coluna databaseVersion não existe ainda. Migração será aplicada posteriormente.`);
-          } else {
-            throw error; // Re-throw other errors
-          }
-        }
+        // Atualizar versão do banco no módulo
+        await this.prisma.module.update({
+          where: { name: moduleName },
+          data: { databaseVersion: module.version }
+        });
   
         this.logger.log(`Banco de dados atualizado com sucesso para o módulo ${moduleName}`);
         this.logger.log(`Versão do banco atualizada para: ${module.version}`);
@@ -841,6 +870,12 @@ export class ModuleInstallerService {
           message: `Banco de dados atualizado com sucesso para o módulo '${moduleName}' (versão ${module.version})`,
           backupPath,
           databaseVersion: module.version,
+          migrationsExecuted: migrationResults.length,
+          seedsExecuted: seedResults.length,
+          results: {
+            migrations: migrationResults,
+            seeds: seedResults
+          },
           timestamp: new Date().toISOString()
         };
 

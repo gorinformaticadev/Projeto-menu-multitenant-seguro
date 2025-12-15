@@ -5,11 +5,35 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
-import { Upload, Package, Trash2, Info, AlertTriangle, CheckCircle, Settings } from "lucide-react";
+import { Upload, Package, Trash2, Info, AlertTriangle, CheckCircle, Settings, XCircle, Clock } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+// **NOVAS INTERFACES:** Controle de Migrations
+interface MigrationRecord {
+  id: string;
+  fileName: string;
+  type: 'MIGRATION' | 'SEED';
+  status: 'PENDING' | 'EXECUTING' | 'COMPLETED' | 'FAILED';
+  executedAt: string | null;
+  executionTime: number | null;
+  errorMessage: string | null;
+}
+
+interface ModuleMigrationStatus {
+  moduleName: string;
+  pendingMigrations: number;
+  pendingSeeds: number;
+  completedMigrations: number;
+  completedSeeds: number;
+  failedMigrations: number;
+  failedSeeds: number;
+  migrations: MigrationRecord[];
+  seeds: MigrationRecord[];
+}
+
+// **INTERFACE ATUALIZADA**
 interface InstalledModule {
   id: string;
   name: string;
@@ -20,6 +44,11 @@ interface InstalledModule {
   isInstalled: boolean;
   hasDatabaseUpdates?: boolean;
   databaseVersion?: string | null;
+  // **NOVOS CAMPOS:**
+  pendingMigrationsCount?: number;
+  pendingSeedsCount?: number;
+  failedMigrationsCount?: number;
+  migrationStatus?: 'updated' | 'pending' | 'error' | 'unknown';
   config?: any;
 }
 
@@ -421,14 +450,50 @@ export function ModuleManagement() {
                                 Não Instalado
                               </Badge>
                             )}
-                            {module.hasDatabaseUpdates && (
-                              <Badge variant="outline" className="text-blue-600 border-blue-600">
-                                <Settings className="h-3 w-3 mr-1" />
-                                Atualização Disponível
+                            
+                            {/* **NOVO:** Badges baseados em migrationStatus */}
+                            {module.migrationStatus === 'error' && (
+                              <Badge variant="outline" className="text-red-600 border-red-600">
+                                <XCircle className="h-3 w-3 mr-1" />
+                                Erro na Atualização
+                              </Badge>
+                            )}
+                            {module.migrationStatus === 'pending' && (
+                              <Badge variant="outline" className="text-yellow-600 border-yellow-600">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Atualização Pendente
+                              </Badge>
+                            )}
+                            {module.migrationStatus === 'updated' && (
+                              <Badge variant="outline" className="text-green-600 border-green-600">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Banco Atualizado
                               </Badge>
                             )}
                           </div>
                           <p className="text-sm text-muted-foreground">{module.description}</p>
+                          
+                          {/* **NOVO:** Contadores de pendências */}
+                          {(module.pendingMigrationsCount > 0 || module.pendingSeedsCount > 0 || module.failedMigrationsCount > 0) && (
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                              {module.pendingMigrationsCount > 0 && (
+                                <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                                  {module.pendingMigrationsCount} migration{module.pendingMigrationsCount > 1 ? 's' : ''} pendente{module.pendingMigrationsCount > 1 ? 's' : ''}
+                                </span>
+                              )}
+                              {module.pendingSeedsCount > 0 && (
+                                <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                                  {module.pendingSeedsCount} seed{module.pendingSeedsCount > 1 ? 's' : ''} pendente{module.pendingSeedsCount > 1 ? 's' : ''}
+                                </span>
+                              )}
+                              {module.failedMigrationsCount > 0 && (
+                                <span className="bg-red-100 text-red-800 px-2 py-1 rounded">
+                                  {module.failedMigrationsCount} falha{module.failedMigrationsCount > 1 ? 's' : ''}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-xs bg-muted px-2 py-1 rounded font-mono">
                               v{module.version}
@@ -454,9 +519,11 @@ export function ModuleManagement() {
                             <Info className="h-4 w-4 mr-1" />
                             Detalhes
                           </Button>
+                          
+                          {/* **ATUALIZADO:** Botão condicional baseado em hasDatabaseUpdates */}
                           {module.hasDatabaseUpdates && (
                             <Button
-                              variant="default"
+                              variant={module.migrationStatus === 'error' ? "destructive" : "default"}
                               size="sm"
                               onClick={() => updateModuleDatabase(module.name)}
                               disabled={updatingDatabase === module.name}
@@ -468,12 +535,22 @@ export function ModuleManagement() {
                                 </>
                               ) : (
                                 <>
-                                  <Settings className="h-4 w-4 mr-1" />
-                                  Atualizar Banco
+                                  {module.migrationStatus === 'error' ? (
+                                    <>
+                                      <XCircle className="h-4 w-4 mr-1" />
+                                      Tentar Novamente
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Settings className="h-4 w-4 mr-1" />
+                                      Atualizar Banco
+                                    </>
+                                  )}
                                 </>
                               )}
                             </Button>
                           )}
+                          
                           <Button
                             variant="destructive"
                             size="sm"

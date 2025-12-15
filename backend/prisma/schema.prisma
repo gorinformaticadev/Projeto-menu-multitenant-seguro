@@ -239,25 +239,66 @@ model UpdateLog {
   @@map("update_logs")
 }
 
+// Enums para controle de migrations
+enum MigrationType {
+  MIGRATION
+  SEED
+}
+
+enum MigrationStatus {
+  PENDING
+  EXECUTING
+  COMPLETED
+  FAILED
+  ROLLED_BACK
+}
+
 // Tabela de Módulos do Sistema
 model Module {
-  id            String   @id @default(uuid())
-  name          String   @unique // Nome único do módulo (ex: "sales", "reports")
-  displayName   String // Nome para exibição (ex: "Sistema de Vendas")
-  description   String? // Descrição do módulo
-  version       String   @default("1.0.0") // Versão do módulo
+  id              String            @id @default(uuid())
+  name            String            @unique // Nome único do módulo (ex: "sales", "reports")
+  displayName     String // Nome para exibição (ex: "Sistema de Vendas")
+  description     String? // Descrição do módulo
+  version         String            @default("1.0.0") // Versão do módulo
   databaseVersion String? // Versão do banco aplicada (null = nunca atualizou)
-  isActive      Boolean  @default(true) // Se o módulo está ativo no sistema
-  config        String? // Configurações específicas do módulo (JSON)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  isActive        Boolean           @default(true) // Se o módulo está ativo no sistema
+  config          String? // Configurações específicas do módulo (JSON)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   // Relacionamento com tenants
-  tenantModules TenantModule[]
+  tenantModules   TenantModule[]
+  // Relacionamento com migrations
+  migrations      ModuleMigration[]
 
   @@index([isActive])
   @@index([databaseVersion])
   @@map("modules")
+}
+
+// Tabela de Controle de Migrations e Seeds
+model ModuleMigration {
+  id            String          @id @default(uuid())
+  moduleName    String // FK para Module.name
+  module        Module          @relation(fields: [moduleName], references: [name], onDelete: Cascade)
+  fileName      String // Nome do arquivo (ex: 001_create_table.sql)
+  type          MigrationType // MIGRATION ou SEED
+  checksum      String // Hash SHA-256 do conteúdo
+  status        MigrationStatus @default(PENDING) // Status da execução
+  executedAt    DateTime? // Quando foi executado
+  executionTime Int? // Tempo de execução em ms
+  errorMessage  String? // Mensagem de erro se falhou
+  executedBy    String? // ID do usuário que executou
+  rollbackAt    DateTime? // Data de rollback se aplicável
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  // Índices para performance
+  @@unique([moduleName, fileName, type]) // Evitar duplicatas
+  @@index([moduleName, status]) // Consultas comuns
+  @@index([status]) // Filtrar por status
+  @@index([executedAt]) // Ordenar por data de execução
+  @@map("module_migrations")
 }
 
 // Tabela de Módulos por Tenant (quais módulos cada tenant tem ativo)

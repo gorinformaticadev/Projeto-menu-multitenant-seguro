@@ -12,10 +12,12 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  Req,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ModulesService } from './modules.service';
 import { ModuleInstallerService } from './module-installer.service';
+import { ModuleMigrationService } from './module-migration.service';
 import { AutoLoaderService } from './auto-loader.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -28,6 +30,7 @@ export class ModulesController {
   constructor(
     private readonly modulesService: ModulesService,
     private readonly moduleInstallerService: ModuleInstallerService,
+    private readonly moduleMigrationService: ModuleMigrationService,
     private readonly autoLoaderService: AutoLoaderService
   ) { }
 
@@ -155,8 +158,12 @@ export class ModulesController {
   @Post(':name/update-database')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
-  async updateModuleDatabase(@Param('name') name: string) {
-    return this.moduleInstallerService.updateModuleDatabase(name);
+  async updateModuleDatabase(
+    @Param('name') name: string,
+    @Req() req: any
+  ) {
+    const userId = req.user?.id;
+    return this.moduleInstallerService.updateModuleDatabase(name, userId);
   }
 
   // GET /modules/:name/check-updates - Verificar se o módulo tem atualizações pendentes (apenas SUPER_ADMIN)
@@ -165,5 +172,71 @@ export class ModulesController {
   @Roles(Role.SUPER_ADMIN)
   async checkModuleUpdates(@Param('name') name: string) {
     return this.moduleInstallerService.checkModuleUpdates(name);
+  }
+
+  // ========================================
+  // Novos Endpoints de Controle de Migrations
+  // ========================================
+
+  // GET /modules/:name/migrations/status - Obter status detalhado de migrations/seeds
+  @Get(':name/migrations/status')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  async getMigrationStatus(@Param('name') name: string) {
+    return this.moduleMigrationService.getMigrationStatus(name);
+  }
+
+  // GET /modules/:name/migrations/pending - Listar apenas migrations/seeds pendentes
+  @Get(':name/migrations/pending')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  async getPendingMigrations(@Param('name') name: string) {
+    const [migrations, seeds] = await Promise.all([
+      this.moduleMigrationService.getPendingMigrations(name),
+      this.moduleMigrationService.getPendingSeeds(name)
+    ]);
+    
+    return {
+      moduleName: name,
+      pendingMigrations: migrations,
+      pendingSeeds: seeds,
+      hasPending: migrations.length > 0 || seeds.length > 0
+    };
+  }
+
+  // POST /modules/:name/migrations/sync - Forçar sincronização (descoberta)
+  @Post(':name/migrations/sync')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  async syncModuleMigrations(@Param('name') name: string) {
+    await this.moduleMigrationService.discoverModuleMigrations(name);
+    const status = await this.moduleMigrationService.getMigrationStatus(name);
+    
+    return {
+      message: `Sincronização concluída para o módulo '${name}'`,
+      status
+    };
+  }
+
+  // POST /modules/:name/migrations/retry/:id - Reexecutar migration que falhou
+  @Post(':name/migrations/retry/:id')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  async retryFailedMigration(
+    @Param('name') moduleName: string,
+    @Param('id') migrationId: string,
+    @Req() req: any
+  ) {
+    const userId = req.user?.id;
+    const result = await this.moduleMigrationService.retryFailedMigration(
+      migrationId,
+      userId
+    );
+    
+    return {
+      message: `Migration reexecutada com sucesso`,
+      moduleName,
+      ...result
+    };
   }
 }

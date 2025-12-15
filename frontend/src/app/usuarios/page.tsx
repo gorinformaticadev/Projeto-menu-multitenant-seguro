@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
@@ -82,6 +82,27 @@ export default function UsuariosPage() {
       setUsers([]);
     }
   }, [selectedTenantId]);
+
+  // Handlers de formulário - movidos para o nível superior para conformidade com Rules of Hooks
+  const handleTenantSelectChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedTenantId(e.target.value);
+  }, []);
+
+  const handleNameInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, name: e.target.value }));
+  }, []);
+
+  const handleEmailInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, email: e.target.value }));
+  }, []);
+
+  const handleRoleSelectChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setFormData(prev => ({ ...prev, role: e.target.value }));
+  }, []);
+
+  const handlePasswordChange = useCallback((value: string, isValid: boolean) => {
+    setFormData(prev => ({ ...prev, password: value }));
+  }, []);
 
   async function loadTenants() {
     const cacheKey = 'tenants-list-cache';
@@ -279,9 +300,7 @@ export default function UsuariosPage() {
               ) : (
                 <select
                   value={selectedTenantId}
-                  onChange={React.useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-                    setSelectedTenantId(e.target.value);
-                  }, [])}
+                  onChange={handleTenantSelectChange}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   <option value="">Selecione uma empresa...</option>
@@ -439,9 +458,7 @@ export default function UsuariosPage() {
                 <Input
                   id="name"
                   value={formData.name}
-                  onChange={React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-                    setFormData(prev => ({ ...prev, name: e.target.value }));
-                  }, [])}
+                  onChange={handleNameInputChange}
                   required
                 />
               </div>
@@ -451,9 +468,7 @@ export default function UsuariosPage() {
                   id="email"
                   type="email"
                   value={formData.email}
-                  onChange={React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-                    setFormData(prev => ({ ...prev, email: e.target.value }));
-                  }, [])}
+                  onChange={handleEmailInputChange}
                   required
                 />
               </div>
@@ -462,9 +477,7 @@ export default function UsuariosPage() {
                 <select
                   id="role"
                   value={formData.role}
-                  onChange={React.useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-                    setFormData(prev => ({ ...prev, role: e.target.value }));
-                  }, [])}
+                  onChange={handleRoleSelectChange}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   required
                 >
@@ -478,9 +491,7 @@ export default function UsuariosPage() {
                   id="password"
                   label={editingUser ? "Nova Senha (deixe em branco para não alterar)" : "Senha"}
                   value={formData.password}
-                  onChange={React.useCallback((value: string, isValid: boolean) => {
-                    setFormData(prev => ({ ...prev, password: value }));
-                  }, [])}
+                  onChange={handlePasswordChange}
                   showValidation={!editingUser || formData.password.length > 0}
                   showStrengthMeter={true}
                   placeholder={editingUser ? "Digite a nova senha (opcional)" : "Digite a senha"}
