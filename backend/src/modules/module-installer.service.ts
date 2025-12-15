@@ -135,12 +135,12 @@ export class ModuleInstallerService {
             description: moduleInfo.description || '',
             version: moduleInfo.version,
             config: moduleInfo.config ? JSON.stringify(moduleInfo.config) : null,
-            isActive: true
+            isActive: true // Mantém ativo se já estava instalado
           }
         });
         this.logger.log(`Módulo ${moduleInfo.name} atualizado com sucesso`);
       } else {
-        // Criar novo módulo
+        // Criar novo módulo - INSTALADO MAS INATIVO GLOBALMENTE
         this.logger.log(`Registrando novo módulo ${moduleInfo.name} no banco de dados...`);
         moduleRecord = await this.prisma.module.create({
           data: {
@@ -149,10 +149,17 @@ export class ModuleInstallerService {
             description: moduleInfo.description || '',
             version: moduleInfo.version,
             config: moduleInfo.config ? JSON.stringify(moduleInfo.config) : null,
-            isActive: true
+            isActive: true // Módulo instalado e disponível globalmente
           }
         });
         this.logger.log(`Módulo ${moduleInfo.name} registrado com sucesso`);
+        
+        // Não criar automaticamente TenantModule para nenhuma tenant
+        // Cada tenant deve ativar o módulo individualmente
+        this.logger.log(
+          `Módulo ${moduleInfo.name} instalado globalmente. ` +
+          `Tenants devem ativá-lo individualmente em suas configurações.`
+        );
       }
 
       // **NOVO:** Descobrir e registrar migrations/seeds após instalação

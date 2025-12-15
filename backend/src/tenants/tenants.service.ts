@@ -94,14 +94,15 @@ export class TenantsService {
         where: { isActive: true },
       });
 
-      // Vincular módulos ao novo tenant
+      // Vincular módulos ao novo tenant (DESABILITADOS por padrão)
+      // Cada tenant deve ativar os módulos que deseja usar
       if (activeModules.length > 0) {
         await prisma.tenantModule.createMany({
           data: activeModules.map((module) => ({
             tenantId: tenant.id,
             moduleName: module.name,
-            isActive: true,
-            // Não duplicamos a config aqui, pois getTenantActiveModules faz o fallback
+            isActive: false, // ✅ Módulos desabilitados por padrão
+            // Config é null - cada tenant configura individualmente
           })),
         });
       }
