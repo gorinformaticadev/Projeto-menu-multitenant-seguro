@@ -40,3 +40,6 @@ backend/prisma/migrations/
 /modules/modulo-exemplo-novo
 /modules/module-template
 /modules/sistema-de-vendas
+modules/module-exemplo-completo.zip
+/modules/module-exemplo-completo
+modules/module-exemplo-completo/module.config.json

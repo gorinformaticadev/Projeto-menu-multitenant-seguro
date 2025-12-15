@@ -406,11 +406,15 @@ export class ModuleMigrationService {
       const cleanFileName = fileName.replace(/_v\d+\.sql$/, '.sql');
       return path.join(modulePath, 'migrations', cleanFileName);
     } else {
-      // SEED
-      if (fileName === 'seed.sql') {
-        return path.join(modulePath, 'seed.sql');
+      // SEED - priorizar pasta seeds/ por padrão de organização
+      // Verificar primeiro na pasta seeds/
+      const seedsPath = path.join(modulePath, 'seeds', fileName);
+      if (fs.existsSync(seedsPath)) {
+        return seedsPath;
       }
-      return path.join(modulePath, 'seeds', fileName);
+      
+      // Fallback para raiz (retrocompatibilidade com seed.sql na raiz)
+      return path.join(modulePath, fileName);
     }
   }
 

@@ -2,7 +2,7 @@
   "name": "module-exemplo",
   "displayName": "Module Exemplo",
   "description": "Módulo de exemplo para demonstração do sistema modular",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Sistema Core",
   "category": "Exemplo",
   "enabled": true,
