@@ -1,0 +1,9 @@
+{
+    "name": "module-template",
+    "displayName": "Module Template",
+    "description": "Template para criação de novos módulos",
+    "version": "1.0.0",
+    "author": "Equipe Dev",
+    "category": "Template",
+    "isActive": false
+}

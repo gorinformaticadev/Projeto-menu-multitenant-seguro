@@ -1,0 +1,9 @@
+{
+  "name": "module-exemplo",
+  "displayName": "Module Exemplo",
+  "description": "Módulo de exemplo para demonstração do sistema modular robusto",
+  "version": "1.0.0",
+  "author": "Sistema Core",
+  "category": "Exemplo",
+  "isActive": true
+}
