@@ -1,0 +1,31 @@
+# Diretório de Seeds do Módulo Boas-Vindas
+
+Este diretório contém os seeds (dados iniciais) específicos do módulo.
+
+## Estrutura
+
+Os seeds devem seguir o padrão:
+- Nome: `XX_descricao.sql` ou `.js` (onde XX é a ordem de execução)
+- Ordem: Numérica (01, 02, 03...)
+
+## Exemplo
+
+```
+01_welcome_messages.sql
+02_tutorial_steps.sql
+03_default_settings.sql
+```
+
+## Como Criar
+
+1. Crie um arquivo com número de ordem
+2. Insira dados iniciais necessários
+3. Teste para garantir que não há conflitos
+4. Documente no README do módulo
+
+## Notas
+
+- Seeds devem verificar se dados já existem antes de inserir
+- Use `INSERT ... ON CONFLICT DO NOTHING` quando aplicável
+- Mantenha dados de exemplo realistas
+- Seeds devem ser seguros para executar múltiplas vezes

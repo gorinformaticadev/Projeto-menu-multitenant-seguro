@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu, Shield, FileText, HelpCircle, Package, Home } from "lucide-react";
+import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu, Shield, FileText, HelpCircle, Package, Home, BookOpen } from "lucide-react";
 import { Button } from "./ui/button";
 import { moduleRegistry, ModuleMenuItem } from "@/lib/module-registry";
 
@@ -21,6 +21,7 @@ const iconMap: Record<string, any> = {
   Package,
   Home,
   Menu,
+  BookOpen,
 };
 
 export function Sidebar() {

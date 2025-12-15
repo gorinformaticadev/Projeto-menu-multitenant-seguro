@@ -16,6 +16,7 @@ export default function DynamicModulePage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [availableRoutes, setAvailableRoutes] = useState<string[]>([]);
   
   const slug = Array.isArray(params.slug) ? params.slug : [params.slug];
   const routeKey = slug.join('/');
@@ -39,6 +40,19 @@ export default function DynamicModulePage() {
       
       const { modules } = await modulesResponse.json();
       console.log('📦 Módulos descobertos:', modules);
+
+      // Coletar todas as rotas disponíveis para exibir em caso de erro
+      const routes: string[] = [];
+      for (const [moduleName, moduleData] of Object.entries(modules)) {
+        const module = moduleData as any;
+        if (module.isValid && module.config.enabled) {
+          for (const page of module.bootstrap.pages) {
+            routes.push(`/modules/${page.path.replace(/^\//, '')}`);
+          }
+        }
+      }
+      setAvailableRoutes(routes);
+      console.log('🗺️ Rotas disponíveis:', routes);
 
       // Encontrar a página correspondente à rota
       let targetPage = null;
@@ -70,9 +84,20 @@ export default function DynamicModulePage() {
       console.log('🎯 Página encontrada:', targetPage);
       console.log('📦 Módulo:', targetModule);
 
-      // Mapear para arquivo físico
-      const modulePath = `/api/modules/${targetModule}/frontend/pages/${targetPage.id.split('.')[1]}.js`;
-      const pageName = `${targetModule.charAt(0).toUpperCase() + targetModule.slice(1).replace(/-([a-z])/g, (g) => g[1].toUpperCase())}${targetPage.id.split('.')[1].charAt(0).toUpperCase() + targetPage.id.split('.')[1].slice(1)}Page`;
+      // Mapear para arquivo físico e nome do componente
+      const moduleFileName = targetPage.id.split('.')[1]; // 'tutorial'
+      const modulePath = `/api/modules/${targetModule}/frontend/pages/${moduleFileName}.js`;
+      
+      // USAR O NOME DO COMPONENTE DIRETAMENTE DO module.pages.json
+      // Isso permite que o módulo defina o nome exato do componente
+      const pageName = targetPage.component;
+
+      console.log('🔍 Debug Info:');
+      console.log('  - targetModule:', targetModule);
+      console.log('  - targetPage.id:', targetPage.id);
+      console.log('  - targetPage.component:', targetPage.component);
+      console.log('  - modulePath:', modulePath);
+      console.log('  - pageName (do module.pages.json):', pageName);
 
       // Carregar o arquivo do módulo via API
       console.log('🔄 Carregando módulo:', modulePath);
@@ -186,13 +211,20 @@ export default function DynamicModulePage() {
             <h3 className="font-medium">Erro ao carregar módulo</h3>
           </div>
           <p className="text-red-700 text-sm mb-4">{error}</p>
-          <div className="p-3 bg-red-100 rounded-lg">
-            <p className="text-sm font-medium text-red-900 mb-2">Rotas disponíveis:</p>
-            <ul className="text-sm text-red-800 space-y-1">
-              <li>• <code>/modules/module-exemplo</code></li>
-              <li>• <code>/modules/module-exemplo/settings</code></li>
-            </ul>
-          </div>
+          {availableRoutes.length > 0 ? (
+            <div className="p-3 bg-red-100 rounded-lg">
+              <p className="text-sm font-medium text-red-900 mb-2">Rotas disponíveis:</p>
+              <ul className="text-sm text-red-800 space-y-1">
+                {availableRoutes.map((route) => (
+                  <li key={route}>• <code>{route}</code></li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="p-3 bg-red-100 rounded-lg">
+              <p className="text-sm text-red-900">Nenhum módulo disponível no momento.</p>
+            </div>
+          )}
         </div>
       </div>
     );

@@ -1,107 +1,107 @@
 /**
- * API ROUTE PARA SERVIR ARQUIVOS DE MÓDULOS
+ * API ROUTE PARA SERVIR ARQUIVOS DOS MÓDULOS
  * 
- * Serve arquivos JavaScript dos módulos independentes
- * Rota: /api/modules/[...path]
+ * Serve arquivos JavaScript, JSON e outros recursos dos módulos
+ * de forma segura e controlada
+ * 
+ * Exemplos de rotas:
+ * - /api/modules/boas-vindas/frontend/pages/tutorial.js
+ * - /api/modules/ModuleCore.js
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
-import { join } from 'path';
-import { existsSync, readdirSync } from 'fs';
+import { join, resolve, extname } from 'path';
+import { existsSync } from 'fs';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { path: string[] } }
 ) {
-  console.log('🚀 API route chamada com params:', params);
-  
   try {
-    // Construir caminho do arquivo
-    const filePath = params.path.join('/');
-    
-    // Determinar o caminho correto dos módulos
+    const path = params.path;
+    console.log('📂 API Modules - Requisição para:', path);
+
+    // Determinar caminho base dos módulos
     const cwd = process.cwd();
-    console.log('📂 Diretório atual:', cwd);
+    const modulesBasePath = cwd.endsWith('frontend') 
+      ? resolve(cwd, '..', 'modules')
+      : resolve(cwd, 'modules');
+
+    // Construir caminho do arquivo
+    let filePath: string;
     
-    // Se estamos na pasta frontend, subir um nível
-    const projectRoot = cwd.endsWith('frontend') ? join(cwd, '..') : cwd;
-    const fullPath = join(projectRoot, 'modules', filePath);
-    
-    console.log('📁 Tentando carregar arquivo:', fullPath);
-    console.log('📂 Raiz do projeto:', projectRoot);
-    console.log('🔍 Caminho solicitado:', filePath);
-    
-    // Verificar se arquivo existe
-    if (!existsSync(fullPath)) {
-      console.error('❌ Arquivo não encontrado:', fullPath);
-      
-      // Listar arquivos na pasta modules para debug
-      try {
-        const modulesDir = join(projectRoot, 'modules');
-        console.log('📂 Pasta modules existe?', existsSync(modulesDir));
-        if (existsSync(modulesDir)) {
-          console.log('📂 Conteúdo da pasta modules:', readdirSync(modulesDir, { recursive: true }));
-        }
-      } catch (e) {
-        console.error('❌ Erro ao listar pasta modules:', e instanceof Error ? e.message : 'Erro desconhecido');
-      }
-      
+    // Caso especial: ModuleCore.js está na raiz de modules/
+    if (path.length === 1 && path[0] === 'ModuleCore.js') {
+      filePath = join(modulesBasePath, 'ModuleCore.js');
+    } else {
+      // Caminho normal: modules/[module-name]/[...rest]
+      filePath = join(modulesBasePath, ...path);
+    }
+
+    console.log('📄 Tentando carregar arquivo:', filePath);
+
+    // Validações de segurança
+    if (!filePath.startsWith(modulesBasePath)) {
+      console.error('❌ Tentativa de acesso fora do diretório de módulos');
       return NextResponse.json(
-        { error: 'Arquivo não encontrado', path: fullPath },
+        { error: 'Acesso negado' },
+        { status: 403 }
+      );
+    }
+
+    // Validar se arquivo existe
+    if (!existsSync(filePath)) {
+      console.error('❌ Arquivo não encontrado:', filePath);
+      return NextResponse.json(
+        { error: `Arquivo não encontrado: ${path.join('/')}` },
         { status: 404 }
       );
     }
-    
-    // Verificar se é um arquivo permitido
-    const allowedExtensions = ['.js', '.json', '.md'];
-    const hasAllowedExtension = allowedExtensions.some(ext => 
-      fullPath.toLowerCase().endsWith(ext)
-    );
-    
-    if (!hasAllowedExtension) {
+
+    // Detectar tipo MIME baseado na extensão
+    const ext = extname(filePath).toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      '.js': 'application/javascript',
+      '.json': 'application/json',
+      '.css': 'text/css',
+      '.html': 'text/html',
+      '.txt': 'text/plain',
+      '.md': 'text/markdown',
+    };
+
+    const contentType = mimeTypes[ext] || 'application/octet-stream';
+
+    // Validar extensões permitidas (segurança)
+    const allowedExtensions = ['.js', '.json', '.css', '.md', '.txt'];
+    if (!allowedExtensions.includes(ext)) {
+      console.error('❌ Extensão de arquivo não permitida:', ext);
       return NextResponse.json(
         { error: 'Tipo de arquivo não permitido' },
         { status: 403 }
       );
     }
-    
-    // Ler arquivo
-    console.log('✅ Arquivo encontrado, lendo conteúdo...');
-    const fileContent = await readFile(fullPath, 'utf-8');
-    console.log('📄 Arquivo lido com sucesso, tamanho:', fileContent.length);
-    
-    // Determinar Content-Type
-    let contentType = 'text/plain';
-    if (fullPath.endsWith('.js')) {
-      contentType = 'application/javascript';
-    } else if (fullPath.endsWith('.json')) {
-      contentType = 'application/json';
-    } else if (fullPath.endsWith('.md')) {
-      contentType = 'text/markdown';
-    }
-    
-    // Retornar arquivo com headers corretos
+
+    // Ler e retornar o arquivo
+    const fileContent = await readFile(filePath, 'utf-8');
+    console.log('✅ Arquivo carregado com sucesso:', filePath);
+
     return new NextResponse(fileContent, {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=3600', // Cache por 1 hora
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Cache-Control': 'public, max-age=3600', // Cache de 1 hora
+        'X-Content-Type-Options': 'nosniff',
       },
     });
-    
+
   } catch (error) {
     console.error('❌ Erro ao servir arquivo do módulo:', error);
-    console.error('❌ Stack trace:', error instanceof Error ? error.stack : 'N/A');
     
     return NextResponse.json(
-      { 
-        error: 'Erro interno do servidor',
-        message: error instanceof Error ? error.message : 'Erro desconhecido',
-        path: params?.path?.join('/') || 'unknown'
+      {
+        error: 'Erro ao carregar arquivo',
+        message: error instanceof Error ? error.message : 'Erro desconhecido'
       },
       { status: 500 }
     );

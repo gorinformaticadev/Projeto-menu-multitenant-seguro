@@ -18,6 +18,7 @@ import { moduleRegistry, ModuleContribution } from './module-registry';
 const AVAILABLE_MODULES = [
   'core',
   'module-exemplo',
+  'boas-vindas',
 ] as const;
 
 type ModuleId = typeof AVAILABLE_MODULES[number];
@@ -52,6 +53,10 @@ async function loadModule(moduleId: ModuleId): Promise<void> {
     
     case 'module-exemplo':
       registerModuleExemploModule();
+      break;
+    
+    case 'boas-vindas':
+      registerBoasVindasModule();
       break;
     
     default:
@@ -192,6 +197,33 @@ function registerModuleExemploModule(): void {
 
   moduleRegistry.register(contribution);
   console.log('✅ Module Exemplo registrado com TODAS as funcionalidades');
+}
+
+/**
+ * REGISTRO DO MÓDULO BOAS-VINDAS
+ * Módulo de tutorial e boas-vindas para novos usuários
+ */
+function registerBoasVindasModule(): void {
+  const contribution: ModuleContribution = {
+    id: 'boas-vindas',
+    name: 'Boas-Vindas',
+    version: '1.0.0',
+    enabled: true,
+    
+    // Menu lateral - Item único "Tutorial"
+    sidebar: [
+      {
+        id: 'tutorial',
+        name: 'Tutorial',
+        href: '/modules/boas-vindas/tutorial',
+        icon: 'BookOpen',
+        order: 1.5 // Entre Dashboard (1) e Administração (2)
+      }
+    ]
+  };
+
+  moduleRegistry.register(contribution);
+  console.log('✅ Módulo Boas-Vindas registrado com sucesso');
 }
 
 /**
