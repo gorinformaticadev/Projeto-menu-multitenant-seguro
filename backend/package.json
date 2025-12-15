@@ -7,8 +7,8 @@
   "homepage": "https://www.gorinformatica.com.br",
   "scripts": {
     "start": "nest start",
-    "start:dev": "nest start --watch",
-    "start:prod": "node dist/main",
+    "start:dev": "nest start --watch --exec \"ts-node src/main.ts\"",
+    "start:prod": "node dist/backend/src/main",
     "build": "nest build",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
