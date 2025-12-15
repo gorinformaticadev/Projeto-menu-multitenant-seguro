@@ -429,3 +429,171 @@ model ModuleUploadPage {
   @@index([path])
   @@map("module_upload_pages")
 }
+
+// ============================================
+// MÓDULO DEMO-COMPLETO - TABELAS
+// ============================================
+
+enum DemoStatus {
+  draft
+  published
+  archived
+}
+
+// Tabela principal de demonstrações
+model Demo {
+  id          String               @id @default(uuid())
+  tenantId    String
+  title       String
+  description String?
+  content     String?
+  status      DemoStatus           @default(draft)
+  priority    Int                  @default(0)
+  viewsCount  Int                  @default(0)
+  likesCount  Int                  @default(0)
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  deletedAt   DateTime?
+  categories  DemoCategoryRelation[]
+  tags        DemoTagRelation[]
+  attachments DemoAttachment[]
+  comments    DemoComment[]
+  activities  DemoActivity[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@index([createdBy])
+  @@index([deletedAt])
+  @@map("demos")
+}
+
+// Tabela de categorias
+model DemoCategory {
+  id         String                 @id @default(uuid())
+  tenantId   String
+  name       String
+  slug       String
+  description String?
+  color      String?
+  icon       String?
+  orderIndex Int                    @default(0)
+  isActive   Boolean                @default(true)
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+  demos      DemoCategoryRelation[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@index([slug])
+  @@index([isActive])
+  @@map("demo_categories")
+}
+
+// Tabela de tags
+model DemoTag {
+  id         String            @id @default(uuid())
+  tenantId   String
+  name       String
+  slug       String
+  color      String?
+  usageCount Int               @default(0)
+  createdAt  DateTime          @default(now())
+  demos      DemoTagRelation[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@index([slug])
+  @@index([usageCount(sort: Desc)])
+  @@map("demo_tags")
+}
+
+// Relacionamento demos <-> categories (many-to-many)
+model DemoCategoryRelation {
+  demoId     String
+  demo       Demo         @relation(fields: [demoId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   DemoCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt  DateTime     @default(now())
+
+  @@id([demoId, categoryId])
+  @@index([demoId])
+  @@index([categoryId])
+  @@map("demo_category_relations")
+}
+
+// Relacionamento demos <-> tags (many-to-many)
+model DemoTagRelation {
+  demoId    String
+  demo      Demo     @relation(fields: [demoId], references: [id], onDelete: Cascade)
+  tagId     String
+  tag       DemoTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([demoId, tagId])
+  @@index([demoId])
+  @@index([tagId])
+  @@map("demo_tag_relations")
+}
+
+// Tabela de anexos/arquivos
+model DemoAttachment {
+  id               String   @id @default(uuid())
+  demoId           String
+  demo             Demo     @relation(fields: [demoId], references: [id], onDelete: Cascade)
+  filename         String
+  originalFilename String
+  mimeType         String
+  sizeBytes        BigInt
+  storagePath      String
+  thumbnailPath    String?
+  uploadedBy       String?
+  createdAt        DateTime @default(now())
+
+  @@index([demoId])
+  @@index([mimeType])
+  @@map("demo_attachments")
+}
+
+// Tabela de comentários
+model DemoComment {
+  id        String         @id @default(uuid())
+  demoId    String
+  demo      Demo           @relation(fields: [demoId], references: [id], onDelete: Cascade)
+  parentId  String?
+  parent    DemoComment?   @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   DemoComment[]  @relation("CommentReplies")
+  userId    String
+  content   String
+  isEdited  Boolean        @default(false)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  deletedAt DateTime?
+
+  @@index([demoId])
+  @@index([userId])
+  @@index([parentId])
+  @@index([createdAt(sort: Desc)])
+  @@map("demo_comments")
+}
+
+// Tabela de atividades/audit log
+model DemoActivity {
+  id        String   @id @default(uuid())
+  demoId    String
+  demo      Demo     @relation(fields: [demoId], references: [id], onDelete: Cascade)
+  userId    String?
+  action    String
+  changes   String?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([demoId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt(sort: Desc)])
+  @@map("demo_activities")
+}

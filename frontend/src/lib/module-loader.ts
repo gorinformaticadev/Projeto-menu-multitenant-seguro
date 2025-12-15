@@ -19,6 +19,7 @@ const AVAILABLE_MODULES = [
   'core',
   'module-exemplo',
   'boas-vindas',
+  'demo-completo',
 ] as const;
 
 type ModuleId = typeof AVAILABLE_MODULES[number];
@@ -57,6 +58,10 @@ async function loadModule(moduleId: ModuleId): Promise<void> {
     
     case 'boas-vindas':
       registerBoasVindasModule();
+      break;
+    
+    case 'demo-completo':
+      registerDemoCompletoModule();
       break;
     
     default:
@@ -224,6 +229,80 @@ function registerBoasVindasModule(): void {
 
   moduleRegistry.register(contribution);
   console.log('✅ Módulo Boas-Vindas registrado com sucesso');
+}
+
+/**
+ * REGISTRO DO MÓDULO DEMO COMPLETO
+ * Módulo de demonstração completa com TODAS as funcionalidades
+ */
+function registerDemoCompletoModule(): void {
+  const contribution: ModuleContribution = {
+    id: 'demo-completo',
+    name: 'Demo Completo',
+    version: '1.0.0',
+    enabled: true,
+    
+    // Menu lateral - Grupo "Demo Completo"
+    sidebar: [
+      {
+        id: 'demo-list',
+        name: 'Lista de Demos',
+        href: '/demo',
+        icon: 'Rocket',
+        order: 15,
+        group: 'demo-completo'
+      },
+      {
+        id: 'demo-dashboard',
+        name: 'Dashboard',
+        href: '/demo/dashboard',
+        icon: 'BarChart3',
+        order: 16,
+        group: 'demo-completo'
+      },
+      {
+        id: 'demo-create',
+        name: 'Novo Demo',
+        href: '/demo/create',
+        icon: 'Rocket',
+        order: 17,
+        group: 'demo-completo'
+      },
+      {
+        id: 'demo-categories',
+        name: 'Categorias',
+        href: '/demo/categories',
+        icon: 'FolderKanban',
+        order: 18,
+        roles: ['ADMIN', 'SUPER_ADMIN'],
+        group: 'demo-completo'
+      },
+      {
+        id: 'demo-tags',
+        name: 'Tags',
+        href: '/demo/tags',
+        icon: 'Tags',
+        order: 19,
+        roles: ['ADMIN', 'SUPER_ADMIN'],
+        group: 'demo-completo'
+      }
+    ],
+    
+    // Widget para dashboard
+    dashboard: [
+      {
+        id: 'demo-stats-widget',
+        name: 'Estatísticas Demo',
+        component: 'DemoStatsWidget',
+        module: 'demo-completo',
+        order: 20,
+        size: 'medium'
+      }
+    ]
+  };
+
+  moduleRegistry.register(contribution);
+  console.log('✅ Módulo Demo Completo registrado com TODAS as funcionalidades');
 }
 
 /**

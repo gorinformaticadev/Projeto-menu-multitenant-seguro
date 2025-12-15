@@ -1,0 +1,17 @@
+{
+  "name": "demo-completo",
+  "displayName": "Demonstração Completa",
+  "version": "1.0.0",
+  "description": "Módulo de demonstração que exemplifica todas as funcionalidades do sistema modular CORE IDEAL",
+  "author": "Equipe CORE",
+  "category": "demos",
+  "enabled": true,
+  "dependencies": {
+    "coreVersion": "1.0.0"
+  },
+  "defaultConfig": {
+    "showNotifications": true,
+    "enableWidgets": true,
+    "maxItems": 50
+  }
+}

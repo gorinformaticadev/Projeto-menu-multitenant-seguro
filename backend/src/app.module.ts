@@ -19,6 +19,7 @@ import { TokenCleanupService } from './common/services/token-cleanup.service';
 import { UpdateModule } from './update/update.module';
 import { ModulesModule } from './modules/modules.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { DemoModule } from '../../modules/demo-completo/src/demo.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     UpdateModule,
     ModulesModule,
     NotificationsModule,
+    DemoModule,
   ],
   providers: [
     {

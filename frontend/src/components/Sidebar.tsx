@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu, Shield, FileText, HelpCircle, Package, Home, BookOpen } from "lucide-react";
+import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu, Shield, FileText, HelpCircle, Package, Home, BookOpen, Rocket, BarChart3, FolderKanban, Tags } from "lucide-react";
 import { Button } from "./ui/button";
 import { moduleRegistry, ModuleMenuItem } from "@/lib/module-registry";
 
@@ -22,6 +22,10 @@ const iconMap: Record<string, any> = {
   Home,
   Menu,
   BookOpen,
+  Rocket,
+  BarChart3,
+  FolderKanban,
+  Tags,
 };
 
 export function Sidebar() {
@@ -150,6 +154,11 @@ export function Sidebar() {
       name: 'Module Exemplo',
       icon: Package,
       order: 100 // Módulos começam na ordem 100+
+    },
+    'demo-completo': {
+      name: 'Demo Completo',
+      icon: Rocket,
+      order: 15 // Após dashboard, antes de administração
     }
   };
 
