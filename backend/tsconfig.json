@@ -16,11 +16,24 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
-    "noFallthroughCasesInSwitch": false
+    "noFallthroughCasesInSwitch": false,
+    "paths": {
+      "@core/*": [
+        "src/core/*"
+      ],
+      "@modules/*": [
+        "../modules/*"
+      ]
+    }
   },
+  "include": [
+    "src/**/*",
+    "../modules/**/*"
+  ],
   "exclude": [
-    "../modules/**/*",
-    "modules/**/*",
-    "node_modules"
+    "node_modules",
+    "dist",
+    "test",
+    "**/*spec.ts"
   ]
 }

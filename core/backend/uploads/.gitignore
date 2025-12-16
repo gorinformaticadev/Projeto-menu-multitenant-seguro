@@ -1,6 +1,0 @@
-# Ignorar todos os arquivos de upload
-*
-# Mas manter a estrutura de pastas
-!.gitignore
-!logos/
-!logos/.gitkeep
