@@ -21,6 +21,9 @@ import DemoViewPage from './pages/[id]/index';
 const MODULE_ROOT = '/demo-completo';
 
 export const ModuleRoutes = [
+    // Rota Raiz: /modules/demo-completo (Redireciona ou exibe lista)
+    { path: `${MODULE_ROOT}`, component: DemoListPage },
+
     // Rota: /modules/demo-completo/demo
     { path: `${MODULE_ROOT}/demo`, component: DemoListPage },
 
