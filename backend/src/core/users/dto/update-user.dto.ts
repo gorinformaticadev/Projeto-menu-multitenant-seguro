@@ -1,8 +1,8 @@
-import { IsEmail, IsString, IsOptional, MinLength, IsEnum, IsBoolean, ValidateIf, registerDecorator, ValidationOptions, ValidationArguments } from 'class-validator';
+﻿import { IsEmail, IsString, IsOptional, MinLength, IsEnum, IsBoolean, ValidateIf, registerDecorator, ValidationOptions, ValidationArguments } from 'class-validator';
 import { Role } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '@core/prisma/prisma.service';
 
-// Validador personalizado para senha baseado nas configurações
+// Validador personalizado para senha baseado nas configuraÃ§Ãµes
 function IsValidPassword(validationOptions?: ValidationOptions) {
   return function (object: Object, propertyName: string) {
     registerDecorator({
@@ -12,15 +12,15 @@ function IsValidPassword(validationOptions?: ValidationOptions) {
       options: validationOptions,
       validator: {
         async validate(value: any, args: ValidationArguments) {
-          if (!value || typeof value !== 'string' || value.trim() === '') return true; // Se não há senha, é válido (para edição)
+          if (!value || typeof value !== 'string' || value.trim() === '') return true; // Se nÃ£o hÃ¡ senha, Ã© vÃ¡lido (para ediÃ§Ã£o)
 
           try {
-            // Buscar configurações de senha do banco
+            // Buscar configuraÃ§Ãµes de senha do banco
             const prisma = new PrismaService();
             const config = await prisma.securityConfig.findFirst();
 
             if (!config) {
-              // Usar valores padrão se não houver configuração
+              // Usar valores padrÃ£o se nÃ£o houver configuraÃ§Ã£o
               const minLength = 8;
               const requireUppercase = true;
               const requireLowercase = true;
@@ -36,7 +36,7 @@ function IsValidPassword(validationOptions?: ValidationOptions) {
               return true;
             }
 
-            // Validar baseado nas configurações do banco
+            // Validar baseado nas configuraÃ§Ãµes do banco
             if (value.length < config.passwordMinLength) return false;
             if (config.passwordRequireUppercase && !/[A-Z]/.test(value)) return false;
             if (config.passwordRequireLowercase && !/[a-z]/.test(value)) return false;
@@ -45,12 +45,12 @@ function IsValidPassword(validationOptions?: ValidationOptions) {
 
             return true;
           } catch (error) {
-            // Em caso de erro, usar validação básica
+            // Em caso de erro, usar validaÃ§Ã£o bÃ¡sica
             return value.length >= 8 && /[A-Z]/.test(value) && /[a-z]/.test(value) && /\d/.test(value);
           }
         },
         defaultMessage(args: ValidationArguments) {
-          return 'A senha não atende aos requisitos de segurança configurados';
+          return 'A senha nÃ£o atende aos requisitos de seguranÃ§a configurados';
         },
       },
     });
@@ -59,16 +59,16 @@ function IsValidPassword(validationOptions?: ValidationOptions) {
 
 export class UpdateUserDto {
   @IsOptional()
-  @IsEmail({}, { message: 'Email inválido' })
+  @IsEmail({}, { message: 'Email invÃ¡lido' })
   email?: string;
 
   @IsOptional()
   @IsString()
-  @MinLength(3, { message: 'Nome deve ter no mínimo 3 caracteres' })
+  @MinLength(3, { message: 'Nome deve ter no mÃ­nimo 3 caracteres' })
   name?: string;
 
   @IsOptional()
-  @IsEnum(Role, { message: 'Role inválida' })
+  @IsEnum(Role, { message: 'Role invÃ¡lida' })
   role?: Role;
 
   @IsOptional()
@@ -81,3 +81,4 @@ export class ToggleUserStatusDto {
   @IsBoolean()
   ativo: boolean;
 }
+

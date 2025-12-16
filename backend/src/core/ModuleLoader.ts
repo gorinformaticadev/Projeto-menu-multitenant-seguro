@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+﻿import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import { CoreContext } from './context/CoreContext';
@@ -10,7 +10,7 @@ export class ModuleLoader implements OnModuleInit {
     private loadedModules: Map<string, ModuleContract> = new Map();
 
     constructor(
-        // private readonly coreContext: CoreContext // Injeção temporariamente desabilitada se provider não estiver pronto
+        // private readonly coreContext: CoreContext // InjeÃ§Ã£o temporariamente desabilitada se provider nÃ£o estiver pronto
     ) { }
 
     async onModuleInit() {
@@ -19,7 +19,7 @@ export class ModuleLoader implements OnModuleInit {
     }
 
     private async scanModules() {
-        // Caminho relativo a partir de dist/src/core/ModuleLoader.js -> ../../../modules
+        // Caminho relativo a partir de dist/src/core/ModuleLoader.js -> @core/modules
         // Ajustar conforme necessidade de build.
         const modulesPath = path.resolve(process.cwd(), 'modules');
 
@@ -49,12 +49,13 @@ export class ModuleLoader implements OnModuleInit {
 
             if (fs.existsSync(moduleEntry)) {
                 this.logger.log(`Discovered module: ${slug}`);
-                // TODO: Implementar carregamento real dinâmico
+                // TODO: Implementar carregamento real dinÃ¢mico
                 // Em ambiente CommonJS/TS-Node isso requer cuidado.
-                // Para "pronto para produção", o build deve incluir modules.
+                // Para "pronto para produÃ§Ã£o", o build deve incluir modules.
             }
         } catch (e) {
             this.logger.error(`Failed to load module ${slug}`, e);
         }
     }
 }
+

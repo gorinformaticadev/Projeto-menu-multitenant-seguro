@@ -1,4 +1,4 @@
-import { DynamicModule, Module, Logger } from '@nestjs/common';
+﻿import { DynamicModule, Module, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -17,17 +17,17 @@ export class AppModulesModule {
                 if (dir.isDirectory() && !dir.name.startsWith('.')) {
                     // Tentar carregar backend/routes.ts que exporta ModuleRoutes (controllers)
                     const routesPathTS = path.join(modulesDir, dir.name, 'backend', 'routes.ts');
-                    // Em prod/dist, a extensão e caminho podem mudar se modules for compilado para dist/modules
+                    // Em prod/dist, a extensÃ£o e caminho podem mudar se modules for compilado para dist/modules
                     // Se estivermos rodando via ts-node, .ts funciona.
                     // Se buildado, precisamos achar onde o tsc colocou.
 
                     try {
-                        // Importação dinâmica requer caminho relativo ou alias correto
-                        // Como configuramos tsconfig para incluir ../modules, imports funcionam.
+                        // ImportaÃ§Ã£o dinÃ¢mica requer caminho relativo ou alias correto
+                        // Como configuramos tsconfig para incluir @core/modules, imports funcionam.
                         // Mas runtime dynamic import de arquivo fora de src pode ser tricky no Nest CLI build.
-                        // Vamos tentar importar usando caminho relativo ao arquivo atual se possível, ou alias.
+                        // Vamos tentar importar usando caminho relativo ao arquivo atual se possÃ­vel, ou alias.
 
-                        // Solução robusta: Usar o alias @modules configurado
+                        // SoluÃ§Ã£o robusta: Usar o alias @modules configurado
                         const moduleRoutes = await import(`@modules/${dir.name}/backend/routes`);
 
                         if (moduleRoutes.ModuleRoutes) {
@@ -53,3 +53,4 @@ export class AppModulesModule {
         };
     }
 }
+

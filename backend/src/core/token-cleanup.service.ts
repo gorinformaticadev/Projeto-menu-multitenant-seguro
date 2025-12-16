@@ -1,13 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+﻿import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '@core/prisma/prisma.service';
 
 /**
- * Serviço de limpeza de tokens expirados
+ * ServiÃ§o de limpeza de tokens expirados
  * 
- * Executa tarefas de manutenção periódicas para:
+ * Executa tarefas de manutenÃ§Ã£o periÃ³dicas para:
  * - Remover refresh tokens expirados do banco de dados
- * - Limpar sessões antigas
+ * - Limpar sessÃµes antigas
  * - Otimizar armazenamento
  */
 @Injectable()
@@ -25,7 +25,7 @@ export class TokenCleanupService {
     name: 'cleanup-expired-tokens',
   })
   async cleanupExpiredTokens() {
-    this.logger.log('🧹 Iniciando limpeza de refresh tokens expirados...');
+    this.logger.log('ðŸ§¹ Iniciando limpeza de refresh tokens expirados...');
 
     try {
       const result = await this.prisma.refreshToken.deleteMany({
@@ -36,20 +36,20 @@ export class TokenCleanupService {
         },
       });
 
-      this.logger.log(`✅ Limpeza concluída: ${result.count} tokens removidos`);
+      this.logger.log(`âœ… Limpeza concluÃ­da: ${result.count} tokens removidos`);
     } catch (error) {
-      this.logger.error('❌ Erro ao limpar tokens expirados:', error);
+      this.logger.error('âŒ Erro ao limpar tokens expirados:', error);
     }
   }
 
   /**
-   * Limpa tokens antigos manualmente (método público para admin)
+   * Limpa tokens antigos manualmente (mÃ©todo pÃºblico para admin)
    * 
    * @param olderThanDays - Remove tokens mais antigos que X dias
-   * @returns Número de tokens removidos
+   * @returns NÃºmero de tokens removidos
    */
   async cleanupOldTokens(olderThanDays: number = 30): Promise<number> {
-    this.logger.log(`🧹 Limpando tokens mais antigos que ${olderThanDays} dias...`);
+    this.logger.log(`ðŸ§¹ Limpando tokens mais antigos que ${olderThanDays} dias...`);
 
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
@@ -64,7 +64,7 @@ export class TokenCleanupService {
                 lt: new Date(),
               },
             },
-            // Tokens muito antigos (mesmo se não expirados)
+            // Tokens muito antigos (mesmo se nÃ£o expirados)
             {
               createdAt: {
                 lt: cutoffDate,
@@ -74,23 +74,23 @@ export class TokenCleanupService {
         },
       });
 
-      this.logger.log(`✅ ${result.count} tokens removidos`);
+      this.logger.log(`âœ… ${result.count} tokens removidos`);
       return result.count;
     } catch (error) {
-      this.logger.error('❌ Erro ao limpar tokens antigos:', error);
+      this.logger.error('âŒ Erro ao limpar tokens antigos:', error);
       throw error;
     }
   }
 
   /**
-   * Limpa todos os refresh tokens de um usuário específico
-   * Útil para forçar logout em todos os dispositivos
+   * Limpa todos os refresh tokens de um usuÃ¡rio especÃ­fico
+   * Ãštil para forÃ§ar logout em todos os dispositivos
    * 
-   * @param userId - ID do usuário
-   * @returns Número de tokens removidos
+   * @param userId - ID do usuÃ¡rio
+   * @returns NÃºmero de tokens removidos
    */
   async revokeAllUserTokens(userId: string): Promise<number> {
-    this.logger.log(`🔒 Revogando todos os tokens do usuário ${userId}...`);
+    this.logger.log(`ðŸ”’ Revogando todos os tokens do usuÃ¡rio ${userId}...`);
 
     try {
       const result = await this.prisma.refreshToken.deleteMany({
@@ -99,18 +99,18 @@ export class TokenCleanupService {
         },
       });
 
-      this.logger.log(`✅ ${result.count} tokens revogados`);
+      this.logger.log(`âœ… ${result.count} tokens revogados`);
       return result.count;
     } catch (error) {
-      this.logger.error('❌ Erro ao revogar tokens do usuário:', error);
+      this.logger.error('âŒ Erro ao revogar tokens do usuÃ¡rio:', error);
       throw error;
     }
   }
 
   /**
-   * Obtém estatísticas sobre tokens
+   * ObtÃ©m estatÃ­sticas sobre tokens
    * 
-   * @returns Estatísticas de tokens
+   * @returns EstatÃ­sticas de tokens
    */
   async getTokenStats() {
     const [total, expired, active] = await Promise.all([
@@ -144,3 +144,4 @@ export class TokenCleanupService {
     };
   }
 }
+

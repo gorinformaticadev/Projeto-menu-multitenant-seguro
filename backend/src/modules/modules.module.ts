@@ -1,11 +1,11 @@
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
 import { ModulesController } from './modules.controller';
 import { ModulesService } from './modules.service';
 import { ModuleInstallerService } from './module-installer.service';
 import { ModuleMigrationService } from './module-migration.service';
 import { AutoLoaderService } from './auto-loader.service';
-import { PrismaModule } from '../prisma/prisma.module';
+import { PrismaModule } from '@core/prisma/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 // Novos services do sistema de upload
 import { SafeConfigParser } from './security/safe-config-parser.service';

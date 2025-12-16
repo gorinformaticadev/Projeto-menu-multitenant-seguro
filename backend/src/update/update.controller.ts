@@ -1,4 +1,4 @@
-import {
+﻿import {
   Controller,
   Get,
   Post,
@@ -11,21 +11,21 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
+import { RolesGuard } from '@core/common/guards/roles.guard';
+import { Roles } from '@core/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { UpdateService } from './update.service';
 import { ExecuteUpdateDto, UpdateConfigDto } from './dto/update.dto';
 import { Throttle } from '@nestjs/throttler';
 
 /**
- * Controller do Sistema de Atualizações
+ * Controller do Sistema de AtualizaÃ§Ãµes
  * 
- * Endpoints protegidos para gerenciar atualizações do sistema:
- * - Verificação de status e versões disponíveis
- * - Execução de atualizações (apenas SUPER_ADMIN)
- * - Configuração do sistema de updates
+ * Endpoints protegidos para gerenciar atualizaÃ§Ãµes do sistema:
+ * - VerificaÃ§Ã£o de status e versÃµes disponÃ­veis
+ * - ExecuÃ§Ã£o de atualizaÃ§Ãµes (apenas SUPER_ADMIN)
+ * - ConfiguraÃ§Ã£o do sistema de updates
  * - Consulta de logs e auditoria
  */
 @Controller('api/update')
@@ -35,8 +35,8 @@ export class UpdateController {
 
   /**
    * GET /api/update/status
-   * Retorna status atual do sistema de atualizações
-   * Acessível para usuários autenticados
+   * Retorna status atual do sistema de atualizaÃ§Ãµes
+   * AcessÃ­vel para usuÃ¡rios autenticados
    */
   @Get('status')
   async getStatus() {
@@ -44,7 +44,7 @@ export class UpdateController {
       return await this.updateService.getUpdateStatus();
     } catch (error) {
       throw new HttpException(
-        'Erro ao buscar status de atualizações',
+        'Erro ao buscar status de atualizaÃ§Ãµes',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -52,13 +52,13 @@ export class UpdateController {
 
   /**
    * GET /api/update/check
-   * Força verificação de novas versões no repositório
+   * ForÃ§a verificaÃ§Ã£o de novas versÃµes no repositÃ³rio
    * Apenas SUPER_ADMIN pode executar
    */
   @Get('check')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
-  @Throttle({ default: { limit: 10, ttl: 60000 } }) // Máximo 10 verificações por minuto
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // MÃ¡ximo 10 verificaÃ§Ãµes por minuto
   async checkForUpdates(@Request() req) {
     try {
       const result = await this.updateService.checkForUpdates();
@@ -66,13 +66,13 @@ export class UpdateController {
       return {
         success: true,
         message: result.updateAvailable 
-          ? `Nova versão disponível: ${result.availableVersion}`
-          : 'Sistema está atualizado',
+          ? `Nova versÃ£o disponÃ­vel: ${result.availableVersion}`
+          : 'Sistema estÃ¡ atualizado',
         ...result,
       };
     } catch (error) {
       throw new HttpException(
-        'Erro ao verificar atualizações',
+        'Erro ao verificar atualizaÃ§Ãµes',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -80,13 +80,13 @@ export class UpdateController {
 
   /**
    * POST /api/update/execute
-   * Executa atualização para versão especificada
+   * Executa atualizaÃ§Ã£o para versÃ£o especificada
    * Apenas SUPER_ADMIN pode executar
    */
   @Post('execute')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
-  @Throttle({ default: { limit: 3, ttl: 3600000 } }) // Máximo 3 atualizações por hora
+  @Throttle({ default: { limit: 3, ttl: 3600000 } }) // MÃ¡ximo 3 atualizaÃ§Ãµes por hora
   async executeUpdate(
     @Body() updateData: ExecuteUpdateDto,
     @Request() req,
@@ -106,7 +106,7 @@ export class UpdateController {
       return result;
     } catch (error) {
       throw new HttpException(
-        error.message || 'Erro ao executar atualização',
+        error.message || 'Erro ao executar atualizaÃ§Ã£o',
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -114,7 +114,7 @@ export class UpdateController {
 
   /**
    * PUT /api/update/config
-   * Atualiza configurações do sistema de updates
+   * Atualiza configuraÃ§Ãµes do sistema de updates
    * Apenas SUPER_ADMIN pode executar
    */
   @Put('config')
@@ -132,7 +132,7 @@ export class UpdateController {
       return result;
     } catch (error) {
       throw new HttpException(
-        'Erro ao atualizar configurações',
+        'Erro ao atualizar configuraÃ§Ãµes',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -140,7 +140,7 @@ export class UpdateController {
 
   /**
    * GET /api/update/logs
-   * Retorna histórico de atualizações
+   * Retorna histÃ³rico de atualizaÃ§Ãµes
    * Apenas SUPER_ADMIN pode acessar
    */
   @Get('logs')
@@ -152,7 +152,7 @@ export class UpdateController {
       
       if (limitNum > 200) {
         throw new HttpException(
-          'Limite máximo de 200 registros',
+          'Limite mÃ¡ximo de 200 registros',
           HttpStatus.BAD_REQUEST,
         );
       }
@@ -166,7 +166,7 @@ export class UpdateController {
       };
     } catch (error) {
       throw new HttpException(
-        'Erro ao buscar logs de atualização',
+        'Erro ao buscar logs de atualizaÃ§Ã£o',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -174,7 +174,7 @@ export class UpdateController {
 
   /**
    * GET /api/update/logs/:id
-   * Retorna detalhes de uma atualização específica
+   * Retorna detalhes de uma atualizaÃ§Ã£o especÃ­fica
    * Apenas SUPER_ADMIN pode acessar
    */
   @Get('logs/:id')
@@ -198,28 +198,28 @@ export class UpdateController {
 
   /**
    * GET /api/update/test-connection
-   * Testa conectividade com o repositório Git
+   * Testa conectividade com o repositÃ³rio Git
    * Apenas SUPER_ADMIN pode executar
    */
   @Get('test-connection')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
-  @Throttle({ default: { limit: 5, ttl: 60000 } }) // Máximo 5 testes por minuto
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // MÃ¡ximo 5 testes por minuto
   async testConnection() {
     try {
-      // Tenta verificar atualizações para testar conectividade
+      // Tenta verificar atualizaÃ§Ãµes para testar conectividade
       const result = await this.updateService.checkForUpdates();
       
       return {
         success: true,
-        message: 'Conexão com repositório estabelecida com sucesso',
+        message: 'ConexÃ£o com repositÃ³rio estabelecida com sucesso',
         connected: true,
         ...result,
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Falha na conexão com o repositório',
+        message: 'Falha na conexÃ£o com o repositÃ³rio',
         connected: false,
         error: error.message,
       };

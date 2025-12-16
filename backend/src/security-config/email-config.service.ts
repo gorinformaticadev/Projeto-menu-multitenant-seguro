@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+﻿import { Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '@core/prisma/prisma.service';
 import { CreateEmailConfigDto, UpdateEmailConfigDto } from './dto/email-config.dto';
 import { EmailConfiguration } from '@prisma/client';
 
@@ -23,7 +23,7 @@ export class EmailConfigService {
         smtpPort: 465,
         encryption: 'SSL',
         authMethod: 'LOGIN',
-        description: 'Configuração recomendada para Gmail com SSL/TLS',
+        description: 'ConfiguraÃ§Ã£o recomendada para Gmail com SSL/TLS',
       },
       {
         providerName: 'Gmail (STARTTLS - Port 587)',
@@ -31,7 +31,7 @@ export class EmailConfigService {
         smtpPort: 587,
         encryption: 'STARTTLS',
         authMethod: 'LOGIN',
-        description: 'Configuração alternativa para Gmail com STARTTLS',
+        description: 'ConfiguraÃ§Ã£o alternativa para Gmail com STARTTLS',
       },
       // Hotmail/Outlook SMTP configuration
       {
@@ -40,7 +40,7 @@ export class EmailConfigService {
         smtpPort: 587,
         encryption: 'STARTTLS',
         authMethod: 'LOGIN',
-        description: 'Configuração para Hotmail e Outlook.com',
+        description: 'ConfiguraÃ§Ã£o para Hotmail e Outlook.com',
       },
       // Titan Mail SMTP configuration
       {
@@ -49,7 +49,7 @@ export class EmailConfigService {
         smtpPort: 465,
         encryption: 'SSL',
         authMethod: 'LOGIN',
-        description: 'Configuração para Titan Email',
+        description: 'ConfiguraÃ§Ã£o para Titan Email',
       },
     ];
   }
@@ -182,7 +182,7 @@ export class EmailConfigService {
         this.logger.warn('No active email configuration found');
         return { 
           success: false, 
-          message: 'Nenhuma configuração de email ativa encontrada. Configure um provedor de email primeiro.' 
+          message: 'Nenhuma configuraÃ§Ã£o de email ativa encontrada. Configure um provedor de email primeiro.' 
         };
       }
       
@@ -198,25 +198,25 @@ export class EmailConfigService {
       );
       
       if (sent) {
-        this.logger.log(`✅ Test email sent successfully by user ${user.id} to ${email}`);
+        this.logger.log(`âœ… Test email sent successfully by user ${user.id} to ${email}`);
         return { 
           success: true, 
           message: `Email de teste enviado com sucesso para ${email}. Verifique sua caixa de entrada.` 
         };
       } else {
-        this.logger.warn(`❌ Failed to send test email to ${email}`);
+        this.logger.warn(`âŒ Failed to send test email to ${email}`);
         return { 
           success: false, 
-          message: 'Falha ao enviar email de teste. Verifique as configurações e credenciais.' 
+          message: 'Falha ao enviar email de teste. Verifique as configuraÃ§Ãµes e credenciais.' 
         };
       }
     } catch (error) {
-      this.logger.error(`❌ Error testing email configuration for ${email}:`, error);
+      this.logger.error(`âŒ Error testing email configuration for ${email}:`, error);
       
       // Return the specific error message from the email service
       return { 
         success: false, 
-        message: error.message || 'Erro desconhecido ao testar configuração de email'
+        message: error.message || 'Erro desconhecido ao testar configuraÃ§Ã£o de email'
       };
     }
   }

@@ -1,5 +1,5 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+﻿import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { PrismaService } from '@core/prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -17,29 +17,29 @@ export class PasswordResetService {
   ) {}
 
   /**
-   * Solicitar recuperação de senha
+   * Solicitar recuperaÃ§Ã£o de senha
    */
   async requestPasswordReset(email: string): Promise<{ message: string }> {
     try {
-      // Verificar se o usuário existe
+      // Verificar se o usuÃ¡rio existe
       const user = await this.prisma.user.findUnique({
         where: { email: email.toLowerCase() },
       });
 
-      // Por segurança, sempre retornamos sucesso mesmo se o email não existir
-      // Isso evita que atacantes descubram quais emails estão cadastrados
+      // Por seguranÃ§a, sempre retornamos sucesso mesmo se o email nÃ£o existir
+      // Isso evita que atacantes descubram quais emails estÃ£o cadastrados
       if (!user) {
-        this.logger.warn(`Tentativa de reset de senha para email não cadastrado: ${email}`);
+        this.logger.warn(`Tentativa de reset de senha para email nÃ£o cadastrado: ${email}`);
         return {
-          message: 'Se o email estiver cadastrado, você receberá as instruções para redefinir sua senha.',
+          message: 'Se o email estiver cadastrado, vocÃª receberÃ¡ as instruÃ§Ãµes para redefinir sua senha.',
         };
       }
 
-      // Verificar se o usuário não está bloqueado
+      // Verificar se o usuÃ¡rio nÃ£o estÃ¡ bloqueado
       if (user.isLocked) {
-        this.logger.warn(`Tentativa de reset de senha para usuário bloqueado: ${email}`);
+        this.logger.warn(`Tentativa de reset de senha para usuÃ¡rio bloqueado: ${email}`);
         return {
-          message: 'Se o email estiver cadastrado, você receberá as instruções para redefinir sua senha.',
+          message: 'Se o email estiver cadastrado, vocÃª receberÃ¡ as instruÃ§Ãµes para redefinir sua senha.',
         };
       }
 
@@ -56,7 +56,7 @@ export class PasswordResetService {
         }
       );
 
-      // Salvar o token no banco de dados para validação posterior
+      // Salvar o token no banco de dados para validaÃ§Ã£o posterior
       await this.prisma.passwordResetToken.create({
         data: {
           userId: user.id,
@@ -65,7 +65,7 @@ export class PasswordResetService {
         },
       });
 
-      // Enviar email de recuperação
+      // Enviar email de recuperaÃ§Ã£o
       const emailSent = await this.emailService.sendPasswordResetEmail(
         user.email,
         user.name,
@@ -73,18 +73,18 @@ export class PasswordResetService {
       );
 
       if (!emailSent) {
-        this.logger.error(`Falha ao enviar email de recuperação para: ${email}`);
+        this.logger.error(`Falha ao enviar email de recuperaÃ§Ã£o para: ${email}`);
         throw new BadRequestException('Erro interno. Tente novamente mais tarde.');
       }
 
-      this.logger.log(`Email de recuperação enviado para: ${email}`);
+      this.logger.log(`Email de recuperaÃ§Ã£o enviado para: ${email}`);
       
       return {
-        message: 'Se o email estiver cadastrado, você receberá as instruções para redefinir sua senha.',
+        message: 'Se o email estiver cadastrado, vocÃª receberÃ¡ as instruÃ§Ãµes para redefinir sua senha.',
       };
 
     } catch (error) {
-      this.logger.error('Erro ao processar solicitação de reset de senha:', error);
+      this.logger.error('Erro ao processar solicitaÃ§Ã£o de reset de senha:', error);
       
       if (error instanceof BadRequestException) {
         throw error;
@@ -106,24 +106,24 @@ export class PasswordResetService {
           secret: this.config.get('JWT_SECRET'),
         });
       } catch (error) {
-        this.logger.warn('Token de reset inválido ou expirado');
-        throw new BadRequestException('Token inválido ou expirado. Solicite um novo link de recuperação.');
+        this.logger.warn('Token de reset invÃ¡lido ou expirado');
+        throw new BadRequestException('Token invÃ¡lido ou expirado. Solicite um novo link de recuperaÃ§Ã£o.');
       }
 
-      // Verificar se é um token de reset de senha
+      // Verificar se Ã© um token de reset de senha
       if (payload.type !== 'password-reset') {
-        this.logger.warn('Token não é do tipo password-reset');
-        throw new BadRequestException('Token inválido.');
+        this.logger.warn('Token nÃ£o Ã© do tipo password-reset');
+        throw new BadRequestException('Token invÃ¡lido.');
       }
 
-      // Verificar se o token existe no banco de dados e não foi usado
+      // Verificar se o token existe no banco de dados e nÃ£o foi usado
       const resetTokenRecord = await this.prisma.passwordResetToken.findFirst({
         where: {
           token,
           userId: payload.userId,
           usedAt: null,
           expiresAt: {
-            gt: new Date(), // Token não expirado
+            gt: new Date(), // Token nÃ£o expirado
           },
         },
         include: {
@@ -132,23 +132,23 @@ export class PasswordResetService {
       });
 
       if (!resetTokenRecord) {
-        this.logger.warn('Token de reset não encontrado ou já usado');
-        throw new BadRequestException('Token inválido ou expirado. Solicite um novo link de recuperação.');
+        this.logger.warn('Token de reset nÃ£o encontrado ou jÃ¡ usado');
+        throw new BadRequestException('Token invÃ¡lido ou expirado. Solicite um novo link de recuperaÃ§Ã£o.');
       }
 
-      // Verificar se o usuário ainda existe e não está bloqueado
+      // Verificar se o usuÃ¡rio ainda existe e nÃ£o estÃ¡ bloqueado
       if (!resetTokenRecord.user || resetTokenRecord.user.isLocked) {
-        this.logger.warn('Usuário não encontrado ou bloqueado');
-        throw new BadRequestException('Usuário não encontrado ou bloqueado.');
+        this.logger.warn('UsuÃ¡rio nÃ£o encontrado ou bloqueado');
+        throw new BadRequestException('UsuÃ¡rio nÃ£o encontrado ou bloqueado.');
       }
 
       // Hash da nova senha
       const saltRounds = 12;
       const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
 
-      // Atualizar a senha do usuário e marcar o token como usado
+      // Atualizar a senha do usuÃ¡rio e marcar o token como usado
       await this.prisma.$transaction([
-        // Atualizar senha do usuário
+        // Atualizar senha do usuÃ¡rio
         this.prisma.user.update({
           where: { id: resetTokenRecord.userId },
           data: {
@@ -163,7 +163,7 @@ export class PasswordResetService {
           where: { id: resetTokenRecord.id },
           data: { usedAt: new Date() },
         }),
-        // Invalidar todos os outros tokens de reset do usuário
+        // Invalidar todos os outros tokens de reset do usuÃ¡rio
         this.prisma.passwordResetToken.updateMany({
           where: {
             userId: resetTokenRecord.userId,
@@ -174,10 +174,10 @@ export class PasswordResetService {
         }),
       ]);
 
-      this.logger.log(`Senha redefinida com sucesso para usuário: ${resetTokenRecord.user.email}`);
+      this.logger.log(`Senha redefinida com sucesso para usuÃ¡rio: ${resetTokenRecord.user.email}`);
 
       return {
-        message: 'Senha redefinida com sucesso. Você já pode fazer login com sua nova senha.',
+        message: 'Senha redefinida com sucesso. VocÃª jÃ¡ pode fazer login com sua nova senha.',
       };
 
     } catch (error) {
@@ -200,7 +200,7 @@ export class PasswordResetService {
         where: {
           OR: [
             { expiresAt: { lt: new Date() } }, // Tokens expirados
-            { usedAt: { not: null } }, // Tokens já usados
+            { usedAt: { not: null } }, // Tokens jÃ¡ usados
           ],
         },
       });

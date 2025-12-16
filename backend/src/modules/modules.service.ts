@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+﻿import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { PrismaService } from '@core/prisma/prisma.service';
 import { AutoLoaderService } from './auto-loader.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -11,9 +11,9 @@ export class ModulesService {
     private notificationsService: NotificationsService
   ) {}
 
-  // Listar todos os módulos disponíveis no sistema
+  // Listar todos os mÃ³dulos disponÃ­veis no sistema
   async findAll() {
-    // Carregar módulos do diretório automaticamente
+    // Carregar mÃ³dulos do diretÃ³rio automaticamente
     await this.autoLoaderService.loadModulesFromDirectory();
     
     const modules = await this.prisma.module.findMany({
@@ -24,14 +24,14 @@ export class ModulesService {
     return modules.map(module => module.name);
   }
 
-  // Obter configuração de um módulo específico
+  // Obter configuraÃ§Ã£o de um mÃ³dulo especÃ­fico
   async findOne(name: string) {
     const module = await this.prisma.module.findUnique({
       where: { name },
     });
 
     if (!module) {
-      throw new NotFoundException(`Módulo '${name}' não encontrado`);
+      throw new NotFoundException(`MÃ³dulo '${name}' nÃ£o encontrado`);
     }
 
     return {
@@ -42,7 +42,7 @@ export class ModulesService {
     };
   }
 
-  // Criar um novo módulo (apenas SUPER_ADMIN)
+  // Criar um novo mÃ³dulo (apenas SUPER_ADMIN)
   async create(data: {
     name: string;
     displayName: string;
@@ -55,7 +55,7 @@ export class ModulesService {
     });
 
     if (existingModule) {
-      throw new BadRequestException(`Módulo '${data.name}' já existe`);
+      throw new BadRequestException(`MÃ³dulo '${data.name}' jÃ¡ existe`);
     }
 
     return this.prisma.module.create({
@@ -69,7 +69,7 @@ export class ModulesService {
     });
   }
 
-  // Atualizar um módulo (apenas SUPER_ADMIN)
+  // Atualizar um mÃ³dulo (apenas SUPER_ADMIN)
   async update(name: string, data: {
     displayName?: string;
     description?: string;
@@ -82,7 +82,7 @@ export class ModulesService {
     });
 
     if (!module) {
-      throw new NotFoundException(`Módulo '${name}' não encontrado`);
+      throw new NotFoundException(`MÃ³dulo '${name}' nÃ£o encontrado`);
     }
 
     return this.prisma.module.update({
@@ -97,24 +97,24 @@ export class ModulesService {
     });
   }
 
-  // Deletar um módulo (apenas SUPER_ADMIN)
+  // Deletar um mÃ³dulo (apenas SUPER_ADMIN)
   async remove(name: string) {
     const module = await this.prisma.module.findUnique({
       where: { name },
     });
 
     if (!module) {
-      throw new NotFoundException(`Módulo '${name}' não encontrado`);
+      throw new NotFoundException(`MÃ³dulo '${name}' nÃ£o encontrado`);
     }
 
-    // Verificar se há tenants usando este módulo
+    // Verificar se hÃ¡ tenants usando este mÃ³dulo
     const tenantModules = await this.prisma.tenantModule.count({
       where: { moduleName: name },
     });
 
     if (tenantModules > 0) {
       throw new BadRequestException(
-        `Não é possível deletar o módulo '${name}' pois está sendo usado por ${tenantModules} tenant(s)`
+        `NÃ£o Ã© possÃ­vel deletar o mÃ³dulo '${name}' pois estÃ¡ sendo usado por ${tenantModules} tenant(s)`
       );
     }
 
@@ -123,7 +123,7 @@ export class ModulesService {
     });
   }
 
-  // Obter módulos ativos de um tenant
+  // Obter mÃ³dulos ativos de um tenant
   async getTenantActiveModules(tenantId: string) {
     const tenantModules = await this.prisma.tenantModule.findMany({
       where: {
@@ -148,7 +148,7 @@ export class ModulesService {
     };
   }
 
-  // Ativar um módulo para um tenant
+  // Ativar um mÃ³dulo para um tenant
   async activateModuleForTenant(tenantId: string, moduleName: string) {
     // Verificar se o tenant existe
     const tenant = await this.prisma.tenant.findUnique({
@@ -156,23 +156,23 @@ export class ModulesService {
     });
 
     if (!tenant) {
-      throw new NotFoundException(`Tenant não encontrado`);
+      throw new NotFoundException(`Tenant nÃ£o encontrado`);
     }
 
-    // Verificar se o módulo existe
+    // Verificar se o mÃ³dulo existe
     const module = await this.prisma.module.findUnique({
       where: { name: moduleName },
     });
 
     if (!module) {
-      throw new NotFoundException(`Módulo '${moduleName}' não encontrado`);
+      throw new NotFoundException(`MÃ³dulo '${moduleName}' nÃ£o encontrado`);
     }
 
     if (!module.isActive) {
-      throw new BadRequestException(`Módulo '${moduleName}' está desativado no sistema`);
+      throw new BadRequestException(`MÃ³dulo '${moduleName}' estÃ¡ desativado no sistema`);
     }
 
-    // Verificar se já existe uma relação
+    // Verificar se jÃ¡ existe uma relaÃ§Ã£o
     const existingTenantModule = await this.prisma.tenantModule.findUnique({
       where: {
         tenantId_moduleName: {
@@ -184,10 +184,10 @@ export class ModulesService {
 
     if (existingTenantModule) {
       if (existingTenantModule.isActive) {
-        throw new BadRequestException(`Módulo '${moduleName}' já está ativo para este tenant`);
+        throw new BadRequestException(`MÃ³dulo '${moduleName}' jÃ¡ estÃ¡ ativo para este tenant`);
       }
 
-      // Reativar módulo
+      // Reativar mÃ³dulo
       const result = await this.prisma.tenantModule.update({
         where: { id: existingTenantModule.id },
         data: {
@@ -197,15 +197,15 @@ export class ModulesService {
         },
       });
 
-      // Emitir notificação de reativação do módulo
+      // Emitir notificaÃ§Ã£o de reativaÃ§Ã£o do mÃ³dulo
       await this.notificationsService.emitEvent({
         type: 'module_reactivated',
         source: 'core',
         severity: 'info',
         tenantId,
         payload: {
-          title: 'Módulo Reativado',
-          message: `O módulo "${module.displayName}" foi reativado para sua empresa.`,
+          title: 'MÃ³dulo Reativado',
+          message: `O mÃ³dulo "${module.displayName}" foi reativado para sua empresa.`,
           context: `/module-${moduleName}`,
           data: {
             moduleName,
@@ -218,7 +218,7 @@ export class ModulesService {
       return result;
     }
 
-    // Criar nova relação
+    // Criar nova relaÃ§Ã£o
     const result = await this.prisma.tenantModule.create({
       data: {
         tenantId,
@@ -227,15 +227,15 @@ export class ModulesService {
       },
     });
 
-    // Emitir notificação de ativação do módulo
+    // Emitir notificaÃ§Ã£o de ativaÃ§Ã£o do mÃ³dulo
     await this.notificationsService.emitEvent({
       type: 'module_activated',
       source: 'core',
       severity: 'info',
       tenantId,
       payload: {
-        title: 'Módulo Ativado',
-        message: `O módulo "${module.displayName}" foi ativado para sua empresa.`,
+        title: 'MÃ³dulo Ativado',
+        message: `O mÃ³dulo "${module.displayName}" foi ativado para sua empresa.`,
         context: `/module-${moduleName}`,
         data: {
           moduleName,
@@ -248,7 +248,7 @@ export class ModulesService {
     return result;
   }
 
-  // Desativar um módulo para um tenant
+  // Desativar um mÃ³dulo para um tenant
   async deactivateModuleForTenant(tenantId: string, moduleName: string) {
     const tenantModule = await this.prisma.tenantModule.findUnique({
       where: {
@@ -260,11 +260,11 @@ export class ModulesService {
     });
 
     if (!tenantModule) {
-      throw new NotFoundException(`Módulo '${moduleName}' não está associado a este tenant`);
+      throw new NotFoundException(`MÃ³dulo '${moduleName}' nÃ£o estÃ¡ associado a este tenant`);
     }
 
     if (!tenantModule.isActive) {
-      throw new BadRequestException(`Módulo '${moduleName}' já está desativado para este tenant`);
+      throw new BadRequestException(`MÃ³dulo '${moduleName}' jÃ¡ estÃ¡ desativado para este tenant`);
     }
 
     const result = await this.prisma.tenantModule.update({
@@ -275,20 +275,20 @@ export class ModulesService {
       },
     });
 
-    // Buscar informações do módulo para a notificação
+    // Buscar informaÃ§Ãµes do mÃ³dulo para a notificaÃ§Ã£o
     const module = await this.prisma.module.findUnique({
       where: { name: moduleName },
     });
 
-    // Emitir notificação de desativação do módulo
+    // Emitir notificaÃ§Ã£o de desativaÃ§Ã£o do mÃ³dulo
     await this.notificationsService.emitEvent({
       type: 'module_deactivated',
       source: 'core',
       severity: 'warning',
       tenantId,
       payload: {
-        title: 'Módulo Desativado',
-        message: `O módulo "${module?.displayName || moduleName}" foi desativado para sua empresa.`,
+        title: 'MÃ³dulo Desativado',
+        message: `O mÃ³dulo "${module?.displayName || moduleName}" foi desativado para sua empresa.`,
         context: `/empresas`,
         data: {
           moduleName,
@@ -301,7 +301,7 @@ export class ModulesService {
     return result;
   }
 
-  // Configurar um módulo para um tenant
+  // Configurar um mÃ³dulo para um tenant
   async configureTenantModule(tenantId: string, moduleName: string, config: any) {
     const tenantModule = await this.prisma.tenantModule.findUnique({
       where: {
@@ -313,7 +313,7 @@ export class ModulesService {
     });
 
     if (!tenantModule) {
-      throw new NotFoundException(`Módulo '${moduleName}' não está associado a este tenant`);
+      throw new NotFoundException(`MÃ³dulo '${moduleName}' nÃ£o estÃ¡ associado a este tenant`);
     }
 
     return this.prisma.tenantModule.update({

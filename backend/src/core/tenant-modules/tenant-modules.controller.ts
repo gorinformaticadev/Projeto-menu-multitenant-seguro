@@ -1,8 +1,8 @@
-import { Controller, Get, Post, Param, UseGuards, Req } from '@nestjs/common';
-import { TenantModuleService } from '../../../modules/engine/backend/tenant-module.service';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
+﻿import { Controller, Get, Post, Param, UseGuards, Req } from '@nestjs/common';
+import { TenantModuleService } from '@core/modules/engine/backend/tenant-module.service';
+import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
+import { RolesGuard } from '@core/common/guards/roles.guard';
+import { Roles } from '@core/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 
 @Controller('tenants/:tenantId/modules')
@@ -27,7 +27,7 @@ export class TenantModulesController {
     @Param('moduleName') moduleName: string
   ) {
     await this.tenantModuleService.activateModuleForTenant(moduleName, tenantId);
-    return { message: `Módulo ${moduleName} ativado para o tenant ${tenantId}` };
+    return { message: `MÃ³dulo ${moduleName} ativado para o tenant ${tenantId}` };
   }
 
   @Post(':moduleName/deactivate')
@@ -37,7 +37,7 @@ export class TenantModulesController {
     @Param('moduleName') moduleName: string
   ) {
     await this.tenantModuleService.deactivateModuleForTenant(moduleName, tenantId);
-    return { message: `Módulo ${moduleName} desativado para o tenant ${tenantId}` };
+    return { message: `MÃ³dulo ${moduleName} desativado para o tenant ${tenantId}` };
   }
 
   @Get('active')

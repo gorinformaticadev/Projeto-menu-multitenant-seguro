@@ -9,7 +9,7 @@
   Req,
 } from "@nestjs/common";
 import { CommentService } from "../services/comment.service";
-import { JwtAuthGuard } from "../../../backend/src/common/guards/jwt-auth.guard";
+import { JwtAuthGuard } from "@core/common/guards/jwt-auth.guard";
 import { CreateCommentDto } from "../dto/demo.dto";
 
 /**
@@ -44,4 +44,5 @@ export class CommentController {
     return this.commentService.remove(id, tenantId, userId);
   }
 }
+
 

@@ -1,6 +1,6 @@
-import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
+﻿import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '@core/prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { AuditService } from '../audit/audit.service';
 
@@ -14,7 +14,7 @@ export class EmailVerificationService {
   ) {}
 
   /**
-   * Gerar e enviar token de verificação de email
+   * Gerar e enviar token de verificaÃ§Ã£o de email
    */
   async sendVerificationEmail(userId: string): Promise<{ message: string }> {
     const user = await this.prisma.user.findUnique({
@@ -22,20 +22,20 @@ export class EmailVerificationService {
     });
 
     if (!user) {
-      throw new BadRequestException('Usuário não encontrado');
+      throw new BadRequestException('UsuÃ¡rio nÃ£o encontrado');
     }
 
     if (user.emailVerified) {
-      throw new BadRequestException('Email já verificado');
+      throw new BadRequestException('Email jÃ¡ verificado');
     }
 
-    // Gerar token JWT de verificação (válido por 24 horas)
+    // Gerar token JWT de verificaÃ§Ã£o (vÃ¡lido por 24 horas)
     const verificationToken = this.jwtService.sign(
       { userId: user.id, email: user.email, type: 'email_verification' },
       { expiresIn: '24h' }
     );
 
-    // Calcular expiração
+    // Calcular expiraÃ§Ã£o
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
 
@@ -59,7 +59,7 @@ export class EmailVerificationService {
       details: { email: user.email },
     });
 
-    return { message: 'Email de verificação enviado com sucesso' };
+    return { message: 'Email de verificaÃ§Ã£o enviado com sucesso' };
   }
 
   /**
@@ -71,30 +71,30 @@ export class EmailVerificationService {
       const payload = this.jwtService.verify(token);
 
       if (payload.type !== 'email_verification') {
-        throw new BadRequestException('Token inválido');
+        throw new BadRequestException('Token invÃ¡lido');
       }
 
-      // Buscar usuário
+      // Buscar usuÃ¡rio
       const user = await this.prisma.user.findUnique({
         where: { id: payload.userId },
       });
 
       if (!user) {
-        throw new BadRequestException('Usuário não encontrado');
+        throw new BadRequestException('UsuÃ¡rio nÃ£o encontrado');
       }
 
       if (user.emailVerified) {
-        throw new BadRequestException('Email já verificado');
+        throw new BadRequestException('Email jÃ¡ verificado');
       }
 
-      // Verificar se é o token mais recente
+      // Verificar se Ã© o token mais recente
       if (user.emailVerificationToken !== token) {
-        throw new BadRequestException('Token inválido ou expirado');
+        throw new BadRequestException('Token invÃ¡lido ou expirado');
       }
 
-      // Verificar expiração
+      // Verificar expiraÃ§Ã£o
       if (user.emailVerificationExpires && user.emailVerificationExpires < new Date()) {
-        throw new BadRequestException('Token expirado. Solicite um novo email de verificação.');
+        throw new BadRequestException('Token expirado. Solicite um novo email de verificaÃ§Ã£o.');
       }
 
       // Marcar email como verificado
@@ -118,17 +118,17 @@ export class EmailVerificationService {
       return { message: 'Email verificado com sucesso!' };
     } catch (error) {
       if (error.name === 'JsonWebTokenError') {
-        throw new BadRequestException('Token inválido');
+        throw new BadRequestException('Token invÃ¡lido');
       }
       if (error.name === 'TokenExpiredError') {
-        throw new BadRequestException('Token expirado. Solicite um novo email de verificação.');
+        throw new BadRequestException('Token expirado. Solicite um novo email de verificaÃ§Ã£o.');
       }
       throw error;
     }
   }
 
   /**
-   * Verificar se email está verificado e se deve bloquear acesso
+   * Verificar se email estÃ¡ verificado e se deve bloquear acesso
    */
   async checkEmailVerification(userId: string): Promise<{
     verified: boolean;
@@ -142,14 +142,14 @@ export class EmailVerificationService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Usuário não encontrado');
+      throw new UnauthorizedException('UsuÃ¡rio nÃ£o encontrado');
     }
 
     const securityConfig = await this.prisma.securityConfig.findFirst();
     const required = securityConfig?.emailVerificationRequired || false;
     const level = securityConfig?.emailVerificationLevel || 'SOFT';
 
-    // Se email já verificado, permitir acesso
+    // Se email jÃ¡ verificado, permitir acesso
     if (user.emailVerified) {
       return {
         verified: true,
@@ -159,25 +159,25 @@ export class EmailVerificationService {
       };
     }
 
-    // Se verificação não é obrigatória, apenas avisar
+    // Se verificaÃ§Ã£o nÃ£o Ã© obrigatÃ³ria, apenas avisar
     if (!required) {
       return {
         verified: false,
         required: false,
         level: 'SOFT',
         shouldBlock: false,
-        message: 'Recomendamos verificar seu email para maior segurança',
+        message: 'Recomendamos verificar seu email para maior seguranÃ§a',
       };
     }
 
-    // Verificação obrigatória - verificar nível
+    // VerificaÃ§Ã£o obrigatÃ³ria - verificar nÃ­vel
     if (level === 'SOFT') {
       return {
         verified: false,
         required: true,
         level: 'SOFT',
         shouldBlock: false,
-        message: 'Por favor, verifique seu email. Um link de verificação foi enviado.',
+        message: 'Por favor, verifique seu email. Um link de verificaÃ§Ã£o foi enviado.',
       };
     } else if (level === 'MODERATE') {
       return {
@@ -205,3 +205,4 @@ export class EmailVerificationService {
     };
   }
 }
+

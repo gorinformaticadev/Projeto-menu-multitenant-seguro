@@ -1,11 +1,11 @@
-import { Controller, Get, Put, Body, UseGuards, Request } from '@nestjs/common';
+﻿import { Controller, Get, Put, Body, UseGuards, Request } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { SecurityConfigService } from './security-config.service';
 import { UpdateSecurityConfigDto } from './dto/update-security-config.dto';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
-import { Public } from '../common/decorators/public.decorator';
+import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
+import { RolesGuard } from '@core/common/guards/roles.guard';
+import { Roles } from '@core/common/decorators/roles.decorator';
+import { Public } from '@core/common/decorators/public.decorator';
 import { Role } from '@prisma/client';
 
 @SkipThrottle()
@@ -16,7 +16,7 @@ export class SecurityConfigController {
 
   /**
    * GET /security-config
-   * Obter configurações de segurança
+   * Obter configuraÃ§Ãµes de seguranÃ§a
    * Apenas SUPER_ADMIN
    */
   @SkipThrottle()
@@ -28,7 +28,7 @@ export class SecurityConfigController {
 
   /**
    * PUT /security-config
-   * Atualizar configurações de segurança
+   * Atualizar configuraÃ§Ãµes de seguranÃ§a
    * Apenas SUPER_ADMIN
    */
   @SkipThrottle()
@@ -43,7 +43,7 @@ export class SecurityConfigController {
 
   /**
    * GET /security-config/password-policy
-   * Obter política de senha (público para validação no frontend)
+   * Obter polÃ­tica de senha (pÃºblico para validaÃ§Ã£o no frontend)
    */
   @Public()
   @SkipThrottle()
@@ -54,7 +54,7 @@ export class SecurityConfigController {
 
   /**
    * GET /security-config/2fa-status
-   * Verificar se 2FA está habilitado globalmente (público)
+   * Verificar se 2FA estÃ¡ habilitado globalmente (pÃºblico)
    */
   @Public()
   @SkipThrottle()
@@ -69,7 +69,7 @@ export class SecurityConfigController {
 
   /**
    * GET /security-config/full
-   * Obter configurações de segurança completas (público para validação no frontend)
+   * Obter configuraÃ§Ãµes de seguranÃ§a completas (pÃºblico para validaÃ§Ã£o no frontend)
    */
   @Public()
   @SkipThrottle()
@@ -85,3 +85,4 @@ export class SecurityConfigController {
     };
   }
 }
+

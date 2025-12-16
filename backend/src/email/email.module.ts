@@ -1,7 +1,7 @@
-import { Module, forwardRef } from '@nestjs/common';
+﻿import { Module, forwardRef } from '@nestjs/common';
 import { EmailService } from './email.service';
-import { PrismaModule } from '../prisma/prisma.module';
-import { SecurityConfigModule } from '../security-config/security-config.module';
+import { PrismaModule } from '@core/prisma/prisma.module';
+import { SecurityConfigModule } from '@core/security-config/security-config.module';
 
 @Module({
   imports: [PrismaModule, forwardRef(() => SecurityConfigModule)],
@@ -9,3 +9,4 @@ import { SecurityConfigModule } from '../security-config/security-config.module'
   exports: [EmailService],
 })
 export class EmailModule {}
+

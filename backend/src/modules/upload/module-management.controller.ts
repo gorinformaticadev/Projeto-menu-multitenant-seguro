@@ -1,4 +1,4 @@
-import {
+﻿import {
     Controller,
     Post,
     Get,
@@ -12,12 +12,12 @@ import {
     HttpCode,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
+import { RolesGuard } from '@core/common/guards/roles.guard';
+import { Roles } from '@core/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { ModuleUploadService } from './module-upload.service';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '@core/prisma/prisma.service';
 
 @Controller('api/modules')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -101,7 +101,7 @@ export class ModuleManagementController {
         if (!module) {
             return {
                 success: false,
-                message: 'Módulo não encontrado'
+                message: 'MÃ³dulo nÃ£o encontrado'
             };
         }
 
@@ -120,7 +120,7 @@ export class ModuleManagementController {
 
         return {
             success: true,
-            message: 'Módulo validado com sucesso'
+            message: 'MÃ³dulo validado com sucesso'
         };
     }
 
@@ -133,7 +133,7 @@ export class ModuleManagementController {
 
         return {
             success: true,
-            message: 'Módulo ativado com sucesso'
+            message: 'MÃ³dulo ativado com sucesso'
         };
     }
 
@@ -146,7 +146,7 @@ export class ModuleManagementController {
 
         return {
             success: true,
-            message: 'Módulo desativado com sucesso'
+            message: 'MÃ³dulo desativado com sucesso'
         };
     }
 
@@ -158,7 +158,8 @@ export class ModuleManagementController {
 
         return {
             success: true,
-            message: 'Módulo removido com sucesso'
+            message: 'MÃ³dulo removido com sucesso'
         };
     }
 } 
+

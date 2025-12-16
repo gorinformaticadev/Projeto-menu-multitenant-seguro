@@ -1,4 +1,4 @@
-import {
+﻿import {
   Controller,
   Get,
   Post,
@@ -19,9 +19,9 @@ import { ModulesService } from './modules.service';
 import { ModuleInstallerService } from './module-installer.service';
 import { ModuleMigrationService } from './module-migration.service';
 import { AutoLoaderService } from './auto-loader.service';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
+import { RolesGuard } from '@core/common/guards/roles.guard';
+import { Roles } from '@core/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 
 @Controller('modules')
@@ -34,7 +34,7 @@ export class ModulesController {
     private readonly autoLoaderService: AutoLoaderService
   ) { }
 
-  // GET /modules - Listar todos os módulos disponíveis
+  // GET /modules - Listar todos os mÃ³dulos disponÃ­veis
   @Get()
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
@@ -42,7 +42,7 @@ export class ModulesController {
     return this.modulesService.findAll();
   }
 
-  // GET /modules/:name/config - Obter configuração de um módulo
+  // GET /modules/:name/config - Obter configuraÃ§Ã£o de um mÃ³dulo
   @Get(':name/config')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
@@ -50,7 +50,7 @@ export class ModulesController {
     return this.modulesService.findOne(name);
   }
 
-  // POST /modules - Criar um novo módulo (apenas SUPER_ADMIN)
+  // POST /modules - Criar um novo mÃ³dulo (apenas SUPER_ADMIN)
   @Post()
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
@@ -64,7 +64,7 @@ export class ModulesController {
     return this.modulesService.create(createModuleDto);
   }
 
-  // PUT /modules/:name - Atualizar um módulo (apenas SUPER_ADMIN)
+  // PUT /modules/:name - Atualizar um mÃ³dulo (apenas SUPER_ADMIN)
   @Put(':name')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
@@ -81,7 +81,7 @@ export class ModulesController {
     return this.modulesService.update(name, updateModuleDto);
   }
 
-  // DELETE /modules/:name - Deletar um módulo (apenas SUPER_ADMIN)
+  // DELETE /modules/:name - Deletar um mÃ³dulo (apenas SUPER_ADMIN)
   @Delete(':name')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
@@ -90,7 +90,7 @@ export class ModulesController {
     await this.modulesService.remove(name);
   }
 
-  // POST /modules/upload - Upload de módulo via ZIP (apenas SUPER_ADMIN)
+  // POST /modules/upload - Upload de mÃ³dulo via ZIP (apenas SUPER_ADMIN)
   @Post('upload')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
@@ -101,7 +101,7 @@ export class ModulesController {
     },
     fileFilter: (req, file, callback) => {
       if (!file.originalname.match(/\.(zip)$/)) {
-        return callback(new BadRequestException('Apenas arquivos ZIP são permitidos'), false);
+        return callback(new BadRequestException('Apenas arquivos ZIP sÃ£o permitidos'), false);
       }
       callback(null, true);
     },
@@ -113,7 +113,7 @@ export class ModulesController {
     return this.moduleInstallerService.uploadModule(file);
   }
 
-  // DELETE /modules/:name/uninstall - Remover módulo instalado (apenas SUPER_ADMIN)
+  // DELETE /modules/:name/uninstall - Remover mÃ³dulo instalado (apenas SUPER_ADMIN)
   @Delete(':name/uninstall')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
@@ -121,7 +121,7 @@ export class ModulesController {
     return this.moduleInstallerService.removeModule(name);
   }
 
-  // GET /modules/installed - Listar módulos instalados (apenas SUPER_ADMIN)
+  // GET /modules/installed - Listar mÃ³dulos instalados (apenas SUPER_ADMIN)
   @Get('installed')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
@@ -129,7 +129,7 @@ export class ModulesController {
     return this.moduleInstallerService.listInstalledModules();
   }
 
-  // GET /modules/:name/info - Informações detalhadas do módulo (apenas SUPER_ADMIN)
+  // GET /modules/:name/info - InformaÃ§Ãµes detalhadas do mÃ³dulo (apenas SUPER_ADMIN)
   @Get(':name/info')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
@@ -137,7 +137,7 @@ export class ModulesController {
     return this.moduleInstallerService.getModuleInfo(name);
   }
 
-  // GET /modules/:name/tenants - Listar tenants que usam o módulo (apenas SUPER_ADMIN)
+  // GET /modules/:name/tenants - Listar tenants que usam o mÃ³dulo (apenas SUPER_ADMIN)
   @Get(':name/tenants')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
@@ -145,16 +145,16 @@ export class ModulesController {
     return this.moduleInstallerService.getModuleTenants(name);
   }
 
-  // GET /modules/auto-load - Forçar carregamento automático de módulos (apenas SUPER_ADMIN)
+  // GET /modules/auto-load - ForÃ§ar carregamento automÃ¡tico de mÃ³dulos (apenas SUPER_ADMIN)
   @Get('auto-load')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   async autoLoadModules() {
     await this.autoLoaderService.loadModulesFromDirectory();
-    return { message: 'Módulos carregados automaticamente com sucesso' };
+    return { message: 'MÃ³dulos carregados automaticamente com sucesso' };
   }
 
-  // POST /modules/:name/update-database - Executar migrações e seed do módulo (apenas SUPER_ADMIN)
+  // POST /modules/:name/update-database - Executar migraÃ§Ãµes e seed do mÃ³dulo (apenas SUPER_ADMIN)
   @Post(':name/update-database')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
@@ -166,7 +166,7 @@ export class ModulesController {
     return this.moduleInstallerService.updateModuleDatabase(name, userId);
   }
 
-  // GET /modules/:name/check-updates - Verificar se o módulo tem atualizações pendentes (apenas SUPER_ADMIN)
+  // GET /modules/:name/check-updates - Verificar se o mÃ³dulo tem atualizaÃ§Ãµes pendentes (apenas SUPER_ADMIN)
   @Get(':name/check-updates')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
@@ -204,7 +204,7 @@ export class ModulesController {
     };
   }
 
-  // POST /modules/:name/migrations/sync - Forçar sincronização (descoberta)
+  // POST /modules/:name/migrations/sync - ForÃ§ar sincronizaÃ§Ã£o (descoberta)
   @Post(':name/migrations/sync')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
@@ -213,7 +213,7 @@ export class ModulesController {
     const status = await this.moduleMigrationService.getMigrationStatus(name);
     
     return {
-      message: `Sincronização concluída para o módulo '${name}'`,
+      message: `SincronizaÃ§Ã£o concluÃ­da para o mÃ³dulo '${name}'`,
       status
     };
   }

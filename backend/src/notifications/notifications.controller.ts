@@ -1,4 +1,4 @@
-import {
+﻿import {
   Controller,
   Get,
   Post,
@@ -10,7 +10,7 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { NotificationsService, NotificationEvent, NotificationFilters } from './notifications.service';
 
 @Controller('notifications')
@@ -19,7 +19,7 @@ export class NotificationsController {
   constructor(private notificationsService: NotificationsService) {}
 
   /**
-   * Emite um evento de notificação
+   * Emite um evento de notificaÃ§Ã£o
    */
   @Post('events')
   async emitEvent(@Body() event: NotificationEvent, @Request() req) {
@@ -28,7 +28,7 @@ export class NotificationsController {
   }
 
   /**
-   * Busca notificações para o dropdown
+   * Busca notificaÃ§Ãµes para o dropdown
    */
   @Get('dropdown')
   async getDropdownNotifications(@Request() req) {
@@ -36,7 +36,7 @@ export class NotificationsController {
   }
 
   /**
-   * Busca notificações para a central
+   * Busca notificaÃ§Ãµes para a central
    */
   @Get('center')
   async getCenterNotifications(@Query() query: any, @Request() req) {
@@ -56,7 +56,7 @@ export class NotificationsController {
   }
 
   /**
-   * Busca contagem de não lidas
+   * Busca contagem de nÃ£o lidas
    */
   @Get('unread-count')
   async getUnreadCount(@Request() req) {
@@ -65,7 +65,7 @@ export class NotificationsController {
   }
 
   /**
-   * Marca notificação como lida
+   * Marca notificaÃ§Ã£o como lida
    */
   @Patch(':id/read')
   async markAsRead(@Param('id') id: string, @Request() req) {
@@ -74,7 +74,7 @@ export class NotificationsController {
   }
 
   /**
-   * Marca todas as notificações como lidas
+   * Marca todas as notificaÃ§Ãµes como lidas
    */
   @Patch('mark-all-read')
   async markAllAsRead(@Body() body: { filters?: NotificationFilters }, @Request() req) {
@@ -83,7 +83,7 @@ export class NotificationsController {
   }
 
   /**
-   * Deleta notificação
+   * Deleta notificaÃ§Ã£o
    */
   @Delete(':id')
   async deleteNotification(@Param('id') id: string, @Request() req) {
@@ -92,7 +92,7 @@ export class NotificationsController {
   }
 
   /**
-   * Deleta notificações em lote
+   * Deleta notificaÃ§Ãµes em lote
    */
   @Delete('batch')
   async deleteNotifications(@Body() body: { ids: string[] }, @Request() req) {

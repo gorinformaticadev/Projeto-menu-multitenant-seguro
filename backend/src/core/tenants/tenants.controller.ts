@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch, Delete, UseInterceptors, UploadedFile, BadRequestException, Req } from '@nestjs/common';
+﻿import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch, Delete, UseInterceptors, UploadedFile, BadRequestException, Req } from '@nestjs/common';
 import { Request as ExpressRequest } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SkipThrottle } from '@nestjs/throttler';
@@ -6,13 +6,13 @@ import { TenantsService } from './tenants.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { ChangeAdminPasswordDto } from './dto/change-admin-password.dto';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
-import { SkipTenantIsolation } from '../common/decorators/skip-tenant-isolation.decorator';
-import { Public } from '../common/decorators/public.decorator';
+import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
+import { RolesGuard } from '@core/common/guards/roles.guard';
+import { Roles } from '@core/common/decorators/roles.decorator';
+import { SkipTenantIsolation } from '@core/common/decorators/skip-tenant-isolation.decorator';
+import { Public } from '@core/common/decorators/public.decorator';
 import { Role } from '@prisma/client';
-import { multerConfig } from '../common/config/multer.config';
+import { multerConfig } from '@core/common/config/multer.config';
 
 @SkipThrottle()
 @Controller('tenants')
@@ -20,7 +20,7 @@ import { multerConfig } from '../common/config/multer.config';
 export class TenantsController {
   constructor(private tenantsService: TenantsService) {}
 
-  // Assinaturas de arquivos válidas (magic numbers)
+  // Assinaturas de arquivos vÃ¡lidas (magic numbers)
   private readonly FILE_SIGNATURES = {
     'image/jpeg': [0xFF, 0xD8, 0xFF],
     'image/png': [0x89, 0x50, 0x4E, 0x47],
@@ -42,24 +42,24 @@ export class TenantsController {
       
       const signature = this.FILE_SIGNATURES[file.mimetype];
       if (!signature) {
-        // Remover arquivo inválido
+        // Remover arquivo invÃ¡lido
         fs.unlinkSync(filePath);
-        throw new BadRequestException('Tipo de arquivo não suportado');
+        throw new BadRequestException('Tipo de arquivo nÃ£o suportado');
       }
       
       // Verificar assinatura
       for (let i = 0; i < signature.length; i++) {
         if (buffer[i] !== signature[i]) {
-          // Remover arquivo com assinatura inválida
+          // Remover arquivo com assinatura invÃ¡lida
           fs.unlinkSync(filePath);
-          throw new BadRequestException('Arquivo corrompido ou tipo inválido');
+          throw new BadRequestException('Arquivo corrompido ou tipo invÃ¡lido');
         }
       }
       
-      // Verificação adicional: tamanho mínimo para ser uma imagem válida
+      // VerificaÃ§Ã£o adicional: tamanho mÃ­nimo para ser uma imagem vÃ¡lida
       if (buffer.length < 100) {
         fs.unlinkSync(filePath);
-        throw new BadRequestException('Arquivo muito pequeno para ser uma imagem válida');
+        throw new BadRequestException('Arquivo muito pequeno para ser uma imagem vÃ¡lida');
       }
       
     } catch (error) {
@@ -118,7 +118,7 @@ export class TenantsController {
       throw new BadRequestException('Nenhum arquivo foi enviado');
     }
     
-    // Validação adicional de segurança: verificar assinatura do arquivo
+    // ValidaÃ§Ã£o adicional de seguranÃ§a: verificar assinatura do arquivo
     await this.validateFileSignature(file);
     
     return this.tenantsService.updateLogo(req.user.tenantId, file.filename);
@@ -153,7 +153,7 @@ export class TenantsController {
       throw new BadRequestException('Nenhum arquivo foi enviado');
     }
     
-    // Validação adicional de segurança: verificar assinatura do arquivo
+    // ValidaÃ§Ã£o adicional de seguranÃ§a: verificar assinatura do arquivo
     await this.validateFileSignature(file);
     
     return this.tenantsService.updateLogo(id, file.filename);
@@ -187,3 +187,4 @@ export class TenantsController {
     return this.tenantsService.getTenantLogo(id);
   }
 }
+

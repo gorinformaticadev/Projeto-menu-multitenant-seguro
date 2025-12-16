@@ -1,9 +1,9 @@
-import { Controller, Get, Put, Body, UseGuards, Request } from '@nestjs/common';
+﻿import { Controller, Get, Put, Body, UseGuards, Request } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { PlatformConfigService } from './platform-config.service';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
+import { RolesGuard } from '@core/common/guards/roles.guard';
+import { Roles } from '@core/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { IsString, IsOptional } from 'class-validator';
 
@@ -29,8 +29,8 @@ export class PlatformConfigController {
 
   /**
    * GET /platform-config
-   * Obter configurações da plataforma
-   * Público para todos os usuários autenticados
+   * Obter configuraÃ§Ãµes da plataforma
+   * PÃºblico para todos os usuÃ¡rios autenticados
    */
   @SkipThrottle()
   @Get()
@@ -40,7 +40,7 @@ export class PlatformConfigController {
 
   /**
    * PUT /platform-config
-   * Atualizar configurações da plataforma
+   * Atualizar configuraÃ§Ãµes da plataforma
    * Apenas SUPER_ADMIN
    */
   @SkipThrottle()
@@ -61,7 +61,7 @@ export class PlatformConfigController {
   /**
    * GET /platform-config/name
    * Obter apenas o nome da plataforma
-   * Público (sem autenticação) para uso em templates
+   * PÃºblico (sem autenticaÃ§Ã£o) para uso em templates
    */
   @SkipThrottle()
   @Get('name')
@@ -74,7 +74,7 @@ export class PlatformConfigController {
   /**
    * GET /platform-config/email
    * Obter apenas o email da plataforma
-   * Público (sem autenticação) para uso em templates
+   * PÃºblico (sem autenticaÃ§Ã£o) para uso em templates
    */
   @SkipThrottle()
   @Get('email')
@@ -87,7 +87,7 @@ export class PlatformConfigController {
   /**
    * GET /platform-config/phone
    * Obter apenas o telefone da plataforma
-   * Público (sem autenticação) para uso em templates
+   * PÃºblico (sem autenticaÃ§Ã£o) para uso em templates
    */
   @SkipThrottle()
   @Get('phone')

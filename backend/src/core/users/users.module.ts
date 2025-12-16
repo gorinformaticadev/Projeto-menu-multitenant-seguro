@@ -1,8 +1,8 @@
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
-import { PrismaModule } from '../prisma/prisma.module';
-import { ValidatorsModule } from '../common/validators/validators.module';
+import { PrismaModule } from '@core/prisma/prisma.module';
+import { ValidatorsModule } from '@core/common/validators/validators.module';
 
 @Module({
   imports: [PrismaModule, ValidatorsModule],
@@ -11,3 +11,5 @@ import { ValidatorsModule } from '../common/validators/validators.module';
   exports: [UsersService],
 })
 export class UsersModule {}
+
+

@@ -1,5 +1,5 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+﻿import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { PrismaService } from '@core/prisma/prisma.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import * as bcrypt from 'bcrypt';
@@ -33,7 +33,7 @@ export class TenantsService {
     });
 
     if (!tenant) {
-      throw new NotFoundException('Empresa não encontrada');
+      throw new NotFoundException('Empresa nÃ£o encontrada');
     }
 
     return tenant;
@@ -42,7 +42,7 @@ export class TenantsService {
   async create(createTenantDto: CreateTenantDto) {
     const { email, cnpjCpf, nomeFantasia, nomeResponsavel, telefone, adminEmail, adminPassword, adminName } = createTenantDto;
 
-    // Verifica se já existe tenant com o mesmo email ou CNPJ/CPF
+    // Verifica se jÃ¡ existe tenant com o mesmo email ou CNPJ/CPF
     const existingTenant = await this.prisma.tenant.findFirst({
       where: {
         OR: [{ email }, { cnpjCpf }],
@@ -50,22 +50,22 @@ export class TenantsService {
     });
 
     if (existingTenant) {
-      throw new ConflictException('Já existe uma empresa com este email ou CNPJ/CPF');
+      throw new ConflictException('JÃ¡ existe uma empresa com este email ou CNPJ/CPF');
     }
 
-    // Verifica se já existe usuário com o email do admin
+    // Verifica se jÃ¡ existe usuÃ¡rio com o email do admin
     const existingUser = await this.prisma.user.findUnique({
       where: { email: adminEmail },
     });
 
     if (existingUser) {
-      throw new ConflictException('Já existe um usuário com este email');
+      throw new ConflictException('JÃ¡ existe um usuÃ¡rio com este email');
     }
 
     // Hash da senha do admin
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
-    // Cria o tenant e o usuário admin em uma transação
+    // Cria o tenant e o usuÃ¡rio admin em uma transaÃ§Ã£o
     return this.prisma.$transaction(async (prisma) => {
       // Cria o tenant
       const tenant = await prisma.tenant.create({
@@ -78,7 +78,7 @@ export class TenantsService {
         },
       });
 
-      // Cria o usuário admin do tenant
+      // Cria o usuÃ¡rio admin do tenant
       await prisma.user.create({
         data: {
           email: adminEmail,
@@ -89,20 +89,20 @@ export class TenantsService {
         },
       });
 
-      // Buscar todos os módulos ativos do sistema
+      // Buscar todos os mÃ³dulos ativos do sistema
       const activeModules = await prisma.module.findMany({
         where: { isActive: true },
       });
 
-      // Vincular módulos ao novo tenant (DESABILITADOS por padrão)
-      // Cada tenant deve ativar os módulos que deseja usar
+      // Vincular mÃ³dulos ao novo tenant (DESABILITADOS por padrÃ£o)
+      // Cada tenant deve ativar os mÃ³dulos que deseja usar
       if (activeModules.length > 0) {
         await prisma.tenantModule.createMany({
           data: activeModules.map((module) => ({
             tenantId: tenant.id,
             moduleName: module.name,
-            isActive: false, // ✅ Módulos desabilitados por padrão
-            // Config é null - cada tenant configura individualmente
+            isActive: false, // âœ… MÃ³dulos desabilitados por padrÃ£o
+            // Config Ã© null - cada tenant configura individualmente
           })),
         });
       }
@@ -115,7 +115,7 @@ export class TenantsService {
     // Verifica se o tenant existe
     await this.findOne(id);
 
-    // Se está atualizando email ou CNPJ, verifica duplicação
+    // Se estÃ¡ atualizando email ou CNPJ, verifica duplicaÃ§Ã£o
     if (updateTenantDto.email || updateTenantDto.cnpjCpf) {
       const existingTenant = await this.prisma.tenant.findFirst({
         where: {
@@ -132,7 +132,7 @@ export class TenantsService {
       });
 
       if (existingTenant) {
-        throw new ConflictException('Já existe uma empresa com este email ou CNPJ/CPF');
+        throw new ConflictException('JÃ¡ existe uma empresa com este email ou CNPJ/CPF');
       }
     }
 
@@ -145,9 +145,9 @@ export class TenantsService {
   async toggleStatus(id: string) {
     const tenant = await this.findOne(id);
 
-    // Bloqueia a desativação da empresa padrão (Empresa Exemplo LTDA)
+    // Bloqueia a desativaÃ§Ã£o da empresa padrÃ£o (Empresa Exemplo LTDA)
     if (tenant.email === 'empresa1@example.com' && tenant.ativo) {
-      throw new BadRequestException('A empresa padrão do sistema não pode ser desativada');
+      throw new BadRequestException('A empresa padrÃ£o do sistema nÃ£o pode ser desativada');
     }
 
     return this.prisma.tenant.update({
@@ -162,7 +162,7 @@ export class TenantsService {
     // Verifica se o tenant existe
     await this.findOne(id);
 
-    // Busca o usuário admin do tenant
+    // Busca o usuÃ¡rio admin do tenant
     const admin = await this.prisma.user.findFirst({
       where: {
         tenantId: id,
@@ -171,7 +171,7 @@ export class TenantsService {
     });
 
     if (!admin) {
-      throw new NotFoundException('Administrador do tenant não encontrado');
+      throw new NotFoundException('Administrador do tenant nÃ£o encontrado');
     }
 
     // Hash da nova senha
@@ -195,7 +195,7 @@ export class TenantsService {
         const oldLogoPath = join(process.cwd(), 'uploads', 'logos', tenant.logoUrl);
         await unlink(oldLogoPath);
       } catch (error) {
-        // Ignora erro se o arquivo não existir
+        // Ignora erro se o arquivo nÃ£o existir
       }
     }
 
@@ -210,18 +210,18 @@ export class TenantsService {
     const tenant = await this.findOne(id);
 
     if (!tenant.logoUrl) {
-      throw new BadRequestException('Esta empresa não possui logo');
+      throw new BadRequestException('Esta empresa nÃ£o possui logo');
     }
 
-    // Remove o arquivo físico
+    // Remove o arquivo fÃ­sico
     try {
       const logoPath = join(process.cwd(), 'uploads', 'logos', tenant.logoUrl);
       await unlink(logoPath);
     } catch (error) {
-      // Ignora erro se o arquivo não existir
+      // Ignora erro se o arquivo nÃ£o existir
     }
 
-    // Remove a referência do banco
+    // Remove a referÃªncia do banco
     return this.prisma.tenant.update({
       where: { id },
       data: { logoUrl: null },
@@ -231,19 +231,19 @@ export class TenantsService {
   async remove(id: string) {
     const tenant = await this.findOne(id);
 
-    // Não permite deletar a empresa padrão
+    // NÃ£o permite deletar a empresa padrÃ£o
     if (tenant.email === 'empresa1@example.com') {
-      throw new BadRequestException('A empresa padrão do sistema não pode ser deletada');
+      throw new BadRequestException('A empresa padrÃ£o do sistema nÃ£o pode ser deletada');
     }
 
-    // Verifica se há usuários vinculados
+    // Verifica se hÃ¡ usuÃ¡rios vinculados
     const usersCount = await this.prisma.user.count({
       where: { tenantId: id },
     });
 
     if (usersCount > 0) {
       throw new BadRequestException(
-        `Não é possível deletar esta empresa pois existem ${usersCount} usuário(s) vinculado(s). Delete os usuários primeiro.`,
+        `NÃ£o Ã© possÃ­vel deletar esta empresa pois existem ${usersCount} usuÃ¡rio(s) vinculado(s). Delete os usuÃ¡rios primeiro.`,
       );
     }
 
@@ -253,7 +253,7 @@ export class TenantsService {
         const logoPath = join(process.cwd(), 'uploads', 'logos', tenant.logoUrl);
         await unlink(logoPath);
       } catch (error) {
-        // Ignora erro se o arquivo não existir
+        // Ignora erro se o arquivo nÃ£o existir
       }
     }
 
@@ -266,7 +266,7 @@ export class TenantsService {
   }
 
   async getMasterLogo() {
-    // Busca a empresa padrão ou a primeira empresa
+    // Busca a empresa padrÃ£o ou a primeira empresa
     const masterTenant = await this.prisma.tenant.findFirst({
       where: {
         OR: [
@@ -297,7 +297,7 @@ export class TenantsService {
     });
 
     if (!tenant) {
-      throw new NotFoundException('Empresa não encontrada');
+      throw new NotFoundException('Empresa nÃ£o encontrada');
     }
 
     return {
@@ -306,24 +306,24 @@ export class TenantsService {
     };
   }
 
-  // Métodos para gerenciamento de módulos dos tenants
+  // MÃ©todos para gerenciamento de mÃ³dulos dos tenants
 
   async getTenantActiveModules(tenantId: string) {
     // Verifica se o tenant existe
     await this.findOne(tenantId);
 
-    // Buscar todos os módulos disponíveis no sistema
+    // Buscar todos os mÃ³dulos disponÃ­veis no sistema
     const allModules = await this.prisma.module.findMany({
       where: { isActive: true },
     });
 
-    // Buscar relações do tenant com os módulos (ativas e inativas)
+    // Buscar relaÃ§Ãµes do tenant com os mÃ³dulos (ativas e inativas)
     const tenantModules = await this.prisma.tenantModule.findMany({
       where: { tenantId },
       include: { module: true },
     });
 
-    // Criar mapa de status dos módulos do tenant
+    // Criar mapa de status dos mÃ³dulos do tenant
     const tenantModuleStatus = new Map();
     tenantModules.forEach(tm => {
       tenantModuleStatus.set(tm.moduleName, {
@@ -334,7 +334,7 @@ export class TenantsService {
       });
     });
 
-    // Montar lista completa de módulos com status
+    // Montar lista completa de mÃ³dulos com status
     const modules = allModules.map(module => {
       const tenantStatus = tenantModuleStatus.get(module.name);
       const isActive = tenantStatus ? tenantStatus.isActive : false;
@@ -351,7 +351,7 @@ export class TenantsService {
       };
     });
 
-    // Lista apenas dos módulos ativos (para compatibilidade)
+    // Lista apenas dos mÃ³dulos ativos (para compatibilidade)
     const activeModules = modules.filter(m => m.isActive).map(m => m.name);
 
     return {
@@ -364,20 +364,20 @@ export class TenantsService {
     // Verifica se o tenant existe
     await this.findOne(tenantId);
 
-    // Verificar se o módulo existe
+    // Verificar se o mÃ³dulo existe
     const module = await this.prisma.module.findUnique({
       where: { name: moduleName },
     });
 
     if (!module) {
-      throw new NotFoundException(`Módulo '${moduleName}' não encontrado`);
+      throw new NotFoundException(`MÃ³dulo '${moduleName}' nÃ£o encontrado`);
     }
 
     if (!module.isActive) {
-      throw new BadRequestException(`Módulo '${moduleName}' está desativado no sistema`);
+      throw new BadRequestException(`MÃ³dulo '${moduleName}' estÃ¡ desativado no sistema`);
     }
 
-    // Verificar se já existe uma relação
+    // Verificar se jÃ¡ existe uma relaÃ§Ã£o
     const existingTenantModule = await this.prisma.tenantModule.findUnique({
       where: {
         tenantId_moduleName: {
@@ -388,12 +388,12 @@ export class TenantsService {
     });
 
     if (existingTenantModule) {
-      // Se já está ativo, retorna o registro atual sem erro
+      // Se jÃ¡ estÃ¡ ativo, retorna o registro atual sem erro
       if (existingTenantModule.isActive) {
         return existingTenantModule;
       }
 
-      // Reativar módulo
+      // Reativar mÃ³dulo
       return this.prisma.tenantModule.update({
         where: { id: existingTenantModule.id },
         data: {
@@ -404,7 +404,7 @@ export class TenantsService {
       });
     }
 
-    // Criar nova relação
+    // Criar nova relaÃ§Ã£o
     return this.prisma.tenantModule.create({
       data: {
         tenantId,
@@ -428,10 +428,10 @@ export class TenantsService {
     });
 
     if (!tenantModule) {
-      throw new NotFoundException(`Módulo '${moduleName}' não está associado a este tenant`);
+      throw new NotFoundException(`MÃ³dulo '${moduleName}' nÃ£o estÃ¡ associado a este tenant`);
     }
 
-    // Se já está desativado, retorna o registro atual sem erro
+    // Se jÃ¡ estÃ¡ desativado, retorna o registro atual sem erro
     if (!tenantModule.isActive) {
       return tenantModule;
     }
@@ -449,20 +449,20 @@ export class TenantsService {
     // Verifica se o tenant existe
     await this.findOne(tenantId);
 
-    // Verificar se o módulo existe
+    // Verificar se o mÃ³dulo existe
     const module = await this.prisma.module.findUnique({
       where: { name: moduleName },
     });
 
     if (!module) {
-      throw new NotFoundException(`Módulo '${moduleName}' não encontrado`);
+      throw new NotFoundException(`MÃ³dulo '${moduleName}' nÃ£o encontrado`);
     }
 
     if (!module.isActive) {
-      throw new BadRequestException(`Módulo '${moduleName}' está desativado no sistema`);
+      throw new BadRequestException(`MÃ³dulo '${moduleName}' estÃ¡ desativado no sistema`);
     }
 
-    // Verificar se já existe uma relação
+    // Verificar se jÃ¡ existe uma relaÃ§Ã£o
     const existingTenantModule = await this.prisma.tenantModule.findUnique({
       where: {
         tenantId_moduleName: {
@@ -473,7 +473,7 @@ export class TenantsService {
     });
 
     if (existingTenantModule) {
-      // Toggle: se está ativo, desativa; se está inativo, ativa
+      // Toggle: se estÃ¡ ativo, desativa; se estÃ¡ inativo, ativa
       const newStatus = !existingTenantModule.isActive;
       
       return this.prisma.tenantModule.update({
@@ -486,7 +486,7 @@ export class TenantsService {
       });
     }
 
-    // Se não existe relação, cria uma nova ativa
+    // Se nÃ£o existe relaÃ§Ã£o, cria uma nova ativa
     return this.prisma.tenantModule.create({
       data: {
         tenantId,
@@ -510,7 +510,7 @@ export class TenantsService {
     });
 
     if (!tenantModule) {
-      throw new NotFoundException(`Módulo '${moduleName}' não está associado a este tenant`);
+      throw new NotFoundException(`MÃ³dulo '${moduleName}' nÃ£o estÃ¡ associado a este tenant`);
     }
 
     return this.prisma.tenantModule.update({
@@ -521,3 +521,4 @@ export class TenantsService {
     });
   }
 }
+

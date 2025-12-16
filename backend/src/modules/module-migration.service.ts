@@ -1,18 +1,18 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+﻿import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { PrismaService } from '@core/prisma/prisma.service';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
 /**
- * Serviço responsável pelo controle de migrations e seeds de módulos
+ * ServiÃ§o responsÃ¡vel pelo controle de migrations e seeds de mÃ³dulos
  * 
  * Funcionalidades:
  * - Descoberta de arquivos de migrations e seeds
- * - Cálculo de checksums (SHA-256)
- * - Registro e rastreamento de execuções
- * - Execução controlada de migrations/seeds
- * - Verificação de pendências
+ * - CÃ¡lculo de checksums (SHA-256)
+ * - Registro e rastreamento de execuÃ§Ãµes
+ * - ExecuÃ§Ã£o controlada de migrations/seeds
+ * - VerificaÃ§Ã£o de pendÃªncias
  */
 @Injectable()
 export class ModuleMigrationService {
@@ -39,34 +39,34 @@ export class ModuleMigrationService {
   }
 
   /**
-   * Descobre e registra migrations/seeds de um módulo
+   * Descobre e registra migrations/seeds de um mÃ³dulo
    * 
-   * Escaneia a pasta do módulo em busca de:
+   * Escaneia a pasta do mÃ³dulo em busca de:
    * - Arquivos .sql na pasta migrations/
    * - Arquivo seed.sql na raiz ou pasta seeds/
    * 
    * Para cada arquivo encontrado:
    * - Calcula checksum
-   * - Verifica se já existe registro na tabela
-   * - Cria novo registro se não existir ou se checksum mudou
+   * - Verifica se jÃ¡ existe registro na tabela
+   * - Cria novo registro se nÃ£o existir ou se checksum mudou
    */
   async discoverModuleMigrations(moduleName: string): Promise<void> {
-    this.logger.log(`Iniciando descoberta de migrations para o módulo: ${moduleName}`);
+    this.logger.log(`Iniciando descoberta de migrations para o mÃ³dulo: ${moduleName}`);
 
     try {
-      // Verificar se módulo existe
+      // Verificar se mÃ³dulo existe
       const module = await this.prisma.module.findUnique({
         where: { name: moduleName }
       });
 
       if (!module) {
-        throw new BadRequestException(`Módulo '${moduleName}' não encontrado no banco de dados`);
+        throw new BadRequestException(`MÃ³dulo '${moduleName}' nÃ£o encontrado no banco de dados`);
       }
 
       const modulePath = path.join(this.modulesPath, moduleName);
       
       if (!fs.existsSync(modulePath)) {
-        this.logger.warn(`Pasta do módulo '${moduleName}' não encontrada: ${modulePath}`);
+        this.logger.warn(`Pasta do mÃ³dulo '${moduleName}' nÃ£o encontrada: ${modulePath}`);
         return;
       }
 
@@ -76,7 +76,7 @@ export class ModuleMigrationService {
       // Descobrir seeds
       await this.discoverSeeds(moduleName, modulePath);
 
-      this.logger.log(`Descoberta concluída para o módulo: ${moduleName}`);
+      this.logger.log(`Descoberta concluÃ­da para o mÃ³dulo: ${moduleName}`);
     } catch (error) {
       this.logger.error(`Erro na descoberta de migrations para ${moduleName}: ${error.message}`);
       throw error;
@@ -96,7 +96,7 @@ export class ModuleMigrationService {
 
     const migrationFiles = fs.readdirSync(migrationsPath)
       .filter(file => file.endsWith('.sql'))
-      .sort(); // Ordenação alfabética
+      .sort(); // OrdenaÃ§Ã£o alfabÃ©tica
 
     this.logger.log(`Encontradas ${migrationFiles.length} migrations em ${moduleName}`);
 
@@ -139,9 +139,9 @@ export class ModuleMigrationService {
   /**
    * Registra um arquivo de migration/seed na tabela de controle
    * 
-   * Lógica:
-   * - Se não existe registro: cria com status PENDING
-   * - Se existe com mesmo checksum: mantém
+   * LÃ³gica:
+   * - Se nÃ£o existe registro: cria com status PENDING
+   * - Se existe com mesmo checksum: mantÃ©m
    * - Se existe com checksum diferente: cria novo registro com sufixo _v2, _v3, etc
    */
   private async registerMigrationFile(
@@ -183,7 +183,7 @@ export class ModuleMigrationService {
         `Novo: ${checksum.substring(0, 8)}...`
       );
 
-      // Se o arquivo já foi executado (COMPLETED), criar nova versão
+      // Se o arquivo jÃ¡ foi executado (COMPLETED), criar nova versÃ£o
       if (existing.status === 'COMPLETED') {
         const newFileName = await this.generateVersionedFileName(fileName, moduleName, type);
         await this.prisma.moduleMigration.create({
@@ -195,9 +195,9 @@ export class ModuleMigrationService {
             status: 'PENDING'
           }
         });
-        this.logger.log(`Criada nova versão: ${newFileName} para ${moduleName}`);
+        this.logger.log(`Criada nova versÃ£o: ${newFileName} para ${moduleName}`);
       } else {
-        // Se ainda está PENDING ou FAILED, atualizar checksum
+        // Se ainda estÃ¡ PENDING ou FAILED, atualizar checksum
         await this.prisma.moduleMigration.update({
           where: { id: existing.id },
           data: { checksum }
@@ -205,7 +205,7 @@ export class ModuleMigrationService {
         this.logger.log(`Checksum atualizado para ${fileName} em ${moduleName}`);
       }
     } else {
-      this.logger.log(`${type} ${fileName} de ${moduleName} já registrado (sem alterações)`);
+      this.logger.log(`${type} ${fileName} de ${moduleName} jÃ¡ registrado (sem alteraÃ§Ãµes)`);
     }
   }
 
@@ -222,7 +222,7 @@ export class ModuleMigrationService {
     let version = 2;
     let newFileName: string;
 
-    // Buscar próxima versão disponível
+    // Buscar prÃ³xima versÃ£o disponÃ­vel
     do {
       newFileName = `${baseName}_v${version}.sql`;
       const existing = await this.prisma.moduleMigration.findUnique({
@@ -236,13 +236,13 @@ export class ModuleMigrationService {
       });
       if (!existing) break;
       version++;
-    } while (version < 100); // Limite de segurança
+    } while (version < 100); // Limite de seguranÃ§a
 
     return newFileName;
   }
 
   /**
-   * Retorna lista de migrations pendentes de um módulo
+   * Retorna lista de migrations pendentes de um mÃ³dulo
    */
   async getPendingMigrations(moduleName: string) {
     return this.prisma.moduleMigration.findMany({
@@ -252,13 +252,13 @@ export class ModuleMigrationService {
         status: 'PENDING'
       },
       orderBy: {
-        fileName: 'asc' // Ordem alfabética
+        fileName: 'asc' // Ordem alfabÃ©tica
       }
     });
   }
 
   /**
-   * Retorna lista de seeds pendentes de um módulo
+   * Retorna lista de seeds pendentes de um mÃ³dulo
    */
   async getPendingSeeds(moduleName: string) {
     return this.prisma.moduleMigration.findMany({
@@ -274,7 +274,7 @@ export class ModuleMigrationService {
   }
 
   /**
-   * Verifica se há migrations ou seeds pendentes
+   * Verifica se hÃ¡ migrations ou seeds pendentes
    */
   async hasPendingUpdates(moduleName: string): Promise<boolean> {
     const count = await this.prisma.moduleMigration.count({
@@ -317,7 +317,7 @@ export class ModuleMigrationService {
   }
 
   /**
-   * Retorna status detalhado de todas as migrations/seeds de um módulo
+   * Retorna status detalhado de todas as migrations/seeds de um mÃ³dulo
    */
   async getMigrationStatus(moduleName: string) {
     const [migrations, seeds, counts] = await Promise.all([
@@ -384,7 +384,7 @@ export class ModuleMigrationService {
   }
 
   /**
-   * Marca migration como em execução
+   * Marca migration como em execuÃ§Ã£o
    */
   async markMigrationAsExecuting(id: string): Promise<void> {
     await this.prisma.moduleMigration.update({
@@ -396,17 +396,17 @@ export class ModuleMigrationService {
   }
 
   /**
-   * Obtém caminho do arquivo de migration/seed
+   * ObtÃ©m caminho do arquivo de migration/seed
    */
   getFilePath(moduleName: string, fileName: string, type: 'MIGRATION' | 'SEED'): string {
     const modulePath = path.join(this.modulesPath, moduleName);
     
     if (type === 'MIGRATION') {
-      // Remover sufixo de versão para encontrar arquivo original
+      // Remover sufixo de versÃ£o para encontrar arquivo original
       const cleanFileName = fileName.replace(/_v\d+\.sql$/, '.sql');
       return path.join(modulePath, 'migrations', cleanFileName);
     } else {
-      // SEED - priorizar pasta seeds/ por padrão de organização
+      // SEED - priorizar pasta seeds/ por padrÃ£o de organizaÃ§Ã£o
       // Verificar primeiro na pasta seeds/
       const seedsPath = path.join(modulePath, 'seeds', fileName);
       if (fs.existsSync(seedsPath)) {
@@ -419,7 +419,7 @@ export class ModuleMigrationService {
   }
 
   /**
-   * Divide comandos SQL por ponto e vírgula preservando comentários
+   * Divide comandos SQL por ponto e vÃ­rgula preservando comentÃ¡rios
    */
   private splitSqlCommands(sqlContent: string): string[] {
     const commands: string[] = [];
@@ -431,7 +431,7 @@ export class ModuleMigrationService {
       const char = sqlContent[i];
       const nextChar = sqlContent[i + 1];
       
-      // Verificar início/fim de comentários
+      // Verificar inÃ­cio/fim de comentÃ¡rios
       if (!inBlockComment && char === '-' && nextChar === '-') {
         inComment = true;
       } else if (char === '\n') {
@@ -440,14 +440,14 @@ export class ModuleMigrationService {
         inBlockComment = true;
       } else if (char === '*' && nextChar === '/') {
         inBlockComment = false;
-        i++; // Pular o próximo caractere
+        i++; // Pular o prÃ³ximo caractere
         continue;
       }
       
       // Adicionar caractere ao comando atual
       currentCommand += char;
       
-      // Se encontramos um ponto e vírgula e não estamos em comentário, finalizar comando
+      // Se encontramos um ponto e vÃ­rgula e nÃ£o estamos em comentÃ¡rio, finalizar comando
       if (char === ';' && !inComment && !inBlockComment) {
         if (currentCommand.trim()) {
           commands.push(currentCommand.trim());
@@ -456,7 +456,7 @@ export class ModuleMigrationService {
       }
     }
     
-    // Adicionar último comando se existir
+    // Adicionar Ãºltimo comando se existir
     if (currentCommand.trim()) {
       commands.push(currentCommand.trim());
     }
@@ -495,17 +495,17 @@ export class ModuleMigrationService {
       const startTime = Date.now();
       
       try {
-        // Marcar como em execução
+        // Marcar como em execuÃ§Ã£o
         await this.markMigrationAsExecuting(migration.id);
 
         // Obter caminho do arquivo
         const filePath = this.getFilePath(moduleName, migration.fileName, 'MIGRATION');
         
         if (!fs.existsSync(filePath)) {
-          throw new Error(`Arquivo de migration não encontrado: ${filePath}`);
+          throw new Error(`Arquivo de migration nÃ£o encontrado: ${filePath}`);
         }
 
-        // Ler conteúdo
+        // Ler conteÃºdo
         const sqlContent = fs.readFileSync(filePath, 'utf8');
         
         // Dividir em comandos e executar
@@ -522,7 +522,7 @@ export class ModuleMigrationService {
 
         const executionTime = Date.now() - startTime;
 
-        // Marcar como concluída
+        // Marcar como concluÃ­da
         await this.markMigrationAsExecuted(migration.id, executionTime, userId);
 
         this.logger.log(
@@ -555,7 +555,7 @@ export class ModuleMigrationService {
           error: errorMessage
         });
 
-        // Interromper execução em caso de erro
+        // Interromper execuÃ§Ã£o em caso de erro
         throw new BadRequestException(
           `Erro na migration ${migration.fileName}: ${errorMessage}`
         );
@@ -589,17 +589,17 @@ export class ModuleMigrationService {
       const startTime = Date.now();
       
       try {
-        // Marcar como em execução
+        // Marcar como em execuÃ§Ã£o
         await this.markMigrationAsExecuting(seed.id);
 
         // Obter caminho do arquivo
         const filePath = this.getFilePath(moduleName, seed.fileName, 'SEED');
         
         if (!fs.existsSync(filePath)) {
-          throw new Error(`Arquivo de seed não encontrado: ${filePath}`);
+          throw new Error(`Arquivo de seed nÃ£o encontrado: ${filePath}`);
         }
 
-        // Ler conteúdo
+        // Ler conteÃºdo
         const sqlContent = fs.readFileSync(filePath, 'utf8');
         
         // Dividir em comandos e executar
@@ -616,7 +616,7 @@ export class ModuleMigrationService {
 
         const executionTime = Date.now() - startTime;
 
-        // Marcar como concluída
+        // Marcar como concluÃ­da
         await this.markMigrationAsExecuted(seed.id, executionTime, userId);
 
         this.logger.log(
@@ -649,8 +649,8 @@ export class ModuleMigrationService {
           error: errorMessage
         });
 
-        // Seeds não interrompem fluxo, apenas logam erro
-        // Mas ainda lançam exceção para tratamento externo
+        // Seeds nÃ£o interrompem fluxo, apenas logam erro
+        // Mas ainda lanÃ§am exceÃ§Ã£o para tratamento externo
         throw new BadRequestException(
           `Erro no seed ${seed.fileName}: ${errorMessage}`
         );
@@ -673,7 +673,7 @@ export class ModuleMigrationService {
     });
 
     if (!migration) {
-      throw new BadRequestException('Migration não encontrada');
+      throw new BadRequestException('Migration nÃ£o encontrada');
     }
 
     if (migration.status !== 'FAILED') {
@@ -687,7 +687,7 @@ export class ModuleMigrationService {
     const startTime = Date.now();
 
     try {
-      // Marcar como em execução
+      // Marcar como em execuÃ§Ã£o
       await this.markMigrationAsExecuting(migration.id);
 
       // Obter caminho do arquivo e recalcular checksum
@@ -698,7 +698,7 @@ export class ModuleMigrationService {
       );
       
       if (!fs.existsSync(filePath)) {
-        throw new Error(`Arquivo não encontrado: ${filePath}`);
+        throw new Error(`Arquivo nÃ£o encontrado: ${filePath}`);
       }
 
       // Recalcular checksum (pode ter sido corrigido)
@@ -728,7 +728,7 @@ export class ModuleMigrationService {
 
       const executionTime = Date.now() - startTime;
 
-      // Marcar como concluída
+      // Marcar como concluÃ­da
       await this.markMigrationAsExecuted(migration.id, executionTime, userId);
 
       this.logger.log(
@@ -757,3 +757,4 @@ export class ModuleMigrationService {
     }
   }
 }
+

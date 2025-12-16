@@ -1,21 +1,21 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+﻿import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '@core/prisma/prisma.service';
 import { UpdateSecurityConfigDto } from './dto/update-security-config.dto';
-import { encryptSensitiveData, decryptSensitiveData } from '../common/utils/security.utils';
+import { encryptSensitiveData, decryptSensitiveData } from '@core/common/utils/security.utils';
 
 @Injectable()
 export class SecurityConfigService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Obtém a configuração de segurança atual
-   * Se não existir, cria uma com valores padrão
+   * ObtÃ©m a configuraÃ§Ã£o de seguranÃ§a atual
+   * Se nÃ£o existir, cria uma com valores padrÃ£o
    */
   async getConfig() {
     let config = await this.prisma.securityConfig.findFirst();
 
     if (!config) {
-      // Criar configuração padrão
+      // Criar configuraÃ§Ã£o padrÃ£o
       config = await this.prisma.securityConfig.create({
         data: {},
       });
@@ -25,7 +25,7 @@ export class SecurityConfigService {
   }
 
   /**
-   * Atualiza a configuração de segurança
+   * Atualiza a configuraÃ§Ã£o de seguranÃ§a
    * Apenas SUPER_ADMIN pode fazer isso
    */
   async updateConfig(dto: UpdateSecurityConfigDto, userId: string) {
@@ -49,7 +49,7 @@ export class SecurityConfigService {
   }
 
   /**
-   * Obtém configuração específica de rate limiting para login
+   * ObtÃ©m configuraÃ§Ã£o especÃ­fica de rate limiting para login
    */
   async getLoginRateLimit() {
     const config = await this.getConfig();
@@ -60,7 +60,7 @@ export class SecurityConfigService {
   }
 
   /**
-   * Obtém configuração de validação de senha
+   * ObtÃ©m configuraÃ§Ã£o de validaÃ§Ã£o de senha
    */
   async getPasswordPolicy() {
     const config = await this.getConfig();
@@ -74,7 +74,7 @@ export class SecurityConfigService {
   }
 
   /**
-   * Obtém configuração de JWT
+   * ObtÃ©m configuraÃ§Ã£o de JWT
    */
   async getJwtConfig() {
     const config = await this.getConfig();
@@ -85,7 +85,7 @@ export class SecurityConfigService {
   }
 
   /**
-   * Obtém configuração de 2FA
+   * ObtÃ©m configuraÃ§Ã£o de 2FA
    */
   async getTwoFactorConfig() {
     const config = await this.getConfig();
@@ -96,7 +96,7 @@ export class SecurityConfigService {
   }
 
   /**
-   * Obtém credenciais SMTP descriptografadas
+   * ObtÃ©m credenciais SMTP descriptografadas
    */
   async getSmtpCredentials() {
     const config = await this.getConfig();
@@ -111,3 +111,4 @@ export class SecurityConfigService {
     };
   }
 }
+

@@ -1,5 +1,5 @@
-import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
-import { Trim, ToLowerCase } from '../../common/decorators/sanitize.decorator';
+﻿import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
+import { Trim, ToLowerCase } from '@core/common/decorators/sanitize.decorator';
 
 export class UpdateProfileDto {
   @Trim()
@@ -13,3 +13,4 @@ export class UpdateProfileDto {
   @IsNotEmpty()
   email: string;
 }
+

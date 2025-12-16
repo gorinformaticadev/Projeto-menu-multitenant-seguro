@@ -1,5 +1,5 @@
 ﻿import { Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "../../../backend/src/prisma/prisma.service";
+import { PrismaService } from "@core/prisma/prisma.service";
 import { CreateCategoryDto, UpdateCategoryDto } from "../dto/demo.dto";
 
 @Injectable()
@@ -87,4 +87,5 @@ export class CategoryService {
     return { message: "Categoria removida com sucesso" };
   }
 }
+
 

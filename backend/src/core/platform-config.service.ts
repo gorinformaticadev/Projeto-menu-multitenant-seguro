@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+﻿import { Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '@core/prisma/prisma.service';
 
 export interface PlatformConfig {
   platformName: string;

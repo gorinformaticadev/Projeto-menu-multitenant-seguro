@@ -1,19 +1,20 @@
-import { IsEmail, IsString, IsNotEmpty, Length } from 'class-validator';
-import { Trim, ToLowerCase } from '../../common/decorators/sanitize.decorator';
+﻿import { IsEmail, IsString, IsNotEmpty, Length } from 'class-validator';
+import { Trim, ToLowerCase } from '@core/common/decorators/sanitize.decorator';
 
 export class Login2FADto {
   @Trim()
   @ToLowerCase()
-  @IsEmail({}, { message: 'Email inválido' })
-  @IsNotEmpty({ message: 'Email é obrigatório' })
+  @IsEmail({}, { message: 'Email invÃ¡lido' })
+  @IsNotEmpty({ message: 'Email Ã© obrigatÃ³rio' })
   email: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Senha é obrigatória' })
+  @IsNotEmpty({ message: 'Senha Ã© obrigatÃ³ria' })
   password: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Código 2FA é obrigatório' })
-  @Length(6, 6, { message: 'Código deve ter 6 dígitos' })
+  @IsNotEmpty({ message: 'CÃ³digo 2FA Ã© obrigatÃ³rio' })
+  @Length(6, 6, { message: 'CÃ³digo deve ter 6 dÃ­gitos' })
   twoFactorToken: string;
 }
+

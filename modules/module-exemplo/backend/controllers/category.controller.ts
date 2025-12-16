@@ -1,8 +1,8 @@
 ﻿import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
 import { CategoryService } from '../services/category.service';
-import { JwtAuthGuard } from '../../../backend/src/common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../../backend/src/common/guards/roles.guard';
-import { Roles } from '../../../backend/src/common/decorators/roles.decorator';
+import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
+import { RolesGuard } from '@core/common/guards/roles.guard';
+import { Roles } from '@core/common/decorators/roles.decorator';
 import { CreateCategoryDto, UpdateCategoryDto } from '../dto/demo.dto';
 
 @Controller('api/demo/categories')
@@ -43,4 +43,5 @@ export class CategoryController {
     return this.categoryService.remove(id, tenantId);
   }
 }
+
 

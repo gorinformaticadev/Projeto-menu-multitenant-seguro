@@ -1,5 +1,5 @@
 ﻿import { Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "../../../backend/src/prisma/prisma.service";
+import { PrismaService } from "@core/prisma/prisma.service";
 import { CreateTagDto } from "../dto/demo.dto";
 
 @Injectable()
@@ -51,4 +51,5 @@ export class TagService {
     return { message: "Tag removida com sucesso" };
   }
 }
+
 

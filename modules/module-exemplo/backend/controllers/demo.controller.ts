@@ -1,8 +1,8 @@
 ﻿import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, Req } from '@nestjs/common';
 import { DemoService } from '../services/demo.service';
-import { JwtAuthGuard } from '../../../backend/src/common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../../backend/src/common/guards/roles.guard';
-import { Roles } from '../../../backend/src/common/decorators/roles.decorator';
+import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
+import { RolesGuard } from '@core/common/guards/roles.guard';
+import { Roles } from '@core/common/decorators/roles.decorator';
 import { CreateDemoDto, UpdateDemoDto, FilterDemoDto } from '../dto/demo.dto';
 
 @Controller('api/demo')
@@ -78,4 +78,5 @@ export class DemoController {
     return this.demoService.getStats(tenantId);
   }
 }
+
 

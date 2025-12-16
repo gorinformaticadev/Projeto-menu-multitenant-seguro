@@ -3,7 +3,7 @@
   NotFoundException,
   BadRequestException,
 } from "@nestjs/common";
-import { PrismaService } from "../../../backend/src/prisma/prisma.service";
+import { PrismaService } from "@core/prisma/prisma.service";
 import { CreateDemoDto, UpdateDemoDto, FilterDemoDto } from "../dto/demo.dto";
 
 /**
@@ -279,4 +279,5 @@ export class DemoService {
     });
   }
 }
+
 

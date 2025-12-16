@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Req, Ip, UseGuards, Get } from '@nestjs/common';
+﻿import { Controller, Post, Body, Req, Ip, UseGuards, Get } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { TwoFactorService } from './two-factor.service';
@@ -12,8 +12,8 @@ import { Verify2FADto } from './dto/verify-2fa.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { SkipCsrf } from '../common/decorators/skip-csrf.decorator';
+import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
+import { SkipCsrf } from '@core/common/decorators/skip-csrf.decorator';
 import { Request } from 'express';
 
 @Controller('auth')
@@ -28,7 +28,7 @@ export class AuthController {
   /**
    * POST /auth/login
    * Rate Limiting: 5 tentativas por minuto
-   * CSRF: Desabilitado - endpoint público de autenticação
+   * CSRF: Desabilitado - endpoint pÃºblico de autenticaÃ§Ã£o
    */
   @SkipCsrf()
   @Post('login')
@@ -45,7 +45,7 @@ export class AuthController {
   /**
    * POST /auth/refresh
    * Renovar access token usando refresh token
-   * CSRF: Desabilitado - usa refresh token como autenticação
+   * CSRF: Desabilitado - usa refresh token como autenticaÃ§Ã£o
    */
   @SkipCsrf()
   @Post('refresh')
@@ -77,7 +77,7 @@ export class AuthController {
   /**
    * POST /auth/login-2fa
    * Login com 2FA
-   * CSRF: Desabilitado - endpoint público de autenticação
+   * CSRF: Desabilitado - endpoint pÃºblico de autenticaÃ§Ã£o
    */
   @SkipCsrf()
   @Post('login-2fa')
@@ -122,7 +122,7 @@ export class AuthController {
   }
   /**
    * GET /auth/2fa/status
-   * Verificar status de 2FA do usuário logado
+   * Verificar status de 2FA do usuÃ¡rio logado
    */
   @Get('2fa/status')
   @UseGuards(JwtAuthGuard)
@@ -130,13 +130,13 @@ export class AuthController {
     const user = await this.authService.getProfile(req.user.id);
     return {
       enabled: user.twoFactorEnabled || false,
-      suggested: true, // Esta informação virá da configuração de segurança
+      suggested: true, // Esta informaÃ§Ã£o virÃ¡ da configuraÃ§Ã£o de seguranÃ§a
     };
   }
 
   /**
    * GET /auth/me
-   * Retornar dados do usuário logado
+   * Retornar dados do usuÃ¡rio logado
    */
   @Get('me')
   @UseGuards(JwtAuthGuard)
@@ -146,7 +146,7 @@ export class AuthController {
 
   /**
    * POST /auth/email/send-verification
-   * Enviar email de verificação
+   * Enviar email de verificaÃ§Ã£o
    */
   @Post('email/send-verification')
   @UseGuards(JwtAuthGuard)
@@ -158,7 +158,7 @@ export class AuthController {
   /**
    * POST /auth/email/verify
    * Verificar email com token
-   * CSRF: Desabilitado - endpoint público
+   * CSRF: Desabilitado - endpoint pÃºblico
    */
   @SkipCsrf()
   @Post('email/verify')
@@ -169,7 +169,7 @@ export class AuthController {
 
   /**
    * GET /auth/email/status
-   * Verificar status de verificação de email
+   * Verificar status de verificaÃ§Ã£o de email
    */
   @Get('email/status')
   @UseGuards(JwtAuthGuard)
@@ -179,8 +179,8 @@ export class AuthController {
 
   /**
    * POST /auth/forgot-password
-   * Solicitar recuperação de senha
-   * CSRF: Desabilitado - endpoint público
+   * Solicitar recuperaÃ§Ã£o de senha
+   * CSRF: Desabilitado - endpoint pÃºblico
    */
   @SkipCsrf()
   @Post('forgot-password')
@@ -192,7 +192,7 @@ export class AuthController {
   /**
    * POST /auth/reset-password
    * Redefinir senha com token
-   * CSRF: Desabilitado - endpoint público
+   * CSRF: Desabilitado - endpoint pÃºblico
    */
   @SkipCsrf()
   @Post('reset-password')
@@ -204,3 +204,4 @@ export class AuthController {
     );
   }
 }
+

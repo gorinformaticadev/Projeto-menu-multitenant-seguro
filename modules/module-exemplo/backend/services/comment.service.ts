@@ -3,7 +3,7 @@
   NotFoundException,
   ForbiddenException,
 } from "@nestjs/common";
-import { PrismaService } from "../../../backend/src/prisma/prisma.service";
+import { PrismaService } from "@core/prisma/prisma.service";
 import { CreateCommentDto } from "../dto/demo.dto";
 
 @Injectable()
@@ -85,4 +85,5 @@ export class CommentService {
     return { message: "ComentÃ¡rio removido com sucesso" };
   }
 }
+
 

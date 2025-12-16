@@ -23,17 +23,26 @@
       ],
       "@modules/*": [
         "../modules/*"
+      ],
+      "@prisma/*": [
+        "./node_modules/@prisma/*"
+      ],
+      "*": [
+        "node_modules/*"
       ]
     }
   },
   "include": [
     "src/**/*",
-    "../modules/**/*"
+    "../modules/**/backend/**/*",
+    "../modules/**/module.ts",
+    "../modules/**/permissions.ts"
   ],
   "exclude": [
     "node_modules",
     "dist",
     "test",
-    "**/*spec.ts"
+    "**/*spec.ts",
+    "../modules/**/frontend/**/*"
   ]
 }

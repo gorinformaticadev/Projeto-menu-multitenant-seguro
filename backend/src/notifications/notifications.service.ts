@@ -1,5 +1,5 @@
-import { Injectable, ForbiddenException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+﻿import { Injectable, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { PrismaService } from '@core/prisma/prisma.service';
 import { User } from '@prisma/client';
 
 export interface NotificationEvent {
@@ -34,27 +34,27 @@ export class NotificationsService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Emite um evento e cria notificações baseado nas regras de audiência
+   * Emite um evento e cria notificaÃ§Ãµes baseado nas regras de audiÃªncia
    */
   async emitEvent(event: NotificationEvent, emitterUser?: User): Promise<void> {
-    console.log('📢 Emitindo evento de notificação:', event.type);
+    console.log('ðŸ“¢ Emitindo evento de notificaÃ§Ã£o:', event.type);
 
-    // Validações básicas
+    // ValidaÃ§Ãµes bÃ¡sicas
     this.validateEvent(event);
 
-    // Determina audiência baseado na severidade e contexto
+    // Determina audiÃªncia baseado na severidade e contexto
     const audiences = this.determineAudiences(event, emitterUser);
 
-    // Cria notificações para cada audiência
+    // Cria notificaÃ§Ãµes para cada audiÃªncia
     for (const audience of audiences) {
       await this.createNotification(event, audience);
     }
 
-    console.log(`✅ Evento ${event.type} processado para ${audiences.length} audiência(s)`);
+    console.log(`âœ… Evento ${event.type} processado para ${audiences.length} audiÃªncia(s)`);
   }
 
   /**
-   * Busca notificações para o dropdown (últimas 15)
+   * Busca notificaÃ§Ãµes para o dropdown (Ãºltimas 15)
    */
   async getDropdownNotifications(user: User) {
     const notifications = await this.prisma.notification.findMany({
@@ -79,7 +79,7 @@ export class NotificationsService {
   }
 
   /**
-   * Busca notificações para a central (paginadas e filtradas)
+   * Busca notificaÃ§Ãµes para a central (paginadas e filtradas)
    */
   async getCenterNotifications(user: User, filters: NotificationFilters = {}) {
     const where = {
@@ -117,7 +117,7 @@ export class NotificationsService {
   }
 
   /**
-   * Marca notificação como lida
+   * Marca notificaÃ§Ã£o como lida
    */
   async markAsRead(notificationId: string, user: User): Promise<void> {
     const notification = await this.prisma.notification.findFirst({
@@ -128,7 +128,7 @@ export class NotificationsService {
     });
 
     if (!notification) {
-      throw new ForbiddenException('Notificação não encontrada ou sem permissão');
+      throw new ForbiddenException('NotificaÃ§Ã£o nÃ£o encontrada ou sem permissÃ£o');
     }
 
     await this.prisma.notification.update({
@@ -141,7 +141,7 @@ export class NotificationsService {
   }
 
   /**
-   * Marca todas as notificações como lidas
+   * Marca todas as notificaÃ§Ãµes como lidas
    */
   async markAllAsRead(user: User, filters?: Partial<NotificationFilters>): Promise<void> {
     const where = {
@@ -160,7 +160,7 @@ export class NotificationsService {
   }
 
   /**
-   * Deleta notificação
+   * Deleta notificaÃ§Ã£o
    */
   async deleteNotification(notificationId: string, user: User): Promise<void> {
     const notification = await this.prisma.notification.findFirst({
@@ -171,7 +171,7 @@ export class NotificationsService {
     });
 
     if (!notification) {
-      throw new ForbiddenException('Notificação não encontrada ou sem permissão');
+      throw new ForbiddenException('NotificaÃ§Ã£o nÃ£o encontrada ou sem permissÃ£o');
     }
 
     await this.prisma.notification.delete({
@@ -180,7 +180,7 @@ export class NotificationsService {
   }
 
   /**
-   * Deleta múltiplas notificações
+   * Deleta mÃºltiplas notificaÃ§Ãµes
    */
   async deleteNotifications(notificationIds: string[], user: User): Promise<void> {
     await this.prisma.notification.deleteMany({
@@ -192,7 +192,7 @@ export class NotificationsService {
   }
 
   /**
-   * Busca contagem de não lidas
+   * Busca contagem de nÃ£o lidas
    */
   async getUnreadCount(user: User): Promise<number> {
     return this.prisma.notification.count({
@@ -204,20 +204,20 @@ export class NotificationsService {
   }
 
   // ============================================================================
-  // MÉTODOS PRIVADOS
+  // MÃ‰TODOS PRIVADOS
   // ============================================================================
 
   private validateEvent(event: NotificationEvent): void {
     if (!event.type || !event.payload?.title || !event.payload?.message) {
-      throw new BadRequestException('Evento inválido: type, title e message são obrigatórios');
+      throw new BadRequestException('Evento invÃ¡lido: type, title e message sÃ£o obrigatÃ³rios');
     }
 
     if (event.payload.title.length > 100) {
-      throw new BadRequestException('Título não pode ter mais de 100 caracteres');
+      throw new BadRequestException('TÃ­tulo nÃ£o pode ter mais de 100 caracteres');
     }
 
     if (event.payload.message.length > 500) {
-      throw new BadRequestException('Mensagem não pode ter mais de 500 caracteres');
+      throw new BadRequestException('Mensagem nÃ£o pode ter mais de 500 caracteres');
     }
   }
 
@@ -228,7 +228,7 @@ export class NotificationsService {
   }> {
     const audiences = [];
 
-    // Se tem userId específico, é para o usuário
+    // Se tem userId especÃ­fico, Ã© para o usuÃ¡rio
     if (event.userId) {
       audiences.push({
         audience: 'user' as const,
@@ -236,7 +236,7 @@ export class NotificationsService {
         userId: event.userId,
       });
     }
-    // Se tem tenantId mas não userId, é para admins do tenant
+    // Se tem tenantId mas nÃ£o userId, Ã© para admins do tenant
     else if (event.tenantId) {
       audiences.push({
         audience: 'admin' as const,
@@ -244,7 +244,7 @@ export class NotificationsService {
         userId: null,
       });
     }
-    // Se não tem nem userId nem tenantId, é global (super_admin)
+    // Se nÃ£o tem nem userId nem tenantId, Ã© global (super_admin)
     else {
       audiences.push({
         audience: 'super_admin' as const,
@@ -253,7 +253,7 @@ export class NotificationsService {
       });
     }
 
-    // Notificações críticas sempre vão para super_admin também
+    // NotificaÃ§Ãµes crÃ­ticas sempre vÃ£o para super_admin tambÃ©m
     if (event.severity === 'critical') {
       audiences.push({
         audience: 'super_admin' as const,
@@ -294,13 +294,13 @@ export class NotificationsService {
     const baseFilter: any = {};
 
     if (user.role === 'USER') {
-      // Usuário comum: apenas suas próprias notificações não críticas
+      // UsuÃ¡rio comum: apenas suas prÃ³prias notificaÃ§Ãµes nÃ£o crÃ­ticas
       baseFilter.AND = [
         { userId: user.id },
         { severity: { not: 'critical' } },
       ];
     } else if (user.role === 'ADMIN') {
-      // Admin: notificações do tenant (suas próprias + do tenant)
+      // Admin: notificaÃ§Ãµes do tenant (suas prÃ³prias + do tenant)
       baseFilter.OR = [
         { userId: user.id },
         {
@@ -311,7 +311,7 @@ export class NotificationsService {
         },
       ];
     } else if (user.role === 'SUPER_ADMIN') {
-      // Super Admin: todas as notificações
+      // Super Admin: todas as notificaÃ§Ãµes
       // Sem filtro adicional
     }
 

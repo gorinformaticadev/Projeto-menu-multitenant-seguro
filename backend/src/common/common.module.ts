@@ -1,9 +1,9 @@
-import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+﻿import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { CspReportController } from './controllers/csp-report.controller';
 import { CspMiddleware } from './middleware/csp.middleware';
 import { StaticCorsMiddleware } from './middleware/static-cors.middleware';
 import { PlatformInitService } from './services/platform-init.service';
-import { SecurityConfigModule } from '../security-config/security-config.module';
+import { SecurityConfigModule } from '@core/security-config/security-config.module';
 
 @Module({
   imports: [SecurityConfigModule],
@@ -13,7 +13,7 @@ import { SecurityConfigModule } from '../security-config/security-config.module'
 })
 export class CommonModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // Aplicar CORS para arquivos estáticos
+    // Aplicar CORS para arquivos estÃ¡ticos
     consumer.apply(StaticCorsMiddleware).forRoutes('/uploads/*');
 
     // Aplicar CSP middleware apenas se CSP_ADVANCED estiver ativado

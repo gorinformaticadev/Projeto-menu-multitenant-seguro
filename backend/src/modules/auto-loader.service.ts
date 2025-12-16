@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+﻿import { Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '@core/prisma/prisma.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -9,48 +9,48 @@ export class AutoLoaderService {
   private readonly modulesPath = path.join(process.cwd(), '..', 'modules');
 
   constructor(private prisma: PrismaService) {
-    // Verificar se o diretório de módulos existe
+    // Verificar se o diretÃ³rio de mÃ³dulos existe
     if (!fs.existsSync(this.modulesPath)) {
-      this.logger.log(`Diretório de módulos não encontrado: ${this.modulesPath}`);
+      this.logger.log(`DiretÃ³rio de mÃ³dulos nÃ£o encontrado: ${this.modulesPath}`);
       return;
     }
 
-    // Carregar módulos automaticamente na inicialização
+    // Carregar mÃ³dulos automaticamente na inicializaÃ§Ã£o
     this.loadModulesFromDirectory();
   }
 
   /**
-   * Carrega automaticamente os módulos do diretório de módulos
+   * Carrega automaticamente os mÃ³dulos do diretÃ³rio de mÃ³dulos
    */
   async loadModulesFromDirectory() {
     try {
-      // Verificar se o diretório de módulos existe
+      // Verificar se o diretÃ³rio de mÃ³dulos existe
       if (!fs.existsSync(this.modulesPath)) {
-        this.logger.log('Diretório de módulos não encontrado, pulando carregamento automático');
+        this.logger.log('DiretÃ³rio de mÃ³dulos nÃ£o encontrado, pulando carregamento automÃ¡tico');
         return;
       }
 
-      // Ler todos os diretórios no diretório de módulos
+      // Ler todos os diretÃ³rios no diretÃ³rio de mÃ³dulos
       const moduleDirs = fs.readdirSync(this.modulesPath, { withFileTypes: true })
         .filter(dirent => dirent.isDirectory())
         .map(dirent => dirent.name);
 
-      this.logger.log(`Encontrados ${moduleDirs.length} diretórios de módulos`);
+      this.logger.log(`Encontrados ${moduleDirs.length} diretÃ³rios de mÃ³dulos`);
 
-      // Processar cada diretório de módulo
+      // Processar cada diretÃ³rio de mÃ³dulo
       for (const moduleName of moduleDirs) {
         await this.processModuleDirectory(moduleName);
       }
 
-      this.logger.log('Carregamento automático de módulos concluído');
+      this.logger.log('Carregamento automÃ¡tico de mÃ³dulos concluÃ­do');
     } catch (error) {
-      this.logger.error('Erro ao carregar módulos automaticamente:', error);
+      this.logger.error('Erro ao carregar mÃ³dulos automaticamente:', error);
     }
   }
 
   /**
-   * Processa um diretório de módulo específico
-   * @param moduleName Nome do módulo
+   * Processa um diretÃ³rio de mÃ³dulo especÃ­fico
+   * @param moduleName Nome do mÃ³dulo
    */
   private async processModuleDirectory(moduleName: string) {
     try {
@@ -62,9 +62,9 @@ export class AutoLoaderService {
 
       if (!fs.existsSync(moduleJsonPath)) {
         moduleJsonPath = path.join(modulePath, 'module.json');
-        isLegacy = true; // Marca como legado para tratamento diferenciado se necessário
+        isLegacy = true; // Marca como legado para tratamento diferenciado se necessÃ¡rio
         if (!fs.existsSync(moduleJsonPath)) {
-          this.logger.warn(`Módulo ${moduleName} não possui arquivo module.config.json ou module.json, pulando`);
+          this.logger.warn(`MÃ³dulo ${moduleName} nÃ£o possui arquivo module.config.json ou module.json, pulando`);
           return;
         }
       }
@@ -73,14 +73,14 @@ export class AutoLoaderService {
       const moduleJsonContent = fs.readFileSync(moduleJsonPath, 'utf8');
       const moduleConfig = JSON.parse(moduleJsonContent);
 
-      // Validar campos obrigatórios
+      // Validar campos obrigatÃ³rios
       if (!moduleConfig.name || (!moduleConfig.displayName && !moduleConfig.name) || !moduleConfig.version) {
-        this.logger.warn(`Módulo ${moduleName} possui campos obrigatórios faltando, pulando`);
+        this.logger.warn(`MÃ³dulo ${moduleName} possui campos obrigatÃ³rios faltando, pulando`);
         return;
       }
 
-      // Normalizar configuração
-      // Se for module.config.json, menu/routes/permissions estão na raiz, mas o DB espera em 'config'
+      // Normalizar configuraÃ§Ã£o
+      // Se for module.config.json, menu/routes/permissions estÃ£o na raiz, mas o DB espera em 'config'
       // O frontend espera 'menu' como array
       let finalConfig = moduleConfig.config || {};
 
@@ -88,32 +88,32 @@ export class AutoLoaderService {
       const ensureArray = (item: any) => Array.isArray(item) ? item : (item ? [item] : []);
 
       // Lista de propriedades "especiais" que devem ser movidas para 'config' se existirem na raiz
-      // Adicione aqui qualquer nova propriedade que os módulos possam definir na raiz
+      // Adicione aqui qualquer nova propriedade que os mÃ³dulos possam definir na raiz
       const specialProps = ['menu', 'routes', 'permissions', 'notifications', 'userMenu', 'dashboardWidgets', 'slots'];
 
       specialProps.forEach(prop => {
         if (moduleConfig[prop]) {
           // Tratamento especial para menu (garantir array)
           if (prop === 'menu') {
-            // Lógica de compatibilidade: se já tinha menu em finalConfig, mantém, senão usa o da raiz
+            // LÃ³gica de compatibilidade: se jÃ¡ tinha menu em finalConfig, mantÃ©m, senÃ£o usa o da raiz
             if (!finalConfig.menu) {
               finalConfig.menu = ensureArray(moduleConfig[prop]);
             } else {
               finalConfig.menu = ensureArray(finalConfig.menu);
             }
           } else {
-            // Para outras propriedades, apenas copia se não existir em finalConfig
+            // Para outras propriedades, apenas copia se nÃ£o existir em finalConfig
             if (!finalConfig[prop]) {
               finalConfig[prop] = moduleConfig[prop];
             }
           }
         } else if (prop === 'menu' && finalConfig.menu) {
-          // Se menu está apenas em config, garante array
+          // Se menu estÃ¡ apenas em config, garante array
           finalConfig.menu = ensureArray(finalConfig.menu);
         }
       });
 
-      // Fusão Genérica: Copiar quaisquer outras propriedades da raiz que não sejam metadados padrão
+      // FusÃ£o GenÃ©rica: Copiar quaisquer outras propriedades da raiz que nÃ£o sejam metadados padrÃ£o
       const metadataProps = ['name', 'displayName', 'description', 'version', 'author', 'dependencies', 'config'];
       Object.keys(moduleConfig).forEach(key => {
         if (!metadataProps.includes(key) && !specialProps.includes(key) && !finalConfig[key]) {
@@ -121,7 +121,7 @@ export class AutoLoaderService {
         }
       });
 
-      // Verificar se o módulo já existe no banco de dados
+      // Verificar se o mÃ³dulo jÃ¡ existe no banco de dados
       const existingModule = await this.prisma.module.findUnique({
         where: { name: moduleConfig.name }
       });
@@ -136,29 +136,29 @@ export class AutoLoaderService {
       };
 
       if (existingModule) {
-        // Opcional: Atualizar módulo existente se a versão mudou ou forçar atualização
-        // Por enquanto, apenas logamos, mas poderíamos atualizar a configuração
-        this.logger.log(`Módulo ${moduleName} já registrado. Atualizando configuração...`);
+        // Opcional: Atualizar mÃ³dulo existente se a versÃ£o mudou ou forÃ§ar atualizaÃ§Ã£o
+        // Por enquanto, apenas logamos, mas poderÃ­amos atualizar a configuraÃ§Ã£o
+        this.logger.log(`MÃ³dulo ${moduleName} jÃ¡ registrado. Atualizando configuraÃ§Ã£o...`);
         await this.prisma.module.update({
           where: { name: moduleConfig.name },
           data: moduleData
         });
       } else {
-        // Registrar o módulo no banco de dados
+        // Registrar o mÃ³dulo no banco de dados
         await this.prisma.module.create({
           data: moduleData
         });
-        this.logger.log(`Módulo ${moduleName} registrado automaticamente com sucesso`);
+        this.logger.log(`MÃ³dulo ${moduleName} registrado automaticamente com sucesso`);
       }
 
-      // Atualizar/Criar vínculo com todos os tenants existentes
-      // Isso garante que o módulo apareça para todos, conforme regra de negócio
+      // Atualizar/Criar vÃ­nculo com todos os tenants existentes
+      // Isso garante que o mÃ³dulo apareÃ§a para todos, conforme regra de negÃ³cio
       const allTenants = await this.prisma.tenant.findMany({ select: { id: true } });
 
       if (allTenants.length > 0) {
         // Usamos createMany com skipDuplicates para ser eficiente
-        // Se já existe, não faz nada (mantém configurações personalizadas se houver)
-        // Se não existe, cria ativo por padrão
+        // Se jÃ¡ existe, nÃ£o faz nada (mantÃ©m configuraÃ§Ãµes personalizadas se houver)
+        // Se nÃ£o existe, cria ativo por padrÃ£o
         await this.prisma.tenantModule.createMany({
           data: allTenants.map(tenant => ({
             tenantId: tenant.id,
@@ -167,18 +167,18 @@ export class AutoLoaderService {
           })),
           skipDuplicates: true
         });
-        this.logger.log(`Módulo ${moduleName} vinculado a ${allTenants.length} tenants`);
+        this.logger.log(`MÃ³dulo ${moduleName} vinculado a ${allTenants.length} tenants`);
       }
 
     } catch (error) {
-      this.logger.error(`Erro ao processar módulo ${moduleName}:`, error);
+      this.logger.error(`Erro ao processar mÃ³dulo ${moduleName}:`, error);
     }
   }
 
   /**
-   * Verifica se um módulo está disponível no diretório
-   * @param moduleName Nome do módulo
-   * @returns true se o módulo estiver disponível, false caso contrário
+   * Verifica se um mÃ³dulo estÃ¡ disponÃ­vel no diretÃ³rio
+   * @param moduleName Nome do mÃ³dulo
+   * @returns true se o mÃ³dulo estiver disponÃ­vel, false caso contrÃ¡rio
    */
   isModuleAvailable(moduleName: string): boolean {
     try {
@@ -190,9 +190,9 @@ export class AutoLoaderService {
   }
 
   /**
-   * Obtém a configuração de um módulo do diretório
-   * @param moduleName Nome do módulo
-   * @returns Configuração do módulo ou null se não encontrado
+   * ObtÃ©m a configuraÃ§Ã£o de um mÃ³dulo do diretÃ³rio
+   * @param moduleName Nome do mÃ³dulo
+   * @returns ConfiguraÃ§Ã£o do mÃ³dulo ou null se nÃ£o encontrado
    */
   async getModuleConfigFromDirectory(moduleName: string): Promise<any> {
     try {
@@ -206,7 +206,7 @@ export class AutoLoaderService {
       const moduleJsonContent = fs.readFileSync(moduleJsonPath, 'utf8');
       return JSON.parse(moduleJsonContent);
     } catch (error) {
-      this.logger.error(`Erro ao ler configuração do módulo ${moduleName}:`, error);
+      this.logger.error(`Erro ao ler configuraÃ§Ã£o do mÃ³dulo ${moduleName}:`, error);
       return null;
     }
   }

@@ -1,4 +1,4 @@
-import {
+﻿import {
   registerDecorator,
   ValidationOptions,
   ValidatorConstraint,
@@ -6,7 +6,7 @@ import {
   ValidationArguments,
 } from 'class-validator';
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '@core/prisma/prisma.service';
 
 export interface PasswordPolicy {
   minLength: number;
@@ -24,11 +24,11 @@ export class IsStrongPasswordConstraint implements ValidatorConstraintInterface 
   async validate(password: string, args: ValidationArguments): Promise<boolean> {
     if (!password) return false;
 
-    // Buscar política de senha do banco
+    // Buscar polÃ­tica de senha do banco
     const config = await this.prisma.securityConfig.findFirst();
 
     if (!config) {
-      // Política padrão se não houver configuração
+      // PolÃ­tica padrÃ£o se nÃ£o houver configuraÃ§Ã£o
       return this.validatePassword(password, {
         minLength: 8,
         requireUppercase: true,
@@ -48,22 +48,22 @@ export class IsStrongPasswordConstraint implements ValidatorConstraintInterface 
   }
 
   private validatePassword(password: string, policy: PasswordPolicy): boolean {
-    // Tamanho mínimo
+    // Tamanho mÃ­nimo
     if (password.length < policy.minLength) {
       return false;
     }
 
-    // Letra maiúscula
+    // Letra maiÃºscula
     if (policy.requireUppercase && !/[A-Z]/.test(password)) {
       return false;
     }
 
-    // Letra minúscula
+    // Letra minÃºscula
     if (policy.requireLowercase && !/[a-z]/.test(password)) {
       return false;
     }
 
-    // Números
+    // NÃºmeros
     if (policy.requireNumbers && !/\d/.test(password)) {
       return false;
     }
@@ -77,8 +77,8 @@ export class IsStrongPasswordConstraint implements ValidatorConstraintInterface 
   }
 
   defaultMessage(args: ValidationArguments): string {
-    // Mensagem padrão (a mensagem real será gerada de forma assíncrona)
-    return 'A senha não atende aos requisitos de segurança configurados';
+    // Mensagem padrÃ£o (a mensagem real serÃ¡ gerada de forma assÃ­ncrona)
+    return 'A senha nÃ£o atende aos requisitos de seguranÃ§a configurados';
   }
 }
 
@@ -93,3 +93,4 @@ export function IsStrongPassword(validationOptions?: ValidationOptions) {
     });
   };
 }
+

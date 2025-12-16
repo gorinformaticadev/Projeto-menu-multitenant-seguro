@@ -1,8 +1,8 @@
-import { Controller, Get, Query, Param, UseGuards } from '@nestjs/common';
+﻿import { Controller, Get, Query, Param, UseGuards } from '@nestjs/common';
 import { AuditService } from './audit.service';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
+import { RolesGuard } from '@core/common/guards/roles.guard';
+import { Roles } from '@core/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 
 @Controller('audit-logs')
@@ -38,7 +38,7 @@ export class AuditController {
 
   /**
    * GET /audit-logs/stats
-   * Estatísticas de logs
+   * EstatÃ­sticas de logs
    */
   @Get('stats')
   async getStats(
@@ -55,10 +55,11 @@ export class AuditController {
 
   /**
    * GET /audit-logs/:id
-   * Buscar log específico
+   * Buscar log especÃ­fico
    */
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.auditService.findOne(id);
   }
 }
+

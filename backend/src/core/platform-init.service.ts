@@ -1,6 +1,6 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { PlatformConfigService } from '../../security-config/platform-config.service';
-import { initializePlatformConfig, PLATFORM } from '../constants/platform.constants';
+﻿import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { PlatformConfigService } from '@core/security-config/platform-config.service';
+import { initializePlatformConfig, PLATFORM } from '@core/constants/platform.constants';
 
 @Injectable()
 export class PlatformInitService implements OnModuleInit {

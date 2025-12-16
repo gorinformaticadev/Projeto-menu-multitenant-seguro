@@ -1,5 +1,5 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException, UnauthorizedException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+﻿import { Injectable, ConflictException, NotFoundException, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { PrismaService } from '@core/prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -13,24 +13,24 @@ export class UsersService {
   async create(createUserDto: CreateUserDto) {
     const { email, password, name, role, tenantId } = createUserDto;
 
-    // Verifica se já existe usuário com o mesmo email
+    // Verifica se jÃ¡ existe usuÃ¡rio com o mesmo email
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
     });
 
     if (existingUser) {
-      throw new ConflictException('Já existe um usuário com este email');
+      throw new ConflictException('JÃ¡ existe um usuÃ¡rio com este email');
     }
 
-    // Valida tenantId se não for SUPER_ADMIN
+    // Valida tenantId se nÃ£o for SUPER_ADMIN
     if (role !== Role.SUPER_ADMIN && !tenantId) {
-      throw new BadRequestException('TenantId é obrigatório para usuários que não são SUPER_ADMIN');
+      throw new BadRequestException('TenantId Ã© obrigatÃ³rio para usuÃ¡rios que nÃ£o sÃ£o SUPER_ADMIN');
     }
 
     // Hash da senha
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Cria o usuário
+    // Cria o usuÃ¡rio
     const user = await this.prisma.user.create({
       data: {
         email,
@@ -83,7 +83,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('Usuário não encontrado');
+      throw new NotFoundException('UsuÃ¡rio nÃ£o encontrado');
     }
 
     const { password, ...userWithoutPassword } = user;
@@ -91,10 +91,10 @@ export class UsersService {
   }
 
   async update(id: string, updateUserDto: UpdateUserDto) {
-    // Verifica se o usuário existe
+    // Verifica se o usuÃ¡rio existe
     await this.findOne(id);
 
-    // Se está atualizando email, verifica duplicação
+    // Se estÃ¡ atualizando email, verifica duplicaÃ§Ã£o
     if (updateUserDto.email) {
       const existingUser = await this.prisma.user.findFirst({
         where: {
@@ -106,11 +106,11 @@ export class UsersService {
       });
 
       if (existingUser) {
-        throw new ConflictException('Já existe um usuário com este email');
+        throw new ConflictException('JÃ¡ existe um usuÃ¡rio com este email');
       }
     }
 
-    // Se está atualizando senha, faz o hash
+    // Se estÃ¡ atualizando senha, faz o hash
     const data: any = { ...updateUserDto };
     if (updateUserDto.password && updateUserDto.password.trim() !== '') {
       data.password = await bcrypt.hash(updateUserDto.password, 10);
@@ -137,19 +137,19 @@ export class UsersService {
   }
 
   async remove(id: string) {
-    // Verifica se o usuário existe
+    // Verifica se o usuÃ¡rio existe
     const user = await this.findOne(id);
 
-    // Não permite deletar o SUPER_ADMIN padrão
+    // NÃ£o permite deletar o SUPER_ADMIN padrÃ£o
     if (user.email === 'admin@system.com') {
-      throw new BadRequestException('O SUPER_ADMIN padrão não pode ser deletado');
+      throw new BadRequestException('O SUPER_ADMIN padrÃ£o nÃ£o pode ser deletado');
     }
 
     await this.prisma.user.delete({
       where: { id },
     });
 
-    return { message: 'Usuário deletado com sucesso' };
+    return { message: 'UsuÃ¡rio deletado com sucesso' };
   }
 
   async findByTenant(tenantId: string) {
@@ -162,18 +162,18 @@ export class UsersService {
   }
 
   /**
-   * Alterar senha do usuário
+   * Alterar senha do usuÃ¡rio
    */
   async changePassword(userId: string, changePasswordDto: ChangePasswordDto) {
     const { currentPassword, newPassword } = changePasswordDto;
 
-    // Buscar usuário com senha
+    // Buscar usuÃ¡rio com senha
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
     if (!user) {
-      throw new NotFoundException('Usuário não encontrado');
+      throw new NotFoundException('UsuÃ¡rio nÃ£o encontrado');
     }
 
     // Verificar senha atual
@@ -183,7 +183,7 @@ export class UsersService {
       throw new UnauthorizedException('Senha atual incorreta');
     }
 
-    // Verificar se a nova senha é diferente da atual
+    // Verificar se a nova senha Ã© diferente da atual
     const isSamePassword = await bcrypt.compare(newPassword, user.password);
 
     if (isSamePassword) {
@@ -203,7 +203,7 @@ export class UsersService {
   }
 
   /**
-   * Desbloquear usuário
+   * Desbloquear usuÃ¡rio
    */
   async unlockUser(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -211,11 +211,11 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('Usuário não encontrado');
+      throw new NotFoundException('UsuÃ¡rio nÃ£o encontrado');
     }
 
     if (!user.isLocked) {
-      throw new BadRequestException('Usuário não está bloqueado');
+      throw new BadRequestException('UsuÃ¡rio nÃ£o estÃ¡ bloqueado');
     }
 
     // Desbloquear e resetar tentativas
@@ -230,25 +230,25 @@ export class UsersService {
       },
     });
 
-    return { message: 'Usuário desbloqueado com sucesso' };
+    return { message: 'UsuÃ¡rio desbloqueado com sucesso' };
   }
 
   /**
-   * Atualizar perfil do próprio usuário
+   * Atualizar perfil do prÃ³prio usuÃ¡rio
    */
   async updateProfile(userId: string, updateProfileDto: { name: string; email: string }) {
     const { name, email } = updateProfileDto;
 
-    // Verificar se o email já está em uso por outro usuário
+    // Verificar se o email jÃ¡ estÃ¡ em uso por outro usuÃ¡rio
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
     });
 
     if (existingUser && existingUser.id !== userId) {
-      throw new ConflictException('Este email já está em uso');
+      throw new ConflictException('Este email jÃ¡ estÃ¡ em uso');
     }
 
-    // Atualizar usuário
+    // Atualizar usuÃ¡rio
     const user = await this.prisma.user.update({
       where: { id: userId },
       data: { name, email },
@@ -262,3 +262,4 @@ export class UsersService {
     return userWithoutPassword;
   }
 }
+

@@ -1,9 +1,9 @@
-import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+﻿import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
-import { PrismaModule } from './prisma/prisma.module';
+import { PrismaModule } from './core/prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
@@ -21,32 +21,32 @@ import { ModulesModule } from './modules/modules.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CoreModule } from './core/CoreModule';
 import { AppModulesModule } from './core/modules/AppModules.module';
-// import { DemoModule } from '../../modules/demo-completo/src/demo.module'; // Removed legacy import
+// import { DemoModule } from '@core/modules/demo-completo/src/demo.module'; // Removed legacy import
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    // Módulo de agendamento para tarefas cron
+    // MÃ³dulo de agendamento para tarefas cron
     ScheduleModule.forRoot(),
     SentryModule,
     CommonModule,
     // ============================================
-    // 🛡️ RATE LIMITING - Proteção contra Brute Force
-    // Configurações ajustadas por ambiente
+    // ðŸ›¡ï¸ RATE LIMITING - ProteÃ§Ã£o contra Brute Force
+    // ConfiguraÃ§Ãµes ajustadas por ambiente
     // ============================================
     ThrottlerModule.forRoot([
       {
         name: 'default',
         ttl: 60000, // 60 segundos (1 minuto)
-        // Desenvolvimento: 2000 req/min | Produção: 100 req/min
+        // Desenvolvimento: 2000 req/min | ProduÃ§Ã£o: 100 req/min
         limit: process.env.NODE_ENV === 'production' ? 100 : 2000,
       },
       {
         name: 'login',
         ttl: 60000, // 60 segundos
-        // Desenvolvimento: 10 tentativas | Produção: 5 tentativas
+        // Desenvolvimento: 10 tentativas | ProduÃ§Ã£o: 5 tentativas
         limit: process.env.NODE_ENV === 'production' ? 5 : 10,
       },
     ]),
@@ -73,13 +73,13 @@ import { AppModulesModule } from './core/modules/AppModules.module';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
-    // Serviço de limpeza de tokens
+    // ServiÃ§o de limpeza de tokens
     TokenCleanupService,
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // HTTPS Redirect - Apenas em produção
+    // HTTPS Redirect - Apenas em produÃ§Ã£o
     consumer.apply(HttpsRedirectMiddleware).forRoutes('*');
   }
 }

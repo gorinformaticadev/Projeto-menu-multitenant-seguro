@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+﻿import { Injectable } from '@nestjs/common';
+import { PrismaService } from '@core/prisma/prisma.service';
 
 export interface AuditLogData {
   action: string;
@@ -31,7 +31,7 @@ export class AuditService {
   }
 
   /**
-   * Buscar logs com filtros e paginação
+   * Buscar logs com filtros e paginaÃ§Ã£o
    */
   async findAll(params: {
     page?: number;
@@ -123,7 +123,7 @@ export class AuditService {
   }
 
   /**
-   * Estatísticas de logs
+   * EstatÃ­sticas de logs
    */
   async getStats(params: { startDate?: Date; endDate?: Date; tenantId?: string }) {
     const where: any = {};
@@ -181,3 +181,4 @@ export class AuditService {
     };
   }
 }
+

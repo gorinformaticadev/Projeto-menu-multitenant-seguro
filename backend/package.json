@@ -7,7 +7,7 @@
   "homepage": "https://www.gorinformatica.com.br",
   "scripts": {
     "start": "nest start",
-    "start:dev": "nest start --watch --exec \"ts-node src/main.ts\"",
+    "start:dev": "nest start --watch --exec \"ts-node -r tsconfig-paths/register src/main.ts\"",
     "start:prod": "node dist/backend/src/main",
     "build": "nest build",
     "prisma:generate": "prisma generate",
@@ -78,6 +78,7 @@
     "husky": "^8.0.3",
     "prisma": "^6.19.1",
     "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
     "typescript": "^5.3.3"
   },
   "prisma": {

@@ -1,5 +1,5 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+﻿import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { PrismaService } from '@core/prisma/prisma.service';
 import { ModuleValidator, ValidationResult } from '../validation/module-validator.service';
 import { SafeConfigParser } from '../security/safe-config-parser.service';
 import * as AdmZip from 'adm-zip';
@@ -9,12 +9,12 @@ import * as path from 'path';
 import { existsSync } from 'fs';
 
 /**
- * MODULE UPLOAD SERVICE - Serviço de Upload de Módulos
+ * MODULE UPLOAD SERVICE - ServiÃ§o de Upload de MÃ³dulos
  * 
- * Responsável por:
- * - Receber arquivo ZIP do módulo
- * - Extrair e validar conteúdo
- * - Executar validações de segurança
+ * ResponsÃ¡vel por:
+ * - Receber arquivo ZIP do mÃ³dulo
+ * - Extrair e validar conteÃºdo
+ * - Executar validaÃ§Ãµes de seguranÃ§a
  * - Salvar no banco de dados
  * - Mover arquivos para pasta definitiva
  */
@@ -48,10 +48,10 @@ export class ModuleUploadService {
     }
 
     /**
-     * Processa upload de módulo
+     * Processa upload de mÃ³dulo
      */
     async uploadModule(dto: UploadModuleDto): Promise<UploadResult> {
-        this.logger.log(`Iniciando upload de módulo por usuário: ${dto.uploadedBy}`);
+        this.logger.log(`Iniciando upload de mÃ³dulo por usuÃ¡rio: ${dto.uploadedBy}`);
 
         try {
             // 1. Validar arquivo
@@ -63,7 +63,7 @@ export class ModuleUploadService {
             // 3. Extrair ZIP
             const extractedFiles = await this.extractZip(tempPath);
 
-            // 4. Validar módulo
+            // 4. Validar mÃ³dulo
             const validation = await this.validator.validateModule(extractedFiles);
 
             if (!validation.valid) {
@@ -71,21 +71,21 @@ export class ModuleUploadService {
                 return {
                     success: false,
                     validation,
-                    message: 'Módulo não passou na validação'
+                    message: 'MÃ³dulo nÃ£o passou na validaÃ§Ã£o'
                 };
             }
 
-            // 5. Parsear configuração
+            // 5. Parsear configuraÃ§Ã£o
             const config = this.configParser.parseModuleConfig(
                 extractedFiles.get('module.config.ts')
             );
 
             if (!config) {
                 await this.cleanup(tempPath);
-                throw new BadRequestException('Configuração do módulo inválida');
+                throw new BadRequestException('ConfiguraÃ§Ã£o do mÃ³dulo invÃ¡lida');
             }
 
-            // 6. Verificar se módulo já existe
+            // 6. Verificar se mÃ³dulo jÃ¡ existe
             const existing = await this.prisma.moduleUpload.findUnique({
                 where: { slug: config.slug }
             });
@@ -93,7 +93,7 @@ export class ModuleUploadService {
             if (existing) {
                 await this.cleanup(tempPath);
                 throw new BadRequestException(
-                    `Módulo com slug '${config.slug}' já existe`
+                    `MÃ³dulo com slug '${config.slug}' jÃ¡ existe`
                 );
             }
 
@@ -113,14 +113,14 @@ export class ModuleUploadService {
             // 9. Mover para pasta definitiva
             await this.moveToModulesDir(tempPath, config.slug);
 
-            this.logger.log(`Módulo ${config.slug} enviado com sucesso!`);
+            this.logger.log(`MÃ³dulo ${config.slug} enviado com sucesso!`);
 
             return {
                 success: true,
                 moduleId: moduleUpload.id,
                 slug: moduleUpload.slug,
                 validation,
-                message: 'Módulo enviado com sucesso! Aguardando validação.'
+                message: 'MÃ³dulo enviado com sucesso! Aguardando validaÃ§Ã£o.'
             };
 
         } catch (error) {
@@ -139,12 +139,12 @@ export class ModuleUploadService {
 
         if (file.size > this.maxFileSize) {
             throw new BadRequestException(
-                `Arquivo muito grande. Máximo: ${this.maxFileSize / 1024 / 1024}MB`
+                `Arquivo muito grande. MÃ¡ximo: ${this.maxFileSize / 1024 / 1024}MB`
             );
         }
 
         if (!file.originalname.endsWith('.zip')) {
-            throw new BadRequestException('Apenas arquivos .zip são permitidos');
+            throw new BadRequestException('Apenas arquivos .zip sÃ£o permitidos');
         }
     }
 
@@ -161,7 +161,7 @@ export class ModuleUploadService {
     }
 
     /**
-     * Extrai conteúdo do ZIP
+     * Extrai conteÃºdo do ZIP
      */
     private async extractZip(zipPath: string): Promise<Map<string, string>> {
         const zip = new AdmZip(zipPath);
@@ -196,7 +196,7 @@ export class ModuleUploadService {
     }
 
     /**
-     * Salva módulo no banco de dados
+     * Salva mÃ³dulo no banco de dados
      */
     private async saveToDatabase(
         config: any,
@@ -206,13 +206,13 @@ export class ModuleUploadService {
         filePath: string,
         fileHash: string
     ) {
-        // Parsear páginas
+        // Parsear pÃ¡ginas
         const pagesContent = files.get('module.pages.ts');
         const pages = pagesContent
             ? this.configParser.parseModulePages(pagesContent)
             : [];
 
-        // Criar módulo
+        // Criar mÃ³dulo
         const moduleUpload = await this.prisma.moduleUpload.create({
             data: {
                 slug: config.slug,
@@ -238,7 +238,7 @@ export class ModuleUploadService {
             }
         });
 
-        // Criar páginas
+        // Criar pÃ¡ginas
         if (pages && pages.length > 0) {
             await this.prisma.moduleUploadPage.createMany({
                 data: pages.map(page => ({
@@ -258,7 +258,7 @@ export class ModuleUploadService {
     }
 
     /**
-     * Move arquivo para pasta de módulos
+     * Move arquivo para pasta de mÃ³dulos
      */
     private async moveToModulesDir(
         tempPath: string,
@@ -267,18 +267,18 @@ export class ModuleUploadService {
         const destDir = path.join(this.modulesDir, slug);
         const destPath = path.join(destDir, `${slug}.zip`);
 
-        // Criar diretório do módulo
+        // Criar diretÃ³rio do mÃ³dulo
         await fs.mkdir(destDir, { recursive: true });
 
         // Copiar arquivo
         await fs.copyFile(tempPath, destPath);
 
-        // Remover temporário
+        // Remover temporÃ¡rio
         await fs.unlink(tempPath);
     }
 
     /**
-     * Limpa arquivos temporários
+     * Limpa arquivos temporÃ¡rios
      */
     private async cleanup(filepath: string): Promise<void> {
         try {
@@ -286,15 +286,16 @@ export class ModuleUploadService {
                 await fs.unlink(filepath);
             }
         } catch (error) {
-            this.logger.warn('Erro ao limpar arquivo temporário:', error);
+            this.logger.warn('Erro ao limpar arquivo temporÃ¡rio:', error);
         }
     }
 
     /**
-     * Garante que diretórios existem
+     * Garante que diretÃ³rios existem
      */
     private async ensureDirectories(): Promise<void> {
         await fs.mkdir(this.uploadDir, { recursive: true });
         await fs.mkdir(this.modulesDir, { recursive: true });
     }
 }
+
