@@ -110,7 +110,7 @@ export const DemoEdit: React.FC<DemoEditProps> = ({ demoId }) => {
         }
       }
 
-      router.push(`/demo/${demoId}`);
+      router.push(`/modules/demo-completo/demo/${demoId}`);
     }
   };
 
@@ -466,7 +466,7 @@ export const DemoEdit: React.FC<DemoEditProps> = ({ demoId }) => {
                     <Button
                       fullWidth
                       variant="outlined"
-                      onClick={() => router.push(`/demo/${demoId}`)}
+                      onClick={() => router.push(`/modules/demo-completo/demo/${demoId}`)}
                     >
                       Cancelar
                     </Button>

@@ -233,7 +233,7 @@ export const DemoView: React.FC<DemoViewProps> = ({ demoId }) => {
             {liked ? <ThumbUpIcon /> : <ThumbUpOutlinedIcon />}
           </IconButton>
           <IconButton
-            onClick={() => router.push(`/demo/edit/${demo.id}`)}
+            onClick={() => router.push(`/modules/demo-completo/demo/edit/${demo.id}`)}
             color="info"
             title="Editar"
           >
@@ -484,7 +484,7 @@ export const DemoView: React.FC<DemoViewProps> = ({ demoId }) => {
                     fullWidth
                     variant="outlined"
                     startIcon={<EditIcon />}
-                    onClick={() => router.push(`/demo/edit/${demo.id}`)}
+                    onClick={() => router.push(`/modules/demo-completo/demo/edit/${demo.id}`)}
                   >
                     Editar
                   </Button>

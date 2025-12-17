@@ -9,9 +9,9 @@ import {
   Req,
 } from "@nestjs/common";
 import { TagService } from "../services/tag.service";
-import { JwtAuthGuard } from "../../../../backend/src/common/guards/jwt-auth.guard";
-import { RolesGuard } from "../../../../backend/src/common/guards/roles.guard";
-import { Roles } from "../../../../backend/src/common/decorators/roles.decorator";
+import { JwtAuthGuard } from "../../../../../backend/src/common/guards/jwt-auth.guard";
+import { RolesGuard } from "../../../../../backend/src/common/guards/roles.guard";
+import { Roles } from "../../../../../backend/src/common/decorators/roles.decorator";
 import { CreateTagDto } from "../dto/demo.dto";
 
 /**
@@ -20,7 +20,7 @@ import { CreateTagDto } from "../dto/demo.dto";
 @Controller("api/demo/tags")
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class TagController {
-  constructor(private readonly tagService: TagService) {}
+  constructor(private readonly tagService: TagService) { }
 
   @Get()
   async findAll(@Req() req) {

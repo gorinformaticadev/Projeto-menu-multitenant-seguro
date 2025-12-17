@@ -468,13 +468,13 @@ export const DemoDashboard: React.FC = () => {
                         <TableCell align="right">
                           <IconButton
                             size="small"
-                            onClick={() => router.push(`/demo/${demo.id}`)}
+                            onClick={() => router.push(`/modules/demo-completo/demo/${demo.id}`)}
                           >
                             <VisibilityIcon fontSize="small" />
                           </IconButton>
                           <IconButton
                             size="small"
-                            onClick={() => router.push(`/demo/edit/${demo.id}`)}
+                            onClick={() => router.push(`/modules/demo-completo/demo/edit/${demo.id}`)}
                           >
                             <EditIcon fontSize="small" />
                           </IconButton>

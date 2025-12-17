@@ -112,7 +112,7 @@ export const DemoList: React.FC = () => {
           variant="contained"
           color="primary"
           startIcon={<AddIcon />}
-          onClick={() => router.push('/demo/create')}
+          onClick={() => router.push('/modules/demo-completo/demo/create')}
         >
           Novo Demo
         </Button>
@@ -350,7 +350,7 @@ export const DemoList: React.FC = () => {
                   <IconButton
                     size="small"
                     color="primary"
-                    onClick={() => router.push(`/demo/${demo.id}`)}
+                    onClick={() => router.push(`/modules/demo-completo/demo/${demo.id}`)}
                     title="Visualizar"
                   >
                     <VisibilityIcon />
@@ -358,7 +358,7 @@ export const DemoList: React.FC = () => {
                   <IconButton
                     size="small"
                     color="info"
-                    onClick={() => router.push(`/demo/edit/${demo.id}`)}
+                    onClick={() => router.push(`/modules/demo-completo/demo/edit/${demo.id}`)}
                     title="Editar"
                   >
                     <EditIcon />

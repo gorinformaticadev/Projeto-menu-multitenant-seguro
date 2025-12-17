@@ -9,7 +9,7 @@ import {
   Req,
 } from "@nestjs/common";
 import { CommentService } from "../services/comment.service";
-import { JwtAuthGuard } from "../../../../backend/src/common/guards/jwt-auth.guard";
+import { JwtAuthGuard } from "../../../../../backend/src/common/guards/jwt-auth.guard";
 import { CreateCommentDto } from "../dto/demo.dto";
 
 /**
@@ -18,7 +18,7 @@ import { CreateCommentDto } from "../dto/demo.dto";
 @Controller("api/demo/:demoId/comments")
 @UseGuards(JwtAuthGuard)
 export class CommentController {
-  constructor(private readonly commentService: CommentService) {}
+  constructor(private readonly commentService: CommentService) { }
 
   @Get()
   async findAll(@Param("demoId") demoId: string, @Req() req) {

@@ -82,14 +82,14 @@ export const DemoCreate: React.FC = () => {
         }
       }
 
-      router.push(`/demo/${demo.id}`);
+      router.push(`/modules/demo-completo/demo/${demo.id}`);
     }
   };
 
   const handleSaveDraft = async () => {
     const demo = await createDemo({ ...formData, status: 'draft' });
     if (demo) {
-      router.push(`/demo/${demo.id}`);
+      router.push(`/modules/demo-completo/demo/${demo.id}`);
     }
   };
 

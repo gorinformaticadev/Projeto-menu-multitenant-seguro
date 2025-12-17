@@ -55,7 +55,7 @@ export function useModulesManager(tenantId?: string) {
   React.useEffect(() => {
     listenerRef.current = updateState;
     listeners.add(updateState);
-    
+
     return () => {
       if (listenerRef.current) {
         listeners.delete(listenerRef.current);
@@ -80,7 +80,7 @@ export function useModulesManager(tenantId?: string) {
   const loadModules = useCallback(async (targetTenantId?: string, forceReload = false) => {
     const now = Date.now();
     const CACHE_DURATION = 30000; // 30 segundos
-    
+
     // Se já tem dados válidos e não é reload forçado, retorna
     if (!forceReload && globalState.modules.length > 0 && (now - globalState.lastUpdated) < CACHE_DURATION) {
       return;
@@ -93,7 +93,7 @@ export function useModulesManager(tenantId?: string) {
 
     // Cria nova promise de carregamento
     loadingPromise = performLoad(targetTenantId);
-    
+
     try {
       await loadingPromise;
     } finally {
@@ -125,10 +125,10 @@ export function useModulesManager(tenantId?: string) {
       notifyListeners();
 
       console.log('📦 Módulos carregados:', response.modules.length);
-      
+
     } catch (error: any) {
       console.error('❌ Erro ao carregar módulos:', error);
-      
+
       globalState = {
         ...globalState,
         error: error.response?.data?.message || 'Erro ao carregar módulos',
@@ -142,7 +142,8 @@ export function useModulesManager(tenantId?: string) {
           isActive: false,
           activatedAt: null,
           deactivatedAt: null
-        }]
+        }],
+        lastUpdated: Date.now() // Atualiza timestamp para evitar loop de retentativas imediatas
       };
       notifyListeners();
     }
@@ -153,7 +154,7 @@ export function useModulesManager(tenantId?: string) {
    */
   const toggleModule = useCallback(async (moduleName: string, targetTenantId?: string) => {
     console.log(`🔄 [TOGGLE] Iniciando toggle para módulo: ${moduleName}, tenant: ${targetTenantId || 'my-tenant'}`);
-    
+
     // Verifica se já existe uma operação em andamento para este módulo
     if (toggleLocks[moduleName]) {
       console.warn(`⚠️ [TOGGLE] Toggle já em andamento para módulo ${moduleName} - IGNORANDO`);
@@ -173,14 +174,14 @@ export function useModulesManager(tenantId?: string) {
 
     // Optimistic update - atualiza UI imediatamente
     const newStatus = !currentModule.isActive;
-    const updatedModules = globalState.modules.map(module => 
-      module.name === moduleName 
-        ? { 
-            ...module, 
-            isActive: newStatus,
-            activatedAt: newStatus ? new Date().toISOString() : module.activatedAt,
-            deactivatedAt: newStatus ? null : new Date().toISOString()
-          }
+    const updatedModules = globalState.modules.map(module =>
+      module.name === moduleName
+        ? {
+          ...module,
+          isActive: newStatus,
+          activatedAt: newStatus ? new Date().toISOString() : module.activatedAt,
+          deactivatedAt: newStatus ? null : new Date().toISOString()
+        }
         : module
     );
 
@@ -197,7 +198,7 @@ export function useModulesManager(tenantId?: string) {
     try {
       // Cria chave única para a requisição
       const requestKey = `toggle-${targetTenantId || 'my-tenant'}-${moduleName}`;
-      
+
       // Verifica se já existe uma requisição idêntica em cache
       if (requestCache.has(requestKey)) {
         console.log(`📋 [TOGGLE] Usando requisição em cache para: ${moduleName}`);
@@ -208,7 +209,7 @@ export function useModulesManager(tenantId?: string) {
       // Executa toggle no backend
       console.log(`📡 [TOGGLE] Enviando requisição para backend: ${moduleName}`);
       let requestPromise;
-      
+
       if (targetTenantId) {
         console.log(`📡 [TOGGLE] Usando toggleModuleForTenant para tenant: ${targetTenantId}`);
         requestPromise = modulesService.toggleModuleForTenant(targetTenantId, moduleName);
@@ -219,7 +220,7 @@ export function useModulesManager(tenantId?: string) {
 
       // Adiciona ao cache
       requestCache.set(requestKey, requestPromise);
-      
+
       // Remove do cache após TTL
       setTimeout(() => {
         requestCache.delete(requestKey);
@@ -228,14 +229,14 @@ export function useModulesManager(tenantId?: string) {
       const result = await requestPromise;
 
       // Confirma o resultado do backend (pode ser diferente do optimistic)
-      const confirmedModules = globalState.modules.map(module => 
-        module.name === moduleName 
-          ? { 
-              ...module, 
-              isActive: result.isActive,
-              activatedAt: result.activatedAt,
-              deactivatedAt: result.deactivatedAt
-            }
+      const confirmedModules = globalState.modules.map(module =>
+        module.name === moduleName
+          ? {
+            ...module,
+            isActive: result.isActive,
+            activatedAt: result.activatedAt,
+            deactivatedAt: result.deactivatedAt
+          }
           : module
       );
 
@@ -243,23 +244,23 @@ export function useModulesManager(tenantId?: string) {
       notifyListeners();
 
       // Dispara evento para outros componentes
-      window.dispatchEvent(new CustomEvent('moduleStatusChanged', { 
-        detail: { moduleName, active: result.isActive } 
+      window.dispatchEvent(new CustomEvent('moduleStatusChanged', {
+        detail: { moduleName, active: result.isActive }
       }));
 
       console.log(`✅ Toggle concluído: ${moduleName} -> ${result.isActive ? 'ativo' : 'inativo'}`);
 
     } catch (error: any) {
       console.error(`❌ Erro no toggle de ${moduleName}:`, error);
-      
+
       // Reverte optimistic update em caso de erro
-      const revertedModules = globalState.modules.map(module => 
-        module.name === moduleName 
+      const revertedModules = globalState.modules.map(module =>
+        module.name === moduleName
           ? currentModule // Volta ao estado original
           : module
       );
 
-      globalState = { 
+      globalState = {
         ...globalState,
         modules: revertedModules,
         error: error.response?.data?.message || 'Erro ao alterar status do módulo'

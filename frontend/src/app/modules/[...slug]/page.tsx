@@ -18,7 +18,11 @@ export default function DynamicModulePage() {
   let ComponentToRender = null;
   let matchParams = {};
 
+  // Debug: Verificar o que está chegando e o que temos registrado
+  console.log('DynamicModulePage Debug:', { currentPath, routesCount: AllModuleRoutes.length, availablePaths: AllModuleRoutes.map(r => r.path) });
+
   for (const route of AllModuleRoutes) {
+
     // 1. Match Exato
     if (route.path === currentPath) {
       ComponentToRender = route.component;

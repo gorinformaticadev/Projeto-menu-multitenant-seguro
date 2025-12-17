@@ -1,14 +1,14 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, Req } from '@nestjs/common';
 import { DemoService } from '../services/demo.service';
-import { JwtAuthGuard } from '../../../../backend/src/common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../../../backend/src/common/guards/roles.guard';
-import { Roles } from '../../../../backend/src/common/decorators/roles.decorator';
+import { JwtAuthGuard } from '../../../../../backend/src/common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../../../../backend/src/common/guards/roles.guard';
+import { Roles } from '../../../../../backend/src/common/decorators/roles.decorator';
 import { CreateDemoDto, UpdateDemoDto, FilterDemoDto } from '../dto/demo.dto';
 
 @Controller('api/demo')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class DemoController {
-  constructor(private readonly demoService: DemoService) {}
+  constructor(private readonly demoService: DemoService) { }
 
   @Get()
   async findAll(@Query() filters: FilterDemoDto, @Req() req) {
