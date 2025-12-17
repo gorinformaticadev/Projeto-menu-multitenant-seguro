@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
-import { ModuleStatus } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 /**
  * Serviço de Segurança para Módulos
@@ -17,11 +17,12 @@ export class ModuleSecurityService {
      */
     async canExecuteModule(slug: string, tenantId?: string): Promise<boolean> {
         try {
+            // Usar 'slug' pois é o campo único no modelo
             const module = await this.prisma.module.findUnique({
                 where: { slug },
                 include: {
                     tenantModules: tenantId ? {
-                        where: { tenantId, enabled: true }
+                        where: { tenantId }
                     } : false
                 }
             });
@@ -31,14 +32,14 @@ export class ModuleSecurityService {
                 return false;
             }
 
-            // Verificar status do módulo
-            if (module.status !== ModuleStatus.active) {
+            // Verificar status do módulo usando string direta pois o enum não está disponível
+            if (module.status !== 'active') {
                 this.logger.warn(`Módulo ${slug} não está ativo (status: ${module.status})`);
                 return false;
             }
 
             // Se tenantId fornecido, verificar se está habilitado para o tenant
-            if (tenantId && (!module.tenantModules || module.tenantModules.length === 0)) {
+            if (tenantId && (!module.tenantModules || module.tenantModules.length === 0 || !module.tenantModules[0]?.enabled)) {
                 this.logger.warn(`Módulo ${slug} não habilitado para tenant ${tenantId}`);
                 return false;
             }
@@ -143,35 +144,42 @@ export class ModuleSecurityService {
             const modules = await this.prisma.module.findMany({
                 where: { 
                     status: {
-                        in: [ModuleStatus.active, ModuleStatus.installed, ModuleStatus.db_ready]
+                        in: ['active', 'installed', 'db_ready']
                     }
                 },
                 include: {
                     tenantModules: {
                         where: { tenantId }
-                    },
-                    menus: {
-                        where: { isUserMenu: true },
-                        orderBy: { order: 'asc' }
                     }
+                    // Removido o include de menus pois não existe no modelo atual
                 }
             });
 
+            // Ajustar o mapeamento para usar os campos corretos do modelo
             return modules.map(module => ({
                 slug: module.slug,
                 name: module.name,
                 description: module.description,
-                enabled: module.tenantModules.length > 0 && module.tenantModules[0].enabled,
-                menus: module.menus.map(menu => ({
-                    label: menu.label,
-                    icon: menu.icon,
-                    route: menu.route,
-                    children: [] // TODO: implementar hierarquia
-                }))
+                enabled: module.tenantModules.length > 0 ? module.tenantModules[0]?.enabled : false,
+                // Removidos os menus pois não existem no modelo atual
             }));
 
         } catch (error) {
+            // Tratamento específico para erros de schema
+            if (error instanceof Prisma.PrismaClientKnownRequestError) {
+                this.logger.error(`Erro de schema ao listar módulos para tenant ${tenantId}:`, error.message);
+                
+                // Verificar se é erro de coluna inexistente
+                if (error.message.includes('slug')) {
+                    this.logger.warn('Possível inconsistência no schema - coluna slug não encontrada');
+                    // Retornar array vazio como fallback
+                    return [];
+                }
+            }
+            
+            // Log genérico para outros tipos de erro
             this.logger.error(`Erro ao listar módulos para tenant ${tenantId}:`, error);
+            // Sempre retornar array vazio em caso de erro para manter a consistência da API
             return [];
         }
     }
