@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { useDemos, useComments, Demo } from '../hooks/useDemos';
 import {
   Box,
@@ -43,7 +43,7 @@ export const DemoView: React.FC<DemoViewProps> = ({ demoId }) => {
   const router = useRouter();
   const { getDemo, deleteDemo, likeDemo, incrementViews, loading, error } = useDemos();
   const { comments, createComment, deleteComment, loading: commentsLoading } = useComments(demoId);
-  
+
   const [demo, setDemo] = useState<Demo | null>(null);
   const [liked, setLiked] = useState(false);
   const [commentText, setCommentText] = useState('');
@@ -158,7 +158,7 @@ export const DemoView: React.FC<DemoViewProps> = ({ demoId }) => {
           <Typography variant="subtitle1" color="text.secondary" paragraph>
             {demo.description}
           </Typography>
-          
+
           {/* Metadata */}
           <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
             <Chip
@@ -202,7 +202,7 @@ export const DemoView: React.FC<DemoViewProps> = ({ demoId }) => {
               ))}
             </Stack>
           )}
-          
+
           {demo.tags && demo.tags.length > 0 && (
             <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
               {demo.tags.map((tag) => (
@@ -225,21 +225,21 @@ export const DemoView: React.FC<DemoViewProps> = ({ demoId }) => {
           <IconButton onClick={handleShare} title="Compartilhar">
             <ShareIcon />
           </IconButton>
-          <IconButton 
-            onClick={handleLike} 
+          <IconButton
+            onClick={handleLike}
             color={liked ? 'primary' : 'default'}
             title="Curtir"
           >
             {liked ? <ThumbUpIcon /> : <ThumbUpOutlinedIcon />}
           </IconButton>
-          <IconButton 
+          <IconButton
             onClick={() => router.push(`/demo/edit/${demo.id}`)}
             color="info"
             title="Editar"
           >
             <EditIcon />
           </IconButton>
-          <IconButton 
+          <IconButton
             onClick={handleDelete}
             color="error"
             title="Deletar"
@@ -254,7 +254,7 @@ export const DemoView: React.FC<DemoViewProps> = ({ demoId }) => {
         <Grid item xs={12} md={8}>
           <Card>
             <CardContent>
-              <Box sx={{ 
+              <Box sx={{
                 '& h1': { fontSize: '2rem', mb: 2 },
                 '& h2': { fontSize: '1.5rem', mb: 1.5, mt: 3 },
                 '& h3': { fontSize: '1.25rem', mb: 1.5, mt: 2 },
@@ -263,7 +263,7 @@ export const DemoView: React.FC<DemoViewProps> = ({ demoId }) => {
                 '& ul, & ol': { mb: 2, pl: 3 },
                 '& li': { mb: 0.5 },
                 '& img': { maxWidth: '100%', borderRadius: 1 },
-                '& blockquote': { 
+                '& blockquote': {
                   borderLeft: '4px solid',
                   borderColor: 'primary.main',
                   pl: 2,
@@ -385,7 +385,7 @@ export const DemoView: React.FC<DemoViewProps> = ({ demoId }) => {
                     <Paper key={comment.id} variant="outlined" sx={{ p: 2 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Avatar 
+                          <Avatar
                             src={comment.user?.avatar}
                             sx={{ width: 32, height: 32 }}
                           >

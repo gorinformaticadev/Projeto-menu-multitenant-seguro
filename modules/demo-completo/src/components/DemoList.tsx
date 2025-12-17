@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDemos, useCategories, useTags, DemoFilters } from '../hooks/useDemos';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import {
   Box,
   Button,
@@ -234,12 +234,12 @@ export const DemoList: React.FC = () => {
       <Grid container spacing={3}>
         {demos.map((demo) => (
           <Grid item xs={12} sm={6} md={4} key={demo.id}>
-            <Card 
-              sx={{ 
-                height: '100%', 
-                display: 'flex', 
+            <Card
+              sx={{
+                height: '100%',
+                display: 'flex',
                 flexDirection: 'column',
-                '&:hover': { 
+                '&:hover': {
                   boxShadow: 6,
                   transform: 'translateY(-4px)',
                   transition: 'all 0.3s ease'
@@ -260,11 +260,11 @@ export const DemoList: React.FC = () => {
                 </Box>
 
                 {/* Título */}
-                <Typography 
-                  variant="h6" 
-                  component="h2" 
+                <Typography
+                  variant="h6"
+                  component="h2"
                   gutterBottom
-                  sx={{ 
+                  sx={{
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     display: '-webkit-box',
@@ -276,10 +276,10 @@ export const DemoList: React.FC = () => {
                 </Typography>
 
                 {/* Descrição */}
-                <Typography 
-                  variant="body2" 
-                  color="text.secondary" 
-                  sx={{ 
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{
                     mb: 2,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -314,7 +314,7 @@ export const DemoList: React.FC = () => {
                         key={tag.id}
                         label={tag.name}
                         size="small"
-                        sx={{ 
+                        sx={{
                           bgcolor: tag.color || '#e0e0e0',
                           color: '#fff',
                           fontSize: '0.7rem'

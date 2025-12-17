@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { useDemos, useCategories, useTags, Demo } from '../hooks/useDemos';
 import {
   Box,
@@ -93,15 +93,15 @@ export const DemoEdit: React.FC<DemoEditProps> = ({ demoId }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const updatedDemo = await updateDemo(demoId, formData);
-    
+
     if (updatedDemo) {
       // Upload de arquivos se houver
       if (files.length > 0) {
         const uploadFormData = new FormData();
         files.forEach(file => uploadFormData.append('files', file));
-        
+
         try {
           // TODO: Implementar upload de arquivos
           // await axios.post(`/api/demo/${demoId}/upload`, uploadFormData);
@@ -109,7 +109,7 @@ export const DemoEdit: React.FC<DemoEditProps> = ({ demoId }) => {
           console.error('Erro ao fazer upload de arquivos:', err);
         }
       }
-      
+
       router.push(`/demo/${demoId}`);
     }
   };
@@ -191,7 +191,7 @@ export const DemoEdit: React.FC<DemoEditProps> = ({ demoId }) => {
                         {showPreview ? 'Editar' : 'Preview'}
                       </Button>
                     </Box>
-                    
+
                     {!showPreview ? (
                       <TextField
                         fullWidth
@@ -203,12 +203,12 @@ export const DemoEdit: React.FC<DemoEditProps> = ({ demoId }) => {
                         sx={{ fontFamily: 'monospace' }}
                       />
                     ) : (
-                      <Paper 
-                        variant="outlined" 
-                        sx={{ 
-                          p: 2, 
-                          minHeight: 400, 
-                          maxHeight: 600, 
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          p: 2,
+                          minHeight: 400,
+                          maxHeight: 600,
                           overflow: 'auto',
                           bgcolor: '#fafafa'
                         }}
@@ -328,7 +328,7 @@ export const DemoEdit: React.FC<DemoEditProps> = ({ demoId }) => {
                     Configurações
                   </Typography>
                   <Divider sx={{ mb: 2 }} />
-                  
+
                   <Stack spacing={2}>
                     <FormControl fullWidth>
                       <InputLabel>Status</InputLabel>
@@ -363,7 +363,7 @@ export const DemoEdit: React.FC<DemoEditProps> = ({ demoId }) => {
                     Categorias
                   </Typography>
                   <Divider sx={{ mb: 2 }} />
-                  
+
                   <FormControl fullWidth>
                     <InputLabel>Selecione categorias</InputLabel>
                     <Select
@@ -410,7 +410,7 @@ export const DemoEdit: React.FC<DemoEditProps> = ({ demoId }) => {
                     Tags
                   </Typography>
                   <Divider sx={{ mb: 2 }} />
-                  
+
                   <FormControl fullWidth>
                     <InputLabel>Selecione tags</InputLabel>
                     <Select

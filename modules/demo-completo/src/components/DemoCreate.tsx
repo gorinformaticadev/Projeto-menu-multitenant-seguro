@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { useDemos, useCategories, useTags } from '../hooks/useDemos';
 import {
   Box,
@@ -65,15 +65,15 @@ export const DemoCreate: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const demo = await createDemo(formData);
-    
+
     if (demo) {
       // Upload de arquivos se houver
       if (files.length > 0) {
         const uploadFormData = new FormData();
         files.forEach(file => uploadFormData.append('files', file));
-        
+
         try {
           // TODO: Implementar upload de arquivos
           // await axios.post(`/api/demo/${demo.id}/upload`, uploadFormData);
@@ -81,7 +81,7 @@ export const DemoCreate: React.FC = () => {
           console.error('Erro ao fazer upload de arquivos:', err);
         }
       }
-      
+
       router.push(`/demo/${demo.id}`);
     }
   };
@@ -154,7 +154,7 @@ export const DemoCreate: React.FC = () => {
                         {showPreview ? 'Editar' : 'Preview'}
                       </Button>
                     </Box>
-                    
+
                     {!showPreview ? (
                       <TextField
                         fullWidth
@@ -166,12 +166,12 @@ export const DemoCreate: React.FC = () => {
                         sx={{ fontFamily: 'monospace' }}
                       />
                     ) : (
-                      <Paper 
-                        variant="outlined" 
-                        sx={{ 
-                          p: 2, 
-                          minHeight: 400, 
-                          maxHeight: 600, 
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          p: 2,
+                          minHeight: 400,
+                          maxHeight: 600,
                           overflow: 'auto',
                           bgcolor: '#fafafa'
                         }}
@@ -246,7 +246,7 @@ export const DemoCreate: React.FC = () => {
                     Configurações
                   </Typography>
                   <Divider sx={{ mb: 2 }} />
-                  
+
                   <Stack spacing={2}>
                     <FormControl fullWidth>
                       <InputLabel>Status</InputLabel>
@@ -281,7 +281,7 @@ export const DemoCreate: React.FC = () => {
                     Categorias
                   </Typography>
                   <Divider sx={{ mb: 2 }} />
-                  
+
                   <FormControl fullWidth>
                     <InputLabel>Selecione categorias</InputLabel>
                     <Select
@@ -328,7 +328,7 @@ export const DemoCreate: React.FC = () => {
                     Tags
                   </Typography>
                   <Divider sx={{ mb: 2 }} />
-                  
+
                   <FormControl fullWidth>
                     <InputLabel>Selecione tags</InputLabel>
                     <Select

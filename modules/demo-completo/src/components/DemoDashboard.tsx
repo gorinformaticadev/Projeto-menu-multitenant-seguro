@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { useDemos, useCategories, useTags } from '../hooks/useDemos';
 import axios from 'axios';
 import {
@@ -81,7 +81,7 @@ export const DemoDashboard: React.FC = () => {
   const { demos, loading: demosLoading, error } = useDemos();
   const { categories } = useCategories();
   const { tags } = useTags();
-  
+
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -110,11 +110,11 @@ export const DemoDashboard: React.FC = () => {
     const publishedDemos = demos.filter(d => d.status === 'published').length;
     const draftDemos = demos.filter(d => d.status === 'draft').length;
     const archivedDemos = demos.filter(d => d.status === 'archived').length;
-    
+
     const totalViews = demos.reduce((sum, d) => sum + d.viewsCount, 0);
     const totalLikes = demos.reduce((sum, d) => sum + d.likesCount, 0);
     const totalComments = demos.reduce((sum, d) => sum + (d.comments?.length || 0), 0);
-    
+
     const avgViewsPerDemo = totalDemos > 0 ? totalViews / totalDemos : 0;
     const avgLikesPerDemo = totalDemos > 0 ? totalLikes / totalDemos : 0;
 
