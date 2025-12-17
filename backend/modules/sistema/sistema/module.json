@@ -1,0 +1,17 @@
+{
+  "name": "sistema",
+  "displayName": "Sistema",
+  "version": "1.0.0",
+  "description": "Módulo de sistema com funcionalidades integradas",
+  "author": "Equipe CORE",
+  "category": "system",
+  "enabled": true,
+  "dependencies": {
+    "coreVersion": "1.0.0"
+  },
+  "defaultConfig": {
+    "showNotifications": true,
+    "enableWidgets": true,
+    "maxItems": 50
+  }
+}

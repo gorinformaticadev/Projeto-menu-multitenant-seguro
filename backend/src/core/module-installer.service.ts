@@ -65,27 +65,98 @@ export class ModuleInstallerService {
      * Instala módulo a partir de arquivo ZIP
      */
     async installModuleFromZip(file: Express.Multer.File) {
+        console.log('\n========== SERVICE - installModuleFromZip ==========');
+        console.log('1. Recebendo arquivo no service:', {
+            originalname: file.originalname,
+            size: file.size,
+            mimetype: file.mimetype,
+            bufferExists: !!file.buffer,
+            bufferType: typeof file.buffer,
+            isBuffer: Buffer.isBuffer(file.buffer),
+            bufferLength: file.buffer?.length
+        });
+        
         const tempPath = path.join(this.uploadsPath, `temp_${Date.now()}_${file.originalname}`);
+        console.log('2. Caminho temporário:', tempPath);
 
         try {
-            // Salva arquivo temporariamente
-            fs.writeFileSync(tempPath, file.buffer);
+            console.log('3. Tentando escrever arquivo com fs.writeFileSync...');
+            console.log('   - Buffer info antes de escrever:', {
+                type: typeof file.buffer,
+                constructor: file.buffer.constructor.name,
+                isBuffer: Buffer.isBuffer(file.buffer),
+                length: file.buffer?.length,
+                first10Bytes: file.buffer ? Array.from(file.buffer.slice(0, 10)) : []
+            });
+            
+            // CORREÇÃO: Garantir que temos um Buffer válido
+            let bufferToWrite: Buffer;
+            
+            if (Buffer.isBuffer(file.buffer)) {
+                console.log('   ✅ file.buffer já é um Buffer válido');
+                bufferToWrite = file.buffer;
+            } else if (file.buffer && typeof file.buffer === 'object') {
+                console.log('   ⚠️ file.buffer é Object, tentando conversão...');
+                try {
+                    bufferToWrite = Buffer.from(file.buffer as any);
+                    console.log('   ✅ Conversão bem-sucedida');
+                } catch (convError) {
+                    console.log('   ❌ Falha na conversão, tentando outra abordagem...');
+                    // Se file.buffer tem propriedade 'data' (formato Multer antigo)
+                    if ((file.buffer as any).data) {
+                        bufferToWrite = Buffer.from((file.buffer as any).data);
+                    } else {
+                        throw new Error('Não foi possível converter buffer para formato válido');
+                    }
+                }
+            } else {
+                throw new Error(`Buffer inválido - tipo recebido: ${typeof file.buffer}`);
+            }
+            
+            console.log('   - Buffer final para escrita:', {
+                isBuffer: Buffer.isBuffer(bufferToWrite),
+                length: bufferToWrite.length,
+                first4Bytes: Array.from(bufferToWrite.slice(0, 4)).map(b => '0x' + b.toString(16).padStart(2, '0'))
+            });
+            
+            // Salva arquivo temporariamente com buffer garantido
+            fs.writeFileSync(tempPath, bufferToWrite);
+            console.log('✅ Arquivo escrito com sucesso em:', tempPath);
+            
+            // Verifica se arquivo foi criado
+            const fileStats = fs.statSync(tempPath);
+            console.log('4. Arquivo criado - stats:', {
+                size: fileStats.size,
+                created: fileStats.birthtime
+            });
 
             // Extrai ZIP
+            console.log('5. Extraindo ZIP...');
             const extractPath = path.join(this.modulesPath, path.parse(file.originalname).name);
             await this.extractZip(tempPath, extractPath);
+            console.log('✅ ZIP extraído para:', extractPath);
 
             // Valida estrutura
+            console.log('6. Validando estrutura do módulo...');
             const validation = await this.security.validateModuleStructure(path.parse(file.originalname).name);
             if (!validation.valid) {
+                console.log('❌ Estrutura inválida:', validation.errors);
                 throw new Error(`Estrutura inválida: ${validation.errors.join(', ')}`);
             }
+            console.log('✅ Estrutura válida');
 
             // Lê module.json
+            console.log('7. Lendo module.json...');
             const moduleJsonPath = path.join(extractPath, 'module.json');
             const moduleJson = JSON.parse(fs.readFileSync(moduleJsonPath, 'utf-8'));
+            console.log('✅ module.json lido:', {
+                slug: moduleJson.slug,
+                name: moduleJson.name,
+                version: moduleJson.version
+            });
 
             // Registra no banco como "installed"
+            console.log('8. Registrando módulo no banco...');
             const module = await this.prisma.module.upsert({
                 where: { slug: moduleJson.slug },
                 update: {
@@ -108,13 +179,19 @@ export class ModuleInstallerService {
                     installedAt: new Date()
                 }
             });
+            console.log('✅ Módulo registrado no banco - ID:', module.id);
 
             // Registra menus se definidos
             if (moduleJson.menus && moduleJson.menus.length > 0) {
+                console.log('9. Registrando menus do módulo...');
                 await this.registerModuleMenus(module.id, moduleJson.menus);
+                console.log('✅ Menus registrados');
+            } else {
+                console.log('9. Sem menus para registrar');
             }
 
             // Notifica instalação (NÃO ativação)
+            console.log('10. Criando notificação...');
             await this.notifications.createNotification({
                 title: 'Módulo Instalado',
                 message: `Módulo ${moduleJson.name} instalado com sucesso. Execute a preparação do banco de dados antes de ativar.`,
@@ -126,6 +203,7 @@ export class ModuleInstallerService {
             });
 
             this.logger.log(`✅ Módulo ${moduleJson.slug} instalado com sucesso`);
+            console.log('===============================================\n');
 
             return {
                 success: true,
@@ -139,11 +217,19 @@ export class ModuleInstallerService {
             };
 
         } catch (error) {
+            console.log('\n❌ ERRO CAPTURADO em installModuleFromZip:');
+            console.log('   - Mensagem:', error.message);
+            console.log('   - Stack:', error.stack);
+            console.log('   - Nome:', error.name);
+            console.log('   - Code:', error.code);
+            console.log('===============================================\n');
+            
             this.logger.error('Erro ao instalar módulo:', error);
             throw error;
         } finally {
             // Limpa arquivo temporário
             if (fs.existsSync(tempPath)) {
+                console.log('Limpando arquivo temporário:', tempPath);
                 fs.unlinkSync(tempPath);
             }
         }
