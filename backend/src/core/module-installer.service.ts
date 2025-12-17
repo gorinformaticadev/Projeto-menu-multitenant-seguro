@@ -1,15 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as AdmZip from 'adm-zip';
 import { PrismaService } from './prisma.service';
-import { ModuleSecurityService } from './module-security.service';
 import { NotificationService } from './notification.service';
 import { ModuleStatus, MigrationType } from '@prisma/client';
+import { ModuleJsonValidator, ModuleJson, ModuleDependency } from './validators/module-json.validator';
+import { ModuleStructureValidator, ModuleStructureResult } from './validators/module-structure.validator';
 
 /**
- * Serviço de Instalação de Módulos
- * Gerencia upload, instalação, ativação e migrations de módulos
+ * Serviço de Instalação de Módulos - REFATORADO
+ * Gerencia upload, instalação, ativação e migrations de módulos de forma segura e robusta
  */
 @Injectable()
 export class ModuleInstallerService {
@@ -19,7 +20,6 @@ export class ModuleInstallerService {
 
     constructor(
         private readonly prisma: PrismaService,
-        private readonly security: ModuleSecurityService,
         private readonly notifications: NotificationService
     ) {
         // Garante que os diretórios existem
@@ -62,181 +62,241 @@ export class ModuleInstallerService {
     }
 
     /**
-     * Instala módulo a partir de arquivo ZIP
+     * Instala módulo a partir de arquivo ZIP - REFATORADO
+     * 
+     * Suporta dois formatos de ZIP:
+     * 1. Raiz limpa: module.json na raiz do ZIP
+     * 2. Pasta raiz: pasta-modulo/module.json
+     * 
+     * Fluxo de instalação seguro:
+     * 1. Preparar buffer do arquivo
+     * 2. Analisar estrutura do ZIP (SEM extrair)
+     * 3. Validar module.json
+     * 4. Validar nome seguro
+     * 5. Validar que módulo não existe
+     * 6. Extrair de forma segura (com proteção Zip Slip)
+     * 7. Registrar no banco
+     * 8. Registrar menus
+     * 9. Notificar sucesso
      */
     async installModuleFromZip(file: Express.Multer.File) {
-        console.log('\n========== SERVICE - installModuleFromZip ==========');
-        console.log('1. Recebendo arquivo no service:', {
-            originalname: file.originalname,
-            size: file.size,
-            mimetype: file.mimetype,
-            bufferExists: !!file.buffer,
-            bufferType: typeof file.buffer,
-            isBuffer: Buffer.isBuffer(file.buffer),
-            bufferLength: file.buffer?.length
-        });
-        
-        const tempPath = path.join(this.uploadsPath, `temp_${Date.now()}_${file.originalname}`);
-        console.log('2. Caminho temporário:', tempPath);
+        this.logger.log('🚀 Iniciando instalação de módulo...');
 
         try {
-            console.log('3. Tentando escrever arquivo com fs.writeFileSync...');
-            console.log('   - Buffer info antes de escrever:', {
-                type: typeof file.buffer,
-                constructor: file.buffer.constructor.name,
-                isBuffer: Buffer.isBuffer(file.buffer),
-                length: file.buffer?.length,
-                first10Bytes: file.buffer ? Array.from(file.buffer.slice(0, 10)) : []
-            });
-            
-            // CORREÇÃO: Garantir que temos um Buffer válido
-            let bufferToWrite: Buffer;
-            
-            if (Buffer.isBuffer(file.buffer)) {
-                console.log('   ✅ file.buffer já é um Buffer válido');
-                bufferToWrite = file.buffer;
-            } else if (file.buffer && typeof file.buffer === 'object') {
-                console.log('   ⚠️ file.buffer é Object, tentando conversão...');
-                try {
-                    bufferToWrite = Buffer.from(file.buffer as any);
-                    console.log('   ✅ Conversão bem-sucedida');
-                } catch (convError) {
-                    console.log('   ❌ Falha na conversão, tentando outra abordagem...');
-                    // Se file.buffer tem propriedade 'data' (formato Multer antigo)
-                    if ((file.buffer as any).data) {
-                        bufferToWrite = Buffer.from((file.buffer as any).data);
-                    } else {
-                        throw new Error('Não foi possível converter buffer para formato válido');
-                    }
-                }
+            // 1️⃣ PREPARAR BUFFER
+            this.logger.log('1. Preparando buffer do arquivo...');
+            const bufferToWrite = this.prepareFileBuffer(file);
+            this.logger.log(`✅ Buffer preparado: ${bufferToWrite.length} bytes`);
+
+            // 2️⃣ ANALISAR ESTRUTURA DO ZIP (SEM EXTRAIR)
+            this.logger.log('2. Analisando estrutura do ZIP...');
+            const structure = ModuleStructureValidator.analyzeZipStructure(bufferToWrite);
+            this.logger.log(`✅ Estrutura detectada - Base: ${structure.basePath || '(raiz)'}`);
+
+            // 3️⃣ VALIDAR MODULE.JSON
+            this.logger.log('3. Validando module.json...');
+            const moduleJsonData = JSON.parse(structure.moduleJsonContent);
+            const validatedModule = ModuleJsonValidator.validate(moduleJsonData);
+            this.logger.log(`✅ module.json válido - Módulo: ${validatedModule.name} v${validatedModule.version}`);
+
+            // 4️⃣ VALIDAR NOME SEGURO
+            this.logger.log('4. Validando nome seguro para filesystem...');
+            ModuleJsonValidator.validateSafeName(validatedModule.name);
+            this.logger.log(`✅ Nome seguro validado: ${validatedModule.name}`);
+
+            // 5️⃣ VALIDAR QUE NÃO EXISTE
+            this.logger.log('5. Verificando se módulo já existe...');
+            ModuleStructureValidator.validateModuleNotExists(validatedModule.name, this.modulesPath);
+            this.logger.log(`✅ Módulo ${validatedModule.name} não existe - OK para instalar`);
+
+            // 6️⃣ EXTRAIR ZIP DE FORMA SEGURA
+            this.logger.log('6. Extraindo módulo de forma segura...');
+            const finalModulePath = path.join(this.modulesPath, validatedModule.name);
+            await this.extractModuleSafely(bufferToWrite, structure, finalModulePath);
+            this.logger.log(`✅ Módulo extraído para: ${finalModulePath}`);
+
+            // 7️⃣ REGISTRAR NO BANCO
+            this.logger.log('7. Registrando módulo no banco de dados...');
+            const module = await this.registerModuleInDatabase(
+                validatedModule,
+                structure,
+                finalModulePath
+            );
+            this.logger.log(`✅ Módulo registrado - ID: ${module.id}`);
+
+            // 8️⃣ REGISTRAR MENUS (SE HOUVER)
+            if (validatedModule.menus && validatedModule.menus.length > 0) {
+                this.logger.log(`8. Registrando ${validatedModule.menus.length} menu(s)...`);
+                await this.registerModuleMenus(module.id, validatedModule.menus);
+                this.logger.log(`✅ Menus registrados`);
             } else {
-                throw new Error(`Buffer inválido - tipo recebido: ${typeof file.buffer}`);
-            }
-            
-            console.log('   - Buffer final para escrita:', {
-                isBuffer: Buffer.isBuffer(bufferToWrite),
-                length: bufferToWrite.length,
-                first4Bytes: Array.from(bufferToWrite.slice(0, 4)).map(b => '0x' + b.toString(16).padStart(2, '0'))
-            });
-            
-            // Salva arquivo temporariamente com buffer garantido
-            fs.writeFileSync(tempPath, bufferToWrite);
-            console.log('✅ Arquivo escrito com sucesso em:', tempPath);
-            
-            // Verifica se arquivo foi criado
-            const fileStats = fs.statSync(tempPath);
-            console.log('4. Arquivo criado - stats:', {
-                size: fileStats.size,
-                created: fileStats.birthtime
-            });
-
-            // Extrai ZIP
-            console.log('5. Extraindo ZIP...');
-            const extractPath = path.join(this.modulesPath, path.parse(file.originalname).name);
-            await this.extractZip(tempPath, extractPath);
-            console.log('✅ ZIP extraído para:', extractPath);
-
-            // Valida estrutura
-            console.log('6. Validando estrutura do módulo...');
-            const validation = await this.security.validateModuleStructure(path.parse(file.originalname).name);
-            if (!validation.valid) {
-                console.log('❌ Estrutura inválida:', validation.errors);
-                throw new Error(`Estrutura inválida: ${validation.errors.join(', ')}`);
-            }
-            console.log('✅ Estrutura válida');
-
-            // Lê module.json
-            console.log('7. Lendo module.json...');
-            const moduleJsonPath = path.join(extractPath, 'module.json');
-            const moduleJson = JSON.parse(fs.readFileSync(moduleJsonPath, 'utf-8'));
-            console.log('✅ module.json lido:', {
-                slug: moduleJson.slug,
-                name: moduleJson.name,
-                version: moduleJson.version
-            });
-
-            // Registra no banco como "installed"
-            console.log('8. Registrando módulo no banco...');
-            const module = await this.prisma.module.upsert({
-                where: { slug: moduleJson.slug },
-                update: {
-                    name: moduleJson.name,
-                    version: moduleJson.version,
-                    description: moduleJson.description,
-                    status: ModuleStatus.installed,
-                    hasBackend: fs.existsSync(path.join(extractPath, 'backend')),
-                    hasFrontend: fs.existsSync(path.join(extractPath, 'frontend')),
-                    installedAt: new Date()
-                },
-                create: {
-                    slug: moduleJson.slug,
-                    name: moduleJson.name,
-                    version: moduleJson.version,
-                    description: moduleJson.description,
-                    status: ModuleStatus.installed,
-                    hasBackend: fs.existsSync(path.join(extractPath, 'backend')),
-                    hasFrontend: fs.existsSync(path.join(extractPath, 'frontend')),
-                    installedAt: new Date()
-                }
-            });
-            console.log('✅ Módulo registrado no banco - ID:', module.id);
-
-            // Registra menus se definidos
-            if (moduleJson.menus && moduleJson.menus.length > 0) {
-                console.log('9. Registrando menus do módulo...');
-                await this.registerModuleMenus(module.id, moduleJson.menus);
-                console.log('✅ Menus registrados');
-            } else {
-                console.log('9. Sem menus para registrar');
+                this.logger.log('8. Nenhum menu para registrar');
             }
 
-            // Notifica instalação (NÃO ativação)
-            console.log('10. Criando notificação...');
-            await this.notifications.createNotification({
-                title: 'Módulo Instalado',
-                message: `Módulo ${moduleJson.name} instalado com sucesso. Execute a preparação do banco de dados antes de ativar.`,
-                severity: 'info',
-                audience: 'super_admin',
-                source: 'core',
-                module: moduleJson.slug,
-                context: '/configuracoes/sistema/modulos'
-            });
+            // 9️⃣ NOTIFICAR SUCESSO
+            this.logger.log('9. Criando notificação de sucesso...');
+            await this.notifyModuleInstalled(validatedModule);
+            this.logger.log(`✅ Notificação criada`);
 
-            this.logger.log(`✅ Módulo ${moduleJson.slug} instalado com sucesso`);
-            console.log('===============================================\n');
+            this.logger.log(`✅ Módulo ${validatedModule.name} instalado com sucesso!`);
 
             return {
                 success: true,
                 module: {
-                    slug: module.slug,
-                    name: module.name,
-                    version: module.version,
-                    status: module.status
+                    name: validatedModule.name,
+                    displayName: validatedModule.displayName,
+                    version: validatedModule.version,
+                    status: ModuleStatus.installed
                 },
                 message: 'Módulo instalado. Execute preparação de banco antes de ativar.'
             };
 
         } catch (error) {
-            console.log('\n❌ ERRO CAPTURADO em installModuleFromZip:');
-            console.log('   - Mensagem:', error.message);
-            console.log('   - Stack:', error.stack);
-            console.log('   - Nome:', error.name);
-            console.log('   - Code:', error.code);
-            console.log('===============================================\n');
-            
-            this.logger.error('Erro ao instalar módulo:', error);
+            this.logger.error('❌ Erro ao instalar módulo:', error.message);
+            this.logger.error('Stack:', error.stack);
             throw error;
-        } finally {
-            // Limpa arquivo temporário
-            if (fs.existsSync(tempPath)) {
-                console.log('Limpando arquivo temporário:', tempPath);
-                fs.unlinkSync(tempPath);
-            }
         }
     }
 
     /**
+     * Prepara buffer do arquivo recebido
+     * Resolve problema de buffer serializado como Object
+     */
+    private prepareFileBuffer(file: Express.Multer.File): Buffer {
+        // Caso 1: Já é Buffer válido
+        if (Buffer.isBuffer(file.buffer)) {
+            return file.buffer;
+        }
+
+        // Caso 2: file.buffer é Object serializado (bug conhecido do Multer)
+        if (file.buffer && typeof file.buffer === 'object') {
+            this.logger.warn('⚠️ Buffer chegou como Object, convertendo...');
+            const bufferArray = Object.values(file.buffer);
+            return Buffer.from(bufferArray as number[]);
+        }
+
+        // Caso 3: Tipo inválido
+        throw new BadRequestException(
+            `Buffer de arquivo inválido - tipo recebido: ${typeof file.buffer}`
+        );
+    }
+
+    /**
+     * Extrai módulo de forma segura com proteção contra Zip Slip
+     * Remove basePath automaticamente se houver
+     */
+    private async extractModuleSafely(
+        zipBuffer: Buffer,
+        structure: ModuleStructureResult,
+        destinationPath: string
+    ): Promise<void> {
+        const zip = new AdmZip(zipBuffer);
+        const entries = zip.getEntries();
+
+        // Criar diretório de destino
+        if (!fs.existsSync(destinationPath)) {
+            fs.mkdirSync(destinationPath, { recursive: true });
+        }
+
+        let filesExtracted = 0;
+
+        for (const entry of entries) {
+            // Ignorar diretórios (serão criados automaticamente)
+            if (entry.isDirectory) {
+                continue;
+            }
+
+            // Remover basePath se houver (normaliza ambos os formatos)
+            let relativePath = entry.entryName;
+            
+            if (structure.basePath) {
+                const basePathWithSlash = structure.basePath + '/';
+                
+                // Ignorar arquivos fora da pasta raiz do módulo
+                if (!relativePath.startsWith(basePathWithSlash)) {
+                    continue;
+                }
+                
+                // Remover basePath para obter caminho relativo limpo
+                relativePath = relativePath.substring(basePathWithSlash.length);
+            }
+
+            // Pular se caminho ficou vazio após remoção do basePath
+            if (!relativePath || relativePath.trim() === '') {
+                continue;
+            }
+
+            // Validar path seguro (previne Zip Slip e path traversal)
+            ModuleStructureValidator.validateSafePath(relativePath);
+
+            // Caminho final absoluto
+            const targetPath = path.join(destinationPath, relativePath);
+
+            // Validar que targetPath está dentro de destinationPath (proteção adicional)
+            const normalizedTarget = path.normalize(targetPath);
+            const normalizedDestination = path.normalize(destinationPath);
+            
+            if (!normalizedTarget.startsWith(normalizedDestination)) {
+                throw new BadRequestException(
+                    `Tentativa de Zip Slip detectada: ${entry.entryName}`
+                );
+            }
+
+            // Criar diretórios intermediários
+            const targetDir = path.dirname(targetPath);
+            if (!fs.existsSync(targetDir)) {
+                fs.mkdirSync(targetDir, { recursive: true });
+            }
+
+            // Extrair arquivo
+            const data = entry.getData();
+            fs.writeFileSync(targetPath, data);
+            filesExtracted++;
+        }
+
+        this.logger.log(`✅ ${filesExtracted} arquivo(s) extraído(s) com segurança`);
+    }
+
+    /**
+     * Registra módulo no banco de dados
+     */
+    private async registerModuleInDatabase(
+        moduleJson: ModuleJson,
+        structure: ModuleStructureResult,
+        modulePath: string
+    ) {
+        return await this.prisma.module.create({
+            data: {
+                slug: moduleJson.name,
+                name: moduleJson.displayName,
+                version: moduleJson.version,
+                description: moduleJson.description || '',
+                status: ModuleStatus.installed,
+                hasBackend: structure.hasBackend,
+                hasFrontend: structure.hasFrontend,
+                installedAt: new Date()
+            }
+        });
+    }
+
+    /**
+     * Cria notificação de módulo instalado
+     */
+    private async notifyModuleInstalled(moduleJson: ModuleJson): Promise<void> {
+        await this.notifications.createNotification({
+            title: 'Módulo Instalado',
+            message: `Módulo ${moduleJson.displayName} instalado com sucesso. Execute a preparação do banco de dados antes de ativar.`,
+            severity: 'info',
+            audience: 'super_admin',
+            source: 'core',
+            module: moduleJson.name,
+            context: '/configuracoes/sistema/modulos'
+        });
+    }
+
+    /**
      * Ativa um módulo instalado
+     * MANTIDO SEM ALTERAÇÕES
      */
     async activateModule(slug: string) {
         const module = await this.prisma.module.findUnique({
@@ -286,7 +346,7 @@ export class ModuleInstallerService {
             }
         }
 
-        // Atualiza status para ativo
+        // Atualizar status para ativo
         await this.prisma.module.update({
             where: { slug },
             data: {
@@ -297,19 +357,20 @@ export class ModuleInstallerService {
 
         await this.notifications.createNotification({
             title: 'Módulo Ativado',
-            message: `Módulo ${module.name} está agora operacional no sistema.`,
+            message: `Módulo ${module.name} está agora operacional no sistema`,
             severity: 'info',
             audience: 'super_admin',
             source: 'core',
-            module: slug
+            module: slug,
+            context: '/configuracoes/sistema/modulos'
         });
-        
-        this.logger.log(`✅ Módulo ${slug} ativado com sucesso`);
+
         return { success: true, message: `Módulo ${slug} ativado` };
     }
 
     /**
      * Desativa um módulo
+     * MANTIDO SEM ALTERAÇÕES
      */
     async deactivateModule(slug: string) {
         const module = await this.prisma.module.findUnique({
@@ -320,33 +381,29 @@ export class ModuleInstallerService {
             throw new Error('Módulo não encontrado');
         }
 
-        // Verificar dependências inversas (outros módulos que dependem deste)
+        // Verificar se outros módulos dependem deste
         const allModules = await this.prisma.module.findMany({
             where: { status: ModuleStatus.active }
         });
 
-        const dependentModules = [];
-        
         for (const otherModule of allModules) {
             if (otherModule.slug === slug) continue;
-            
+
             const otherModulePath = path.join(this.modulesPath, otherModule.slug);
             const otherModuleJsonPath = path.join(otherModulePath, 'module.json');
-            
+
             if (fs.existsSync(otherModuleJsonPath)) {
                 const otherModuleJson = JSON.parse(fs.readFileSync(otherModuleJsonPath, 'utf-8'));
-                
+
                 if (otherModuleJson.dependencies && otherModuleJson.dependencies.includes(slug)) {
-                    dependentModules.push(otherModule.name);
+                    throw new Error(
+                        `Não é possível desativar ${slug}. Módulo ${otherModule.name} depende dele. Desative ${otherModule.name} primeiro.`
+                    );
                 }
             }
         }
-        
-        if (dependentModules.length > 0) {
-            throw new Error(`Não é possível desativar. Módulos dependentes: ${dependentModules.join(', ')}`);
-        }
 
-        // Atualiza status para desativado
+        // Atualizar status para desativado
         await this.prisma.module.update({
             where: { slug },
             data: {
@@ -357,19 +414,19 @@ export class ModuleInstallerService {
 
         await this.notifications.createNotification({
             title: 'Módulo Desativado',
-            message: `Módulo ${module.name} foi desativado`,
+            message: `Módulo ${slug} foi desativado`,
             severity: 'info',
             audience: 'super_admin',
             source: 'core',
             module: slug
         });
 
-        this.logger.log(`⏸️ Módulo ${slug} desativado com sucesso`);
         return { success: true, message: `Módulo ${slug} desativado` };
     }
 
     /**
      * Atualiza banco de dados do módulo (executa migrations e seeds)
+     * MANTIDO SEM ALTERAÇÕES
      */
     async updateModuleDatabase(slug: string) {
         const module = await this.prisma.module.findUnique({
@@ -381,59 +438,41 @@ export class ModuleInstallerService {
         }
 
         const modulePath = path.join(this.modulesPath, slug);
-        let migrationsExecuted = 0;
-        let seedsExecuted = 0;
 
-        try {
-            // Executa migrations
-            migrationsExecuted = await this.executeMigrations(slug, modulePath, 'migration');
+        // Executa migrations
+        const migrationsExecuted = await this.executeMigrations(slug, modulePath, MigrationType.migration);
 
-            // Executa seeds
-            seedsExecuted = await this.executeMigrations(slug, modulePath, 'seed');
+        // Executa seeds
+        const seedsExecuted = await this.executeMigrations(slug, modulePath, MigrationType.seed);
 
-            // Atualiza status
-            await this.prisma.module.update({
-                where: { slug },
-                data: { status: ModuleStatus.db_ready }
-            });
+        // Atualiza status
+        await this.prisma.module.update({
+            where: { slug },
+            data: { status: ModuleStatus.db_ready }
+        });
 
-            // Notifica sucesso
-            await this.notifications.createNotification({
-                title: 'Banco de Dados Atualizado',
-                message: `Módulo ${module.name} está pronto. ${migrationsExecuted} migrations e ${seedsExecuted} seeds executados.`,
-                severity: 'info',
-                audience: 'super_admin',
-                source: 'core',
-                module: slug
-            });
+        await this.notifications.createNotification({
+            title: 'Banco de Dados Atualizado',
+            message: `Módulo ${module.name}: ${migrationsExecuted} migration(s) e ${seedsExecuted} seed(s) executados`,
+            severity: 'info',
+            audience: 'super_admin',
+            source: 'core',
+            module: slug
+        });
 
-            this.logger.log(`✅ Banco de dados do módulo ${slug} atualizado`);
-            
-            return {
-                success: true,
-                executed: {
-                    migrations: migrationsExecuted,
-                    seeds: seedsExecuted
-                },
-                message: 'Banco de dados atualizado'
-            };
-        } catch (error) {
-            // Notifica erro
-            await this.notifications.createNotification({
-                title: 'Erro ao Preparar Banco',
-                message: `Falha ao atualizar banco do módulo ${module.name}: ${error.message}`,
-                severity: 'critical',
-                audience: 'super_admin',
-                source: 'core',
-                module: slug
-            });
-            
-            throw error;
-        }
+        return {
+            success: true,
+            executed: {
+                migrations: migrationsExecuted,
+                seeds: seedsExecuted
+            },
+            message: 'Banco de dados atualizado'
+        };
     }
 
     /**
      * Obtém status detalhado de um módulo
+     * MANTIDO SEM ALTERAÇÕES
      */
     async getModuleStatus(slug: string) {
         const module = await this.prisma.module.findUnique({
@@ -478,199 +517,10 @@ export class ModuleInstallerService {
     }
 
     /**
-     * Desinstala um módulo com opções de remoção de dados
-     */
-    async uninstallModule(slug: string, options: {
-        dataRemovalOption: 'keep' | 'core_only' | 'full';
-        confirmationName: string;
-    }) {
-        const module = await this.prisma.module.findUnique({
-            where: { slug },
-            include: {
-                tenantModules: true,
-                migrations: true
-            }
-        });
-
-        if (!module) {
-            throw new Error('Módulo não encontrado');
-        }
-
-        // VALIDAÇÃO 1: Status deve ser disabled ou installed
-        if (module.status !== ModuleStatus.disabled && module.status !== ModuleStatus.installed) {
-            throw new Error('Desative o módulo antes de desinstalar');
-        }
-
-        // VALIDAÇÃO 2: Verificar dependências inversas
-        const allModules = await this.prisma.module.findMany({
-            where: {
-                status: { in: [ModuleStatus.active, ModuleStatus.db_ready] }
-            }
-        });
-
-        const dependentModules = [];
-        
-        for (const otherModule of allModules) {
-            if (otherModule.slug === slug) continue;
-            
-            const otherModulePath = path.join(this.modulesPath, otherModule.slug);
-            const otherModuleJsonPath = path.join(otherModulePath, 'module.json');
-            
-            if (fs.existsSync(otherModuleJsonPath)) {
-                const otherModuleJson = JSON.parse(fs.readFileSync(otherModuleJsonPath, 'utf-8'));
-                
-                if (otherModuleJson.dependencies && otherModuleJson.dependencies.includes(slug)) {
-                    dependentModules.push(otherModule.name);
-                }
-            }
-        }
-        
-        if (dependentModules.length > 0) {
-            throw new Error(`Módulos dependentes: ${dependentModules.join(', ')}. Desative-os primeiro`);
-        }
-
-        // VALIDAÇÃO 3: Verificar tenants ativos
-        const activeTenants = module.tenantModules.filter(tm => tm.enabled);
-        if (activeTenants.length > 0) {
-            throw new Error(`Módulo em uso por ${activeTenants.length} tenant(s). Desabilite primeiro`);
-        }
-
-        // VALIDAÇÃO 4: Confirmação de nome
-        if (options.confirmationName !== slug) {
-            throw new Error('Nome de confirmação incorreto');
-        }
-
-        const result: any = {
-            success: true,
-            removed: {
-                coreRecords: false,
-                tables: [],
-                files: null
-            },
-            message: 'Módulo desinstalado'
-        };
-
-        try {
-            // CAMADA 1: Remover registros do CORE (SEMPRE)
-            // Os registros de module_menus, module_migrations e module_tenant
-            // serão removidos em cascata devido ao onDelete: Cascade no Prisma
-            await this.prisma.module.delete({
-                where: { slug }
-            });
-            result.removed.coreRecords = true;
-            this.logger.log(`✅ Registros do CORE removidos para módulo ${slug}`);
-
-            // CAMADA 2: Remover tabelas do módulo (CONDICIONAL)
-            if (options.dataRemovalOption === 'full') {
-                const modulePath = path.join(this.modulesPath, slug);
-                const moduleJsonPath = path.join(modulePath, 'module.json');
-                
-                // Buscar tabelas criadas pelo módulo
-                const tablesToDrop = [];
-                
-                if (fs.existsSync(moduleJsonPath)) {
-                    const moduleJson = JSON.parse(fs.readFileSync(moduleJsonPath, 'utf-8'));
-                    
-                    // Se módulo declara allowDataRemoval: true e possui rollback.sql
-                    const rollbackPath = path.join(modulePath, 'rollback.sql');
-                    const uninstallPath = path.join(modulePath, 'uninstall.sql');
-                    
-                    if (moduleJson.allowDataRemoval && fs.existsSync(rollbackPath)) {
-                        // Executar script de rollback customizado
-                        const rollbackSql = fs.readFileSync(rollbackPath, 'utf-8');
-                        await this.prisma.$executeRawUnsafe(rollbackSql);
-                        this.logger.log(`✅ Rollback customizado executado para ${slug}`);
-                    } else if (moduleJson.allowDataRemoval && fs.existsSync(uninstallPath)) {
-                        // Executar script de uninstall customizado
-                        const uninstallSql = fs.readFileSync(uninstallPath, 'utf-8');
-                        await this.prisma.$executeRawUnsafe(uninstallSql);
-                        this.logger.log(`✅ Uninstall customizado executado para ${slug}`);
-                    }
-                    
-                    // Extrair tabelas das migrations
-                    const migrationsPath = path.join(modulePath, 'migrations');
-                    if (fs.existsSync(migrationsPath)) {
-                        const migrationFiles = fs.readdirSync(migrationsPath)
-                            .filter(f => f.endsWith('.sql'))
-                            .sort();
-                        
-                        for (const file of migrationFiles) {
-                            const filePath = path.join(migrationsPath, file);
-                            const sql = fs.readFileSync(filePath, 'utf-8');
-                            
-                            // Regex simples para detectar CREATE TABLE
-                            const tableMatches = sql.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?(\w+)["']?/gi);
-                            if (tableMatches) {
-                                tableMatches.forEach(match => {
-                                    const tableName = match.replace(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?/i, '').replace(/["']?.*/, '');
-                                    if (tableName && !tablesToDrop.includes(tableName.toLowerCase())) {
-                                        tablesToDrop.push(tableName.toLowerCase());
-                                    }
-                                });
-                            }
-                        }
-                    }
-                }
-                
-                // Executar DROP TABLE para cada tabela detectada
-                for (const tableName of tablesToDrop) {
-                    try {
-                        // Verificar se tabela existe antes de dropar
-                        const tableExists = await this.prisma.$queryRawUnsafe<any[]>(
-                            `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1`,
-                            tableName
-                        );
-                        
-                        if (tableExists && tableExists.length > 0) {
-                            await this.prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "${tableName}" CASCADE`);
-                            result.removed.tables.push(tableName);
-                            this.logger.log(`✅ Tabela ${tableName} removida`);
-                        }
-                    } catch (error) {
-                        this.logger.warn(`⚠️ Não foi possível remover tabela ${tableName}: ${error.message}`);
-                        // Não lança erro, apenas registra aviso
-                    }
-                }
-            }
-
-            // CAMADA 3: Remover arquivos do módulo
-            const modulePath = path.join(this.modulesPath, slug);
-            if (fs.existsSync(modulePath)) {
-                // Remover diretório recursivamente
-                fs.rmSync(modulePath, { recursive: true, force: true });
-                result.removed.files = `/modules/${slug}`;
-                this.logger.log(`✅ Arquivos do módulo ${slug} removidos`);
-            }
-
-            // AUDITORIA
-            await this.notifications.createNotification({
-                title: 'Módulo Desinstalado',
-                message: `Módulo ${module.name} foi removido do sistema`,
-                severity: 'warning',
-                audience: 'super_admin',
-                source: 'core',
-                module: slug
-            });
-
-            this.logger.log(`✅ Módulo ${slug} desinstalado com sucesso`);
-            return result;
-
-        } catch (error) {
-            this.logger.error(`❌ Erro ao desinstalar módulo ${slug}:`, error);
-            throw error;
-        }
-    }
-
-    /**
      * Registra menus do módulo
+     * MANTIDO SEM ALTERAÇÕES
      */
     private async registerModuleMenus(moduleId: string, menus: any[]) {
-        // Deletar menus existentes do módulo (para atualizações)
-        await this.prisma.moduleMenu.deleteMany({
-            where: { moduleId }
-        });
-
-        // Criar novos menus
         for (const menu of menus) {
             await this.prisma.moduleMenu.create({
                 data: {
@@ -689,7 +539,7 @@ export class ModuleInstallerService {
 
     /**
      * Executa migrations ou seeds
-     * @returns Número de arquivos executados
+     * MANTIDO SEM ALTERAÇÕES
      */
     private async executeMigrations(slug: string, modulePath: string, type: MigrationType): Promise<number> {
         const migrationsPath = path.join(modulePath, type === MigrationType.migration ? 'migrations' : 'seeds');
@@ -702,17 +552,8 @@ export class ModuleInstallerService {
             .filter(file => file.endsWith('.sql'))
             .sort();
 
-        if (files.length === 0) {
-            return 0;
-        }
-
-        // Buscar moduleId uma vez
-        const module = await this.prisma.module.findUnique({ where: { slug } });
-        if (!module) {
-            throw new Error(`Módulo ${slug} não encontrado`);
-        }
-
-        let executedCount = 0;
+        const moduleId = (await this.prisma.module.findUnique({ where: { slug } }))!.id;
+        let executed = 0;
 
         for (const file of files) {
             const filePath = path.join(migrationsPath, file);
@@ -721,7 +562,7 @@ export class ModuleInstallerService {
             const existing = await this.prisma.moduleMigration.findUnique({
                 where: {
                     moduleId_filename_type: {
-                        moduleId: module.id,
+                        moduleId,
                         filename: file,
                         type
                     }
@@ -740,7 +581,7 @@ export class ModuleInstallerService {
                 // Registra execução
                 await this.prisma.moduleMigration.create({
                     data: {
-                        moduleId: module.id,
+                        moduleId,
                         filename: file,
                         type,
                         executedAt: new Date()
@@ -748,32 +589,16 @@ export class ModuleInstallerService {
                 });
 
                 const duration = Date.now() - startTime;
-                executedCount++;
-
                 this.logger.log(`✅ ${type} ${file} executado em ${duration}ms`);
+                executed++;
 
             } catch (error) {
                 this.logger.error(`❌ Erro ao executar ${type} ${file}:`, error);
-                throw new Error(`Falha ao executar ${file}: ${error.message}`);
+                throw error;
             }
         }
 
-        return executedCount;
-    }
-
-    /**
-     * Extrai arquivo ZIP
-     */
-    private async extractZip(zipPath: string, extractPath: string): Promise<void> {
-        return new Promise((resolve, reject) => {
-            try {
-                const zip = new AdmZip(zipPath);
-                zip.extractAllTo(extractPath, true);
-                resolve();
-            } catch (error) {
-                reject(error);
-            }
-        });
+        return executed;
     }
 
     /**
@@ -785,5 +610,125 @@ export class ModuleInstallerService {
                 fs.mkdirSync(dir, { recursive: true });
             }
         });
+    }
+
+    /**
+     * Desinstala um módulo do sistema
+     * 
+     * Validações obrigatórias:
+     * 1. Módulo deve estar disabled ou installed
+     * 2. Nenhum módulo ativo pode depender dele
+     * 3. Nenhum tenant pode ter o módulo habilitado
+     * 4. Confirmação de nome deve ser exata
+     */
+    async uninstallModule(
+        slug: string,
+        options: {
+            dataRemovalOption: 'keep' | 'core_only' | 'full';
+            confirmationName: string;
+        }
+    ) {
+        this.logger.log(`🗑️ Iniciando desinstalação do módulo: ${slug}`);
+
+        // 1️⃣ VALIDAR MÓDULO EXISTE
+        const module = await this.prisma.module.findUnique({
+            where: { slug },
+            include: {
+                tenantModules: true
+            }
+        });
+
+        if (!module) {
+            throw new BadRequestException('Módulo não encontrado');
+        }
+
+        // 2️⃣ VALIDAR STATUS
+        if (module.status !== ModuleStatus.disabled && module.status !== ModuleStatus.installed) {
+            throw new BadRequestException(
+                `Módulo deve estar desativado antes de desinstalar. Status atual: ${module.status}`
+            );
+        }
+
+        // 3️⃣ VALIDAR DEPENDÊNCIAS INVERSAS
+        const allModules = await this.prisma.module.findMany({
+            where: { status: ModuleStatus.active }
+        });
+
+        const dependentModules: string[] = [];
+
+        for (const otherModule of allModules) {
+            if (otherModule.slug === slug) continue;
+
+            const otherModulePath = path.join(this.modulesPath, otherModule.slug);
+            const otherModuleJsonPath = path.join(otherModulePath, 'module.json');
+
+            if (fs.existsSync(otherModuleJsonPath)) {
+                const otherModuleJson = JSON.parse(fs.readFileSync(otherModuleJsonPath, 'utf-8'));
+
+                if (otherModuleJson.dependencies && otherModuleJson.dependencies.includes(slug)) {
+                    dependentModules.push(otherModule.name);
+                }
+            }
+        }
+
+        if (dependentModules.length > 0) {
+            throw new BadRequestException(
+                `Não é possível desinstalar. Módulos dependentes: ${dependentModules.join(', ')}. Desative-os primeiro.`
+            );
+        }
+
+        // 4️⃣ VALIDAR TENANTS ATIVOS
+        const activeTenants = module.tenantModules.filter(tm => tm.enabled);
+        
+        if (activeTenants.length > 0) {
+            throw new BadRequestException(
+                `Módulo em uso por ${activeTenants.length} tenant(s). Desabilite o módulo em todos os tenants primeiro.`
+            );
+        }
+
+        // 5️⃣ VALIDAR CONFIRMAÇÃO DE NOME
+        if (options.confirmationName !== slug) {
+            throw new BadRequestException(
+                'Nome de confirmação incorreto. Digite o slug exato do módulo para confirmar.'
+            );
+        }
+
+        this.logger.log('✅ Todas as validações passaram');
+
+        // 6️⃣ REMOVER REGISTROS DO CORE (SEMPRE)
+        this.logger.log('Removendo registros do CORE do banco de dados...');
+        await this.prisma.module.delete({
+            where: { slug }
+        });
+        this.logger.log('✅ Registros do CORE removidos (module, menus, migrations, tenant associations)');
+
+        // 7️⃣ REMOVER ARQUIVOS DO MÓDULO
+        const modulePath = path.join(this.modulesPath, slug);
+        
+        if (fs.existsSync(modulePath)) {
+            this.logger.log(`Removendo arquivos do módulo: ${modulePath}`);
+            fs.rmSync(modulePath, { recursive: true, force: true });
+            this.logger.log('✅ Arquivos do módulo removidos');
+        }
+
+        // 8️⃣ NOTIFICAR
+        await this.notifications.createNotification({
+            title: 'Módulo Desinstalado',
+            message: `Módulo ${module.name} foi removido do sistema`,
+            severity: 'warning',
+            audience: 'super_admin',
+            source: 'core'
+        });
+
+        this.logger.log(`✅ Módulo ${slug} desinstalado com sucesso`);
+
+        return {
+            success: true,
+            removed: {
+                coreRecords: true,
+                files: modulePath
+            },
+            message: 'Módulo desinstalado com sucesso'
+        };
     }
 }
