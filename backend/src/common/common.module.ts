@@ -1,15 +1,31 @@
-﻿import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { CspReportController } from './controllers/csp-report.controller';
 import { CspMiddleware } from './middleware/csp.middleware';
 import { StaticCorsMiddleware } from './middleware/static-cors.middleware';
 import { PlatformInitService } from './services/platform-init.service';
 import { SecurityConfigModule } from '@core/security-config/security-config.module';
+import { PrismaModule } from '@core/prisma.module';
+import { UserModulesController } from '@core/user-modules.controller';
+import { ModuleSecurityService } from '@core/module-security.service';
+import { NotificationService } from '@core/notification.service';
+import { eventBus } from '@core/events/EventBus';
+import { ModuleInstallerController } from '@core/module-installer.controller';
+import { ModuleInstallerService } from '@core/module-installer.service';
 
 @Module({
-  imports: [SecurityConfigModule],
-  controllers: [CspReportController],
-  providers: [PlatformInitService],
-  exports: [PlatformInitService],
+  imports: [PrismaModule, SecurityConfigModule],
+  controllers: [CspReportController, UserModulesController, ModuleInstallerController],
+  providers: [
+    PlatformInitService,
+    ModuleSecurityService,
+    NotificationService,
+    ModuleInstallerService,
+    {
+      provide: 'EventBus',
+      useValue: eventBus
+    }
+  ],
+  exports: [PlatformInitService, ModuleSecurityService, NotificationService, ModuleInstallerService],
 })
 export class CommonModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

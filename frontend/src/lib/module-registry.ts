@@ -126,6 +126,115 @@ class ModuleRegistry {
       console.log(`    - ${module.slug}: ${module.menus.length} menus`);
     });
   }
+
+  /**
+   * Obtém itens da sidebar agrupados (para compatibilidade com Sidebar antiga)
+   * Retorna menu básico do core + menus dos módulos
+   */
+  getGroupedSidebarItems(userRole?: string): {
+    ungrouped: any[];
+    groups: Record<string, any[]>;
+    groupOrder: string[];
+  } {
+    // Menu básico do CORE (sempre presente)
+    const coreItems = [
+      {
+        id: 'dashboard',
+        name: 'Dashboard',
+        href: '/dashboard',
+        icon: 'LayoutDashboard',
+        order: 1
+      }
+    ];
+
+    // Adiciona itens de administração se for ADMIN ou SUPER_ADMIN
+    const adminItems = [];
+    if (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') {
+      adminItems.push(
+        {
+          id: 'tenants',
+          name: 'Empresas',
+          href: '/empresas',
+          icon: 'Building2',
+          order: 10
+        },
+        {
+          id: 'users',
+          name: 'Usuários',
+          href: '/usuarios',
+          icon: 'Users',
+          order: 11
+        },
+        {
+          id: 'configuracoes',
+          name: 'Configurações',
+          href: '/configuracoes',
+          icon: 'Settings',
+          order: 12
+        }
+      );
+    }
+
+    // Combina itens do core
+    const ungrouped = [...coreItems, ...adminItems];
+
+    // Se não houver módulos carregados, retorna apenas menu do core
+    if (!this.isLoaded || this.modules.length === 0) {
+      return {
+        ungrouped,
+        groups: {},
+        groupOrder: []
+      };
+    }
+
+    // TODO: Processar menus dos módulos quando API retornar dados
+    // Por enquanto retorna apenas menus do core
+    
+    return {
+      ungrouped,
+      groups: {},
+      groupOrder: []
+    };
+  }
+
+  /**
+   * Obtém widgets do dashboard (para compatibilidade)
+   */
+  getDashboardWidgets(): any[] {
+    // Se não houver módulos, retorna array vazio
+    if (!this.isLoaded || this.modules.length === 0) {
+      return [];
+    }
+
+    // TODO: Implementar quando API retornar widgets
+    return [];
+  }
+
+  /**
+   * Obtém notificações (para compatibilidade)
+   */
+  getNotifications(): any[] {
+    // Se não houver módulos, retorna array vazio
+    if (!this.isLoaded || this.modules.length === 0) {
+      return [];
+    }
+
+    // TODO: Implementar quando API retornar notificações
+    return [];
+  }
+
+  /**
+   * Obtém itens da taskbar (para compatibilidade)
+   */
+  getTaskbarItems(userRole?: string): any[] {
+    // Se não houver módulos, retorna array vazio
+    if (!this.isLoaded || this.modules.length === 0) {
+      return [];
+    }
+
+    // TODO: Implementar quando API retornar taskbar items
+    return [];
+  }
 }
 
 // Exporta instância singleton

@@ -5,7 +5,6 @@ import * as AdmZip from 'adm-zip';
 import { PrismaService } from './prisma.service';
 import { ModuleSecurityService } from './module-security.service';
 import { NotificationService } from './notification.service';
-import { ModuleLoader } from './ModuleLoader';
 import { ModuleStatus, MigrationType } from '@prisma/client';
 
 /**
@@ -21,8 +20,7 @@ export class ModuleInstallerService {
     constructor(
         private readonly prisma: PrismaService,
         private readonly security: ModuleSecurityService,
-        private readonly notifications: NotificationService,
-        private readonly moduleLoader: ModuleLoader
+        private readonly notifications: NotificationService
     ) {
         // Garante que os diretórios existem
         this.ensureDirectories();
@@ -158,37 +156,50 @@ export class ModuleInstallerService {
             throw new Error('Módulo deve ter banco atualizado antes da ativação');
         }
 
-        // Ativa via ModuleLoader
-        const success = await this.moduleLoader.activateModule(slug);
+        // Atualiza status para ativo
+        await this.prisma.module.update({
+            where: { slug },
+            data: {
+                status: ModuleStatus.active,
+                activatedAt: new Date()
+            }
+        });
 
-        if (success) {
-            await this.notifications.notifyModuleActivated(slug, module.name);
-            return { success: true, message: `Módulo ${slug} ativado` };
-        } else {
-            throw new Error('Falha ao ativar módulo');
-        }
+        await this.notifications.notifyModuleActivated(slug, module.name);
+        return { success: true, message: `Módulo ${slug} ativado` };
     }
 
     /**
      * Desativa um módulo
      */
     async deactivateModule(slug: string) {
-        const success = await this.moduleLoader.deactivateModule(slug);
+        const module = await this.prisma.module.findUnique({
+            where: { slug }
+        });
 
-        if (success) {
-            await this.notifications.createNotification({
-                title: 'Módulo Desativado',
-                message: `Módulo ${slug} foi desativado`,
-                severity: 'info',
-                audience: 'super_admin',
-                source: 'core',
-                module: slug
-            });
-
-            return { success: true, message: `Módulo ${slug} desativado` };
-        } else {
-            throw new Error('Falha ao desativar módulo');
+        if (!module) {
+            throw new Error('Módulo não encontrado');
         }
+
+        // Atualiza status para desativado
+        await this.prisma.module.update({
+            where: { slug },
+            data: {
+                status: ModuleStatus.disabled,
+                activatedAt: null
+            }
+        });
+
+        await this.notifications.createNotification({
+            title: 'Módulo Desativado',
+            message: `Módulo ${slug} foi desativado`,
+            severity: 'info',
+            audience: 'super_admin',
+            source: 'core',
+            module: slug
+        });
+
+        return { success: true, message: `Módulo ${slug} desativado` };
     }
 
     /**

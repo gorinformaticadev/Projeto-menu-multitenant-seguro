@@ -47,6 +47,17 @@ export function useModuleFeatures() {
         const dashboardWidgets: ModuleDashboardWidget[] = [];
         const slots: ModuleSlotConfig[] = [];
 
+        // Proteção: garante que modules seja um array
+        if (!modules || !Array.isArray(modules)) {
+            console.warn('⚠️ Modules não disponível ou inválido');
+            return {
+                userMenu: [],
+                notifications: [],
+                dashboardWidgets: [],
+                slots: []
+            };
+        }
+
         // Processa apenas módulos ativos
         modules.filter(mod => mod.isActive).forEach((mod) => {
             if (mod.config) {

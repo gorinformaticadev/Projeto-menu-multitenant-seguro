@@ -3,18 +3,29 @@
  *
  * Responsável por inicializar o registry consumindo dados da API
  * PRINCÍPIO: Frontend NUNCA define módulos, apenas CONSUME da API
+ * 
+ * IMPORTANTE: Só carrega módulos APÓS autenticação
  */
 
 import { useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { moduleRegistry } from '@/lib/module-registry';
 
 export function useModuleRegistry() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
-    initializeRegistry();
-  }, []);
+    // Só inicializa se o usuário estiver autenticado
+    if (user) {
+      initializeRegistry();
+    } else {
+      // Se não houver usuário, marca como não inicializado
+      setIsInitialized(false);
+      setError(null);
+    }
+  }, [user]); // Reexecuta quando o estado de autenticação mudar
 
   const initializeRegistry = async () => {
     try {

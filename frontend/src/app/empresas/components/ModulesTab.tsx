@@ -11,17 +11,31 @@ import { useModulesManager } from "@/hooks/useModulesManager";
 export function ModulesTab({ tenantId }: { tenantId: string }) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { modules, loading, error, loadModules, toggleModule, isToggling } = useModulesManager();
+  const { modules, loading, error, loadModules } = useModulesManager();
   
   // Debounce para evitar cliques múltiplos
   const lastClickTime = useRef<{ [key: string]: number }>({});
   const DEBOUNCE_DELAY = 1000; // 1 segundo
+  
+  // Flag para evitar múltiplas chamadas
+  const hasLoadedRef = useRef(false);
+  const currentTenantRef = useRef<string | null>(null);
 
   useEffect(() => {
-    // Carrega módulos ao montar o componente
-    const targetTenantId = user?.tenantId === tenantId ? undefined : tenantId;
-    loadModules(targetTenantId);
-  }, [tenantId, user?.tenantId, loadModules]);
+    // Evita carregar múltiplas vezes para o mesmo tenant
+    if (hasLoadedRef.current && currentTenantRef.current === tenantId) {
+      console.log('⏭️ [MODULES_TAB] Módulos já carregados para este tenant, pulando...');
+      return;
+    }
+    
+    // Marca como carregado para este tenant
+    hasLoadedRef.current = true;
+    currentTenantRef.current = tenantId;
+    
+    console.log('📦 [MODULES_TAB] Carregando módulos para tenant:', tenantId);
+    // useModulesManager não aceita parâmetros, usa /me/modules sempre
+    loadModules();
+  }, [tenantId, loadModules]);
 
   // Mostra toast de erro se houver
   useEffect(() => {
@@ -45,24 +59,15 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
       console.warn(`⚠️ [MODULES_TAB] Clique muito rápido em ${moduleName} - IGNORANDO (debounce)`);
       return;
     }
-    
-    // Verifica se já está processando este módulo
-    if (isToggling(moduleName)) {
-      console.warn(`⚠️ [MODULES_TAB] Módulo ${moduleName} já está sendo processado - IGNORANDO clique`);
-      return;
-    }
 
     // Atualiza timestamp do último clique
     lastClickTime.current[moduleName] = now;
 
     try {
-      const targetTenantId = user?.tenantId === tenantId ? undefined : tenantId;
-      await toggleModule(moduleName, targetTenantId);
-      
-      const newStatus = !currentStatus;
       toast({
-        title: newStatus ? "Módulo ativado" : "Módulo desativado",
-        description: `O módulo ${moduleName} foi ${newStatus ? 'ativado' : 'desativado'} com sucesso.`,
+        title: "Funcionalidade em desenvolvimento",
+        description: "O gerenciamento de módulos está em desenvolvimento.",
+        variant: "default",
       });
       
     } catch (error: any) {
@@ -72,7 +77,7 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
         variant: "destructive",
       });
     }
-  }, [user?.tenantId, tenantId, toggleModule, isToggling, toast]);
+  }, [toast]);
 
   if (loading) {
     return (
@@ -105,20 +110,20 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
               {modules.map((module) => (
                 <div key={module.name} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
                   <div className="flex-1 space-y-1 min-w-0">
-                    <h3 className="font-medium text-sm sm:text-base truncate">{module.displayName}</h3>
-                    <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 overflow-hidden">{module.description}</p>
+                    <h3 className="font-medium text-sm sm:text-base truncate">{module.name || module.slug}</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 overflow-hidden">{module.description || 'Sem descrição'}</p>
                     <div className="flex items-center gap-2 mt-2">
                       <span className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                        v{module.version}
+                        {module.slug}
                       </span>
-                      {module.isActive && module.activatedAt && (
+                      {module.isActive && (
                         <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
-                          Ativo desde {new Date(module.activatedAt).toLocaleDateString()}
+                          Ativo
                         </span>
                       )}
-                      {!module.isActive && module.deactivatedAt && (
+                      {!module.isActive && (
                         <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
-                          Desativado em {new Date(module.deactivatedAt).toLocaleDateString()}
+                          Inativo
                         </span>
                       )}
                     </div>
@@ -128,17 +133,12 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
                       {module.isActive ? 'Ativo' : 'Inativo'}
                     </span>
                     <div className="flex items-center gap-2">
-                      {isToggling(module.name) && (
-                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      )}
                       <Switch
                         checked={module.isActive}
-                        disabled={isToggling(module.name)}
+                        disabled={true}
                         onCheckedChange={(checked) => {
-                          console.log(`🔄 [SWITCH] onCheckedChange disparado: ${module.name}, checked: ${checked}, disabled: ${isToggling(module.name)}`);
-                          if (!isToggling(module.name)) {
-                            handleToggleModule(module.name, module.isActive);
-                          }
+                          console.log(`🔄 [SWITCH] onCheckedChange disparado: ${module.name}, checked: ${checked}`);
+                          handleToggleModule(module.name || module.slug, module.isActive || false);
                         }}
                       />
                     </div>

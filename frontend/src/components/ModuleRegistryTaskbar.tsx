@@ -6,9 +6,18 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { moduleRegistry, ModuleTaskbarItem } from '@/lib/module-registry';
+import { moduleRegistry } from '@/lib/module-registry';
 import { Button } from './ui/button';
 import * as LucideIcons from 'lucide-react';
+
+// Interface local para itens da taskbar
+interface ModuleTaskbarItem {
+  id: string;
+  name: string;
+  icon: string;
+  href: string;
+  order?: number;
+}
 
 // Helper para ícones dinâmicos
 const getIconComponent = (iconName: string): any => {
@@ -37,11 +46,27 @@ export function ModuleRegistryTaskbar() {
 
   const loadTaskbarItems = () => {
     try {
+      // Verificação de segurança: método existe?
+      if (typeof moduleRegistry.getTaskbarItems !== 'function') {
+        console.warn('⚠️ Método getTaskbarItems não disponível no moduleRegistry');
+        setTaskbarItems([]);
+        return;
+      }
+
       const items = moduleRegistry.getTaskbarItems(user?.role);
+      
+      // Validação defensiva: items é um array?
+      if (!Array.isArray(items)) {
+        console.warn('⚠️ getTaskbarItems não retornou um array válido');
+        setTaskbarItems([]);
+        return;
+      }
+
       setTaskbarItems(items);
       console.log('🔧 Itens da taskbar carregados:', items.length);
     } catch (error) {
-      console.error('❌ Erro ao carregar taskbar:', error);
+      console.warn('⚠️ Erro ao carregar taskbar, continuando sem taskbar:', error);
+      setTaskbarItems([]);
     }
   };
 

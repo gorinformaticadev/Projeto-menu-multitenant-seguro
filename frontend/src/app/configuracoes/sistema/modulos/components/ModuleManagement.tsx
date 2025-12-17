@@ -72,8 +72,10 @@ export function ModuleManagement() {
   const loadInstalledModules = async () => {
     try {
       setLoading(true);
-      const response = await api.get("/modules/installed");
-      setModules(response.data);
+      // Usa o endpoint correto /me/modules que retorna módulos do usuário
+      const response = await api.get("/me/modules");
+      // A API retorna { modules: [...] }
+      setModules(response.data.modules || []);
     } catch (error: any) {
       toast({
         title: "Erro ao carregar módulos",
@@ -131,10 +133,12 @@ export function ModuleManagement() {
 
     setUploading(true);
     const formData = new FormData();
-    formData.append('module', selectedFile);
+    // O backend espera o campo 'file', não 'module'
+    formData.append('file', selectedFile);
 
     try {
-      const response = await api.post("/modules/upload", formData, {
+      // Endpoint correto: /configuracoes/sistema/modulos/upload
+      const response = await api.post("/configuracoes/sistema/modulos/upload", formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -185,7 +189,8 @@ export function ModuleManagement() {
 
   const handleRemoveModule = async (moduleName: string) => {
     try {
-      await api.delete(`/modules/${moduleName}/uninstall`);
+      // Endpoint correto: /configuracoes/sistema/modulos/:slug/uninstall
+      await api.delete(`/configuracoes/sistema/modulos/${moduleName}/uninstall`);
       
       toast({
         title: "Módulo removido",
@@ -207,7 +212,8 @@ export function ModuleManagement() {
 
   const openInfoDialog = async (module: InstalledModule) => {
     try {
-      const response = await api.get(`/modules/${module.name}/info`);
+      // Endpoint correto: /configuracoes/sistema/modulos/:slug/info
+      const response = await api.get(`/configuracoes/sistema/modulos/${module.name}/info`);
       setSelectedModule(response.data);
       setShowInfoDialog(true);
     } catch (error: any) {
@@ -228,7 +234,8 @@ export function ModuleManagement() {
     setUpdatingDatabase(moduleName);
 
     try {
-      const response = await api.post(`/modules/${moduleName}/update-database`);
+      // Endpoint correto: /configuracoes/sistema/modulos/:slug/update-database
+      const response = await api.post(`/configuracoes/sistema/modulos/${moduleName}/update-database`);
 
       toast({
         title: "Banco de dados atualizado!",

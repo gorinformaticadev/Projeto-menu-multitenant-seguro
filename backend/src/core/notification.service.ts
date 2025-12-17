@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from './prisma.service';
+import { Injectable, Logger, Inject } from '@nestjs/common';
+import { PrismaService } from './prisma/prisma.service';
 import { EventBus } from './events/EventBus';
 
 /**
@@ -12,7 +12,7 @@ export class NotificationService {
 
     constructor(
         private readonly prisma: PrismaService,
-        private readonly eventBus: EventBus
+        @Inject('EventBus') private readonly eventBus: EventBus
     ) { }
 
     /**

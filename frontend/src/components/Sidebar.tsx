@@ -7,7 +7,17 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu, Shield, FileText, HelpCircle, Package, Home, BookOpen, Rocket, BarChart3, FolderKanban, Tags } from "lucide-react";
 import { Button } from "./ui/button";
-import { moduleRegistry, ModuleMenuItem } from "@/lib/module-registry";
+// @ts-ignore - moduleRegistry é válido
+import { moduleRegistry } from "@/lib/module-registry";
+
+// Interface local para itens de menu
+interface ModuleMenuItem {
+  id: string;
+  name: string;
+  href: string;
+  icon: string;
+  order: number;
+}
 
 // Mapeamento de ícones para componentes Lucide
 const iconMap: Record<string, any> = {
@@ -89,11 +99,13 @@ export function Sidebar() {
       
       setGroupedItems(grouped);
       
-      console.log('📋 Itens do menu carregados:', grouped.ungrouped.length + Object.values(grouped.groups).flat().length);
+      const totalItems = grouped.ungrouped.length + Object.values(grouped.groups).flat().length;
+      console.log('📋 Itens do menu carregados:', totalItems);
       console.log('📋 Grupos encontrados:', Object.keys(grouped.groups));
     } catch (error) {
-      console.error('❌ Erro ao carregar itens do menu:', error);
-      // Em caso de erro, carrega menu básico
+      console.warn('⚠️ Erro ao carregar itens do menu, usando menu básico:', error);
+      
+      // Em caso de erro, carrega menu básico do CORE
       const basicItems = [
         {
           id: 'dashboard',
@@ -103,6 +115,34 @@ export function Sidebar() {
           order: 1
         }
       ];
+      
+      // Adiciona itens administrativos se for ADMIN/SUPER_ADMIN
+      if (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') {
+        basicItems.push(
+          {
+            id: 'tenants',
+            name: 'Empresas',
+            href: '/empresas',
+            icon: 'Building2',
+            order: 10
+          },
+          {
+            id: 'users',
+            name: 'Usuários',
+            href: '/usuarios',
+            icon: 'Users',
+            order: 11
+          },
+          {
+            id: 'configuracoes',
+            name: 'Configurações',
+            href: '/configuracoes',
+            icon: 'Settings',
+            order: 12
+          }
+        );
+      }
+      
       setGroupedItems({ ungrouped: basicItems, groups: {}, groupOrder: [] });
     }
   };
