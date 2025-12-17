@@ -40,9 +40,6 @@ interface InstalledModule {
   description: string;
   enabled: boolean;
   menus: any[];
-  // Campos adicionais para exibição
-  displayName?: string;
-  version?: string;
 }
 export function ModuleManagement() {
   const { toast } = useToast();
@@ -248,6 +245,50 @@ export function ModuleManagement() {
     }
   };
 
+  const activateModule = async (moduleName: string) => {
+    try {
+      // Endpoint para ativar módulo: /configuracoes/sistema/modulos/:slug/activate
+      const response = await api.post(`/configuracoes/sistema/modulos/${moduleName}/activate`);
+
+      toast({
+        title: "Módulo ativado!",
+        description: response.data.message || "Módulo ativado com sucesso",
+      });
+
+      // Recarregar lista de módulos para atualizar o status
+      await loadInstalledModules();
+
+    } catch (error: any) {
+      toast({
+        title: "Erro ao ativar módulo",
+        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deactivateModule = async (moduleName: string) => {
+    try {
+      // Endpoint para desativar módulo: /configuracoes/sistema/modulos/:slug/deactivate
+      const response = await api.post(`/configuracoes/sistema/modulos/${moduleName}/deactivate`);
+
+      toast({
+        title: "Módulo desativado!",
+        description: response.data.message || "Módulo desativado com sucesso",
+      });
+
+      // Recarregar lista de módulos para atualizar o status
+      await loadInstalledModules();
+
+    } catch (error: any) {
+      toast({
+        title: "Erro ao desativar módulo",
+        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -429,7 +470,7 @@ export function ModuleManagement() {
               ) : (
                 <div className="space-y-4">
                   {modules.map((module) => (
-                    <div key={module.id} className="p-4 border rounded-lg">
+                    <div key={module.slug} className="p-4 border rounded-lg">
                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                         {/* Informações do Módulo */}
                         <div className="flex-1 space-y-2">
@@ -445,35 +486,9 @@ export function ModuleManagement() {
                           </div>                          <p className="text-sm text-muted-foreground">{module.description}</p>
                           
                           {/* **NOVO:** Contadores de pendências */}
-                          {(module.pendingMigrationsCount > 0 || module.pendingSeedsCount > 0 || module.failedMigrationsCount > 0) && (
-                            <div className="flex flex-wrap items-center gap-2 text-xs">
-                              {module.pendingMigrationsCount > 0 && (
-                                <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                                  {module.pendingMigrationsCount} migration{module.pendingMigrationsCount > 1 ? 's' : ''} pendente{module.pendingMigrationsCount > 1 ? 's' : ''}
-                                </span>
-                              )}
-                              {module.pendingSeedsCount > 0 && (
-                                <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                                  {module.pendingSeedsCount} seed{module.pendingSeedsCount > 1 ? 's' : ''} pendente{module.pendingSeedsCount > 1 ? 's' : ''}
-                                </span>
-                              )}
-                              {module.failedMigrationsCount > 0 && (
-                                <span className="bg-red-100 text-red-800 px-2 py-1 rounded">
-                                  {module.failedMigrationsCount} falha{module.failedMigrationsCount > 1 ? 's' : ''}
-                                </span>
-                              )}
-                            </div>
-                          )}
+                          {/* Pendências de migração removidas - não fazem parte da resposta do backend */}
                           
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                              v{module.version}
-                            </span>
-                            {module.databaseVersion && (
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-mono">
-                                DB v{module.databaseVersion}
-                              </span>
-                            )}
                             <span className="text-xs text-muted-foreground">
                               {module.name}
                             </span>
@@ -491,36 +506,44 @@ export function ModuleManagement() {
                             Detalhes
                           </Button>
                           
-                          {/* **ATUALIZADO:** Botão condicional baseado em hasDatabaseUpdates */}
-                          {module.hasDatabaseUpdates && (
-                            <Button
-                              variant={module.migrationStatus === 'error' ? "destructive" : "default"}
-                              size="sm"
-                              onClick={() => updateModuleDatabase(module.name)}
-                              disabled={updatingDatabase === module.name}
-                            >
-                              {updatingDatabase === module.name ? (
-                                <>
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                  Atualizando...
-                                </>
-                              ) : (
-                                <>
-                                  {module.migrationStatus === 'error' ? (
-                                    <>
-                                      <XCircle className="h-4 w-4 mr-1" />
-                                      Tentar Novamente
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Settings className="h-4 w-4 mr-1" />
-                                      Atualizar Banco
-                                    </>
-                                  )}
-                                </>
-                              )}
-                            </Button>
-                          )}
+                          {/* Botão para ativar/desativar módulo */}
+                          <Button
+                            variant={module.enabled ? "outline" : "default"}
+                            size="sm"
+                            onClick={() => module.enabled ? deactivateModule(module.name) : activateModule(module.name)}
+                          >
+                            {module.enabled ? (
+                              <>
+                                <XCircle className="h-4 w-4 mr-1" />
+                                Desativar
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Ativar
+                              </>
+                            )}
+                          </Button>
+                          
+                          {/* Botão para atualizar banco de dados */}
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => updateModuleDatabase(module.name)}
+                            disabled={updatingDatabase === module.name}
+                          >
+                            {updatingDatabase === module.name ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                Atualizando...
+                              </>
+                            ) : (
+                              <>
+                                <Settings className="h-4 w-4 mr-1" />
+                                DB
+                              </>
+                            )}
+                          </Button>
                           
                           <Button
                             variant="destructive"
@@ -552,32 +575,15 @@ export function ModuleManagement() {
           </DialogHeader>
           {selectedModule && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Nome Técnico</label>
-                  <p className="font-mono text-sm">{selectedModule.name}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Versão</label>
-                  <p className="font-mono text-sm">{selectedModule.version}</p>
-                </div>
-              </div>
               <div>
-                <label className="text-sm font-medium text-muted-foreground">Nome de Exibição</label>
-                <p className="text-sm">{selectedModule.displayName}</p>
+                <label className="text-sm font-medium text-muted-foreground">Nome Técnico</label>
+                <p className="font-mono text-sm">{selectedModule.name}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Descrição</label>
                 <p className="text-sm">{selectedModule.description}</p>
               </div>
-              {selectedModule.config && (
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Configuração Padrão</label>
-                  <pre className="text-xs bg-muted p-3 rounded-lg overflow-auto max-h-40">
-                    {JSON.stringify(selectedModule.config, null, 2)}
-                  </pre>
-                </div>
-              )}
+              {/* Configuração padrão removida - não faz parte da resposta do backend */}
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-700">
                   <strong>Nota:</strong> Este módulo está instalado globalmente no sistema. 
@@ -615,9 +621,8 @@ export function ModuleManagement() {
                 </ul>
               </div>
               <div className="p-3 bg-muted rounded-lg">
-                <p className="text-sm"><strong>Módulo:</strong> {selectedModule.displayName}</p>
+                <p className="text-sm"><strong>Módulo:</strong> {selectedModule.name}</p>
                 <p className="text-sm"><strong>Nome Técnico:</strong> {selectedModule.name}</p>
-                <p className="text-sm"><strong>Versão:</strong> {selectedModule.version}</p>
               </div>
             </div>
           )}

@@ -16,8 +16,8 @@ try {
     Write-Host "1. Fazendo login..." -ForegroundColor Yellow
     
     $loginBody = @{
-        email = "admin@empresa.com"
-        password = "Admin123!"
+        email = "admin@system.com"
+        password = "admin123"
     } | ConvertTo-Json
     
     $loginResponse = Invoke-RestMethod -Uri $loginUrl -Method Post -Body $loginBody -ContentType "application/json"
