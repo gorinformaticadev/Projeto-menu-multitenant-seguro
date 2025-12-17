@@ -2,11 +2,13 @@ import {
     Controller,
     Post,
     Get,
+    Delete,
     UseGuards,
     UseInterceptors,
     UploadedFile,
     Body,
-    Param
+    Param,
+    BadRequestException
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -14,6 +16,7 @@ import { RolesGuard } from './guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { ModuleInstallerService } from './module-installer.service';
+import { memoryStorage } from 'multer';
 
 /**
  * Controller para instalação e gerenciamento de módulos
@@ -39,14 +42,25 @@ export class ModuleInstallerController {
      * Faz upload e instala um módulo .zip
      */
     @Post('upload')
-    @UseInterceptors(FileInterceptor('file'))
+    @UseInterceptors(FileInterceptor('file', {
+        storage: memoryStorage(),
+        limits: {
+            fileSize: 50 * 1024 * 1024 // 50MB
+        },
+        fileFilter: (req, file, cb) => {
+            if (!file.originalname.endsWith('.zip')) {
+                return cb(new Error('Apenas arquivos .zip são permitidos'), false);
+            }
+            cb(null, true);
+        }
+    }))
     async uploadModule(@UploadedFile() file: Express.Multer.File) {
         if (!file) {
-            throw new Error('Arquivo não fornecido');
+            throw new BadRequestException('Arquivo não fornecido');
         }
 
-        if (!file.originalname.endsWith('.zip')) {
-            throw new Error('Apenas arquivos .zip são permitidos');
+        if (!file.buffer) {
+            throw new BadRequestException('Buffer do arquivo não encontrado');
         }
 
         return await this.installer.installModuleFromZip(file);
@@ -86,5 +100,20 @@ export class ModuleInstallerController {
     @Get(':slug/status')
     async getModuleStatus(@Param('slug') slug: string) {
         return await this.installer.getModuleStatus(slug);
+    }
+
+    /**
+     * DELETE /configuracoes/sistema/modulos/:slug/uninstall
+     * Desinstala um módulo com opções de remoção de dados
+     */
+    @Delete(':slug/uninstall')
+    async uninstallModule(
+        @Param('slug') slug: string,
+        @Body() body: {
+            dataRemovalOption: 'keep' | 'core_only' | 'full';
+            confirmationName: string;
+        }
+    ) {
+        return await this.installer.uninstallModule(slug, body);
     }
 }
