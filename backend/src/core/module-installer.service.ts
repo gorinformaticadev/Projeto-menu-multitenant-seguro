@@ -104,10 +104,29 @@ export class ModuleInstallerService {
             ModuleJsonValidator.validateSafeName(validatedModule.name);
             this.logger.log(`✅ Nome seguro validado: ${validatedModule.name}`);
 
-            // 5️⃣ VALIDAR QUE NÃO EXISTE
-            this.logger.log('5. Verificando se módulo já existe...');
-            ModuleStructureValidator.validateModuleNotExists(validatedModule.name, this.modulesPath);
-            this.logger.log(`✅ Módulo ${validatedModule.name} não existe - OK para instalar`);
+            // 5️⃣ VERIFICAR SE MÓDULO JÁ EXISTE (permitir atualização)
+            this.logger.log('5. Verificando se módulo já existe (atualização permitida)...');
+            const existingModule = await this.prisma.module.findUnique({
+                where: { slug: validatedModule.name }
+            });
+            
+            if (existingModule) {
+                this.logger.log(`⚠️ Módulo ${validatedModule.name} já existe - será atualizado`);
+                // Remover versão antiga dos arquivos
+                const oldModulePath = path.join(this.modulesPath, validatedModule.name);
+                if (fs.existsSync(oldModulePath)) {
+                    fs.rmSync(oldModulePath, { recursive: true, force: true });
+                    this.logger.log(`✅ Versão antiga removida: ${oldModulePath}`);
+                }
+                
+                // Remover registros antigos do banco
+                await this.prisma.module.delete({
+                    where: { slug: validatedModule.name }
+                });
+                this.logger.log(`✅ Registros antigos removidos do banco`);
+            } else {
+                this.logger.log(`✅ Módulo ${validatedModule.name} não existe - instalação limpa`);
+            }
 
             // 6️⃣ EXTRAIR ZIP DE FORMA SEGURA
             this.logger.log('6. Extraindo módulo de forma segura...');
