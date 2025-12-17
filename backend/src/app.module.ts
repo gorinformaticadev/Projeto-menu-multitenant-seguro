@@ -17,10 +17,8 @@ import { SentryModule } from './common/services/sentry.module';
 import { CommonModule } from './common/common.module';
 import { TokenCleanupService } from './common/services/token-cleanup.service';
 import { UpdateModule } from './update/update.module';
-import { ModulesModule } from './modules/modules.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CoreModule } from './core/CoreModule';
-import { AppModulesModule } from './core/modules/AppModules.module';
 // import { DemoModule } from '@core/modules/demo-completo/src/demo.module'; // Removed legacy import
 
 @Module({
@@ -59,7 +57,6 @@ import { AppModulesModule } from './core/modules/AppModules.module';
     EmailConfigModule,
     AuditModule,
     UpdateModule,
-    ModulesModule,
     NotificationsModule,
 
   ],

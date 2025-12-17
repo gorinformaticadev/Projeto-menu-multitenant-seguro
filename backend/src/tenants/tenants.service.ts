@@ -3,7 +3,7 @@ import { PrismaService } from '@core/prisma/prisma.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import * as bcrypt from 'bcrypt';
-import { Role } from '@prisma/client';
+import { Role, ModuleStatus } from '@prisma/client';
 import { unlink } from 'fs/promises';
 import { join } from 'path';
 
@@ -91,18 +91,17 @@ export class TenantsService {
 
       // Buscar todos os mÃ³dulos ativos do sistema
       const activeModules = await prisma.module.findMany({
-        where: { isActive: true },
+        where: { status: ModuleStatus.active },
       });
 
       // Vincular mÃ³dulos ao novo tenant (DESABILITADOS por padrÃ£o)
       // Cada tenant deve ativar os mÃ³dulos que deseja usar
       if (activeModules.length > 0) {
-        await prisma.tenantModule.createMany({
+        await prisma.moduleTenant.createMany({
           data: activeModules.map((module) => ({
             tenantId: tenant.id,
-            moduleName: module.name,
-            isActive: false, // âœ… MÃ³dulos desabilitados por padrÃ£o
-            // Config Ã© null - cada tenant configura individualmente
+            moduleId: module.id,
+            enabled: false, // âœ… MÃ³dulos desabilitados por padrÃ£o
           })),
         });
       }
@@ -309,216 +308,31 @@ export class TenantsService {
   // MÃ©todos para gerenciamento de mÃ³dulos dos tenants
 
   async getTenantActiveModules(tenantId: string) {
-    // Verifica se o tenant existe
-    await this.findOne(tenantId);
-
-    // Buscar todos os mÃ³dulos disponÃ­veis no sistema
-    const allModules = await this.prisma.module.findMany({
-      where: { isActive: true },
-    });
-
-    // Buscar relaÃ§Ãµes do tenant com os mÃ³dulos (ativas e inativas)
-    const tenantModules = await this.prisma.tenantModule.findMany({
-      where: { tenantId },
-      include: { module: true },
-    });
-
-    // Criar mapa de status dos mÃ³dulos do tenant
-    const tenantModuleStatus = new Map();
-    tenantModules.forEach(tm => {
-      tenantModuleStatus.set(tm.moduleName, {
-        isActive: tm.isActive,
-        config: tm.config,
-        activatedAt: tm.activatedAt,
-        deactivatedAt: tm.deactivatedAt,
-      });
-    });
-
-    // Montar lista completa de mÃ³dulos com status
-    const modules = allModules.map(module => {
-      const tenantStatus = tenantModuleStatus.get(module.name);
-      const isActive = tenantStatus ? tenantStatus.isActive : false;
-      
-      return {
-        name: module.name,
-        displayName: module.displayName,
-        description: module.description,
-        version: module.version,
-        isActive: isActive,
-        config: tenantStatus?.config ? JSON.parse(tenantStatus.config) : (module.config ? JSON.parse(module.config) : null),
-        activatedAt: tenantStatus?.activatedAt || null,
-        deactivatedAt: tenantStatus?.deactivatedAt || null,
-      };
-    });
-
-    // Lista apenas dos mÃ³dulos ativos (para compatibilidade)
-    const activeModules = modules.filter(m => m.isActive).map(m => m.name);
-
+    // Método temporariamente desabilitado - usar ModuleSecurityService
     return {
-      activeModules,
-      modules,
+      activeModules: [],
+      modules: [],
     };
   }
 
   async activateModuleForTenant(tenantId: string, moduleName: string) {
-    // Verifica se o tenant existe
-    await this.findOne(tenantId);
-
-    // Verificar se o mÃ³dulo existe
-    const module = await this.prisma.module.findUnique({
-      where: { name: moduleName },
-    });
-
-    if (!module) {
-      throw new NotFoundException(`MÃ³dulo '${moduleName}' nÃ£o encontrado`);
-    }
-
-    if (!module.isActive) {
-      throw new BadRequestException(`MÃ³dulo '${moduleName}' estÃ¡ desativado no sistema`);
-    }
-
-    // Verificar se jÃ¡ existe uma relaÃ§Ã£o
-    const existingTenantModule = await this.prisma.tenantModule.findUnique({
-      where: {
-        tenantId_moduleName: {
-          tenantId,
-          moduleName,
-        },
-      },
-    });
-
-    if (existingTenantModule) {
-      // Se jÃ¡ estÃ¡ ativo, retorna o registro atual sem erro
-      if (existingTenantModule.isActive) {
-        return existingTenantModule;
-      }
-
-      // Reativar mÃ³dulo
-      return this.prisma.tenantModule.update({
-        where: { id: existingTenantModule.id },
-        data: {
-          isActive: true,
-          activatedAt: new Date(),
-          deactivatedAt: null,
-        },
-      });
-    }
-
-    // Criar nova relaÃ§Ã£o
-    return this.prisma.tenantModule.create({
-      data: {
-        tenantId,
-        moduleName,
-        isActive: true,
-      },
-    });
+    // Método temporariamente desabilitado - usar ModuleInstallerService
+    throw new BadRequestException('Use o novo sistema de módulos');
   }
 
   async deactivateModuleForTenant(tenantId: string, moduleName: string) {
-    // Verifica se o tenant existe
-    await this.findOne(tenantId);
-
-    const tenantModule = await this.prisma.tenantModule.findUnique({
-      where: {
-        tenantId_moduleName: {
-          tenantId,
-          moduleName,
-        },
-      },
-    });
-
-    if (!tenantModule) {
-      throw new NotFoundException(`MÃ³dulo '${moduleName}' nÃ£o estÃ¡ associado a este tenant`);
-    }
-
-    // Se jÃ¡ estÃ¡ desativado, retorna o registro atual sem erro
-    if (!tenantModule.isActive) {
-      return tenantModule;
-    }
-
-    return this.prisma.tenantModule.update({
-      where: { id: tenantModule.id },
-      data: {
-        isActive: false,
-        deactivatedAt: new Date(),
-      },
-    });
+    // Método temporariamente desabilitado - usar ModuleInstallerService
+    throw new BadRequestException('Use o novo sistema de módulos');
   }
 
   async toggleModuleForTenant(tenantId: string, moduleName: string) {
-    // Verifica se o tenant existe
-    await this.findOne(tenantId);
-
-    // Verificar se o mÃ³dulo existe
-    const module = await this.prisma.module.findUnique({
-      where: { name: moduleName },
-    });
-
-    if (!module) {
-      throw new NotFoundException(`MÃ³dulo '${moduleName}' nÃ£o encontrado`);
-    }
-
-    if (!module.isActive) {
-      throw new BadRequestException(`MÃ³dulo '${moduleName}' estÃ¡ desativado no sistema`);
-    }
-
-    // Verificar se jÃ¡ existe uma relaÃ§Ã£o
-    const existingTenantModule = await this.prisma.tenantModule.findUnique({
-      where: {
-        tenantId_moduleName: {
-          tenantId,
-          moduleName,
-        },
-      },
-    });
-
-    if (existingTenantModule) {
-      // Toggle: se estÃ¡ ativo, desativa; se estÃ¡ inativo, ativa
-      const newStatus = !existingTenantModule.isActive;
-      
-      return this.prisma.tenantModule.update({
-        where: { id: existingTenantModule.id },
-        data: {
-          isActive: newStatus,
-          activatedAt: newStatus ? new Date() : existingTenantModule.activatedAt,
-          deactivatedAt: newStatus ? null : new Date(),
-        },
-      });
-    }
-
-    // Se nÃ£o existe relaÃ§Ã£o, cria uma nova ativa
-    return this.prisma.tenantModule.create({
-      data: {
-        tenantId,
-        moduleName,
-        isActive: true,
-      },
-    });
+    // Método temporariamente desabilitado - usar ModuleInstallerService
+    throw new BadRequestException('Use o novo sistema de módulos');
   }
 
   async configureTenantModule(tenantId: string, moduleName: string, config: any) {
-    // Verifica se o tenant existe
-    await this.findOne(tenantId);
-
-    const tenantModule = await this.prisma.tenantModule.findUnique({
-      where: {
-        tenantId_moduleName: {
-          tenantId,
-          moduleName,
-        },
-      },
-    });
-
-    if (!tenantModule) {
-      throw new NotFoundException(`MÃ³dulo '${moduleName}' nÃ£o estÃ¡ associado a este tenant`);
-    }
-
-    return this.prisma.tenantModule.update({
-      where: { id: tenantModule.id },
-      data: {
-        config: JSON.stringify(config),
-      },
-    });
+    // Método temporariamente desabilitado - usar ModuleInstallerService
+    throw new BadRequestException('Use o novo sistema de módulos');
   }
 }
 

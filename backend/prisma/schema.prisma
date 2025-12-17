@@ -15,18 +15,19 @@ enum Role {
 }
 
 model Tenant {
-  id              String         @id @default(uuid())
-  email           String         @unique
-  cnpjCpf         String         @unique
+  id              String             @id @default(uuid())
+  email           String             @unique
+  cnpjCpf         String             @unique
   nomeFantasia    String
   nomeResponsavel String
   telefone        String
   logoUrl         String?
-  ativo           Boolean        @default(true)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  ativo           Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
   users           User[]
-  tenantModules   TenantModule[]
+  tenantModules   ModuleTenant[]
+  publicPage      TenantPublicPage?
 
   // Índices para performance
   @@index([ativo]) // Filtrar tenants ativos
@@ -239,87 +240,103 @@ model UpdateLog {
   @@map("update_logs")
 }
 
-// Enums para controle de migrations
+// Enums para status de módulos
+enum ModuleStatus {
+  detected
+  installed
+  db_ready
+  active
+  disabled
+}
+
+// Enums para tipos de migration
 enum MigrationType {
-  MIGRATION
-  SEED
+  migration
+  seed
 }
 
-enum MigrationStatus {
-  PENDING
-  EXECUTING
-  COMPLETED
-  FAILED
-  ROLLED_BACK
-}
-
-// Tabela de Módulos do Sistema
+// Tabela principal de módulos
 model Module {
-  id              String            @id @default(uuid())
-  name            String            @unique // Nome único do módulo (ex: "sales", "reports")
-  displayName     String // Nome para exibição (ex: "Sistema de Vendas")
-  description     String? // Descrição do módulo
-  version         String            @default("1.0.0") // Versão do módulo
-  databaseVersion String? // Versão do banco aplicada (null = nunca atualizou)
-  isActive        Boolean           @default(true) // Se o módulo está ativo no sistema
-  config          String? // Configurações específicas do módulo (JSON)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id          String       @id @default(uuid())
+  slug        String       @unique // Slug único do módulo (ex: "sistema", "financeiro")
+  name        String // Nome para exibição (ex: "Sistema", "Financeiro")
+  version     String       @default("1.0.0") // Versão do módulo
+  description String? // Descrição do módulo
+  status      ModuleStatus @default(detected) // Estado do ciclo de vida
+  hasBackend  Boolean      @default(false) // Se tem código backend
+  hasFrontend Boolean      @default(false) // Se tem código frontend
+  installedAt DateTime? // Quando foi instalado
+  activatedAt DateTime? // Quando foi ativado
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
-  // Relacionamento com tenants
-  tenantModules   TenantModule[]
-  // Relacionamento com migrations
-  migrations      ModuleMigration[]
+  // Relacionamentos
+  menus       ModuleMenu[]
+  tenantModules ModuleTenant[]
+  migrations  ModuleMigration[]
 
-  @@index([isActive])
-  @@index([databaseVersion])
+  @@index([status])
+  @@index([slug])
   @@map("modules")
 }
 
-// Tabela de Controle de Migrations e Seeds
-model ModuleMigration {
-  id            String          @id @default(uuid())
-  moduleName    String // FK para Module.name
-  module        Module          @relation(fields: [moduleName], references: [name], onDelete: Cascade)
-  fileName      String // Nome do arquivo (ex: 001_create_table.sql)
-  type          MigrationType // MIGRATION ou SEED
-  checksum      String // Hash SHA-256 do conteúdo
-  status        MigrationStatus @default(PENDING) // Status da execução
-  executedAt    DateTime? // Quando foi executado
-  executionTime Int? // Tempo de execução em ms
-  errorMessage  String? // Mensagem de erro se falhou
-  executedBy    String? // ID do usuário que executou
-  rollbackAt    DateTime? // Data de rollback se aplicável
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+// Tabela de menus dos módulos
+model ModuleMenu {
+  id         String   @id @default(uuid())
+  moduleId   String
+  module     Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  label      String // Texto do menu
+  icon       String? // Ícone do menu
+  route      String // Rota do menu
+  parentId   String? // ID do menu pai (para submenus)
+  parent     ModuleMenu? @relation("MenuHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children   ModuleMenu[] @relation("MenuHierarchy") // Submenus
+  order      Int      @default(0) // Ordem de exibição
+  permission String? // Permissão necessária
+  isUserMenu Boolean  @default(true) // Se aparece no menu do usuário
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  // Índices para performance
-  @@unique([moduleName, fileName, type]) // Evitar duplicatas
-  @@index([moduleName, status]) // Consultas comuns
-  @@index([status]) // Filtrar por status
-  @@index([executedAt]) // Ordenar por data de execução
-  @@map("module_migrations")
+  @@index([moduleId])
+  @@index([parentId])
+  @@index([order])
+  @@map("module_menus")
 }
 
-// Tabela de Módulos por Tenant (quais módulos cada tenant tem ativo)
-model TenantModule {
-  id            String    @id @default(uuid())
-  tenantId      String
-  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  moduleName    String
-  module        Module    @relation(fields: [moduleName], references: [name], onDelete: Cascade)
-  isActive      Boolean   @default(true) // Se o módulo está ativo para este tenant
-  config        String? // Configurações específicas do módulo para este tenant (JSON)
-  activatedAt   DateTime  @default(now())
-  deactivatedAt DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+// Tabela de módulos por tenant
+model ModuleTenant {
+  id       String  @id @default(uuid())
+  moduleId String
+  module   Module  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  enabled  Boolean @default(false) // Se o módulo está habilitado para este tenant
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@unique([tenantId, moduleName]) // Um tenant não pode ter o mesmo módulo duplicado
+  @@unique([moduleId, tenantId])
   @@index([tenantId])
-  @@index([moduleName])
-  @@index([isActive])
-  @@map("tenant_modules")
+  @@index([moduleId])
+  @@index([enabled])
+  @@map("module_tenant")
+}
+
+// Tabela de migrations dos módulos
+model ModuleMigration {
+  id         String        @id @default(uuid())
+  moduleId   String
+  module     Module        @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  filename   String // Nome do arquivo de migration/seed
+  type       MigrationType // migration ou seed
+  executedAt DateTime? // Quando foi executado
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@unique([moduleId, filename, type])
+  @@index([moduleId])
+  @@index([type])
+  @@index([executedAt])
+  @@map("module_migrations")
 }
 
 // Tabela de Notificações
@@ -330,7 +347,7 @@ model Notification {
   severity  String // info, warning, critical
   audience  String // user, admin, super_admin
   source    String // core, module
-  module    String? // Nome do módulo (se source = module)
+  module    String? // Slug do módulo (se source = module)
   tenantId  String? // ID do tenant (null = global)
   userId    String? // ID do usuário específico (null = todos da audiência)
   context   String? // URL para redirecionamento
@@ -354,81 +371,28 @@ model Notification {
   @@map("notifications")
 }
 
-// ============================================
-// SISTEMA DE MÓDULOS ROBUSTO - NOVAS TABELAS
-// ============================================
-// INSTRUÇÕES: Copie todo este conteúdo e cole NO FINAL do arquivo schema.prisma
-// (após a tabela Notification, antes da última linha vazia)
+// Tabela de páginas públicas por tenant
+model TenantPublicPage {
+  id          String  @id @default(uuid())
+  tenantId    String  @unique
+  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title       String  @default("Página Institucional") // Título da página
+  subtitle    String? // Subtítulo
+  description String? // Descrição da empresa/tenant
+  content     String? // Conteúdo HTML da página
+  logoUrl     String? // URL do logo
+  bannerUrl   String? // URL do banner
+  contactInfo String? // Informações de contato em JSON
+  socialLinks String? // Links sociais em JSON
+  isActive    Boolean @default(false) // Se a página está ativa
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-// Tabela de Uploads de Módulos
-model ModuleUpload {
-  id                String                   @id @default(uuid())
-  slug              String                   @unique
-  name              String
-  version           String
-  description       String?
-  author            String?
-  category          String?
-  enabled           Boolean                  @default(false)
-  validated         Boolean                  @default(false)
-  sandboxed         Boolean                  @default(true)
-  permissionsStrict Boolean                  @default(true)
-  uploadedAt        DateTime                 @default(now())
-  uploadedBy        String?
-  filePath          String?
-  fileHash          String?
-  configJson        String?
-  securityFlags     String?
-  validationReport  String?
-  createdAt         DateTime                 @default(now())
-  updatedAt         DateTime                 @updatedAt
-  permissions       ModuleUploadPermission[]
-  pages             ModuleUploadPage[]
-
-  @@index([slug])
-  @@index([enabled])
-  @@index([validated])
-  @@index([enabled, validated])
-  @@index([uploadedBy])
-  @@index([category])
-  @@map("module_uploads")
+  @@index([tenantId])
+  @@index([isActive])
+  @@map("tenant_public_pages")
 }
 
-model ModuleUploadPermission {
-  id          String       @id @default(uuid())
-  moduleId    String
-  module      ModuleUpload @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  name        String
-  description String
-  category    String
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  @@unique([moduleId, name])
-  @@index([moduleId])
-  @@index([name])
-  @@map("module_upload_permissions")
-}
-
-model ModuleUploadPage {
-  id          String       @id @default(uuid())
-  moduleId    String
-  module      ModuleUpload @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  pageId      String
-  path        String
-  title       String?
-  description String?
-  component   String?
-  protected   Boolean      @default(true)
-  permissions String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  @@unique([moduleId, pageId])
-  @@index([moduleId])
-  @@index([path])
-  @@map("module_upload_pages")
-}
 
 // ============================================
 // MÓDULO DEMO-COMPLETO - TABELAS

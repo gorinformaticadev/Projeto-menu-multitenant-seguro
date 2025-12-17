@@ -4,12 +4,24 @@ import { CspMiddleware } from './middleware/csp.middleware';
 import { StaticCorsMiddleware } from './middleware/static-cors.middleware';
 import { PlatformInitService } from './services/platform-init.service';
 import { SecurityConfigModule } from '@core/security-config/security-config.module';
+import { UserModulesController } from './user-modules.controller';
+import { ModuleSecurityService } from './module-security.service';
+import { NotificationService } from './notification.service';
+import { eventBus } from './events/EventBus';
 
 @Module({
   imports: [SecurityConfigModule],
-  controllers: [CspReportController],
-  providers: [PlatformInitService],
-  exports: [PlatformInitService],
+  controllers: [CspReportController, UserModulesController],
+  providers: [
+    PlatformInitService,
+    ModuleSecurityService,
+    NotificationService,
+    {
+      provide: 'EventBus',
+      useValue: eventBus
+    }
+  ],
+  exports: [PlatformInitService, ModuleSecurityService, NotificationService],
 })
 export class CommonModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

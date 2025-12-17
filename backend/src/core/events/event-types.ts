@@ -89,6 +89,58 @@ export interface UserAuthenticatedEvent {
 }
 
 /**
+ * Payload do evento module:discovered
+ */
+export interface ModuleDiscoveredEvent {
+  slug: string;
+  name: string;
+  version: string;
+  timestamp: Date;
+}
+
+/**
+ * Payload do evento module:installed
+ */
+export interface ModuleInstalledEvent {
+  slug: string;
+  name: string;
+  version: string;
+  hasBackend: boolean;
+  hasFrontend: boolean;
+  timestamp: Date;
+}
+
+/**
+ * Payload do evento module:activated
+ */
+export interface ModuleActivatedEvent {
+  slug: string;
+  name: string;
+  timestamp: Date;
+}
+
+/**
+ * Payload do evento module:deactivated
+ */
+export interface ModuleDeactivatedEvent {
+  slug: string;
+  name: string;
+  timestamp: Date;
+}
+
+/**
+ * Payload do evento module:migration:executed
+ */
+export interface ModuleMigrationExecutedEvent {
+  moduleSlug: string;
+  filename: string;
+  type: 'migration' | 'seed';
+  success: boolean;
+  duration: number;
+  timestamp: Date;
+}
+
+/**
  * Mapa de eventos do sistema
  * Garante type-safety nos eventos
  */
@@ -103,6 +155,11 @@ export interface EventMap {
   'notifications:register': NotificationsRegisterEvent;
   'tenant:resolved': TenantResolvedEvent;
   'user:authenticated': UserAuthenticatedEvent;
+  'module:discovered': ModuleDiscoveredEvent;
+  'module:installed': ModuleInstalledEvent;
+  'module:activated': ModuleActivatedEvent;
+  'module:deactivated': ModuleDeactivatedEvent;
+  'module:migration:executed': ModuleMigrationExecutedEvent;
 }
 
 /**
