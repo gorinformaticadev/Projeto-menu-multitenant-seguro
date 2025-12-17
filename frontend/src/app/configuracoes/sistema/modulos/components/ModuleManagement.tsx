@@ -35,23 +35,15 @@ interface ModuleMigrationStatus {
 
 // **INTERFACE ATUALIZADA**
 interface InstalledModule {
-  id: string;
+  slug: string;
   name: string;
-  displayName: string;
   description: string;
-  version: string;
-  isActive: boolean;
-  isInstalled: boolean;
-  hasDatabaseUpdates?: boolean;
-  databaseVersion?: string | null;
-  // **NOVOS CAMPOS:**
-  pendingMigrationsCount?: number;
-  pendingSeedsCount?: number;
-  failedMigrationsCount?: number;
-  migrationStatus?: 'updated' | 'pending' | 'error' | 'unknown';
-  config?: any;
+  enabled: boolean;
+  menus: any[];
+  // Campos adicionais para exibição
+  displayName?: string;
+  version?: string;
 }
-
 export function ModuleManagement() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -442,43 +434,15 @@ export function ModuleManagement() {
                         {/* Informações do Módulo */}
                         <div className="flex-1 space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-medium">{module.displayName}</h3>
-                            <Badge variant={module.isActive ? "default" : "secondary"}>
-                              {module.isActive ? "Ativo no Sistema" : "Inativo no Sistema"}
+                            <h3 className="font-medium">{module.name}</h3>
+                            <Badge variant={module.enabled ? "default" : "secondary"}>
+                              {module.enabled ? "Ativo no Sistema" : "Inativo no Sistema"}
                             </Badge>
-                            {module.isInstalled ? (
-                              <Badge variant="outline" className="text-green-600 border-green-600">
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Instalado
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-orange-600 border-orange-600">
-                                <AlertTriangle className="h-3 w-3 mr-1" />
-                                Não Instalado
-                              </Badge>
-                            )}
-                            
-                            {/* **NOVO:** Badges baseados em migrationStatus */}
-                            {module.migrationStatus === 'error' && (
-                              <Badge variant="outline" className="text-red-600 border-red-600">
-                                <XCircle className="h-3 w-3 mr-1" />
-                                Erro na Atualização
-                              </Badge>
-                            )}
-                            {module.migrationStatus === 'pending' && (
-                              <Badge variant="outline" className="text-yellow-600 border-yellow-600">
-                                <Clock className="h-3 w-3 mr-1" />
-                                Atualização Pendente
-                              </Badge>
-                            )}
-                            {module.migrationStatus === 'updated' && (
-                              <Badge variant="outline" className="text-green-600 border-green-600">
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Banco Atualizado
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground">{module.description}</p>
+                            <Badge variant="outline" className="text-green-600 border-green-600">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Instalado
+                            </Badge>
+                          </div>                          <p className="text-sm text-muted-foreground">{module.description}</p>
                           
                           {/* **NOVO:** Contadores de pendências */}
                           {(module.pendingMigrationsCount > 0 || module.pendingSeedsCount > 0 || module.failedMigrationsCount > 0) && (

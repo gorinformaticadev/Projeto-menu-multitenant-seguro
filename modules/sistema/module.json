@@ -3,12 +3,16 @@
   "displayName": "Sistema",
   "version": "1.0.0",
   "description": "Módulo de sistema com funcionalidades integradas",
-  "author": "Equipe CORE",
+  "author": "GOR Informatica",
   "category": "system",
   "enabled": true,
-  "dependencies": {
-    "coreVersion": "1.0.0"
-  },
+  "dependencies": [
+    {
+      "type": "core",
+      "name": "core",
+      "version": ">=1.0.0"
+    }
+  ],
   "defaultConfig": {
     "showNotifications": true,
     "enableWidgets": true,

@@ -141,7 +141,11 @@ export class ModuleSecurityService {
     async getAvailableModules(tenantId: string): Promise<any[]> {
         try {
             const modules = await this.prisma.module.findMany({
-                where: { status: ModuleStatus.active },
+                where: { 
+                    status: {
+                        in: [ModuleStatus.active, ModuleStatus.installed, ModuleStatus.db_ready]
+                    }
+                },
                 include: {
                     tenantModules: {
                         where: { tenantId }

@@ -7,9 +7,13 @@
   "author": "Equipe CORE",
   "category": "system",
   "enabled": true,
-  "dependencies": {
-    "coreVersion": "1.0.0"
-  },
+"dependencies": [
+    {
+      "type": "core",
+      "name": "core",
+      "version": ">=1.0.0"
+    }
+  ],
   "config": {
     "defaultSettings": {
       "showNotifications": true,
