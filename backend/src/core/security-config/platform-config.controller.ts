@@ -23,14 +23,13 @@ export class UpdatePlatformConfigDto {
 
 @SkipThrottle()
 @Controller('platform-config')
-@UseGuards(JwtAuthGuard, RolesGuard)
 export class PlatformConfigController {
-  constructor(private readonly platformConfigService: PlatformConfigService) {}
+  constructor(private readonly platformConfigService: PlatformConfigService) { }
 
   /**
    * GET /platform-config
-   * Obter configuraÃ§Ãµes da plataforma
-   * PÃºblico para todos os usuÃ¡rios autenticados
+   * Obter configurações da plataforma
+   * Público para todos os usuários autenticados
    */
   @SkipThrottle()
   @Get()
@@ -40,11 +39,12 @@ export class PlatformConfigController {
 
   /**
    * PUT /platform-config
-   * Atualizar configuraÃ§Ãµes da plataforma
+   * Atualizar configurações da plataforma
    * Apenas SUPER_ADMIN
    */
   @SkipThrottle()
   @Put()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   async updatePlatformConfig(
     @Body() dto: UpdatePlatformConfigDto,
@@ -61,7 +61,7 @@ export class PlatformConfigController {
   /**
    * GET /platform-config/name
    * Obter apenas o nome da plataforma
-   * PÃºblico (sem autenticaÃ§Ã£o) para uso em templates
+   * Público (sem autenticação) para uso em templates
    */
   @SkipThrottle()
   @Get('name')
@@ -74,7 +74,7 @@ export class PlatformConfigController {
   /**
    * GET /platform-config/email
    * Obter apenas o email da plataforma
-   * PÃºblico (sem autenticaÃ§Ã£o) para uso em templates
+   * Público (sem autenticação) para uso em templates
    */
   @SkipThrottle()
   @Get('email')
@@ -87,7 +87,7 @@ export class PlatformConfigController {
   /**
    * GET /platform-config/phone
    * Obter apenas o telefone da plataforma
-   * PÃºblico (sem autenticaÃ§Ã£o) para uso em templates
+   * Público (sem autenticação) para uso em templates
    */
   @SkipThrottle()
   @Get('phone')

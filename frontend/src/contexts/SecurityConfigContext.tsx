@@ -35,10 +35,10 @@ export function SecurityConfigProvider({ children }: { children: ReactNode }) {
   const fetchConfig = async () => {
     try {
       setLoading(true);
-      
+
       // Busca configurações completas de segurança
-      const response = await api.get("/security-config");
-      
+      const response = await api.get("/security-config/full");
+
       // Mapeia os dados do backend para o formato esperado
       const backendConfig = response.data;
       setConfig({
@@ -57,7 +57,7 @@ export function SecurityConfigProvider({ children }: { children: ReactNode }) {
       });
     } catch (error) {
       console.error("Erro ao carregar configurações de segurança:", error);
-      
+
       // Em caso de erro, assume valores padrão
       setConfig({
         twoFactorEnabled: false,

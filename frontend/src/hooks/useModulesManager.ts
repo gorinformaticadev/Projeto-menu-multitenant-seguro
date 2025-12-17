@@ -11,6 +11,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { modulesService, TenantModule } from '@/services/modules.service';
 import { moduleRegistry } from '@/lib/module-registry';
+import { getSecureToken } from '@/lib/api';
 
 interface ModulesState {
   modules: TenantModule[];
@@ -75,6 +76,84 @@ export function useModulesManager(tenantId?: string) {
   }, []); // Remove notifyListeners da dependência para evitar loops
 
   /**
+   * Executa o carregamento real
+   */
+  const performLoad = async (targetTenantId?: string) => {
+    try {
+      // Verificar autenticação se não houver targetTenantId (uso padrão para usuário logado)
+      if (!targetTenantId) {
+        const token = await getSecureToken();
+        if (!token) {
+          console.log('🚫 [useModulesManager] Usuário não autenticado, ignorando carregamento de módulos');
+          globalState = {
+            ...globalState,
+            loading: false,
+            error: null,
+            modules: [],
+            lastUpdated: Date.now() // Atualiza timestamp para evitar tentativas imediatas
+          };
+          notifyListeners();
+          return;
+        }
+      }
+
+      globalState = { ...globalState, loading: true, error: null };
+      notifyListeners();
+
+      let response;
+      if (targetTenantId) {
+        response = await modulesService.getTenantActiveModules(targetTenantId);
+      } else {
+        response = await modulesService.getMyTenantActiveModules();
+      }
+
+      globalState = {
+        ...globalState,
+        modules: response.modules,
+        loading: false,
+        lastUpdated: Date.now()
+      };
+      notifyListeners();
+
+      console.log('📦 Módulos carregados:', response.modules.length);
+
+    } catch (error: any) {
+      console.error('❌ Erro ao carregar módulos:', error);
+
+      // Se o erro for 401, garante que limpamos o estado
+      if (error.response?.status === 401) {
+        globalState = {
+          ...globalState,
+          loading: false,
+          error: 'Não autorizado',
+          modules: [],
+          lastUpdated: Date.now()
+        };
+        notifyListeners();
+        return;
+      }
+
+      globalState = {
+        ...globalState,
+        error: error.response?.data?.message || 'Erro ao carregar módulos',
+        loading: false,
+        // Em caso de erro, mantém módulos existentes ou usa fallback
+        modules: globalState.modules.length > 0 ? globalState.modules : [{
+          name: 'module-exemplo',
+          displayName: 'Module Exemplo',
+          description: 'Módulo de exemplo para demonstração do sistema modular',
+          version: '1.0.0',
+          isActive: false,
+          activatedAt: null,
+          deactivatedAt: null
+        }],
+        lastUpdated: Date.now() // Atualiza timestamp para evitar loop de retentativas imediatas
+      };
+      notifyListeners();
+    }
+  };
+
+  /**
    * Carrega módulos do backend (apenas uma vez por sessão)
    */
   const loadModules = useCallback(async (targetTenantId?: string, forceReload = false) => {
@@ -100,54 +179,6 @@ export function useModulesManager(tenantId?: string) {
       loadingPromise = null;
     }
   }, []); // Remove updateGlobalState da dependência
-
-  /**
-   * Executa o carregamento real
-   */
-  const performLoad = async (targetTenantId?: string) => {
-    try {
-      globalState = { ...globalState, loading: true, error: null };
-      notifyListeners();
-
-      let response;
-      if (targetTenantId) {
-        response = await modulesService.getTenantActiveModules(targetTenantId);
-      } else {
-        response = await modulesService.getMyTenantActiveModules();
-      }
-
-      globalState = {
-        ...globalState,
-        modules: response.modules,
-        loading: false,
-        lastUpdated: Date.now()
-      };
-      notifyListeners();
-
-      console.log('📦 Módulos carregados:', response.modules.length);
-
-    } catch (error: any) {
-      console.error('❌ Erro ao carregar módulos:', error);
-
-      globalState = {
-        ...globalState,
-        error: error.response?.data?.message || 'Erro ao carregar módulos',
-        loading: false,
-        // Em caso de erro, mantém módulos existentes ou usa fallback
-        modules: globalState.modules.length > 0 ? globalState.modules : [{
-          name: 'module-exemplo',
-          displayName: 'Module Exemplo',
-          description: 'Módulo de exemplo para demonstração do sistema modular',
-          version: '1.0.0',
-          isActive: false,
-          activatedAt: null,
-          deactivatedAt: null
-        }],
-        lastUpdated: Date.now() // Atualiza timestamp para evitar loop de retentativas imediatas
-      };
-      notifyListeners();
-    }
-  };
 
   /**
    * Toggle de módulo com controle de concorrência e optimistic update

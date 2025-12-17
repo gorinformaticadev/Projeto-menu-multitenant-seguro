@@ -370,6 +370,16 @@ class ModuleRegistry {
       // Como não podemos usar hooks aqui, vamos importar o serviço diretamente
       // mas de forma mais controlada
       const { modulesService } = await import('@/services/modules.service');
+      const { getSecureToken } = await import('@/lib/api');
+
+      const token = await getSecureToken();
+      
+      if (!token) {
+        console.log('🚫 [ModuleRegistry] Usuário não autenticado, usando estado padrão');
+        this.moduleActivationStatus.set('module-exemplo', true); // Fallback
+        this.isInitialized = true;
+        return;
+      }
       
       const response = await modulesService.getMyTenantActiveModules();
       

@@ -32,9 +32,9 @@ const processQueue = (error: any, token: string | null = null) => {
 };
 
 // Funções para gerenciamento seguro de tokens
-const getSecureToken = async (): Promise<string | null> => {
+export const getSecureToken = async (): Promise<string | null> => {
   if (typeof window === "undefined") return null;
-  
+
   try {
     // Tentar ler do cookie primeiro
     const cookies = document.cookie.split(';');
@@ -42,8 +42,8 @@ const getSecureToken = async (): Promise<string | null> => {
     if (tokenCookie) {
       return tokenCookie.split('=')[1];
     }
-  } catch {}
-  
+  } catch { }
+
   // Fallback para sessionStorage criptografado
   const encrypted = sessionStorage.getItem("@App:token");
   if (encrypted) {
@@ -53,13 +53,13 @@ const getSecureToken = async (): Promise<string | null> => {
       return null;
     }
   }
-  
+
   return null;
 };
 
 const getSecureRefreshToken = async (): Promise<string | null> => {
   if (typeof window === "undefined") return null;
-  
+
   try {
     // Tentar ler do cookie primeiro
     const cookies = document.cookie.split(';');
@@ -67,8 +67,8 @@ const getSecureRefreshToken = async (): Promise<string | null> => {
     if (tokenCookie) {
       return tokenCookie.split('=')[1];
     }
-  } catch {}
-  
+  } catch { }
+
   // Fallback para sessionStorage criptografado
   const encrypted = sessionStorage.getItem("@App:refreshToken");
   if (encrypted) {
@@ -78,13 +78,13 @@ const getSecureRefreshToken = async (): Promise<string | null> => {
       return null;
     }
   }
-  
+
   return null;
 };
 
 const setSecureToken = async (token: string): Promise<void> => {
   if (typeof window === "undefined") return;
-  
+
   try {
     document.cookie = `accessToken=${token}; Secure; SameSite=Strict; Max-Age=900; Path=/`;
   } catch {
@@ -94,7 +94,7 @@ const setSecureToken = async (token: string): Promise<void> => {
 
 const setSecureRefreshToken = async (token: string): Promise<void> => {
   if (typeof window === "undefined") return;
-  
+
   try {
     document.cookie = `refreshToken=${token}; Secure; SameSite=Strict; Max-Age=604800; Path=/`;
   } catch {
