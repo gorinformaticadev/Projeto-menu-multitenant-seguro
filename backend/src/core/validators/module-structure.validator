@@ -1,6 +1,4 @@
-import { BadRequestException, Logger } from '@nestjs/common';
-import * as fs from 'fs';
-import * as path from 'path';
+import { BadRequestException } from '@nestjs/common';
 import * as AdmZip from 'adm-zip';
 
 /**
@@ -38,13 +36,12 @@ export interface ModuleStructureResult {
 /**
  * Validador de estrutura de módulo
  * Detecta e valida a estrutura do ZIP antes da extração
+ * IMPLEMENTAÇÃO CONFORME ESPECIFICAÇÕES: VALIDAÇÃO DUPLA
  */
 export class ModuleStructureValidator {
-    private static readonly logger = new Logger(ModuleStructureValidator.name);
-
     /**
      * VALIDAÇÃO DUPLA DE ZIP (OBRIGATÓRIO)
-     *
+     * 
      * 1ª Validação: Assinatura ZIP (PK\x03\x04)
      * 2ª Validação: Estrutura interna válida (module.json na raiz)
      */
@@ -121,8 +118,8 @@ export class ModuleStructureValidator {
             }
 
             // Verificar se module.json existe (em qualquer formato)
-            const hasModuleJson = entries.some(entry =>
-                entry.entryName === 'module.json' ||
+            const hasModuleJson = entries.some(entry => 
+                entry.entryName === 'module.json' || 
                 entry.entryName.endsWith('/module.json')
             );
 

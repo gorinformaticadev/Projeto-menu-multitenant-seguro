@@ -46,6 +46,7 @@
     "dist",
     "test",
     "**/*spec.ts",
+    "**/*.js",
     "../modules/**/frontend/**/*"
   ]
 }

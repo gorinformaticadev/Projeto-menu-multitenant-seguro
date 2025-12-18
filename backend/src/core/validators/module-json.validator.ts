@@ -1,16 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 
 /**
- * Interface de dependência de módulo
- */
-export interface ModuleDependency {
-    type: 'core' | 'module';
-    name: string;
-    version: string;
-}
-
-/**
- * Interface do module.json
+ * Interface do module.json - formato correto especificado
  */
 export interface ModuleJson {
     name: string;
@@ -20,7 +11,8 @@ export interface ModuleJson {
     author?: string;
     category?: string;
     enabled?: boolean;
-    dependencies?: ModuleDependency[] | null;
+    dependencies?: string[] | null;  // string[] | null conforme especificado
+    defaultConfig?: any;
     menus?: any[];
     [key: string]: any;
 }
@@ -109,11 +101,30 @@ export class ModuleJsonValidator {
             throw new BadRequestException('Campo "enabled" deve ser boolean');
         }
 
-        // dependencies: array (opcional)
-        if (moduleJson.dependencies !== undefined && 
-            moduleJson.dependencies !== null && 
+        // dependencies: string[] | null (opcional)
+        if (moduleJson.dependencies !== undefined &&
+            moduleJson.dependencies !== null &&
             !Array.isArray(moduleJson.dependencies)) {
-            throw new BadRequestException('Campo "dependencies" deve ser array ou null');
+            throw new BadRequestException('Campo "dependencies" deve ser array de strings ou null');
+        }
+
+        // Validar se dependencies é array de strings
+        if (moduleJson.dependencies && Array.isArray(moduleJson.dependencies)) {
+            for (let i = 0; i < moduleJson.dependencies.length; i++) {
+                const dep = moduleJson.dependencies[i];
+                if (typeof dep !== 'string' || dep.trim() === '') {
+                    throw new BadRequestException(
+                        `Dependência ${i + 1} deve ser string não vazia`
+                    );
+                }
+            }
+        }
+
+        // defaultConfig: object (opcional)
+        if (moduleJson.defaultConfig !== undefined && 
+            moduleJson.defaultConfig !== null && 
+            typeof moduleJson.defaultConfig !== 'object') {
+            throw new BadRequestException('Campo "defaultConfig" deve ser objeto ou null');
         }
 
         // menus: array (opcional)
@@ -154,36 +165,15 @@ export class ModuleJsonValidator {
             throw new BadRequestException('Campo "displayName" deve ter entre 2 e 100 caracteres');
         }
 
-        // dependencies: validar estrutura de objetos Dependency[]
+        // Validar que cada dependência é um slug válido
         if (moduleJson.dependencies && Array.isArray(moduleJson.dependencies)) {
             for (let i = 0; i < moduleJson.dependencies.length; i++) {
-                const dep = moduleJson.dependencies[i];
-
-                // Cada dependência deve ser um objeto
-                if (typeof dep !== 'object' || dep === null) {
+                const depSlug = moduleJson.dependencies[i];
+                const depRegex = /^[a-zA-Z0-9_-]+$/;
+                
+                if (!depRegex.test(depSlug)) {
                     throw new BadRequestException(
-                        `Dependência ${i + 1} deve ser um objeto com type, name e version`
-                    );
-                }
-
-                // type: deve ser 'core' ou 'module'
-                if (!dep.type || !['core', 'module'].includes(dep.type)) {
-                    throw new BadRequestException(
-                        `Dependência ${i + 1}: campo "type" deve ser "core" ou "module"`
-                    );
-                }
-
-                // name: deve ser string não vazia
-                if (typeof dep.name !== 'string' || dep.name.trim() === '') {
-                    throw new BadRequestException(
-                        `Dependência ${i + 1}: campo "name" deve ser string não vazia`
-                    );
-                }
-
-                // version: deve ser string não vazia
-                if (typeof dep.version !== 'string' || dep.version.trim() === '') {
-                    throw new BadRequestException(
-                        `Dependência ${i + 1}: campo "version" deve ser string não vazia`
+                        `Dependência ${i + 1} (${depSlug}) deve conter apenas letras, números, hífen e underscore`
                     );
                 }
             }

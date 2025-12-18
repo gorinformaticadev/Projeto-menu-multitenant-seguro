@@ -5,8 +5,9 @@ import * as AdmZip from 'adm-zip';
 import { PrismaService } from './prisma.service';
 import { NotificationService } from './notification.service';
 import { ModuleStatus, MigrationType } from '@prisma/client';
-import { ModuleJsonValidator, ModuleJson, ModuleDependency } from './validators/module-json.validator';
+import { ModuleJsonValidator, ModuleJson } from './validators/module-json.validator';
 import { ModuleStructureValidator, ModuleStructureResult } from './validators/module-structure.validator';
+import { ModuleDatabaseExecutorService } from './services/module-database-executor.service';
 
 /**
  * Serviço de Instalação de Módulos - REFATORADO
@@ -20,7 +21,8 @@ export class ModuleInstallerService {
 
     constructor(
         private readonly prisma: PrismaService,
-        private readonly notifications: NotificationService
+        private readonly notifications: NotificationService,
+        private readonly dbExecutor: ModuleDatabaseExecutorService
     ) {
         // Garante que os diretórios existem
         this.ensureDirectories();
@@ -594,8 +596,8 @@ export class ModuleInstallerService {
             const sql = fs.readFileSync(filePath, 'utf-8');
 
             try {
-                // Executa SQL
-                await this.prisma.$executeRawUnsafe(sql);
+                // Executa SQL de forma segura com transação
+                await this.dbExecutor.executeInTransaction(sql);
 
                 // Registra execução
                 await this.prisma.moduleMigration.create({
