@@ -1,9 +1,10 @@
-﻿import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch, Delete, UseInterceptors, UploadedFile, BadRequestException, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch, Delete, UseInterceptors, UploadedFile, BadRequestException, Req } from '@nestjs/common';
 import { Request as ExpressRequest } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SkipThrottle } from '@nestjs/throttler';
 import { DuplicateRequestInterceptor } from '@core/common/interceptors/duplicate-request.interceptor';
 import { TenantsService } from './tenants.service';
+import { TenantModuleService } from '../core/modules/engine/backend/tenant-module.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { ChangeAdminPasswordDto } from './dto/change-admin-password.dto';
@@ -19,7 +20,10 @@ import { multerConfig } from '@core/common/config/multer.config';
 @Controller('tenants')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class TenantsController {
-  constructor(private tenantsService: TenantsService) { }
+  constructor(
+    private tenantsService: TenantsService,
+    private tenantModuleService: TenantModuleService
+  ) { }
 
   // Assinaturas de arquivos vÃ¡lidas (magic numbers)
   private readonly FILE_SIGNATURES = {
@@ -202,7 +206,14 @@ export class TenantsController {
       }
       throw new BadRequestException('UsuÃ¡rio sem vinculo com tenant.');
     }
-    return this.tenantsService.getTenantActiveModules(req.user.tenantId);
+    const modules = await this.tenantModuleService.getModulesForTenant(req.user.tenantId);
+    return {
+      modules: modules.filter(m => m.enabled).map(m => ({
+        name: m.slug,
+        isActive: m.enabled
+      })),
+      activeModules: modules.filter(m => m.enabled).map(m => m.slug)
+    };
   }
 
   @Get(':id/modules/active')
@@ -210,7 +221,14 @@ export class TenantsController {
   @SkipTenantIsolation()
   @SkipThrottle()
   async getTenantActiveModules(@Param('id') id: string) {
-    return this.tenantsService.getTenantActiveModules(id);
+    const modules = await this.tenantModuleService.getModulesForTenant(id);
+    return {
+      modules: modules.filter(m => m.enabled).map(m => ({
+        name: m.slug,
+        isActive: m.enabled
+      })),
+      activeModules: modules.filter(m => m.enabled).map(m => m.slug)
+    };
   }
 
   @Post(':id/modules/:moduleName/activate')
@@ -218,7 +236,8 @@ export class TenantsController {
   @SkipTenantIsolation()
   @SkipThrottle()
   async activateModuleForTenant(@Param('id') id: string, @Param('moduleName') moduleName: string) {
-    return this.tenantsService.activateModuleForTenant(id, moduleName);
+    await this.tenantModuleService.activateModuleForTenant(moduleName, id);
+    return { message: `Módulo ${moduleName} ativado para o tenant ${id}` };
   }
 
   @Post(':id/modules/:moduleName/deactivate')
@@ -226,7 +245,8 @@ export class TenantsController {
   @SkipTenantIsolation()
   @SkipThrottle()
   async deactivateModuleForTenant(@Param('id') id: string, @Param('moduleName') moduleName: string) {
-    return this.tenantsService.deactivateModuleForTenant(id, moduleName);
+    await this.tenantModuleService.deactivateModuleForTenant(moduleName, id);
+    return { message: `Módulo ${moduleName} desativado para o tenant ${id}` };
   }
 
   @Post('my-tenant/modules/:moduleName/toggle')

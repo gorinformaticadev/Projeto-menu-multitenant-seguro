@@ -57,7 +57,7 @@ class ModulesService {
       const response = await api.post(`/tenants/${tenantId}/modules/${moduleName}/activate`);
       console.log(`✅ Módulo ${moduleName} ativado para tenant ${tenantId}`);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error(`❌ Erro ao ativar módulo ${moduleName} para tenant ${tenantId}:`, error);
       throw error;
     }
@@ -71,7 +71,7 @@ class ModulesService {
       const response = await api.post(`/tenants/${tenantId}/modules/${moduleName}/deactivate`);
       console.log(`❌ Módulo ${moduleName} desativado para tenant ${tenantId}`);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error(`❌ Erro ao desativar módulo ${moduleName} para tenant ${tenantId}:`, error);
       throw error;
     }
