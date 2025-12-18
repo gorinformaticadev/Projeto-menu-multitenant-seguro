@@ -7,13 +7,13 @@
 -- Tabela de configurações do sistema
 CREATE TABLE IF NOT EXISTS sistema_configs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL,
+    tenant_id TEXT NOT NULL,
     key VARCHAR(255) NOT NULL,
     value TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    -- Índices
+    -- Foreign Key para tabela tenants
     CONSTRAINT fk_sistema_configs_tenant FOREIGN KEY (tenant_id)
         REFERENCES tenants(id) ON DELETE CASCADE
 );

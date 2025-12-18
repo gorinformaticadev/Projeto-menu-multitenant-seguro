@@ -226,8 +226,8 @@ export function ModuleManagement() {
     setUpdatingDatabase(moduleName);
 
     try {
-      // Endpoint correto: /configuracoes/sistema/modulos/:slug/update-database
-      const response = await api.post(`/configuracoes/sistema/modulos/${moduleName}/update-database`);
+      // Endpoint correto: /configuracoes/sistema/modulos/:slug/update-db
+      const response = await api.post(`/configuracoes/sistema/modulos/${moduleName}/update-db`);
 
       toast({
         title: "Banco de dados atualizado!",
