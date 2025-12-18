@@ -45,7 +45,7 @@ export function ModuleRegistryNotifications() {
 
   const loadNotifications = () => {
     try {
-      const moduleNotifications = moduleRegistry.getNotifications(user?.role);
+      const moduleNotifications = moduleRegistry.getNotifications();
       setNotifications(moduleNotifications);
       console.log('🔔 Notificações do Module Registry carregadas:', moduleNotifications.length);
     } catch (error) {

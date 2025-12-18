@@ -505,7 +505,7 @@ export default function EmpresasPage() {
                           placeholder="empresa@example.com"
                           className="pl-10"
                           value={formData.email}
-                          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))
+                          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                           disabled={submitting}
                         />
                       </div>
@@ -529,7 +529,7 @@ export default function EmpresasPage() {
                           placeholder="Empresa LTDA"
                           className="pl-10"
                           value={formData.nomeFantasia}
-                          onChange={(e) => setFormData(prev => ({ ...prev, nomeFantasia: e.target.value }))
+                          onChange={(e) => setFormData(prev => ({ ...prev, nomeFantasia: e.target.value }))}
                           disabled={submitting}
                         />
                       </div>
@@ -544,7 +544,7 @@ export default function EmpresasPage() {
                           placeholder="João Silva"
                           className="pl-10"
                           value={formData.nomeResponsavel}
-                          onChange={(e) => setFormData(prev => ({ ...prev, nomeResponsavel: e.target.value }))
+                          onChange={(e) => setFormData(prev => ({ ...prev, nomeResponsavel: e.target.value }))}
                           disabled={submitting}
                         />
                       </div>
@@ -559,7 +559,7 @@ export default function EmpresasPage() {
                           placeholder="(11) 98765-4321"
                           className="pl-10"
                           value={formData.telefone}
-                          onChange={(e) => setFormData(prev => ({ ...prev, telefone: e.target.value }))
+                          onChange={(e) => setFormData(prev => ({ ...prev, telefone: e.target.value }))}
                           disabled={submitting}
                         />
                       </div>
@@ -583,7 +583,7 @@ export default function EmpresasPage() {
                           placeholder="Maria Santos"
                           className="pl-10"
                           value={formData.adminName}
-                          onChange={(e) => setFormData(prev => ({ ...prev, adminName: e.target.value }))
+                          onChange={(e) => setFormData(prev => ({ ...prev, adminName: e.target.value }))}
                           disabled={submitting}
                         />
                       </div>
@@ -599,7 +599,7 @@ export default function EmpresasPage() {
                           placeholder="admin@empresa.com"
                           className="pl-10"
                           value={formData.adminEmail}
-                          onChange={(e) => setFormData(prev => ({ ...prev, adminEmail: e.target.value }))
+                          onChange={(e) => setFormData(prev => ({ ...prev, adminEmail: e.target.value }))}
                           disabled={submitting}
                         />
                       </div>
@@ -901,7 +901,7 @@ export default function EmpresasPage() {
                   id="edit-email"
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))
+                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                   disabled={submitting}
                 />
               </div>
@@ -909,7 +909,7 @@ export default function EmpresasPage() {
                 id="edit-cnpjCpf"
                 label="CNPJ/CPF"
                 value={formData.cnpjCpf}
-                onChange={(value, isValid) => setFormData(prev => ({ ...prev, cnpjCpf: value }))
+                onChange={(value, isValid) => setFormData(prev => ({ ...prev, cnpjCpf: value }))}
                 disabled={submitting}
                 showValidation={true}
               />
@@ -918,7 +918,7 @@ export default function EmpresasPage() {
                 <Input
                   id="edit-nomeFantasia"
                   value={formData.nomeFantasia}
-                  onChange={(e) => setFormData(prev => ({ ...prev, nomeFantasia: e.target.value }))
+                  onChange={(e) => setFormData(prev => ({ ...prev, nomeFantasia: e.target.value }))}
                   disabled={submitting}
                 />
               </div>
@@ -927,7 +927,7 @@ export default function EmpresasPage() {
                 <Input
                   id="edit-nomeResponsavel"
                   value={formData.nomeResponsavel}
-                  onChange={(e) => setFormData(prev => ({ ...prev, nomeResponsavel: e.target.value }))
+                  onChange={(e) => setFormData(prev => ({ ...prev, nomeResponsavel: e.target.value }))}
                   disabled={submitting}
                 />
               </div>
@@ -936,7 +936,7 @@ export default function EmpresasPage() {
                 <Input
                   id="edit-telefone"
                   value={formData.telefone}
-                  onChange={(e) => setFormData(prev => ({ ...prev, telefone: e.target.value }))
+                  onChange={(e) => setFormData(prev => ({ ...prev, telefone: e.target.value }))}
                   disabled={submitting}
                 />
               </div>

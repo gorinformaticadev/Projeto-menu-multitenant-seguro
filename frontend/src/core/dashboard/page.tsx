@@ -5,7 +5,7 @@ import { use2FAStatus } from "@/hooks/use2FAStatus";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Shield, Building2, Users, Settings, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DashboardWidgets } from "@/components/dashboard/DashboardWidgets";
+import { DashboardWidgets } from "./DashboardWidgets";
 
 export default function DashboardPage() {
   const { user } = useAuth();

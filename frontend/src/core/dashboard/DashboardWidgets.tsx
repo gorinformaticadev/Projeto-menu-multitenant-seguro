@@ -9,8 +9,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { moduleRegistry } from '../../../../shared/registry/module-registry';
-import { ModuleDashboardWidget } from '../../../../shared/types/module.types';
+import { moduleRegistry, ModuleDashboardWidget } from '@/lib/module-registry';
 
 // Componentes de widgets disponíveis
 const widgetComponents: Record<string, React.ComponentType<any>> = {
@@ -60,7 +59,7 @@ export function DashboardWidgets() {
   const loadWidgets = () => {
     try {
       // Core agrega widgets de todos os módulos registrados
-      const moduleWidgets = moduleRegistry.getDashboardWidgets(user?.role, user?.permissions);
+      const moduleWidgets = moduleRegistry.getDashboardWidgets();
       setWidgets(moduleWidgets);
     } catch (error) {
       console.error('Erro ao carregar widgets:', error);

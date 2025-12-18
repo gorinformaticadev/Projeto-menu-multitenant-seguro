@@ -22,6 +22,7 @@ export function useModulesManager() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modules, setModules] = useState<ModuleData[]>([]);
+  const [isToggling, setIsToggling] = useState(false);
 
   /**
    * Carrega módulos da API e atualiza estado local
@@ -57,10 +58,29 @@ export function useModulesManager() {
     }
   }, [loading]);
 
+  /**
+   * Ativa/desativa um módulo
+   */
+  const toggleModule = useCallback(async (moduleName: string) => {
+    setIsToggling(true);
+    try {
+      // TODO: Implementar chamada à API para toggle
+      console.log('🔄 Toggle módulo:', moduleName);
+      await loadModules();
+    } catch (err) {
+      console.error('❌ Erro ao fazer toggle do módulo:', err);
+      throw err;
+    } finally {
+      setIsToggling(false);
+    }
+  }, [loadModules]);
+
   return {
     modules,
     loading,
     error,
-    loadModules
+    loadModules,
+    toggleModule,
+    isToggling
   };
 }

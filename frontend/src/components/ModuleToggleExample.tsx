@@ -30,19 +30,19 @@ export function ModuleToggleExample() {
     <div className="space-y-4">
       <h3 className="text-lg font-semibold">Módulos Disponíveis</h3>
       {modules.map((module) => (
-        <div key={module.name} className="flex items-center justify-between p-4 border rounded">
+        <div key={module.slug} className="flex items-center justify-between p-4 border rounded">
           <div>
-            <h4 className="font-medium">{module.displayName}</h4>
+            <h4 className="font-medium">{module.name || module.slug}</h4>
             <p className="text-sm text-muted-foreground">{module.description}</p>
           </div>
           <div className="flex items-center gap-2">
-            {isToggling(module.name) && (
+            {isToggling && (
               <Loader2 className="h-4 w-4 animate-spin" />
             )}
             <Switch
               checked={module.isActive}
-              disabled={isToggling(module.name)}
-              onCheckedChange={() => handleToggle(module.name)}
+              disabled={isToggling}
+              onCheckedChange={() => handleToggle(module.slug)}
             />
           </div>
         </div>

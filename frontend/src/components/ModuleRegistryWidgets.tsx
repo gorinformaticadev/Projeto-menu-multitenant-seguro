@@ -178,7 +178,7 @@ export function ModuleRegistryWidgets() {
   const loadWidgets = () => {
     try {
       // Core agrega widgets de todos os módulos registrados
-      const moduleWidgets = moduleRegistry.getDashboardWidgets(user?.role);
+      const moduleWidgets = moduleRegistry.getDashboardWidgets();
       setWidgets(moduleWidgets);
       console.log('📊 Widgets do Module Registry carregados:', moduleWidgets.length);
     } catch (error) {

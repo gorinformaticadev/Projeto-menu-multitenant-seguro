@@ -29,6 +29,34 @@ export interface ModulesResponse {
   modules: ModuleData[];
 }
 
+export interface ModuleNotification {
+  id: string;
+  type: 'info' | 'warning' | 'error' | 'success';
+  title: string;
+  message: string;
+  source: string;
+  timestamp: Date;
+}
+
+export interface ModuleUserMenuItem {
+  id: string;
+  label: string;
+  icon?: string;
+  href?: string;
+  onClick?: () => void;
+  order?: number;
+}
+
+export interface ModuleDashboardWidget {
+  id: string;
+  title: string;
+  component: any;
+  module?: string;
+  size?: 'small' | 'medium' | 'large';
+  order?: number;
+  permissions?: string[];
+}
+
 /**
  * Registry simples que consome dados da API
  * Não registra módulos, apenas armazena dados recebidos
@@ -198,6 +226,14 @@ class ModuleRegistry {
   }
 
   /**
+   * Obtém itens da sidebar simplificados (para Sidebar nova)
+   */
+  getSidebarItems(userRole?: string, permissions?: string[]): any[] {
+    const grouped = this.getGroupedSidebarItems(userRole);
+    return grouped.ungrouped;
+  }
+
+  /**
    * Obtém widgets do dashboard (para compatibilidade)
    */
   getDashboardWidgets(): any[] {
@@ -233,6 +269,19 @@ class ModuleRegistry {
     }
 
     // TODO: Implementar quando API retornar taskbar items
+    return [];
+  }
+
+  /**
+   * Obtém itens do menu do usuário (para compatibilidade)
+   */
+  getUserMenuItems(userRole?: string): ModuleUserMenuItem[] {
+    // Se não houver módulos, retorna array vazio
+    if (!this.isLoaded || this.modules.length === 0) {
+      return [];
+    }
+
+    // TODO: Implementar quando API retornar user menu items
     return [];
   }
 }

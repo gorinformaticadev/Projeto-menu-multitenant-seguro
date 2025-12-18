@@ -1,13 +1,11 @@
 /**
  * HOOK PARA INICIALIZAÇÃO DO MODULE REGISTRY
  * 
- * Responsável por inicializar o registry e registrar módulos
- * de forma determinística e controlada
+ * Responsável por carregar módulos da API de forma controlada
  */
 
 import { useEffect, useState } from 'react';
-import { registerCoreModule } from '../../../shared/modules/core-module';
-import { loadExternalModules } from '../../../shared/modules/module-loader';
+import { moduleRegistry } from '@/lib/module-registry';
 
 export function useModuleRegistry() {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -19,11 +17,8 @@ export function useModuleRegistry() {
 
   const initializeRegistry = async () => {
     try {
-      // 1. Registra o módulo core (funcionalidades básicas)
-      registerCoreModule();
-
-      // 2. Carrega módulos externos de forma explícita e determinística
-      await loadExternalModules();
+      // Carrega módulos da API
+      await moduleRegistry.loadModules();
 
       setIsInitialized(true);
       console.log('Module Registry inicializado com sucesso');

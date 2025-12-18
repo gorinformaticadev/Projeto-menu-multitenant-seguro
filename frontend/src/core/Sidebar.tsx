@@ -7,8 +7,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu, Shield, FileText } from "lucide-react";
 import { Button } from "./ui/button";
-import { moduleRegistry } from "../../../shared/registry/module-registry";
-import { ModuleMenuItem } from "../../../shared/types/module.types";
+import { moduleRegistry } from "@/lib/module-registry";
+
+interface SidebarItem {
+  id: string;
+  name: string;
+  href: string;
+  icon: string;
+  order: number;
+}
 
 // Mapeamento de ícones para componentes Lucide
 const iconMap: Record<string, any> = {
@@ -25,7 +32,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
-  const [menuItems, setMenuItems] = useState<ModuleMenuItem[]>([]);
+  const [menuItems, setMenuItems] = useState<SidebarItem[]>([]);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   // Recolhe o menu ao clicar fora dele
@@ -54,7 +61,7 @@ export function Sidebar() {
   const loadMenuItems = () => {
     try {
       // Core agrega itens de todos os módulos registrados
-      const items = moduleRegistry.getSidebarItems(user?.role, user?.permissions);
+      const items = moduleRegistry.getSidebarItems(user?.role);
       setMenuItems(items);
     } catch (error) {
       console.error('Erro ao carregar itens do menu:', error);
