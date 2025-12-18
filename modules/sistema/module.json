@@ -6,13 +6,7 @@
   "author": "GOR Informatica",
   "category": "system",
   "enabled": true,
-  "dependencies": [
-    {
-      "type": "core",
-      "name": "core",
-      "version": ">=1.0.0"
-    }
-  ],
+  "dependencies": null,
   "defaultConfig": {
     "showNotifications": true,
     "enableWidgets": true,
