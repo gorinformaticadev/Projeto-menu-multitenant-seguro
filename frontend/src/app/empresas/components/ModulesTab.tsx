@@ -1,83 +1,128 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Package, Loader2 } from "lucide-react";
-import { useModulesManager } from "@/hooks/useModulesManager";
+import api from "@/lib/api";
+import { modulesService } from "@/services/modules.service";
+
+interface SystemModule {
+  slug: string;
+  name: string;
+  version: string;
+  description: string | null;
+  status: 'detected' | 'installed' | 'db_ready' | 'active' | 'disabled';
+  hasBackend: boolean;
+  hasFrontend: boolean;
+  installedAt: string;
+  activatedAt: string | null;
+}
+
+interface TenantModuleStatus {
+  slug: string;
+  enabled: boolean;
+}
 
 export function ModulesTab({ tenantId }: { tenantId: string }) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { modules, loading, error, loadModules } = useModulesManager();
+  const [systemModules, setSystemModules] = useState<SystemModule[]>([]);
+  const [tenantModules, setTenantModules] = useState<TenantModuleStatus[]>([]);
+  const [loading, setLoading] = useState(true);
   
   // Debounce para evitar cliques múltiplos
   const lastClickTime = useRef<{ [key: string]: number }>({});
   const DEBOUNCE_DELAY = 1000; // 1 segundo
-  
-  // Flag para evitar múltiplas chamadas
-  const hasLoadedRef = useRef(false);
-  const currentTenantRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    // Evita carregar múltiplas vezes para o mesmo tenant
-    if (hasLoadedRef.current && currentTenantRef.current === tenantId) {
-      console.log('⏭️ [MODULES_TAB] Módulos já carregados para este tenant, pulando...');
-      return;
-    }
-    
-    // Marca como carregado para este tenant
-    hasLoadedRef.current = true;
-    currentTenantRef.current = tenantId;
-    
-    console.log('📦 [MODULES_TAB] Carregando módulos para tenant:', tenantId);
-    // useModulesManager não aceita parâmetros, usa /me/modules sempre
-    loadModules();
-  }, [tenantId, loadModules]);
-
-  // Mostra toast de erro se houver
-  useEffect(() => {
-    if (error) {
+  const loadModulesData = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Buscar módulos do sistema
+      const systemModulesResponse = await api.get('/configuracoes/sistema/modulos');
+      setSystemModules(systemModulesResponse.data);
+      
+      // Buscar módulos habilitados para o tenant
+      const tenantModulesResponse = await api.get(`/tenants/${tenantId}/modules/active`);
+      const enabledModules = tenantModulesResponse.data.modules || [];
+      
+      // Mapear para formato de status
+      const tenantStatus: TenantModuleStatus[] = systemModulesResponse.data.map((mod: SystemModule) => ({
+        slug: mod.slug,
+        enabled: enabledModules.some((tm: any) => tm.name === mod.slug && tm.isActive)
+      }));
+      
+      setTenantModules(tenantStatus);
+      
+    } catch (error: any) {
+      console.error('Erro ao carregar módulos:', error);
       toast({
         title: "Erro ao carregar módulos",
-        description: error,
+        description: error.response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
-  }, [error, toast]);
+  }, [tenantId, toast]);
 
-  const handleToggleModule = useCallback(async (moduleName: string, currentStatus: boolean) => {
+  useEffect(() => {
+    loadModulesData();
+  }, [loadModulesData]);
+
+  const handleToggleModule = useCallback(async (moduleSlug: string, currentStatus: boolean) => {
     const now = Date.now();
-    const lastClick = lastClickTime.current[moduleName] || 0;
-    
-    console.log(`🖱️ [MODULES_TAB] Clique no toggle: ${moduleName}, status atual: ${currentStatus}, tempo desde último clique: ${now - lastClick}ms`);
+    const lastClick = lastClickTime.current[moduleSlug] || 0;
     
     // Debounce - ignora cliques muito rápidos
     if (now - lastClick < DEBOUNCE_DELAY) {
-      console.warn(`⚠️ [MODULES_TAB] Clique muito rápido em ${moduleName} - IGNORANDO (debounce)`);
+      console.warn(`⚠️ [MODULES_TAB] Clique muito rápido em ${moduleSlug} - IGNORANDO (debounce)`);
       return;
     }
 
     // Atualiza timestamp do último clique
-    lastClickTime.current[moduleName] = now;
+    lastClickTime.current[moduleSlug] = now;
 
     try {
-      toast({
-        title: "Funcionalidade em desenvolvimento",
-        description: "O gerenciamento de módulos está em desenvolvimento.",
-        variant: "default",
-      });
+      // Optimistic update
+      setTenantModules(prev => prev.map(tm => 
+        tm.slug === moduleSlug ? { ...tm, enabled: !currentStatus } : tm
+      ));
+
+      // Chamar API de toggle
+      if (currentStatus) {
+        await modulesService.deactivateModuleForTenant(tenantId, moduleSlug);
+        toast({
+          title: "Módulo desativado",
+          description: `O módulo foi desativado para este tenant.`,
+        });
+      } else {
+        await modulesService.activateModuleForTenant(tenantId, moduleSlug);
+        toast({
+          title: "Módulo ativado",
+          description: `O módulo foi ativado para este tenant.`,
+        });
+      }
+      
+      // Recarregar dados para confirmar
+      await loadModulesData();
       
     } catch (error: any) {
+      // Reverter optimistic update em caso de erro
+      setTenantModules(prev => prev.map(tm => 
+        tm.slug === moduleSlug ? { ...tm, enabled: currentStatus } : tm
+      ));
+      
       toast({
         title: "Erro ao atualizar módulo",
-        description: error.message || "Ocorreu um erro ao alterar o status do módulo",
+        description: error.response?.data?.message || "Ocorreu um erro ao alterar o status do módulo",
         variant: "destructive",
       });
     }
-  }, [toast]);
+  }, [toast, tenantId, loadModulesData]);
 
   if (loading) {
     return (
@@ -100,51 +145,65 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-0">
-          {modules.length === 0 ? (
+          {systemModules.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
               <p>Nenhum módulo disponível no momento</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {modules.map((module) => (
-                <div key={module.name} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
-                  <div className="flex-1 space-y-1 min-w-0">
-                    <h3 className="font-medium text-sm sm:text-base truncate">{module.name || module.slug}</h3>
-                    <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 overflow-hidden">{module.description || 'Sem descrição'}</p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                        {module.slug}
-                      </span>
-                      {module.isActive && (
-                        <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
-                          Ativo
+              {systemModules.map((module) => {
+                const tenantStatus = tenantModules.find(tm => tm.slug === module.slug);
+                const isEnabled = tenantStatus?.enabled || false;
+                const canToggle = module.status === 'active';
+                
+                return (
+                  <div key={module.slug} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
+                    <div className="flex-1 space-y-1 min-w-0">
+                      <h3 className="font-medium text-sm sm:text-base truncate">{module.name}</h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 overflow-hidden">
+                        {module.description || 'Sem descrição'}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                          v{module.version}
                         </span>
-                      )}
-                      {!module.isActive && (
-                        <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
-                          Inativo
-                        </span>
-                      )}
+                        {module.status === 'active' && (
+                          <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                            Sistema: Ativo
+                          </span>
+                        )}
+                        {module.status !== 'active' && (
+                          <span className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
+                            Sistema: {module.status}
+                          </span>
+                        )}
+                        {isEnabled && (
+                          <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                            Tenant: Ativo
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between sm:justify-end gap-2">
+                      <div className="flex flex-col items-end gap-1">
+                        <Switch
+                          checked={isEnabled}
+                          disabled={!canToggle}
+                          onCheckedChange={(checked) => {
+                            handleToggleModule(module.slug, isEnabled);
+                          }}
+                        />
+                        {!canToggle && (
+                          <span className="text-xs text-muted-foreground">
+                            Módulo não ativo
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between sm:justify-end gap-2">
-                    <span className="text-xs text-muted-foreground sm:hidden">
-                      {module.isActive ? 'Ativo' : 'Inativo'}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={module.isActive}
-                        disabled={true}
-                        onCheckedChange={(checked) => {
-                          console.log(`🔄 [SWITCH] onCheckedChange disparado: ${module.name}, checked: ${checked}`);
-                          handleToggleModule(module.name || module.slug, module.isActive || false);
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
