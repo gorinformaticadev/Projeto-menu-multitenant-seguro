@@ -1,4 +1,4 @@
-﻿import { Injectable, OnModuleInit, Logger, Inject } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger, Inject } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from './prisma.service';
@@ -226,6 +226,7 @@ export class ModuleLoader implements OnModuleInit {
 
     /**
      * Ativa um módulo (chamado pelo instalador após migrations)
+     * Aceita módulos com status 'db_ready' ou 'disabled' (reativação)
      */
     async activateModule(slug: string): Promise<boolean> {
         try {
@@ -233,7 +234,10 @@ export class ModuleLoader implements OnModuleInit {
                 where: { slug }
             });
 
-            if (!moduleData || moduleData.status !== ModuleStatus.db_ready) {
+            // Permite ativação de módulos db_ready ou disabled
+            if (!moduleData || 
+                (moduleData.status !== ModuleStatus.db_ready && moduleData.status !== ModuleStatus.disabled)) {
+                this.logger.warn(`⚠️ Não é possível ativar módulo ${slug} com status: ${moduleData?.status}`);
                 return false;
             }
 

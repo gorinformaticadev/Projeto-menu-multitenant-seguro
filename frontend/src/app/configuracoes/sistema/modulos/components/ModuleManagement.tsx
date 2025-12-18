@@ -5,10 +5,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
-import { Upload, Package, Trash2, Info, AlertTriangle, CheckCircle, Settings, XCircle, Clock } from "lucide-react";
+import { Upload, Package, Trash2, Info, AlertTriangle, CheckCircle, Settings, XCircle, Clock, Power, PowerOff, Database } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { 
+  getAllowedModuleActions, 
+  getStatusBadgeConfig, 
+  getStatusGuidance,
+  getDisabledTooltip,
+  type InstalledModule,
+  type ModuleStatus 
+} from "@/lib/module-utils";
 
 // **NOVAS INTERFACES:** Controle de Migrations
 interface MigrationRecord {
@@ -33,14 +42,8 @@ interface ModuleMigrationStatus {
   seeds: MigrationRecord[];
 }
 
-// **INTERFACE ATUALIZADA**
-interface InstalledModule {
-  slug: string;
-  name: string;
-  description: string;
-  enabled: boolean;
-  menus: any[];
-}
+// **INTERFACE ATUALIZADA** - Agora importada de module-utils
+// interface InstalledModule já está definida em @/lib/module-utils
 export function ModuleManagement() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -61,10 +64,10 @@ export function ModuleManagement() {
   const loadInstalledModules = async () => {
     try {
       setLoading(true);
-      // Usa o endpoint correto /me/modules que retorna módulos do usuário
-      const response = await api.get("/me/modules");
-      // A API retorna { modules: [...] }
-      setModules(response.data.modules || []);
+      // Usa o endpoint correto /configuracoes/sistema/modulos que retorna módulos globais
+      const response = await api.get("/configuracoes/sistema/modulos");
+      // A API retorna array de módulos com status
+      setModules(response.data || []);
     } catch (error: any) {
       toast({
         title: "Erro ao carregar módulos",
@@ -469,94 +472,156 @@ export function ModuleManagement() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {modules.map((module) => (
+                  {modules.map((module) => {
+                    // Obtém ações permitidas baseadas no status
+                    const allowedActions = getAllowedModuleActions(module.status);
+                    const badgeConfig = getStatusBadgeConfig(module.status);
+                    const guidance = getStatusGuidance(module.status);
+                    
+                    return (
                     <div key={module.slug} className="p-4 border rounded-lg">
                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                         {/* Informações do Módulo */}
                         <div className="flex-1 space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
                             <h3 className="font-medium">{module.name}</h3>
-                            <Badge variant={module.enabled ? "default" : "secondary"}>
-                              {module.enabled ? "Ativo no Sistema" : "Inativo no Sistema"}
+                            <Badge className={`${badgeConfig.color} border`}>
+                              {badgeConfig.icon} {badgeConfig.label}
                             </Badge>
-                            <Badge variant="outline" className="text-green-600 border-green-600">
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Instalado
-                            </Badge>
-                          </div>                          <p className="text-sm text-muted-foreground">{module.description}</p>
-                          
-                          {/* **NOVO:** Contadores de pendências */}
-                          {/* Pendências de migração removidas - não fazem parte da resposta do backend */}
-                          
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-xs text-muted-foreground">
-                              {module.name}
-                            </span>
+                            <span className="text-xs text-muted-foreground">v{module.version}</span>
                           </div>
+                          <p className="text-sm text-muted-foreground">{module.description}</p>
+                          
+                          {/* Mensagem de orientação */}
+                          <div className="p-2 bg-muted/50 rounded text-xs">
+                            <p className="font-medium">{guidance.title}</p>
+                            <p className="text-muted-foreground">{guidance.message}</p>
+                            {guidance.suggestion && (
+                              <p className="text-primary mt-1">➡️ {guidance.suggestion}</p>
+                            )}
+                          </div>
+                          
+                          {module.stats && (
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                              <span>📊 {module.stats.tenants} tenant(s)</span>
+                              <span>🗃️ {module.stats.migrations} migration(s)</span>
+                              <span>📑 {module.stats.menus} menu(s)</span>
+                            </div>
+                          )}
                         </div>
 
-                        {/* Botões de Ação */}
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openInfoDialog(module)}
-                          >
-                            <Info className="h-4 w-4 mr-1" />
-                            Detalhes
-                          </Button>
-                          
-                          {/* Botão para ativar/desativar módulo */}
-                          <Button
-                            variant={module.enabled ? "outline" : "default"}
-                            size="sm"
-                            onClick={() => module.enabled ? deactivateModule(module.name) : activateModule(module.name)}
-                          >
-                            {module.enabled ? (
-                              <>
-                                <XCircle className="h-4 w-4 mr-1" />
-                                Desativar
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                Ativar
-                              </>
-                            )}
-                          </Button>
-                          
-                          {/* Botão para atualizar banco de dados */}
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => updateModuleDatabase(module.name)}
-                            disabled={updatingDatabase === module.name}
-                          >
-                            {updatingDatabase === module.name ? (
-                              <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                Atualizando...
-                              </>
-                            ) : (
-                              <>
-                                <Settings className="h-4 w-4 mr-1" />
-                                DB
-                              </>
-                            )}
-                          </Button>
-                          
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => openRemoveDialog(module)}
-                          >
-                            <Trash2 className="h-4 w-4 mr-1" />
-                            Desinstalar
-                          </Button>
-                        </div>
+                        {/* Botões de Ação - Controlados por Status */}
+                        <TooltipProvider>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {/* Botão Detalhes (sempre ativo) */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openInfoDialog(module)}
+                                >
+                                  <Info className="h-4 w-4 mr-1" />
+                                  Detalhes
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Ver informações detalhadas</TooltipContent>
+                            </Tooltip>
+                            
+                            {/* Botão Atualizar Banco */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => updateModuleDatabase(module.slug)}
+                                  disabled={!allowedActions.updateDatabase || updatingDatabase === module.slug}
+                                >
+                                  {updatingDatabase === module.slug ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                      Atualizando...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Database className="h-4 w-4 mr-1" />
+                                      Atualizar Banco
+                                    </>
+                                  )}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {allowedActions.updateDatabase 
+                                  ? 'Executar migrations e seeds' 
+                                  : getDisabledTooltip('updateDatabase', module.status)}
+                              </TooltipContent>
+                            </Tooltip>
+                            
+                            {/* Botão Ativar */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  onClick={() => activateModule(module.slug)}
+                                  disabled={!allowedActions.activate}
+                                  className="bg-green-600 hover:bg-green-700"
+                                >
+                                  <Power className="h-4 w-4 mr-1" />
+                                  Ativar
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {allowedActions.activate 
+                                  ? 'Ativar módulo no sistema' 
+                                  : getDisabledTooltip('activate', module.status)}
+                              </TooltipContent>
+                            </Tooltip>
+                            
+                            {/* Botão Desativar */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => deactivateModule(module.slug)}
+                                  disabled={!allowedActions.deactivate}
+                                >
+                                  <PowerOff className="h-4 w-4 mr-1" />
+                                  Desativar
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {allowedActions.deactivate 
+                                  ? 'Desativar módulo temporariamente' 
+                                  : getDisabledTooltip('deactivate', module.status)}
+                              </TooltipContent>
+                            </Tooltip>
+                            
+                            {/* Botão Desinstalar */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => openRemoveDialog(module)}
+                                  disabled={!allowedActions.uninstall}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-1" />
+                                  Desinstalar
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {allowedActions.uninstall 
+                                  ? 'Remover módulo do sistema' 
+                                  : getDisabledTooltip('uninstall', module.status)}
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </TooltipProvider>
                       </div>
                     </div>
-                  ))}
+                  )})}
                 </div>
               )}
             </CardContent>

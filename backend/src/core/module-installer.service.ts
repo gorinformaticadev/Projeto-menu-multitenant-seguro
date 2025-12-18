@@ -317,7 +317,7 @@ export class ModuleInstallerService {
 
     /**
      * Ativa um módulo instalado
-     * MANTIDO SEM ALTERAÇÕES
+     * Validação rigorosa: status deve ser 'db_ready' ou 'disabled'
      */
     async activateModule(slug: string) {
         const module = await this.prisma.module.findUnique({
@@ -333,8 +333,13 @@ export class ModuleInstallerService {
             throw new Error('Módulo não encontrado');
         }
 
-        if (module.status !== ModuleStatus.db_ready) {
-            throw new Error('Módulo deve ter banco atualizado antes da ativação');
+        // Validação rigorosa de status conforme ciclo de vida
+        if (module.status !== ModuleStatus.db_ready && module.status !== ModuleStatus.disabled) {
+            throw new Error(
+                `Não é possível ativar este módulo.\n` +
+                `Motivo: Status atual é '${module.status}' (requer 'db_ready' ou 'disabled')\n` +
+                `Solução: ${this.getActivationSolution(module.status)}`
+            );
         }
 
         // Validar dependências se declaradas no module.json
@@ -391,7 +396,7 @@ export class ModuleInstallerService {
 
     /**
      * Desativa um módulo
-     * MANTIDO SEM ALTERAÇÕES
+     * Validação rigorosa: status deve ser 'active'
      */
     async deactivateModule(slug: string) {
         const module = await this.prisma.module.findUnique({
@@ -400,6 +405,15 @@ export class ModuleInstallerService {
 
         if (!module) {
             throw new Error('Módulo não encontrado');
+        }
+
+        // Validação rigorosa de status
+        if (module.status !== ModuleStatus.active) {
+            throw new Error(
+                `Desativação Bloqueada\n` +
+                `Este módulo não pode ser desativado.\n` +
+                `Motivo: Status atual é '${module.status}' (apenas módulos 'active' podem ser desativados)`
+            );
         }
 
         // Verificar se outros módulos dependem deste
@@ -631,6 +645,22 @@ export class ModuleInstallerService {
                 fs.mkdirSync(dir, { recursive: true });
             }
         });
+    }
+
+    /**
+     * Obtém mensagem de solução para erro de ativação
+     */
+    private getActivationSolution(currentStatus: ModuleStatus): string {
+        switch (currentStatus) {
+            case ModuleStatus.detected:
+                return 'O módulo precisa ser instalado primeiro';
+            case ModuleStatus.installed:
+                return 'Execute "Atualizar Banco" antes de ativar';
+            case ModuleStatus.active:
+                return 'Módulo já está ativo';
+            default:
+                return 'Verifique o status do módulo';
+        }
     }
 
     /**
