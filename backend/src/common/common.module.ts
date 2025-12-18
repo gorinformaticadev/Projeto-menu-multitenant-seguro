@@ -38,8 +38,9 @@ import { ModuleInstallerService } from '@core/module-installer.service';
 })
 export class CommonModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // Aplicar CORS para arquivos estáticos
-    consumer.apply(StaticCorsMiddleware).forRoutes('/uploads/*');
+    // CORS para arquivos estáticos está configurado em main.ts (useStaticAssets)
+    // Middleware removido para permitir acesso público aos logos
+    // StaticCorsMiddleware bloqueava requisições sem header 'origin'
 
     // Aplicar CSP middleware apenas se CSP_ADVANCED estiver ativado
     if (process.env.CSP_ADVANCED === 'true') {

@@ -115,13 +115,14 @@ async function bootstrap() {
   // 🛡️ Headers de Segurança Adicionais
   // ============================================
   app.use((req, res, next) => {
-    // Cross-Origin Embedder Policy - Protege contra certos ataques
-    res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+    // Cross-Origin Embedder Policy - Ajustado para permitir imagens
+    // unsafe-none permite carregar recursos cross-origin sem CORP
+    res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
 
-    // Cross-Origin Opener Policy - Protege contra certos ataques
-    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    // Cross-Origin Opener Policy - Ajustado para permitir imagens
+    res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
 
-    // Cross-Origin Resource Policy
+    // Cross-Origin Resource Policy - Permite cross-origin
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
     // Origin-Agent-Cluster - Melhora isolamento
@@ -151,21 +152,42 @@ async function bootstrap() {
       // Headers de segurança para arquivos estáticos
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
-      // CORS restritivo - apenas origins permitidas
-      const allowedOrigins = [
-        process.env.FRONTEND_URL || 'http://localhost:5000',
-        'http://127.0.0.1:5000',
-        'http://localhost:5000',
-        'http://localhost:3000'
-      ].filter(Boolean);
+      // Detecta se é um arquivo de logo
+      const isLogoFile = path.includes('logos/');
 
-      const origin = res.req.headers.origin;
-      if (origin && allowedOrigins.includes(origin)) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
+      if (isLogoFile) {
+        // CORS permissivo para logos (recursos públicos visuais)
+        // Logos não contêm informações sensíveis e precisam ser acessíveis
+        // Tags <img> frequentemente não enviam header 'origin'
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        
+        // Cache mais longo para logos (mudam raramente)
+        res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache por 24 horas
+        
+        if (!isProduction) {
+          console.log('🖼️  Servindo logo:', path);
+        }
+      } else {
+        // CORS restritivo para outros arquivos estáticos
+        const allowedOrigins = [
+          process.env.FRONTEND_URL || 'http://localhost:5000',
+          'http://127.0.0.1:5000',
+          'http://localhost:5000',
+          'http://localhost:3000'
+        ].filter(Boolean);
+
+        const origin = res.req.headers.origin;
+        if (origin && allowedOrigins.includes(origin)) {
+          res.setHeader('Access-Control-Allow-Origin', origin);
+        }
+        
+        // Cache padrão para outros arquivos
+        res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache por 1 hora
       }
 
-      // Headers de cache e segurança
-      res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache por 1 hora
+      // Headers de segurança comuns a todos os arquivos
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.setHeader('X-Frame-Options', 'DENY');
     },
