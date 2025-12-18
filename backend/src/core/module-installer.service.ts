@@ -2,7 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as AdmZip from 'adm-zip';
-import { PrismaService } from './prisma.service';
+import { PrismaService } from './prisma/prisma.service';
 import { NotificationService } from './notification.service';
 import { ModuleStatus, MigrationType } from '@prisma/client';
 import { ModuleJsonValidator, ModuleJson } from './validators/module-json.validator';
