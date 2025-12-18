@@ -2,6 +2,13 @@
 
 import { useState } from 'react';
 
+// Declaração de tipo global para propriedades dinâmicas do window
+declare global {
+  interface Window {
+    testModule?: () => any;
+  }
+}
+
 export default function TestApiPage() {
   const [result, setResult] = useState('');
   const [loading, setLoading] = useState(false);
@@ -32,7 +39,7 @@ export default function TestApiPage() {
       }
     } catch (error) {
       console.error('Erro:', error);
-      setResult(`❌ Erro: ${error.message}`);
+      setResult(`❌ Erro: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setLoading(false);
     }
