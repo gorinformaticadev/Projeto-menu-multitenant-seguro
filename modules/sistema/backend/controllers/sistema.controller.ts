@@ -18,6 +18,7 @@ import { SistemaService } from '../services/sistema.service';
 import { JwtAuthGuard } from '@core/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/guards/roles.guard';
 import { Roles } from '@core/decorators/roles.decorator';
+import { SendNotificationDto } from '../dto/sistema.dto';
 
 /**
  * Decorators que aplicam guards de autenticação e autorização
@@ -62,5 +63,20 @@ export class SistemaController {
     const tenantId = req.user?.tenantId;
     // Chama o serviço para obter as estatísticas
     return this.sistemaService.getStats(tenantId);
+  }
+
+  /**
+   * Endpoint para enviar notificações através do módulo sistema
+   * Integrado ao sistema central de notificações
+   *
+   * @param dto - Dados da notificação
+   * @param req - Objeto de requisição contendo informações do usuário
+   * @returns Confirmação de envio
+   */
+  @Post('notificacoes/enviar')
+  async enviarNotificacao(@Body() dto: SendNotificationDto, @Req() req) {
+    const userId = req.user?.id;
+    const tenantId = req.user?.tenantId;
+    return this.sistemaService.enviarNotificacao(dto, userId, tenantId);
   }
 }

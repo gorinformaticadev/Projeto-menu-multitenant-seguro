@@ -70,34 +70,26 @@ export default function SistemaNotificacaoPage() {
     setLoading(true);
 
     try {
-      // Monta o payload da notificação
+      // Monta o payload seguindo o padrão do backend
       const payload = {
-        type: formData.tipo,
-        title: formData.titulo,
-        message: formData.mensagem,
-        priority: formData.critica ? 'high' : 'normal',
-        target: formData.alvo,
-        source: 'modulo-sistema',
-        metadata: {
-          timestamp: new Date().toISOString(),
-          module: 'sistema',
-          critical: formData.critica,
-        }
+        titulo: formData.titulo,
+        mensagem: formData.mensagem,
+        tipo: formData.tipo,
+        destino: formData.alvo === 'tenant-atual' ? 'tenant_atual' : 'todos_tenants',
+        critica: formData.critica,
       };
 
       console.log('📤 [NotificacaoPage] Enviando notificação:', payload);
 
-      // Envia para o backend
-      // TODO: Ajustar endpoint quando estiver implementado
-      // const response = await api.post('/notifications/send', payload);
-      
-      // Simulação temporária
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Envia para o backend do módulo sistema
+      const response = await api.post('/api/sistema/notificacoes/enviar', payload);
+
+      console.log('✅ [NotificacaoPage] Resposta do servidor:', response.data);
 
       // Feedback de sucesso
       toast({
         title: '✅ Notificação enviada!',
-        description: `Notificação do tipo "${tipoAtual?.label}" enviada para ${formData.alvo === 'tenant-atual' ? 'o tenant atual' : 'todos os tenants'}`,
+        description: `Notificação do tipo "${tipoAtual?.label}" enviada para ${formData.alvo === 'tenant-atual' ? 'o tenant atual' : 'todos os tenants'}. Confira no ícone de notificações!`,
       });
 
       // Limpa o formulário
@@ -136,10 +128,14 @@ export default function SistemaNotificacaoPage() {
       </div>
 
       {/* Badge de status */}
-      <div className="mb-6">
+      <div className="mb-6 flex items-center gap-3">
         <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
           <CheckCircle className="h-3 w-3 mr-1" />
           Sistema de Notificações Ativo
+        </Badge>
+        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+          <Bell className="h-3 w-3 mr-1" />
+          Integrado com TopBar
         </Badge>
       </div>
 
