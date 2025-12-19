@@ -1,0 +1,29 @@
+# Diretório de Migrations do Módulo Boas-Vindas
+
+Este diretório contém as migrations de banco de dados específicas do módulo.
+
+## Estrutura
+
+As migrations devem seguir o padrão:
+- Nome: `YYYYMMDDHHMMSS_descricao.sql` ou `.js`
+- Ordem: Cronológica pelo timestamp
+
+## Exemplo
+
+```
+20241215000001_create_welcome_settings_table.sql
+20241215000002_add_tutorial_progress_table.sql
+```
+
+## Como Criar
+
+1. Crie um arquivo com timestamp único
+2. Descreva as alterações no banco
+3. Teste localmente antes de commitar
+4. Documente mudanças no README do módulo
+
+## Notas
+
+- Migrations devem ser idempotentes quando possível
+- Use transações para garantir consistência
+- Sempre adicione migration de rollback quando aplicável

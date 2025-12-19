@@ -150,19 +150,32 @@ export class ModuleSecurityService {
                 include: {
                     tenantModules: {
                         where: { tenantId }
+                    },
+                    menus: {
+                        orderBy: { order: 'asc' }
                     }
-                    // Removido o include de menus pois não existe no modelo atual
                 }
             });
 
-            // Ajustar o mapeamento para usar os campos corretos do modelo
-            return modules.map(module => ({
-                slug: module.slug,
-                name: module.name,
-                description: module.description,
-                enabled: module.tenantModules.length > 0 ? module.tenantModules[0]?.enabled : false,
-                // Removidos os menus pois não existem no modelo atual
-            }));
+            // Mapear módulos com estrutura completa
+            return modules.map(module => {
+                const enabled = module.tenantModules.length > 0 ? module.tenantModules[0]?.enabled : false;
+                
+                // Construir estrutura hierárquica de menus
+                const menuTree = this.buildMenuTree(module.menus);
+                
+                return {
+                    slug: module.slug,
+                    name: module.name,
+                    description: module.description,
+                    version: module.version,
+                    enabled: enabled,
+                    menus: menuTree,
+                    // Meta informações
+                    hasBackend: module.hasBackend,
+                    hasFrontend: module.hasFrontend
+                };
+            });
 
         } catch (error) {
             // Tratamento específico para erros de schema
@@ -182,5 +195,34 @@ export class ModuleSecurityService {
             // Sempre retornar array vazio em caso de erro para manter a consistência da API
             return [];
         }
+    }
+    
+    /**
+     * Constrói árvore hierárquica de menus
+     */
+    private buildMenuTree(menus: any[]): any[] {
+        // Separar menus pai (sem parentId) e filhos
+        const parentMenus = menus.filter(m => !m.parentId);
+        const childMenus = menus.filter(m => m.parentId);
+        
+        // Mapear menus pai e adicionar filhos
+        return parentMenus.map(parent => ({
+            id: parent.id,
+            label: parent.label,
+            icon: parent.icon,
+            route: parent.route,
+            order: parent.order,
+            permission: parent.permission,
+            children: childMenus
+                .filter(child => child.parentId === parent.id)
+                .map(child => ({
+                    id: child.id,
+                    label: child.label,
+                    icon: child.icon,
+                    route: child.route,
+                    order: child.order,
+                    permission: child.permission
+                }))
+        }));
     }
 }

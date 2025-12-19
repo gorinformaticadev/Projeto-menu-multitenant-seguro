@@ -97,6 +97,13 @@ export function Sidebar() {
       // Core agrega itens de todos os módulos registrados
       const grouped = moduleRegistry.getGroupedSidebarItems(user?.role);
       
+      console.log('📋 [Sidebar] Itens agrupados recebidos:', {
+        ungrouped: grouped.ungrouped.length,
+        groups: Object.keys(grouped.groups),
+        groupOrder: grouped.groupOrder,
+        detalhes: grouped
+      });
+      
       setGroupedItems(grouped);
       
       const totalItems = grouped.ungrouped.length + Object.values(grouped.groups).flat().length;
@@ -184,11 +191,16 @@ export function Sidebar() {
   };
 
   // Configuração dos grupos
-  const groupConfig = {
+  const groupConfig: Record<string, { name: string; icon: any; order: number }> = {
     administration: {
       name: 'Administração',
       icon: Settings,
       order: 2 // Logo após Dashboard (ordem 1)
+    },
+    sistema: {
+      name: 'Sistema',
+      icon: Package,
+      order: 50 // Antes dos módulos personalizados
     },
     'module-exemplo': {
       name: 'Module Exemplo',

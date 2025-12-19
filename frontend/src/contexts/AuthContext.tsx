@@ -3,6 +3,8 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
+// @ts-ignore - moduleRegistry é válido
+import { moduleRegistry } from "@/lib/module-registry";
 
 export type Role = "SUPER_ADMIN" | "ADMIN" | "USER" | "CLIENT";
 
@@ -222,6 +224,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Buscar dados atualizados do usuário
           const response = await api.get("/auth/me");
           setUser(response.data);
+          
+          // Carregar módulos após autenticação bem-sucedida
+          console.log('📦 Carregando módulos...');
+          await moduleRegistry.loadModules();
+          console.log('✅ Módulos carregados');
         } catch (error) {
           console.error("Erro ao carregar usuário:", error);
           SecureStorage.removeToken();
@@ -275,6 +282,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Atualizar estado do usuário
       setUser(userData);
+      
+      // Carregar módulos após login
+      console.log('📦 Carregando módulos...');
+      await moduleRegistry.loadModules();
+      console.log('✅ Módulos carregados');
 
       // Redirecionar para dashboard
       router.push("/dashboard");
@@ -330,6 +342,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Atualizar estado do usuário
       setUser(userData);
+      
+      // Carregar módulos após login com 2FA
+      console.log('📦 Carregando módulos...');
+      await moduleRegistry.loadModules();
+      console.log('✅ Módulos carregados');
 
       // Redirecionar para dashboard
       router.push("/dashboard");

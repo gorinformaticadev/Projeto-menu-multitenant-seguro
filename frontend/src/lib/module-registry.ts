@@ -81,15 +81,27 @@ class ModuleRegistry {
    */
   async loadModules(): Promise<void> {
     try {
+      console.log('🔄 [ModuleRegistry] Iniciando carregamento de módulos...');
+      
       // URL completa para garantir que vai para o backend
       const response = await api.get<ModulesResponse>(`${API_URL}/me/modules`);
+      
+      console.log('📡 [ModuleRegistry] Resposta da API:', response.data);
+      
       this.modules = response.data.modules;
       this.isLoaded = true;
 
-      console.log('✅ Módulos carregados da API:', this.modules.map(m => m.slug));
+      console.log('✅ [ModuleRegistry] Módulos carregados da API:', {
+        total: this.modules.length,
+        modulos: this.modules.map(m => ({
+          slug: m.slug,
+          name: m.name,
+          menus: m.menus ? m.menus.length : 0
+        }))
+      });
 
     } catch (error) {
-      console.error('❌ Erro ao carregar módulos:', error);
+      console.error('❌ [ModuleRegistry] Erro ao carregar módulos:', error);
       this.modules = [];
       this.isLoaded = false;
     }
@@ -219,6 +231,7 @@ class ModuleRegistry {
 
     // Se não houver módulos carregados, retorna apenas menu do core
     if (!this.isLoaded || this.modules.length === 0) {
+      console.log('⚠️ [ModuleRegistry] Nenhum módulo carregado, retornando apenas core');
       return {
         ungrouped,
         groups,
@@ -226,8 +239,57 @@ class ModuleRegistry {
       };
     }
 
-    // TODO: Processar menus dos módulos quando API retornar dados
-    // Por enquanto retorna apenas menus do core
+    console.log('🔍 [ModuleRegistry] Processando menus dos módulos:', this.modules.length);
+    
+    // Processar menus dos módulos
+    for (const module of this.modules) {
+      if (!module.menus || module.menus.length === 0) {
+        console.log(`  ⚠️ Módulo ${module.slug} sem menus`);
+        continue;
+      }
+      
+      console.log(`  📝 Módulo ${module.slug}: ${module.menus.length} menus`);
+      
+      // Cada módulo cria seu próprio grupo
+      const moduleSlug = module.slug;
+      const moduleItems: any[] = [];
+      
+      for (const menu of module.menus) {
+        console.log(`     - Menu: ${menu.label}, children: ${menu.children ? menu.children.length : 0}`);
+        
+        // Se o menu tem filhos, adiciona cada filho
+        if (menu.children && menu.children.length > 0) {
+          for (const child of menu.children) {
+            moduleItems.push({
+              id: child.id,
+              name: child.label,
+              href: child.route,
+              icon: child.icon || 'Menu',
+              order: child.order,
+              group: moduleSlug
+            });
+          }
+        } else {
+          // Menu sem filhos
+          moduleItems.push({
+            id: menu.id,
+            name: menu.label,
+            href: menu.route,
+            icon: menu.icon || 'Menu',
+            order: menu.order,
+            group: moduleSlug
+          });
+        }
+      }
+      
+      if (moduleItems.length > 0) {
+        console.log(`  ✅ Adicionado grupo '${moduleSlug}' com ${moduleItems.length} itens`);
+        groups[moduleSlug] = moduleItems;
+        groupOrder.push(moduleSlug);
+      }
+    }
+    
+    console.log('✅ [ModuleRegistry] Grupos finais:', Object.keys(groups));
     
     return {
       ungrouped,
@@ -253,8 +315,29 @@ class ModuleRegistry {
       return [];
     }
 
-    // TODO: Implementar quando API retornar widgets
-    return [];
+    console.log('📊 [ModuleRegistry] Gerando widgets do dashboard para módulos:', this.modules.length);
+    
+    // Gerar widgets para módulos ativos
+    const widgets: any[] = [];
+    
+    for (const module of this.modules) {
+      // Criar widget padrão para cada módulo
+      widgets.push({
+        id: `${module.slug}-widget`,
+        title: module.name,
+        component: 'GenericModuleWidget', // Usar widget genérico
+        module: module.slug,
+        icon: 'Package', // Ícone padrão, pode ser customizado
+        size: 'small',
+        order: 100,
+        permissions: []
+      });
+      
+      console.log(`  ✅ Widget criado para módulo: ${module.slug}`);
+    }
+    
+    console.log(`📊 [ModuleRegistry] Total de widgets: ${widgets.length}`);
+    return widgets;
   }
 
   /**
