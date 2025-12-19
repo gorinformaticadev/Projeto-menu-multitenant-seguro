@@ -1,4 +1,4 @@
-﻿import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -19,6 +19,7 @@ import { TokenCleanupService } from './common/services/token-cleanup.service';
 import { UpdateModule } from './update/update.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CoreModule } from './core/CoreModule';
+import { SecureFilesModule } from './core/secure-files/secure-files.module';
 // import { DemoModule } from '@core/modules/demo-completo/src/demo.module'; // Removed legacy import
 
 @Module({
@@ -58,7 +59,8 @@ import { CoreModule } from './core/CoreModule';
     AuditModule,
     UpdateModule,
     NotificationsModule,
-
+    SecureFilesModule, // Módulo de uploads sensíveis
+  
   ],
   providers: [
     {

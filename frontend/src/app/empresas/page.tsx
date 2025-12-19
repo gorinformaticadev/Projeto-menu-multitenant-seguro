@@ -719,7 +719,7 @@ export default function EmpresasPage() {
                       {tenant.logoUrl ? (
                         <>
                           <img 
-                            src={`${API_URL}/uploads/logos/${tenant.logoUrl}`} 
+                            src={`${API_URL}/uploads/logos/${tenant.logoUrl}?t=${Date.now()}`} 
                             alt={tenant.nomeFantasia}
                             className="w-full h-full object-cover rounded-full logo-image"
                             onLoad={() => {

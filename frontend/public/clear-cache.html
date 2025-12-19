@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Limpar Cache - Sistema Multi-tenant</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        button {
+            background: #0070f3;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+            width: 100%;
+        }
+        button:hover {
+            background: #0051cc;
+        }
+        .success {
+            background: #10b981;
+            color: white;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 10px 0;
+            display: none;
+        }
+        .info {
+            background: #eff6ff;
+            border-left: 4px solid #0070f3;
+            padding: 12px;
+            margin: 15px 0;
+        }
+        pre {
+            background: #f1f1f1;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Limpeza de Cache</h1>
+        
+        <div class="info">
+            <strong>ℹ️ Informação:</strong><br>
+            Esta página limpa todo o cache de logos e dados antigos do sistema.
+            Use esta ferramenta se estiver vendo logos incorretas ou dados desatualizados.
+        </div>
+
+        <button onclick="clearAllCache()">🗑️ Limpar Todo o Cache</button>
+        <button onclick="clearLogoCache()">🖼️ Limpar Apenas Cache de Logos</button>
+        <button onclick="clearAuthCache()">🔐 Limpar Cache de Autenticação (Logout)</button>
+        <button onclick="showCacheInfo()">📊 Mostrar Informações do Cache</button>
+
+        <div class="success" id="successMessage"></div>
+        <pre id="cacheInfo" style="display:none;"></pre>
+    </div>
+
+    <script>
+        function showSuccess(message) {
+            const el = document.getElementById('successMessage');
+            el.textContent = '✅ ' + message;
+            el.style.display = 'block';
+            setTimeout(() => {
+                el.style.display = 'none';
+            }, 3000);
+        }
+
+        function clearAllCache() {
+            // Limpar localStorage
+            localStorage.clear();
+            
+            // Limpar sessionStorage
+            sessionStorage.clear();
+            
+            // Limpar cookies
+            document.cookie.split(";").forEach(function(c) { 
+                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+            });
+            
+            showSuccess('Todo o cache foi limpo! Recarregando página...');
+            setTimeout(() => {
+                window.location.href = '/login';
+            }, 1500);
+        }
+
+        function clearLogoCache() {
+            let count = 0;
+            Object.keys(localStorage).forEach(key => {
+                if (key.includes('logo') || key.includes('tenant')) {
+                    localStorage.removeItem(key);
+                    count++;
+                }
+            });
+            showSuccess(`${count} itens de cache de logos removidos!`);
+        }
+
+        function clearAuthCache() {
+            // Limpar tokens
+            localStorage.removeItem('@App:token');
+            localStorage.removeItem('@App:refreshToken');
+            sessionStorage.removeItem('@App:token');
+            sessionStorage.removeItem('@App:refreshToken');
+            
+            // Limpar cookies
+            document.cookie = 'accessToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            document.cookie = 'refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            
+            showSuccess('Cache de autenticação limpo! Redirecionando para login...');
+            setTimeout(() => {
+                window.location.href = '/login';
+            }, 1500);
+        }
+
+        function showCacheInfo() {
+            const info = {
+                localStorage: {},
+                sessionStorage: {},
+                cookies: document.cookie || 'Nenhum cookie'
+            };
+
+            Object.keys(localStorage).forEach(key => {
+                info.localStorage[key] = localStorage.getItem(key)?.substring(0, 100) + '...';
+            });
+
+            Object.keys(sessionStorage).forEach(key => {
+                info.sessionStorage[key] = sessionStorage.getItem(key)?.substring(0, 100) + '...';
+            });
+
+            const el = document.getElementById('cacheInfo');
+            el.textContent = JSON.stringify(info, null, 2);
+            el.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

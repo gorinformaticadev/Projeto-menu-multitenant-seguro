@@ -561,3 +561,34 @@ model DemoActivity {
   @@index([createdAt(sort: Desc)])
   @@map("demo_activities")
 }
+
+// ============================================
+// MÓDULO SECURE FILES - UPLOADS SENSÍVEIS
+// ============================================
+
+// Tabela de arquivos sensíveis com isolamento multi-tenant
+model SecureFile {
+  id              String    @id @default(uuid())
+  tenantId        String    // ID do tenant proprietário
+  moduleName      String    // Slug do módulo que fez upload
+  documentType    String    // Tipo de documento (categoria)
+  originalName    String    // Nome original do arquivo (sanitizado)
+  storedName      String    // Nome do arquivo no filesystem (UUID + extensão)
+  mimeType        String    // Tipo MIME validado
+  sizeBytes       BigInt    // Tamanho do arquivo em bytes
+  uploadedBy      String    // ID do usuário que fez upload
+  uploadedAt      DateTime  @default(now())
+  lastAccessedAt  DateTime? // Última vez que foi acessado
+  accessCount     Int       @default(0) // Contador de acessos
+  deletedAt       DateTime? // Soft delete
+  metadata        String?   @db.Text // Metadados adicionais em JSON
+
+  // Índices para performance
+  @@index([tenantId]) // Isolamento multi-tenant
+  @@index([moduleName]) // Filtrar por módulo
+  @@index([uploadedBy]) // Auditoria
+  @@index([documentType]) // Busca por categoria
+  @@index([tenantId, moduleName, documentType]) // Consulta composta comum
+  @@index([deletedAt]) // Soft delete
+  @@map("secure_files")
+}

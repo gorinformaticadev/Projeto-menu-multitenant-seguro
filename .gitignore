@@ -34,6 +34,11 @@ next-env.d.ts
 
 # Prisma
 backend/prisma/migrations/
+
+# Uploads - Arquivos sensíveis (NÃO commitar)
+backend/uploads/secure/**
+!backend/uploads/secure/.gitkeep
+!backend/uploads/secure/tenants/.gitkeep
 /modules/module-exemplo-completo
 
 /modules/module-template

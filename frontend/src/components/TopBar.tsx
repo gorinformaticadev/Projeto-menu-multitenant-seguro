@@ -92,37 +92,26 @@ export function TopBar() {
   useEffect(() => {
     async function fetchUserTenantLogo() {
       if (user?.tenantId) {
-        // Usuário tem tenant (ADMIN, USER, CLIENT) - usa endpoint público
-        const cacheKey = `tenant-logo-${user.tenantId}`;
-        const cacheTTL = 10 * 60 * 1000; // 10 minutos
-
-        // Verificar cache
-        const cached = localStorage.getItem(cacheKey);
-        if (cached) {
-          try {
-            const { logoUrl, timestamp } = JSON.parse(cached);
-            if (Date.now() - timestamp < cacheTTL) {
-              setUserTenantLogo(logoUrl);
-              return;
-            }
-          } catch (e) {
-            // Cache inválido, continua
+        // Limpar cache antigo de outros tenants
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('tenant-logo-') && key !== `tenant-logo-${user.tenantId}`) {
+            localStorage.removeItem(key);
           }
-        }
+        });
 
         try {
-          const response = await api.get(`/tenants/public/${user.tenantId}/logo`);
+          // SEMPRE buscar da API para garantir dados atualizados
+          const response = await api.get(`/tenants/public/${user.tenantId}/logo?_t=${Date.now()}`);
           const logoUrl = response.data?.logoUrl;
+          console.log('🔄 Logo do tenant atualizado:', logoUrl);
           if (logoUrl) {
             setUserTenantLogo(logoUrl);
-            // Cache o resultado
-            localStorage.setItem(cacheKey, JSON.stringify({
-              logoUrl,
-              timestamp: Date.now()
-            }));
+          } else {
+            setUserTenantLogo(null);
           }
         } catch (error) {
           console.error("Erro ao buscar logo do tenant:", error);
+          setUserTenantLogo(null);
         }
       } else if (user?.role === "SUPER_ADMIN") {
         // SUPER_ADMIN usa o logo master
@@ -396,7 +385,7 @@ export function TopBar() {
               {userTenantLogo ? (
                 <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-100">
                   <img
-                    src={`${API_URL}/uploads/logos/${userTenantLogo}`}
+                    src={`${API_URL}/uploads/logos/${userTenantLogo}?t=${Date.now()}`}
                     alt="Logo Tenant"
                     className="w-full h-full object-cover"
                     onError={(e) => {
@@ -436,7 +425,7 @@ export function TopBar() {
                     {userTenantLogo ? (
                       <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 flex-shrink-0">
                         <img
-                          src={`${API_URL}/uploads/logos/${userTenantLogo}`}
+                          src={`${API_URL}/uploads/logos/${userTenantLogo}?t=${Date.now()}`}
                           alt="Logo Tenant"
                           className="w-full h-full object-cover"
                           onError={(e) => {
