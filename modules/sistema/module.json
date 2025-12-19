@@ -1,7 +1,7 @@
 {
   "name": "sistema",
   "displayName": "Sistema",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Módulo de sistema com funcionalidades integradas",
   "author": "GOR Informatica",
   "category": "system",
@@ -11,5 +11,10 @@
     "showNotifications": true,
     "enableWidgets": true,
     "maxItems": 50
+  },
+  "comments": {
+    "purpose": "Módulo de exemplo que demonstra a estrutura básica de um módulo no sistema",
+    "structure": "Inclui frontend, backend, permissões, menus, rotas e banco de dados",
+    "usage": "Usado como referência para desenvolvimento de novos módulos"
   }
 }

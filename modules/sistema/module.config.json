@@ -2,12 +2,12 @@
   "name": "sistema",
   "slug": "sistema",
   "displayName": "Sistema",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Módulo completo de sistema com funcionalidades integradas",
   "author": "Equipe CORE",
   "category": "system",
   "enabled": true,
-"dependencies": [
+  "dependencies": [
     {
       "type": "core",
       "name": "core",
