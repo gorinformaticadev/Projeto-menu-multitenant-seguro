@@ -40,17 +40,22 @@ export function ModuleRegistryUserMenu({ onItemClick }: Props) {
 
   const loadUserMenuItems = () => {
     try {
+      console.log('🔍 [ModuleRegistryUserMenu] Carregando itens do menu do usuário...');
       const items = moduleRegistry.getUserMenuItems(user?.role);
       setUserMenuItems(items);
-      console.log('👤 Itens do menu do usuário carregados:', items.length);
+      console.log('✅ [ModuleRegistryUserMenu] Itens carregados:', items.length);
+      console.log('👤 [ModuleRegistryUserMenu] Detalhes:', items);
     } catch (error) {
-      console.error('❌ Erro ao carregar menu do usuário:', error);
+      console.error('❌ [ModuleRegistryUserMenu] Erro ao carregar menu do usuário:', error);
     }
   };
 
   if (userMenuItems.length === 0) {
+    console.log('⚠️ [ModuleRegistryUserMenu] Nenhum item para renderizar');
     return null;
   }
+
+  console.log('✅ [ModuleRegistryUserMenu] Renderizando', userMenuItems.length, 'item(s)');
 
   return (
     <>

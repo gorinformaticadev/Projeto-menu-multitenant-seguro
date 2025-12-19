@@ -359,11 +359,30 @@ class ModuleRegistry {
   getTaskbarItems(userRole?: string): any[] {
     // Se não houver módulos, retorna array vazio
     if (!this.isLoaded || this.modules.length === 0) {
+      console.log('⚠️ [ModuleRegistry] Nenhum módulo carregado para taskbar');
       return [];
     }
 
-    // TODO: Implementar quando API retornar taskbar items
-    return [];
+    console.log('🔧 [ModuleRegistry] Gerando itens da taskbar para módulos:', this.modules.length);
+    
+    // Gerar itens da taskbar para módulos ativos
+    const taskbarItems: any[] = [];
+    
+    for (const module of this.modules) {
+      // Criar item de taskbar para cada módulo
+      taskbarItems.push({
+        id: `${module.slug}-taskbar`,
+        name: module.name,
+        icon: 'Package', // Ícone padrão, pode ser customizado
+        href: `/modules/${module.slug}/dashboard`, // Rota padrão
+        order: 100
+      });
+      
+      console.log(`  ✅ Item de taskbar criado para módulo: ${module.slug}`);
+    }
+    
+    console.log(`🔧 [ModuleRegistry] Total de itens na taskbar: ${taskbarItems.length}`);
+    return taskbarItems;
   }
 
   /**
@@ -372,11 +391,30 @@ class ModuleRegistry {
   getUserMenuItems(userRole?: string): ModuleUserMenuItem[] {
     // Se não houver módulos, retorna array vazio
     if (!this.isLoaded || this.modules.length === 0) {
+      console.log('⚠️ [ModuleRegistry] Nenhum módulo carregado para menu do usuário');
       return [];
     }
 
-    // TODO: Implementar quando API retornar user menu items
-    return [];
+    console.log('👤 [ModuleRegistry] Gerando itens do menu do usuário para módulos:', this.modules.length);
+    
+    // Gerar itens do menu do usuário para módulos ativos
+    const userMenuItems: ModuleUserMenuItem[] = [];
+    
+    for (const module of this.modules) {
+      // Criar item de menu do usuário para cada módulo
+      userMenuItems.push({
+        id: `${module.slug}-user-menu`,
+        label: `Acessar ${module.name}`,
+        icon: 'ExternalLink',
+        href: `/modules/${module.slug}/dashboard`,
+        order: 100
+      });
+      
+      console.log(`  ✅ Item de menu do usuário criado para módulo: ${module.slug}`);
+    }
+    
+    console.log(`👤 [ModuleRegistry] Total de itens no menu do usuário: ${userMenuItems.length}`);
+    return userMenuItems;
   }
 }
 
