@@ -142,12 +142,11 @@ async function bootstrap() {
   }
 
   // Servir arquivos estáticos (logos)
-  // Em dev: __dirname = dist/src, então precisa subir 2 níveis
-  // Em prod: __dirname = dist, então precisa subir 1 nível
-  const uploadsPath = join(__dirname, '..', '..', 'uploads');
+  // Usa process.cwd() que sempre aponta para a raiz do projeto
+  const uploadsPath = join(process.cwd(), 'uploads');
   console.log('📁 Servindo arquivos estáticos de:', uploadsPath);
   app.useStaticAssets(uploadsPath, {
-    prefix: '/uploads/',
+    prefix: '/uploads',
     setHeaders: (res, path, stat) => {
       // Headers de segurança para arquivos estáticos
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
