@@ -184,34 +184,45 @@ class ModuleRegistry {
           name: 'Empresas',
           href: '/empresas',
           icon: 'Building2',
-          order: 10
+          order: 10,
+          group: 'administration'
         },
         {
           id: 'users',
           name: 'Usuários',
           href: '/usuarios',
           icon: 'Users',
-          order: 11
+          order: 11,
+          group: 'administration'
         },
         {
           id: 'configuracoes',
           name: 'Configurações',
           href: '/configuracoes',
           icon: 'Settings',
-          order: 12
+          order: 12,
+          group: 'administration'
         }
       );
     }
 
-    // Combina itens do core
-    const ungrouped = [...coreItems, ...adminItems];
+    // Separa itens não agrupados e agrupados
+    const ungrouped = coreItems;
+    const groups: Record<string, any[]> = {};
+    const groupOrder: string[] = [];
+
+    // Processa itens de administração
+    if (adminItems.length > 0) {
+      groups['administration'] = adminItems;
+      groupOrder.push('administration');
+    }
 
     // Se não houver módulos carregados, retorna apenas menu do core
     if (!this.isLoaded || this.modules.length === 0) {
       return {
         ungrouped,
-        groups: {},
-        groupOrder: []
+        groups,
+        groupOrder
       };
     }
 
@@ -220,8 +231,8 @@ class ModuleRegistry {
     
     return {
       ungrouped,
-      groups: {},
-      groupOrder: []
+      groups,
+      groupOrder
     };
   }
 

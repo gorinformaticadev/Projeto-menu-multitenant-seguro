@@ -255,8 +255,8 @@ export function Sidebar() {
               const config = groupConfig[groupId as keyof typeof groupConfig];
               
               if (config && items && items.length > 0) {
-                // Usa a ordem do primeiro item do grupo
-                const groupOrder = items[0]?.order || 999;
+                // Usa a ordem do grupo definida na configuração
+                const groupOrder = config.order || 999;
                 renderQueue.push({
                   type: 'group',
                   order: groupOrder,
