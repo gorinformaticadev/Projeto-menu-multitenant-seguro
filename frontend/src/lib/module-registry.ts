@@ -14,14 +14,17 @@
 import api, { API_URL } from './api';
 
 export interface ModuleMenu {
+  id?: string;
   label: string;
   icon?: string;
   route: string;
+  order?: number;
   children?: ModuleMenu[];
 }
 
 export interface ModuleData {
   slug: string;
+  name: string;
   menus: ModuleMenu[];
 }
 
@@ -52,6 +55,7 @@ export interface ModuleDashboardWidget {
   title: string;
   component: any;
   module?: string;
+  icon?: string;
   size?: 'small' | 'medium' | 'large';
   order?: number;
   permissions?: string[];

@@ -18,8 +18,8 @@ import SistemaNotificacaoPage from './pages/notificacao';
 import SistemaAjustesPage from './pages/ajustes';
 
 // Prefixo padrão para isolamento de rota
-// Todas as rotas deste módulo serão acessadas sob /sistema
-const MODULE_ROOT = '/sistema';
+// Todas as rotas deste módulo serão acessadas sob /modules/sistema
+const MODULE_ROOT = '/modules/sistema';
 
 export const ModuleRoutes = [
     // Rota: /modules/sistema/dashboard

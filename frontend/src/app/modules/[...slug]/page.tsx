@@ -19,7 +19,13 @@ export default function DynamicModulePage() {
   let matchParams = {};
 
   // Debug: Verificar o que está chegando e o que temos registrado
-  console.log('DynamicModulePage Debug:', { currentPath, routesCount: AllModuleRoutes.length, availablePaths: AllModuleRoutes.map(r => r.path) });
+  console.log('🔍 [DynamicModulePage] Debug:', { 
+    currentPath, 
+    routesCount: AllModuleRoutes.length, 
+    availablePaths: AllModuleRoutes.map(r => r.path),
+    slug,
+    params 
+  });
 
   for (const route of AllModuleRoutes) {
 
