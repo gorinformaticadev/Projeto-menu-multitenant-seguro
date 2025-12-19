@@ -1,4 +1,4 @@
-﻿import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
@@ -168,8 +168,9 @@ export class TenantsService {
     return { message: 'Senha alterada com sucesso' };
   }
 
-  async updateLogo(id: string, filename: string) {
+  async updateLogo(id: string, filename: string, userId?: string) {
     const tenant = await this.findOne(id);
+    const oldLogoUrl = tenant.logoUrl;
 
     // Remove o logo antigo se existir
     if (tenant.logoUrl) {
@@ -177,37 +178,74 @@ export class TenantsService {
         const oldLogoPath = join(process.cwd(), 'uploads', 'logos', tenant.logoUrl);
         await unlink(oldLogoPath);
       } catch (error) {
-        // Ignora erro se o arquivo nÃ£o existir
+        // Ignora erro se o arquivo não existir
       }
     }
 
     // Atualiza com o novo logo
-    return this.prisma.tenant.update({
+    const updatedTenant = await this.prisma.tenant.update({
       where: { id },
       data: { logoUrl: filename },
     });
+
+    // Registra auditoria
+    if (userId) {
+      await this.prisma.auditLog.create({
+        data: {
+          action: 'TENANT_LOGO_UPLOADED',
+          userId,
+          tenantId: id,
+          details: JSON.stringify({
+            tenantName: tenant.nomeFantasia,
+            oldLogo: oldLogoUrl,
+            newLogo: filename,
+          }),
+        },
+      });
+    }
+
+    return updatedTenant;
   }
 
-  async removeLogo(id: string) {
+  async removeLogo(id: string, userId?: string) {
     const tenant = await this.findOne(id);
 
     if (!tenant.logoUrl) {
-      throw new BadRequestException('Esta empresa nÃ£o possui logo');
+      throw new BadRequestException('Esta empresa não possui logo');
     }
 
-    // Remove o arquivo fÃ­sico
+    const oldLogoUrl = tenant.logoUrl;
+
+    // Remove o arquivo físico
     try {
       const logoPath = join(process.cwd(), 'uploads', 'logos', tenant.logoUrl);
       await unlink(logoPath);
     } catch (error) {
-      // Ignora erro se o arquivo nÃ£o existir
+      // Ignora erro se o arquivo não existir
     }
 
-    // Remove a referÃªncia do banco
-    return this.prisma.tenant.update({
+    // Remove a referência do banco
+    const updatedTenant = await this.prisma.tenant.update({
       where: { id },
       data: { logoUrl: null },
     });
+
+    // Registra auditoria
+    if (userId) {
+      await this.prisma.auditLog.create({
+        data: {
+          action: 'TENANT_LOGO_REMOVED',
+          userId,
+          tenantId: id,
+          details: JSON.stringify({
+            tenantName: tenant.nomeFantasia,
+            removedLogo: oldLogoUrl,
+          }),
+        },
+      });
+    }
+
+    return updatedTenant;
   }
 
   async remove(id: string) {
@@ -248,24 +286,38 @@ export class TenantsService {
   }
 
   async getMasterLogo() {
-    // Busca a empresa padrÃ£o ou a primeira empresa
+    // Busca a empresa marcada como master (tenant principal da plataforma)
     const masterTenant = await this.prisma.tenant.findFirst({
       where: {
-        OR: [
-          { email: 'empresa1@example.com' },
-          { ativo: true },
-        ],
+        isMasterTenant: true,
+        ativo: true,
       },
-      orderBy: { createdAt: 'asc' },
       select: {
         logoUrl: true,
         nomeFantasia: true,
       },
     });
 
+    // Fallback: se não houver master definido, usa a primeira ativa
+    if (!masterTenant) {
+      const fallbackTenant = await this.prisma.tenant.findFirst({
+        where: { ativo: true },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          logoUrl: true,
+          nomeFantasia: true,
+        },
+      });
+
+      return {
+        logoUrl: fallbackTenant?.logoUrl || null,
+        nomeFantasia: fallbackTenant?.nomeFantasia || 'Sistema',
+      };
+    }
+
     return {
-      logoUrl: masterTenant?.logoUrl || null,
-      nomeFantasia: masterTenant?.nomeFantasia || 'Sistema',
+      logoUrl: masterTenant.logoUrl || null,
+      nomeFantasia: masterTenant.nomeFantasia,
     };
   }
 

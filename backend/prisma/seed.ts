@@ -39,13 +39,14 @@ async function main() {
   // Cria a tenant principal (empresa padrão do sistema)
   const tenant1 = await prisma.tenant.upsert({
     where: { email: 'empresa1@example.com' },
-    update: {},
+    update: { isMasterTenant: true },
     create: {
       email: 'empresa1@example.com',
       cnpjCpf: '12345678901234',
       nomeFantasia: 'GOR Informatica',
       nomeResponsavel: 'João Silva',
       telefone: '(11) 98765-4321',
+      isMasterTenant: true,
     },
   });
 

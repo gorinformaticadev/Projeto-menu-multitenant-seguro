@@ -22,6 +22,7 @@ model Tenant {
   nomeResponsavel String
   telefone        String
   logoUrl         String?
+  isMasterTenant  Boolean            @default(false)
   ativo           Boolean            @default(true)
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
@@ -32,6 +33,7 @@ model Tenant {
   // Índices para performance
   @@index([ativo]) // Filtrar tenants ativos
   @@index([createdAt]) // Ordenar por data de criação
+  @@index([isMasterTenant]) // Buscar tenant master rapidamente
   @@map("tenants")
 }
 

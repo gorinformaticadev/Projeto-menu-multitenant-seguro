@@ -261,7 +261,7 @@ export function TopBar() {
               {userTenantLogo ? (
                 <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-100">
                   <img 
-                    src={`${API_URL}/uploads/logos/${userTenantLogo}`} 
+                    src={`${API_URL}/uploads/logos/${userTenantLogo}?t=${Date.now()}`} 
                     alt="Logo Tenant"
                     className="w-full h-full object-cover"
                     onError={(e) => {
@@ -301,7 +301,7 @@ export function TopBar() {
                     {userTenantLogo ? (
                       <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 flex-shrink-0">
                         <img 
-                          src={`${API_URL}/uploads/logos/${userTenantLogo}`} 
+                          src={`${API_URL}/uploads/logos/${userTenantLogo}?t=${Date.now()}`} 
                           alt="Logo Tenant"
                           className="w-full h-full object-cover"
                           onError={(e) => {

@@ -1,4 +1,4 @@
-﻿import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
@@ -248,24 +248,38 @@ export class TenantsService {
   }
 
   async getMasterLogo() {
-    // Busca a empresa padrÃ£o ou a primeira empresa
+    // Busca a empresa marcada como master (tenant principal da plataforma)
     const masterTenant = await this.prisma.tenant.findFirst({
       where: {
-        OR: [
-          { email: 'empresa1@example.com' },
-          { ativo: true },
-        ],
+        isMasterTenant: true,
+        ativo: true,
       },
-      orderBy: { createdAt: 'asc' },
       select: {
         logoUrl: true,
         nomeFantasia: true,
       },
     });
 
+    // Fallback: se não houver master definido, usa a primeira ativa
+    if (!masterTenant) {
+      const fallbackTenant = await this.prisma.tenant.findFirst({
+        where: { ativo: true },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          logoUrl: true,
+          nomeFantasia: true,
+        },
+      });
+
+      return {
+        logoUrl: fallbackTenant?.logoUrl || null,
+        nomeFantasia: fallbackTenant?.nomeFantasia || 'Sistema',
+      };
+    }
+
     return {
-      logoUrl: masterTenant?.logoUrl || null,
-      nomeFantasia: masterTenant?.nomeFantasia || 'Sistema',
+      logoUrl: masterTenant.logoUrl || null,
+      nomeFantasia: masterTenant.nomeFantasia,
     };
   }
 

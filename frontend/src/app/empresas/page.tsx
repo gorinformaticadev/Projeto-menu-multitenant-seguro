@@ -50,6 +50,7 @@ export default function EmpresasPage() {
   const [submitting, setSubmitting] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoTimestamp, setLogoTimestamp] = useState<number>(Date.now());
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isAdminPasswordValid, setIsAdminPasswordValid] = useState(false);
   const [activeTab, setActiveTab] = useState("details");
@@ -444,6 +445,8 @@ export default function EmpresasPage() {
       setShowLogoDialog(false);
       setLogoFile(null);
       setLogoPreview(null);
+      // Forçar atualização do timestamp para reload da imagem
+      setLogoTimestamp(Date.now());
       // Invalidar cache antes de recarregar
       localStorage.removeItem('tenants-list-cache');
       loadTenants();
@@ -472,6 +475,8 @@ export default function EmpresasPage() {
       });
 
       setShowLogoDialog(false);
+      // Forçar atualização do timestamp para reload da imagem
+      setLogoTimestamp(Date.now());
       // Invalidar cache antes de recarregar
       localStorage.removeItem('tenants-list-cache');
       loadTenants();
@@ -1116,9 +1121,13 @@ export default function EmpresasPage() {
                   <Label>Logo Atual</Label>
                   <div className="flex items-center justify-center p-4 border rounded-lg bg-muted">
                     <img 
-                      src={`${API_URL}/uploads/logos/${selectedTenant.logoUrl}`} 
+                      src={`${API_URL}/uploads/logos/${selectedTenant.logoUrl}?t=${logoTimestamp}`} 
                       alt="Logo atual"
                       className="max-h-32 object-contain"
+                      onError={(e) => {
+                        console.error('Erro ao carregar logo atual:', selectedTenant.logoUrl);
+                        e.currentTarget.src = '/placeholder-logo.png';
+                      }}
                     />
                   </div>
                   <Button

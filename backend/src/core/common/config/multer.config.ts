@@ -24,9 +24,16 @@ export function validateFileSignature(buffer: Buffer, mimetype: string): boolean
   return true;
 }
 
+// Configurações dinâmicas a partir de variáveis de ambiente
+const getLogosUploadDir = () => process.env.LOGOS_UPLOAD_DIR || './uploads/logos';
+const getMaxLogoFileSize = () => parseInt(process.env.MAX_LOGO_FILE_SIZE || '5242880', 10);
+const getAllowedLogoMimeTypes = () => (
+  process.env.ALLOWED_LOGO_MIME_TYPES || 'image/jpeg,image/png,image/webp,image/gif'
+).split(',');
+
 export const multerConfig = {
   storage: diskStorage({
-    destination: './uploads/logos',
+    destination: getLogosUploadDir(),
     filename: (req, file, callback) => {
       // Sanitizar nome do arquivo
       const sanitizedName = file.originalname
@@ -38,8 +45,8 @@ export const multerConfig = {
     },
   }),
   fileFilter: (req, file, callback) => {
-    // Validação 1: MIME type
-    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    // Validação 1: MIME type (dinâmico via .env)
+    const allowedMimeTypes = getAllowedLogoMimeTypes();
     if (!allowedMimeTypes.includes(file.mimetype)) {
       return callback(new BadRequestException('Tipo de arquivo não permitido. Apenas JPEG, PNG, WebP e GIF são aceitos.'), false);
     }
@@ -65,7 +72,7 @@ export const multerConfig = {
     callback(null, true);
   },
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB
+    fileSize: getMaxLogoFileSize(), // Dinâmico via .env (padrão 5MB)
     files: 1, // Apenas 1 arquivo por vez
     fieldSize: 1024 * 1024, // 1MB para campos de texto
   },

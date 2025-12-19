@@ -1,4 +1,4 @@
-﻿import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch, Delete, UseInterceptors, UploadedFile, BadRequestException, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch, Delete, UseInterceptors, UploadedFile, BadRequestException, Req } from '@nestjs/common';
 import { Request as ExpressRequest } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SkipThrottle } from '@nestjs/throttler';
@@ -148,22 +148,29 @@ export class TenantsController {
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
   @UseInterceptors(FileInterceptor('logo', multerConfig))
-  async uploadLogo(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
+  async uploadLogo(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: ExpressRequest & { user: any },
+  ) {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo foi enviado');
     }
     
-    // ValidaÃ§Ã£o adicional de seguranÃ§a: verificar assinatura do arquivo
+    // Validação adicional de segurança: verificar assinatura do arquivo
     await this.validateFileSignature(file);
     
-    return this.tenantsService.updateLogo(id, file.filename);
+    return this.tenantsService.updateLogo(id, file.filename, req.user?.id);
   }
 
   @Patch(':id/remove-logo')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
-  async removeLogo(@Param('id') id: string) {
-    return this.tenantsService.removeLogo(id);
+  async removeLogo(
+    @Param('id') id: string,
+    @Req() req: ExpressRequest & { user: any },
+  ) {
+    return this.tenantsService.removeLogo(id, req.user?.id);
   }
 
   @Delete(':id')
