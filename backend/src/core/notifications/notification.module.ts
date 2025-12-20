@@ -7,7 +7,6 @@ import { NotificationSseController, NotificationSseTransport } from './notificat
 import { NotificationController } from './notification.controller';
 import { RealtimeBus } from '../realtime/realtime.bus';
 import { PrismaModule } from '../prisma/prisma.module';
-import { NotificationService } from '../notification.service';
 
 @Global() // Make it global so other modules can use NotificationCore easily
 @Module({
@@ -20,9 +19,8 @@ import { NotificationService } from '../notification.service';
         NotificationStore,
         NotificationPermissions,
         NotificationSseTransport,
-        NotificationService,
     ],
-    exports: [NotificationCore, NotificationStore, NotificationService],
+    exports: [NotificationCore, NotificationStore],
 })
 export class NotificationModule implements OnModuleInit {
     constructor(
