@@ -1,6 +1,8 @@
-﻿import { DynamicModule, Module, Logger } from '@nestjs/common';
+import { DynamicModule, Module, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
+import { PrismaModule } from '@core/prisma/prisma.module';
+import { CommonModule } from '@common/common.module';
 
 @Module({})
 export class AppModulesModule {
@@ -32,11 +34,32 @@ export class AppModulesModule {
 
                         if (moduleRoutes.ModuleRoutes) {
                             controllers.push(...moduleRoutes.ModuleRoutes);
-                            this.logger.log(`Loaded controllers from ${dir.name}`);
+                            this.logger.log(`✅ Loaded controllers from ${dir.name}`);
                         }
 
-                        // Carregar Providers/Services se houver um entry point
-                        // providers.push(...)
+                        // Tentar carregar services se existir um index de services
+                        try {
+                            const servicesPath = path.join(modulesDir, dir.name, 'backend', 'services');
+                            if (fs.existsSync(servicesPath)) {
+                                const serviceFiles = fs.readdirSync(servicesPath).filter(f => f.endsWith('.service.ts'));
+                                
+                                for (const serviceFile of serviceFiles) {
+                                    const serviceName = serviceFile.replace('.ts', '');
+                                    const serviceModule = await import(`@modules/${dir.name}/backend/services/${serviceName}`);
+                                    
+                                    // Procura por exports que sejam classes (services)
+                                    for (const exportKey of Object.keys(serviceModule)) {
+                                        const exportedItem = serviceModule[exportKey];
+                                        if (typeof exportedItem === 'function' && exportedItem.name && exportedItem.name.endsWith('Service')) {
+                                            providers.push(exportedItem);
+                                            this.logger.log(`✅ Loaded service ${exportedItem.name} from ${dir.name}`);
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (servicesError) {
+                            this.logger.warn(`Could not load services for module ${dir.name}: ${servicesError.message}`);
+                        }
 
                     } catch (e) {
                         this.logger.warn(`Could not load routes for module ${dir.name}: ${e.message}`);
@@ -47,6 +70,7 @@ export class AppModulesModule {
 
         return {
             module: AppModulesModule,
+            imports: [PrismaModule, CommonModule], // Importa módulos necessários para injeção
             controllers: controllers,
             providers: providers,
             exports: providers,

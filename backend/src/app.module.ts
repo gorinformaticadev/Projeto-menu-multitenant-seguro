@@ -20,6 +20,7 @@ import { UpdateModule } from './update/update.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CoreModule } from './core/CoreModule';
 import { SecureFilesModule } from './core/secure-files/secure-files.module';
+import { AppModulesModule } from './core/modules/AppModules.module';
 // import { DemoModule } from '@core/modules/demo-completo/src/demo.module'; // Removed legacy import
 
 @Module({
@@ -60,6 +61,7 @@ import { SecureFilesModule } from './core/secure-files/secure-files.module';
     UpdateModule,
     NotificationsModule,
     SecureFilesModule, // Módulo de uploads sensíveis
+    AppModulesModule.forRoot(), // Módulo de carregamento dinâmico de módulos externos
   
   ],
   providers: [

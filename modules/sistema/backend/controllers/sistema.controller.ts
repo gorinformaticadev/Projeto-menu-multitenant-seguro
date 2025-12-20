@@ -77,6 +77,20 @@ export class SistemaController {
   async enviarNotificacao(@Body() dto: SendNotificationDto, @Req() req) {
     const userId = req.user?.id;
     const tenantId = req.user?.tenantId;
-    return this.sistemaService.enviarNotificacao(dto, userId, tenantId);
+    
+    console.log('📤 [SistemaController] Recebendo requisição:', {
+      userId,
+      tenantId,
+      dto
+    });
+    
+    try {
+      const result = await this.sistemaService.enviarNotificacao(dto, userId, tenantId);
+      console.log('✅ [SistemaController] Notificação enviada com sucesso');
+      return result;
+    } catch (error) {
+      console.error('❌ [SistemaController] Erro ao enviar notificação:', error.message);
+      throw error;
+    }
   }
 }
