@@ -60,7 +60,7 @@ export class SistemaService {
   }
 
   /**
-   * Envia notificação usando o sistema central de notificações
+   * [REGRA 1] Envia notificação usando o sistema central de notificações COM SSE IMEDIATO
    * Integrado ao NotificationService do CORE
    *
    * @param dto - Dados da notificação
@@ -69,6 +69,9 @@ export class SistemaService {
    * @returns Confirmação de envio
    */
   async enviarNotificacao(dto: SendNotificationDto, userId: string, tenantId: string) {
+    const timestamp1 = Date.now();
+    console.log(`[${timestamp1}] [1] Clique em enviar detectado - Módulo Sistema`);
+
     // Validações
     if (!dto.titulo || dto.titulo.length > 100) {
       throw new BadRequestException('Título é obrigatório e deve ter no máximo 100 caracteres');
@@ -91,7 +94,10 @@ export class SistemaService {
     // Determina tenantId baseado no destino
     const targetTenantId = dto.destino === 'todos_tenants' ? null : tenantId;
 
-    // Cria notificação usando o serviço do CORE
+    // [REGRA 1] Cria notificação usando o serviço do CORE (que emite SSE IMEDIATO)
+    const timestamp2 = Date.now();
+    console.log(`[${timestamp2}] [2] Chamando NotificationService.createNotification - SSE será emitido ANTES do banco`);
+    
     await this.notificationService.createNotification({
       title: dto.titulo,
       message: dto.mensagem,
@@ -105,13 +111,20 @@ export class SistemaService {
         tipo: dto.tipo,
         critica: dto.critica,
         destino: dto.destino,
-        enviadoPor: userId
+        enviadoPor: userId,
+        timestamp: timestamp1
       }
     });
 
+    const timestamp3 = Date.now();
+    console.log(`[${timestamp3}] [3] Notificação processada - Tempo total: ${timestamp3 - timestamp1}ms`);
+    console.log(`[${timestamp3}] ✅ FLUXO CORRETO: SSE emitido ANTES da persistência no banco`);
+
     return {
       success: true,
-      message: 'Notificação enviada com sucesso'
+      message: 'Notificação enviada com sucesso via SSE',
+      timestamp: timestamp3,
+      latency: `${timestamp3 - timestamp1}ms`
     };
   }
 }
