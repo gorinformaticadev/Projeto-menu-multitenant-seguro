@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as AdmZip from 'adm-zip';
 import { PrismaService } from './prisma/prisma.service';
-import { NotificationService } from './notification.service';
+import { NotificationCore } from './notifications/notification.core';
 import { ModuleStatus, MigrationType } from '@prisma/client';
 import { ModuleJsonValidator, ModuleJson } from './validators/module-json.validator';
 import { ModuleStructureValidator, ModuleStructureResult } from './validators/module-structure.validator';
@@ -21,7 +21,7 @@ export class ModuleInstallerService {
 
     constructor(
         private readonly prisma: PrismaService,
-        private readonly notifications: NotificationService,
+        private readonly notifications: NotificationCore,
         private readonly dbExecutor: ModuleDatabaseExecutorService
     ) {
         // Garante que os diretórios existem
@@ -304,14 +304,15 @@ export class ModuleInstallerService {
      * Cria notificação de módulo instalado
      */
     private async notifyModuleInstalled(moduleJson: ModuleJson): Promise<void> {
-        await this.notifications.createNotification({
+        await this.notifications.notifySystem({
             title: 'Módulo Instalado',
-            message: `Módulo ${moduleJson.displayName} instalado com sucesso. Execute a preparação do banco de dados antes de ativar.`,
-            severity: 'info',
-            audience: 'super_admin',
-            source: 'core',
-            module: moduleJson.name,
-            context: '/configuracoes/sistema/modulos'
+            description: `Módulo ${moduleJson.displayName} instalado com sucesso. Execute a preparação do banco de dados antes de ativar.`,
+            type: 'success',
+            metadata: {
+                module: moduleJson.slug,
+                action: 'installed',
+                context: '/configuracoes/sistema/modulos'
+            }
         });
     }
 
@@ -381,14 +382,16 @@ export class ModuleInstallerService {
             }
         });
 
-        await this.notifications.createNotification({
+        await this.notifications.notifySystem({
             title: 'Módulo Ativado',
-            message: `Módulo ${module.name} está agora operacional no sistema`,
-            severity: 'info',
-            audience: 'super_admin',
-            source: 'core',
-            module: slug,
-            context: '/configuracoes/sistema/modulos'
+            description: `Módulo ${module.name} está agora operacional no sistema`,
+            type: 'success',
+            entityId: slug,
+            metadata: {
+                module: slug,
+                action: 'activated',
+                context: '/configuracoes/sistema/modulos'
+            }
         });
 
         return { success: true, message: `Módulo ${slug} ativado` };
@@ -447,13 +450,15 @@ export class ModuleInstallerService {
             }
         });
 
-        await this.notifications.createNotification({
+        await this.notifications.notifySystem({
             title: 'Módulo Desativado',
-            message: `Módulo ${slug} foi desativado`,
-            severity: 'info',
-            audience: 'super_admin',
-            source: 'core',
-            module: slug
+            description: `Módulo ${slug} foi desativado`,
+            type: 'info',
+            entityId: slug,
+            metadata: {
+                module: slug,
+                action: 'deactivated'
+            }
         });
 
         return { success: true, message: `Módulo ${slug} desativado` };
@@ -486,13 +491,17 @@ export class ModuleInstallerService {
             data: { status: ModuleStatus.db_ready }
         });
 
-        await this.notifications.createNotification({
+        await this.notifications.notifySystem({
             title: 'Banco de Dados Atualizado',
-            message: `Módulo ${module.name}: ${migrationsExecuted} migration(s) e ${seedsExecuted} seed(s) executados`,
-            severity: 'info',
-            audience: 'super_admin',
-            source: 'core',
-            module: slug
+            description: `Módulo ${module.name}: ${migrationsExecuted} migration(s) e ${seedsExecuted} seed(s) executados`,
+            type: 'success',
+            entityId: slug,
+            metadata: {
+                module: slug,
+                action: 'database_updated',
+                migrationsExecuted,
+                seedsExecuted
+            }
         });
 
         return {
@@ -763,12 +772,15 @@ export class ModuleInstallerService {
         }
 
         // 8️⃣ NOTIFICAR
-        await this.notifications.createNotification({
+        await this.notifications.notifySystem({
             title: 'Módulo Desinstalado',
-            message: `Módulo ${module.name} foi removido do sistema`,
-            severity: 'warning',
-            audience: 'super_admin',
-            source: 'core'
+            description: `Módulo ${module.name} foi removido do sistema`,
+            type: 'warning',
+            entityId: slug,
+            metadata: {
+                module: slug,
+                action: 'uninstalled'
+            }
         });
 
         this.logger.log(`✅ Módulo ${slug} desinstalado com sucesso`);

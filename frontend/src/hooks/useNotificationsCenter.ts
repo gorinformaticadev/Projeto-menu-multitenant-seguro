@@ -2,12 +2,14 @@
  * HOOK PARA CENTRAL DE NOTIFICAÇÕES
  * 
  * Gerencia notificações com filtros, paginação e ações em lote
+ * INTEGRADO COM SSE - Atualiza em tempo real
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { notificationsService } from '@/services/notifications.service';
 import { Notification, NotificationFilters } from '@/types/notifications';
+import { useNotificationSSEIntegration } from './useNotificationSSEIntegration';
 
 interface UseNotificationsCenterReturn {
   /** Notificações carregadas */
@@ -92,6 +94,22 @@ export function useNotificationsCenter(): UseNotificationsCenterReturn {
   // Refs para controle
   const isActiveRef = useRef(true);
   const currentRequestRef = useRef<AbortController | null>(null);
+
+  // Integração SSE
+  const { isConnected } = useNotificationSSEIntegration({
+    onNewNotification: () => {
+      // Recarrega primeira página quando recebe nova notificação
+      loadNotifications({ page: 1 }, false, false);
+    },
+    onNotificationRead: () => {
+      // Recarrega para atualizar contadores
+      loadNotifications(undefined, false, false);
+    },
+    onNotificationDeleted: () => {
+      // Recarrega para remover notificação deletada
+      loadNotifications(undefined, false, false);
+    }
+  });
 
   /**
    * Carrega notificações do servidor

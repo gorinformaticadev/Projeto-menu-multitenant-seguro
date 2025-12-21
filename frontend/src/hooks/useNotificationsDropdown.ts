@@ -2,13 +2,14 @@
  * HOOK PARA DROPDOWN DE NOTIFICAÇÕES
  * 
  * Gerencia as últimas 15 notificações para exibição na topbar
- * Implementa polling simples e cache inteligente
+ * INTEGRADO COM SSE - Atualiza em tempo real
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { notificationsService } from '@/services/notifications.service';
 import { Notification } from '@/types/notifications';
+import { useNotificationSSEIntegration } from './useNotificationSSEIntegration';
 
 interface UseNotificationsDropdownReturn {
   /** Notificações para o dropdown (máximo 15) */
@@ -47,8 +48,25 @@ export function useNotificationsDropdown(): UseNotificationsDropdownReturn {
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isActiveRef = useRef(true);
   
-  // Configurações
-  const POLLING_INTERVAL = 30000; // 30 segundos
+  // Integração SSE
+  const { isConnected, playNotificationSound } = useNotificationSSEIntegration({
+    onNewNotification: (notification) => {
+      // Recarrega notificações quando recebe nova via SSE
+      loadNotifications(false);
+      playNotificationSound();
+    },
+    onNotificationRead: () => {
+      // Recarrega quando notificação é lida via SSE
+      loadNotifications(false);
+    },
+    onNotificationDeleted: () => {
+      // Recarrega quando notificação é deletada via SSE
+      loadNotifications(false);
+    }
+  });
+  
+  // Configurações - Reduz polling quando SSE está conectado
+  const POLLING_INTERVAL = isConnected ? 60000 : 30000; // 60s com SSE, 30s sem SSE
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 5000; // 5 segundos
 
@@ -148,7 +166,7 @@ export function useNotificationsDropdown(): UseNotificationsDropdownReturn {
   }, []);
 
   /**
-   * Configura polling
+   * Configura polling - Reduzido quando SSE está ativo
    */
   const startPolling = useCallback(() => {
     // Limpa polling anterior
@@ -159,13 +177,13 @@ export function useNotificationsDropdown(): UseNotificationsDropdownReturn {
     // Carrega imediatamente
     loadNotifications(true);
 
-    // Configura polling
+    // Configura polling (menos frequente se SSE está conectado)
     pollingIntervalRef.current = setInterval(() => {
       if (isActiveRef.current && document.visibilityState === 'visible') {
         loadNotifications(false);
       }
     }, POLLING_INTERVAL);
-  }, [loadNotifications]);
+  }, [loadNotifications, POLLING_INTERVAL]);
 
   /**
    * Para polling
@@ -182,7 +200,7 @@ export function useNotificationsDropdown(): UseNotificationsDropdownReturn {
   // ============================================================================
 
   /**
-   * Inicia/para polling baseado no usuário
+   * Inicia/para polling baseado no usuário e status SSE
    */
   useEffect(() => {
     if (user) {
@@ -196,7 +214,7 @@ export function useNotificationsDropdown(): UseNotificationsDropdownReturn {
     return () => {
       stopPolling();
     };
-  }, [user, startPolling, stopPolling]);
+  }, [user, startPolling, stopPolling, isConnected]);
 
   /**
    * Pausa polling quando página não está visível

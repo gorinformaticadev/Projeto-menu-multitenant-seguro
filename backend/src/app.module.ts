@@ -21,6 +21,10 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { CoreModule } from './core/CoreModule';
 import { SecureFilesModule } from './core/secure-files/secure-files.module';
 import { AppModulesModule } from './core/modules/AppModules.module';
+// Novos módulos do sistema de notificações
+import { RealtimeModule } from './core/realtime/realtime.module';
+import { NotificationModule } from './core/notifications/notification.module';
+import { WhatsAppModule } from './core/whatsapp/whatsapp.module';
 // import { DemoModule } from '@core/modules/demo-completo/src/demo.module'; // Removed legacy import
 
 @Module({
@@ -59,7 +63,11 @@ import { AppModulesModule } from './core/modules/AppModules.module';
     EmailConfigModule,
     AuditModule,
     UpdateModule,
-    NotificationsModule,
+    NotificationsModule, // Sistema antigo (será substituído internamente)
+    // Novos módulos do sistema de notificações
+    RealtimeModule,
+    NotificationModule,
+    WhatsAppModule,
     SecureFilesModule, // Módulo de uploads sensíveis
     AppModulesModule.forRoot(), // Módulo de carregamento dinâmico de módulos externos
   
