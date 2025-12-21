@@ -25,11 +25,11 @@ export default function ModulePage() {
 
     try {
         console.log('🔍 [ModulePage] Tentando resolver componente:', { module, route });
-
+        
         // Resolve componente via registry (client-side)
         const ModulePages = require('@/modules/registry').modulePages;
         const modulePagesMap = ModulePages[module];
-
+        
         if (!modulePagesMap) {
             console.error('❌ [ModulePage] Módulo não encontrado:', module);
             return (
@@ -39,7 +39,7 @@ export default function ModulePage() {
                 </div>
             );
         }
-
+        
         const pageLoader = modulePagesMap[route];
         if (!pageLoader) {
             console.error('❌ [ModulePage] Página não encontrada:', route);
@@ -50,12 +50,12 @@ export default function ModulePage() {
                 </div>
             );
         }
-
-        // Lazy load do componente com memoização para evitar recriação a cada render
-        const Component = React.useMemo(() => React.lazy(pageLoader), [pageLoader]);
+        
+        // Lazy load do componente
+        const Component = React.lazy(pageLoader);
 
         console.log('✅ [ModulePage] Componente resolvido com sucesso');
-
+        
         // Renderiza dinamicamente com Suspense
         return (
             <React.Suspense fallback={<div className="p-6">Carregando...</div>}>

@@ -19,7 +19,7 @@ import api from '@/lib/api';
 export default function SistemaNotificacaoPage() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-
+  
   // Estado do formulário
   const [formData, setFormData] = useState({
     tipo: 'info' as 'info' | 'success' | 'warning' | 'error',
@@ -81,8 +81,8 @@ export default function SistemaNotificacaoPage() {
 
       console.log('📤 [NotificacaoPage] Enviando notificação:', payload);
 
-      // Envia para o backend (NotificationController)
-      const response = await api.post('/notifications/send', payload);
+      // Envia para o backend do módulo sistema
+      const response = await api.post('/api/sistema/notificacoes/enviar', payload);
 
       console.log('✅ [NotificacaoPage] Resposta do servidor:', response.data);
 
@@ -105,7 +105,7 @@ export default function SistemaNotificacaoPage() {
 
     } catch (error: any) {
       console.error('❌ [NotificacaoPage] Erro ao enviar notificação:', error);
-
+      
       toast({
         title: '❌ Erro ao enviar notificação',
         description: error.response?.data?.message || 'Ocorreu um erro ao processar a notificação',

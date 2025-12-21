@@ -17,7 +17,7 @@ import { SentryModule } from './common/services/sentry.module';
 import { CommonModule } from './common/common.module';
 import { TokenCleanupService } from './common/services/token-cleanup.service';
 import { UpdateModule } from './update/update.module';
-import { NotificationModule } from './core/notifications/notification.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { CoreModule } from './core/CoreModule';
 import { SecureFilesModule } from './core/secure-files/secure-files.module';
 import { AppModulesModule } from './core/modules/AppModules.module';
@@ -59,10 +59,10 @@ import { AppModulesModule } from './core/modules/AppModules.module';
     EmailConfigModule,
     AuditModule,
     UpdateModule,
-    NotificationModule,
+    NotificationsModule,
     SecureFilesModule, // Módulo de uploads sensíveis
     AppModulesModule.forRoot(), // Módulo de carregamento dinâmico de módulos externos
-
+  
   ],
   providers: [
     {

@@ -7,7 +7,6 @@ import { PlatformConfigProvider } from "@/contexts/PlatformConfigContext";
 import { Toaster } from "@/components/ui/toaster";
 import { AppLayout } from "@/components/AppLayout";
 import { InactivityLogout } from "@/components/InactivityLogout";
-import { NotificationProvider } from "@/contexts/NotificationContext";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -44,14 +43,11 @@ export default function RootLayout({
         <PlatformConfigProvider>
           <AuthProvider>
             <SecurityConfigProvider>
-              {/* [REGRA 1] Provedor SSE - Gerencia conexão global */}
-              <NotificationProvider>
-                <InactivityLogout />
-                <AppLayout>
-                  {children}
-                </AppLayout>
-                <Toaster />
-              </NotificationProvider>
+              <InactivityLogout />
+              <AppLayout>
+                {children}
+              </AppLayout>
+              <Toaster />
             </SecurityConfigProvider>
           </AuthProvider>
         </PlatformConfigProvider>

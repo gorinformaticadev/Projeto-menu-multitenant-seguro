@@ -8,10 +8,9 @@ import { UserModulesController } from './user-modules.controller';
 import { ModuleSecurityService } from './module-security.service';
 import { NotificationService } from './notification.service';
 import { eventBus } from './events/EventBus';
-import { NotificationModule } from './notifications/notification.module';
 
 @Module({
-  imports: [SecurityConfigModule, NotificationModule],
+  imports: [SecurityConfigModule],
   controllers: [CspReportController, UserModulesController],
   providers: [
     PlatformInitService,
