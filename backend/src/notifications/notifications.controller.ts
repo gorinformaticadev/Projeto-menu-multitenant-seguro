@@ -1,4 +1,8 @@
-﻿import {
+/**
+ * NOTIFICATIONS CONTROLLER - Endpoints REST para notificações
+ */
+
+import {
   Controller,
   Get,
   Post,
@@ -11,92 +15,112 @@
   Request,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
-import { NotificationsService, NotificationEvent, NotificationFilters } from './notifications.service';
+import { NotificationService } from './notification.service';
+import { NotificationGateway } from './notification.gateway';
+import { CreateNotificationDto, NotificationFiltersDto } from './notification.dto';
 
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)
 export class NotificationsController {
-  constructor(private notificationsService: NotificationsService) {}
+  constructor(
+    private notificationService: NotificationService,
+    private notificationGateway: NotificationGateway
+  ) {}
 
   /**
-   * Emite um evento de notificaÃ§Ã£o
+   * Cria uma nova notificação
    */
-  @Post('events')
-  async emitEvent(@Body() event: NotificationEvent, @Request() req) {
-    await this.notificationsService.emitEvent(event, req.user);
-    return { success: true };
+  @Post()
+  async create(@Body() createDto: CreateNotificationDto, @Request() req) {
+    const notification = await this.notificationService.create(createDto);
+    
+    // Emite via Socket.IO
+    await this.notificationGateway.emitNewNotification(notification);
+    
+    return { success: true, notification };
   }
 
   /**
-   * Busca notificaÃ§Ãµes para o dropdown
+   * Busca notificações para o dropdown (últimas 10)
    */
   @Get('dropdown')
-  async getDropdownNotifications(@Request() req) {
-    return this.notificationsService.getDropdownNotifications(req.user);
+  async getDropdown(@Request() req) {
+    return this.notificationService.findForDropdown(req.user);
   }
 
   /**
-   * Busca notificaÃ§Ãµes para a central
+   * Busca notificações com filtros e paginação
    */
-  @Get('center')
-  async getCenterNotifications(@Query() query: any, @Request() req) {
-    const filters: NotificationFilters = {
-      severity: query.severity,
-      source: query.source,
-      module: query.module,
+  @Get()
+  async findMany(@Query() query: NotificationFiltersDto, @Request() req) {
+    const filters = {
+      type: query.type,
+      read: query.read,
       tenantId: query.tenantId,
-      read: query.read === 'true' ? true : query.read === 'false' ? false : undefined,
+      userId: query.userId,
       dateFrom: query.dateFrom ? new Date(query.dateFrom) : undefined,
       dateTo: query.dateTo ? new Date(query.dateTo) : undefined,
-      page: query.page ? parseInt(query.page) : 1,
-      limit: query.limit ? parseInt(query.limit) : 20,
+      page: query.page || 1,
+      limit: query.limit || 20,
     };
 
-    return this.notificationsService.getCenterNotifications(req.user, filters);
+    return this.notificationService.findMany(req.user, filters);
   }
 
   /**
-   * Busca contagem de nÃ£o lidas
+   * Conta notificações não lidas
    */
   @Get('unread-count')
   async getUnreadCount(@Request() req) {
-    const count = await this.notificationsService.getUnreadCount(req.user);
+    const count = await this.notificationService.countUnread(req.user);
     return { count };
   }
 
   /**
-   * Marca notificaÃ§Ã£o como lida
+   * Marca notificação como lida
    */
   @Patch(':id/read')
   async markAsRead(@Param('id') id: string, @Request() req) {
-    await this.notificationsService.markAsRead(id, req.user);
-    return { success: true };
+    const notification = await this.notificationService.markAsRead(id, req.user);
+    
+    if (notification) {
+      // Emite evento via Socket.IO
+      await this.notificationGateway.emitNotificationRead(notification);
+    }
+    
+    return { success: !!notification };
   }
 
   /**
-   * Marca todas as notificaÃ§Ãµes como lidas
+   * Marca todas as notificações como lidas
    */
   @Patch('mark-all-read')
-  async markAllAsRead(@Body() body: { filters?: NotificationFilters }, @Request() req) {
-    await this.notificationsService.markAllAsRead(req.user, body.filters);
-    return { success: true };
+  async markAllAsRead(@Request() req) {
+    const count = await this.notificationService.markAllAsRead(req.user);
+    return { success: true, count };
   }
 
   /**
-   * Deleta notificaÃ§Ã£o
+   * Deleta uma notificação
    */
   @Delete(':id')
-  async deleteNotification(@Param('id') id: string, @Request() req) {
-    await this.notificationsService.deleteNotification(id, req.user);
-    return { success: true };
+  async delete(@Param('id') id: string, @Request() req) {
+    const notification = await this.notificationService.delete(id, req.user);
+    
+    if (notification) {
+      // Emite evento via Socket.IO
+      await this.notificationGateway.emitNotificationDeleted(id, notification);
+    }
+    
+    return { success: !!notification };
   }
 
   /**
-   * Deleta notificaÃ§Ãµes em lote
+   * Deleta múltiplas notificações
    */
   @Delete('batch')
-  async deleteNotifications(@Body() body: { ids: string[] }, @Request() req) {
-    await this.notificationsService.deleteNotifications(body.ids, req.user);
-    return { success: true };
+  async deleteMany(@Body() body: { ids: string[] }, @Request() req) {
+    const count = await this.notificationService.deleteMany(body.ids, req.user);
+    return { success: true, count };
   }
 }

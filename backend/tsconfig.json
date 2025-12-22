@@ -21,6 +21,9 @@
       "@core/*": [
         "src/core/*"
       ],
+      "@notifications/*": [
+        "src/notifications/*"
+      ],
       "@common/*": [
         "src/common/*"
       ],

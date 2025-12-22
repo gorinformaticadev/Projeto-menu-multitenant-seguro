@@ -1,15 +1,12 @@
 /**
- * CENTRAL DE NOTIFICAÇÕES
- * 
- * Página completa para gerenciar notificações com filtros,
- * paginação, seleção múltipla e ações em lote
+ * NOVA PÁGINA DE NOTIFICAÇÕES - Sistema Socket.IO
  */
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNotificationsCenter } from '@/hooks/useNotificationsCenter';
+import { useNotificationContext } from '@/providers/NotificationProvider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,7 +29,9 @@ import {
   EyeOff,
   MoreVertical,
   Check,
-  X
+  X,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import { Notification } from '@/types/notifications';
 
@@ -41,51 +40,55 @@ export default function NotificationsPage() {
   const {
     notifications,
     unreadCount,
-    total,
-    hasMore,
-    loading,
-    loadingMore,
-    error,
-    filters,
-    setFilters,
-    loadMore,
+    isConnected,
+    connectionError,
     markAsRead,
-    markMultipleAsRead,
     markAllAsRead,
-    deleteNotification,
-    deleteMultiple,
-    refresh,
-    clearError,
-    selectedIds,
-    toggleSelection,
-    selectAll,
-    clearSelection
-  } = useNotificationsCenter();
+    deleteNotification
+  } = useNotificationContext();
 
   const [showFilters, setShowFilters] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [filteredNotifications, setFilteredNotifications] = useState<Notification[]>([]);
+
+  // Filtrar notificações baseado na busca
+  useEffect(() => {
+    if (searchTerm.trim() === '') {
+      setFilteredNotifications(notifications);
+    } else {
+      const filtered = notifications.filter(n => 
+        n.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        n.description.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredNotifications(filtered);
+    }
+  }, [notifications, searchTerm]);
 
   // Utilitários
-  const getNotificationIcon = (severity: string) => {
-    switch (severity) {
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
       case 'warning': return AlertTriangle;
-      case 'critical': return AlertCircle;
+      case 'error': return AlertCircle;
+      case 'success': return CheckCircle;
       default: return Info;
     }
   };
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
+  const getTypeColor = (type: string) => {
+    switch (type) {
       case 'warning': return 'text-yellow-600';
-      case 'critical': return 'text-red-600';
+      case 'error': return 'text-red-600';
+      case 'success': return 'text-green-600';
       default: return 'text-blue-600';
     }
   };
 
-  const getSeverityBadge = (severity: string) => {
-    switch (severity) {
+  const getTypeBadge = (type: string) => {
+    switch (type) {
       case 'warning': return 'bg-yellow-100 text-yellow-800';
-      case 'critical': return 'bg-red-100 text-red-800';
+      case 'error': return 'bg-red-100 text-red-800';
+      case 'success': return 'bg-green-100 text-green-800';
       default: return 'bg-blue-100 text-blue-800';
     }
   };
@@ -97,31 +100,34 @@ export default function NotificationsPage() {
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
-    }).format(date);
+    }).format(new Date(date));
   };
 
   const handleNotificationClick = async (notification: Notification) => {
     if (!notification.read) {
-      await markAsRead(notification.id);
-    }
-    
-    if (notification.context) {
-      window.open(notification.context, '_blank');
+      markAsRead(notification.id);
     }
   };
 
-  const handleBulkAction = async (action: 'read' | 'delete') => {
-    if (selectedIds.length === 0) return;
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) 
+        ? prev.filter(selectedId => selectedId !== id)
+        : [...prev, id]
+    );
+  };
 
-    try {
-      if (action === 'read') {
-        await markMultipleAsRead(selectedIds);
-      } else {
-        await deleteMultiple(selectedIds);
-      }
-    } catch (err) {
-      console.error(`Erro na ação em lote ${action}:`, err);
-    }
+  const selectAll = () => {
+    setSelectedIds(filteredNotifications.map(n => n.id));
+  };
+
+  const clearSelection = () => {
+    setSelectedIds([]);
+  };
+
+  const handleBulkDelete = () => {
+    selectedIds.forEach(id => deleteNotification(id));
+    clearSelection();
   };
 
   if (!user) {
@@ -141,9 +147,14 @@ export default function NotificationsPage() {
             <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
               <Bell className="h-6 w-6" />
               Central de Notificações
+              {isConnected ? (
+                <Wifi className="h-4 w-4 text-green-600" title="Conectado" />
+              ) : (
+                <WifiOff className="h-4 w-4 text-red-600" title="Desconectado" />
+              )}
             </h1>
             <p className="text-gray-600 mt-1">
-              Gerencie todas as suas notificações em um só lugar
+              Sistema em tempo real via Socket.IO
             </p>
           </div>
           
@@ -151,11 +162,10 @@ export default function NotificationsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={refresh}
-              disabled={loading}
+              onClick={() => window.location.reload()}
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Atualizar
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Recarregar
             </Button>
             
             <Button
@@ -169,6 +179,15 @@ export default function NotificationsPage() {
           </div>
         </div>
 
+        {/* Status da Conexão */}
+        {connectionError && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-600">
+              ❌ Erro de conexão: {connectionError}
+            </p>
+          </div>
+        )}
+
         {/* Estatísticas */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <Card>
@@ -177,7 +196,7 @@ export default function NotificationsPage() {
                 <Bell className="h-4 w-4 text-blue-600" />
                 <div>
                   <p className="text-sm text-gray-600">Total</p>
-                  <p className="text-lg font-semibold">{total}</p>
+                  <p className="text-lg font-semibold">{filteredNotifications.length}</p>
                 </div>
               </div>
             </CardContent>
@@ -200,9 +219,9 @@ export default function NotificationsPage() {
               <div className="flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 text-red-600" />
                 <div>
-                  <p className="text-sm text-gray-600">Críticas</p>
+                  <p className="text-sm text-gray-600">Erros</p>
                   <p className="text-lg font-semibold">
-                    {notifications.filter(n => n.severity === 'critical').length}
+                    {filteredNotifications.filter(n => n.type === 'error').length}
                   </p>
                 </div>
               </div>
@@ -223,87 +242,19 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      {/* Filtros */}
-      {showFilters && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-lg">Filtros</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Severidade */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Severidade
-                </label>
-                <select
-                  value={filters.severity || 'all'}
-                  onChange={(e) => setFilters({ severity: e.target.value as any })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="all">Todas</option>
-                  <option value="info">Informação</option>
-                  <option value="warning">Aviso</option>
-                  <option value="critical">Crítica</option>
-                </select>
-              </div>
-
-              {/* Origem */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Origem
-                </label>
-                <select
-                  value={filters.source || 'all'}
-                  onChange={(e) => setFilters({ source: e.target.value as any })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="all">Todas</option>
-                  <option value="core">Sistema</option>
-                  <option value="module">Módulos</option>
-                </select>
-              </div>
-
-              {/* Status de leitura */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Status
-                </label>
-                <select
-                  value={filters.read === undefined ? 'all' : filters.read ? 'read' : 'unread'}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setFilters({ 
-                      read: value === 'all' ? undefined : value === 'read' 
-                    });
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="all">Todas</option>
-                  <option value="unread">Não lidas</option>
-                  <option value="read">Lidas</option>
-                </select>
-              </div>
-
-              {/* Ações */}
-              <div className="flex items-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setFilters({
-                    severity: 'all',
-                    source: 'all',
-                    read: undefined,
-                    module: undefined
-                  })}
-                  className="flex-1"
-                >
-                  Limpar
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Busca */}
+      <div className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Buscar notificações..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      </div>
 
       {/* Ações em lote */}
       {selectedIds.length > 0 && (
@@ -321,16 +272,7 @@ export default function NotificationsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleBulkAction('read')}
-                >
-                  <Eye className="h-4 w-4 mr-2" />
-                  Marcar como lidas
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleBulkAction('delete')}
+                  onClick={handleBulkDelete}
                   className="text-red-600 hover:text-red-700"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
@@ -355,18 +297,18 @@ export default function NotificationsPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">
-              Notificações ({total})
+              Notificações ({filteredNotifications.length})
             </CardTitle>
             
             <div className="flex items-center gap-2">
-              {notifications.length > 0 && (
+              {filteredNotifications.length > 0 && (
                 <>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={selectedIds.length === notifications.length ? clearSelection : selectAll}
+                    onClick={selectedIds.length === filteredNotifications.length ? clearSelection : selectAll}
                   >
-                    {selectedIds.length === notifications.length ? 'Desmarcar todas' : 'Selecionar todas'}
+                    {selectedIds.length === filteredNotifications.length ? 'Desmarcar todas' : 'Selecionar todas'}
                   </Button>
                   
                   {unreadCount > 0 && (
@@ -385,51 +327,24 @@ export default function NotificationsPage() {
         </CardHeader>
         
         <CardContent className="p-0">
-          {/* Erro */}
-          {error && (
-            <div className="p-4 bg-red-50 border-b border-red-200">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-red-600">{error}</p>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearError}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Loading inicial */}
-          {loading && notifications.length === 0 && (
-            <div className="p-8 text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-gray-500">Carregando notificações...</p>
-            </div>
-          )}
-
           {/* Sem notificações */}
-          {!loading && notifications.length === 0 && (
+          {filteredNotifications.length === 0 && (
             <div className="p-8 text-center">
               <Bell className="h-12 w-12 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
                 Nenhuma notificação encontrada
               </h3>
               <p className="text-gray-500">
-                {Object.values(filters).some(v => v && v !== 'all') 
-                  ? 'Tente ajustar os filtros para ver mais resultados.'
-                  : 'Você está em dia com suas notificações!'
-                }
+                {searchTerm ? 'Tente ajustar sua busca.' : 'Você está em dia com suas notificações!'}
               </p>
             </div>
           )}
 
           {/* Lista */}
-          {notifications.length > 0 && (
+          {filteredNotifications.length > 0 && (
             <div className="divide-y divide-gray-200">
-              {notifications.map((notification) => {
-                const Icon = getNotificationIcon(notification.severity);
+              {filteredNotifications.map((notification) => {
+                const Icon = getNotificationIcon(notification.type);
                 const isSelected = selectedIds.includes(notification.id);
                 const isUnread = !notification.read;
                 
@@ -451,7 +366,7 @@ export default function NotificationsPage() {
 
                       {/* Ícone e indicador */}
                       <div className="flex-shrink-0 relative">
-                        <Icon className={`h-5 w-5 mt-0.5 ${getSeverityColor(notification.severity)}`} />
+                        <Icon className={`h-5 w-5 mt-0.5 ${getTypeColor(notification.type)}`} />
                         {isUnread && (
                           <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"></div>
                         )}
@@ -468,48 +383,29 @@ export default function NotificationsPage() {
                                 {notification.title}
                               </h3>
                               
-                              <Badge className={getSeverityBadge(notification.severity)}>
-                                {notification.severity === 'critical' ? 'Crítica' : 
-                                 notification.severity === 'warning' ? 'Aviso' : 'Info'}
+                              <Badge className={getTypeBadge(notification.type)}>
+                                {notification.type === 'error' ? 'Erro' : 
+                                 notification.type === 'warning' ? 'Aviso' : 
+                                 notification.type === 'success' ? 'Sucesso' : 'Info'}
                               </Badge>
                             </div>
                             
                             <p className="text-sm text-gray-600 mb-2">
-                              {notification.message}
+                              {notification.description}
                             </p>
                             
                             <div className="flex items-center gap-4 text-xs text-gray-500">
                               <span>{formatDate(notification.createdAt)}</span>
                               
-                              {notification.source === 'module' && notification.module && (
-                                <div className="flex items-center gap-1">
-                                  <Package className="h-3 w-3" />
-                                  <span className="capitalize">{notification.module}</span>
-                                </div>
-                              )}
-                              
-                              {notification.source === 'core' && (
-                                <div className="flex items-center gap-1">
-                                  <Settings className="h-3 w-3" />
-                                  <span>Sistema</span>
-                                </div>
-                              )}
+                              <div className="flex items-center gap-1">
+                                <Settings className="h-3 w-3" />
+                                <span>Sistema</span>
+                              </div>
                             </div>
                           </div>
 
                           {/* Ações */}
                           <div className="flex items-center gap-2">
-                            {notification.context && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleNotificationClick(notification)}
-                                title="Abrir contexto"
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </Button>
-                            )}
-                            
                             {isUnread && (
                               <Button
                                 variant="ghost"
@@ -537,26 +433,6 @@ export default function NotificationsPage() {
                   </div>
                 );
               })}
-            </div>
-          )}
-
-          {/* Carregar mais */}
-          {hasMore && (
-            <div className="p-4 text-center border-t border-gray-200">
-              <Button
-                variant="outline"
-                onClick={loadMore}
-                disabled={loadingMore}
-              >
-                {loadingMore ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
-                    Carregando...
-                  </>
-                ) : (
-                  'Carregar mais'
-                )}
-              </Button>
             </div>
           )}
         </CardContent>

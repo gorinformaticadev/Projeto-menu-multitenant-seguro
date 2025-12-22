@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaModule } from '@core/prisma/prisma.module';
 import { CommonModule } from '@common/common.module';
+import { NotificationsModule } from '../../notifications/notifications.module';
 
 @Module({})
 export class AppModulesModule {
@@ -70,7 +71,7 @@ export class AppModulesModule {
 
         return {
             module: AppModulesModule,
-            imports: [PrismaModule, CommonModule], // Importa módulos necessários para injeção
+            imports: [PrismaModule, CommonModule, NotificationsModule], // Importa módulos necessários para injeção
             controllers: controllers,
             providers: providers,
             exports: providers,

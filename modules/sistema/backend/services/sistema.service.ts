@@ -12,7 +12,7 @@
 
 // Importação necessária do decorator Injectable do NestJS
 import { Injectable, Inject, BadRequestException } from '@nestjs/common';
-import { NotificationService } from '@core/notification.service';
+import { NotificationService } from '../../../../backend/src/notifications/notification.service';
 import { SendNotificationDto } from '../dto/sistema.dto';
 
 /**
@@ -78,30 +78,19 @@ export class SistemaService {
       throw new BadRequestException('Mensagem é obrigatória e deve ter no máximo 500 caracteres');
     }
 
-    // Mapeia tipo para severity
-    const severityMap = {
-      'info': 'info' as const,
-      'success': 'info' as const,
-      'warning': 'warning' as const,
-      'error': 'critical' as const
-    };
-
-    const severity = dto.critica ? 'critical' as const : severityMap[dto.tipo];
-
     // Determina tenantId baseado no destino
     const targetTenantId = dto.destino === 'todos_tenants' ? null : tenantId;
 
     // Cria notificação usando o serviço do CORE
-    await this.notificationService.createNotification({
+    await this.notificationService.create({
       title: dto.titulo,
-      message: dto.mensagem,
-      severity: severity,
-      audience: 'admin', // Notificações do módulo sistema vão para admins
-      source: 'module',
-      module: 'sistema',
+      description: dto.mensagem,
+      type: dto.critica ? 'error' : dto.tipo,
       tenantId: targetTenantId,
-      context: '/modules/sistema/notificacao',
-      data: {
+      metadata: {
+        source: 'module',
+        module: 'sistema',
+        context: '/modules/sistema/notificacao',
         tipo: dto.tipo,
         critica: dto.critica,
         destino: dto.destino,

@@ -6,7 +6,6 @@ import { PlatformInitService } from './services/platform-init.service';
 import { SecurityConfigModule } from '@core/security-config/security-config.module';
 import { UserModulesController } from './user-modules.controller';
 import { ModuleSecurityService } from './module-security.service';
-import { NotificationService } from './notification.service';
 import { eventBus } from './events/EventBus';
 
 @Module({
@@ -15,13 +14,12 @@ import { eventBus } from './events/EventBus';
   providers: [
     PlatformInitService,
     ModuleSecurityService,
-    NotificationService,
     {
       provide: 'EventBus',
       useValue: eventBus
     }
   ],
-  exports: [PlatformInitService, ModuleSecurityService, NotificationService],
+  exports: [PlatformInitService, ModuleSecurityService],
 })
 export class CommonModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

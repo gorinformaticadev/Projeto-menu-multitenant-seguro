@@ -9,7 +9,7 @@ import * as LucideIcons from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModuleSlot } from "@/components/ModuleSlot";
 import { ModuleRegistryWidgets } from "@/components/ModuleRegistryWidgets";
-import { ModuleRegistryNotifications } from "@/components/ModuleRegistryNotifications";
+
 import { PlatformName } from "@/components/PlatformInfo";
 
 // Helper para ícones dinâmicos
@@ -141,10 +141,6 @@ export default function DashboardPage() {
         <ModuleRegistryWidgets />
       </div>
 
-      {/* Notificações dos Módulos */}
-      <div className="mt-8">
-        <ModuleRegistryNotifications />
-      </div>
     </div>
   );
 }

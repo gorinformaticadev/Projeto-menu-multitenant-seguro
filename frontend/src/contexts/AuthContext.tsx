@@ -32,6 +32,7 @@ export interface LoginResult {
 
 interface AuthContextData {
   user: User | null;
+  token: string | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginWithCredentials: (email: string, password: string) => Promise<LoginResult>;
@@ -210,15 +211,17 @@ const SecureStorage = {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
     const loadUser = async () => {
-      const token = await SecureStorage.getToken();
+      const currentToken = await SecureStorage.getToken();
 
-      if (token) {
-        api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      if (currentToken) {
+        setToken(currentToken);
+        api.defaults.headers.common["Authorization"] = `Bearer ${currentToken}`;
 
         try {
           // Buscar dados atualizados do usuário
@@ -232,6 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch (error) {
           console.error("Erro ao carregar usuário:", error);
           SecureStorage.removeToken();
+          setToken(null);
           delete api.defaults.headers.common["Authorization"];
         }
       }
@@ -251,6 +255,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await SecureStorage.setRefreshToken(refreshToken);
       api.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
 
+      setToken(accessToken);
       setUser(userData);
       router.push("/dashboard");
     } catch (error: any) {
@@ -281,6 +286,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       api.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
 
       // Atualizar estado do usuário
+      setToken(accessToken);
       setUser(userData);
       
       // Carregar módulos após login
@@ -341,6 +347,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       api.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
 
       // Atualizar estado do usuário
+      setToken(accessToken);
       setUser(userData);
       
       // Carregar módulos após login com 2FA
@@ -380,6 +387,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     SecureStorage.clear();
     delete api.defaults.headers.common["Authorization"];
+    setToken(null);
     setUser(null);
     router.push("/login");
   }
@@ -391,7 +399,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, loginWithCredentials, loginWith2FA, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, token, loading, login, loginWithCredentials, loginWith2FA, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

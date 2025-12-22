@@ -8,18 +8,17 @@ import { SecurityConfigModule } from '@core/security-config/security-config.modu
 import { PrismaModule } from '@core/prisma/prisma.module';
 import { UserModulesController } from '@core/user-modules.controller';
 import { ModuleSecurityService } from '@core/module-security.service';
-import { NotificationService } from '@core/notification.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { eventBus } from '@core/events/EventBus';
 import { ModuleInstallerController } from '@core/module-installer.controller';
 import { ModuleInstallerService } from '@core/module-installer.service';
 
 @Module({
-  imports: [PrismaModule, SecurityConfigModule],
+  imports: [PrismaModule, SecurityConfigModule, NotificationsModule],
   controllers: [CspReportController, UserModulesController, ModuleInstallerController],
   providers: [
     PlatformInitService,
     ModuleSecurityService,
-    NotificationService,
     ModuleInstallerService,
     ModuleDatabaseExecutorService,
     {
@@ -30,7 +29,6 @@ import { ModuleInstallerService } from '@core/module-installer.service';
   exports: [
     PlatformInitService,
     ModuleSecurityService,
-    NotificationService,
     ModuleInstallerService,
     ModuleDatabaseExecutorService,
     PrismaModule  // Export PrismaModule for module dependencies

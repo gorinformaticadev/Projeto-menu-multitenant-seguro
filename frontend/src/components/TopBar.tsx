@@ -10,9 +10,9 @@ import { Bell, Search, User, LogOut, Info } from "lucide-react";
 import { API_URL } from "@/lib/api";
 import api from "@/lib/api";
 import { ModuleRegistryUserMenu } from "./ModuleRegistryUserMenu";
-import { useNotificationsDropdown } from "@/hooks/useNotificationsDropdown";
-import { AlertTriangle, AlertCircle, CheckCircle, ExternalLink } from "lucide-react";
-import { Notification } from "@/types/notifications";
+import { useNotificationContext } from '@/providers/NotificationProvider';
+import { AlertTriangle, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
+import { Notification } from '@/types/notifications';
 import * as LucideIcons from "lucide-react";
 
 // Helper para ícones dinâmicos
@@ -33,13 +33,11 @@ export function TopBar() {
   const {
     notifications,
     unreadCount,
-    loading: notificationsLoading,
-    error: notificationsError,
+    isConnected,
+    connectionError,
     markAsRead,
-    markAllAsRead,
-    refresh: refreshNotifications,
-    clearError
-  } = useNotificationsDropdown();
+    markAllAsRead
+  } = useNotificationContext();
 
 
 
@@ -122,26 +120,29 @@ export function TopBar() {
   }, [user, masterLogo]);
 
   // Utilitários para notificações
-  const getNotificationIcon = (severity: string) => {
-    switch (severity) {
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
       case 'warning': return AlertTriangle;
-      case 'critical': return AlertCircle;
+      case 'error': return AlertCircle;
+      case 'success': return CheckCircle;
       default: return Info;
     }
   };
 
-  const getNotificationColor = (severity: string) => {
-    switch (severity) {
+  const getNotificationColor = (type: string) => {
+    switch (type) {
       case 'warning': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-      case 'critical': return 'text-red-600 bg-red-50 border-red-200';
+      case 'error': return 'text-red-600 bg-red-50 border-red-200';
+      case 'success': return 'text-green-600 bg-green-50 border-green-200';
       default: return 'text-blue-600 bg-blue-50 border-blue-200';
     }
   };
 
-  const getSeverityBadgeColor = (severity: string) => {
-    switch (severity) {
+  const getSeverityBadgeColor = (type: string) => {
+    switch (type) {
       case 'warning': return 'bg-yellow-100 text-yellow-800';
-      case 'critical': return 'bg-red-100 text-red-800';
+      case 'error': return 'bg-red-100 text-red-800';
+      case 'success': return 'bg-green-100 text-green-800';
       default: return 'bg-blue-100 text-blue-800';
     }
   };
@@ -162,12 +163,7 @@ export function TopBar() {
   const handleNotificationClick = async (notification: Notification) => {
     // Marca como lida se não estiver
     if (!notification.read) {
-      await markAsRead(notification.id);
-    }
-
-    // Redireciona se tiver contexto
-    if (notification.context) {
-      window.location.href = notification.context;
+      markAsRead(notification.id);
     }
   };
 
@@ -246,24 +242,18 @@ export function TopBar() {
                         {unreadCount} nova{unreadCount !== 1 ? 's' : ''}
                       </span>
                     )}
+                    {!isConnected && (
+                      <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-medium">
+                        Desconectado
+                      </span>
+                    )}
                   </div>
-                  {notificationsLoading && (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                  )}
                 </div>
 
                 {/* Erro */}
-                {notificationsError && (
+                {connectionError && (
                   <div className="px-4 py-2 bg-red-50 border-b border-red-200">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs text-red-600">{notificationsError}</p>
-                      <button
-                        onClick={clearError}
-                        className="text-xs text-red-800 hover:text-red-900 font-medium"
-                      >
-                        Tentar novamente
-                      </button>
-                    </div>
+                    <p className="text-xs text-red-600">{connectionError}</p>
                   </div>
                 )}
 
@@ -277,7 +267,7 @@ export function TopBar() {
                 ) : (
                   <div className="max-h-96 overflow-y-auto">
                     {notifications.map((notification) => {
-                      const Icon = getNotificationIcon(notification.severity);
+                      const Icon = getNotificationIcon(notification.type);
                       const isUnread = !notification.read;
                       
                       return (
@@ -292,8 +282,9 @@ export function TopBar() {
                             {/* Ícone e indicador de não lida */}
                             <div className="flex-shrink-0 relative">
                               <Icon className={`h-4 w-4 mt-1 ${
-                                notification.severity === 'critical' ? 'text-red-600' :
-                                notification.severity === 'warning' ? 'text-yellow-600' :
+                                notification.type === 'error' ? 'text-red-600' :
+                                notification.type === 'warning' ? 'text-yellow-600' :
+                                notification.type === 'success' ? 'text-green-600' :
                                 'text-blue-600'
                               }`} />
                               {isUnread && (
@@ -310,34 +301,26 @@ export function TopBar() {
                                   {notification.title}
                                 </p>
                                 
-                                {/* Badge de severidade */}
-                                {notification.severity !== 'info' && (
+                                {/* Badge de tipo */}
+                                {notification.type !== 'info' && (
                                   <span className={`px-2 py-1 text-xs rounded-full font-medium flex-shrink-0 ${
-                                    getSeverityBadgeColor(notification.severity)
+                                    getSeverityBadgeColor(notification.type)
                                   }`}>
-                                    {notification.severity === 'critical' ? 'Crítica' : 'Aviso'}
+                                    {notification.type === 'error' ? 'Erro' : 
+                                     notification.type === 'warning' ? 'Aviso' : 
+                                     notification.type === 'success' ? 'Sucesso' : 'Info'}
                                   </span>
                                 )}
                               </div>
                               
                               <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                                {notification.message}
+                                {notification.description}
                               </p>
                               
                               <div className="flex items-center justify-between mt-2">
                                 <div className="flex items-center gap-2 text-xs text-gray-400">
                                   <span>{formatNotificationTime(notification.createdAt)}</span>
-                                  {notification.source === 'module' && notification.module && (
-                                    <>
-                                      <span>•</span>
-                                      <span className="capitalize">{notification.module}</span>
-                                    </>
-                                  )}
                                 </div>
-                                
-                                {notification.context && (
-                                  <ExternalLink className="h-3 w-3 text-gray-400" />
-                                )}
                               </div>
                             </div>
                           </div>
@@ -362,7 +345,7 @@ export function TopBar() {
                   )}
                   
                   <a
-                    href="/notificacoes"
+                    href="/notifications"
                     onClick={() => setShowNotifications(false)}
                     className="text-xs text-gray-600 hover:text-gray-800 font-medium flex items-center gap-1"
                   >

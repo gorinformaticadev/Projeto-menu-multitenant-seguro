@@ -21,9 +21,6 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { CoreModule } from './core/CoreModule';
 import { SecureFilesModule } from './core/secure-files/secure-files.module';
 import { AppModulesModule } from './core/modules/AppModules.module';
-// Novos módulos do sistema de notificações
-import { RealtimeModule } from './core/realtime/realtime.module';
-import { NotificationModule } from './core/notifications/notification.module';
 import { WhatsAppModule } from './core/whatsapp/whatsapp.module';
 // import { DemoModule } from '@core/modules/demo-completo/src/demo.module'; // Removed legacy import
 
@@ -63,10 +60,7 @@ import { WhatsAppModule } from './core/whatsapp/whatsapp.module';
     EmailConfigModule,
     AuditModule,
     UpdateModule,
-    NotificationsModule, // Sistema antigo (será substituído internamente)
-    // Novos módulos do sistema de notificações
-    RealtimeModule,
-    NotificationModule,
+    NotificationsModule, // Novo sistema Socket.IO apenas
     WhatsAppModule,
     SecureFilesModule, // Módulo de uploads sensíveis
     AppModulesModule.forRoot(), // Módulo de carregamento dinâmico de módulos externos
