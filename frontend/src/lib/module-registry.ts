@@ -26,6 +26,7 @@ export interface ModuleData {
   slug: string;
   name: string;
   menus: ModuleMenu[];
+  enabled?: boolean;
 }
 
 export interface ModulesResponse {
@@ -92,7 +93,10 @@ class ModuleRegistry {
 
       // console.log('📡 [ModuleRegistry] Resposta da API:', response.data);
 
-      this.modules = response.data.modules;
+      // Filtra apenas módulos habilitados para o tenant
+      // O backend retorna todos os módulos do sistema com flag enabled
+      this.modules = response.data.modules.filter(m => m.enabled !== false);
+
       this.isLoaded = true;
 
       // console.log('✅ [ModuleRegistry] Módulos carregados da API:', {
