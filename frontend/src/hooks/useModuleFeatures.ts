@@ -83,12 +83,12 @@ export function useModuleFeatures() {
             slots
         };
 
-        console.log('🔍 [DEBUG] Module Features processadas:', {
-            userMenu: userMenuItems.length,
-            notifications: notificationConfigs.length,
-            dashboardWidgets: dashboardWidgets.length,
-            slots: slots.length
-        });
+        // console.log('🔍 [DEBUG] Module Features processadas:', {
+        //     userMenu: userMenuItems.length,
+        //     notifications: notificationConfigs.length,
+        //     dashboardWidgets: dashboardWidgets.length,
+        //     slots: slots.length
+        // });
 
         return result;
     }, [modules]); // Só recalcula quando modules muda

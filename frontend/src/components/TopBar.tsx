@@ -59,7 +59,7 @@ export function TopBar() {
       try {
         const { logoUrl, timestamp } = JSON.parse(cached);
         if (Date.now() - timestamp < 10 * 60 * 1000) { // 10 minutos
-          console.log('🎨 Usando cache master logo:', logoUrl);
+          // console.log('🎨 Usando cache master logo:', logoUrl);
           setMasterLogo(logoUrl);
           return;
         }
@@ -101,7 +101,7 @@ export function TopBar() {
           // SEMPRE buscar da API para garantir dados atualizados
           const response = await api.get(`/tenants/public/${user.tenantId}/logo?_t=${Date.now()}`);
           const logoUrl = response.data?.logoUrl;
-          console.log('🔄 Logo do tenant atualizado:', logoUrl);
+          // console.log('🔄 Logo do tenant atualizado:', logoUrl);
           if (logoUrl) {
             setUserTenantLogo(logoUrl);
           } else {

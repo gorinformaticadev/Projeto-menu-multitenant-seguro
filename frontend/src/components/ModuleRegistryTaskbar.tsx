@@ -46,7 +46,7 @@ export function ModuleRegistryTaskbar() {
 
   const loadTaskbarItems = () => {
     try {
-      console.log('🔍 [ModuleRegistryTaskbar] Carregando itens da taskbar...');
+      // console.log('🔍 [ModuleRegistryTaskbar] Carregando itens da taskbar...');
       
       // Verificação de segurança: método existe?
       if (typeof moduleRegistry.getTaskbarItems !== 'function') {
@@ -65,8 +65,8 @@ export function ModuleRegistryTaskbar() {
       }
 
       setTaskbarItems(items);
-      console.log('✅ [ModuleRegistryTaskbar] Itens da taskbar carregados:', items.length);
-      console.log('🔧 [ModuleRegistryTaskbar] Detalhes:', items);
+      // console.log('✅ [ModuleRegistryTaskbar] Itens da taskbar carregados:', items.length);
+      // console.log('🔧 [ModuleRegistryTaskbar] Detalhes:', items);
     } catch (error) {
       console.warn('⚠️ [ModuleRegistryTaskbar] Erro ao carregar taskbar:', error);
       setTaskbarItems([]);
@@ -74,11 +74,11 @@ export function ModuleRegistryTaskbar() {
   };
 
   if (taskbarItems.length === 0) {
-    console.log('⚠️ [ModuleRegistryTaskbar] Nenhum item para renderizar, taskbar oculta');
+    // console.log('⚠️ [ModuleRegistryTaskbar] Nenhum item para renderizar, taskbar oculta');
     return null;
   }
 
-  console.log('✅ [ModuleRegistryTaskbar] Renderizando taskbar com', taskbarItems.length, 'item(s)');
+ // console.log('✅ [ModuleRegistryTaskbar] Renderizando taskbar com', taskbarItems.length, 'item(s)');
 
   return (
     <div className="fixed bottom-4 right-4 z-50">

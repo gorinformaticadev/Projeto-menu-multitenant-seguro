@@ -111,7 +111,7 @@ class SocketClient {
     if (!this.socket) return;
 
     this.socket.on('connect', () => {
-      console.log('✅ Socket.IO conectado para notificações');
+      // console.log('✅ Socket.IO conectado para notificações');
     });
 
     this.socket.on('disconnect', (reason) => {

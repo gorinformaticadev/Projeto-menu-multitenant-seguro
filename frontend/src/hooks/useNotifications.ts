@@ -137,8 +137,8 @@ export function useNotifications(): UseNotificationsReturn {
     // Listeners de conexão
     const handleConnect = () => {
       if (!isActiveRef.current) return;
-      
-      console.log('✅ Socket.IO conectado');
+
+      // console.log('✅ Socket.IO conectado');
       setIsConnected(true);
       setConnectionError(null);
     };
@@ -192,8 +192,8 @@ export function useNotifications(): UseNotificationsReturn {
    */
   useEffect(() => {
     if (user && token) {
-      console.log('🔌 Conectando Socket.IO para notificações...');
-      
+      // console.log('🔌 Conectando Socket.IO para notificações...');
+
       const socket = socketClient.connect(token);
       const cleanup = setupSocketListeners();
       
@@ -201,7 +201,7 @@ export function useNotifications(): UseNotificationsReturn {
         if (cleanup) cleanup();
       };
     } else {
-      console.log('🔌 Desconectando Socket.IO...');
+      // console.log('🔌 Desconectando Socket.IO...');
       socketClient.disconnect();
       setNotifications([]);
       setUnreadCount(0);

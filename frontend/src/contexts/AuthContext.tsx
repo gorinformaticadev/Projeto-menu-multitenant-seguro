@@ -229,9 +229,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(response.data);
           
           // Carregar módulos após autenticação bem-sucedida
-          console.log('📦 Carregando módulos...');
+          // console.log('📦 Carregando módulos...');
           await moduleRegistry.loadModules();
-          console.log('✅ Módulos carregados');
+          // console.log('✅ Módulos carregados');
         } catch (error) {
           console.error("Erro ao carregar usuário:", error);
           SecureStorage.removeToken();
@@ -290,9 +290,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userData);
       
       // Carregar módulos após login
-      console.log('📦 Carregando módulos...');
+      // console.log('📦 Carregando módulos...');
       await moduleRegistry.loadModules();
-      console.log('✅ Módulos carregados');
+      // console.log('✅ Módulos carregados');
 
       // Redirecionar para dashboard
       router.push("/dashboard");
@@ -351,9 +351,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userData);
       
       // Carregar módulos após login com 2FA
-      console.log('📦 Carregando módulos...');
+      // console.log('📦 Carregando módulos...');
       await moduleRegistry.loadModules();
-      console.log('✅ Módulos carregados');
+      // console.log('✅ Módulos carregados');
 
       // Redirecionar para dashboard
       router.push("/dashboard");

@@ -96,19 +96,19 @@ export function Sidebar() {
     try {
       // Core agrega itens de todos os módulos registrados
       const grouped = moduleRegistry.getGroupedSidebarItems(user?.role);
-      
-      console.log('📋 [Sidebar] Itens agrupados recebidos:', {
-        ungrouped: grouped.ungrouped.length,
-        groups: Object.keys(grouped.groups),
-        groupOrder: grouped.groupOrder,
-        detalhes: grouped
-      });
-      
+
+      // console.log('📋 [Sidebar] Itens agrupados recebidos:', {
+      //   ungrouped: grouped.ungrouped.length,
+      //   groups: Object.keys(grouped.groups),
+      //   groupOrder: grouped.groupOrder,
+      //   detalhes: grouped
+      // });
+
       setGroupedItems(grouped);
-      
+
       const totalItems = grouped.ungrouped.length + Object.values(grouped.groups).flat().length;
-      console.log('📋 Itens do menu carregados:', totalItems);
-      console.log('📋 Grupos encontrados:', Object.keys(grouped.groups));
+      // console.log('📋 Itens do menu carregados:', totalItems);
+      // console.log('📋 Grupos encontrados:', Object.keys(grouped.groups));
     } catch (error) {
       console.warn('⚠️ Erro ao carregar itens do menu, usando menu básico:', error);
       

@@ -23,9 +23,9 @@ const getIconComponent = (iconName: string): any => {
 function GenericModuleWidget({ widget }: { widget: ModuleDashboardWidget }) {
   const Icon = getIconComponent(widget.icon || 'Package');
   const colors = getModuleColors(widget.module || 'default');
-  
-  console.log('🟜️ [GenericModuleWidget] Renderizando widget:', widget.title);
-  
+
+  // console.log('🟜️ [GenericModuleWidget] Renderizando widget:', widget.title);
+
   return (
     <Card className={`w-full ${colors.border} ${colors.bg}`}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -84,8 +84,8 @@ function getModuleColors(moduleSlug: string) {
 
 // Componente para carregar widgets dinamicamente
 function DynamicWidget({ widget }: { widget: ModuleDashboardWidget }) {
-  console.log('🎭 [DynamicWidget] Renderizando widget:', widget.id, '- Component:', widget.component);
-  
+  // console.log('🎭 [DynamicWidget] Renderizando widget:', widget.id, '- Component:', widget.component);
+
   // Usar widget genérico para todos os módulos
   return <GenericModuleWidget widget={widget} />;
 }
@@ -103,27 +103,27 @@ export function ModuleRegistryWidgets() {
       // Core agrega widgets de todos os módulos registrados
       const moduleWidgets = moduleRegistry.getDashboardWidgets();
       setWidgets(moduleWidgets);
-      console.log('📊 [ModuleRegistryWidgets] Widgets carregados:', moduleWidgets.length);
-      console.log('📊 [ModuleRegistryWidgets] Detalhes:', moduleWidgets);
+      // console.log('📊 [ModuleRegistryWidgets] Widgets carregados:', moduleWidgets.length);
+      // console.log('📊 [ModuleRegistryWidgets] Detalhes:', moduleWidgets);
     } catch (error) {
       console.error('❌ [ModuleRegistryWidgets] Erro ao carregar widgets:', error);
     }
   };
 
   if (widgets.length === 0) {
-    console.log('⚠️ [ModuleRegistryWidgets] Nenhum widget para renderizar');
+    // console.log('⚠️ [ModuleRegistryWidgets] Nenhum widget para renderizar');
     return null;
   }
 
-  console.log('✅ [ModuleRegistryWidgets] Renderizando', widgets.length, 'widget(s)');
+  // console.log('✅ [ModuleRegistryWidgets] Renderizando', widgets.length, 'widget(s)');
 
   return (
     <>
       {widgets.map((widget) => {
-        console.log('🎭 [ModuleRegistryWidgets] Renderizando widget:', widget.id, '- Component:', widget.component);
+        // console.log('🎭 [ModuleRegistryWidgets] Renderizando widget:', widget.id, '- Component:', widget.component);
         return (
-          <DynamicWidget 
-            key={widget.id} 
+          <DynamicWidget
+            key={widget.id}
             widget={widget}
           />
         );

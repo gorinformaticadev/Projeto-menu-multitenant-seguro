@@ -29,13 +29,13 @@ export function useModuleRegistry() {
 
   const initializeRegistry = async () => {
     try {
-      console.log('🔄 Inicializando Module Registry...');
+      // console.log('🔄 Inicializando Module Registry...');
 
       // Carrega módulos da API /api/me/modules
       await moduleRegistry.loadModules();
 
       setIsInitialized(true);
-      console.log('✅ Module Registry inicializado com sucesso');
+      // console.log('✅ Module Registry inicializado com sucesso');
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';

@@ -85,24 +85,24 @@ class ModuleRegistry {
    */
   async loadModules(): Promise<void> {
     try {
-      console.log('🔄 [ModuleRegistry] Iniciando carregamento de módulos...');
-      
+      // console.log('🔄 [ModuleRegistry] Iniciando carregamento de módulos...');
+
       // URL completa para garantir que vai para o backend
       const response = await api.get<ModulesResponse>(`${API_URL}/me/modules`);
-      
-      console.log('📡 [ModuleRegistry] Resposta da API:', response.data);
-      
+
+      // console.log('📡 [ModuleRegistry] Resposta da API:', response.data);
+
       this.modules = response.data.modules;
       this.isLoaded = true;
 
-      console.log('✅ [ModuleRegistry] Módulos carregados da API:', {
-        total: this.modules.length,
-        modulos: this.modules.map(m => ({
-          slug: m.slug,
-          name: m.name,
-          menus: m.menus ? m.menus.length : 0
-        }))
-      });
+      // console.log('✅ [ModuleRegistry] Módulos carregados da API:', {
+      //   total: this.modules.length,
+      //   modulos: this.modules.map(m => ({
+      //     slug: m.slug,
+      //     name: m.name,
+      //     menus: m.menus ? m.menus.length : 0
+      //   }))
+      // });
 
     } catch (error) {
       console.error('❌ [ModuleRegistry] Erro ao carregar módulos:', error);
@@ -243,12 +243,12 @@ class ModuleRegistry {
       };
     }
 
-    console.log('🔍 [ModuleRegistry] Processando menus dos módulos:', this.modules.length);
-    
+    // console.log('🔍 [ModuleRegistry] Processando menus dos módulos:', this.modules.length);
+
     // Processar menus dos módulos
     for (const module of this.modules) {
       if (!module.menus || module.menus.length === 0) {
-        console.log(`  ⚠️ Módulo ${module.slug} sem menus`);
+        // console.log(`  ⚠️ Módulo ${module.slug} sem menus`);
         continue;
       }
       
@@ -319,8 +319,8 @@ class ModuleRegistry {
       return [];
     }
 
-    console.log('📊 [ModuleRegistry] Gerando widgets do dashboard para módulos:', this.modules.length);
-    
+    // console.log('📊 [ModuleRegistry] Gerando widgets do dashboard para módulos:', this.modules.length);
+
     // Gerar widgets para módulos ativos
     const widgets: any[] = [];
     
@@ -336,8 +336,8 @@ class ModuleRegistry {
         order: 100,
         permissions: []
       });
-      
-      console.log(`  ✅ Widget criado para módulo: ${module.slug}`);
+
+      // console.log(`  ✅ Widget criado para módulo: ${module.slug}`);
     }
     
     console.log(`📊 [ModuleRegistry] Total de widgets: ${widgets.length}`);
@@ -367,8 +367,8 @@ class ModuleRegistry {
       return [];
     }
 
-    console.log('🔧 [ModuleRegistry] Gerando itens da taskbar para módulos:', this.modules.length);
-    
+    // console.log('🔧 [ModuleRegistry] Gerando itens da taskbar para módulos:', this.modules.length);
+
     // Gerar itens da taskbar para módulos ativos
     const taskbarItems: any[] = [];
     
@@ -384,8 +384,8 @@ class ModuleRegistry {
       
       console.log(`  ✅ Item de taskbar criado para módulo: ${module.slug}`);
     }
-    
-    console.log(`🔧 [ModuleRegistry] Total de itens na taskbar: ${taskbarItems.length}`);
+
+    // console.log(`🔧 [ModuleRegistry] Total de itens na taskbar: ${taskbarItems.length}`);
     return taskbarItems;
   }
 

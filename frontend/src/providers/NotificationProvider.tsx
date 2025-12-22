@@ -43,7 +43,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   // Log de debug
   useEffect(() => {
     if (user) {
-      console.log('🔔 NotificationProvider ativo para usuário:', user.id);
+      // console.log('🔔 NotificationProvider ativo para usuário:', user.id);
     }
   }, [user]);
 
