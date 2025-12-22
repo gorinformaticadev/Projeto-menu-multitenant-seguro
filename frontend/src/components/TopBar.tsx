@@ -39,9 +39,8 @@ export function TopBar() {
     markAllAsRead
   } = useNotificationContext();
 
-  console.log('👀 [TopBar] Render com unreadCount:', unreadCount);
 
-
+  // console.log('👀 [TopBar] Render com unreadCount:', unreadCount);
 
   // Hook para fechar menu ao clicar fora
   const userMenuRef = useClickOutside<HTMLDivElement>(() => {
@@ -70,7 +69,7 @@ export function TopBar() {
       }
     }
 
-    console.log('🌐 Buscando master logo da API');
+    // console.log('🌐 Buscando master logo da API');
     api.get("/tenants/public/master-logo")
       .then(response => {
         const logoUrl = response.data?.logoUrl;
@@ -80,7 +79,7 @@ export function TopBar() {
             logoUrl,
             timestamp: Date.now()
           }));
-          console.log('💾 Master logo cacheado:', logoUrl);
+          // console.log('💾 Master logo cacheado:', logoUrl);
         }
       })
       .catch(error => {

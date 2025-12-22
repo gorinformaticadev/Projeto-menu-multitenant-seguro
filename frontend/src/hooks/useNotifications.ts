@@ -76,7 +76,7 @@ export function useNotifications(): UseNotificationsReturn {
     const handleNewNotification = (notification: Notification) => {
       if (!isActiveRef.current) return;
 
-      console.log('🔔 Nova notificação recebida:', notification);
+      // console.log('🔔 Nova notificação recebida:', notification);
 
       setNotifications(prev => [notification, ...prev.slice(0, 9)]); // Mantém apenas 10
       setUnreadCount(prev => prev + 1);
@@ -89,7 +89,7 @@ export function useNotifications(): UseNotificationsReturn {
     const handleNotificationRead = (notification: Notification) => {
       if (!isActiveRef.current) return;
 
-      console.log('👁️ Notificação marcada como lida:', notification.id);
+      // console.log('👁️ Notificação marcada como lida:', notification.id);
 
       setNotifications(prev =>
         prev.map(n =>
@@ -104,7 +104,7 @@ export function useNotifications(): UseNotificationsReturn {
     const handleNotificationDeleted = (data: { id: string }) => {
       if (!isActiveRef.current) return;
 
-      console.log('🗑️ Notificação deletada:', data.id);
+      // console.log('🗑️ Notificação deletada:', data.id);
 
       setNotifications(prev => prev.filter(n => n.id !== data.id));
     };
@@ -113,7 +113,7 @@ export function useNotifications(): UseNotificationsReturn {
     const handleAllRead = (data: { count: number }) => {
       if (!isActiveRef.current) return;
 
-      console.log('✅ Todas as notificações marcadas como lidas:', data.count);
+      // console.log('✅ Todas as notificações marcadas como lidas:', data.count);
 
       setNotifications(prev =>
         prev.map(n => ({ ...n, read: true, readAt: new Date() }))
@@ -202,18 +202,16 @@ export function useNotifications(): UseNotificationsReturn {
         api.get(`/notifications/dropdown?_t=${Date.now()}`)
       ]);
 
-      console.log('📡 [Hook] Count API:', unreadRes.data);
+      // console.log('📡 [Hook] Count API:', unreadRes.data);
 
       if (unreadRes.data && typeof unreadRes.data.count === 'number') {
-        setUnreadCount(prev => {
-          console.log(`🔢 [Hook] Atualizando Count: ${prev} -> ${unreadRes.data.count}`);
-          return unreadRes.data.count;
-        });
+        setUnreadCount(unreadRes.data.count);
+        // console.log(`🔢 [Hook] Atualizando Count: -> ${unreadRes.data.count}`);
       }
 
       if (dropdownRes.data && Array.isArray(dropdownRes.data.notifications)) {
-        // console.log('📝 [Hook] Atualizando Lista:', dropdownRes.data.notifications.length);
         setNotifications(dropdownRes.data.notifications);
+        // console.log('📝 [Hook] Atualizando Lista:', dropdownRes.data.notifications.length);
       }
     } catch (error) {
       console.error('❌ Erro ao atualizar notificações:', error);

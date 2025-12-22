@@ -89,7 +89,7 @@ export default function NotificacaoPage() {
     try {
       await api.patch(`/notifications/${id}/read`);
       await fetchNotifications();
-      console.log('🔄 Atualizando contexto global...');
+      // console.log('🔄 Atualizando contexto global...');
       await refreshNotifications();
       toast({ description: "Notificação marcada como lida." });
     } catch (error) {
@@ -104,7 +104,7 @@ export default function NotificacaoPage() {
     try {
       await api.patch(`/notifications/${id}/unread`);
       await fetchNotifications();
-      console.log('🔄 Atualizando contexto global...');
+      // console.log('🔄 Atualizando contexto global...');
       await refreshNotifications();
       toast({ description: "Notificação marcada como não lida." });
     } catch (error) {
@@ -119,7 +119,7 @@ export default function NotificacaoPage() {
     try {
       await api.delete(`/notifications/${id}`);
       await fetchNotifications();
-      console.log('🔄 Atualizando contexto global...');
+      // console.log('🔄 Atualizando contexto global...');
       await refreshNotifications();
       setSelectedIds(prev => prev.filter(pid => pid !== id));
       toast({ description: "Notificação excluída." });
@@ -138,7 +138,7 @@ export default function NotificacaoPage() {
       // Implement batch delete or sequential delete
       await api.delete('/notifications/batch', { data: { ids: selectedIds } });
       await fetchNotifications();
-      console.log('🔄 Atualizando contexto global...');
+      // console.log('🔄 Atualizando contexto global...');
       await refreshNotifications();
       setSelectedIds([]);
       toast({ description: `${selectedIds.length} notificações excluídas.` });
@@ -154,7 +154,7 @@ export default function NotificacaoPage() {
       setLoading(true);
       await api.patch('/notifications/mark-all-read');
       await fetchNotifications();
-      console.log('🔄 Atualizando contexto global...');
+      // console.log('🔄 Atualizando contexto global...');
       await refreshNotifications();
       toast({ description: "Todas as notificações marcadas como lidas." });
     } catch (error) {

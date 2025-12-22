@@ -235,7 +235,7 @@ class ModuleRegistry {
 
     // Se não houver módulos carregados, retorna apenas menu do core
     if (!this.isLoaded || this.modules.length === 0) {
-      console.log('⚠️ [ModuleRegistry] Nenhum módulo carregado, retornando apenas core');
+      // console.log('⚠️ [ModuleRegistry] Nenhum módulo carregado, retornando apenas core');
       return {
         ungrouped,
         groups,
@@ -251,16 +251,16 @@ class ModuleRegistry {
         // console.log(`  ⚠️ Módulo ${module.slug} sem menus`);
         continue;
       }
-      
-      console.log(`  📝 Módulo ${module.slug}: ${module.menus.length} menus`);
-      
+
+      // console.log(`  📝 Módulo ${module.slug}: ${module.menus.length} menus`);
+
       // Cada módulo cria seu próprio grupo
       const moduleSlug = module.slug;
       const moduleItems: any[] = [];
-      
+
       for (const menu of module.menus) {
-        console.log(`     - Menu: ${menu.label}, children: ${menu.children ? menu.children.length : 0}`);
-        
+        // console.log(`     - Menu: ${menu.label}, children: ${menu.children ? menu.children.length : 0}`);
+
         // Se o menu tem filhos, adiciona cada filho
         if (menu.children && menu.children.length > 0) {
           for (const child of menu.children) {
@@ -285,16 +285,16 @@ class ModuleRegistry {
           });
         }
       }
-      
+
       if (moduleItems.length > 0) {
-        console.log(`  ✅ Adicionado grupo '${moduleSlug}' com ${moduleItems.length} itens`);
+        // console.log(`  ✅ Adicionado grupo '${moduleSlug}' com ${moduleItems.length} itens`);
         groups[moduleSlug] = moduleItems;
         groupOrder.push(moduleSlug);
       }
     }
-    
-    console.log('✅ [ModuleRegistry] Grupos finais:', Object.keys(groups));
-    
+
+    // console.log('✅ [ModuleRegistry] Grupos finais:', Object.keys(groups));
+
     return {
       ungrouped,
       groups,
@@ -323,7 +323,7 @@ class ModuleRegistry {
 
     // Gerar widgets para módulos ativos
     const widgets: any[] = [];
-    
+
     for (const module of this.modules) {
       // Criar widget padrão para cada módulo
       widgets.push({
@@ -339,8 +339,8 @@ class ModuleRegistry {
 
       // console.log(`  ✅ Widget criado para módulo: ${module.slug}`);
     }
-    
-    console.log(`📊 [ModuleRegistry] Total de widgets: ${widgets.length}`);
+
+    // console.log(`📊 [ModuleRegistry] Total de widgets: ${widgets.length}`);
     return widgets;
   }
 
@@ -363,7 +363,7 @@ class ModuleRegistry {
   getTaskbarItems(userRole?: string): any[] {
     // Se não houver módulos, retorna array vazio
     if (!this.isLoaded || this.modules.length === 0) {
-      console.log('⚠️ [ModuleRegistry] Nenhum módulo carregado para taskbar');
+      // console.log('⚠️ [ModuleRegistry] Nenhum módulo carregado para taskbar');
       return [];
     }
 
@@ -371,7 +371,7 @@ class ModuleRegistry {
 
     // Gerar itens da taskbar para módulos ativos
     const taskbarItems: any[] = [];
-    
+
     for (const module of this.modules) {
       // Criar item de taskbar para cada módulo
       taskbarItems.push({
@@ -381,8 +381,8 @@ class ModuleRegistry {
         href: `/modules/${module.slug}/dashboard`, // Rota padrão
         order: 100
       });
-      
-      console.log(`  ✅ Item de taskbar criado para módulo: ${module.slug}`);
+
+      // console.log(`  ✅ Item de taskbar criado para módulo: ${module.slug}`);
     }
 
     // console.log(`🔧 [ModuleRegistry] Total de itens na taskbar: ${taskbarItems.length}`);
@@ -395,15 +395,15 @@ class ModuleRegistry {
   getUserMenuItems(userRole?: string): ModuleUserMenuItem[] {
     // Se não houver módulos, retorna array vazio
     if (!this.isLoaded || this.modules.length === 0) {
-      console.log('⚠️ [ModuleRegistry] Nenhum módulo carregado para menu do usuário');
+      // console.log('⚠️ [ModuleRegistry] Nenhum módulo carregado para menu do usuário');
       return [];
     }
 
-    console.log('👤 [ModuleRegistry] Gerando itens do menu do usuário para módulos:', this.modules.length);
-    
+    // console.log('👤 [ModuleRegistry] Gerando itens do menu do usuário para módulos:', this.modules.length);
+
     // Gerar itens do menu do usuário para módulos ativos
     const userMenuItems: ModuleUserMenuItem[] = [];
-    
+
     for (const module of this.modules) {
       // Criar item de menu do usuário para cada módulo
       userMenuItems.push({
@@ -413,11 +413,11 @@ class ModuleRegistry {
         href: `/modules/${module.slug}/dashboard`,
         order: 100
       });
-      
-      console.log(`  ✅ Item de menu do usuário criado para módulo: ${module.slug}`);
+
+      // console.log(`  ✅ Item de menu do usuário criado para módulo: ${module.slug}`);
     }
-    
-    console.log(`👤 [ModuleRegistry] Total de itens no menu do usuário: ${userMenuItems.length}`);
+
+    // console.log(`👤 [ModuleRegistry] Total de itens no menu do usuário: ${userMenuItems.length}`);
     return userMenuItems;
   }
 }
