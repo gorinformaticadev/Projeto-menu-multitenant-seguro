@@ -4,18 +4,18 @@
 
 import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
-import { 
-  Notification, 
-  NotificationCreateData, 
-  NotificationFilters, 
-  NotificationResponse 
+import {
+  Notification,
+  NotificationCreateData,
+  NotificationFilters,
+  NotificationResponse
 } from './notification.entity';
 
 @Injectable()
 export class NotificationService {
   private readonly logger = new Logger(NotificationService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   /**
    * Cria uma nova notificação
@@ -49,7 +49,7 @@ export class NotificationService {
    */
   async findForDropdown(user: any): Promise<NotificationResponse> {
     const where = this.buildWhereClause(user);
-    
+
     const [notifications, total, unreadCount] = await Promise.all([
       this.prisma.notification.findMany({
         where,
@@ -57,13 +57,13 @@ export class NotificationService {
         take: 10,
       }),
       this.prisma.notification.count({ where }),
-      this.prisma.notification.count({ 
-        where: { ...where, read: false } 
+      this.prisma.notification.count({
+        where: { ...where, read: false }
       }),
     ]);
 
     return {
-      notifications: notifications.map(this.mapToEntity),
+      notifications: notifications.map(n => this.mapToEntity(n)),
       total,
       unreadCount,
       hasMore: total > 10,
@@ -87,13 +87,13 @@ export class NotificationService {
         take: limit,
       }),
       this.prisma.notification.count({ where }),
-      this.prisma.notification.count({ 
-        where: { ...where, read: false } 
+      this.prisma.notification.count({
+        where: { ...where, read: false }
       }),
     ]);
 
     return {
-      notifications: notifications.map(this.mapToEntity),
+      notifications: notifications.map(n => this.mapToEntity(n)),
       total,
       unreadCount,
       hasMore: skip + notifications.length < total,
@@ -104,17 +104,17 @@ export class NotificationService {
    * Marca notificação como lida
    */
   async markAsRead(id: string, user: any): Promise<Notification | null> {
-    const where = { 
-      id, 
-      ...this.buildWhereClause(user) 
+    const where = {
+      id,
+      ...this.buildWhereClause(user)
     };
 
     try {
       const notification = await this.prisma.notification.update({
         where,
-        data: { 
-          read: true, 
-          readAt: new Date() 
+        data: {
+          read: true,
+          readAt: new Date()
         },
       });
 
@@ -127,16 +127,42 @@ export class NotificationService {
   }
 
   /**
+   * Marca notificação como NÃO lida
+   */
+  async markAsUnread(id: string, user: any): Promise<Notification | null> {
+    const where = {
+      id,
+      ...this.buildWhereClause(user)
+    };
+
+    try {
+      const notification = await this.prisma.notification.update({
+        where,
+        data: {
+          read: false,
+          readAt: null
+        },
+      });
+
+      this.logger.log(`Notificação marcada como não lida: ${id}`);
+      return this.mapToEntity(notification);
+    } catch (error) {
+      this.logger.warn(`Notificação não encontrada ou sem permissão: ${id}`);
+      return null;
+    }
+  }
+
+  /**
    * Marca todas as notificações como lidas
    */
   async markAllAsRead(user: any, filters?: NotificationFilters): Promise<number> {
     const where = this.buildWhereClause(user, filters);
-    
+
     const result = await this.prisma.notification.updateMany({
       where: { ...where, read: false },
-      data: { 
-        read: true, 
-        readAt: new Date() 
+      data: {
+        read: true,
+        readAt: new Date()
       },
     });
 
@@ -148,9 +174,9 @@ export class NotificationService {
    * Deleta uma notificação
    */
   async delete(id: string, user: any): Promise<Notification | null> {
-    const where = { 
-      id, 
-      ...this.buildWhereClause(user) 
+    const where = {
+      id,
+      ...this.buildWhereClause(user)
     };
 
     try {
@@ -199,9 +225,9 @@ export class NotificationService {
    * Busca uma notificação por ID
    */
   async findById(id: string, user: any): Promise<Notification | null> {
-    const where = { 
-      id, 
-      ...this.buildWhereClause(user) 
+    const where = {
+      id,
+      ...this.buildWhereClause(user)
     };
 
     try {

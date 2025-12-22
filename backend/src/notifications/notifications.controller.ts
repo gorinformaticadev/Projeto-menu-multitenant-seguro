@@ -25,7 +25,7 @@ export class NotificationsController {
   constructor(
     private notificationService: NotificationService,
     private notificationGateway: NotificationGateway
-  ) {}
+  ) { }
 
   /**
    * Cria uma nova notificação
@@ -33,10 +33,10 @@ export class NotificationsController {
   @Post()
   async create(@Body() createDto: CreateNotificationDto, @Request() req) {
     const notification = await this.notificationService.create(createDto);
-    
+
     // Emite via Socket.IO
     await this.notificationGateway.emitNewNotification(notification);
-    
+
     return { success: true, notification };
   }
 
@@ -58,10 +58,10 @@ export class NotificationsController {
       read: query.read,
       tenantId: query.tenantId,
       userId: query.userId,
-      dateFrom: query.dateFrom ? new Date(query.dateFrom) : undefined,
-      dateTo: query.dateTo ? new Date(query.dateTo) : undefined,
-      page: query.page || 1,
-      limit: query.limit || 20,
+      dateFrom: query.dateFrom && query.dateFrom !== 'undefined' ? new Date(query.dateFrom) : undefined,
+      dateTo: query.dateTo && query.dateTo !== 'undefined' ? new Date(query.dateTo) : undefined,
+      page: query.page ? Number(query.page) : 1,
+      limit: query.limit ? Number(query.limit) : 20,
     };
 
     return this.notificationService.findMany(req.user, filters);
@@ -82,12 +82,24 @@ export class NotificationsController {
   @Patch(':id/read')
   async markAsRead(@Param('id') id: string, @Request() req) {
     const notification = await this.notificationService.markAsRead(id, req.user);
-    
+
     if (notification) {
       // Emite evento via Socket.IO
       await this.notificationGateway.emitNotificationRead(notification);
     }
-    
+
+    return { success: !!notification };
+  }
+
+  /**
+   * Marca notificação como NÃO lida
+   */
+  @Patch(':id/unread')
+  async markAsUnread(@Param('id') id: string, @Request() req) {
+    const notification = await this.notificationService.markAsUnread(id, req.user);
+
+    // Não emite socket conforme regra de isolamento da lista
+
     return { success: !!notification };
   }
 
@@ -106,12 +118,12 @@ export class NotificationsController {
   @Delete(':id')
   async delete(@Param('id') id: string, @Request() req) {
     const notification = await this.notificationService.delete(id, req.user);
-    
+
     if (notification) {
       // Emite evento via Socket.IO
       await this.notificationGateway.emitNotificationDeleted(id, notification);
     }
-    
+
     return { success: !!notification };
   }
 
