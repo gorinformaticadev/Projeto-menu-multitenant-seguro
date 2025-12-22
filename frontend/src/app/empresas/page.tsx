@@ -16,7 +16,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { TestForm } from "@/components/TestForm";
+
 import { ModulesTab } from "./components/ModulesTab";
 
 
@@ -87,12 +87,12 @@ export default function EmpresasPage() {
   useEffect(() => {
     // Garante que o estado submitting seja false na inicialização
     setSubmitting(false);
-    
+
     // Debounce para evitar múltiplas chamadas em React StrictMode
     const timeoutId = setTimeout(() => {
       loadTenants();
     }, 100);
-    
+
     return () => clearTimeout(timeoutId);
   }, []);
 
@@ -102,7 +102,7 @@ export default function EmpresasPage() {
       const cacheKey = 'tenants-list-cache';
       const cacheTTL = 2 * 60 * 1000; // 2 minutos
       const cached = localStorage.getItem(cacheKey);
-      
+
       if (cached) {
         const { data, timestamp } = JSON.parse(cached);
         if (Date.now() - timestamp < cacheTTL) {
@@ -112,18 +112,18 @@ export default function EmpresasPage() {
           return;
         }
       }
-      
+
       const response = await api.get("/tenants");
       console.log('Tenants carregados:', response.data);
       console.log('API_URL:', API_URL);
       setTenants(response.data);
-      
+
       // Salvar no cache
       localStorage.setItem(cacheKey, JSON.stringify({
         data: response.data,
         timestamp: Date.now()
       }));
-      
+
     } catch (error: any) {
       toast({
         title: "Erro ao carregar empresas",
@@ -138,9 +138,9 @@ export default function EmpresasPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!formData.email || !formData.cnpjCpf || !formData.nomeFantasia || 
-        !formData.nomeResponsavel || !formData.telefone ||
-        !formData.adminEmail || !formData.adminPassword || !formData.adminName) {
+    if (!formData.email || !formData.cnpjCpf || !formData.nomeFantasia ||
+      !formData.nomeResponsavel || !formData.telefone ||
+      !formData.adminEmail || !formData.adminPassword || !formData.adminName) {
       toast({
         title: "Erro",
         description: "Preencha todos os campos",
@@ -172,7 +172,7 @@ export default function EmpresasPage() {
 
     try {
       await api.post("/tenants", formData);
-      
+
       toast({
         title: "Sucesso",
         description: "Empresa e administrador cadastrados com sucesso!",
@@ -218,7 +218,7 @@ export default function EmpresasPage() {
         nomeResponsavel: formData.nomeResponsavel,
         telefone: formData.telefone,
       });
-      
+
       toast({
         title: "Sucesso",
         description: "Empresa atualizada com sucesso!",
@@ -268,7 +268,7 @@ export default function EmpresasPage() {
       await api.patch(`/tenants/${selectedTenant.id}/change-admin-password`, {
         newPassword: passwordData.newPassword,
       });
-      
+
       toast({
         title: "Sucesso",
         description: "Senha do administrador alterada com sucesso!",
@@ -292,7 +292,7 @@ export default function EmpresasPage() {
   async function handleToggleStatus(tenant: Tenant) {
     try {
       await api.patch(`/tenants/${tenant.id}/toggle-status`);
-      
+
       toast({
         title: "Sucesso",
         description: `Empresa ${tenant.ativo ? 'desativada' : 'ativada'} com sucesso!`,
@@ -332,7 +332,7 @@ export default function EmpresasPage() {
 
     try {
       await api.delete(`/tenants/${selectedTenant.id}`);
-      
+
       toast({
         title: "Sucesso",
         description: "Empresa deletada com sucesso!",
@@ -436,7 +436,7 @@ export default function EmpresasPage() {
           'Content-Type': 'multipart/form-data',
         },
       });
-      
+
       toast({
         title: "Sucesso",
         description: "Logo atualizado com sucesso!",
@@ -468,7 +468,7 @@ export default function EmpresasPage() {
 
     try {
       await api.patch(`/tenants/${selectedTenant.id}/remove-logo`);
-      
+
       toast({
         title: "Sucesso",
         description: "Logo removido com sucesso!",
@@ -507,12 +507,7 @@ export default function EmpresasPage() {
           </Button>
         </div>
 
-        {/* Componente de teste para debug */}
-        {showForm && (
-          <div className="mb-8">
-            <TestForm />
-          </div>
-        )}
+
 
         {showForm && (
           <Card className="mb-8">
@@ -690,12 +685,12 @@ export default function EmpresasPage() {
                       console.log('- Submitting:', submitting);
                       console.log('- FormData:', formData);
                       console.log('- Inputs disabled:', document.querySelectorAll('input[disabled]').length);
-                      
+
                       // Força habilitar todos os inputs para teste
                       document.querySelectorAll('input').forEach(input => {
                         input.disabled = false;
                       });
-                      
+
                       toast({
                         title: "Debug",
                         description: "Verifique o console para informações de debug",
@@ -723,8 +718,8 @@ export default function EmpresasPage() {
                     <div className={`rounded-full shadow-sm ${tenant.ativo ? 'bg-gradient-to-br from-primary to-primary/80' : 'bg-gray-400'} relative overflow-hidden flex items-center justify-center w-12 h-12 p-0`}>
                       {tenant.logoUrl ? (
                         <>
-                          <img 
-                            src={`${API_URL}/uploads/logos/${tenant.logoUrl}?t=${Date.now()}`} 
+                          <img
+                            src={`${API_URL}/uploads/logos/${tenant.logoUrl}?t=${Date.now()}`}
                             alt={tenant.nomeFantasia}
                             className="w-full h-full object-cover rounded-full logo-image"
                             onLoad={() => {
@@ -754,11 +749,10 @@ export default function EmpresasPage() {
                         {tenant.cnpjCpf}
                       </CardDescription>
                       <div className="mt-2 flex flex-wrap gap-1">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                          tenant.ativo 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${tenant.ativo
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                          }`}>
                           {tenant.ativo ? 'Ativa' : 'Inativa'}
                         </span>
                         {tenant.email === 'empresa1@example.com' && (
@@ -791,7 +785,7 @@ export default function EmpresasPage() {
                       </span>
                     </div>
                   </div>
-                  
+
                   {tenant._count && (
                     <div className="pt-3 mt-3 border-t">
                       <div className="flex items-center justify-between">
@@ -937,11 +931,10 @@ export default function EmpresasPage() {
                     <div className="sm:col-span-2">
                       <Label className="text-muted-foreground text-xs sm:text-sm">Status</Label>
                       <div className="mt-1">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                          selectedTenant.ativo 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${selectedTenant.ativo
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                          }`}>
                           {selectedTenant.ativo ? 'Ativa' : 'Inativa'}
                         </span>
                       </div>
@@ -951,7 +944,7 @@ export default function EmpresasPage() {
                 <TabsContent value="modules" className="mt-4">
                   <div className="space-y-4">
                     <ModulesTab tenantId={selectedTenant.id} />
-                    
+
                     {user?.role === "SUPER_ADMIN" && (
                       <Card className="border-blue-200 bg-blue-50">
                         <CardContent className="p-4">
@@ -1095,8 +1088,8 @@ export default function EmpresasPage() {
                 >
                   Cancelar
                 </Button>
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   disabled={submitting || !isPasswordValid || !passwordsMatch}
                 >
                   {submitting ? "Alterando..." : "Alterar Senha"}
@@ -1120,8 +1113,8 @@ export default function EmpresasPage() {
                 <div className="space-y-2">
                   <Label>Logo Atual</Label>
                   <div className="flex items-center justify-center p-4 border rounded-lg bg-muted">
-                    <img 
-                      src={`${API_URL}/uploads/logos/${selectedTenant.logoUrl}?t=${logoTimestamp}`} 
+                    <img
+                      src={`${API_URL}/uploads/logos/${selectedTenant.logoUrl}?t=${logoTimestamp}`}
                       alt="Logo atual"
                       className="max-h-32 object-contain"
                       onError={(e) => {
@@ -1163,8 +1156,8 @@ export default function EmpresasPage() {
                 <div className="space-y-2">
                   <Label>Pré-visualização</Label>
                   <div className="flex items-center justify-center p-4 border rounded-lg bg-muted">
-                    <img 
-                      src={logoPreview} 
+                    <img
+                      src={logoPreview}
                       alt="Pré-visualização"
                       className="max-h-32 object-contain"
                     />
