@@ -41,8 +41,8 @@ import { WhatsAppModule } from './core/whatsapp/whatsapp.module';
       {
         name: 'default',
         ttl: 60000, // 60 segundos (1 minuto)
-        // Desenvolvimento: 2000 req/min | ProduÃ§Ã£o: 100 req/min
-        limit: process.env.NODE_ENV === 'production' ? 100 : 2000,
+        // Desenvolvimento: 10000 req/min (AUMENTADO DEBUG)
+        limit: 10000,
       },
       {
         name: 'login',
@@ -64,7 +64,7 @@ import { WhatsAppModule } from './core/whatsapp/whatsapp.module';
     WhatsAppModule,
     SecureFilesModule, // Módulo de uploads sensíveis
     AppModulesModule.forRoot(), // Módulo de carregamento dinâmico de módulos externos
-  
+
   ],
   providers: [
     {

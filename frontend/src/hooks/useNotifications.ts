@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { socketClient } from '@/lib/socket';
 import { Notification } from '@/types/notifications';
+import api from '@/lib/api';
 
 interface UseNotificationsReturn {
   notifications: Notification[];
@@ -24,7 +25,7 @@ export function useNotifications(): UseNotificationsReturn {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  
+
   const isActiveRef = useRef(true);
 
   /**
@@ -73,12 +74,12 @@ export function useNotifications(): UseNotificationsReturn {
     // Listener para nova notificação
     const handleNewNotification = (notification: Notification) => {
       if (!isActiveRef.current) return;
-      
+
       console.log('🔔 Nova notificação recebida:', notification);
-      
+
       setNotifications(prev => [notification, ...prev.slice(0, 9)]); // Mantém apenas 10
       setUnreadCount(prev => prev + 1);
-      
+
       // Reproduz som apenas para notificações novas
       playNotificationSound();
     };
@@ -86,12 +87,12 @@ export function useNotifications(): UseNotificationsReturn {
     // Listener para notificação lida
     const handleNotificationRead = (notification: Notification) => {
       if (!isActiveRef.current) return;
-      
+
       console.log('👁️ Notificação marcada como lida:', notification.id);
-      
-      setNotifications(prev => 
-        prev.map(n => 
-          n.id === notification.id 
+
+      setNotifications(prev =>
+        prev.map(n =>
+          n.id === notification.id
             ? { ...n, read: true, readAt: new Date() }
             : n
         )
@@ -101,19 +102,19 @@ export function useNotifications(): UseNotificationsReturn {
     // Listener para notificação deletada
     const handleNotificationDeleted = (data: { id: string }) => {
       if (!isActiveRef.current) return;
-      
+
       console.log('🗑️ Notificação deletada:', data.id);
-      
+
       setNotifications(prev => prev.filter(n => n.id !== data.id));
     };
 
     // Listener para todas marcadas como lidas
     const handleAllRead = (data: { count: number }) => {
       if (!isActiveRef.current) return;
-      
+
       console.log('✅ Todas as notificações marcadas como lidas:', data.count);
-      
-      setNotifications(prev => 
+
+      setNotifications(prev =>
         prev.map(n => ({ ...n, read: true, readAt: new Date() }))
       );
       setUnreadCount(0);
@@ -122,14 +123,14 @@ export function useNotifications(): UseNotificationsReturn {
     // Listener para contagem de não lidas
     const handleUnreadCount = (data: { count: number }) => {
       if (!isActiveRef.current) return;
-      
+
       setUnreadCount(data.count);
     };
 
     // Listener para erros
     const handleError = (data: { message: string }) => {
       if (!isActiveRef.current) return;
-      
+
       console.error('❌ Erro de notificação:', data.message);
       setConnectionError(data.message);
     };
@@ -145,14 +146,14 @@ export function useNotifications(): UseNotificationsReturn {
 
     const handleDisconnect = () => {
       if (!isActiveRef.current) return;
-      
+
       console.log('❌ Socket.IO desconectado');
       setIsConnected(false);
     };
 
     const handleConnectError = (error: any) => {
       if (!isActiveRef.current) return;
-      
+
       console.error('❌ Erro de conexão Socket.IO:', error);
       setConnectionError('Erro de conexão');
       setIsConnected(false);
@@ -190,18 +191,41 @@ export function useNotifications(): UseNotificationsReturn {
   /**
    * Conecta/desconecta baseado no usuário
    */
+  /**
+   * Conecta/desconecta e busca dados iniciais REST
+   */
   useEffect(() => {
     if (user && token) {
-      // console.log('🔌 Conectando Socket.IO para notificações...');
+      // 1. Fetch inicial via REST (Garante dados mesmo sem socket)
+      const fetchInitialData = async () => {
+        try {
+          const [unreadRes, dropdownRes] = await Promise.all([
+            api.get('/notifications/unread-count'),
+            api.get('/notifications/dropdown')
+          ]);
 
+          if (unreadRes.data && typeof unreadRes.data.count === 'number') {
+            setUnreadCount(unreadRes.data.count);
+          }
+
+          if (dropdownRes.data && Array.isArray(dropdownRes.data.notifications)) {
+            setNotifications(dropdownRes.data.notifications);
+          }
+        } catch (error) {
+          console.error('❌ Erro ao buscar dados iniciais de notificação:', error);
+        }
+      };
+
+      fetchInitialData();
+
+      // 2. Conecta Socket.IO para updates em tempo real
       const socket = socketClient.connect(token);
       const cleanup = setupSocketListeners();
-      
+
       return () => {
         if (cleanup) cleanup();
       };
     } else {
-      // console.log('🔌 Desconectando Socket.IO...');
       socketClient.disconnect();
       setNotifications([]);
       setUnreadCount(0);

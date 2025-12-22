@@ -147,8 +147,12 @@ export function TopBar() {
     }
   };
 
-  const formatNotificationTime = (date: Date) => {
+  const formatNotificationTime = (dateInput: Date | string) => {
     const now = new Date();
+    const date = new Date(dateInput);
+
+    if (isNaN(date.getTime())) return 'data inválida';
+
     const diff = now.getTime() - date.getTime();
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
@@ -269,24 +273,22 @@ export function TopBar() {
                     {notifications.map((notification) => {
                       const Icon = getNotificationIcon(notification.type);
                       const isUnread = !notification.read;
-                      
+
                       return (
                         <div
                           key={notification.id}
-                          className={`px-4 py-3 border-b border-gray-100 last:border-b-0 cursor-pointer transition-colors ${
-                            isUnread ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-50'
-                          }`}
+                          className={`px-4 py-3 border-b border-gray-100 last:border-b-0 cursor-pointer transition-colors ${isUnread ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-50'
+                            }`}
                           onClick={() => handleNotificationClick(notification)}
                         >
                           <div className="flex items-start gap-3">
                             {/* Ícone e indicador de não lida */}
                             <div className="flex-shrink-0 relative">
-                              <Icon className={`h-4 w-4 mt-1 ${
-                                notification.type === 'error' ? 'text-red-600' :
-                                notification.type === 'warning' ? 'text-yellow-600' :
-                                notification.type === 'success' ? 'text-green-600' :
-                                'text-blue-600'
-                              }`} />
+                              <Icon className={`h-4 w-4 mt-1 ${notification.type === 'error' ? 'text-red-600' :
+                                  notification.type === 'warning' ? 'text-yellow-600' :
+                                    notification.type === 'success' ? 'text-green-600' :
+                                      'text-blue-600'
+                                }`} />
                               {isUnread && (
                                 <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"></div>
                               )}
@@ -295,28 +297,26 @@ export function TopBar() {
                             {/* Conteúdo */}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start justify-between gap-2">
-                                <p className={`text-sm truncate ${
-                                  isUnread ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'
-                                }`}>
+                                <p className={`text-sm truncate ${isUnread ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'
+                                  }`}>
                                   {notification.title}
                                 </p>
-                                
+
                                 {/* Badge de tipo */}
                                 {notification.type !== 'info' && (
-                                  <span className={`px-2 py-1 text-xs rounded-full font-medium flex-shrink-0 ${
-                                    getSeverityBadgeColor(notification.type)
-                                  }`}>
-                                    {notification.type === 'error' ? 'Erro' : 
-                                     notification.type === 'warning' ? 'Aviso' : 
-                                     notification.type === 'success' ? 'Sucesso' : 'Info'}
+                                  <span className={`px-2 py-1 text-xs rounded-full font-medium flex-shrink-0 ${getSeverityBadgeColor(notification.type)
+                                    }`}>
+                                    {notification.type === 'error' ? 'Erro' :
+                                      notification.type === 'warning' ? 'Aviso' :
+                                        notification.type === 'success' ? 'Sucesso' : 'Info'}
                                   </span>
                                 )}
                               </div>
-                              
+
                               <p className="text-xs text-gray-500 mt-1 line-clamp-2">
                                 {notification.description}
                               </p>
-                              
+
                               <div className="flex items-center justify-between mt-2">
                                 <div className="flex items-center gap-2 text-xs text-gray-400">
                                   <span>{formatNotificationTime(notification.createdAt)}</span>
@@ -343,7 +343,7 @@ export function TopBar() {
                       Marcar todas como lidas
                     </button>
                   )}
-                  
+
                   <a
                     href="/notifications"
                     onClick={() => setShowNotifications(false)}
