@@ -17,6 +17,7 @@ interface UseNotificationsReturn {
   markAllAsRead: () => void;
   deleteNotification: (id: string) => void;
   playNotificationSound: () => void;
+  refreshNotifications: () => Promise<void>;
 }
 
 export function useNotifications(): UseNotificationsReturn {
@@ -189,8 +190,36 @@ export function useNotifications(): UseNotificationsReturn {
   // ============================================================================
 
   /**
-   * Conecta/desconecta baseado no usuário
+   * Busca dados atualizados via REST
    */
+  const refreshNotifications = useCallback(async () => {
+    if (!user || !token) return;
+
+    try {
+      // console.log('🔄 Hook: Buscando dados atualizados...');
+      const [unreadRes, dropdownRes] = await Promise.all([
+        api.get(`/notifications/unread-count?_t=${Date.now()}`),
+        api.get(`/notifications/dropdown?_t=${Date.now()}`)
+      ]);
+
+      console.log('📡 [Hook] Count API:', unreadRes.data);
+
+      if (unreadRes.data && typeof unreadRes.data.count === 'number') {
+        setUnreadCount(prev => {
+          console.log(`🔢 [Hook] Atualizando Count: ${prev} -> ${unreadRes.data.count}`);
+          return unreadRes.data.count;
+        });
+      }
+
+      if (dropdownRes.data && Array.isArray(dropdownRes.data.notifications)) {
+        // console.log('📝 [Hook] Atualizando Lista:', dropdownRes.data.notifications.length);
+        setNotifications(dropdownRes.data.notifications);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao atualizar notificações:', error);
+    }
+  }, [user, token]);
+
   /**
    * Conecta/desconecta e busca dados iniciais REST
    */
@@ -253,5 +282,6 @@ export function useNotifications(): UseNotificationsReturn {
     markAllAsRead,
     deleteNotification,
     playNotificationSound,
+    refreshNotifications,
   };
 }

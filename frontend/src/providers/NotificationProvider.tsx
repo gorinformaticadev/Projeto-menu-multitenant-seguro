@@ -17,6 +17,7 @@ interface NotificationContextType {
   markAllAsRead: () => void;
   deleteNotification: (id: string) => void;
   playNotificationSound: () => void;
+  refreshNotifications: () => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType>({
@@ -24,10 +25,11 @@ const NotificationContext = createContext<NotificationContextType>({
   unreadCount: 0,
   isConnected: false,
   connectionError: null,
-  markAsRead: () => {},
-  markAllAsRead: () => {},
-  deleteNotification: () => {},
-  playNotificationSound: () => {}
+  markAsRead: () => { },
+  markAllAsRead: () => { },
+  deleteNotification: () => { },
+  playNotificationSound: () => { },
+  refreshNotifications: async () => { }
 });
 
 export const useNotificationContext = () => useContext(NotificationContext);
@@ -56,6 +58,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     markAllAsRead: notificationHook.markAllAsRead,
     deleteNotification: notificationHook.deleteNotification,
     playNotificationSound: notificationHook.playNotificationSound,
+    refreshNotifications: notificationHook.refreshNotifications,
   };
 
   return (

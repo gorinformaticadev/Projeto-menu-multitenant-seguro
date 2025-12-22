@@ -39,6 +39,8 @@ export function TopBar() {
     markAllAsRead
   } = useNotificationContext();
 
+  console.log('👀 [TopBar] Render com unreadCount:', unreadCount);
+
 
 
   // Hook para fechar menu ao clicar fora
@@ -285,9 +287,9 @@ export function TopBar() {
                             {/* Ícone e indicador de não lida */}
                             <div className="flex-shrink-0 relative">
                               <Icon className={`h-4 w-4 mt-1 ${notification.type === 'error' ? 'text-red-600' :
-                                  notification.type === 'warning' ? 'text-yellow-600' :
-                                    notification.type === 'success' ? 'text-green-600' :
-                                      'text-blue-600'
+                                notification.type === 'warning' ? 'text-yellow-600' :
+                                  notification.type === 'success' ? 'text-green-600' :
+                                    'text-blue-600'
                                 }`} />
                               {isUnread && (
                                 <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"></div>

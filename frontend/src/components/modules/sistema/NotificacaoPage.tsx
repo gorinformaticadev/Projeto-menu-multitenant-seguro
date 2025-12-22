@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import api from '@/lib/api';
+import { useNotificationContext } from '@/providers/NotificationProvider';
 
 interface Notification {
   id: string;
@@ -35,6 +36,7 @@ interface Notification {
 
 export default function NotificacaoPage() {
   const { toast } = useToast();
+  const { refreshNotifications } = useNotificationContext();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -87,6 +89,8 @@ export default function NotificacaoPage() {
     try {
       await api.patch(`/notifications/${id}/read`);
       await fetchNotifications();
+      console.log('🔄 Atualizando contexto global...');
+      await refreshNotifications();
       toast({ description: "Notificação marcada como lida." });
     } catch (error) {
       toast({ title: "Erro", description: "Falha ao atualizar status.", variant: "destructive" });
@@ -100,6 +104,8 @@ export default function NotificacaoPage() {
     try {
       await api.patch(`/notifications/${id}/unread`);
       await fetchNotifications();
+      console.log('🔄 Atualizando contexto global...');
+      await refreshNotifications();
       toast({ description: "Notificação marcada como não lida." });
     } catch (error) {
       toast({ title: "Erro", description: "Falha ao atualizar status.", variant: "destructive" });
@@ -113,6 +119,8 @@ export default function NotificacaoPage() {
     try {
       await api.delete(`/notifications/${id}`);
       await fetchNotifications();
+      console.log('🔄 Atualizando contexto global...');
+      await refreshNotifications();
       setSelectedIds(prev => prev.filter(pid => pid !== id));
       toast({ description: "Notificação excluída." });
     } catch (error) {
@@ -130,6 +138,8 @@ export default function NotificacaoPage() {
       // Implement batch delete or sequential delete
       await api.delete('/notifications/batch', { data: { ids: selectedIds } });
       await fetchNotifications();
+      console.log('🔄 Atualizando contexto global...');
+      await refreshNotifications();
       setSelectedIds([]);
       toast({ description: `${selectedIds.length} notificações excluídas.` });
     } catch (error) {
@@ -144,6 +154,8 @@ export default function NotificacaoPage() {
       setLoading(true);
       await api.patch('/notifications/mark-all-read');
       await fetchNotifications();
+      console.log('🔄 Atualizando contexto global...');
+      await refreshNotifications();
       toast({ description: "Todas as notificações marcadas como lidas." });
     } catch (error) {
       toast({ title: "Erro", description: "Falha ao atualizar.", variant: "destructive" });
