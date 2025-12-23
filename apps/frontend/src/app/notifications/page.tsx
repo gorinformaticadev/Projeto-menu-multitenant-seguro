@@ -22,6 +22,7 @@ import {
     Search
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { useNotificationContext } from '@/providers/NotificationProvider';
 import api from '@/lib/api';
 
 interface Notification {
@@ -35,6 +36,9 @@ interface Notification {
 
 export default function NotificacaoPage() {
     const { toast } = useToast();
+    // Integração com o contexto global para atualizar o badge
+    const { refreshNotifications: refreshGlobalBadge, unreadCount: globalUnreadCount } = useNotificationContext();
+
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
@@ -87,6 +91,7 @@ export default function NotificacaoPage() {
         try {
             await api.patch(`/notifications/${id}/read`);
             await fetchNotifications();
+            refreshGlobalBadge(); // Atualiza badge HEADER
             toast({ description: "Notificação marcada como lida." });
         } catch (error) {
             toast({ title: "Erro", description: "Falha ao atualizar status.", variant: "destructive" });
@@ -100,6 +105,7 @@ export default function NotificacaoPage() {
         try {
             await api.patch(`/notifications/${id}/unread`);
             await fetchNotifications();
+            refreshGlobalBadge(); // Atualiza badge HEADER
             toast({ description: "Notificação marcada como não lida." });
         } catch (error) {
             toast({ title: "Erro", description: "Falha ao atualizar status.", variant: "destructive" });
@@ -113,6 +119,7 @@ export default function NotificacaoPage() {
         try {
             await api.delete(`/notifications/${id}`);
             await fetchNotifications();
+            refreshGlobalBadge(); // Atualiza badge HEADER
             setSelectedIds(prev => prev.filter(pid => pid !== id));
             toast({ description: "Notificação excluída." });
         } catch (error) {
@@ -127,13 +134,20 @@ export default function NotificacaoPage() {
 
         try {
             setLoading(true);
-            // Implement batch delete or sequential delete
-            await api.delete('/notifications/batch', { data: { ids: selectedIds } });
+            // Implement batch delete or sequential delete (POST para garantir body)
+            await api.post('/notifications/batch-delete', { ids: selectedIds });
             await fetchNotifications();
+            refreshGlobalBadge(); // Atualiza badge HEADER
             setSelectedIds([]);
             toast({ description: `${selectedIds.length} notificações excluídas.` });
-        } catch (error) {
-            toast({ title: "Erro", description: "Falha na exclusão em massa.", variant: "destructive" });
+        } catch (error: any) {
+            console.error('Bulk Delete Error:', error);
+            const msg = error.response?.data?.message || error.message;
+            toast({
+                title: "Erro na Exclusão",
+                description: Array.isArray(msg) ? msg.join(', ') : msg,
+                variant: "destructive"
+            });
         } finally {
             setLoading(false);
         }
@@ -144,6 +158,7 @@ export default function NotificacaoPage() {
             setLoading(true);
             await api.patch('/notifications/mark-all-read');
             await fetchNotifications();
+            refreshGlobalBadge(); // Atualiza badge HEADER
             toast({ description: "Todas as notificações marcadas como lidas." });
         } catch (error) {
             toast({ title: "Erro", description: "Falha ao atualizar.", variant: "destructive" });

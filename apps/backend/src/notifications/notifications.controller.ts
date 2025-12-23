@@ -121,16 +121,23 @@ export class NotificationsController {
   }
 
   /**
-   * Deleta múltiplas notificações
+   * Deleta múltiplas notificações (Via POST para garantir envio do body)
    */
-  @Delete('batch')
+  @Post('batch-delete')
   async deleteMany(@Body() body: { ids: string[] }, @Request() req) {
     try {
-      console.log('🗑️ [Batch Delete] IDs recebidos:', body);
+      // console.log('🗑️ [Batch Delete] IDs recebidos:', body);
 
       let idsToDelete = body.ids;
-      if (!Array.isArray(idsToDelete) && typeof idsToDelete === 'object') {
-        idsToDelete = Object.values(idsToDelete);
+
+      // Sanitização robusta para garantir array puro de strings
+      if (Array.isArray(idsToDelete)) {
+        idsToDelete = [...idsToDelete]; // Clone para remover propriedades estranhas de Proxy se houver
+      } else if (typeof idsToDelete === 'object' && idsToDelete !== null) {
+        // Converte objeto {0: 'a', 1: 'b'} para array
+        idsToDelete = Object.values(idsToDelete).filter(i => typeof i === 'string');
+      } else {
+        idsToDelete = [];
       }
 
       const count = await this.notificationService.deleteMany(idsToDelete, req.user);
