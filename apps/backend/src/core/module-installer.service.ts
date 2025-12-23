@@ -16,7 +16,7 @@ import { ModuleDatabaseExecutorService } from './services/module-database-execut
 @Injectable()
 export class ModuleInstallerService {
     private readonly logger = new Logger(ModuleInstallerService.name);
-    private readonly modulesPath = path.resolve(process.cwd(), '..', 'modules');
+    private readonly modulesPath = path.resolve(process.cwd(), '..', '..', 'packages', 'modules');
     private readonly uploadsPath = path.resolve(process.cwd(), 'uploads', 'modules');
 
     constructor(

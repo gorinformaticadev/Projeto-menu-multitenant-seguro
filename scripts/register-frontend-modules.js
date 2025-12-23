@@ -3,8 +3,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const MODULES_DIR = path.resolve(__dirname, '..', 'modules');
-const FRONTEND_MODULES_DIR = path.resolve(__dirname, '..', 'frontend', 'src', 'modules');
+const MODULES_DIR = path.resolve(__dirname, '..', 'packages', 'modules');
+const FRONTEND_MODULES_DIR = path.resolve(__dirname, '..', 'apps', 'frontend', 'src', 'modules');
 const REGISTRY_FILE = path.join(FRONTEND_MODULES_DIR, 'registry.ts');
 
 console.log('🔍 Escaneando módulos para registro de componentes...');
@@ -55,7 +55,7 @@ function scanModuleFrontend(moduleSlug, frontendPath) {
                     .replace(/\/index$/, '')
                     .replace(/^/, '/');
 
-                pages[route] = `./../../../modules/${moduleSlug}/frontend/pages/${itemName}`;
+                pages[route] = `@modules/${moduleSlug}/frontend/pages/${itemName}`;
             }
         }
     };

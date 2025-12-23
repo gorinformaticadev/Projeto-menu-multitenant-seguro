@@ -28,7 +28,7 @@
         "src/common/*"
       ],
       "@modules/*": [
-        "../modules/*"
+        "../../packages/modules/*"
       ],
       "@prisma/*": [
         "./node_modules/@prisma/*"
@@ -40,9 +40,9 @@
   },
   "include": [
     "src/**/*",
-    "../modules/**/backend/**/*",
-    "../modules/**/module.ts",
-    "../modules/**/permissions.ts"
+    "../../packages/modules/**/backend/**/*",
+    "../../packages/modules/**/module.ts",
+    "../../packages/modules/**/permissions.ts"
   ],
   "exclude": [
     "node_modules",
@@ -50,6 +50,6 @@
     "test",
     "**/*spec.ts",
     "**/*.js",
-    "../modules/**/frontend/**/*"
+    "../../packages/modules/**/frontend/**/*"
   ]
 }
