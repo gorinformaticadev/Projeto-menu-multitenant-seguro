@@ -10,12 +10,14 @@
 import dynamic from 'next/dynamic';
 
 // Imports dinâmicos para lazy loading
+// Imports dinâmicos para lazy loading
 export const modulePages: Record<string, Record<string, () => Promise<any>>> = {
-  // Módulo Sistema - usando componentes copiados para frontend/src/components/modules/
+  // Módulo Sistema - Importando direto da raiz modules/
   sistema: {
-    '/dashboard': () => import('../components/modules/sistema/DashboardPage'),
-    '/notificacao': () => import('../components/modules/sistema/NotificacaoPage'),
-    '/ajustes': () => import('../components/modules/sistema/AjustesPage'),
+    '/dashboard': () => import('../external_modules/sistema/frontend/pages/overview.tsx'),
+    '/modelNotification': () => import('../external_modules/sistema/frontend/pages/modelNotification.tsx'),
+    '/model-notification': () => import('../external_modules/sistema/frontend/pages/modelNotification.tsx'), // Fallback
+    '/ajustes': () => import('../external_modules/sistema/frontend/pages/settings.tsx'),
   }
 };
 
@@ -24,13 +26,13 @@ export async function resolveModuleComponent(moduleSlug: string, route: string) 
   console.log('🔍 [resolveModuleComponent] INÍCIO - Chamada recebida');
   console.log('🔍 [ModuleRegistry] Resolvendo componente:', { moduleSlug, route });
   console.log('📚 [ModuleRegistry] Módulos disponíveis:', Object.keys(modulePages));
-  
+
   const modulePagesMap = modulePages[moduleSlug];
   if (!modulePagesMap) {
     console.error('❌ [ModuleRegistry] Módulo não encontrado:', moduleSlug);
     throw new Error(`Módulo não encontrado: ${moduleSlug}`);
   }
-  
+
   console.log('📝 [ModuleRegistry] Rotas disponíveis:', Object.keys(modulePagesMap));
 
   const pageLoader = modulePagesMap[route];

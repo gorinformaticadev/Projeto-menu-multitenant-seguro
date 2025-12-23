@@ -1,0 +1,69 @@
+{
+  "name": "sistema",
+  "slug": "sistema",
+  "displayName": "Sistema",
+  "version": "1.0.0",
+  "description": "Módulo completo de sistema com funcionalidades integradas",
+  "author": "Equipe CORE",
+  "category": "system",
+  "enabled": true,
+"dependencies": [
+    {
+      "type": "core",
+      "name": "core",
+      "version": ">=1.0.0"
+    }
+  ],
+  "config": {
+    "defaultSettings": {
+      "showNotifications": true,
+      "enableWidgets": true,
+      "maxItems": 50,
+      "enablePublicPages": true
+    },
+    "permissions": [
+      "sistema.view",
+      "sistema.create",
+      "sistema.edit",
+      "sistema.delete",
+      "sistema.admin"
+    ],
+    "routes": [
+      {
+        "path": "/sistema",
+        "component": "SistemaDashboardPage",
+        "title": "Dashboard Sistema",
+        "protected": true,
+        "permissions": ["sistema.view"]
+      },
+      {
+        "path": "/sistema/notificacao",
+        "component": "SistemaNotificacaoPage",
+        "title": "Notificações",
+        "protected": true,
+        "permissions": ["sistema.view"]
+      },
+      {
+        "path": "/sistema/ajustes",
+        "component": "SistemaAjustesPage",
+        "title": "Ajustes",
+        "protected": true,
+        "permissions": ["sistema.view"]
+      }
+    ],
+    "menuItems": [
+      {
+        "id": "sistema-main",
+        "label": "Sistema",
+        "icon": "settings",
+        "path": "/sistema",
+        "order": 10,
+        "permissions": ["sistema.view"]
+      }
+    ],
+    "database": {
+      "tables": ["sistema_configs"],
+      "migrations": true
+    }
+  }
+}
