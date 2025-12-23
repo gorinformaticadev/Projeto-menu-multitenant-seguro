@@ -9,7 +9,7 @@ const nextConfig = {
   },
   async headers() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-    
+
     return [
       {
         source: '/(.*)',
@@ -44,6 +44,9 @@ const nextConfig = {
   },
   // Configure build output
   output: 'standalone', // For containerized deployments
+
+  // Transpile local module packages
+  transpilePackages: ['@modules/sistema'],
 }
 
 module.exports = nextConfig

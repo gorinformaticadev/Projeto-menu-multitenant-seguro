@@ -78,15 +78,20 @@ function getModuleColors(moduleSlug: string) {
       status: 'text-blue-700'
     }
   };
-  
+
   return colorSchemes[moduleSlug] || colorSchemes.default;
 }
 
 // Componente para carregar widgets dinamicamente
 function DynamicWidget({ widget }: { widget: ModuleDashboardWidget }) {
-  // console.log('🎭 [DynamicWidget] Renderizando widget:', widget.id, '- Component:', widget.component);
+  // Se o componente for uma função/classe (componente React), renderiza diretamente
+  if (typeof widget.component === 'function' || typeof widget.component === 'object') {
+    const Component = widget.component;
+    return <Component />;
+  }
 
-  // Usar widget genérico para todos os módulos
+  // Fallback para widget genérico se for string ou indefinido
+  // console.log('🎭 [DynamicWidget] Usando widget genérico para:', widget.title);
   return <GenericModuleWidget widget={widget} />;
 }
 
