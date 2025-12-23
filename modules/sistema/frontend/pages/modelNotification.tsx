@@ -1,14 +1,15 @@
 import React from 'react';
+import { Box, Typography } from '@mui/material';
 
 export default function SistemaNotificacaoPage() {
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" component="h1" gutterBottom>
         Notificações
-      </h1>
-      <p className="text-gray-700">
+      </Typography>
+      <Typography variant="body1">
         Seu conteúdo vai aqui
-      </p>
-    </div>
+      </Typography>
+    </Box>
   );
 }

@@ -1,25 +1,34 @@
 import React from 'react';
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Grid,
+} from '@mui/material';
 
 export const SistemaDashboard: React.FC = () => {
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" component="h1" gutterBottom>
         Dashboard - Módulo Sistema
-      </h1>
+      </Typography>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow p-4 border border-gray-200">
-          <div className="p-2">
-            <h2 className="text-xl font-semibold mb-2">
-              Widget do Sistema
-            </h2>
-            <p className="text-gray-700">
-              Informações do módulo funcionando perfeitamente.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Widget do Sistema
+              </Typography>
+              <Typography variant="body1">
+                Informações do módulo funcionando perfeitamente.
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+    </Box>
   );
 };
 
