@@ -4,15 +4,15 @@
  * Este arquivo é gerado pelo script register-frontend-modules.js
  * NÃO EDITE MANUALMENTE
  *
- * Atualizado em: 2025-12-23T16:01:28.745Z
+ * Atualizado em: 2025-12-23T16:44:38.627Z
  */
 
 // Imports dinâmicos para lazy loading
 export const modulePages = {
   'sistema': {
+    '/ajustes': () => import('@modules/sistema/frontend/pages/ajustes.tsx'),
+    '/dashboard': () => import('@modules/sistema/frontend/pages/dashboard.tsx'),
     '/modelNotification': () => import('@modules/sistema/frontend/pages/modelNotification.tsx'),
-    '/overview': () => import('@modules/sistema/frontend/pages/overview.tsx'),
-    '/settings': () => import('@modules/sistema/frontend/pages/settings.tsx'),
   },
 };
 
