@@ -10,6 +10,7 @@ import {
   NotificationFilters,
   NotificationResponse
 } from './notification.entity';
+import { BroadcastNotificationDto } from './notification.dto';
 
 @Injectable()
 export class NotificationService {
@@ -222,6 +223,69 @@ export class NotificationService {
   }
 
   /**
+   * Envia notificação em massa (Broadcast)
+   */
+  async broadcast(dto: BroadcastNotificationDto, authorInfo: any): Promise<{ count: number }> {
+    const where: any = {};
+
+    // 1. Filtro de Target (Role)
+    if (dto.target === 'admins_only') {
+      where.role = { in: ['ADMIN', 'SUPER_ADMIN'] };
+    } else if (dto.target === 'super_admins') {
+      where.role = 'SUPER_ADMIN';
+    }
+
+    // 2. Filtro de Escopo (Tenants)
+    if (dto.scope === 'tenants' && dto.tenantIds && dto.tenantIds.length > 0) {
+      where.tenantId = { in: dto.tenantIds };
+    }
+
+    // 3. Buscar Usuários Alvo
+    // @ts-ignore - Acessando user via prisma client genérico
+    const users = await this.prisma.user.findMany({
+      where,
+      select: { id: true, tenantId: true }
+    });
+
+    if (!users || users.length === 0) {
+      return { count: 0 };
+    }
+
+    // 4. Mapear Severidade
+    const severityMap = {
+      'error': 'critical',
+      'warning': 'warning',
+      'success': 'info', // ou success se o banco suportar
+      'info': 'info'
+    };
+    const dbSeverity = severityMap[dto.type] || 'info';
+
+    // 5. Preparar dados para Bulk Insert
+    const notificationsData = users.map(u => ({
+      title: dto.title,
+      message: dto.description,
+      severity: dbSeverity,
+      userId: u.id,
+      tenantId: u.tenantId,
+      source: 'broadcast',
+      audience: 'user',
+      read: false,
+      data: JSON.stringify({ broadcast: true, target: dto.target }),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }));
+
+    // 6. Inserir (createMany)
+    const result = await this.prisma.notification.createMany({
+      data: notificationsData
+    });
+
+    this.logger.log(`Broadcast enviado para ${result.count} usuários. Scope: ${dto.scope}`);
+
+    return { count: result.count };
+  }
+
+  /**
    * Busca uma notificação por ID
    */
   async findById(id: string, user: any): Promise<Notification | null> {
@@ -259,7 +323,12 @@ export class NotificationService {
         { userId: user.id }, // Suas próprias notificações
       ];
     } else if (user.role === 'SUPER_ADMIN') {
-      // Super Admin: todas as notificações (sem filtro adicional)
+      // Super Admin: Vê apenas suas próprias notificações ou notificações globais (sem usuário)
+      // Evita listar notificações destinadas a outros usuários individualmente
+      where.OR = [
+        { userId: user.id },
+        { userId: null }
+      ];
     }
 
     // Aplicar filtros adicionais

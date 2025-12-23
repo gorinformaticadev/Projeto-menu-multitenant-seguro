@@ -17,7 +17,7 @@ import {
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { NotificationService } from './notification.service';
 import { NotificationGateway } from './notification.gateway';
-import { CreateNotificationDto, NotificationFiltersDto } from './notification.dto';
+import { CreateNotificationDto, NotificationFiltersDto, BroadcastNotificationDto } from './notification.dto';
 
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)
@@ -38,6 +38,14 @@ export class NotificationsController {
     await this.notificationGateway.emitNewNotification(notification);
 
     return { success: true, notification };
+  }
+
+  /**
+   * Envia notificação em massa (Broadcast)
+   */
+  @Post('broadcast')
+  async broadcast(@Body() body: BroadcastNotificationDto, @Request() req) {
+    return this.notificationService.broadcast(body, req.user);
   }
 
   /**

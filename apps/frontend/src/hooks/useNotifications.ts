@@ -78,7 +78,15 @@ export function useNotifications(): UseNotificationsReturn {
 
       // console.log('🔔 Nova notificação recebida:', notification);
 
-      setNotifications(prev => [notification, ...prev.slice(0, 9)]); // Mantém apenas 10
+      setNotifications(prev => {
+        // Evitar duplicatas de socket/render
+        if (prev.some(n => n.id === notification.id)) {
+          return prev;
+        }
+        return [notification, ...prev.slice(0, 9)];
+      });
+
+      // Só incrementa se for nova de verdade
       setUnreadCount(prev => prev + 1);
 
       // Reproduz som apenas para notificações novas
