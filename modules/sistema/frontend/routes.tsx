@@ -21,7 +21,7 @@ export const ModuleRoutes = [
     { path: `${MODULE_ROOT}/dashboard`, component: SistemaDashboardPage },
 
     // Rota: /modules/sistema/notificacao -> model-notification
-    { path: `${MODULE_ROOT}/model-notification`, component: SistemaModelNotificationPage },
+    { path: `${MODULE_ROOT}/modelNotification`, component: SistemaModelNotificationPage },
 
     // Rota: /modules/sistema/ajustes
     { path: `${MODULE_ROOT}/ajustes`, component: SistemaAjustesPage },

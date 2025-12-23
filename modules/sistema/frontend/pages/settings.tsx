@@ -1,15 +1,14 @@
 import React from 'react';
-import { Box, Typography } from '@mui/material';
 
 export default function SistemaAjustesPage() {
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" component="h1" gutterBottom>
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-4">
         Ajustes
-      </Typography>
-      <Typography variant="body1">
+      </h1>
+      <p className="text-gray-700">
         Seu conteúdo vai aqui
-      </Typography>
-    </Box>
+      </p>
+    </div>
   );
 }

@@ -16,7 +16,7 @@
     },
     {
       "label": "Notificações (Modelo)",
-      "route": "/modules/sistema/model-notification",
+      "route": "/modules/sistema/modelNotification",
       "icon": "Bell",
       "order": 2
     },
