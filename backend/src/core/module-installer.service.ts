@@ -16,7 +16,7 @@ import { ModuleDatabaseExecutorService } from './services/module-database-execut
 @Injectable()
 export class ModuleInstallerService {
     private readonly logger = new Logger(ModuleInstallerService.name);
-    private readonly modulesPath = path.resolve(process.cwd(), 'modules');
+    private readonly modulesPath = path.resolve(process.cwd(), '..', 'modules');
     private readonly uploadsPath = path.resolve(process.cwd(), 'uploads', 'modules');
 
     constructor(
@@ -111,7 +111,7 @@ export class ModuleInstallerService {
             const existingModule = await this.prisma.module.findUnique({
                 where: { slug: validatedModule.name }
             });
-            
+
             if (existingModule) {
                 this.logger.log(`⚠️ Módulo ${validatedModule.name} já existe - será atualizado`);
                 // Remover versão antiga dos arquivos
@@ -120,7 +120,7 @@ export class ModuleInstallerService {
                     fs.rmSync(oldModulePath, { recursive: true, force: true });
                     this.logger.log(`✅ Versão antiga removida: ${oldModulePath}`);
                 }
-                
+
                 // Remover registros antigos do banco
                 await this.prisma.module.delete({
                     where: { slug: validatedModule.name }
@@ -229,15 +229,15 @@ export class ModuleInstallerService {
 
             // Remover basePath se houver (normaliza ambos os formatos)
             let relativePath = entry.entryName;
-            
+
             if (structure.basePath) {
                 const basePathWithSlash = structure.basePath + '/';
-                
+
                 // Ignorar arquivos fora da pasta raiz do módulo
                 if (!relativePath.startsWith(basePathWithSlash)) {
                     continue;
                 }
-                
+
                 // Remover basePath para obter caminho relativo limpo
                 relativePath = relativePath.substring(basePathWithSlash.length);
             }
@@ -256,7 +256,7 @@ export class ModuleInstallerService {
             // Validar que targetPath está dentro de destinationPath (proteção adicional)
             const normalizedTarget = path.normalize(targetPath);
             const normalizedDestination = path.normalize(destinationPath);
-            
+
             if (!normalizedTarget.startsWith(normalizedDestination)) {
                 throw new BadRequestException(
                     `Tentativa de Zip Slip detectada: ${entry.entryName}`
@@ -346,27 +346,27 @@ export class ModuleInstallerService {
         // Validar dependências se declaradas no module.json
         const modulePath = path.join(this.modulesPath, slug);
         const moduleJsonPath = path.join(modulePath, 'module.json');
-        
+
         if (fs.existsSync(moduleJsonPath)) {
-            const moduleJson = JSON.parse(fs.readFileSync(moduleJsonPath, 'utf-8'));
-            
+            const moduleJson = this.readModuleJsonSafe(moduleJsonPath);
+
             if (moduleJson.dependencies && moduleJson.dependencies.length > 0) {
                 const inactiveDeps = [];
-                
+
                 for (const depSlug of moduleJson.dependencies) {
                     const depModule = await this.prisma.module.findUnique({
                         where: { slug: depSlug }
                     });
-                    
+
                     if (!depModule) {
                         throw new Error(`Dependência não encontrada: ${depSlug}`);
                     }
-                    
+
                     if (depModule.status !== ModuleStatus.active) {
                         inactiveDeps.push(depSlug);
                     }
                 }
-                
+
                 if (inactiveDeps.length > 0) {
                     throw new Error(`Módulos dependentes não estão ativos: ${inactiveDeps.join(', ')}`);
                 }
@@ -430,7 +430,7 @@ export class ModuleInstallerService {
             const otherModuleJsonPath = path.join(otherModulePath, 'module.json');
 
             if (fs.existsSync(otherModuleJsonPath)) {
-                const otherModuleJson = JSON.parse(fs.readFileSync(otherModuleJsonPath, 'utf-8'));
+                const otherModuleJson = this.readModuleJsonSafe(otherModuleJsonPath);
 
                 if (otherModuleJson.dependencies && otherModuleJson.dependencies.includes(slug)) {
                     throw new Error(
@@ -736,7 +736,7 @@ export class ModuleInstallerService {
 
         // 4️⃣ VALIDAR TENANTS ATIVOS
         const activeTenants = module.tenantModules.filter(tm => tm.enabled);
-        
+
         if (activeTenants.length > 0) {
             throw new BadRequestException(
                 `Módulo em uso por ${activeTenants.length} tenant(s). Desabilite o módulo em todos os tenants primeiro.`
@@ -761,7 +761,7 @@ export class ModuleInstallerService {
 
         // 7️⃣ REMOVER ARQUIVOS DO MÓDULO
         const modulePath = path.join(this.modulesPath, slug);
-        
+
         if (fs.existsSync(modulePath)) {
             this.logger.log(`Removendo arquivos do módulo: ${modulePath}`);
             fs.rmSync(modulePath, { recursive: true, force: true });
@@ -789,5 +789,75 @@ export class ModuleInstallerService {
             },
             message: 'Módulo desinstalado com sucesso'
         };
+    }
+    /**
+     * Recarrega configuração do módulo a partir do disco (module.json)
+     * Útil para desenvolvimento ou correções manuais
+     */
+    async reloadModuleConfig(slug: string) {
+        this.logger.log(`🔄 Recarregando configuração do módulo: ${slug}`);
+
+        const modulePath = path.join(this.modulesPath, slug);
+        const moduleJsonPath = path.join(modulePath, 'module.json');
+
+        if (!fs.existsSync(moduleJsonPath)) {
+            throw new BadRequestException(`Arquivo module.json não encontrado em ${modulePath}`);
+        }
+
+        try {
+            const moduleJson = this.readModuleJsonSafe(moduleJsonPath);
+            const validatedModule = ModuleJsonValidator.validate(moduleJson);
+
+            // Validar que o slug corresponde
+            if (validatedModule.name !== slug) {
+                throw new BadRequestException(`Nome no module.json (${validatedModule.name}) difere do slug solicitado (${slug})`);
+            }
+
+            // 1. Atualizar dados do módulo
+            const module = await this.prisma.module.update({
+                where: { slug },
+                data: {
+                    name: validatedModule.displayName,
+                    version: validatedModule.version,
+                    description: validatedModule.description || ''
+                }
+            });
+
+            // 2. Atualizar Menus (Strategy: Delete All + Recreate)
+            // Primeiro remove menus existentes
+            await this.prisma.moduleMenu.deleteMany({
+                where: { moduleId: module.id }
+            });
+
+            // Recria menus se houver
+            if (validatedModule.menus && validatedModule.menus.length > 0) {
+                await this.registerModuleMenus(module.id, validatedModule.menus);
+                this.logger.log(`✅ ${validatedModule.menus.length} menus recriados`);
+            } else {
+                this.logger.log('ℹ️ Nenhum menu para registrar');
+            }
+
+            this.logger.log(`✅ Configuração do módulo ${slug} recarregada com sucesso`);
+
+            return {
+                success: true,
+                message: 'Configuração e menus recarregados com sucesso',
+                module: {
+                    slug: module.slug,
+                    version: module.version,
+                    menusCount: validatedModule.menus?.length || 0
+                }
+            };
+
+        } catch (error) {
+            this.logger.error(`❌ Erro ao recarregar configuração: ${error.message}`);
+            throw new BadRequestException(`Falha ao recarregar configuração: ${error.message}`);
+        }
+    }
+    private readModuleJsonSafe(filePath: string): any {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        // Remove BOM and trim
+        const cleanContent = content.replace(/^\uFEFF/, '').trim();
+        return JSON.parse(cleanContent);
     }
 }

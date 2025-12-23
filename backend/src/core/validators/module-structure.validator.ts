@@ -51,10 +51,10 @@ export class ModuleStructureValidator {
     static analyzeZipStructure(zipBuffer: Buffer): ModuleStructureResult {
         this.validateZipSignature(zipBuffer);
         this.validateZipStructure(zipBuffer);
-        
+
         const zip = new AdmZip(zipBuffer);
         const entries = zip.getEntries();
-        
+
         if (entries.length === 0) {
             throw new BadRequestException('Arquivo ZIP está vazio');
         }
@@ -183,12 +183,14 @@ export class ModuleStructureValidator {
      */
     private static analyzeRootFormat(files: string[], zip: AdmZip): ModuleStructureResult {
         const moduleJsonEntry = zip.getEntry('module.json');
-        
+
         if (!moduleJsonEntry) {
             throw new BadRequestException('Erro ao ler module.json do ZIP');
         }
 
-        const moduleJsonContent = moduleJsonEntry.getData().toString('utf8');
+        let moduleJsonContent = moduleJsonEntry.getData().toString('utf8');
+        // Remove BOM and trim
+        moduleJsonContent = moduleJsonContent.replace(/^\uFEFF/, '').trim();
 
         return {
             basePath: '',
@@ -210,7 +212,9 @@ export class ModuleStructureValidator {
             throw new BadRequestException(`Erro ao ler ${moduleJsonPath} do ZIP`);
         }
 
-        const moduleJsonContent = moduleJsonEntry.getData().toString('utf8');
+        let moduleJsonContent = moduleJsonEntry.getData().toString('utf8');
+        // Remove BOM and trim
+        moduleJsonContent = moduleJsonContent.replace(/^\uFEFF/, '').trim();
 
         return {
             basePath: rootFolder,
@@ -229,7 +233,7 @@ export class ModuleStructureValidator {
 
         for (const file of files) {
             const parts = file.split('/');
-            
+
             // Se tem pelo menos 2 partes (pasta/arquivo), é pasta raiz
             if (parts.length >= 2) {
                 folders.add(parts[0]);
@@ -265,7 +269,7 @@ export class ModuleStructureValidator {
         // Prevenir nomes de arquivo perigosos
         const basename = path.basename(normalized);
         const dangerousNames = ['.env', '.git', 'node_modules', 'package-lock.json'];
-        
+
         if (dangerousNames.includes(basename)) {
             throw new BadRequestException(
                 `Arquivo não permitido no módulo: ${basename}`

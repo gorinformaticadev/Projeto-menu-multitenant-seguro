@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
-import { Upload, Package, Trash2, Info, AlertTriangle, CheckCircle, Settings, XCircle, Clock, Power, PowerOff, Database } from "lucide-react";
+import { Upload, Package, Trash2, Info, AlertTriangle, CheckCircle, Settings, XCircle, Clock, Power, PowerOff, Database, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -44,6 +44,7 @@ interface ModuleMigrationStatus {
 
 // **INTERFACE ATUALIZADA** - Agora importada de module-utils
 // interface InstalledModule já está definida em @/lib/module-utils
+
 export function ModuleManagement() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -56,6 +57,7 @@ export function ModuleManagement() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState("upload");
   const [updatingDatabase, setUpdatingDatabase] = useState<string | null>(null);
+  const [reloadingConfig, setReloadingConfig] = useState<string | null>(null);
 
   useEffect(() => {
     loadInstalledModules();
@@ -338,6 +340,32 @@ export function ModuleManagement() {
     }
   };
 
+  const reloadModuleConfig = async (moduleName: string) => {
+    setReloadingConfig(moduleName);
+
+    try {
+      // Endpoint: /configuracoes/sistema/modulos/:slug/reload-config
+      const response = await api.post(`/configuracoes/sistema/modulos/${moduleName}/reload-config`);
+
+      toast({
+        title: "Configuração Recarregada!",
+        description: `Menus e configurações do módulo ${moduleName} foram atualizados.`,
+      });
+
+      // Recarregar lista de módulos
+      await loadInstalledModules();
+
+    } catch (error: any) {
+      toast({
+        title: "Erro ao recarregar configuração",
+        description: error.response?.data?.message || "Ocorreu um erro ao recarregar a configuração",
+        variant: "destructive",
+      });
+    } finally {
+      setReloadingConfig(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -559,6 +587,29 @@ export function ModuleManagement() {
                           {/* Botões de Ação - Controlados por Status */}
                           <TooltipProvider>
                             <div className="flex flex-wrap items-center gap-2">
+
+
+                              {/* Botão Recarregar Config (Novo) */}
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => reloadModuleConfig(module.slug)}
+                                    disabled={reloadingConfig === module.slug}
+                                  >
+                                    {reloadingConfig === module.slug ? (
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                                    ) : (
+                                      <RefreshCw className="h-4 w-4 text-blue-600" />
+                                    )}
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Recarregar configurações e menus do disco (module.json)
+                                </TooltipContent>
+                              </Tooltip>
+
                               {/* Botão Detalhes (sempre ativo) */}
                               <Tooltip>
                                 <TooltipTrigger asChild>
