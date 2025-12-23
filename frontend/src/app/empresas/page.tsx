@@ -30,6 +30,7 @@ interface Tenant {
   logoUrl?: string | null;
   ativo: boolean;
   createdAt: string;
+  isMasterTenant?: boolean;
   _count?: {
     users: number;
   };
@@ -114,9 +115,34 @@ export default function EmpresasPage() {
       }
 
       const response = await api.get("/tenants");
-      console.log('Tenants carregados:', response.data);
+      const data = response.data;
+
+      // Ordenar: Master primeiro, depois alfabético
+      const sortedTenants = data.sort((a: Tenant, b: Tenant) => {
+        // Critério 1: Flag isMasterTenant
+        if (a.isMasterTenant && !b.isMasterTenant) return -1;
+        if (!a.isMasterTenant && b.isMasterTenant) return 1;
+
+        // Critério 2: Email padrão (fallback)
+        const isAMasterEmail = a.email === 'empresa1@example.com';
+        const isBMasterEmail = b.email === 'empresa1@example.com';
+        if (isAMasterEmail && !isBMasterEmail) return -1;
+        if (!isAMasterEmail && isBMasterEmail) return 1;
+
+        // Critério 3: Nome "Master" (fallback visual)
+        const isAMasterName = a.nomeFantasia.toLowerCase().includes('master');
+        const isBMasterName = b.nomeFantasia.toLowerCase().includes('master');
+
+        if (isAMasterName && !isBMasterName) return -1;
+        if (!isAMasterName && isBMasterName) return 1;
+
+        // Ordenação alfabética padrão
+        return a.nomeFantasia.localeCompare(b.nomeFantasia);
+      });
+
+      console.log('Tenants carregados:', sortedTenants);
       console.log('API_URL:', API_URL);
-      setTenants(response.data);
+      setTenants(sortedTenants);
 
       // Salvar no cache
       localStorage.setItem(cacheKey, JSON.stringify({
@@ -755,7 +781,7 @@ export default function EmpresasPage() {
                           }`}>
                           {tenant.ativo ? 'Ativa' : 'Inativa'}
                         </span>
-                        {tenant.email === 'empresa1@example.com' && (
+                        {(tenant.isMasterTenant || tenant.email === 'empresa1@example.com') && (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
                             Padrão
                           </span>
