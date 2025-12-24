@@ -46,7 +46,7 @@ const nextConfig = {
   output: 'standalone', // For containerized deployments
 
   // Transpile local module packages
-  transpilePackages: ['@modules/sistema'],
+  // transpilePackages: ['@modules/sistema'],
 }
 
 module.exports = nextConfig

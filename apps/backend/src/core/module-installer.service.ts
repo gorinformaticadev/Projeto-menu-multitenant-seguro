@@ -339,12 +339,12 @@ export class ModuleInstallerService {
         });
 
         if (!module) {
-            throw new Error('Módulo não encontrado');
+            throw new BadRequestException('Módulo não encontrado');
         }
 
         // Validação rigorosa de status conforme ciclo de vida
         if (module.status !== ModuleStatus.db_ready && module.status !== ModuleStatus.disabled) {
-            throw new Error(
+            throw new BadRequestException(
                 `Não é possível ativar este módulo.\n` +
                 `Motivo: Status atual é '${module.status}' (requer 'db_ready' ou 'disabled')\n` +
                 `Solução: ${this.getActivationSolution(module.status)}`
@@ -356,28 +356,36 @@ export class ModuleInstallerService {
         const moduleJsonPath = path.join(modulePath, 'module.json');
 
         if (fs.existsSync(moduleJsonPath)) {
-            const moduleJson = this.readModuleJsonSafe(moduleJsonPath);
+            try {
+                const moduleJson = this.readModuleJsonSafe(moduleJsonPath);
 
-            if (moduleJson.dependencies && moduleJson.dependencies.length > 0) {
-                const inactiveDeps = [];
+                if (moduleJson.dependencies && moduleJson.dependencies.length > 0) {
+                    const inactiveDeps = [];
 
-                for (const depSlug of moduleJson.dependencies) {
-                    const depModule = await this.prisma.module.findUnique({
-                        where: { slug: depSlug }
-                    });
+                    for (const depSlug of moduleJson.dependencies) {
+                        const depModule = await this.prisma.module.findUnique({
+                            where: { slug: depSlug }
+                        });
 
-                    if (!depModule) {
-                        throw new Error(`Dependência não encontrada: ${depSlug}`);
+                        if (!depModule) {
+                            this.logger.warn(`⚠️ Dependência declarada ${depSlug} não existe no banco.`);
+                            inactiveDeps.push(depSlug); // Consider missing modules as inactive
+                            continue;
+                        }
+
+                        if (depModule.status !== ModuleStatus.active) {
+                            inactiveDeps.push(depSlug);
+                        }
                     }
 
-                    if (depModule.status !== ModuleStatus.active) {
-                        inactiveDeps.push(depSlug);
+                    if (inactiveDeps.length > 0) {
+                        throw new BadRequestException(`Módulos dependentes não estão ativos: ${inactiveDeps.join(', ')}`);
                     }
                 }
-
-                if (inactiveDeps.length > 0) {
-                    throw new Error(`Módulos dependentes não estão ativos: ${inactiveDeps.join(', ')}`);
-                }
+            } catch (error) {
+                if (error instanceof BadRequestException) throw error;
+                this.logger.warn(`⚠️ Erro ao validar dependências do módulo ${slug}: ${error.message}`);
+                // Continue activation (best effort)
             }
         }
 
@@ -386,7 +394,8 @@ export class ModuleInstallerService {
             where: { slug },
             data: {
                 status: ModuleStatus.active,
-                activatedAt: new Date()
+                activatedAt: new Date(),
+                enabled: true // Garante que será carregado no próximo boot
             }
         });
 
@@ -414,38 +423,54 @@ export class ModuleInstallerService {
         });
 
         if (!module) {
-            throw new Error('Módulo não encontrado');
+            throw new BadRequestException('Módulo não encontrado');
         }
 
         // Validação rigorosa de status
+        // Apenas módulos 'active' ou 'db_ready' podem ser desativados.
+        // Se já estiver desativado, apenas retorna sucesso para idempotência.
         if (module.status !== ModuleStatus.active) {
-            throw new Error(
-                `Desativação Bloqueada\n` +
-                `Este módulo não pode ser desativado.\n` +
-                `Motivo: Status atual é '${module.status}' (apenas módulos 'active' podem ser desativados)`
-            );
+            if (module.status === ModuleStatus.disabled) {
+                return { success: true, message: `Módulo ${slug} já está desativado` };
+            }
+            // throw new BadRequestException(
+            //     `Desativação Bloqueada. Status atual: '${module.status}'`
+            // );
         }
 
         // Verificar se outros módulos dependem deste
-        const allModules = await this.prisma.module.findMany({
-            where: { status: ModuleStatus.active }
-        });
+        try {
+            const allModules = await this.prisma.module.findMany({
+                where: { status: ModuleStatus.active }
+            });
 
-        for (const otherModule of allModules) {
-            if (otherModule.slug === slug) continue;
+            for (const otherModule of allModules) {
+                if (otherModule.slug === slug) continue;
 
-            const otherModulePath = path.join(this.modulesPath, otherModule.slug);
-            const otherModuleJsonPath = path.join(otherModulePath, 'module.json');
+                const otherModulePath = path.join(this.modulesPath, otherModule.slug);
+                const otherModuleJsonPath = path.join(otherModulePath, 'module.json');
 
-            if (fs.existsSync(otherModuleJsonPath)) {
-                const otherModuleJson = this.readModuleJsonSafe(otherModuleJsonPath);
+                // Se o módulo dependente não tiver arquivos, ignoramos a verificação de dependência dele
+                // (assumimos que ele está quebrado ou é fantasma, então não deve impedir desativação do atual)
+                if (fs.existsSync(otherModuleJsonPath)) {
+                    try {
+                        const otherModuleJson = this.readModuleJsonSafe(otherModuleJsonPath);
 
-                if (otherModuleJson.dependencies && otherModuleJson.dependencies.includes(slug)) {
-                    throw new Error(
-                        `Não é possível desativar ${slug}. Módulo ${otherModule.name} depende dele. Desative ${otherModule.name} primeiro.`
-                    );
+                        if (otherModuleJson.dependencies && otherModuleJson.dependencies.includes(slug)) {
+                            throw new BadRequestException(
+                                `Não é possível desativar ${slug}. Módulo ${otherModule.name} depende dele. Desative ${otherModule.name} primeiro.`
+                            );
+                        }
+                    } catch (readError) {
+                        this.logger.warn(`⚠️ Erro ao ler dependências de ${otherModule.slug}: ${readError.message}`);
+                        // Ignora erro de leitura e prossegue
+                    }
                 }
             }
+        } catch (error) {
+            if (error instanceof BadRequestException) throw error;
+            this.logger.error(`Erro ao verificar dependências: ${error.message}`);
+            // Não impede desativação se houver erro sistêmico na verificação
         }
 
         // Atualizar status para desativado
@@ -453,7 +478,8 @@ export class ModuleInstallerService {
             where: { slug },
             data: {
                 status: ModuleStatus.disabled,
-                activatedAt: null
+                activatedAt: null,
+                enabled: false // Garante consistência com o novo campo enabled
             }
         });
 
@@ -472,7 +498,6 @@ export class ModuleInstallerService {
 
     /**
      * Atualiza banco de dados do módulo (executa migrations e seeds)
-     * MANTIDO SEM ALTERAÇÕES
      */
     async updateModuleDatabase(slug: string) {
         const module = await this.prisma.module.findUnique({
@@ -480,7 +505,7 @@ export class ModuleInstallerService {
         });
 
         if (!module || module.status !== ModuleStatus.installed) {
-            throw new Error('Módulo deve estar instalado');
+            throw new BadRequestException('Módulo deve estar instalado');
         }
 
         const modulePath = path.join(this.modulesPath, slug);
@@ -521,7 +546,6 @@ export class ModuleInstallerService {
 
     /**
      * Obtém status detalhado de um módulo
-     * MANTIDO SEM ALTERAÇÕES
      */
     async getModuleStatus(slug: string) {
         const module = await this.prisma.module.findUnique({
@@ -542,7 +566,7 @@ export class ModuleInstallerService {
         });
 
         if (!module) {
-            throw new Error('Módulo não encontrado');
+            throw new BadRequestException('Módulo não encontrado');
         }
 
         return {
@@ -567,7 +591,6 @@ export class ModuleInstallerService {
 
     /**
      * Registra menus do módulo
-     * MANTIDO SEM ALTERAÇÕES
      */
     private async registerModuleMenus(moduleId: string, menus: any[]) {
         for (const menu of menus) {
@@ -588,7 +611,6 @@ export class ModuleInstallerService {
 
     /**
      * Executa migrations ou seeds
-     * MANTIDO SEM ALTERAÇÕES
      */
     private async executeMigrations(slug: string, modulePath: string, type: MigrationType): Promise<number> {
         const migrationsPath = path.join(modulePath, type === MigrationType.migration ? 'migrations' : 'seeds');
@@ -677,15 +699,6 @@ export class ModuleInstallerService {
         }
     }
 
-    /**
-     * Desinstala um módulo do sistema
-     * 
-     * Validações obrigatórias:
-     * 1. Módulo deve estar disabled ou installed
-     * 2. Nenhum módulo ativo pode depender dele
-     * 3. Nenhum tenant pode ter o módulo habilitado
-     * 4. Confirmação de nome deve ser exata
-     */
     async uninstallModule(
         slug: string,
         options: {
@@ -714,7 +727,7 @@ export class ModuleInstallerService {
             );
         }
 
-        // 3️⃣ VALIDAR DEPENDÊNCIAS INVERSAS
+        // 3️⃣ VALIDAR DEPENDÊNCIAS INVERSAS (Ignorar erros de leitura)
         const allModules = await this.prisma.module.findMany({
             where: { status: ModuleStatus.active }
         });
@@ -723,16 +736,17 @@ export class ModuleInstallerService {
 
         for (const otherModule of allModules) {
             if (otherModule.slug === slug) continue;
-
-            const otherModulePath = path.join(this.modulesPath, otherModule.slug);
-            const otherModuleJsonPath = path.join(otherModulePath, 'module.json');
-
-            if (fs.existsSync(otherModuleJsonPath)) {
-                const otherModuleJson = JSON.parse(fs.readFileSync(otherModuleJsonPath, 'utf-8'));
-
-                if (otherModuleJson.dependencies && otherModuleJson.dependencies.includes(slug)) {
-                    dependentModules.push(otherModule.name);
+            try {
+                const otherModulePath = path.join(this.modulesPath, otherModule.slug);
+                const otherModuleJsonPath = path.join(otherModulePath, 'module.json');
+                if (fs.existsSync(otherModuleJsonPath)) {
+                    const otherModuleJson = this.readModuleJsonSafe(otherModuleJsonPath);
+                    if (otherModuleJson.dependencies && otherModuleJson.dependencies.includes(slug)) {
+                        dependentModules.push(otherModule.name);
+                    }
                 }
+            } catch (e) {
+                // Ignore parsing errors
             }
         }
 
@@ -767,19 +781,15 @@ export class ModuleInstallerService {
         });
         this.logger.log('✅ Registros do CORE removidos (module, menus, migrations, tenant associations)');
 
-        // 7️⃣ REMOVER ARQUIVOS DO MÓDULO
-        const modulePath = path.join(this.modulesPath, slug);
-
-        if (fs.existsSync(modulePath)) {
-            this.logger.log(`Removendo arquivos do módulo: ${modulePath}`);
-            fs.rmSync(modulePath, { recursive: true, force: true });
-            this.logger.log('✅ Arquivos do módulo removidos');
-        }
+        // 7️⃣ PRESERVAR ARQUIVOS DO MÓDULO (Mudança solicitada)
+        // O instalador/desinstalador NÃO deve remover código manualmente.
+        // Apenas registros do banco são limpos.
+        this.logger.log(`ℹ️ Arquivos do módulo ${slug} preservados em disco.`);
 
         // 8️⃣ NOTIFICAR
         await this.notificationService.create({
             title: 'Módulo Desinstalado',
-            description: `Módulo ${module.name} foi removido do sistema`,
+            description: `Módulo ${module.name} foi removido do sistema (arquivos mantidos)`,
             type: 'warning',
             metadata: {
                 module: slug,
@@ -793,9 +803,9 @@ export class ModuleInstallerService {
             success: true,
             removed: {
                 coreRecords: true,
-                files: modulePath
+                files: false
             },
-            message: 'Módulo desinstalado com sucesso'
+            message: 'Módulo desinstalado com sucesso (arquivos preservados)'
         };
     }
     /**

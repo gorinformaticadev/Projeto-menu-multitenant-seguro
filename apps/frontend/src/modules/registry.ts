@@ -4,26 +4,24 @@
  * Este arquivo é gerado pelo script register-frontend-modules.js
  * NÃO EDITE MANUALMENTE
  *
- * Atualizado em: 2025-12-23T16:44:38.627Z
+ * Atualizado em: 2025-12-24
  */
 
 // Imports dinâmicos para lazy loading
-export const modulePages = {
-  'sistema': {
-    '/ajustes': () => import('@modules/sistema/frontend/pages/ajustes.tsx'),
-    '/dashboard': () => import('@modules/sistema/frontend/pages/dashboard.tsx'),
-    '/modelNotification': () => import('@modules/sistema/frontend/pages/modelNotification.tsx'),
-  },
+export const modulePages: Record<string, Record<string, () => Promise<any>>> = {
+  // 'sistema': {
+  //   '/ajustes': () => import('@modules/sistema/frontend/pages/ajustes.tsx'),
+  // },
 };
 
 // Função helper para resolver componente
 export async function resolveModuleComponent(moduleSlug: string, route: string) {
-  const modulePages = modulePages[moduleSlug];
-  if (!modulePages) {
-    throw new Error(`Módulo não encontrado: ${moduleSlug}`);
+  const moduleRoutes = modulePages[moduleSlug];
+  if (!moduleRoutes) {
+    throw new Error(`Módulo não encontrado no registro frontend: ${moduleSlug}`);
   }
 
-  const pageLoader = modulePages[route];
+  const pageLoader = moduleRoutes[route];
   if (!pageLoader) {
     throw new Error(`Página não encontrada: ${moduleSlug}${route}`);
   }
