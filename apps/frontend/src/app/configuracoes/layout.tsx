@@ -5,15 +5,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { 
-  Shield, 
-  Building2, 
-  Settings, 
+import {
+  Shield,
+  Building2,
+  Settings,
   Download,
   Package,
   ChevronRight,
   Menu,
-  X
+  X,
+  Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -69,6 +70,13 @@ export default function ConfiguracoesLayout({
       description: "Informações da empresa",
       show: user?.role === "ADMIN",
     },
+    {
+      name: "Agendamento de Tarefas",
+      href: "/configuracoes/sistema/cron",
+      icon: Clock,
+      description: "Gerenciar jobs e cronogramas",
+      show: user?.role === "SUPER_ADMIN",
+    },
   ];
 
   const visibleItems = menuItems.filter(item => item.show);
@@ -77,7 +85,7 @@ export default function ConfiguracoesLayout({
     <div className="flex h-screen bg-background">
       {/* Sidebar Mobile Overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
@@ -111,7 +119,7 @@ export default function ConfiguracoesLayout({
           <div className="flex-1 p-6">
             <nav className="space-y-2">
               {visibleItems.map((item) => {
-                const isActive = pathname === item.href || 
+                const isActive = pathname === item.href ||
                   (item.href !== "/configuracoes" && pathname.startsWith(item.href));
                 const Icon = item.icon;
 
@@ -132,8 +140,8 @@ export default function ConfiguracoesLayout({
                       <div className="font-medium">{item.name}</div>
                       <div className={cn(
                         "text-xs truncate",
-                        isActive 
-                          ? "text-primary-foreground/80" 
+                        isActive
+                          ? "text-primary-foreground/80"
                           : "text-muted-foreground"
                       )}>
                         {item.description}
@@ -168,7 +176,7 @@ export default function ConfiguracoesLayout({
                 <span className="text-xs font-medium">Acesso Restrito</span>
               </div>
               <p className="text-xs text-muted-foreground">
-                {user?.role === "SUPER_ADMIN" 
+                {user?.role === "SUPER_ADMIN"
                   ? "Você tem acesso completo a todas as configurações do sistema."
                   : "Algumas configurações são restritas a SUPER_ADMIN."
                 }

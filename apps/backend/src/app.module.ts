@@ -22,6 +22,7 @@ import { CoreModule } from './core/CoreModule';
 import { SecureFilesModule } from './core/secure-files/secure-files.module';
 import { AppModulesModule } from './core/modules/AppModules.module';
 import { WhatsAppModule } from './core/whatsapp/whatsapp.module';
+import { CronModule } from './core/cron/cron.module';
 // import { DemoModule } from '@core/modules/demo-completo/src/demo.module'; // Removed legacy import
 
 @Module({
@@ -64,7 +65,7 @@ import { WhatsAppModule } from './core/whatsapp/whatsapp.module';
     WhatsAppModule,
     SecureFilesModule, // Módulo de uploads sensíveis
     AppModulesModule.forRoot(), // Módulo de carregamento dinâmico de módulos externos
-
+    CronModule,
   ],
   providers: [
     {

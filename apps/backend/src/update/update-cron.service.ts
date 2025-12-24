@@ -1,84 +1,84 @@
-﻿import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+﻿import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { CronExpression } from '@nestjs/schedule';
 import { UpdateService } from './update.service';
 import { PrismaService } from '@core/prisma/prisma.service';
+import { CronService } from '@core/cron/cron.service';
 
 /**
- * ServiÃ§o de CronJob para verificaÃ§Ã£o automÃ¡tica de atualizaÃ§Ãµes
+ * Serviço de CronJob para verificação automática de atualizações
  * 
- * Executa diariamente Ã  meia-noite para verificar se hÃ¡ novas versÃµes
- * disponÃ­veis no repositÃ³rio Git configurado
+ * Agora usa o sistema de Cron Dinâmico
  */
 @Injectable()
-export class UpdateCronService {
+export class UpdateCronService implements OnModuleInit {
   private readonly logger = new Logger(UpdateCronService.name);
 
   constructor(
     private updateService: UpdateService,
     private prisma: PrismaService,
-  ) {}
+    private cronService: CronService, // Injeta o novo serviço
+  ) { }
 
-  /**
-   * CronJob que executa diariamente Ã  meia-noite
-   * Verifica automaticamente por novas versÃµes disponÃ­veis
-   */
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
-  async handleUpdateCheck() {
-    try {
-      this.logger.log('Iniciando verificaÃ§Ã£o automÃ¡tica de atualizaÃ§Ãµes...');
-      
-      const result = await this.updateService.checkForUpdates();
-      
-      if (result.updateAvailable) {
-        this.logger.log(`Nova versÃ£o disponÃ­vel: ${result.availableVersion}`);
-      } else {
-        this.logger.log('Sistema estÃ¡ atualizado');
-      }
-      
-    } catch (error) {
-      this.logger.error('Erro na verificaÃ§Ã£o automÃ¡tica de atualizaÃ§Ãµes:', error);
-    }
+  onModuleInit() {
+    // Registra os jobs no sistema dinâmico
+    this.registerUpdateCheckJob();
+    this.registerLogCleanupJob();
   }
 
-  /**
-   * CronJob para limpeza de logs antigos (executa semanalmente)
-   * Remove logs de atualizaÃ§Ã£o com mais de 90 dias
-   */
-  @Cron(CronExpression.EVERY_WEEK)
-  async handleLogCleanup() {
-    try {
-      this.logger.log('Iniciando limpeza de logs antigos...');
-      
-      // Data limite: 90 dias atrÃ¡s
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - 90);
-      
-      // Contar logs que serÃ£o removidos
-      const logsToDelete = await (this.prisma as any).updateLog.count({
-        where: {
-          startedAt: {
-            lt: cutoffDate,
-          },
-        },
-      });
-      
-      if (logsToDelete > 0) {
-        // Remover logs antigos
-        await (this.prisma as any).updateLog.deleteMany({
-          where: {
-            startedAt: {
-              lt: cutoffDate,
-            },
-          },
-        });
-        
-        this.logger.log(`Removidos ${logsToDelete} logs antigos (>90 dias)`);
-      } else {
-        this.logger.log('Nenhum log antigo para remover');
+  private registerUpdateCheckJob() {
+    this.cronService.register(
+      'system.update_check',
+      CronExpression.EVERY_DAY_AT_MIDNIGHT,
+      async () => {
+        try {
+          this.logger.log('Iniciando verificação automática de atualizações...');
+          const result = await this.updateService.checkForUpdates();
+          if (result.updateAvailable) {
+            this.logger.log(`Nova versão disponível: ${result.availableVersion}`);
+          } else {
+            this.logger.log('Sistema está atualizado');
+          }
+        } catch (error) {
+          this.logger.error('Erro na verificação automática de atualizações:', error);
+        }
+      },
+      {
+        name: 'Verificar Atualizações',
+        description: 'Verifica diariamente se há novas versões do sistema disponíveis no Git.'
       }
-      
-    } catch (error) {
-      this.logger.error('Erro na limpeza de logs:', error);
-    }
+    );
+  }
+
+  private registerLogCleanupJob() {
+    this.cronService.register(
+      'system.log_cleanup',
+      CronExpression.EVERY_WEEK,
+      async () => {
+        try {
+          this.logger.log('Iniciando limpeza de logs antigos...');
+          const cutoffDate = new Date();
+          cutoffDate.setDate(cutoffDate.getDate() - 90);
+
+          // @ts-ignore
+          const logsToDelete = await this.prisma.updateLog.count({
+            where: { startedAt: { lt: cutoffDate } },
+          });
+
+          if (logsToDelete > 0) {
+            // @ts-ignore
+            await this.prisma.updateLog.deleteMany({
+              where: { startedAt: { lt: cutoffDate } },
+            });
+            this.logger.log(`Removidos ${logsToDelete} logs antigos (>90 dias)`);
+          }
+        } catch (error) {
+          this.logger.error('Erro na limpeza de logs:', error);
+        }
+      },
+      {
+        name: 'Limpeza de Logs',
+        description: 'Remove logs de atualização com mais de 90 dias.'
+      }
+    );
   }
 }
