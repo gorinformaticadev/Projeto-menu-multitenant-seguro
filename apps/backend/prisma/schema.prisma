@@ -265,6 +265,13 @@ model Module {
   version     String       @default("1.0.0") // Versão do módulo
   description String? // Descrição do módulo
   status      ModuleStatus @default(detected) // Estado do ciclo de vida
+  
+  // Controle de Carregamento
+  enabled       Boolean @default(false)
+  backendEntry  String? // Caminho do entrypoint backend (ex: dist/modules/sistema/backend/module.js)
+  frontendEntry String? // Caminho do entrypoint frontend
+  lastError     String? // Último erro de carregamento
+  
   hasBackend  Boolean      @default(false) // Se tem código backend
   hasFrontend Boolean      @default(false) // Se tem código frontend
   installedAt DateTime? // Quando foi instalado
@@ -279,6 +286,7 @@ model Module {
 
   @@index([status])
   @@index([slug])
+  @@index([enabled])
   @@map("modules")
 }
 

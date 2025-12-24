@@ -1,5 +1,5 @@
 import { DynamicModule, Module, Logger } from '@nestjs/common';
-import * as fs from 'fs';
+import { PrismaClient } from '@prisma/client';
 import * as path from 'path';
 import { PrismaModule } from '@core/prisma/prisma.module';
 import { CommonModule } from '@common/common.module';
@@ -10,72 +10,70 @@ export class AppModulesModule {
     private static readonly logger = new Logger(AppModulesModule.name);
 
     static async forRoot(): Promise<DynamicModule> {
-        const controllers = [];
-        const providers = [];
-        const modulesDir = path.resolve(process.cwd(), 'modules'); // Assume root/modules
+        const imports = [];
+        const prisma = new PrismaClient(); // Instância local para bootstrap
 
-        if (fs.existsSync(modulesDir)) {
-            const dirs = fs.readdirSync(modulesDir, { withFileTypes: true });
-            for (const dir of dirs) {
-                if (dir.isDirectory() && !dir.name.startsWith('.')) {
-                    // Tentar carregar backend/routes.ts que exporta ModuleRoutes (controllers)
-                    const routesPathTS = path.join(modulesDir, dir.name, 'backend', 'routes.ts');
-                    // Em prod/dist, a extensÃ£o e caminho podem mudar se modules for compilado para dist/modules
-                    // Se estivermos rodando via ts-node, .ts funciona.
-                    // Se buildado, precisamos achar onde o tsc colocou.
+        try {
+            await prisma.$connect();
+            this.logger.log('🔄 Loading modules from database...');
+            this.logger.log(`📂 CWD: ${process.cwd()}`);
 
-                    try {
-                        // ImportaÃ§Ã£o dinÃ¢mica requer caminho relativo ou alias correto
-                        // Como configuramos tsconfig para incluir @core/modules, imports funcionam.
-                        // Mas runtime dynamic import de arquivo fora de src pode ser tricky no Nest CLI build.
-                        // Vamos tentar importar usando caminho relativo ao arquivo atual se possÃ­vel, ou alias.
+            const enabledModules = await prisma.module.findMany({
+                where: { enabled: true, hasBackend: true }
+            });
 
-                        // SoluÃ§Ã£o robusta: Usar o alias @modules configurado
-                        const moduleRoutes = await import(`@modules/${dir.name}/backend/routes`);
+            for (const mod of enabledModules) {
+                if (!mod.backendEntry) continue;
 
-                        if (moduleRoutes.ModuleRoutes) {
-                            controllers.push(...moduleRoutes.ModuleRoutes);
-                            this.logger.log(`✅ Loaded controllers from ${dir.name}`);
-                        }
+                try {
+                    const modulePath = path.resolve(process.cwd(), mod.backendEntry);
+                    this.logger.log(`⏳ Loading module: ${mod.slug} (Path: ${modulePath})`);
 
-                        // Tentar carregar services se existir um index de services
-                        try {
-                            const servicesPath = path.join(modulesDir, dir.name, 'backend', 'services');
-                            if (fs.existsSync(servicesPath)) {
-                                const serviceFiles = fs.readdirSync(servicesPath).filter(f => f.endsWith('.service.ts'));
-                                
-                                for (const serviceFile of serviceFiles) {
-                                    const serviceName = serviceFile.replace('.ts', '');
-                                    const serviceModule = await import(`@modules/${dir.name}/backend/services/${serviceName}`);
-                                    
-                                    // Procura por exports que sejam classes (services)
-                                    for (const exportKey of Object.keys(serviceModule)) {
-                                        const exportedItem = serviceModule[exportKey];
-                                        if (typeof exportedItem === 'function' && exportedItem.name && exportedItem.name.endsWith('Service')) {
-                                            providers.push(exportedItem);
-                                            this.logger.log(`✅ Loaded service ${exportedItem.name} from ${dir.name}`);
-                                        }
-                                    }
-                                }
+                    // Importação dinâmica com caminho absoluto
+                    const moduleExports = await import(modulePath);
+
+                    let moduleClass = moduleExports.default;
+                    if (!moduleClass) {
+                        for (const key of Object.keys(moduleExports)) {
+                            if (typeof moduleExports[key] === 'function' && moduleExports[key].name.endsWith('Module')) {
+                                moduleClass = moduleExports[key];
+                                break;
                             }
-                        } catch (servicesError) {
-                            this.logger.warn(`Could not load services for module ${dir.name}: ${servicesError.message}`);
                         }
-
-                    } catch (e) {
-                        this.logger.warn(`Could not load routes for module ${dir.name}: ${e.message}`);
                     }
+
+                    if (moduleClass) {
+                        imports.push(moduleClass);
+                        this.logger.log(`✅ Module ${mod.slug} loaded successfully.`);
+                    } else {
+                        throw new Error(`No module class found`);
+                    }
+
+                } catch (error) {
+                    this.logger.error(`❌ Failed to load module ${mod.slug}: ${error.message}`);
+                    await prisma.module.update({
+                        where: { id: mod.id },
+                        data: { lastError: error.message }
+                    });
                 }
             }
+
+        } catch (dbError) {
+            this.logger.error(`❌ Database error while loading modules: ${dbError.message}`);
+        } finally {
+            await prisma.$disconnect();
         }
 
         return {
             module: AppModulesModule,
-            imports: [PrismaModule, CommonModule, NotificationsModule], // Importa módulos necessários para injeção
-            controllers: controllers,
-            providers: providers,
-            exports: providers,
+            imports: [
+                PrismaModule,
+                CommonModule,
+                NotificationsModule,
+                ...imports
+            ],
+            exports: imports, // Re-export loaded modules
+            global: true,
         };
     }
 }
-

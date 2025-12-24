@@ -23,21 +23,19 @@ import { SecureFilesModule } from './core/secure-files/secure-files.module';
 import { AppModulesModule } from './core/modules/AppModules.module';
 import { WhatsAppModule } from './core/whatsapp/whatsapp.module';
 import { CronModule } from './core/cron/cron.module';
-import { SistemaBackendModule } from '@modules/sistema/backend';
-// import { DemoModule } from '@core/modules/demo-completo/src/demo.module'; // Removed legacy import
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    // MÃ³dulo de agendamento para tarefas cron
+    // Módulo de agendamento para tarefas cron
     ScheduleModule.forRoot(),
     SentryModule,
     CommonModule,
     // ============================================
-    // ðŸ›¡ï¸ RATE LIMITING - ProteÃ§Ã£o contra Brute Force
-    // ConfiguraÃ§Ãµes ajustadas por ambiente
+    // 🛡️  RATE LIMITING - Proteção contra Brute Force
+    // Configurações ajustadas por ambiente
     // ============================================
     ThrottlerModule.forRoot([
       {
@@ -49,7 +47,7 @@ import { SistemaBackendModule } from '@modules/sistema/backend';
       {
         name: 'login',
         ttl: 60000, // 60 segundos
-        // Desenvolvimento: 10 tentativas | ProduÃ§Ã£o: 5 tentativas
+        // Desenvolvimento: 10 tentativas | Produção: 5 tentativas
         limit: process.env.NODE_ENV === 'production' ? 5 : 10,
       },
     ]),
@@ -67,7 +65,6 @@ import { SistemaBackendModule } from '@modules/sistema/backend';
     SecureFilesModule, // Módulo de uploads sensíveis
     AppModulesModule.forRoot(), // Módulo de carregamento dinâmico de módulos externos
     CronModule,
-    SistemaBackendModule,
   ],
   providers: [
     {
@@ -79,13 +76,13 @@ import { SistemaBackendModule } from '@modules/sistema/backend';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
-    // ServiÃ§o de limpeza de tokens
+    // Serviço de limpeza de tokens
     TokenCleanupService,
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // HTTPS Redirect - Apenas em produÃ§Ã£o
+    // HTTPS Redirect - Apenas em produção
     consumer.apply(HttpsRedirectMiddleware).forRoutes('*');
   }
 }

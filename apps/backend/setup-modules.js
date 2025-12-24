@@ -1,6 +1,6 @@
 /**
- * Script para configurar módulos no sistema
- * Este script cria as tabelas de módulos e popula com módulos de exemplo
+ * Script para configurar módulos no sistema (setup-modules.js)
+ * Atualiza a tabela 'modules' com as definições corretas e caminhos de entrada.
  */
 
 const { PrismaClient } = require('@prisma/client');
@@ -8,171 +8,86 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function setupModules() {
-  console.log('🔧 Configurando módulos do sistema...');
+  console.log('🔧 Configurando módulos do sistema (Via Banco de Dados)...');
 
   try {
-    // Criar módulos de exemplo
-    const modules = [
+    const modulesToInstall = [
       {
-        name: 'sales',
-        displayName: 'Sistema de Vendas',
-        description: 'Módulo completo para gestão de vendas, pedidos e clientes',
+        slug: 'sistema',
+        name: 'Sistema Core',
         version: '1.0.0',
-        config: JSON.stringify({
-          features: ['orders', 'customers', 'products', 'reports'],
-          permissions: ['view_sales', 'create_order', 'manage_customers']
-        })
+        description: 'Módulo principal do sistema',
+        enabled: true,
+        // Entry point relativo ao CWD (apps/backend)
+        backendEntry: '../../packages/modules/sistema3/backend/sistema.module',
+        hasBackend: true,
+        status: 'active'
       },
+      // Exemplo de módulo financeiro (usando mocks para caminhos por enquanto se não existirem)
       {
-        name: 'inventory',
-        displayName: 'Controle de Estoque',
-        description: 'Gestão completa de estoque, produtos e movimentações',
-        version: '1.2.0',
-        config: JSON.stringify({
-          features: ['stock_control', 'product_management', 'movements'],
-          permissions: ['view_inventory', 'manage_stock', 'view_reports']
-        })
-      },
-      {
-        name: 'financial',
-        displayName: 'Módulo Financeiro',
-        description: 'Controle financeiro com contas a pagar, receber e fluxo de caixa',
-        version: '2.0.0',
-        config: JSON.stringify({
-          features: ['accounts_payable', 'accounts_receivable', 'cash_flow'],
-          permissions: ['view_financial', 'manage_accounts', 'view_reports']
-        })
-      },
-      {
-        name: 'reports',
-        displayName: 'Relatórios Avançados',
-        description: 'Relatórios personalizados e dashboards interativos',
-        version: '1.5.0',
-        config: JSON.stringify({
-          features: ['custom_reports', 'dashboards', 'data_export'],
-          permissions: ['view_reports', 'create_reports', 'export_data']
-        })
-      },
-      {
-        name: 'crm',
-        displayName: 'CRM - Gestão de Clientes',
-        description: 'Sistema de relacionamento com clientes e gestão de leads',
-        version: '1.1.0',
-        config: JSON.stringify({
-          features: ['lead_management', 'customer_history', 'follow_up'],
-          permissions: ['view_crm', 'manage_leads', 'view_customer_data']
-        })
-      },
-      {
-        name: 'hr',
-        displayName: 'Recursos Humanos',
-        description: 'Gestão de funcionários, folha de pagamento e benefícios',
+        slug: 'financeiro',
+        name: 'Financeiro',
         version: '1.0.0',
-        config: JSON.stringify({
-          features: ['employee_management', 'payroll', 'benefits'],
-          permissions: ['view_hr', 'manage_employees', 'process_payroll']
-        })
+        description: 'Gestão Financeira',
+        enabled: false,
+        backendEntry: '@modules/financeiro/backend/module',
+        hasBackend: true,
+        status: 'disabled'
       }
     ];
 
-    console.log('📦 Criando módulos...');
-    
-    for (const moduleData of modules) {
-      try {
-        const existingModule = await prisma.module.findUnique({
-          where: { name: moduleData.name }
-        });
+    console.log('📦 Sincronizando módulos...');
 
-        if (existingModule) {
-          console.log(`⚠️  Módulo '${moduleData.name}' já existe, atualizando...`);
-          await prisma.module.update({
-            where: { name: moduleData.name },
-            data: {
-              displayName: moduleData.displayName,
-              description: moduleData.description,
-              version: moduleData.version,
-              config: moduleData.config
-            }
-          });
-        } else {
-          await prisma.module.create({
-            data: moduleData
-          });
-          console.log(`✅ Módulo '${moduleData.displayName}' criado com sucesso`);
-        }
-      } catch (error) {
-        console.error(`❌ Erro ao criar módulo '${moduleData.name}':`, error.message);
-      }
-    }
+    for (const mod of modulesToInstall) {
+      const existing = await prisma.module.findUnique({
+        where: { slug: mod.slug }
+      });
 
-    // Ativar alguns módulos para a empresa padrão (se existir)
-    console.log('\n🏢 Configurando módulos para empresa padrão...');
-    
-    const defaultTenant = await prisma.tenant.findFirst({
-      where: {
-        OR: [
-          { email: 'empresa1@example.com' },
-          { nomeFantasia: { contains: 'GOR' } }
-        ]
-      }
-    });
-
-    if (defaultTenant) {
-      const defaultModules = ['sales', 'inventory', 'reports'];
-      
-      for (const moduleName of defaultModules) {
-        try {
-          const existingTenantModule = await prisma.tenantModule.findUnique({
-            where: {
-              tenantId_moduleName: {
-                tenantId: defaultTenant.id,
-                moduleName: moduleName
-              }
-            }
-          });
-
-          if (!existingTenantModule) {
-            await prisma.tenantModule.create({
-              data: {
-                tenantId: defaultTenant.id,
-                moduleName: moduleName,
-                isActive: true
-              }
-            });
-            console.log(`✅ Módulo '${moduleName}' ativado para ${defaultTenant.nomeFantasia}`);
-          } else {
-            console.log(`⚠️  Módulo '${moduleName}' já está configurado para ${defaultTenant.nomeFantasia}`);
+      if (existing) {
+        console.log(`🔄 Atualizando módulo: ${mod.name}`);
+        await prisma.module.update({
+          where: { slug: mod.slug },
+          data: {
+            name: mod.name,
+            version: mod.version,
+            description: mod.description,
+            backendEntry: mod.backendEntry,
+            // Não sobrescrevemos enabled se já existir, para respeitar escolha do usuário?
+            // O comando diz: "Ao instalar ... cria (ou atualize) ... defina enabled = true"
+            enabled: true,
+            status: mod.status, // Alinha status
+            hasBackend: mod.hasBackend
           }
-        } catch (error) {
-          console.error(`❌ Erro ao ativar módulo '${moduleName}':`, error.message);
-        }
+        });
+      } else {
+        console.log(`✨ Criando módulo: ${mod.name}`);
+        await prisma.module.create({
+          data: {
+            slug: mod.slug,
+            name: mod.name,
+            version: mod.version,
+            description: mod.description,
+            backendEntry: mod.backendEntry,
+            enabled: mod.enabled,
+            status: mod.status,
+            hasBackend: mod.hasBackend,
+            installedAt: new Date()
+          }
+        });
       }
-    } else {
-      console.log('⚠️  Empresa padrão não encontrada, pulando configuração automática');
     }
 
-    console.log('\n📊 Resumo dos módulos criados:');
-    const allModules = await prisma.module.findMany({
-      orderBy: { displayName: 'asc' }
-    });
-
-    allModules.forEach(module => {
-      console.log(`  • ${module.displayName} (${module.name}) - v${module.version}`);
-    });
-
-    console.log(`\n✅ Configuração concluída! ${allModules.length} módulos disponíveis no sistema.`);
+    console.log('✅ Setup de módulos concluído!');
 
   } catch (error) {
-    console.error('❌ Erro durante a configuração:', error);
-    throw error;
+    console.error('❌ Erro no setup de módulos:', error);
   } finally {
     await prisma.$disconnect();
   }
 }
 
-// Executar apenas se chamado diretamente
 if (require.main === module) {
-  setupModules().catch(console.error);
+  setupModules();
 }
 
 module.exports = { setupModules };
