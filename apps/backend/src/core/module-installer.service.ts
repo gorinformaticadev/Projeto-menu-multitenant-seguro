@@ -115,10 +115,18 @@ export class ModuleInstallerService {
             if (existingModule) {
                 this.logger.log(`⚠️ Módulo ${validatedModule.name} já existe - será atualizado`);
                 // Remover versão antiga dos arquivos
+                // Remover versão antiga dos arquivos com Retry
                 const oldModulePath = path.join(this.modulesPath, validatedModule.name);
                 if (fs.existsSync(oldModulePath)) {
-                    fs.rmSync(oldModulePath, { recursive: true, force: true });
-                    this.logger.log(`✅ Versão antiga removida: ${oldModulePath}`);
+                    try {
+                        // Tenta remover diretório antigo
+                        await this.robustRemoveDir(oldModulePath);
+                        this.logger.log(`✅ Versão antiga removida: ${oldModulePath}`);
+                    } catch (e) {
+                        this.logger.warn(`⚠️ Não foi possível limpar pasta antiga (bloqueada?): ${e.message}`);
+                        this.logger.warn(`ℹ️ Tentando sobrescrever arquivos...`);
+                        // Não lança erro, tenta prosseguir com a extração que irá sobrescrever
+                    }
                 }
 
                 // Remover registros antigos do banco
@@ -860,4 +868,29 @@ export class ModuleInstallerService {
         const cleanContent = content.replace(/^\uFEFF/, '').trim();
         return JSON.parse(cleanContent);
     }
+
+    /**
+     * Remove diretório de forma robusta com retries
+     * Útil no Windows onde arquivos podem estar bloqueados temporariamente
+     */
+    private async robustRemoveDir(dirPath: string, retries = 5, delay = 1000): Promise<void> {
+        for (let i = 0; i < retries; i++) {
+            try {
+                if (!fs.existsSync(dirPath)) return;
+
+                fs.rmSync(dirPath, { recursive: true, force: true });
+                return;
+            } catch (err) {
+                if (err.code === 'EPERM' || err.code === 'EBUSY' || err.code === 'ENOTEMPTY') {
+                    if (i === retries - 1) throw err; // Desiste na última tentativa
+
+                    // Espera um pouco antes de tentar de novo
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    throw err;
+                }
+            }
+        }
+    }
 }
+
