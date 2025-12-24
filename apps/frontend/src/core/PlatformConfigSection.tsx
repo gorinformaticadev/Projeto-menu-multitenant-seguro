@@ -7,55 +7,34 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Building2, Info } from "lucide-react";
-
-interface PlatformConfig {
-  platformName: string;
-  platformEmail: string;
-  platformPhone: string;
-}
+import { Save, Building2, Info, RefreshCw } from "lucide-react";
+import { usePlatformConfigContext } from "@/contexts/PlatformConfigContext";
+import { PlatformConfig } from "@/hooks/usePlatformConfig";
 
 export default function PlatformConfigSection() {
   const { toast } = useToast();
-  const [config, setConfig] = useState<PlatformConfig>({
+  // Usar o contexto para dados globais e função de recarga
+  const { config: globalConfig, loading: globalLoading, refreshConfig } = usePlatformConfigContext();
+
+  // Estado local para o formulário
+  const [formData, setFormData] = useState<PlatformConfig>({
     platformName: "",
     platformEmail: "",
     platformPhone: "",
   });
-  const [loading, setLoading] = useState(true);
+
   const [saving, setSaving] = useState(false);
 
-  // Load platform configuration
+  // Sincronizar estado local com configurações globais quando carregadas
   useEffect(() => {
-    const fetchConfig = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get("/platform-config");
-        setConfig(response.data);
-      } catch (error: any) {
-        toast({
-          title: "Erro ao carregar configurações da plataforma",
-          description: error.response?.data?.message || "Erro desconhecido",
-          variant: "destructive",
-        });
-        
-        // Set default values on error
-        setConfig({
-          platformName: "Sistema Multitenant",
-          platformEmail: "contato@sistema.com",
-          platformPhone: "(11) 99999-9999",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchConfig();
-  }, [toast]);
+    if (!globalLoading && globalConfig) {
+      setFormData(globalConfig);
+    }
+  }, [globalConfig, globalLoading]);
 
   // Handle input changes
   const handleInputChange = (field: keyof PlatformConfig, value: string) => {
-    setConfig(prev => ({
+    setFormData(prev => ({
       ...prev,
       [field]: value,
     }));
@@ -65,9 +44,12 @@ export default function PlatformConfigSection() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      
-      await api.put("/platform-config", config);
-      
+
+      await api.put("/platform-config", formData);
+
+      // Forçar atualização do contexto global (Isso atualiza o título no navegador)
+      await refreshConfig();
+
       toast({
         title: "Configurações salvas",
         description: "As configurações da plataforma foram atualizadas com sucesso",
@@ -83,7 +65,7 @@ export default function PlatformConfigSection() {
     }
   };
 
-  if (loading) {
+  if (globalLoading && !formData.platformName) {
     return (
       <Card>
         <CardHeader>
@@ -97,7 +79,10 @@ export default function PlatformConfigSection() {
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <div className="text-muted-foreground">Carregando...</div>
+            <div className="flex flex-col items-center gap-2 text-muted-foreground">
+              <RefreshCw className="h-6 w-6 animate-spin" />
+              <span>Carregando...</span>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -139,7 +124,7 @@ export default function PlatformConfigSection() {
             </Label>
             <Input
               id="platform-name"
-              value={config.platformName}
+              value={formData.platformName}
               onChange={(e) => handleInputChange("platformName", e.target.value)}
               placeholder="Sistema Multitenant"
             />
@@ -155,7 +140,7 @@ export default function PlatformConfigSection() {
             <Input
               id="platform-email"
               type="email"
-              value={config.platformEmail}
+              value={formData.platformEmail}
               onChange={(e) => handleInputChange("platformEmail", e.target.value)}
               placeholder="contato@sistema.com"
             />
@@ -171,7 +156,7 @@ export default function PlatformConfigSection() {
             <Input
               id="platform-phone"
               type="tel"
-              value={config.platformPhone}
+              value={formData.platformPhone}
               onChange={(e) => handleInputChange("platformPhone", e.target.value)}
               placeholder="(11) 99999-9999"
             />
@@ -195,9 +180,9 @@ export default function PlatformConfigSection() {
             Preview das Configurações
           </h4>
           <div className="text-sm space-y-1">
-            <p><strong>Nome:</strong> {config.platformName || "Sistema Multitenant"}</p>
-            <p><strong>Email:</strong> {config.platformEmail || "contato@sistema.com"}</p>
-            <p><strong>Telefone:</strong> {config.platformPhone || "(11) 99999-9999"}</p>
+            <p><strong>Nome:</strong> {formData.platformName || "Sistema Multitenant"}</p>
+            <p><strong>Email:</strong> {formData.platformEmail || "contato@sistema.com"}</p>
+            <p><strong>Telefone:</strong> {formData.platformPhone || "(11) 99999-9999"}</p>
           </div>
         </div>
       </CardContent>

@@ -4,9 +4,9 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
-import { DynamicTitle } from "./DynamicTitle";
 import { useModuleRegistry } from "@/hooks/useModuleRegistry";
 import { ModuleRegistryTaskbar } from "./ModuleRegistryTaskbar";
+import { ModuleLoader } from "@/core/ModuleLoader";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -40,12 +40,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   // Mostra topbar e sidebar fixos em todas as outras páginas
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Título dinâmico */}
-      <DynamicTitle />
-      
+      {/* Carregador de Módulos Dinâmicos */}
+      <ModuleLoader />
+
       {/* TopBar Fixa */}
       <TopBar />
-      
+
       {/* Layout com Sidebar e Conteúdo */}
       <div className="flex w-full pt-16">
         <aside className="flex-shrink-0 h-[calc(100vh-4rem)]">
@@ -55,7 +55,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
-      
+
       {/* Taskbar dos Módulos */}
       <ModuleRegistryTaskbar />
     </div>
