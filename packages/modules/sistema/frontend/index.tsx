@@ -1,6 +1,7 @@
 import React from 'react';
 import { FrontendModuleDefinition } from '@/lib/module-types';
 import { SistemaWidget } from './components/SistemaWidget';
+export { default as SistemaAjustesPage } from './pages/ajustes';
 
 /**
  * Definição do Módulo Sistema (Frontend)

@@ -11,6 +11,7 @@ export interface CronJobDefinition {
     enabled: boolean;
     lastRun?: Date;
     nextRun?: Date;
+    settingsUrl?: string; // Link para editar a configuração do job no módulo original
 }
 
 @Injectable()
@@ -31,11 +32,14 @@ export class CronService implements OnModuleInit {
     /**
      * Registra um novo Cron Job vindo de um módulo
      */
+    /**
+     * Registra um novo Cron Job vindo de um módulo
+     */
     register(
         key: string,
         schedule: string,
         callback: () => Promise<void> | void,
-        meta: { name: string; description: string }
+        meta: { name: string; description: string; settingsUrl?: string }
     ) {
         if (this.jobs.has(key)) {
             this.logger.warn(`Cron job ${key} já registrado. Sobrescrevendo...`);
@@ -48,6 +52,7 @@ export class CronService implements OnModuleInit {
             description: meta.description,
             schedule,
             enabled: true, // Default to enabled
+            settingsUrl: meta.settingsUrl,
         };
 
         // Cria o job do 'cron' package

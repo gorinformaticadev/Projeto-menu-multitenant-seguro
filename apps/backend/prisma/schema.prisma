@@ -594,3 +594,20 @@ model SecureFile {
   @@index([deletedAt]) // Soft delete
   @@map("secure_files")
 }
+
+// ============================================
+// MÓDULO SISTEMA - TABELAS
+// ============================================
+
+model SistemaNotificationSchedule {
+  id              String   @id @default(uuid())
+  title           String
+  content         String
+  audience        String
+  cronExpression  String
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("sistema_notification_schedules")
+}

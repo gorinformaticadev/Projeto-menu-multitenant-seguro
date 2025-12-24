@@ -5,7 +5,7 @@ import api from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Play, Pause, RotateCw, AlertCircle } from "lucide-react";
+import { Clock, Play, Pause, RotateCw, AlertCircle, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -18,6 +18,7 @@ interface CronJob {
     enabled: boolean;
     lastRun?: string;
     nextRun?: string;
+    settingsUrl?: string;
 }
 
 export default function CronJobsPage() {
@@ -113,6 +114,18 @@ export default function CronJobsPage() {
                                 <CardDescription>{job.description}</CardDescription>
                             </div>
                             <div className="flex items-center gap-2">
+                                {job.settingsUrl && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        asChild
+                                        title="Configurar Job"
+                                    >
+                                        <a href={job.settingsUrl}>
+                                            <Settings className="h-4 w-4" />
+                                        </a>
+                                    </Button>
+                                )}
                                 <Button
                                     variant="ghost"
                                     size="sm"
@@ -169,6 +182,6 @@ export default function CronJobsPage() {
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     );
 }
