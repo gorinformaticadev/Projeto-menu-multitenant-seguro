@@ -180,10 +180,76 @@ class ModuleRegistry {
   }
 
   // Backwards compatibility methods
-  getAllMenus(): ModuleMenu[] { return []; }
-  getTaskbarItems(userRole?: string): any[] { return []; }
-  getUserMenuItems(userRole?: string): ModuleUserMenuItem[] { return []; }
-  hasModule(slug: string): boolean { return this.apiModules.some(m => m.slug === slug); }
+  getAllMenus(): ModuleMenu[] {
+    const allMenus: ModuleMenu[] = [];
+    for (const mod of this.apiModules) {
+      if (mod.menus && mod.menus.length > 0) {
+        allMenus.push(...mod.menus);
+      }
+    }
+    return allMenus;
+  }
+
+  /**
+   * Retorna itens da taskbar baseado nos módulos ativos
+   * Taskbar = atalhos rápidos para funcionalidades principais
+   */
+  getTaskbarItems(userRole?: string): any[] {
+    if (!this.isLoaded) return [];
+
+    const taskbarItems: any[] = [];
+
+    // Para cada módulo ativo, verificar se tem menus marcados para taskbar
+    for (const mod of this.apiModules) {
+      if (mod.menus && mod.menus.length > 0) {
+        // Pega o primeiro menu de cada módulo para a taskbar
+        const mainMenu = mod.menus[0];
+        taskbarItems.push({
+          id: `taskbar-${mod.slug}`,
+          name: mainMenu.label || mod.name,
+          icon: mainMenu.icon || 'Package',
+          href: mainMenu.route,
+          order: mainMenu.order || 50
+        });
+      }
+    }
+
+    return taskbarItems.sort((a, b) => (a.order || 99) - (b.order || 99));
+  }
+
+  /**
+   * Retorna itens do menu do usuário baseado nos módulos ativos
+   * User Menu = menu dropdown no canto superior direito
+   */
+  getUserMenuItems(userRole?: string): ModuleUserMenuItem[] {
+    if (!this.isLoaded) return [];
+
+    const userMenuItems: ModuleUserMenuItem[] = [];
+
+    // Para cada módulo ativo, adicionar seus menus principais ao user menu
+    for (const mod of this.apiModules) {
+      if (mod.menus && mod.menus.length > 0) {
+        for (const menu of mod.menus) {
+          // Adiciona menus de nível superior (sem children ou menus principais)
+          if (!menu.children || menu.children.length === 0) {
+            userMenuItems.push({
+              id: `usermenu-${mod.slug}-${menu.id || menu.route}`,
+              label: menu.label,
+              icon: menu.icon,
+              href: menu.route,
+              order: menu.order || 50
+            });
+          }
+        }
+      }
+    }
+
+    return userMenuItems.sort((a, b) => (a.order || 99) - (b.order || 99));
+  }
+
+  hasModule(slug: string): boolean {
+    return this.apiModules.some(m => m.slug === slug);
+  }
 }
 
 export const moduleRegistry = ModuleRegistry.getInstance();

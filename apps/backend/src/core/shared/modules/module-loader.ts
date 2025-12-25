@@ -1,140 +1,118 @@
 /**
- * CARREGADOR EXPLÍCITO DE MÓDULOS
+ * CARREGADOR DINÂMICO DE MÓDULOS
  * 
- * Sistema determinístico para carregar módulos externos
- * SEM auto-discovery, SEM lógica mágica
+ * Sistema que carrega módulos baseado EXCLUSIVAMENTE no banco de dados
+ * SEM listas fixas, SEM hardcoded modules
  * 
- * Cada módulo deve ser explicitamente declarado aqui
+ * PRINCÍPIO: O BANCO É A ÚNICA FONTE DE VERDADE
  */
 
 import { moduleRegistry } from '../registry/module-registry';
 import { ModuleContribution } from '../types/module.types';
 
 /**
- * LISTA EXPLÍCITA DE MÓDULOS DISPONÍVEIS
- * 
- * Para adicionar um novo módulo:
- * 1. Adicione o ID na lista abaixo
- * 2. Implemente a função de registro correspondente
- * 3. Adicione a chamada em loadExternalModules()
- */
-const AVAILABLE_MODULES = [
-  'sample-module',
-  // 'financeiro',
-  // 'os',
-  // 'whatsboost'
-] as const;
-
-type ModuleId = typeof AVAILABLE_MODULES[number];
-
-/**
- * Carrega todos os módulos externos registrados
+ * Carrega módulos externos baseado nos dados da API
+ * Não há lista fixa - os módulos são descobertos dinamicamente
  */
 export async function loadExternalModules(): Promise<void> {
-  console.log('Carregando módulos externos...');
+  console.log('🔄 Carregando módulos externos dinamicamente...');
 
-  for (const moduleId of AVAILABLE_MODULES) {
-    try {
-      await loadModule(moduleId);
-    } catch (error) {
-      console.error(`Erro ao carregar módulo ${moduleId}:`, error);
-      // Continua carregando outros módulos mesmo se um falhar
+  try {
+    // Buscar módulos ativos da API
+    const response = await fetch('/api/me/modules', {
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      console.warn('⚠️ Não foi possível carregar módulos da API');
+      return;
     }
-  }
 
-  console.log('Carregamento de módulos externos concluído');
-}
+    const data = await response.json();
+    const modules = data.modules || [];
 
-/**
- * Carrega um módulo específico
- */
-async function loadModule(moduleId: ModuleId): Promise<void> {
-  switch (moduleId) {
-    case 'sample-module':
-      await registerSampleModule();
-      break;
-    
-    // case 'financeiro':
-    //   await registerFinanceiroModule();
-    //   break;
-    
-    // case 'os':
-    //   await registerOSModule();
-    //   break;
-    
-    default:
-      console.warn(`Módulo não implementado: ${moduleId}`);
+    console.log(`📦 ${modules.length} módulo(s) encontrado(s) no banco de dados`);
+
+    // Para cada módulo retornado pela API, tentar carregar sua definição
+    for (const module of modules) {
+      try {
+        await loadModuleDynamically(module);
+      } catch (error) {
+        console.error(`❌ Erro ao carregar módulo ${module.slug}:`, error);
+        // Continua carregando outros módulos mesmo se um falhar
+      }
+    }
+
+    console.log('✅ Carregamento de módulos externos concluído');
+  } catch (error) {
+    console.error('❌ Erro ao carregar lista de módulos:', error);
   }
 }
 
 /**
- * REGISTRO DO MÓDULO SAMPLE
+ * Carrega um módulo específico dinamicamente
+ * Tenta importar o módulo baseado em convenção de nomes
  */
-async function registerSampleModule(): Promise<void> {
-  const contribution: ModuleContribution = {
-    id: 'sample-module',
-    name: 'Módulo de Exemplo',
-    version: '1.0.0',
-    enabled: true,
-    
-    sidebar: [
-      {
-        id: 'sample',
-        name: 'Exemplo',
-        href: '/sample',
-        icon: 'Shield',
-        order: 50
-      }
-    ],
-    
-    dashboard: [
-      {
-        id: 'sample-widget',
-        name: 'Widget de Exemplo',
-        component: 'SampleWidget',
-        order: 10,
-        size: 'small'
-      }
-    ]
-  };
+async function loadModuleDynamically(moduleData: any): Promise<void> {
+  const { slug, name, menus } = moduleData;
 
-  moduleRegistry.register(contribution);
-  console.log('Módulo Sample registrado');
+  try {
+    // Tentar carregar definição do módulo se existir
+    // Convenção: @modules/{slug}/frontend/index.ts exporta ModuleContribution
+    const modulePath = `@modules/${slug}/frontend`;
+
+    console.log(`📦 Tentando carregar definição de ${slug}...`);
+
+    // Import dinâmico (pode falhar se módulo não tiver definição frontend)
+    const moduleDefinition = await import(
+      /* webpackIgnore: true */
+      `../../../../../packages/modules/${slug}/frontend/index`
+    ).catch(() => null);
+
+    if (moduleDefinition && moduleDefinition.default) {
+      // Módulo tem definição completa - registrar
+      moduleRegistry.register(moduleDefinition.default);
+      console.log(`✅ Módulo ${slug} registrado com definição completa`);
+    } else {
+      // Módulo não tem definição - criar contribuição básica baseada nos dados da API
+      const basicContribution: ModuleContribution = {
+        id: slug,
+        name: name,
+        version: '1.0.0',
+        enabled: true,
+        sidebar: menus?.map((menu: any, index: number) => ({
+          id: menu.id || `${slug}-${index}`,
+          name: menu.label,
+          href: menu.route,
+          icon: menu.icon || 'Package',
+          order: menu.order || 50
+        })) || [],
+        dashboard: []
+      };
+
+      moduleRegistry.register(basicContribution);
+      console.log(`✅ Módulo ${slug} registrado com contribuição básica`);
+    }
+
+  } catch (error) {
+    console.warn(`⚠️ Não foi possível carregar definição de ${slug}, usando fallback`);
+
+    // Fallback: registrar apenas com dados da API
+    const fallbackContribution: ModuleContribution = {
+      id: slug,
+      name: name,
+      version: '1.0.0',
+      enabled: true,
+      sidebar: menus?.map((menu: any, index: number) => ({
+        id: menu.id || `${slug}-${index}`,
+        name: menu.label,
+        href: menu.route,
+        icon: menu.icon || 'Package',
+        order: menu.order || 50
+      })) || [],
+      dashboard: []
+    };
+
+    moduleRegistry.register(fallbackContribution);
+  }
 }
-
-/**
- * TEMPLATE PARA NOVOS MÓDULOS
- * 
- * async function registerNomeDoModuloModule(): Promise<void> {
- *   const contribution: ModuleContribution = {
- *     id: 'nome-do-modulo',
- *     name: 'Nome do Módulo',
- *     version: '1.0.0',
- *     enabled: true,
- *     
- *     sidebar: [
- *       {
- *         id: 'modulo-item',
- *         name: 'Item do Módulo',
- *         href: '/modulo',
- *         icon: 'IconName',
- *         order: 60,
- *         roles: ['ADMIN', 'USER'] // opcional
- *       }
- *     ],
- *     
- *     dashboard: [
- *       {
- *         id: 'modulo-widget',
- *         name: 'Widget do Módulo',
- *         component: 'ModuloWidget',
- *         order: 20,
- *         size: 'medium'
- *       }
- *     ]
- *   };
- * 
- *   moduleRegistry.register(contribution);
- *   console.log('Módulo Nome registrado');
- * }
- */
