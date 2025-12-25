@@ -18,10 +18,22 @@ export class AppModulesModule {
             this.logger.log('🔄 Loading modules from database...');
             this.logger.log(`📂 CWD: ${process.cwd()}`);
 
+            // Buscar apenas módulos ativos com backend
+            // O controle de habilitação por tenant é feito via ModuleTenant.enabled
             const enabledModules = await prisma.module.findMany({
-                where: { enabled: true, hasBackend: true }
+                where: {
+                    status: 'active',
+                    hasBackend: true
+                }
             });
 
+            // NOTA: Carregamento dinâmico de módulos desabilitado
+            // O campo 'backendEntry' não existe no banco de dados
+            // Módulos são gerenciados pelo ModuleLoader
+            this.logger.log(`✅ Found ${enabledModules.length} active module(s) in database`);
+            this.logger.log(`ℹ️  Dynamic module loading is managed by ModuleLoader service`);
+
+            /*
             for (const mod of enabledModules) {
                 if (!mod.backendEntry) continue;
 
@@ -51,15 +63,20 @@ export class AppModulesModule {
 
                 } catch (error) {
                     this.logger.error(`❌ Failed to load module ${mod.slug}: ${error.message}`);
-                    await prisma.module.update({
-                        where: { id: mod.id },
-                        data: { lastError: error.message }
-                    });
+                    // Erro já está logado, não precisa armazenar no banco
                 }
             }
+            */
 
         } catch (dbError) {
-            this.logger.error(`❌ Database error while loading modules: ${dbError.message}`);
+            // Tratamento específico para erros de schema
+            if (dbError.message?.includes('does not exist') || dbError.code === 'P2010') {
+                this.logger.error(`❌ Schema inconsistency detected: ${dbError.message}`);
+                this.logger.warn('⚠️ Continuing without modules. Please check database migrations.');
+            } else {
+                this.logger.error(`❌ Database error while loading modules: ${dbError.message}`);
+            }
+            // Sistema continua sem módulos em vez de quebrar
         } finally {
             await prisma.$disconnect();
         }

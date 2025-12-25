@@ -7,33 +7,25 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  SUPER_ADMIN
-  ADMIN
-  USER
-  CLIENT
-}
-
 model Tenant {
-  id              String             @id @default(uuid())
-  email           String             @unique
-  cnpjCpf         String             @unique
+  id              String            @id @default(uuid())
+  email           String            @unique
+  cnpjCpf         String            @unique
   nomeFantasia    String
   nomeResponsavel String
   telefone        String
   logoUrl         String?
-  isMasterTenant  Boolean            @default(false)
-  ativo           Boolean            @default(true)
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  users           User[]
+  ativo           Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  isMasterTenant  Boolean           @default(false)
   tenantModules   ModuleTenant[]
   publicPage      TenantPublicPage?
+  users           User[]
 
-  // Índices para performance
-  @@index([ativo]) // Filtrar tenants ativos
-  @@index([createdAt]) // Ordenar por data de criação
-  @@index([isMasterTenant]) // Buscar tenant master rapidamente
+  @@index([ativo])
+  @@index([createdAt])
+  @@index([isMasterTenant])
   @@map("tenants")
 }
 
@@ -44,17 +36,13 @@ model User {
   name                     String
   role                     Role                 @default(USER)
   tenantId                 String?
-  tenant                   Tenant?              @relation(fields: [tenantId], references: [id])
   twoFactorSecret          String?
   twoFactorEnabled         Boolean              @default(false)
-  // Verificação de email
   emailVerified            Boolean              @default(false)
   emailVerificationToken   String?
   emailVerificationExpires DateTime?
-  // Histórico de senhas (JSON array com últimos 5 hashes)
   passwordHistory          String?
   lastPasswordChange       DateTime?
-  // Controle de bloqueio por tentativas de login
   loginAttempts            Int                  @default(0)
   isLocked                 Boolean              @default(false)
   lockedAt                 DateTime?
@@ -63,119 +51,102 @@ model User {
   createdAt                DateTime             @default(now())
   updatedAt                DateTime             @updatedAt
   auditLogs                AuditLog[]
-  refreshTokens            RefreshToken[]
   passwordResetTokens      PasswordResetToken[]
+  refreshTokens            RefreshToken[]
+  tenant                   Tenant?              @relation(fields: [tenantId], references: [id])
 
-  // Índices para performance e segurança
-  @@index([tenantId]) // Já existia - essencial para isolamento multitenant
-  @@index([email]) // Busca rápida por email (login)
-  @@index([role]) // Filtrar por role (RBAC)
-  @@index([isLocked]) // Encontrar contas bloqueadas
-  @@index([tenantId, role]) // Combinação comum: usuários de um tenant por role
+  @@index([tenantId])
+  @@index([email])
+  @@index([role])
+  @@index([isLocked])
+  @@index([tenantId, role])
   @@map("users")
 }
 
-// Tabela de Refresh Tokens
 model RefreshToken {
   id        String   @id @default(uuid())
   token     String   @unique
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Índices para performance de limpeza e validação
-  @@index([userId]) // Já existia - buscar tokens de um usuário
-  @@index([token]) // Já existia - validação rápida de token
-  @@index([expiresAt]) // NOVO - limpeza de tokens expirados
-  @@index([userId, expiresAt]) // NOVO - tokens ativos de um usuário
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@index([userId, expiresAt])
   @@map("refresh_tokens")
 }
 
-// Tabela de Tokens de Reset de Senha
 model PasswordResetToken {
   id        String    @id @default(uuid())
   token     String    @unique
   userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Índices para performance
-  @@index([userId]) // Buscar tokens de um usuário
-  @@index([token]) // Validação rápida de token
-  @@index([expiresAt]) // Limpeza de tokens expirados
-  @@index([usedAt]) // Filtrar tokens não utilizados
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@index([usedAt])
   @@map("password_reset_tokens")
 }
 
-// Tabela de Logs de Auditoria
 model AuditLog {
   id        String   @id @default(uuid())
-  action    String // LOGIN, LOGOUT, CREATE_TENANT, UPDATE_USER, etc
+  action    String
   userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   tenantId  String?
   ipAddress String?
   userAgent String?
-  details   String? // JSON com detalhes adicionais
+  details   String?
   createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
 
-  // Índices para queries de auditoria e relatórios
-  @@index([userId]) // Já existia - logs de um usuário
-  @@index([tenantId]) // Já existia - logs de um tenant
-  @@index([action]) // Já existia - filtrar por tipo de ação
-  @@index([createdAt]) // Já existia - ordenar por data
-  @@index([tenantId, action, createdAt]) // NOVO - combinação comum para relatórios
-  @@index([userId, action, createdAt]) // NOVO - histórico de ações do usuário
+  @@index([userId])
+  @@index([tenantId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([tenantId, action, createdAt])
+  @@index([userId, action, createdAt])
   @@map("audit_logs")
 }
 
-// Tabela de Configurações de Segurança (apenas SUPER_ADMIN pode editar)
 model SecurityConfig {
   id                         String   @id @default(uuid())
-  // Rate Limiting
-  loginMaxAttempts           Int      @default(5) // Tentativas de login antes de bloquear
-  loginLockDurationMinutes   Int      @default(30) // Duração do bloqueio em minutos
-  loginWindowMinutes         Int      @default(1) // Janela de tempo em minutos
-  globalMaxRequests          Int      @default(100) // Requisições globais
-  globalWindowMinutes        Int      @default(1) // Janela de tempo global
-  // Senha
+  loginMaxAttempts           Int      @default(5)
+  loginLockDurationMinutes   Int      @default(30)
+  loginWindowMinutes         Int      @default(1)
+  globalMaxRequests          Int      @default(100)
+  globalWindowMinutes        Int      @default(1)
   passwordMinLength          Int      @default(8)
   passwordRequireUppercase   Boolean  @default(true)
   passwordRequireLowercase   Boolean  @default(true)
   passwordRequireNumbers     Boolean  @default(true)
   passwordRequireSpecial     Boolean  @default(true)
-  // JWT
-  accessTokenExpiresIn       String   @default("15m") // 15 minutos
-  refreshTokenExpiresIn      String   @default("7d") // 7 dias
-  // 2FA
-  twoFactorEnabled           Boolean  @default(false) // Habilitar 2FA globalmente
-  twoFactorRequired          Boolean  @default(false) // Tornar 2FA obrigatório
-  twoFactorRequiredForAdmins Boolean  @default(false) // 2FA obrigatório apenas para ADMIN/SUPER_ADMIN
-  twoFactorSuggested         Boolean  @default(true) // Exibir avisos sugerindo ativação de 2FA
-  // Email Verification
-  emailVerificationRequired  Boolean  @default(false) // Exigir verificação de email
-  emailVerificationLevel     String   @default("SOFT") // Nível: SOFT, MODERATE, STRICT
-  // Password Policy
-  passwordReuseLimit         Int      @default(5) // Prevenir reutilização das últimas N senhas
-  // Sessão
-  sessionTimeoutMinutes      Int      @default(30) // Timeout de inatividade em minutos (logout automático)
-  // Email SMTP Credentials (único para toda a plataforma)
-  smtpUsername               String? // Usuário SMTP
-  smtpPassword               String? // Senha SMTP (armazenada com criptografia)
-  // Configurações da Plataforma
-  platformName               String?  @default("Sistema Multitenant") // Nome da plataforma
-  platformEmail              String? // Email informativo da plataforma
-  platformPhone              String? // Telefone de contato da plataforma
+  accessTokenExpiresIn       String   @default("15m")
+  refreshTokenExpiresIn      String   @default("7d")
+  twoFactorEnabled           Boolean  @default(false)
+  twoFactorRequired          Boolean  @default(false)
+  twoFactorRequiredForAdmins Boolean  @default(false)
+  twoFactorSuggested         Boolean  @default(true)
+  emailVerificationRequired  Boolean  @default(false)
+  emailVerificationLevel     String   @default("SOFT")
+  passwordReuseLimit         Int      @default(5)
+  sessionTimeoutMinutes      Int      @default(30)
+  smtpUsername               String?
+  smtpPassword               String?
+  platformName               String?  @default("Sistema Multitenant")
+  platformEmail              String?
+  platformPhone              String?
   updatedAt                  DateTime @updatedAt
-  updatedBy                  String? // ID do SUPER_ADMIN que atualizou
+  updatedBy                  String?
 
   @@map("security_config")
 }
 
-// Tabela de Configurações de Email (apenas SUPER_ADMIN pode editar)
 model EmailConfiguration {
   id           String   @id @default(uuid())
   providerName String
@@ -192,48 +163,39 @@ model EmailConfiguration {
   @@map("email_configurations")
 }
 
-// Tabela de Configurações do Sistema de Updates (apenas SUPER_ADMIN pode editar)
 model SystemSettings {
   id                 String    @id @default(uuid())
-  // Versão da aplicação
   appVersion         String?   @default("1.0.0")
-  // Configurações do Git
-  gitToken           String? // Token criptografado
+  gitToken           String?
   gitUsername        String?
   gitRepository      String?
   gitReleaseBranch   String    @default("main")
-  // Configurações do sistema
   packageManager     String    @default("npm")
   updateCheckEnabled Boolean   @default(true)
   lastUpdateCheck    DateTime?
   availableVersion   String?
   updateAvailable    Boolean   @default(false)
-  // Metadados
   updatedAt          DateTime  @updatedAt
-  updatedBy          String? // ID do SUPER_ADMIN que atualizou
+  updatedBy          String?
 
   @@map("system_settings")
 }
 
-// Tabela de Logs de Atualizações (auditoria completa)
 model UpdateLog {
   id             String    @id @default(uuid())
-  version        String // Versão de destino
-  status         String // STARTED, SUCCESS, FAILED, ROLLED_BACK
+  version        String
+  status         String
   startedAt      DateTime  @default(now())
   completedAt    DateTime?
-  duration       Int? // Duração em segundos
-  // Detalhes da execução
+  duration       Int?
   packageManager String    @default("npm")
-  backupPath     String? // Caminho do backup criado
-  errorMessage   String? // Mensagem de erro se falhou
-  rollbackReason String? // Motivo do rollback
-  // Auditoria
-  executedBy     String? // ID do SUPER_ADMIN
+  backupPath     String?
+  errorMessage   String?
+  rollbackReason String?
+  executedBy     String?
   ipAddress      String?
   userAgent      String?
-  // Logs detalhados (JSON)
-  executionLogs  String? // Logs completos da execução
+  executionLogs  String?
 
   @@index([status])
   @@index([startedAt])
@@ -242,70 +204,43 @@ model UpdateLog {
   @@map("update_logs")
 }
 
-// Enums para status de módulos
-enum ModuleStatus {
-  detected
-  installed
-  db_ready
-  active
-  disabled
-}
-
-// Enums para tipos de migration
-enum MigrationType {
-  migration
-  seed
-}
-
-// Tabela principal de módulos
 model Module {
-  id          String       @id @default(uuid())
-  slug        String       @unique // Slug único do módulo (ex: "sistema", "financeiro")
-  name        String // Nome para exibição (ex: "Sistema", "Financeiro")
-  version     String       @default("1.0.0") // Versão do módulo
-  description String? // Descrição do módulo
-  status      ModuleStatus @default(detected) // Estado do ciclo de vida
-  
-  // Controle de Carregamento
-  enabled       Boolean @default(false)
-  backendEntry  String? // Caminho do entrypoint backend (ex: dist/modules/sistema/backend/module.js)
-  frontendEntry String? // Caminho do entrypoint frontend
-  lastError     String? // Último erro de carregamento
-  
-  hasBackend  Boolean      @default(false) // Se tem código backend
-  hasFrontend Boolean      @default(false) // Se tem código frontend
-  installedAt DateTime? // Quando foi instalado
-  activatedAt DateTime? // Quando foi ativado
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  // Relacionamentos
-  menus       ModuleMenu[]
+  id            String            @id @default(uuid())
+  slug          String            @unique
+  name          String
+  version       String            @default("1.0.0")
+  description   String?
+  status        ModuleStatus      @default(detected)
+  hasBackend    Boolean           @default(false)
+  hasFrontend   Boolean           @default(false)
+  installedAt   DateTime?
+  activatedAt   DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  menus         ModuleMenu[]
+  migrations    ModuleMigration[]
   tenantModules ModuleTenant[]
-  migrations  ModuleMigration[]
 
   @@index([status])
   @@index([slug])
-  @@index([enabled])
   @@map("modules")
 }
 
-// Tabela de menus dos módulos
 model ModuleMenu {
-  id         String   @id @default(uuid())
+  id         String       @id @default(uuid())
   moduleId   String
-  module     Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  label      String // Texto do menu
-  icon       String? // Ícone do menu
-  route      String // Rota do menu
-  parentId   String? // ID do menu pai (para submenus)
-  parent     ModuleMenu? @relation("MenuHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children   ModuleMenu[] @relation("MenuHierarchy") // Submenus
-  order      Int      @default(0) // Ordem de exibição
-  permission String? // Permissão necessária
-  isUserMenu Boolean  @default(true) // Se aparece no menu do usuário
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  label      String
+  icon       String?
+  route      String
+  parentId   String?
+  order      Int          @default(0)
+  permission String?
+  isUserMenu Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  module     Module       @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  parent     ModuleMenu?  @relation("MenuHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children   ModuleMenu[] @relation("MenuHierarchy")
 
   @@index([moduleId])
   @@index([parentId])
@@ -313,16 +248,15 @@ model ModuleMenu {
   @@map("module_menus")
 }
 
-// Tabela de módulos por tenant
 model ModuleTenant {
-  id       String  @id @default(uuid())
-  moduleId String
-  module   Module  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  tenantId String
-  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  enabled  Boolean @default(false) // Se o módulo está habilitado para este tenant
+  id        String   @id @default(uuid())
+  moduleId  String
+  tenantId  String
+  enabled   Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  module    Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([moduleId, tenantId])
   @@index([tenantId])
@@ -331,16 +265,15 @@ model ModuleTenant {
   @@map("module_tenant")
 }
 
-// Tabela de migrations dos módulos
 model ModuleMigration {
   id         String        @id @default(uuid())
   moduleId   String
-  module     Module        @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  filename   String // Nome do arquivo de migration/seed
-  type       MigrationType // migration ou seed
-  executedAt DateTime? // Quando foi executado
+  filename   String
+  type       MigrationType
+  executedAt DateTime?
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
+  module     Module        @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
   @@unique([moduleId, filename, type])
   @@index([moduleId])
@@ -349,25 +282,23 @@ model ModuleMigration {
   @@map("module_migrations")
 }
 
-// Tabela de Notificações
 model Notification {
   id        String    @id @default(uuid())
-  title     String // Título da notificação
-  message   String // Mensagem da notificação
-  severity  String // info, warning, critical
-  audience  String // user, admin, super_admin
-  source    String // core, module
-  module    String? // Slug do módulo (se source = module)
-  tenantId  String? // ID do tenant (null = global)
-  userId    String? // ID do usuário específico (null = todos da audiência)
-  context   String? // URL para redirecionamento
-  data      String    @default("{}") // Dados extras em JSON
-  read      Boolean   @default(false) // Se foi lida
-  readAt    DateTime? // Quando foi lida
+  title     String
+  message   String
+  severity  String
+  audience  String
+  source    String
+  module    String?
+  tenantId  String?
+  userId    String?
+  context   String?
+  data      String    @default("{}")
+  read      Boolean   @default(false)
+  readAt    DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  // Índices para performance
   @@index([tenantId])
   @@index([userId])
   @@index([audience])
@@ -376,65 +307,52 @@ model Notification {
   @@index([module])
   @@index([read])
   @@index([createdAt])
-  @@index([tenantId, audience, read]) // Consultas comuns
-  @@index([userId, read]) // Notificações não lidas do usuário
+  @@index([tenantId, audience, read])
+  @@index([userId, read])
   @@map("notifications")
 }
 
-// Tabela de páginas públicas por tenant
 model TenantPublicPage {
-  id          String  @id @default(uuid())
-  tenantId    String  @unique
-  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  title       String  @default("Página Institucional") // Título da página
-  subtitle    String? // Subtítulo
-  description String? // Descrição da empresa/tenant
-  content     String? // Conteúdo HTML da página
-  logoUrl     String? // URL do logo
-  bannerUrl   String? // URL do banner
-  contactInfo String? // Informações de contato em JSON
-  socialLinks String? // Links sociais em JSON
-  isActive    Boolean @default(false) // Se a página está ativa
+  id          String   @id @default(uuid())
+  tenantId    String   @unique
+  title       String   @default("Página Institucional")
+  subtitle    String?
+  description String?
+  content     String?
+  logoUrl     String?
+  bannerUrl   String?
+  contactInfo String?
+  socialLinks String?
+  isActive    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([isActive])
   @@map("tenant_public_pages")
 }
 
-
-// ============================================
-// MÓDULO DEMO-COMPLETO - TABELAS
-// ============================================
-
-enum DemoStatus {
-  draft
-  published
-  archived
-}
-
-// Tabela principal de demonstrações
 model Demo {
-  id          String               @id @default(uuid())
+  id          String                 @id @default(uuid())
   tenantId    String
   title       String
   description String?
   content     String?
-  status      DemoStatus           @default(draft)
-  priority    Int                  @default(0)
-  viewsCount  Int                  @default(0)
-  likesCount  Int                  @default(0)
+  status      DemoStatus             @default(draft)
+  priority    Int                    @default(0)
+  viewsCount  Int                    @default(0)
+  likesCount  Int                    @default(0)
   createdBy   String?
   updatedBy   String?
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
   deletedAt   DateTime?
-  categories  DemoCategoryRelation[]
-  tags        DemoTagRelation[]
-  attachments DemoAttachment[]
-  comments    DemoComment[]
   activities  DemoActivity[]
+  attachments DemoAttachment[]
+  categories  DemoCategoryRelation[]
+  comments    DemoComment[]
+  tags        DemoTagRelation[]
 
   @@index([tenantId])
   @@index([status])
@@ -444,20 +362,19 @@ model Demo {
   @@map("demos")
 }
 
-// Tabela de categorias
 model DemoCategory {
-  id         String                 @id @default(uuid())
-  tenantId   String
-  name       String
-  slug       String
+  id          String                 @id @default(uuid())
+  tenantId    String
+  name        String
+  slug        String
   description String?
-  color      String?
-  icon       String?
-  orderIndex Int                    @default(0)
-  isActive   Boolean                @default(true)
-  createdAt  DateTime               @default(now())
-  updatedAt  DateTime               @updatedAt
-  demos      DemoCategoryRelation[]
+  color       String?
+  icon        String?
+  orderIndex  Int                    @default(0)
+  isActive    Boolean                @default(true)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  demos       DemoCategoryRelation[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])
@@ -466,7 +383,6 @@ model DemoCategory {
   @@map("demo_categories")
 }
 
-// Tabela de tags
 model DemoTag {
   id         String            @id @default(uuid())
   tenantId   String
@@ -484,13 +400,12 @@ model DemoTag {
   @@map("demo_tags")
 }
 
-// Relacionamento demos <-> categories (many-to-many)
 model DemoCategoryRelation {
   demoId     String
-  demo       Demo         @relation(fields: [demoId], references: [id], onDelete: Cascade)
   categoryId String
-  category   DemoCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   createdAt  DateTime     @default(now())
+  category   DemoCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  demo       Demo         @relation(fields: [demoId], references: [id], onDelete: Cascade)
 
   @@id([demoId, categoryId])
   @@index([demoId])
@@ -498,13 +413,12 @@ model DemoCategoryRelation {
   @@map("demo_category_relations")
 }
 
-// Relacionamento demos <-> tags (many-to-many)
 model DemoTagRelation {
   demoId    String
-  demo      Demo     @relation(fields: [demoId], references: [id], onDelete: Cascade)
   tagId     String
-  tag       DemoTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+  demo      Demo     @relation(fields: [demoId], references: [id], onDelete: Cascade)
+  tag       DemoTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([demoId, tagId])
   @@index([demoId])
@@ -512,11 +426,9 @@ model DemoTagRelation {
   @@map("demo_tag_relations")
 }
 
-// Tabela de anexos/arquivos
 model DemoAttachment {
   id               String   @id @default(uuid())
   demoId           String
-  demo             Demo     @relation(fields: [demoId], references: [id], onDelete: Cascade)
   filename         String
   originalFilename String
   mimeType         String
@@ -525,26 +437,26 @@ model DemoAttachment {
   thumbnailPath    String?
   uploadedBy       String?
   createdAt        DateTime @default(now())
+  demo             Demo     @relation(fields: [demoId], references: [id], onDelete: Cascade)
 
   @@index([demoId])
   @@index([mimeType])
   @@map("demo_attachments")
 }
 
-// Tabela de comentários
 model DemoComment {
-  id        String         @id @default(uuid())
+  id        String        @id @default(uuid())
   demoId    String
-  demo      Demo           @relation(fields: [demoId], references: [id], onDelete: Cascade)
   parentId  String?
-  parent    DemoComment?   @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies   DemoComment[]  @relation("CommentReplies")
   userId    String
   content   String
-  isEdited  Boolean        @default(false)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  isEdited  Boolean       @default(false)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
   deletedAt DateTime?
+  demo      Demo          @relation(fields: [demoId], references: [id], onDelete: Cascade)
+  parent    DemoComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   DemoComment[] @relation("CommentReplies")
 
   @@index([demoId])
   @@index([userId])
@@ -553,17 +465,16 @@ model DemoComment {
   @@map("demo_comments")
 }
 
-// Tabela de atividades/audit log
 model DemoActivity {
   id        String   @id @default(uuid())
   demoId    String
-  demo      Demo     @relation(fields: [demoId], references: [id], onDelete: Cascade)
   userId    String?
   action    String
   changes   String?
   ipAddress String?
   userAgent String?
   createdAt DateTime @default(now())
+  demo      Demo     @relation(fields: [demoId], references: [id], onDelete: Cascade)
 
   @@index([demoId])
   @@index([userId])
@@ -572,50 +483,53 @@ model DemoActivity {
   @@map("demo_activities")
 }
 
-// ============================================
-// MÓDULO SECURE FILES - UPLOADS SENSÍVEIS
-// ============================================
-
-// Tabela de arquivos sensíveis com isolamento multi-tenant
 model SecureFile {
-  id              String    @id @default(uuid())
-  tenantId        String    // ID do tenant proprietário
-  moduleName      String    // Slug do módulo que fez upload
-  documentType    String    // Tipo de documento (categoria)
-  originalName    String    // Nome original do arquivo (sanitizado)
-  storedName      String    // Nome do arquivo no filesystem (UUID + extensão)
-  mimeType        String    // Tipo MIME validado
-  sizeBytes       BigInt    // Tamanho do arquivo em bytes
-  uploadedBy      String    // ID do usuário que fez upload
-  uploadedAt      DateTime  @default(now())
-  lastAccessedAt  DateTime? // Última vez que foi acessado
-  accessCount     Int       @default(0) // Contador de acessos
-  deletedAt       DateTime? // Soft delete
-  metadata        String?   @db.Text // Metadados adicionais em JSON
+  id             String    @id @default(uuid())
+  tenantId       String
+  moduleName     String
+  documentType   String
+  originalName   String
+  storedName     String
+  mimeType       String
+  sizeBytes      BigInt
+  uploadedBy     String
+  uploadedAt     DateTime  @default(now())
+  lastAccessedAt DateTime?
+  accessCount    Int       @default(0)
+  deletedAt      DateTime?
+  metadata       String?
 
-  // Índices para performance
-  @@index([tenantId]) // Isolamento multi-tenant
-  @@index([moduleName]) // Filtrar por módulo
-  @@index([uploadedBy]) // Auditoria
-  @@index([documentType]) // Busca por categoria
-  @@index([tenantId, moduleName, documentType]) // Consulta composta comum
-  @@index([deletedAt]) // Soft delete
+  @@index([tenantId])
+  @@index([moduleName])
+  @@index([uploadedBy])
+  @@index([documentType])
+  @@index([tenantId, moduleName, documentType])
+  @@index([deletedAt])
   @@map("secure_files")
 }
 
-// ============================================
-// MÓDULO SISTEMA - TABELAS
-// ============================================
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  USER
+  CLIENT
+}
 
-model SistemaNotificationSchedule {
-  id              String   @id @default(uuid())
-  title           String
-  content         String
-  audience        String
-  cronExpression  String
-  enabled         Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+enum ModuleStatus {
+  detected
+  installed
+  db_ready
+  active
+  disabled
+}
 
-  @@map("sistema_notification_schedules")
+enum MigrationType {
+  migration
+  seed
+}
+
+enum DemoStatus {
+  draft
+  published
+  archived
 }

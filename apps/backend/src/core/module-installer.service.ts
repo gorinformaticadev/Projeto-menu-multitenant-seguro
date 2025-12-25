@@ -294,17 +294,6 @@ export class ModuleInstallerService {
         structure: ModuleStructureResult,
         modulePath: string
     ) {
-        let backendEntry: string | null = null;
-        if (structure.hasBackend) {
-            // Assume convention: has backend/${slug}.module.ts
-            backendEntry = `../../packages/modules/${moduleJson.name}/backend/${moduleJson.name}.module`;
-        }
-
-        let frontendEntry: string | null = null;
-        if (structure.hasFrontend) {
-            frontendEntry = `../../packages/modules/${moduleJson.name}/frontend`;
-        }
-
         return await this.prisma.module.create({
             data: {
                 slug: moduleJson.name,
@@ -314,8 +303,6 @@ export class ModuleInstallerService {
                 status: ModuleStatus.installed,
                 hasBackend: structure.hasBackend,
                 hasFrontend: structure.hasFrontend,
-                backendEntry,
-                frontendEntry,
                 installedAt: new Date()
             }
         });
@@ -407,8 +394,7 @@ export class ModuleInstallerService {
             where: { slug },
             data: {
                 status: ModuleStatus.active,
-                activatedAt: new Date(),
-                enabled: true // Garante que será carregado no próximo boot
+                activatedAt: new Date()
             }
         });
 
@@ -491,8 +477,7 @@ export class ModuleInstallerService {
             where: { slug },
             data: {
                 status: ModuleStatus.disabled,
-                activatedAt: null,
-                enabled: false // Garante consistência com o novo campo enabled
+                activatedAt: null
             }
         });
 

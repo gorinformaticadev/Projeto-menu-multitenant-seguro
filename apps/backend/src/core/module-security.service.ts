@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
+import {
+    PrismaClientKnownRequestError,
+    PrismaClientValidationError
+} from '@prisma/client/runtime/library';
 
 /**
  * Serviço de Segurança para Módulos
@@ -142,7 +146,7 @@ export class ModuleSecurityService {
     async getAvailableModules(tenantId: string): Promise<any[]> {
         try {
             const modules = await this.prisma.module.findMany({
-                where: { 
+                where: {
                     status: {
                         in: ['active', 'installed', 'db_ready']
                     }
@@ -160,10 +164,10 @@ export class ModuleSecurityService {
             // Mapear módulos com estrutura completa
             return modules.map(module => {
                 const enabled = module.tenantModules.length > 0 ? module.tenantModules[0]?.enabled : false;
-                
+
                 // Construir estrutura hierárquica de menus
                 const menuTree = this.buildMenuTree(module.menus);
-                
+
                 return {
                     slug: module.slug,
                     name: module.name,
@@ -178,25 +182,44 @@ export class ModuleSecurityService {
             });
 
         } catch (error) {
-            // Tratamento específico para erros de schema
-            if (error instanceof Prisma.PrismaClientKnownRequestError) {
-                this.logger.error(`Erro de schema ao listar módulos para tenant ${tenantId}:`, error.message);
-                
-                // Verificar se é erro de coluna inexistente
-                if (error.message.includes('slug')) {
-                    this.logger.warn('Possível inconsistência no schema - coluna slug não encontrada');
-                    // Retornar array vazio como fallback
-                    return [];
+            // Tratamento robusto de erros de schema
+            if (error instanceof PrismaClientKnownRequestError) {
+                // P2010: Erro de query SQL (coluna inexistente, etc)
+                // P2021: Tabela não existe
+                if (error.code === 'P2010' || error.code === 'P2021') {
+                    this.logger.error(
+                        `❌ Schema inconsistency for tenant ${tenantId}: ${error.message}`
+                    );
+                    this.logger.warn(
+                        '⚠️ Database schema may be out of sync. Please run migrations.'
+                    );
+                } else {
+                    this.logger.error(
+                        `❌ Prisma error listing modules for tenant ${tenantId} (${error.code}): ${error.message}`
+                    );
                 }
+            } else if (error instanceof PrismaClientValidationError) {
+                // Erro de validação do Prisma (campo inexistente no modelo, etc)
+                this.logger.error(
+                    `❌ Validation error listing modules for tenant ${tenantId}: ${error.message}`
+                );
+                this.logger.warn(
+                    '⚠️ This may indicate a mismatch between Prisma schema and database.'
+                );
+            } else {
+                // Erro genérico
+                this.logger.error(
+                    `❌ Unexpected error listing modules for tenant ${tenantId}:`,
+                    error
+                );
             }
-            
-            // Log genérico para outros tipos de erro
-            this.logger.error(`Erro ao listar módulos para tenant ${tenantId}:`, error);
-            // Sempre retornar array vazio em caso de erro para manter a consistência da API
+
+            // Sempre retornar array vazio para manter consistência da API
+            // O frontend deve lidar graciosamente com lista vazia
             return [];
         }
     }
-    
+
     /**
      * Constrói árvore hierárquica de menus
      */
@@ -204,7 +227,7 @@ export class ModuleSecurityService {
         // Separar menus pai (sem parentId) e filhos
         const parentMenus = menus.filter(m => !m.parentId);
         const childMenus = menus.filter(m => m.parentId);
-        
+
         // Mapear menus pai e adicionar filhos
         return parentMenus.map(parent => ({
             id: parent.id,
