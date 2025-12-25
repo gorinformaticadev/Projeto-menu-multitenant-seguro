@@ -3,28 +3,35 @@
 import React from 'react';
 import { useParams } from 'next/navigation';
 
-interface ModulePageProps {
-    params: {
-        module: string;
-        slug: string[];
-    };
-}
-
 /**
- * Rota dinâmica para páginas de módulos
- * Resolve componentes DINAMICAMENTE baseado em convenção de caminhos
+ * Loader dinâmico de páginas de módulos
  * 
- * PRINCÍPIO: O banco define quais módulos existem, o código resolve onde estão
+ * CONVENÇÃO OFICIAL OBRIGATÓRIA:
+ * - URL: /modules/{moduleSlug}/{route-slug}
+ * - Estrutura: packages/modules/{moduleSlug}/frontend/pages/{route-slug}/page.tsx
+ * 
+ * EXEMPLO:
+ * - URL: /modules/sistema/model-notification
+ * - Arquivo: packages/modules/sistema/frontend/pages/model-notification/page.tsx
+ * 
+ * PRINCÍPIOS:
+ * - Sem conversões mágicas (camelCase ↔ kebab-case)
+ * - Sem fallbacks múltiplos
+ * - Sem tentativas de adivinhar nomes
+ * - Import direto do caminho esperado
  */
 export default function ModulePage() {
     const params = useParams();
     const moduleSlug = params.module as string;
     const slug = params.slug as string[];
+
+    // Rota é o caminho completo após /modules/{moduleSlug}/
+    // Ex: ['model-notification'] -> 'model-notification'
+    // Ex: ['relatorios', 'vendas'] -> 'relatorios/vendas'
     const route = slug?.join('/') || 'index';
 
-    console.log('🔎 [ModulePage] Carregando página dinâmica:', { moduleSlug, route });
+    console.log('🔎 [ModulePage] Parâmetros:', { moduleSlug, slug, route });
 
-    // Estado para componente carregado
     const [Component, setComponent] = React.useState<React.ComponentType<any> | null>(null);
     const [error, setError] = React.useState<string | null>(null);
     const [loading, setLoading] = React.useState(true);
@@ -38,36 +45,23 @@ export default function ModulePage() {
             setLoading(true);
             setError(null);
 
-            // Convenção de caminho: @modules/{moduleSlug}/frontend/pages/{route}
-            // Exemplo: @modules/sistema/frontend/pages/ajustes
-            const componentPath = `@modules/${moduleSlug}/frontend/pages/${route}`;
+            // Caminho esperado: packages/modules/{moduleSlug}/frontend/pages/{route}/page.tsx
+            // Usando alias @modules configurado no tsconfig.json
+            const modulePath = `@modules/${moduleSlug}/frontend/pages/${route}/page`;
 
-            console.log('📦 [ModulePage] Tentando carregar:', componentPath);
+            console.log('📦 [ModulePage] Importando de:', modulePath);
 
-            // Import dinâmico
+            // Import dinâmico usando o alias @modules
+            // Next.js consegue resolver isso porque @modules está mapeado no tsconfig
             const module = await import(
-                /* webpackIgnore: true */
-                `../../../../../packages/modules/${moduleSlug}/frontend/pages/${route}`
-            ).catch(async (err) => {
-                // Fallback: tentar com .tsx
-                console.log('⚠️ Tentando com extensão .tsx...');
-                return await import(
-                    /* webpackIgnore: true */
-                    `../../../../../packages/modules/${moduleSlug}/frontend/pages/${route}.tsx`
-                );
-            }).catch(async (err) => {
-                // Fallback: tentar index
-                console.log('⚠️ Tentando index...');
-                return await import(
-                    /* webpackIgnore: true */
-                    `../../../../../packages/modules/${moduleSlug}/frontend/pages/${route}/index`
-                );
-            });
+                /* @vite-ignore */
+                `@modules/${moduleSlug}/frontend/pages/${route}/page`
+            );
 
-            const ComponentToLoad = module.default || module;
+            const ComponentToLoad = module.default;
 
             if (!ComponentToLoad) {
-                throw new Error('Componente não exporta default');
+                throw new Error('O arquivo page.tsx não exporta um componente default');
             }
 
             setComponent(() => ComponentToLoad);
@@ -75,7 +69,16 @@ export default function ModulePage() {
 
         } catch (err: any) {
             console.error(`❌ [ModulePage] Erro ao carregar ${moduleSlug}/${route}:`, err);
-            setError(`Não foi possível carregar a página do módulo "${moduleSlug}"`);
+
+            const expectedPath = `packages/modules/${moduleSlug}/frontend/pages/${route}/page.tsx`;
+            setError(
+                `Página não encontrada.\n\n` +
+                `Caminho esperado:\n${expectedPath}\n\n` +
+                `Verifique se:\n` +
+                `1. O diretório existe: packages/modules/${moduleSlug}/frontend/pages/${route}/\n` +
+                `2. O arquivo page.tsx existe dentro do diretório\n` +
+                `3. O arquivo exporta: export default function Page() { ... }`
+            );
         } finally {
             setLoading(false);
         }
@@ -94,16 +97,23 @@ export default function ModulePage() {
 
     if (error || !Component) {
         return (
-            <div className="p-6">
-                <h2 className="text-2xl font-bold mb-2">Módulo não encontrado</h2>
-                <p className="text-muted-foreground mb-4">
-                    {error || `O módulo "${moduleSlug}" não possui a página "${route}".`}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                    Caminho esperado: <code className="bg-muted px-2 py-1 rounded">
-                        packages/modules/{moduleSlug}/frontend/pages/{route}
-                    </code>
-                </p>
+            <div className="p-6 max-w-3xl">
+                <h2 className="text-2xl font-bold mb-4 text-destructive">Página não encontrada</h2>
+                <div className="bg-muted p-4 rounded-lg mb-4 font-mono text-sm">
+                    <pre className="whitespace-pre-wrap">{error}</pre>
+                </div>
+                <div className="text-sm text-muted-foreground space-y-2">
+                    <p><strong>Módulo:</strong> <code className="bg-muted px-2 py-1 rounded">{moduleSlug}</code></p>
+                    <p><strong>Rota:</strong> <code className="bg-muted px-2 py-1 rounded">{route}</code></p>
+                </div>
+                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded">
+                    <p className="text-blue-900 text-sm">
+                        <strong>📘 Convenção:</strong> Todas as páginas de módulos devem seguir a estrutura:
+                        <code className="block mt-2 bg-blue-100 px-3 py-2 rounded">
+                            packages/modules/&#123;moduleSlug&#125;/frontend/pages/&#123;route&#125;/page.tsx
+                        </code>
+                    </p>
+                </div>
             </div>
         );
     }
