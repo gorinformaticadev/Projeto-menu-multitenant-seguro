@@ -23,6 +23,7 @@ import { SecureFilesModule } from './core/secure-files/secure-files.module';
 import { AppModulesModule } from './core/modules/AppModules.module';
 import { WhatsAppModule } from './core/whatsapp/whatsapp.module';
 import { CronModule } from './core/cron/cron.module';
+import { SistemaModule } from './modules/sistema/sistema.module';
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { CronModule } from './core/cron/cron.module';
     SecureFilesModule, // Módulo de uploads sensíveis
     AppModulesModule.forRoot(), // Módulo de carregamento dinâmico de módulos externos
     CronModule,
+    SistemaModule,
   ],
   providers: [
     {

@@ -22,12 +22,8 @@ export class ModuleInstallerService {
     private readonly logger = new Logger(ModuleInstallerService.name);
 
     // Caminhos definidos conforme especificação do monorepo
-    // Backend: apps/backend/modules/{slug}
     private readonly backendModulesPath = path.resolve(process.cwd(), 'modules');
-
-    // Frontend: apps/frontend/src/app/modules
     private readonly frontendBase = path.resolve(process.cwd(), '..', 'frontend', 'src', 'app', 'modules');
-
     private readonly uploadsPath = path.resolve(process.cwd(), 'uploads', 'modules');
 
     constructor(
@@ -201,13 +197,27 @@ export class ModuleInstallerService {
             let targetPath = '';
             const data = entry.getData();
 
-            if (relativePath.startsWith('frontend/pages/')) {
-                const inner = relativePath.substring('frontend/pages/'.length);
-                targetPath = path.join(frontendDest, inner);
+            // Lógica de Distribuição Atualizada
+            if (relativePath.startsWith('frontend/')) {
+                // Conteúdo de Pages (Flatten) -> Garante rotas limpas em modules/{slug}/
+                if (relativePath.startsWith('frontend/pages/')) {
+                    const inner = relativePath.substring('frontend/pages/'.length);
+                    if (inner.trim() !== '') {
+                        targetPath = path.join(frontendDest, inner);
+                    }
+                } else {
+                    // Outros Assets (Components, Utils) -> modules/{slug}/components, etc.
+                    const inner = relativePath.substring('frontend/'.length);
+                    if (inner.trim() !== '') {
+                        targetPath = path.join(frontendDest, inner);
+                    }
+                }
             } else if (relativePath.startsWith('backend/')) {
+                // Backend
                 const inner = relativePath.substring('backend/'.length);
                 targetPath = path.join(backendDest, inner);
             } else if (!relativePath.includes('/')) {
+                // Raiz (module.json)
                 targetPath = path.join(backendDest, relativePath);
             }
 
