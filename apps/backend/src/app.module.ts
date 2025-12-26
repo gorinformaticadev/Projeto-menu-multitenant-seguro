@@ -1,4 +1,4 @@
-import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer, DynamicModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -20,10 +20,10 @@ import { UpdateModule } from './update/update.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CoreModule } from './core/CoreModule';
 import { SecureFilesModule } from './core/secure-files/secure-files.module';
-import { AppModulesModule } from './core/modules/AppModules.module';
+import { DynamicModulesLoader } from './core/dynamic-modules.loader';
+import { PrismaService } from './core/prisma/prisma.service';
 import { WhatsAppModule } from './core/whatsapp/whatsapp.module';
 import { CronModule } from './core/cron/cron.module';
-import { SistemaModule } from './modules/sistema/sistema.module';
 
 @Module({
   imports: [
@@ -64,9 +64,7 @@ import { SistemaModule } from './modules/sistema/sistema.module';
     NotificationsModule, // Novo sistema Socket.IO apenas
     WhatsAppModule,
     SecureFilesModule, // Módulo de uploads sensíveis
-    AppModulesModule.forRoot(), // Módulo de carregamento dinâmico de módulos externos
     CronModule,
-    SistemaModule,
   ],
   providers: [
     {
@@ -83,6 +81,23 @@ import { SistemaModule } from './modules/sistema/sistema.module';
   ],
 })
 export class AppModule implements NestModule {
+  static async register(): Promise<DynamicModule> {
+    const prisma = new PrismaService();
+    // Conecta explicitamente para garantir que o banco está acessível
+    // (Opcional, pois o Prisma conecta ao fazer a query, mas boa prática para debug)
+
+    const dynamicModules = await DynamicModulesLoader.load(prisma);
+
+    // Desconecta após carregar (cada módulo terá seu próprio PrismaService via injeção se necessário,
+    // ou usarão o PrismaModule global)
+    await prisma.$disconnect();
+
+    return {
+      module: AppModule,
+      imports: [...dynamicModules],
+    };
+  }
+
   configure(consumer: MiddlewareConsumer) {
     // HTTPS Redirect - Apenas em produção
     consumer.apply(HttpsRedirectMiddleware).forRoutes('*');

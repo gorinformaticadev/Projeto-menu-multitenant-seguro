@@ -29,7 +29,9 @@ async function bootstrap() {
 
   console.log('✅ Configurações de segurança validadas com sucesso');
 
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // Carregamento dinâmico de módulos via register()
+  const dynamicModule = await AppModule.register();
+  const app = await NestFactory.create<NestExpressApplication>(dynamicModule);
 
   // ============================================
   // 🔒 COOKIE PARSER - Necessário para CSRF protection
@@ -161,10 +163,10 @@ async function bootstrap() {
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-        
+
         // Cache mais longo para logos (mudam raramente)
         res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache por 24 horas
-        
+
         if (!isProduction) {
           console.log('🖼️  Servindo logo:', path);
         }
@@ -181,7 +183,7 @@ async function bootstrap() {
         if (origin && allowedOrigins.includes(origin)) {
           res.setHeader('Access-Control-Allow-Origin', origin);
         }
-        
+
         // Cache padrão para outros arquivos
         res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache por 1 hora
       }
