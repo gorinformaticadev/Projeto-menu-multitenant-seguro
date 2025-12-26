@@ -14,10 +14,13 @@ import * as fs from 'fs';
 @Injectable()
 export class ModuleResolverService {
     private readonly logger = new Logger(ModuleResolverService.name);
-    private readonly modulesBasePath = path.resolve(process.cwd(), '..', '..', 'packages', 'modules');
+    // Caminho dos módulos de backend: apps/backend/modules
+    private readonly modulesBasePath = path.resolve(process.cwd(), 'modules');
+    // Caminho dos módulos de frontend: apps/frontend/src/app/modules
+    private readonly frontendModulesPath = path.resolve(process.cwd(), '..', 'frontend', 'src', 'app', 'modules');
 
     constructor(private readonly prisma: PrismaService) {
-        this.logger.log(`📂 Módulos base path: ${this.modulesBasePath}`);
+        this.logger.log(`📂 Módulos base path (Backend): ${this.modulesBasePath}`);
     }
 
     /**
@@ -27,9 +30,9 @@ export class ModuleResolverService {
      */
     resolveModulePath(moduleSlug: string): string | null {
         const modulePath = path.join(this.modulesBasePath, moduleSlug);
-        
+
         if (!fs.existsSync(modulePath)) {
-            this.logger.warn(`⚠️ Diretório do módulo não encontrado: ${modulePath}`);
+            // this.logger.warn(`⚠️ Diretório do módulo não encontrado: ${modulePath}`);
             return null;
         }
 
@@ -82,31 +85,30 @@ export class ModuleResolverService {
      * @returns Caminho absoluto do componente ou null
      */
     resolveFrontendComponent(moduleSlug: string, componentPath: string): string | null {
-        const modulePath = this.resolveModulePath(moduleSlug);
-        if (!modulePath) {
+        const moduleFrontendPath = path.join(this.frontendModulesPath, moduleSlug);
+
+        if (!fs.existsSync(moduleFrontendPath)) {
             return null;
         }
 
-        const frontendPath = path.join(modulePath, 'frontend', componentPath);
-        
-        // Tentar diferentes extensões
-        const extensions = ['.tsx', '.ts', '.jsx', '.js'];
+        const fullPath = path.join(moduleFrontendPath, componentPath);
+
+        const extensions = ['', '.tsx', '.ts', '.jsx', '.js'];
         for (const ext of extensions) {
-            const fullPath = frontendPath + ext;
-            if (fs.existsSync(fullPath)) {
-                return fullPath;
+            const tryPath = fullPath + ext;
+            if (fs.existsSync(tryPath)) {
+                return tryPath;
             }
         }
 
-        // Tentar como diretório com index
         for (const ext of extensions) {
-            const indexPath = path.join(frontendPath, 'index' + ext);
+            if (ext === '') continue;
+            const indexPath = path.join(fullPath, 'index' + ext);
             if (fs.existsSync(indexPath)) {
                 return indexPath;
             }
         }
 
-        this.logger.warn(`⚠️ Componente frontend não encontrado: ${frontendPath}`);
         return null;
     }
 
@@ -116,16 +118,16 @@ export class ModuleResolverService {
      */
     async validateAndDisableIfMissing(moduleSlug: string): Promise<void> {
         const modulePath = this.resolveModulePath(moduleSlug);
-        
+
         if (!modulePath) {
             this.logger.warn(`⚠️ Código-fonte do módulo ${moduleSlug} não encontrado. Desativando...`);
-            
+
             try {
                 await this.prisma.module.update({
                     where: { slug: moduleSlug },
                     data: { status: 'disabled' }
                 });
-                
+
                 this.logger.log(`✅ Módulo ${moduleSlug} desativado automaticamente`);
             } catch (error) {
                 this.logger.error(`Erro ao desativar módulo ${moduleSlug}:`, error);
