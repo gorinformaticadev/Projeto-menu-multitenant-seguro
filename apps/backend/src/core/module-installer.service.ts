@@ -22,7 +22,7 @@ export class ModuleInstallerService {
     private readonly logger = new Logger(ModuleInstallerService.name);
 
     // Caminhos definidos conforme especificação do monorepo
-    private readonly backendModulesPath = path.resolve(process.cwd(), 'modules');
+    private readonly backendModulesPath = path.resolve(process.cwd(), 'src', 'modules');
     private readonly frontendBase = path.resolve(process.cwd(), '..', 'frontend', 'src', 'app', 'modules');
     private readonly uploadsPath = path.resolve(process.cwd(), 'uploads', 'modules');
 
