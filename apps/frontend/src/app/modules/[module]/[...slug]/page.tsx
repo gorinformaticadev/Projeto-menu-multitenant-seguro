@@ -4,21 +4,13 @@ import React from 'react';
 import { useParams } from 'next/navigation';
 
 /**
- * Loader dinâmico de páginas de módulos
+ * Loader dinâmico de páginas de módulos (FALLBACK)
  * 
- * CONVENÇÃO OFICIAL OBRIGATÓRIA:
- * - URL: /modules/{moduleSlug}/{route-slug}
- * - Estrutura: apps/backend/src/modules/{moduleSlug}/frontend/pages/{route-slug}/page.tsx
+ * ATENÇÃO: O Next.js deve priorizar pastas estáticas (ex: modules/sistema).
+ * Este loader serve apenas como fallback para rotas não mapeadas fisicamente.
  * 
- * EXEMPLO:
- * - URL: /modules/sistema/model-notification
- * - Arquivo: apps/backend/src/modules/sistema/frontend/pages/model-notification/page.tsx
- * 
- * PRINCÍPIOS:
- * - Sem conversões mágicas (camelCase ↔ kebab-case)
- * - Sem fallbacks múltiplos
- * - Sem tentativas de adivinhar nomes
- * - Import direto do caminho esperado
+ * CAMINHO DE BUSCA:
+ * - apps/frontend/src/app/modules/{moduleSlug}/{route}/page.tsx
  */
 export default function ModulePage() {
     const params = useParams();
@@ -26,11 +18,9 @@ export default function ModulePage() {
     const slug = params.slug as string[];
 
     // Rota é o caminho completo após /modules/{moduleSlug}/
-    // Ex: ['model-notification'] -> 'model-notification'
-    // Ex: ['relatorios', 'vendas'] -> 'relatorios/vendas'
     const route = slug?.join('/') || 'index';
 
-    console.log('🔎 [ModulePage] Parâmetros:', { moduleSlug, slug, route });
+    console.log('🔎 [ModulePage] Buscando rota (fallback):', { moduleSlug, route });
 
     const [Component, setComponent] = React.useState<React.ComponentType<any> | null>(null);
     const [error, setError] = React.useState<string | null>(null);
@@ -45,19 +35,11 @@ export default function ModulePage() {
             setLoading(true);
             setError(null);
 
-            // Caminho esperado: apps/backend/src/modules/{moduleSlug}/frontend/pages/{route}/page.tsx
-            // Usando alias @modules configurado no tsconfig.json
-            // Caminho relativo calculado para sair de apps/frontend/src/app/modules/[module]/[...slug]
-            // até apps/backend/src/modules
-            // Níveis: [...slug] -> [module] -> modules -> app -> src -> frontend -> apps -> root -> apps -> backend -> src -> modules
-            // Mas o import dinâmico do Webpack resolve relativo ao arquivo fonte
-            // Caminho: ../../../../../../backend/src/modules/${moduleSlug}/frontend/pages/${route}/page
-
-            // Tenta carregar usando import relativo para garantir que o Webpack encontre a árvore de arquivos
-            // mesmo que o alias @modules falhe se não houver módulos com frontend
+            // Tenta carregar do diretório FRONTEND
+            // Caminho relativo: ../../{moduleSlug}/{route}/page
             const module = await import(
                 /* @vite-ignore */
-                `../../../../../../backend/src/modules/${moduleSlug}/frontend/pages/${route}/page`
+                `../../${moduleSlug}/${route}/page`
             );
 
             const ComponentToLoad = module.default;
@@ -67,24 +49,21 @@ export default function ModulePage() {
             }
 
             setComponent(() => ComponentToLoad);
-            console.log('✅ [ModulePage] Componente carregado com sucesso');
+            console.log('✅ [ModulePage] Componente carregado:', `${moduleSlug}/${route}`);
 
         } catch (err: any) {
-            console.error(`❌ [ModulePage] Erro ao carregar ${moduleSlug}/${route}:`, err);
+            console.error(`❌ [ModulePage] Falha ao carregar ${moduleSlug}/${route}:`, err);
 
-            const expectedPath = `apps/backend/src/modules/${moduleSlug}/frontend/pages/${route}/page.tsx`;
+            const expectedPath = `apps/frontend/src/app/modules/${moduleSlug}/${route}/page.tsx`;
+
             let errorMessage = `Página não encontrada.\n\n` +
-                `Caminho esperado:\n${expectedPath}\n\n` +
-                `Verifique se:\n` +
-                `1. O diretório existe: apps/backend/src/modules/${moduleSlug}/frontend/pages/${route}/\n` +
-                `2. O arquivo page.tsx existe dentro do diretório\n` +
-                `3. O arquivo exporta: export default function Page() { ... }`;
+                `Caminho buscado:\n${expectedPath}\n\n` +
+                `Verifique se o arquivo existe e se a URL contém o caminho completo (ex: /pages/dashboard).`;
 
-            // Tratamento específico para módulo ou página não encontrada
             if (err.message && (err.message.includes('Cannot find module') || err.code === 'MODULE_NOT_FOUND')) {
                 errorMessage = `Módulo ou página não encontrada (${moduleSlug}/${route}).\n` +
-                    `O sistema tentou carregar dinamicamente o arquivo, mas ele não existe ou não foi incluído no build.\n\n` +
-                    `Caminho: ${expectedPath}`;
+                    `O arquivo não foi encontrado no build do Frontend.\n\n` +
+                    `Caminho esperado: ${expectedPath}`;
             }
 
             setError(errorMessage);
@@ -98,7 +77,7 @@ export default function ModulePage() {
             <div className="flex items-center justify-center min-h-[50vh]">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                    <p className="text-muted-foreground">Carregando módulo...</p>
+                    <p className="text-muted-foreground">Carregando...</p>
                 </div>
             </div>
         );
@@ -117,9 +96,9 @@ export default function ModulePage() {
                 </div>
                 <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded">
                     <p className="text-blue-900 text-sm">
-                        <strong>📘 Convenção:</strong> Todas as páginas de módulos devem seguir a estrutura:
+                        <strong>📘 Estrutura Esperada:</strong>
                         <code className="block mt-2 bg-blue-100 px-3 py-2 rounded">
-                            packages/modules/&#123;moduleSlug&#125;/frontend/pages/&#123;route&#125;/page.tsx
+                            apps/frontend/src/app/modules/&#123;module&#125;/&#123;route&#125;/page.tsx
                         </code>
                     </p>
                 </div>

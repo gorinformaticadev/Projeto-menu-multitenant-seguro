@@ -197,20 +197,13 @@ export class ModuleInstallerService {
             let targetPath = '';
             const data = entry.getData();
 
-            // Lógica de Distribuição Atualizada
+            // Lógica de Distribuição Atualizada - PRESERVANDO ESTRUTURA
             if (relativePath.startsWith('frontend/')) {
-                // Conteúdo de Pages (Flatten) -> Garante rotas limpas em modules/{slug}/
-                if (relativePath.startsWith('frontend/pages/')) {
-                    const inner = relativePath.substring('frontend/pages/'.length);
-                    if (inner.trim() !== '') {
-                        targetPath = path.join(frontendDest, inner);
-                    }
-                } else {
-                    // Outros Assets (Components, Utils) -> modules/{slug}/components, etc.
-                    const inner = relativePath.substring('frontend/'.length);
-                    if (inner.trim() !== '') {
-                        targetPath = path.join(frontendDest, inner);
-                    }
+                // Remove o prefixo 'frontend/' e mantém a hierarquia completa
+                // Ex: frontend/pages/dashboard/page.tsx -> modules/{slug}/pages/dashboard/page.tsx
+                const inner = relativePath.substring('frontend/'.length);
+                if (inner.trim() !== '') {
+                    targetPath = path.join(frontendDest, inner);
                 }
             } else if (relativePath.startsWith('backend/')) {
                 // Backend
