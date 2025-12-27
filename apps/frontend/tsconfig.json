@@ -27,7 +27,7 @@
         "./src/*"
       ],
       "@modules/*": [
-        "../../packages/modules/*"
+        "../../apps/backend/src/modules/*"
       ]
     }
   },
