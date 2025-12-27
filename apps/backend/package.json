@@ -50,7 +50,6 @@
     "helmet": "^8.1.0",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.11",
-    "openssl": "^2.0.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.16.3",
