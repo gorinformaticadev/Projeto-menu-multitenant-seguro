@@ -20,7 +20,6 @@ model Tenant {
   updatedAt       DateTime          @updatedAt
   isMasterTenant  Boolean           @default(false)
   tenantModules   ModuleTenant[]
-  publicPage      TenantPublicPage?
   users           User[]
 
   @@index([ativo])
@@ -312,177 +311,6 @@ model Notification {
   @@map("notifications")
 }
 
-model TenantPublicPage {
-  id          String   @id @default(uuid())
-  tenantId    String   @unique
-  title       String   @default("Página Institucional")
-  subtitle    String?
-  description String?
-  content     String?
-  logoUrl     String?
-  bannerUrl   String?
-  contactInfo String?
-  socialLinks String?
-  isActive    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId])
-  @@index([isActive])
-  @@map("tenant_public_pages")
-}
-
-model Demo {
-  id          String                 @id @default(uuid())
-  tenantId    String
-  title       String
-  description String?
-  content     String?
-  status      DemoStatus             @default(draft)
-  priority    Int                    @default(0)
-  viewsCount  Int                    @default(0)
-  likesCount  Int                    @default(0)
-  createdBy   String?
-  updatedBy   String?
-  createdAt   DateTime               @default(now())
-  updatedAt   DateTime               @updatedAt
-  deletedAt   DateTime?
-  activities  DemoActivity[]
-  attachments DemoAttachment[]
-  categories  DemoCategoryRelation[]
-  comments    DemoComment[]
-  tags        DemoTagRelation[]
-
-  @@index([tenantId])
-  @@index([status])
-  @@index([createdAt(sort: Desc)])
-  @@index([createdBy])
-  @@index([deletedAt])
-  @@map("demos")
-}
-
-model DemoCategory {
-  id          String                 @id @default(uuid())
-  tenantId    String
-  name        String
-  slug        String
-  description String?
-  color       String?
-  icon        String?
-  orderIndex  Int                    @default(0)
-  isActive    Boolean                @default(true)
-  createdAt   DateTime               @default(now())
-  updatedAt   DateTime               @updatedAt
-  demos       DemoCategoryRelation[]
-
-  @@unique([tenantId, slug])
-  @@index([tenantId])
-  @@index([slug])
-  @@index([isActive])
-  @@map("demo_categories")
-}
-
-model DemoTag {
-  id         String            @id @default(uuid())
-  tenantId   String
-  name       String
-  slug       String
-  color      String?
-  usageCount Int               @default(0)
-  createdAt  DateTime          @default(now())
-  demos      DemoTagRelation[]
-
-  @@unique([tenantId, slug])
-  @@index([tenantId])
-  @@index([slug])
-  @@index([usageCount(sort: Desc)])
-  @@map("demo_tags")
-}
-
-model DemoCategoryRelation {
-  demoId     String
-  categoryId String
-  createdAt  DateTime     @default(now())
-  category   DemoCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  demo       Demo         @relation(fields: [demoId], references: [id], onDelete: Cascade)
-
-  @@id([demoId, categoryId])
-  @@index([demoId])
-  @@index([categoryId])
-  @@map("demo_category_relations")
-}
-
-model DemoTagRelation {
-  demoId    String
-  tagId     String
-  createdAt DateTime @default(now())
-  demo      Demo     @relation(fields: [demoId], references: [id], onDelete: Cascade)
-  tag       DemoTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
-
-  @@id([demoId, tagId])
-  @@index([demoId])
-  @@index([tagId])
-  @@map("demo_tag_relations")
-}
-
-model DemoAttachment {
-  id               String   @id @default(uuid())
-  demoId           String
-  filename         String
-  originalFilename String
-  mimeType         String
-  sizeBytes        BigInt
-  storagePath      String
-  thumbnailPath    String?
-  uploadedBy       String?
-  createdAt        DateTime @default(now())
-  demo             Demo     @relation(fields: [demoId], references: [id], onDelete: Cascade)
-
-  @@index([demoId])
-  @@index([mimeType])
-  @@map("demo_attachments")
-}
-
-model DemoComment {
-  id        String        @id @default(uuid())
-  demoId    String
-  parentId  String?
-  userId    String
-  content   String
-  isEdited  Boolean       @default(false)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  deletedAt DateTime?
-  demo      Demo          @relation(fields: [demoId], references: [id], onDelete: Cascade)
-  parent    DemoComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies   DemoComment[] @relation("CommentReplies")
-
-  @@index([demoId])
-  @@index([userId])
-  @@index([parentId])
-  @@index([createdAt(sort: Desc)])
-  @@map("demo_comments")
-}
-
-model DemoActivity {
-  id        String   @id @default(uuid())
-  demoId    String
-  userId    String?
-  action    String
-  changes   String?
-  ipAddress String?
-  userAgent String?
-  createdAt DateTime @default(now())
-  demo      Demo     @relation(fields: [demoId], references: [id], onDelete: Cascade)
-
-  @@index([demoId])
-  @@index([userId])
-  @@index([action])
-  @@index([createdAt(sort: Desc)])
-  @@map("demo_activities")
-}
-
 model SecureFile {
   id             String    @id @default(uuid())
   tenantId       String
@@ -526,12 +354,6 @@ enum ModuleStatus {
 enum MigrationType {
   migration
   seed
-}
-
-enum DemoStatus {
-  draft
-  published
-  archived
 }
 
 model CronSchedule {
