@@ -533,3 +533,19 @@ enum DemoStatus {
   published
   archived
 }
+
+model CronSchedule {
+  id            String   @id @default(uuid())
+  origem        String   // "core" | "modulo"
+  modulo        String?
+  identificador String
+  descricao     String?
+  expressao     String
+  ativo         Boolean  @default(true)
+  editavel      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([modulo, identificador])
+  @@map("cron_schedules")
+}

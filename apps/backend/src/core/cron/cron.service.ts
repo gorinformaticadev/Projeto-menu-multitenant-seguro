@@ -2,6 +2,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
+import { PrismaService } from '../prisma/prisma.service';
 
 export interface CronJobDefinition {
     key: string;
@@ -11,7 +12,9 @@ export interface CronJobDefinition {
     enabled: boolean;
     lastRun?: Date;
     nextRun?: Date;
-    settingsUrl?: string; // Link para editar a configuração do job no módulo original
+    settingsUrl?: string;
+    origin?: 'core' | 'modulo';
+    editable?: boolean;
 }
 
 @Injectable()
@@ -23,27 +26,108 @@ export class CronService implements OnModuleInit {
         job?: CronJob;
     }>();
 
-    constructor(private schedulerRegistry: SchedulerRegistry) { }
+    constructor(
+        private schedulerRegistry: SchedulerRegistry,
+        private prisma: PrismaService
+    ) { }
 
-    onModuleInit() {
+    async onModuleInit() {
         this.logger.log('Inicializando Cron Service...');
+        await this.syncWithDatabase();
+    }
+
+    private async syncWithDatabase() {
+        try {
+            // Verifica/Carrega jobs do banco
+            const dbJobs = await this.prisma.cronSchedule.findMany();
+
+            for (const dbJob of dbJobs) {
+                const key = `${dbJob.modulo}.${dbJob.identificador}`;
+
+                // Se o job já existe em memória (registrado pelo módulo), atualiza o estado
+                if (this.jobs.has(key)) {
+                    const wrapper = this.jobs.get(key);
+                    if (wrapper) {
+                        // Atualiza estado baseado no banco
+                        if (dbJob.ativo && !wrapper.definition.enabled) {
+                            this.toggle(key, true);
+                        } else if (!dbJob.ativo && wrapper.definition.enabled) {
+                            this.toggle(key, false);
+                        }
+                    }
+                } else {
+                    // Job existe no banco mas não foi registrado em memória (módulo inativo ou removido?)
+                    // Exibe como "Desconhecido" ou apenas listagem
+                    // Para fins de UI, podemos manter na lista mas sem callback executável
+                    this.jobs.set(key, {
+                        definition: {
+                            key,
+                            name: dbJob.identificador, // Fallback name
+                            description: dbJob.descricao || '',
+                            schedule: dbJob.expressao,
+                            enabled: dbJob.ativo,
+                            origin: dbJob.origem as 'core' | 'modulo',
+                            editable: dbJob.editavel
+                        },
+                        callback: async () => { this.logger.warn(`Job ${key} acionado mas sem callback registrado.`); }
+                    });
+                }
+            }
+        } catch (error) {
+            this.logger.error('Erro ao sincronizar Crons com o banco:', error);
+        }
     }
 
     /**
-     * Registra um novo Cron Job vindo de um módulo
+     * Registra um novo Cron Job vindo de um módulo e persiste na tabela base
      */
-    /**
-     * Registra um novo Cron Job vindo de um módulo
-     */
-    register(
+    async register(
         key: string,
         schedule: string,
         callback: () => Promise<void> | void,
         meta: { name: string; description: string; settingsUrl?: string }
     ) {
+        // Extrai modulo e identificador da key (ex: "sistema.auto_notification")
+        const [modulo, ...rest] = key.split('.');
+        const identificador = rest.join('.') || key;
+
+        // Persiste no Core
+        try {
+            await this.prisma.cronSchedule.upsert({
+                where: {
+                    modulo_identificador: {
+                        modulo,
+                        identificador
+                    }
+                },
+                update: {
+                    expressao: schedule,
+                    descricao: meta.description,
+                    updatedAt: new Date()
+                },
+                create: {
+                    origem: 'modulo',
+                    modulo,
+                    identificador,
+                    descricao: meta.description,
+                    expressao: schedule,
+                    ativo: true,
+                    editavel: true
+                }
+            });
+        } catch (e) {
+            this.logger.error(`Erro ao persistir cron ${key} no banco:`, e);
+        }
+
+        // Recupera status atual do banco para respeitar desativação pelo usuário
+        const dbJob = await this.prisma.cronSchedule.findUnique({
+            where: { modulo_identificador: { modulo, identificador } }
+        });
+
+        const isEnabled = dbJob ? dbJob.ativo : true;
+
         if (this.jobs.has(key)) {
-            this.logger.warn(`Cron job ${key} já registrado. Sobrescrevendo...`);
-            this.delete(key);
+            this.deleteCronJobOnly(key); // Remove apenas o agendamento em memória para recriar
         }
 
         const definition: CronJobDefinition = {
@@ -51,12 +135,23 @@ export class CronService implements OnModuleInit {
             name: meta.name,
             description: meta.description,
             schedule,
-            enabled: true, // Default to enabled
+            enabled: isEnabled,
             settingsUrl: meta.settingsUrl,
+            origin: 'modulo',
+            editable: true
         };
 
-        // Cria o job do 'cron' package
         const job = new CronJob(schedule, async () => {
+            // Verifica status no banco antes de executar (double check)
+            const current = await this.prisma.cronSchedule.findUnique({
+                where: { modulo_identificador: { modulo, identificador } }
+            });
+
+            if (!current || !current.ativo) {
+                this.logger.log(`Job ${key} ignorado (desativado no banco).`);
+                return;
+            }
+
             try {
                 this.logger.log(`Executando Cron Job: ${key}`);
                 definition.lastRun = new Date();
@@ -67,66 +162,85 @@ export class CronService implements OnModuleInit {
             }
         });
 
-        this.schedulerRegistry.addCronJob(key, job);
-        job.start();
-
-        definition.nextRun = job.nextDate().toJSDate();
-
-        this.jobs.set(key, { definition, callback, job });
-        this.logger.log(`Cron Job registrado: ${key} (${schedule})`);
-    }
-
-    /**
-     * Remove um job
-     */
-    delete(key: string) {
-        if (this.schedulerRegistry.doesExist('cron', key)) {
-            this.schedulerRegistry.deleteCronJob(key);
+        if (isEnabled) {
+            this.schedulerRegistry.addCronJob(key, job);
+            job.start();
         }
-        this.jobs.delete(key);
+
+        definition.nextRun = isEnabled ? job.nextDate().toJSDate() : undefined;
+
+        this.jobs.set(key, { definition, callback, job: isEnabled ? job : undefined });
+        this.logger.log(`Cron Job registrado: ${key} (${schedule}) - Ativo: ${isEnabled}`);
     }
 
-    /**
-     * Lista todos os jobs
-     */
+    private deleteCronJobOnly(key: string) {
+        try {
+            if (this.schedulerRegistry.doesExist('cron', key)) {
+                this.schedulerRegistry.deleteCronJob(key);
+            }
+        } catch (e) { }
+    }
+
+    delete(key: string) {
+        this.deleteCronJobOnly(key);
+        this.jobs.delete(key);
+        // Opcional: Marcar como inativo no banco ou remover? O requisito diz "Core apenas lê". 
+        // O módulo pode pedir para remover, mas vamos manter o histórico se possível, ou setar ativo=false.
+    }
+
     listJobs(): CronJobDefinition[] {
         return Array.from(this.jobs.values()).map(j => {
-            // Atualiza nextRun em tempo real
             if (j.job) {
-                j.definition.nextRun = j.job.nextDate().toJSDate();
+                try {
+                    j.definition.nextRun = j.job.nextDate().toJSDate();
+                } catch (e) { }
             }
             return j.definition;
         });
     }
 
-    /**
-     * Executa um job manualmente
-     */
-    async trigger(key: string) {
+    async toggle(key: string, enable: boolean) {
         const jobWrapper = this.jobs.get(key);
         if (!jobWrapper) {
             throw new Error(`Cron Job ${key} não encontrado`);
         }
 
-        this.logger.log(`Disparando manualmente Cron Job: ${key}`);
-        return jobWrapper.callback();
-    }
+        const [modulo, ...rest] = key.split('.');
+        const identificador = rest.join('.') || key;
 
-    /**
-     * Pausa/Retoma um job
-     */
-    toggle(key: string, enable: boolean) {
-        const jobWrapper = this.jobs.get(key);
-        if (!jobWrapper || !jobWrapper.job) {
-            throw new Error(`Cron Job ${key} não encontrado`);
-        }
+        // Atualiza banco
+        await this.prisma.cronSchedule.update({
+            where: { modulo_identificador: { modulo, identificador } },
+            data: { ativo: enable }
+        });
 
+        // Atualiza Memória
         if (enable) {
+            if (!jobWrapper.job) {
+                // Se não tem job instanciado, precisa recriar via register ou guardar a factory?
+                // Como não guardamos a factory, vamos assumir que o job só foi pausado (stop).
+                // Mas se não estava no scheduler, precisamos recriar.
+                // Simplificação: Se temos o callback, recriamos o CronJob.
+                const job = new CronJob(jobWrapper.definition.schedule, async () => {
+                    jobWrapper.definition.lastRun = new Date();
+                    await jobWrapper.callback();
+                });
+                this.schedulerRegistry.addCronJob(key, job);
+                jobWrapper.job = job;
+            }
             jobWrapper.job.start();
             jobWrapper.definition.enabled = true;
         } else {
-            jobWrapper.job.stop();
+            if (jobWrapper.job) {
+                jobWrapper.job.stop();
+            }
             jobWrapper.definition.enabled = false;
         }
+    }
+
+    // Trigger manual permanece igual
+    async trigger(key: string) {
+        const jobWrapper = this.jobs.get(key);
+        if (jobWrapper) await jobWrapper.callback();
     }
 }
