@@ -8,11 +8,11 @@ import { useParams } from 'next/navigation';
  * 
  * CONVENÇÃO OFICIAL OBRIGATÓRIA:
  * - URL: /modules/{moduleSlug}/{route-slug}
- * - Estrutura: packages/modules/{moduleSlug}/frontend/pages/{route-slug}/page.tsx
+ * - Estrutura: apps/backend/src/modules/{moduleSlug}/frontend/pages/{route-slug}/page.tsx
  * 
  * EXEMPLO:
  * - URL: /modules/sistema/model-notification
- * - Arquivo: packages/modules/sistema/frontend/pages/model-notification/page.tsx
+ * - Arquivo: apps/backend/src/modules/sistema/frontend/pages/model-notification/page.tsx
  * 
  * PRINCÍPIOS:
  * - Sem conversões mágicas (camelCase ↔ kebab-case)
@@ -45,17 +45,19 @@ export default function ModulePage() {
             setLoading(true);
             setError(null);
 
-            // Caminho esperado: packages/modules/{moduleSlug}/frontend/pages/{route}/page.tsx
+            // Caminho esperado: apps/backend/src/modules/{moduleSlug}/frontend/pages/{route}/page.tsx
             // Usando alias @modules configurado no tsconfig.json
-            const modulePath = `@modules/${moduleSlug}/frontend/pages/${route}/page`;
+            // Caminho relativo calculado para sair de apps/frontend/src/app/modules/[module]/[...slug]
+            // até apps/backend/src/modules
+            // Níveis: [...slug] -> [module] -> modules -> app -> src -> frontend -> apps -> root -> apps -> backend -> src -> modules
+            // Mas o import dinâmico do Webpack resolve relativo ao arquivo fonte
+            // Caminho: ../../../../../../backend/src/modules/${moduleSlug}/frontend/pages/${route}/page
 
-            console.log('📦 [ModulePage] Importando de:', modulePath);
-
-            // Import dinâmico usando o alias @modules
-            // Next.js consegue resolver isso porque @modules está mapeado no tsconfig
+            // Tenta carregar usando import relativo para garantir que o Webpack encontre a árvore de arquivos
+            // mesmo que o alias @modules falhe se não houver módulos com frontend
             const module = await import(
                 /* @vite-ignore */
-                `@modules/${moduleSlug}/frontend/pages/${route}/page`
+                `../../../../../../backend/src/modules/${moduleSlug}/frontend/pages/${route}/page`
             );
 
             const ComponentToLoad = module.default;
@@ -70,15 +72,22 @@ export default function ModulePage() {
         } catch (err: any) {
             console.error(`❌ [ModulePage] Erro ao carregar ${moduleSlug}/${route}:`, err);
 
-            const expectedPath = `packages/modules/${moduleSlug}/frontend/pages/${route}/page.tsx`;
-            setError(
-                `Página não encontrada.\n\n` +
+            const expectedPath = `apps/backend/src/modules/${moduleSlug}/frontend/pages/${route}/page.tsx`;
+            let errorMessage = `Página não encontrada.\n\n` +
                 `Caminho esperado:\n${expectedPath}\n\n` +
                 `Verifique se:\n` +
-                `1. O diretório existe: packages/modules/${moduleSlug}/frontend/pages/${route}/\n` +
+                `1. O diretório existe: apps/backend/src/modules/${moduleSlug}/frontend/pages/${route}/\n` +
                 `2. O arquivo page.tsx existe dentro do diretório\n` +
-                `3. O arquivo exporta: export default function Page() { ... }`
-            );
+                `3. O arquivo exporta: export default function Page() { ... }`;
+
+            // Tratamento específico para módulo ou página não encontrada
+            if (err.message && (err.message.includes('Cannot find module') || err.code === 'MODULE_NOT_FOUND')) {
+                errorMessage = `Módulo ou página não encontrada (${moduleSlug}/${route}).\n` +
+                    `O sistema tentou carregar dinamicamente o arquivo, mas ele não existe ou não foi incluído no build.\n\n` +
+                    `Caminho: ${expectedPath}`;
+            }
+
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }

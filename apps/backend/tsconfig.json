@@ -50,6 +50,7 @@
     "test",
     "**/*spec.ts",
     "**/*.js",
-    "../../packages/modules/**/frontend/**/*"
+    "../../packages/modules/**/frontend/**/*",
+    "src/**/frontend/**/*"
   ]
 }
