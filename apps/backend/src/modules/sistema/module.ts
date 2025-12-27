@@ -59,7 +59,14 @@ export const SistemaModule: ModuleContract = {
                 permissions: ['sistema.view']
             });
 
-
+            ctx.menu.add({
+                id: 'sistema-cron',
+                label: 'Tarefas Agendadas',
+                href: '/modules/sistema/cron',
+                icon: 'Clock',
+                order: 11,
+                permissions: ['sistema.view']
+            });
         });
 
         console.log('✅ [Sistema] Módulo registrado com sucesso.');
