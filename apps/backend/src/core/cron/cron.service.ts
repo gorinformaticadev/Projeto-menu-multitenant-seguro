@@ -87,9 +87,20 @@ export class CronService implements OnModuleInit {
         callback: () => Promise<void> | void,
         meta: { name: string; description: string; settingsUrl?: string }
     ) {
+        if (!schedule) {
+            this.logger.error(`Tentativa de registrar Cron Job ${key} sem expressão de agendamento definida.`);
+            return;
+        }
+
         // Extrai modulo e identificador da key (ex: "sistema.auto_notification")
-        const [modulo, ...rest] = key.split('.');
-        const identificador = rest.join('.') || key;
+        const parts = key.split('.');
+        let modulo = 'core';
+        let identificador = key;
+
+        if (parts.length > 1) {
+            modulo = parts[0];
+            identificador = parts.slice(1).join('.') || key;
+        }
 
         // Persiste no Core
         try {

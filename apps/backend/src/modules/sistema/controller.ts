@@ -17,10 +17,23 @@ export class SistemaConfigController {
 
     @Get('notifications')
     async getNotificationConfig() {
-        const config = await (this.prisma as any).modSistemaNotificationSchedule.findFirst({
-            where: { enabled: true }
-        });
-        return config || {
+        // Uso de QueryRaw pois a tabela é dinâmica do módulo e não está no schema.prisma
+        const result = await this.prisma.$queryRaw<any[]>`
+            SELECT * FROM mod_sistema_notification_schedules 
+            WHERE enabled = true 
+            LIMIT 1
+        `;
+
+        const config = result[0];
+
+        return config ? {
+            id: config.id,
+            title: config.title,
+            content: config.content,
+            audience: config.audience,
+            cronExpression: config.cron_expression,
+            enabled: config.enabled
+        } : {
             title: '',
             content: '',
             audience: 'all',
@@ -31,31 +44,38 @@ export class SistemaConfigController {
 
     @Post('notifications')
     async saveNotificationConfig(@Body() body: any) {
-        // Upsert logic (assuming single config for now)
-        const existing = await (this.prisma as any).modSistemaNotificationSchedule.findFirst();
+        // Verifica se já existe (QueryRaw)
+        const existing = await this.prisma.$queryRaw<any[]>`
+            SELECT id FROM mod_sistema_notification_schedules LIMIT 1
+        `;
 
         let result;
-        if (existing) {
-            result = await (this.prisma as any).modSistemaNotificationSchedule.update({
-                where: { id: existing.id },
-                data: {
-                    title: body.title,
-                    content: body.content,
-                    audience: body.audience,
-                    cronExpression: body.cronExpression,
-                    enabled: body.enabled
-                }
-            });
+        if (existing && existing.length > 0) {
+            // Update via ExecuteRaw
+            const id = existing[0].id;
+            result = await this.prisma.$executeRaw`
+                UPDATE mod_sistema_notification_schedules
+                SET title = ${body.title},
+                    content = ${body.content},
+                    audience = ${body.audience},
+                    cron_expression = ${body.cronExpression},
+                    enabled = ${body.enabled},
+                    updated_at = NOW()
+                WHERE id = ${id}::uuid
+            `;
         } else {
-            result = await (this.prisma as any).modSistemaNotificationSchedule.create({
-                data: {
-                    title: body.title,
-                    content: body.content,
-                    audience: body.audience,
-                    cronExpression: body.cronExpression,
-                    enabled: body.enabled
-                }
-            });
+            // Insert via ExecuteRaw
+            result = await this.prisma.$executeRaw`
+                INSERT INTO mod_sistema_notification_schedules 
+                (title, content, audience, cron_expression, enabled)
+                VALUES (
+                    ${body.title}, 
+                    ${body.content}, 
+                    ${body.audience}, 
+                    ${body.cronExpression}, 
+                    ${body.enabled}
+                )
+            `;
         }
 
         // Refresh the cron job immediately

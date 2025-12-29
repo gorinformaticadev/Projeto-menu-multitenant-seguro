@@ -60,11 +60,11 @@ export class SistemaCronService implements OnModuleInit {
                 return;
             }
 
-            this.logger.log(`Registrando Job de Notificação: ${config.title} (${config.cronExpression})`);
+            this.logger.log(`Registrando Job de Notificação: ${config.title} (${config.cron_expression})`);
 
             await this.cronService.register(
                 'sistema.auto_notification',
-                config.cronExpression,
+                config.cron_expression,
                 async () => {
                     await this.executeNotificationJob(config);
                 },
