@@ -1,10 +1,23 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { ModuleStatus } from '@prisma/client';
+import { CronService } from '@core/cron/cron.service';
 
 @Injectable()
 export class TenantModuleService {
-    constructor(private readonly prisma: PrismaService) {}
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly cronService: CronService
+    ) { }
+
+    private async countActiveTenantsForModule(moduleId: string): Promise<number> {
+        return this.prisma.moduleTenant.count({
+            where: {
+                moduleId,
+                enabled: true
+            }
+        });
+    }
 
     /**
      * Verifica se um módulo está ativo para um tenant específico
@@ -117,6 +130,19 @@ export class TenantModuleService {
                 enabled: false
             }
         });
+
+        // Parar crons relacionados ao módulo e tenant
+        // Parar crons relacionados ao módulo e tenant
+        // 1. Tenta parar crons ESPECÍFICOS deste tenant
+        await this.cronService.stopJobsForModule(moduleName, tenantId);
+
+        // 2. Verifica se este era o ÚLTIMO tenant ativo para este módulo
+        const activeCount = await this.countActiveTenantsForModule(module.id);
+
+        if (activeCount === 0) {
+            // Se ninguém mais usa, podemos parar os crons GLOBAIS do módulo
+            await this.cronService.stopJobsForModule(moduleName);
+        }
     }
 
     /**

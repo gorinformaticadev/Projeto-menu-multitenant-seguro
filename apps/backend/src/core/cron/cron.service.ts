@@ -254,4 +254,34 @@ export class CronService implements OnModuleInit {
         const jobWrapper = this.jobs.get(key);
         if (jobWrapper) await jobWrapper.callback();
     }
+
+    /**
+     * Pára os crons relacionados a um módulo.
+     * Se tenantId for fornecido, tenta filtrar jobs que contenham o ID do tenant na chave.
+     * Se tenantId não for fornecido, pára todos os crons do módulo.
+     */
+    async stopJobsForModule(moduleName: string, tenantId?: string) {
+        this.logger.log(`Parando crons para módulo: ${moduleName} (Tenant: ${tenantId || 'Todos'})`);
+
+        for (const key of this.jobs.keys()) {
+            // Verifica se o job pertence ao módulo
+            if (key.startsWith(`${moduleName}.`)) {
+                let shouldStop = true;
+
+                // Se tenantId foi passado, só para se o job parecer ser específico deste tenant
+                // (por convenção de nomenclatura ou se assumirmos que jobs do módulo devem parar)
+                if (tenantId) {
+                    if (!key.includes(tenantId)) {
+                        shouldStop = false;
+                        this.logger.debug(`Job ${key} ignorado pois não contém tenantId ${tenantId}`);
+                    }
+                }
+
+                if (shouldStop) {
+                    this.logger.log(`Parando job ${key} devido a desativação do módulo.`);
+                    await this.toggle(key, false);
+                }
+            }
+        }
+    }
 }
