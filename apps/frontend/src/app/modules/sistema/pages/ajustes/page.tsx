@@ -2,13 +2,14 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Bell, Save } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Bell, Save, ArrowRight, CalendarClock, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
@@ -16,12 +17,13 @@ export default function SistemaAjustesPage() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [schedules, setSchedules] = useState<any[]>([]);
 
   const [config, setConfig] = useState({
     title: '',
     content: '',
     audience: 'all',
-    cronExpression: '0 0 * * *',
+    cronExpression: '0 9 * * *',
     enabled: true
   });
 
@@ -74,19 +76,20 @@ export default function SistemaAjustesPage() {
   };
 
   useEffect(() => {
-    fetchConfig();
+    fetchSchedules();
   }, []);
 
-  const fetchConfig = async () => {
+  const fetchSchedules = async () => {
     try {
       setLoading(true);
       const response = await api.get('/modules/sistema/config/notifications');
-      setConfig(response.data);
+      // Garante que é um array
+      setSchedules(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
-      console.error('Erro ao carregar configurações:', error);
+      console.error('Erro ao carregar agendamentos:', error);
       toast({
         title: 'Erro',
-        description: 'Não foi possível carregar as configurações.',
+        description: 'Não foi possível carregar os agendamentos.',
         variant: 'destructive'
       });
     } finally {
@@ -94,17 +97,35 @@ export default function SistemaAjustesPage() {
     }
   };
 
-  const handleSave = async () => {
+  const handleCreate = async () => {
+    if (!config.title || !config.content) {
+      toast({
+        title: 'Campos obrigatórios',
+        description: 'Preencha o título e o conteúdo da notificação.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     try {
       setSaving(true);
       await api.post('/modules/sistema/config/notifications', config);
       toast({
         title: 'Sucesso',
-        description: 'Configurações de notificação salvas.',
+        description: 'Novo agendamento criado.',
       });
+      // Reset form basics, keep audience/cron preferences or reset fully?
+      // Resetting basics seems safer
+      setConfig({
+        ...config,
+        title: '',
+        content: ''
+      });
+      fetchSchedules();
     } catch (error) {
       toast({
-        title: 'Erro ao salvar',
+        title: 'Erro ao criar',
+        description: 'Ocorreu um erro ao criar o agendamento.',
         variant: 'destructive'
       });
     } finally {
@@ -112,52 +133,49 @@ export default function SistemaAjustesPage() {
     }
   };
 
-  if (loading) return <div>Carregando...</div>;
-
   return (
-    <div className="p-8 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold mb-8 flex items-center gap-2">
-        <Bell className="h-8 w-8" />
-        Ajustes do Sistema
-      </h1>
+    <div className="p-8 max-w-5xl mx-auto space-y-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <h1 className="text-3xl font-bold flex items-center gap-2">
+          <Bell className="h-8 w-8" />
+          Agendamento de Notificações
+        </h1>
+        <Link href="/configuracoes/sistema/cron">
+          <Button variant="outline" className="gap-2">
+            Ver todas as rotinas (Cron)
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </Link>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Notificações Automáticas</CardTitle>
-          <CardDescription>
-            Configure a rotina de envio de notificações automáticas do sistema.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Form Section */}
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle>Novo Agendamento</CardTitle>
+            <CardDescription>
+              Crie uma nova regra de notificação automática.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Título</Label>
+              <Input
+                value={config.title}
+                onChange={(e) => setConfig({ ...config, title: e.target.value })}
+                placeholder="Ex: Lembrete Diário"
+              />
+            </div>
 
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="enabled"
-              checked={config.enabled}
-              onCheckedChange={(checked) => setConfig({ ...config, enabled: checked })}
-            />
-            <Label htmlFor="enabled">Ativar tarefa automática</Label>
-          </div>
+            <div className="space-y-2">
+              <Label>Conteúdo</Label>
+              <Input
+                value={config.content}
+                onChange={(e) => setConfig({ ...config, content: e.target.value })}
+                placeholder="Mensagem da notificação..."
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label>Título da Notificação</Label>
-            <Input
-              value={config.title}
-              onChange={(e) => setConfig({ ...config, title: e.target.value })}
-              placeholder="Ex: Lembrete de Sistema"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Conteúdo da Mensagem</Label>
-            <Input
-              value={config.content}
-              onChange={(e) => setConfig({ ...config, content: e.target.value })}
-              placeholder="Ex: Não esqueça de verificar os logs..."
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Público Alvo</Label>
               <Select
@@ -175,78 +193,32 @@ export default function SistemaAjustesPage() {
               </Select>
             </div>
 
-            {/* Frequency Selector Block */}
             <div className="space-y-2">
               <Label>Frequência</Label>
               <Select
                 value={getFrequencyType(config.cronExpression)}
                 onValueChange={(type) => {
-                  // Set default values when switching type
                   const newCron = generateCron(type, '09:00', '1', '30');
                   setConfig({ ...config, cronExpression: newCron });
                 }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione a frequência" />
+                  <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="daily">Diário (Todo dia)</SelectItem>
                   <SelectItem value="weekly">Semanal</SelectItem>
                   <SelectItem value="monthly">Mensal</SelectItem>
                   <SelectItem value="interval">Intervalo (Minutos)</SelectItem>
-                  <SelectItem value="custom">Personalizado (Avançado)</SelectItem>
+                  <SelectItem value="custom">Personalizado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          {/* Dynamic Frequency Inputs */}
-          <div className="pl-4 border-l-2 border-slate-200 mt-4 space-y-4">
-            {getFrequencyType(config.cronExpression) === 'daily' && (
-              <div className="space-y-2 max-w-xs">
-                <Label>Horário</Label>
-                <Input
-                  type="time"
-                  value={getTimeFromCron(config.cronExpression)}
-                  onChange={(e) => {
-                    const time = e.target.value;
-                    if (!time) return;
-                    const [hour, minute] = time.split(':');
-                    setConfig({ ...config, cronExpression: `${parseInt(minute)} ${parseInt(hour)} * * *` });
-                  }}
-                />
-              </div>
-            )}
-
-            {getFrequencyType(config.cronExpression) === 'weekly' && (
-              <div className="flex gap-4">
-                <div className="space-y-2 w-1/2">
-                  <Label>Dia da Semana</Label>
-                  <Select
-                    value={config.cronExpression.split(' ')[4] || '1'}
-                    onValueChange={(day) => {
-                      const parts = config.cronExpression.split(' ');
-                      // Ensure we have enough parts
-                      while (parts.length < 5) parts.push('*');
-                      parts[4] = day;
-                      setConfig({ ...config, cronExpression: parts.join(' ') });
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">Segunda-feira</SelectItem>
-                      <SelectItem value="2">Terça-feira</SelectItem>
-                      <SelectItem value="3">Quarta-feira</SelectItem>
-                      <SelectItem value="4">Quinta-feira</SelectItem>
-                      <SelectItem value="5">Sexta-feira</SelectItem>
-                      <SelectItem value="6">Sábado</SelectItem>
-                      <SelectItem value="0">Domingo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2 w-1/2">
+            {/* Dynamic Frequency Inputs */}
+            <div className="pl-3 border-l-2 border-slate-100 dark:border-slate-800 space-y-3">
+              {getFrequencyType(config.cronExpression) === 'daily' && (
+                <div className="space-y-2">
                   <Label>Horário</Label>
                   <Input
                     type="time"
@@ -255,39 +227,66 @@ export default function SistemaAjustesPage() {
                       const time = e.target.value;
                       if (!time) return;
                       const [hour, minute] = time.split(':');
+                      setConfig({ ...config, cronExpression: `${parseInt(minute)} ${parseInt(hour)} * * *` });
+                    }}
+                  />
+                </div>
+              )}
+
+              {getFrequencyType(config.cronExpression) === 'weekly' && (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>Dia da Semana</Label>
+                    <Select
+                      value={config.cronExpression.split(' ')[4] || '1'}
+                      onValueChange={(day) => {
+                        const parts = config.cronExpression.split(' ');
+                        while (parts.length < 5) parts.push('*');
+                        parts[4] = day;
+                        setConfig({ ...config, cronExpression: parts.join(' ') });
+                      }}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">Segunda-feira</SelectItem>
+                        <SelectItem value="2">Terça-feira</SelectItem>
+                        <SelectItem value="3">Quarta-feira</SelectItem>
+                        <SelectItem value="4">Quinta-feira</SelectItem>
+                        <SelectItem value="5">Sexta-feira</SelectItem>
+                        <SelectItem value="6">Sábado</SelectItem>
+                        <SelectItem value="0">Domingo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Horário</Label>
+                    <Input type="time" value={getTimeFromCron(config.cronExpression)} onChange={(e) => {
+                      const time = e.target.value;
+                      if (!time) return;
+                      const [hour, minute] = time.split(':');
                       const parts = config.cronExpression.split(' ');
                       parts[0] = String(parseInt(minute));
                       parts[1] = String(parseInt(hour));
                       setConfig({ ...config, cronExpression: parts.join(' ') });
-                    }}
-                  />
+                    }} />
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {getFrequencyType(config.cronExpression) === 'monthly' && (
-              <div className="flex gap-4">
-                <div className="space-y-2 w-1/2">
-                  <Label>Dia do Mês</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={31}
-                    value={config.cronExpression.split(' ')[2] || '1'}
-                    onChange={(e) => {
+              {getFrequencyType(config.cronExpression) === 'monthly' && (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>Dia do Mês</Label>
+                    <Input type="number" min={1} max={31} value={config.cronExpression.split(' ')[2] || '1'} onChange={(e) => {
                       const day = e.target.value;
                       const parts = config.cronExpression.split(' ');
                       parts[2] = day;
                       setConfig({ ...config, cronExpression: parts.join(' ') });
-                    }}
-                  />
-                </div>
-                <div className="space-y-2 w-1/2">
-                  <Label>Horário</Label>
-                  <Input
-                    type="time"
-                    value={getTimeFromCron(config.cronExpression)}
-                    onChange={(e) => {
+                    }} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Horário</Label>
+                    <Input type="time" value={getTimeFromCron(config.cronExpression)} onChange={(e) => {
                       const time = e.target.value;
                       if (!time) return;
                       const [hour, minute] = time.split(':');
@@ -295,51 +294,80 @@ export default function SistemaAjustesPage() {
                       parts[0] = String(parseInt(minute));
                       parts[1] = String(parseInt(hour));
                       setConfig({ ...config, cronExpression: parts.join(' ') });
-                    }}
-                  />
+                    }} />
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {getFrequencyType(config.cronExpression) === 'interval' && (
-              <div className="space-y-2 max-w-xs">
-                <Label>Executar a cada (minutos)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={config.cronExpression.split('/')[1]?.split(' ')[0] || '15'}
-                  onChange={(e) => {
+              {getFrequencyType(config.cronExpression) === 'interval' && (
+                <div className="space-y-2">
+                  <Label>Minutos</Label>
+                  <Input type="number" min={1} value={config.cronExpression.split('/')[1]?.split(' ')[0] || '15'} onChange={(e) => {
                     const minutes = e.target.value;
                     setConfig({ ...config, cronExpression: `*/${minutes} * * * *` });
-                  }}
-                />
-              </div>
-            )}
+                  }} />
+                </div>
+              )}
 
-            {getFrequencyType(config.cronExpression) === 'custom' && (
-              <div className="space-y-2">
-                <Label>Cron Expression (Manual)</Label>
-                <Input
-                  value={config.cronExpression}
-                  onChange={(e) => setConfig({ ...config, cronExpression: e.target.value })}
-                  placeholder="Ex: 0 0 * * *"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Formato: <code>minuto hora dia_mês mês dia_semana</code>
-                </p>
-              </div>
-            )}
-          </div>
+              {getFrequencyType(config.cronExpression) === 'custom' && (
+                <div className="space-y-2">
+                  <Label>Cron Expression</Label>
+                  <Input value={config.cronExpression} onChange={(e) => setConfig({ ...config, cronExpression: e.target.value })} />
+                </div>
+              )}
+            </div>
 
-          <div className="pt-4 flex justify-end">
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={handleCreate} disabled={saving} className="w-full mt-4">
               <Save className="h-4 w-4 mr-2" />
-              {saving ? 'Salvando...' : 'Salvar Configuração'}
+              {saving ? 'Criando...' : 'Criar Agendamento'}
             </Button>
-          </div>
+          </CardContent>
+        </Card>
 
-        </CardContent>
-      </Card>
+        {/* List Section */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Agendamentos Ativos</CardTitle>
+            <CardDescription>
+              Lista de notificações agendadas para envio automático.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="text-center py-8 text-muted-foreground">Carregando agendamentos...</div>
+            ) : schedules.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
+                Nenhum agendamento encontrado.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {schedules.map((schedule) => (
+                  <div key={schedule.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-lg">{schedule.title}</h3>
+                        <Badge variant={schedule.enabled ? 'default' : 'secondary'}>
+                          {schedule.enabled ? 'Ativo' : 'Inativo'}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-balance text-muted-foreground">{schedule.content}</p>
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
+                        <span className="flex items-center gap-1">
+                          <CalendarClock className="h-3 w-3" />
+                          {schedule.cron_expression}
+                        </span>
+                        <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                          Destino: {schedule.audience === 'all' ? 'Todos' : schedule.audience}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

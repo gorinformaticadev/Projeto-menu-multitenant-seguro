@@ -16,67 +16,29 @@ export class SistemaConfigController {
     ) { }
 
     @Get('notifications')
-    async getNotificationConfig() {
-        // Uso de QueryRaw pois a tabela é dinâmica do módulo e não está no schema.prisma
+    async getNotificationConfigs() {
+        // Retorna lista de agendamentos ordenados por criação
         const result = await this.prisma.$queryRaw<any[]>`
             SELECT * FROM mod_sistema_notification_schedules 
-            WHERE enabled = true 
-            LIMIT 1
+            ORDER BY created_at DESC
         `;
-
-        const config = result[0];
-
-        return config ? {
-            id: config.id,
-            title: config.title,
-            content: config.content,
-            audience: config.audience,
-            cronExpression: config.cron_expression,
-            enabled: config.enabled
-        } : {
-            title: '',
-            content: '',
-            audience: 'all',
-            cronExpression: '0 0 * * *',
-            enabled: true
-        };
+        return result;
     }
 
     @Post('notifications')
-    async saveNotificationConfig(@Body() body: any) {
-        // Verifica se já existe (QueryRaw)
-        const existing = await this.prisma.$queryRaw<any[]>`
-            SELECT id FROM mod_sistema_notification_schedules LIMIT 1
+    async createNotificationConfig(@Body() body: any) {
+        // Sempre cria um novo registro
+        const result = await this.prisma.$executeRaw`
+            INSERT INTO mod_sistema_notification_schedules 
+            (title, content, audience, cron_expression, enabled)
+            VALUES (
+                ${body.title}, 
+                ${body.content}, 
+                ${body.audience}, 
+                ${body.cronExpression}, 
+                ${body.enabled ?? true}
+            )
         `;
-
-        let result;
-        if (existing && existing.length > 0) {
-            // Update via ExecuteRaw
-            const id = existing[0].id;
-            result = await this.prisma.$executeRaw`
-                UPDATE mod_sistema_notification_schedules
-                SET title = ${body.title},
-                    content = ${body.content},
-                    audience = ${body.audience},
-                    cron_expression = ${body.cronExpression},
-                    enabled = ${body.enabled},
-                    updated_at = NOW()
-                WHERE id = ${id}::uuid
-            `;
-        } else {
-            // Insert via ExecuteRaw
-            result = await this.prisma.$executeRaw`
-                INSERT INTO mod_sistema_notification_schedules 
-                (title, content, audience, cron_expression, enabled)
-                VALUES (
-                    ${body.title}, 
-                    ${body.content}, 
-                    ${body.audience}, 
-                    ${body.cronExpression}, 
-                    ${body.enabled}
-                )
-            `;
-        }
 
         // Refresh the cron job immediately
         await this.sistemaCron.registerNotificationJob();

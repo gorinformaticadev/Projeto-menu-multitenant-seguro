@@ -1,5 +1,5 @@
 
-import { Injectable, Logger, OnModuleInit, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { CronService } from '../../core/cron/cron.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 
@@ -24,58 +24,72 @@ export class SistemaCronService implements OnModuleInit {
 
     private async ensureDatabaseTable() {
         try {
+            // Fallback creation matching the migration
             await this.prisma.$executeRawUnsafe(`
-                CREATE TABLE IF NOT EXISTS "mod_sistema_notification_schedules" (
-                    "id" TEXT NOT NULL,
-                    "title" TEXT NOT NULL,
-                    "content" TEXT NOT NULL,
-                    "audience" TEXT NOT NULL,
-                    "cronExpression" TEXT NOT NULL,
-                    "enabled" BOOLEAN NOT NULL DEFAULT true,
-                    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    "updatedAt" TIMESTAMP(3) NOT NULL,
-                    CONSTRAINT "mod_sistema_notification_schedules_pkey" PRIMARY KEY ("id")
+                CREATE TABLE IF NOT EXISTS mod_sistema_notification_schedules (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    title VARCHAR(255) NOT NULL,
+                    content TEXT,
+                    audience VARCHAR(50) DEFAULT 'all',
+                    cron_expression VARCHAR(100) NOT NULL,
+                    enabled BOOLEAN DEFAULT true,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             `);
         } catch (error) {
-            this.logger.error('Erro ao criar tabela do módulo sistema:', error);
+            // Ignore error if table exists or extension missing, strictly a fallback
+            this.logger.warn('Aviso ao verificar tabela mod_sistema_notification_schedules: ' + error.message);
         }
     }
 
-    // Registra ou atualiza o job baseando-se no banco de dados
+    // Registra todos os agendamentos ativos
     async registerNotificationJob() {
         try {
-            const results = await this.prisma.$queryRawUnsafe<any[]>(`
-                SELECT * FROM "mod_sistema_notification_schedules" WHERE enabled = true LIMIT 1
+            const schedules = await this.prisma.$queryRawUnsafe<any[]>(`
+                SELECT * FROM mod_sistema_notification_schedules
             `);
 
-            const config = results[0];
+            const activeKeys = new Set<string>();
 
-            if (!config) {
-                this.logger.log('Nenhuma configuração de notificação automática ativa encontrada.');
-                // Se existir um job antigo registrado, remove
-                if ((this.cronService as any)['jobs']?.has('sistema.auto_notification')) {
-                    this.cronService.delete('sistema.auto_notification');
+            for (const config of schedules) {
+                const key = `sistema.auto_notification.${config.id}`;
+
+                if (config.enabled) {
+                    // Register or Update
+                    await this.cronService.register(
+                        key,
+                        config.cron_expression,
+                        async () => {
+                            await this.executeNotificationJob(config);
+                        },
+                        {
+                            name: 'Notif: ' + config.title,
+                            description: 'Notificação Automática do Sistema',
+                            settingsUrl: '/modules/sistema/ajustes'
+                        }
+                    );
+                    activeKeys.add(key);
+                } else {
+                    // Ensure disabled jobs are removed from scheduler
+                    this.cronService.delete(key);
                 }
-                return;
             }
 
-            this.logger.log(`Registrando Job de Notificação: ${config.title} (${config.cron_expression})`);
+            // Cleanup legacy singleton job if exists
+            this.cronService.delete('sistema.auto_notification');
 
-            await this.cronService.register(
-                'sistema.auto_notification',
-                config.cron_expression,
-                async () => {
-                    await this.executeNotificationJob(config);
-                },
-                {
-                    name: 'Notificação Automática: ' + config.title,
-                    description: 'Envia notificações automáticas configuradas no módulo Sistema.',
-                    settingsUrl: '/modules/sistema/ajustes'
+            // Cleanup jobs that were deleted from DB (orphans in CronService)
+            const allJobs = this.cronService.listJobs();
+            for (const job of allJobs) {
+                // If it belongs to this module logic but is not active
+                if (job.key.startsWith('sistema.auto_notification.') && !activeKeys.has(job.key)) {
+                    this.cronService.delete(job.key);
                 }
-            );
+            }
+
         } catch (e) {
-            this.logger.error('Erro ao registrar job:', e);
+            this.logger.error('Erro ao registrar jobs:', e);
         }
     }
 
@@ -83,8 +97,6 @@ export class SistemaCronService implements OnModuleInit {
         this.logger.log(`Executando Notificação Automática: ${config.title}`);
 
         try {
-            // Verifica se a tabela notifications existe (core) antes de inserir
-            // Assumimos que existe pois é Core.
             await this.prisma.notification.create({
                 data: {
                     title: config.title,
