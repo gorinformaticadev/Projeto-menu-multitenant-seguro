@@ -250,6 +250,10 @@ class ModuleRegistry {
   hasModule(slug: string): boolean {
     return this.apiModules.some(m => m.slug === slug);
   }
+
+  getModule(slug: string): ModuleData | undefined {
+    return this.apiModules.find(m => m.slug === slug);
+  }
 }
 
 export const moduleRegistry = ModuleRegistry.getInstance();

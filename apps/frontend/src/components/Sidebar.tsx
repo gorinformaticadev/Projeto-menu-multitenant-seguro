@@ -111,7 +111,7 @@ export function Sidebar() {
       // console.log('📋 Grupos encontrados:', Object.keys(grouped.groups));
     } catch (error) {
       console.warn('⚠️ Erro ao carregar itens do menu, usando menu básico:', error);
-      
+
       // Em caso de erro, carrega menu básico do CORE
       const basicItems = [
         {
@@ -122,7 +122,7 @@ export function Sidebar() {
           order: 1
         }
       ];
-      
+
       // Adiciona itens administrativos se for ADMIN/SUPER_ADMIN
       if (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') {
         basicItems.push(
@@ -149,7 +149,7 @@ export function Sidebar() {
           }
         );
       }
-      
+
       setGroupedItems({ ungrouped: basicItems, groups: {}, groupOrder: [] });
     }
   };
@@ -158,7 +158,7 @@ export function Sidebar() {
   const toggleGroup = (groupId: string) => {
     setExpandedGroups(prev => {
       const isCurrentlyExpanded = prev[groupId];
-      
+
       if (isCurrentlyExpanded) {
         // Se o grupo atual está expandido, apenas o recolhe
         return {
@@ -168,15 +168,15 @@ export function Sidebar() {
       } else {
         // Se o grupo atual está recolhido, recolhe todos os outros e expande este
         const newState: Record<string, boolean> = {};
-        
+
         // Recolhe todos os grupos
         Object.keys(prev).forEach(key => {
           newState[key] = false;
         });
-        
+
         // Expande apenas o grupo clicado
         newState[groupId] = true;
-        
+
         return newState;
       }
     });
@@ -244,7 +244,7 @@ export function Sidebar() {
           {/* Renderiza todos os itens em ordem global: Dashboard -> Administração -> Módulos */}
           {(() => {
             const allRenderItems: JSX.Element[] = [];
-            
+
             // Cria uma lista de todos os itens e grupos com suas ordens
             const renderQueue: Array<{
               type: 'item' | 'group';
@@ -264,8 +264,20 @@ export function Sidebar() {
             // Adiciona grupos à fila
             groupedItems.groupOrder.forEach((groupId) => {
               const items = groupedItems.groups[groupId];
-              const config = groupConfig[groupId as keyof typeof groupConfig];
-              
+              let config = groupConfig[groupId as keyof typeof groupConfig];
+
+              // Fallback para módulos dinâmicos (não hardcoded)
+              if (!config) {
+                const moduleData = moduleRegistry.getModule(groupId);
+                if (moduleData) {
+                  config = {
+                    name: moduleData.name, // Usa o nome amigável do módulo
+                    icon: Package,      // Icone padrão
+                    order: 100          // Ordem padrão para módulos dinâmicos
+                  };
+                }
+              }
+
               if (config && items && items.length > 0) {
                 // Usa a ordem do grupo definida na configuração
                 const groupOrder = config.order || 999;
@@ -327,11 +339,11 @@ export function Sidebar() {
                             <config.icon className="h-5 w-5" />
                             <span>{config.name}</span>
                           </div>
-                          <ChevronLeft 
+                          <ChevronLeft
                             className={cn(
-                              "h-4 w-4 transition-transform", 
+                              "h-4 w-4 transition-transform",
                               isGroupExpanded ? "-rotate-90" : "rotate-180"
-                            )} 
+                            )}
                           />
                         </Button>
 
@@ -341,7 +353,7 @@ export function Sidebar() {
                             {items.map((item: any) => {
                               const isActive = pathname === item.href;
                               const Icon = iconMap[item.icon] || Menu;
-                              
+
                               return (
                                 <Link
                                   key={item.id}
