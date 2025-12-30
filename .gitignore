@@ -58,3 +58,6 @@ modules/demo-completo.zip
 # /modules/sistema
 /packages/modules/sistema
 /packages
+
+apps/backend/src/modules/*
+apps/frontend/src/app/modules/*
