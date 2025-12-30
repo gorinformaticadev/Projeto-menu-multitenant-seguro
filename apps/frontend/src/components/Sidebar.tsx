@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu, Shield, FileText, HelpCircle, Package, Home, BookOpen, Rocket, BarChart3, FolderKanban, Tags } from "lucide-react";
+import * as LucideIcons from "lucide-react";
 import { Button } from "./ui/button";
 // @ts-ignore - moduleRegistry é válido
 import { moduleRegistry } from "@/lib/module-registry";
@@ -270,10 +271,25 @@ export function Sidebar() {
               if (!config) {
                 const moduleData = moduleRegistry.getModule(groupId);
                 if (moduleData) {
+                  // Estratégia para encontrar o ícone mais representativo:
+                  // 1. Tenta encontrar um menu com o mesmo nome do módulo
+                  // 2. Tenta encontrar um menu que tenha filhos (menu pai)
+                  // 3. Fallback para o primeiro menu da lista
+                  const menus = moduleData.menus || [];
+                  const mainMenu = menus.find(m => m.label === moduleData.name) ||
+                    menus.find(m => m.children && m.children.length > 0) ||
+                    menus[0];
+
+                  const iconName = mainMenu?.icon;
+
+                  const DynamicIcon = iconName
+                    ? (LucideIcons as any)[iconName] || Package
+                    : Package;
+
                   config = {
-                    name: moduleData.name, // Usa o nome amigável do módulo
-                    icon: Package,      // Icone padrão
-                    order: 100          // Ordem padrão para módulos dinâmicos
+                    name: moduleData.name,
+                    icon: DynamicIcon,
+                    order: 100
                   };
                 }
               }
@@ -350,7 +366,7 @@ export function Sidebar() {
                         {/* Itens do grupo */}
                         {isGroupExpanded && (
                           <div className="pl-4 space-y-1 border-l ml-4 border-border">
-                            {items.map((item: any) => {
+                            {items.filter((item: any) => item.name !== config.name).map((item: any) => {
                               const isActive = pathname === item.href;
                               const Icon = iconMap[item.icon] || Menu;
 
