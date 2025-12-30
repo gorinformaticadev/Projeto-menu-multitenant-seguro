@@ -61,3 +61,4 @@ modules/demo-completo.zip
 
 apps/backend/src/modules/*
 apps/frontend/src/app/modules/*
+module-os
