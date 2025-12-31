@@ -38,6 +38,19 @@ const nextConfig = {
       },
     ];
   },
+  async rewrites() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${apiUrl}/api/:path*`, // Proxy API requests to backend
+      },
+      {
+        source: '/uploads/:path*',
+        destination: `${apiUrl}/uploads/:path*`, // Proxy static uploads to backend
+      },
+    ];
+  },
   // Enable experimental features for better security
   experimental: {
     optimizeCss: true, // Optimize CSS
