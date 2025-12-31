@@ -57,6 +57,7 @@ export function ModuleManagement() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState("upload");
   const [updatingDatabase, setUpdatingDatabase] = useState<string | null>(null);
+  const [dbUpdateStatus, setDbUpdateStatus] = useState<string>("");
   const [reloadingConfig, setReloadingConfig] = useState<string | null>(null);
 
   useEffect(() => {
@@ -272,14 +273,29 @@ export function ModuleManagement() {
 
   const updateModuleDatabase = async (moduleName: string) => {
     setUpdatingDatabase(moduleName);
+    setDbUpdateStatus("Rodando Migrations...");
 
     try {
-      // Endpoint correto: /configuracoes/sistema/modulos/:slug/update-db
-      const response = await api.post(`/configuracoes/sistema/modulos/${moduleName}/update-db`);
+      // 1. Executar Migrations
+      const migResponse = await api.post(`/configuracoes/sistema/modulos/${moduleName}/run-migrations`);
+
+      toast({
+        title: "Migrations ok",
+        description: `${migResponse.data.count} migrations executadas com sucesso.`,
+      });
+
+      setDbUpdateStatus("Aguardando...");
+      // Pequena espera UX
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // 2. Executar Seeds
+      setDbUpdateStatus("Rodando Seeds...");
+      const seedResponse = await api.post(`/configuracoes/sistema/modulos/${moduleName}/run-seeds`);
 
       toast({
         title: "Banco de dados atualizado!",
-        description: response.data.message || "Migrações e seed executados com sucesso",
+        description: "Migrações e seeds finalizados. Módulo pronto para uso.",
+        className: "bg-green-50 border-green-200 text-green-800",
       });
 
       // Recarregar lista de módulos para atualizar o status
@@ -293,6 +309,7 @@ export function ModuleManagement() {
       });
     } finally {
       setUpdatingDatabase(null);
+      setDbUpdateStatus("");
     }
   };
 
@@ -637,7 +654,7 @@ export function ModuleManagement() {
                                     {updatingDatabase === module.slug ? (
                                       <>
                                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                        Atualizando...
+                                        {dbUpdateStatus || "Atualizando..."}
                                       </>
                                     ) : (
                                       <>

@@ -299,6 +299,31 @@ export class ModuleInstallerService {
         return { success: true, message: `Módulo ${slug} desativado` };
     }
 
+    async runModuleMigrations(slug: string) {
+        const module = await this.prisma.module.findUnique({ where: { slug } });
+        if (!module) throw new BadRequestException('Módulo não encontrado');
+
+        const modulePath = path.join(this.backendModulesPath, slug);
+        const count = await this.executeMigrations(slug, modulePath, MigrationType.migration);
+
+        return { success: true, count, message: 'Migrações executadas com sucesso' };
+    }
+
+    async runModuleSeeds(slug: string) {
+        const module = await this.prisma.module.findUnique({ where: { slug } });
+        if (!module) throw new BadRequestException('Módulo não encontrado');
+
+        const modulePath = path.join(this.backendModulesPath, slug);
+        const count = await this.executeMigrations(slug, modulePath, MigrationType.seed);
+
+        await this.prisma.module.update({
+            where: { slug },
+            data: { status: ModuleStatus.db_ready }
+        });
+
+        return { success: true, count, message: 'Seeds executados com sucesso' };
+    }
+
     async updateModuleDatabase(slug: string) {
         const module = await this.prisma.module.findUnique({ where: { slug } });
         if (!module) throw new BadRequestException('Módulo não encontrado');

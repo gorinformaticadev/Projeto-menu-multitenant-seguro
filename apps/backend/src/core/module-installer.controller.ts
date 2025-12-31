@@ -26,6 +26,7 @@ import { memoryStorage } from 'multer';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.SUPER_ADMIN)
 export class ModuleInstallerController {
+    // Controller refreshed
     constructor(private readonly installer: ModuleInstallerService) { }
 
     /**
@@ -155,6 +156,24 @@ export class ModuleInstallerController {
     @Post(':slug/update-db')
     async updateDatabase(@Param('slug') slug: string) {
         return await this.installer.updateModuleDatabase(slug);
+    }
+
+    /**
+     * POST /configuracoes/sistema/modulos/:slug/run-migrations
+     * Executa apenas migrations
+     */
+    @Post(':slug/run-migrations')
+    async runMigrations(@Param('slug') slug: string) {
+        return await this.installer.runModuleMigrations(slug);
+    }
+
+    /**
+     * POST /configuracoes/sistema/modulos/:slug/run-seeds
+     * Executa apenas seeds e finaliza preparação
+     */
+    @Post(':slug/run-seeds')
+    async runSeeds(@Param('slug') slug: string) {
+        return await this.installer.runModuleSeeds(slug);
     }
 
     /**
