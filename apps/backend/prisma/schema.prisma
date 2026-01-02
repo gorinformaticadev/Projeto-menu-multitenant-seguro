@@ -53,6 +53,7 @@ model User {
   passwordResetTokens      PasswordResetToken[]
   refreshTokens            RefreshToken[]
   tenant                   Tenant?              @relation(fields: [tenantId], references: [id])
+  preferences              UserPreferences?
 
   @@index([tenantId])
   @@index([email])
@@ -60,6 +61,17 @@ model User {
   @@index([isLocked])
   @@index([tenantId, role])
   @@map("users")
+}
+
+model UserPreferences {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  theme     String   @default("light")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
 }
 
 model RefreshToken {

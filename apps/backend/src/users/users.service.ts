@@ -8,7 +8,7 @@ import { Role } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async create(createUserDto: CreateUserDto) {
     const { email, password, name, role, tenantId } = createUserDto;
@@ -79,6 +79,7 @@ export class UsersService {
             nomeFantasia: true,
           },
         },
+        preferences: true,
       },
     });
 
@@ -260,6 +261,21 @@ export class UsersService {
     // Remove a senha do retorno
     const { password, ...userWithoutPassword } = user;
     return userWithoutPassword;
+  }
+
+  /**
+   * Atualizar preferências do usuário (Tema)
+   */
+  async updatePreferences(userId: string, theme: string) {
+    if (!['light', 'dark', 'system'].includes(theme)) {
+      throw new BadRequestException('Tema inválido. Use: light, dark ou system');
+    }
+
+    return this.prisma.userPreferences.upsert({
+      where: { userId },
+      update: { theme },
+      create: { userId, theme },
+    });
   }
 }
 

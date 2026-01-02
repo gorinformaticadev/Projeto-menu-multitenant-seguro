@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { AppLayout } from "@/components/AppLayout";
 import { NotificationProvider } from "@/providers/NotificationProvider";
 import { InactivityLogout } from "@/components/InactivityLogout";
+import { ThemeProvider } from "@/providers/ThemeProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -45,11 +46,18 @@ export default function RootLayout({
           <AuthProvider>
             <SecurityConfigProvider>
               <NotificationProvider>
-                <InactivityLogout />
-                <AppLayout>
-                  {children}
-                </AppLayout>
-                <Toaster />
+                <ThemeProvider
+                  attribute="class"
+                  defaultTheme="light"
+                  enableSystem
+                  disableTransitionOnChange
+                >
+                  <InactivityLogout />
+                  <AppLayout>
+                    {children}
+                  </AppLayout>
+                  <Toaster />
+                </ThemeProvider>
               </NotificationProvider>
             </SecurityConfigProvider>
           </AuthProvider>

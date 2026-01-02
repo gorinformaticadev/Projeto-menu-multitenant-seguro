@@ -13,6 +13,8 @@ import { ModuleRegistryUserMenu } from "./ModuleRegistryUserMenu";
 import { useNotificationContext } from '@/providers/NotificationProvider';
 import { AlertTriangle, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
 import { Notification } from '@/types/notifications';
+import { ThemeToggle } from "./ThemeToggle";
+import { useTheme } from "next-themes";
 import * as LucideIcons from "lucide-react";
 
 // Helper para ícones dinâmicos
@@ -28,6 +30,14 @@ export function TopBar() {
   const [userTenantLogo, setUserTenantLogo] = useState<string | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const { setTheme } = useTheme();
+
+  // Sincroniza tema da preferência do usuário
+  useEffect(() => {
+    if ((user as any)?.preferences?.theme) {
+      setTheme((user as any).preferences.theme);
+    }
+  }, [user, setTheme]);
 
   // Hook do sistema de notificações
   const {
@@ -440,6 +450,13 @@ export function TopBar() {
                     </div>
                   </div>
                 </div>
+
+                {/* Seletor de Tema */}
+                <div className="px-4 py-2 border-b border-gray-200">
+                  <div className="text-xs font-semibold text-gray-500 mb-2">Tema</div>
+                  <ThemeToggle />
+                </div>
+
                 <a
                   href="/perfil"
                   onClick={() => setShowUserMenu(false)}

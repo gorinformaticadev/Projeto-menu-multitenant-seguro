@@ -14,7 +14,7 @@ import { CurrentUser } from '@core/common/decorators/current-user.decorator';
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   @Post()
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
@@ -96,6 +96,18 @@ export class UsersController {
     @CurrentUser() user: any,
   ) {
     return this.usersService.changePassword(user.id, changePasswordDto);
+  }
+
+  /**
+   * PATCH /users/preferences
+   * Atualizar preferências do usuário (Tema)
+   */
+  @Patch('preferences')
+  updatePreferences(
+    @Body('theme') theme: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.usersService.updatePreferences(user.id, theme);
   }
 
   /**
