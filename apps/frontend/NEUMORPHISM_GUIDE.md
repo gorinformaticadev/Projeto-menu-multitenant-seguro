@@ -47,29 +47,34 @@ import { Button } from "@/components/ui/button"
 
 export function NeumorphicButton() {
   return (
-    <div className="flex gap-4 p-4 bg-background">
-      {/* Botão Primário */}
+    <div className="flex gap-3 p-3 bg-background">
+      {/* Botão Primário Compacto */}
       <Button 
         className="
           bg-primary text-primary-foreground 
-          rounded-xl border-none 
+          h-9 px-4 py-2 /* Tamanho reduzido */
+          rounded-md /* Radius padrão (0.5rem) */
+          border-none 
           shadow-neu-sm hover:shadow-neu-flat active:shadow-neu-pressed 
           transition-all duration-300 ease-in-out
           hover:-translate-y-0.5 active:translate-y-0
+          text-sm
         "
       >
-        Salvar Alterações
+        Salvar
       </Button>
 
-      {/* Botão Secundário / Ghost */}
+      {/* Botão Secundário / Ghost Compacto */}
       <Button 
         variant="secondary"
         className="
           bg-background text-foreground 
-          rounded-xl border border-transparent
+          h-9 px-4 py-2
+          rounded-md border border-transparent
           shadow-neu-flat hover:text-primary
           active:shadow-neu-pressed
           transition-all duration-300
+          text-sm
         "
       >
         Cancelar

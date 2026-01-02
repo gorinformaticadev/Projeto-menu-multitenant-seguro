@@ -28,7 +28,7 @@ export default function DashboardPage() {
       <ModuleSlot position="dashboard_top" className="mb-6" />
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <h1 className="text-2xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground">
           Bem-vindo ao <PlatformName />, {user?.name}!
         </p>
@@ -62,7 +62,7 @@ export default function DashboardPage() {
             <Shield className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{user?.role}</div>
+            <div className="text-xl font-bold">{user?.role}</div>
             <p className="text-xs text-muted-foreground">
               Nível de acesso
             </p>
@@ -76,7 +76,7 @@ export default function DashboardPage() {
               <Building2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold truncate">
+              <div className="text-xl font-bold truncate">
                 {user.tenant.nomeFantasia}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -92,7 +92,7 @@ export default function DashboardPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">Ativo</div>
+            <div className="text-xl font-bold text-green-600">Ativo</div>
             <p className="text-xs text-muted-foreground">
               Sistema operacional
             </p>
@@ -105,7 +105,7 @@ export default function DashboardPage() {
             <Settings className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">Alta</div>
+            <div className="text-xl font-bold text-blue-600">Alta</div>
             <p className="text-xs text-muted-foreground">
               Isolamento ativo
             </p>

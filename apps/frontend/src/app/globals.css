@@ -30,10 +30,11 @@
     --destructive-foreground: 210 40% 98%;
 
     --border: 216 20% 85%;
-    --input: 216 20% 92%; /* Slightly darker for input bg if needed, or keeping flat */
+    --input: 216 20% 92%;
+    /* Slightly darker for input bg if needed, or keeping flat */
     --ring: 212 90% 55%;
 
-    --radius: 0.75rem;
+    --radius: 0.5rem;
 
     /* Neumorphic Shadows */
     --shadow-light: 0 0% 100%;
@@ -79,54 +80,62 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
-    font-size: 14px; /* Reduzindo o tamanho base da fonte */
+    font-size: 13px;
+    /* Reduzido para 13px base */
   }
-  
+
   /* Ajustes específicos para elementos comuns */
   h1 {
-    font-size: 1.75rem; /* Reduzido de 2.25rem */
+    font-size: 1.5rem;
+    /* ~24px */
   }
-  
+
   h2 {
-    font-size: 1.5rem; /* Reduzido de 1.875rem */
+    font-size: 1.25rem;
+    /* ~20px */
   }
-  
+
   h3 {
-    font-size: 1.25rem; /* Reduzido de 1.5rem */
+    font-size: 1.125rem;
+    /* ~18px */
   }
-  
-  p, div, span {
-    font-size: 0.875rem; /* 14px */
+
+  p,
+  div,
+  span {
+    font-size: 0.8125rem;
+    /* 13px */
   }
-  
+
   /* Ajustes para componentes específicos */
   .text-3xl {
-    font-size: 1.75rem !important; /* Reduzido */
+    font-size: 1.5rem !important;
   }
-  
+
   .text-2xl {
-    font-size: 1.5rem !important; /* Reduzido */
+    font-size: 1.25rem !important;
   }
-  
+
   .text-xl {
-    font-size: 1.25rem !important; /* Reduzido */
+    font-size: 1.125rem !important;
   }
-  
+
   .text-lg {
-    font-size: 1.125rem !important; /* Reduzido */
+    font-size: 1rem !important;
   }
-  
+
   .text-base {
-    font-size: 0.875rem !important; /* Reduzido */
+    font-size: 0.8125rem !important;
   }
-  
+
   .text-sm {
-    font-size: 0.8125rem !important; /* Reduzido */
+    font-size: 0.75rem !important;
   }
-  
+
   .text-xs {
-    font-size: 0.75rem !important; /* Mantido */
+    font-size: 0.7rem !important;
   }
 }

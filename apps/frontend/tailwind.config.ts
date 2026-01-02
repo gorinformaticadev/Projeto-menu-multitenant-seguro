@@ -19,16 +19,16 @@ const config = {
     },
     extend: {
       fontSize: {
-        'xs': '0.75rem',     // 12px
-        'sm': '0.8125rem',   // 13px - reduzido
-        'base': '0.875rem',  // 14px - reduzido
-        'lg': '1.125rem',    // 18px - reduzido
-        'xl': '1.25rem',     // 20px - reduzido
-        '2xl': '1.5rem',     // 24px - reduzido
-        '3xl': '1.75rem',    // 28px - reduzido
-        '4xl': '2rem',       // 32px - reduzido
-        '5xl': '2.25rem',    // 36px - reduzido
-        '6xl': '2.5rem',     // 40px - reduzido
+        'xs': '0.7rem',      // 11px
+        'sm': '0.75rem',     // 12px
+        'base': '0.8125rem', // 13px
+        'lg': '1rem',        // 16px
+        'xl': '1.125rem',    // 18px
+        '2xl': '1.25rem',    // 20px
+        '3xl': '1.5rem',     // 24px
+        '4xl': '1.75rem',    // 28px
+        '5xl': '2rem',       // 32px
+        '6xl': '2.25rem',    // 36px
       },
       colors: {
         border: "hsl(var(--border))",
@@ -85,9 +85,9 @@ const config = {
         "accordion-up": "accordion-up 0.2s ease-out",
       },
       boxShadow: {
-        'neu-flat': '6px 6px 12px hsl(var(--shadow-dark)), -6px -6px 12px hsl(var(--shadow-light))',
-        'neu-pressed': 'inset 4px 4px 8px hsl(var(--shadow-dark)), inset -4px -4px 8px hsl(var(--shadow-light))',
-        'neu-sm': '3px 3px 6px hsl(var(--shadow-dark)), -3px -3px 6px hsl(var(--shadow-light))',
+        'neu-flat': '3px 3px 6px hsl(var(--shadow-dark)), -3px -3px 6px hsl(var(--shadow-light))',
+        'neu-pressed': 'inset 2px 2px 4px hsl(var(--shadow-dark)), inset -2px -2px 4px hsl(var(--shadow-light))',
+        'neu-sm': '1px 1px 2px hsl(var(--shadow-dark)), -1px -1px 2px hsl(var(--shadow-light))',
       },
     },
   },
