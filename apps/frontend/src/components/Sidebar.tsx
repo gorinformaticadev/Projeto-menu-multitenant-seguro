@@ -224,20 +224,23 @@ export function Sidebar() {
       )}
     >
       {/* Header */}
-      <div className="p-1 flex items-center justify-center">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="h-8 w-8"
-        >
-          {isExpanded ? (
-            <ChevronLeft className="h-4 w-4" />
-          ) : (
-            <Menu className="h-4 w-4" />
-          )}
-        </Button>
-      </div>
+      {/* Controle de Toggle Minimalista (Float) */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={cn(
+          "absolute -right-3 top-0 z-50",
+          "h-6 w-6 rounded-full flex items-center justify-center",
+          "bg-background shadow-neu-sm hover:shadow-neu-flat",
+          "text-muted-foreground hover:text-primary transition-all duration-300",
+          "focus:outline-none border border-white/20" // Borda sutil para contraste
+        )}
+        title={isExpanded ? "Recolher" : "Expandir"}
+      >
+        <ChevronLeft className={cn("h-3 w-3 transition-transform", !isExpanded && "rotate-180")} />
+      </button>
+
+      {/* Espaçador Superior */}
+      <div className="h-2" />
 
       {/* Navigation */}
       <div className="flex-1 p-1 overflow-y-auto">
