@@ -1,5 +1,4 @@
 import * as Sentry from '@sentry/node';
-import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
@@ -22,13 +21,9 @@ export class SentryService {
     Sentry.init({
       dsn,
       environment,
-      integrations: [
-        nodeProfilingIntegration(),
-      ],
+      integrations: [],
       // Performance Monitoring
       tracesSampleRate: environment === 'production' ? 0.1 : 1.0, // 10% em produção, 100% em dev
-      // Profiling
-      profilesSampleRate: environment === 'production' ? 0.1 : 1.0,
       // Filtrar dados sensíveis
       beforeSend(event, hint) {
         // Remover dados sensíveis
@@ -41,8 +36,8 @@ export class SentryService {
 
           // Remover dados sensíveis do body
           if (event.request.data) {
-            const data = typeof event.request.data === 'string' 
-              ? JSON.parse(event.request.data) 
+            const data = typeof event.request.data === 'string'
+              ? JSON.parse(event.request.data)
               : event.request.data;
 
             if (data.password) data.password = '[FILTERED]';
