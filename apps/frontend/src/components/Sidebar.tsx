@@ -402,7 +402,13 @@ export function Sidebar() {
                           variant="ghost"
                           onClick={() => {
                             setIsExpanded(true);
-                            setExpandedGroups(prev => ({ ...prev, [groupId]: true }));
+                            setExpandedGroups(prev => {
+                              // Accordion: recolhe outros antes de expandir este
+                              const newState: Record<string, boolean> = {};
+                              Object.keys(prev).forEach(key => newState[key] = false);
+                              newState[groupId] = true;
+                              return newState;
+                            });
                           }}
                           className={cn(
                             "w-full justify-center px-1 py-1 transition-all duration-200 hover:text-primary hover:shadow-neu-flat hover:-translate-y-0.5",
