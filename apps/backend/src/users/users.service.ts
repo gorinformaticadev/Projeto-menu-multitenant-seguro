@@ -3,6 +3,7 @@ import { PrismaService } from '@core/prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { ThemeEnum } from './dto/update-preferences.dto';
 import * as bcrypt from 'bcrypt';
 import { Role } from '@prisma/client';
 
@@ -266,12 +267,8 @@ export class UsersService {
   /**
    * Atualizar preferências do usuário (Tema)
    */
-  async updatePreferences(userId: string, theme: string) {
-    if (!['light', 'dark', 'system'].includes(theme)) {
-      throw new BadRequestException('Tema inválido. Use: light, dark ou system');
-    }
-
-    return (this.prisma as any).userPreferences.upsert({
+  async updatePreferences(userId: string, theme: ThemeEnum) {
+    return this.prisma.userPreferences.upsert({
       where: { userId },
       update: { theme },
       create: { userId, theme },

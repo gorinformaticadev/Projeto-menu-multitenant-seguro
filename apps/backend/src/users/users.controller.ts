@@ -4,7 +4,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { UpdatePreferencesDto } from './dto/update-preferences.dto';
+import { UpdateUserPreferencesDto } from './dto/update-preferences.dto';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { Roles } from '@core/common/decorators/roles.decorator';
@@ -54,6 +54,22 @@ export class UsersController {
     return this.usersService.findByTenant(tenantId);
   }
 
+  /**
+   * PATCH /users/preferences
+   * Atualizar preferências do usuário (Tema)
+   * MOVED UP to avoid conflict with :id
+   */
+  @Patch('preferences')
+  updatePreferences(
+    @Body() updateUserPreferencesDto: UpdateUserPreferencesDto,
+    @CurrentUser() user: any,
+  ) {
+    if (updateUserPreferencesDto.theme) {
+      return this.usersService.updatePreferences(user.id, updateUserPreferencesDto.theme);
+    }
+    return { message: 'No preferences to update' };
+  }
+
   @Get(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @SkipTenantIsolation()
@@ -100,18 +116,6 @@ export class UsersController {
   }
 
   /**
-   * PATCH /users/preferences
-   * Atualizar preferências do usuário (Tema)
-   */
-  @Patch('preferences')
-  updatePreferences(
-    @Body() updatePreferencesDto: UpdatePreferencesDto,
-    @CurrentUser() user: any,
-  ) {
-    return this.usersService.updatePreferences(user.id, updatePreferencesDto.theme);
-  }
-
-  /**
    * POST /users/:id/unlock
    * Desbloquear usuÃ¡rio
    * Apenas SUPER_ADMIN e ADMIN
@@ -124,4 +128,3 @@ export class UsersController {
   }
 
 }
-

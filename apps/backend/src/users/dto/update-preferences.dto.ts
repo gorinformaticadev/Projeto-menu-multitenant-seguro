@@ -1,7 +1,13 @@
-import { IsIn, IsString } from 'class-validator';
+import { IsEnum, IsOptional } from 'class-validator';
 
-export class UpdatePreferencesDto {
-    @IsString()
-    @IsIn(['light', 'dark', 'system'])
-    theme: string;
+export enum ThemeEnum {
+    light = 'light',
+    dark = 'dark',
+    system = 'system',
+}
+
+export class UpdateUserPreferencesDto {
+    @IsOptional()
+    @IsEnum(ThemeEnum)
+    theme?: ThemeEnum;
 }

@@ -39,6 +39,7 @@
     }
   },
   "include": [
+    "src/**/*",
     "../../packages/modules/**/backend/**/*",
     "../../packages/modules/**/module.ts",
     "../../packages/modules/**/permissions.ts"
