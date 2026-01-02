@@ -20,7 +20,7 @@ export function ThemeToggle() {
         try {
             await api.patch('/users/preferences', { theme: newTheme });
         } catch (error) {
-            console.error('Erro ao salvar preferência de tema:', error);
+            console.error('Erro ao salvar preferência de tema:', (error as any).response?.data || error);
         }
     };
 

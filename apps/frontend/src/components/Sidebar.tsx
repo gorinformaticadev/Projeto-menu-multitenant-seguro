@@ -219,7 +219,7 @@ export function Sidebar() {
     <div
       ref={sidebarRef}
       className={cn(
-        "flex flex-col h-full bg-background shadow-neu-sidebar z-20 transition-all duration-300 relative",
+        "flex flex-col h-full bg-gradient-to-b from-secondary to-background border-r border-border/40 shadow-xl z-20 transition-all duration-300 relative",
         isExpanded ? "w-56" : "w-16"
       )}
     >
@@ -324,15 +324,15 @@ export function Sidebar() {
                     href={item.href}
                     onClick={handleItemClick}
                     className={cn(
-                      "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+                      "flex items-center gap-2 px-3 py-2 text-sm font-medium transition-all duration-200 group relative",
                       isActive
-                        ? "text-primary font-semibold shadow-neu-pressed"
-                        : "text-muted-foreground hover:text-primary hover:shadow-neu-flat hover:-translate-y-0.5",
-                      !isExpanded && "justify-center"
+                        ? "bg-primary/10 text-primary border-l-2 border-primary"
+                        : "text-muted-foreground/70 hover:text-foreground hover:bg-white/5 hover:opacity-100",
+                      !isExpanded && "justify-center px-0"
                     )}
                     title={!isExpanded ? item.name : undefined}
                   >
-                    <Icon className="h-5 w-5 flex-shrink-0" />
+                    <Icon className="h-5 w-5 flex-shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
                     {isExpanded && <span>{item.name}</span>}
                   </Link>
                 );
@@ -380,10 +380,10 @@ export function Sidebar() {
                                   href={item.href}
                                   onClick={handleItemClick}
                                   className={cn(
-                                    "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium transition-all duration-200 group relative",
                                     isActive
-                                      ? "text-primary font-semibold shadow-neu-pressed"
-                                      : "text-muted-foreground hover:text-primary hover:shadow-neu-flat hover:-translate-y-0.5"
+                                      ? "bg-primary/10 text-primary border-l-2 border-primary"
+                                      : "text-muted-foreground/70 hover:text-foreground hover:bg-white/5 hover:opacity-100"
                                   )}
                                 >
                                   <Icon className="h-4 w-4" />

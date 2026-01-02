@@ -42,37 +42,46 @@
   }
 
   .dark {
-    /* Dark Neumorphic Base: #2b2e33 */
-    --background: 216 8% 18%;
-    --foreground: 210 40% 98%;
+    /* Modern SaaS Dark Theme
+       Ref: #0F1115 (bg), #141824 (sec), #1A1F2E (surface)
+    */
+    --background: 220 18% 7%;
+    --foreground: 220 14% 91%;
 
-    --card: 216 8% 18%;
-    --card-foreground: 210 40% 98%;
+    --card: 225 28% 14%;
+    --card-foreground: 220 14% 91%;
 
-    --popover: 216 8% 18%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 225 28% 14%;
+    --popover-foreground: 220 14% 91%;
 
-    --primary: 212 90% 60%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    /* Azul moderno: #4F8CFF */
+    --primary: 219 100% 65%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 216 8% 22%;
-    --secondary-foreground: 210 40% 98%;
+    /* Fundo secundário: #141824 */
+    --secondary: 225 31% 11%;
+    --secondary-foreground: 220 14% 91%;
 
-    --muted: 216 8% 22%;
-    --muted-foreground: 215 20.2% 65.1%;
+    /* Muted levemente mais claro que o bg */
+    --muted: 225 25% 18%;
+    --muted-foreground: 218 11% 65%;
+    /* #A1A7B3 */
 
-    --accent: 216 8% 22%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 225 28% 18%;
+    --accent-foreground: 220 14% 91%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 216 8% 25%;
-    --input: 216 8% 20%;
-    --ring: 212 90% 60%;
+    --border: 225 28% 20%;
+    --input: 225 28% 18%;
+    --ring: 219 100% 65%;
 
-    --shadow-light: 216 8% 23%;
-    --shadow-dark: 216 8% 13%;
+    /* Sombras neumórficas sutis para Dark Mode */
+    /* Light: reflexo suave (5% white approx) */
+    --shadow-light: 225 20% 18%;
+    /* Dark: sombra profunda (70% black approx) */
+    --shadow-dark: 220 20% 4%;
   }
 }
 
@@ -91,16 +100,21 @@
   h1 {
     font-size: 1.5rem;
     /* ~24px */
+    letter-spacing: -0.015em;
+    font-weight: 600;
   }
 
   h2 {
     font-size: 1.25rem;
     /* ~20px */
+    letter-spacing: -0.015em;
+    font-weight: 500;
   }
 
   h3 {
     font-size: 1.125rem;
     /* ~18px */
+    font-weight: 500;
   }
 
   p,

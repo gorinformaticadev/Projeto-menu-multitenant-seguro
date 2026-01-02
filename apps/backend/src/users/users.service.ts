@@ -80,7 +80,7 @@ export class UsersService {
           },
         },
         preferences: true,
-      },
+      } as any,
     });
 
     if (!user) {
@@ -271,7 +271,7 @@ export class UsersService {
       throw new BadRequestException('Tema inválido. Use: light, dark ou system');
     }
 
-    return this.prisma.userPreferences.upsert({
+    return (this.prisma as any).userPreferences.upsert({
       where: { userId },
       update: { theme },
       create: { userId, theme },

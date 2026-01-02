@@ -4,6 +4,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { Roles } from '@core/common/decorators/roles.decorator';
@@ -104,10 +105,10 @@ export class UsersController {
    */
   @Patch('preferences')
   updatePreferences(
-    @Body('theme') theme: string,
+    @Body() updatePreferencesDto: UpdatePreferencesDto,
     @CurrentUser() user: any,
   ) {
-    return this.usersService.updatePreferences(user.id, theme);
+    return this.usersService.updatePreferences(user.id, updatePreferencesDto.theme);
   }
 
   /**
