@@ -88,6 +88,7 @@ const config = {
         'neu-flat': '3px 3px 6px hsl(var(--shadow-dark)), -3px -3px 6px hsl(var(--shadow-light))',
         'neu-pressed': 'inset 2px 2px 4px hsl(var(--shadow-dark)), inset -2px -2px 4px hsl(var(--shadow-light))',
         'neu-sm': '1px 1px 2px hsl(var(--shadow-dark)), -1px -1px 2px hsl(var(--shadow-light))',
+        'neu-sidebar': '10px 0 20px -5px hsl(var(--shadow-dark)), 4px 0 8px -2px rgba(0,0,0,0.1)',
       },
     },
   },

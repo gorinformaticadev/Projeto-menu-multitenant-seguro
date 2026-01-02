@@ -147,7 +147,7 @@ A sidebar pode ser levemente elevada ou separada por uma sombra sutil.
 export function Sidebar() {
   return (
     <aside className="
-      h-screen w-64
+      h-screen w-56 /* Largura reduzida */
       bg-background
       shadow-neu-flat
       z-50

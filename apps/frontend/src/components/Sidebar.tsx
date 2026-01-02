@@ -219,12 +219,12 @@ export function Sidebar() {
     <div
       ref={sidebarRef}
       className={cn(
-        "flex flex-col h-full bg-card border-r transition-all duration-300",
-        isExpanded ? "w-64" : "w-20"
+        "flex flex-col h-full bg-background shadow-neu-sidebar z-20 transition-all duration-300 relative",
+        isExpanded ? "w-56" : "w-16"
       )}
     >
       {/* Header */}
-      <div className="p-4 border-b flex items-center justify-center">
+      <div className="p-1 flex items-center justify-center">
         <Button
           variant="ghost"
           size="icon"
@@ -240,7 +240,7 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 p-4 overflow-y-auto">
+      <div className="flex-1 p-1 overflow-y-auto">
         <nav className="space-y-1">
           {/* Renderiza todos os itens em ordem global: Dashboard -> Administração -> Módulos */}
           {(() => {
@@ -321,10 +321,10 @@ export function Sidebar() {
                     href={item.href}
                     onClick={handleItemClick}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                      "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                       isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                        ? "text-primary font-semibold shadow-neu-pressed"
+                        : "text-muted-foreground hover:text-primary hover:shadow-neu-flat hover:-translate-y-0.5",
                       !isExpanded && "justify-center"
                     )}
                     title={!isExpanded ? item.name : undefined}
@@ -347,8 +347,9 @@ export function Sidebar() {
                           variant="ghost"
                           onClick={() => toggleGroup(groupId)}
                           className={cn(
-                            "w-full justify-between px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
-                            hasActiveItem && "text-primary"
+                            "w-full justify-between px-3 py-2 text-sm font-medium transition-all duration-200",
+                            "hover:text-primary hover:shadow-neu-flat",
+                            hasActiveItem && "text-primary font-semibold"
                           )}
                         >
                           <div className="flex items-center gap-3">
@@ -365,7 +366,7 @@ export function Sidebar() {
 
                         {/* Itens do grupo */}
                         {isGroupExpanded && (
-                          <div className="pl-4 space-y-1 border-l ml-4 border-border">
+                          <div className="pl-4 space-y-1 ml-4">
                             {items.filter((item: any) => item.name !== config.name).map((item: any) => {
                               const isActive = pathname === item.href;
                               const Icon = iconMap[item.icon] || Menu;
@@ -376,10 +377,10 @@ export function Sidebar() {
                                   href={item.href}
                                   onClick={handleItemClick}
                                   className={cn(
-                                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                                    "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                                     isActive
-                                      ? "text-primary bg-accent"
-                                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                                      ? "text-primary font-semibold shadow-neu-pressed"
+                                      : "text-muted-foreground hover:text-primary hover:shadow-neu-flat hover:-translate-y-0.5"
                                   )}
                                 >
                                   <Icon className="h-4 w-4" />
@@ -393,7 +394,7 @@ export function Sidebar() {
                     ) : (
                       // Versão colapsada do grupo
                       <>
-                        <div className="my-2 border-t" />
+                        <div className="my-2" />
                         <Button
                           variant="ghost"
                           onClick={() => {
@@ -401,8 +402,8 @@ export function Sidebar() {
                             setExpandedGroups(prev => ({ ...prev, [groupId]: true }));
                           }}
                           className={cn(
-                            "w-full justify-center px-2 py-2 hover:bg-accent hover:text-accent-foreground",
-                            hasActiveItem && "text-primary bg-accent"
+                            "w-full justify-center px-1 py-1 transition-all duration-200 hover:text-primary hover:shadow-neu-flat hover:-translate-y-0.5",
+                            hasActiveItem && "text-primary shadow-neu-pressed hover:translate-y-0 hover:shadow-neu-pressed"
                           )}
                           title={config.name}
                         >
@@ -421,12 +422,12 @@ export function Sidebar() {
       </div>
 
       {/* Logout Button */}
-      <div className="p-4 border-t">
+      <div className="p-1">
         <Button
           variant="ghost"
           className={cn(
             "w-full",
-            isExpanded ? "justify-start" : "justify-center px-2"
+            isExpanded ? "justify-start" : "justify-center px-1"
           )}
           onClick={() => {
             handleItemClick(); // Recolhe o sidebar
