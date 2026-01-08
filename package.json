@@ -15,7 +15,8 @@
     "packages/modules/*"
   ],
   "dependencies": {
-    "axios": "^1.13.2"
+    "axios": "^1.13.2",
+    "node-fetch": "^3.3.2"
   },
   "scripts": {
     "versao": "git add . && git commit -m \"chore: Update\" || echo Commit existente. Prosseguindo... && npm run release && git push --follow-tags",
