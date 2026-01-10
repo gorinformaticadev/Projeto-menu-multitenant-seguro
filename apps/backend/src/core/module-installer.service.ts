@@ -347,10 +347,15 @@ export class ModuleInstallerService {
         if (!module) throw new BadRequestException('Módulo não encontrado');
 
         const modulePath = path.join(this.backendModulesPath, slug);
-        const moduleJsonPath = path.join(modulePath, 'module.json');
+        
+        // Tentar module.json primeiro, depois module.config.json
+        let moduleJsonPath = path.join(modulePath, 'module.json');
+        if (!fs.existsSync(moduleJsonPath)) {
+            moduleJsonPath = path.join(modulePath, 'module.config.json');
+        }
 
         if (!fs.existsSync(moduleJsonPath)) {
-            throw new BadRequestException(`module.json não encontrado em: ${moduleJsonPath}`);
+            throw new BadRequestException(`module.json ou module.config.json não encontrado em: ${modulePath}`);
         }
 
         try {
@@ -420,6 +425,147 @@ export class ModuleInstallerService {
         }
     }
 
+    /**
+     * Executa novamente as migrations e seeds do módulo
+     * Remove registros existentes e executa tudo novamente
+     * VERSÃO MELHORADA: Executa uma migration por vez e para no primeiro erro
+     */
+    async runMigrationsAndSeeds(slug: string) {
+        this.logger.log(`🔄 Executando migrations e seeds novamente para o módulo: ${slug}`);
+
+        const module = await this.prisma.module.findUnique({ where: { slug } });
+        if (!module) throw new BadRequestException('Módulo não encontrado');
+
+        const modulePath = path.join(this.backendModulesPath, slug);
+        if (!fs.existsSync(modulePath)) {
+            throw new BadRequestException(`Módulo não encontrado no disco: ${modulePath}`);
+        }
+
+        try {
+            // Remove registros de migrations e seeds existentes
+            const deletedCount = await this.prisma.moduleMigration.deleteMany({
+                where: { moduleId: module.id }
+            });
+
+            this.logger.log(`🗑️ ${deletedCount.count} registros de migrations/seeds removidos para ${slug}`);
+
+            // Executa migrations novamente (uma por vez, parando no primeiro erro)
+            const migrationsExecuted = await this.executeMigrationsOneByOne(slug, modulePath, MigrationType.migration);
+            this.logger.log(`📊 ${migrationsExecuted} migrations executadas para ${slug}`);
+
+            // Executa seeds novamente (uma por vez, parando no primeiro erro)
+            const seedsExecuted = await this.executeMigrationsOneByOne(slug, modulePath, MigrationType.seed);
+            this.logger.log(`🌱 ${seedsExecuted} seeds executados para ${slug}`);
+
+            // Atualiza status do módulo para db_ready se necessário
+            if (module.status === 'installed' && (migrationsExecuted > 0 || seedsExecuted > 0)) {
+                await this.prisma.module.update({
+                    where: { slug },
+                    data: { status: ModuleStatus.db_ready }
+                });
+                this.logger.log(`✅ Status do módulo ${slug} atualizado para db_ready`);
+            }
+
+            // Criar notificação
+            await this.notificationService.create({
+                title: 'Migrations e Seeds Executados',
+                description: `Módulo ${module.name}: ${migrationsExecuted} migrations e ${seedsExecuted} seeds executados novamente.`,
+                type: 'success',
+                metadata: { 
+                    module: slug, 
+                    action: 'migrations-seeds-rerun',
+                    migrationsExecuted,
+                    seedsExecuted
+                }
+            });
+
+            return {
+                success: true,
+                message: 'Migrations e seeds executados com sucesso',
+                module: {
+                    name: module.name,
+                    slug: module.slug,
+                    migrationsExecuted,
+                    seedsExecuted
+                }
+            };
+
+        } catch (error) {
+            this.logger.error(`❌ Erro ao executar migrations/seeds para ${slug}:`, error);
+            throw new BadRequestException(`Erro ao executar migrations/seeds: ${error.message}`);
+        }
+    }
+
+    /**
+     * Executa migrations uma por vez, parando no primeiro erro
+     * Versão mais robusta que fornece informações detalhadas sobre falhas
+     */
+    private async executeMigrationsOneByOne(slug: string, modulePath: string, type: MigrationType): Promise<number> {
+        const migrationsPath = path.join(modulePath, type === MigrationType.migration ? 'migrations' : 'seeds');
+        if (!fs.existsSync(migrationsPath)) {
+            this.logger.log(`📁 Pasta ${type} não encontrada: ${migrationsPath}`);
+            return 0;
+        }
+
+        const files = fs.readdirSync(migrationsPath).filter(f => f.endsWith('.sql')).sort();
+        this.logger.log(`📋 Encontrados ${files.length} arquivos ${type}: ${files.join(', ')}`);
+        
+        const moduleId = (await this.prisma.module.findUnique({ where: { slug } }))!.id;
+        let executed = 0;
+
+        for (const file of files) {
+            this.logger.log(`🔍 Processando ${type}: ${file}`);
+            
+            const existing = await this.prisma.moduleMigration.findUnique({
+                where: { moduleId_filename_type: { moduleId, filename: file, type } }
+            });
+            
+            if (existing) {
+                this.logger.log(`⏭️ ${type} ${file} já executada, pulando...`);
+                continue;
+            }
+
+            try {
+                this.logger.log(`🚀 Executando ${type}: ${file}`);
+                const filePath = path.join(migrationsPath, file);
+                const sql = fs.readFileSync(filePath, 'utf-8');
+                
+                // Log do SQL para debug (apenas primeiras linhas)
+                const sqlLines = sql.split('\n').filter(line => line.trim() && !line.trim().startsWith('--'));
+                const sqlPreview = sqlLines.slice(0, 3).join('\n');
+                this.logger.log(`📝 SQL Preview: ${sqlPreview}...`);
+                
+                // Executar SQL em transação
+                await this.dbExecutor.executeInTransaction(sql);
+                
+                // Registrar execução
+                await this.prisma.moduleMigration.create({
+                    data: { moduleId, filename: file, type, executedAt: new Date() }
+                });
+                
+                executed++;
+                this.logger.log(`✅ ${type} ${file} executada com sucesso`);
+                
+            } catch (error) {
+                this.logger.error(`❌ ERRO CRÍTICO ao executar ${type} ${file}:`, {
+                    error: error.message,
+                    file: file,
+                    type: type,
+                    module: slug
+                });
+                
+                // Parar execução no primeiro erro e fornecer informações detalhadas
+                throw new BadRequestException(
+                    `Erro ao executar ${type} "${file}": ${error.message}. ` +
+                    `Execução interrompida. ${executed} ${type}s foram executadas com sucesso antes do erro.`
+                );
+            }
+        }
+        
+        this.logger.log(`📊 Total de ${type} executadas: ${executed}`);
+        return executed;
+    }
+
     async getModuleStatus(slug: string) {
         const module = await this.prisma.module.findUnique({
             where: { slug },
@@ -474,25 +620,53 @@ export class ModuleInstallerService {
 
     private async executeMigrations(slug: string, modulePath: string, type: MigrationType): Promise<number> {
         const migrationsPath = path.join(modulePath, type === MigrationType.migration ? 'migrations' : 'seeds');
-        if (!fs.existsSync(migrationsPath)) return 0;
+        if (!fs.existsSync(migrationsPath)) {
+            this.logger.log(`📁 Pasta ${type} não encontrada: ${migrationsPath}`);
+            return 0;
+        }
 
         const files = fs.readdirSync(migrationsPath).filter(f => f.endsWith('.sql')).sort();
+        this.logger.log(`📋 Encontrados ${files.length} arquivos ${type}: ${files.join(', ')}`);
+        
         const moduleId = (await this.prisma.module.findUnique({ where: { slug } }))!.id;
         let executed = 0;
 
         for (const file of files) {
+            this.logger.log(`🔍 Verificando ${type}: ${file}`);
+            
             const existing = await this.prisma.moduleMigration.findUnique({
                 where: { moduleId_filename_type: { moduleId, filename: file, type } }
             });
-            if (existing) continue;
+            
+            if (existing) {
+                this.logger.log(`⏭️ ${type} ${file} já executada, pulando...`);
+                continue;
+            }
 
-            const sql = fs.readFileSync(path.join(migrationsPath, file), 'utf-8');
-            await this.dbExecutor.executeInTransaction(sql);
-            await this.prisma.moduleMigration.create({
-                data: { moduleId, filename: file, type, executedAt: new Date() }
-            });
-            executed++;
+            try {
+                this.logger.log(`🚀 Executando ${type}: ${file}`);
+                const sql = fs.readFileSync(path.join(migrationsPath, file), 'utf-8');
+                
+                // Log do SQL para debug (apenas primeiras linhas)
+                const sqlPreview = sql.split('\n').slice(0, 5).join('\n');
+                this.logger.log(`📝 SQL Preview: ${sqlPreview}...`);
+                
+                await this.dbExecutor.executeInTransaction(sql);
+                
+                await this.prisma.moduleMigration.create({
+                    data: { moduleId, filename: file, type, executedAt: new Date() }
+                });
+                
+                executed++;
+                this.logger.log(`✅ ${type} ${file} executada com sucesso`);
+                
+            } catch (error) {
+                this.logger.error(`❌ Erro ao executar ${type} ${file}:`, error);
+                throw new BadRequestException(`Erro ao executar ${type} ${file}: ${error.message}`);
+            }
         }
+        
+        this.logger.log(`📊 Total de ${type} executadas: ${executed}`);
         return executed;
     }
 

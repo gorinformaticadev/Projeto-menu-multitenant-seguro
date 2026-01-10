@@ -59,6 +59,9 @@ export function ModuleManagement() {
   const [updatingDatabase, setUpdatingDatabase] = useState<string | null>(null);
   const [dbUpdateStatus, setDbUpdateStatus] = useState<string>("");
   const [reloadingConfig, setReloadingConfig] = useState<string | null>(null);
+  const [runningMigrationsSeeds, setRunningMigrationsSeeds] = useState<string | null>(null);
+  const [showMigrationsSeedsDialog, setShowMigrationsSeedsDialog] = useState(false);
+  const [selectedModuleForMigrations, setSelectedModuleForMigrations] = useState<InstalledModule | null>(null);
 
   useEffect(() => {
     loadInstalledModules();
@@ -383,6 +386,45 @@ export function ModuleManagement() {
     }
   };
 
+  const runMigrationsAndSeeds = async (moduleName: string) => {
+    setRunningMigrationsSeeds(moduleName);
+
+    try {
+      console.log(`🔄 Frontend: Executando migrations/seeds para ${moduleName}`);
+      
+      // Endpoint: /configuracoes/sistema/modulos/:slug/run-migrations-seeds
+      const response = await api.post(`/configuracoes/sistema/modulos/${moduleName}/run-migrations-seeds`);
+
+      console.log(`✅ Frontend: Sucesso ao executar migrations/seeds:`, response.data);
+
+      toast({
+        title: "Migrations e Seeds Executados!",
+        description: `${response.data.module.migrationsExecuted} migrations e ${response.data.module.seedsExecuted} seeds foram executados novamente.`,
+      });
+
+      // Recarregar lista de módulos
+      await loadInstalledModules();
+
+    } catch (error: any) {
+      console.error(`❌ Frontend: Erro ao executar migrations/seeds:`, error);
+      
+      toast({
+        title: "Erro ao executar migrations/seeds",
+        description: error.response?.data?.message || "Ocorreu um erro ao executar migrations e seeds",
+        variant: "destructive",
+      });
+    } finally {
+      setRunningMigrationsSeeds(null);
+      setShowMigrationsSeedsDialog(false);
+      setSelectedModuleForMigrations(null);
+    }
+  };
+
+  const handleMigrationsSeedsClick = (module: InstalledModule) => {
+    setSelectedModuleForMigrations(module);
+    setShowMigrationsSeedsDialog(true);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -627,6 +669,27 @@ export function ModuleManagement() {
                                 </TooltipContent>
                               </Tooltip>
 
+                              {/* Botão Executar Migrations/Seeds */}
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleMigrationsSeedsClick(module)}
+                                    disabled={runningMigrationsSeeds === module.slug}
+                                  >
+                                    {runningMigrationsSeeds === module.slug ? (
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                                    ) : (
+                                      <Database className="h-4 w-4 text-green-600" />
+                                    )}
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Executar migrations e seeds novamente
+                                </TooltipContent>
+                              </Tooltip>
+
                               {/* Botão Detalhes (sempre ativo) */}
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -833,6 +896,57 @@ export function ModuleManagement() {
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Confirmar Desinstalação
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Confirmação para Migrations/Seeds */}
+      <Dialog open={showMigrationsSeedsDialog} onOpenChange={setShowMigrationsSeedsDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5 text-green-600" />
+              Executar Migrations e Seeds
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div>
+                <p className="mb-4">
+                  Deseja executar as migrations e seeds do módulo <strong>{selectedModuleForMigrations?.name}</strong> novamente?
+                </p>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 text-sm text-yellow-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    <strong>Atenção:</strong>
+                  </div>
+                  <p className="mb-2">Esta ação irá:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Remover todos os registros de migrations/seeds anteriores</li>
+                    <li>Executar novamente todas as migrations do módulo</li>
+                    <li>Executar novamente todos os seeds do módulo</li>
+                  </ul>
+                </div>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowMigrationsSeedsDialog(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="default"
+              onClick={() => selectedModuleForMigrations && runMigrationsAndSeeds(selectedModuleForMigrations.slug)}
+              disabled={runningMigrationsSeeds !== null}
+            >
+              {runningMigrationsSeeds ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              ) : (
+                <Database className="h-4 w-4 mr-2" />
+              )}
+              Confirmar Execução
             </Button>
           </DialogFooter>
         </DialogContent>

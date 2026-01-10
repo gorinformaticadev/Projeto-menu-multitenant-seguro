@@ -43,6 +43,59 @@ npx ts-node prisma/seed.ts
 npm run start:dev
 ```
 
+
+### Apagar banco de dados
+1️⃣ Acessar o PostgreSQL
+
+No PowerShell ou Prompt de Comando:
+```bash
+psql -U postgres
+```
+ou & "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres
+substitua o 18 pelo numeo do postgres
+
+
+Digite a senha:
+
+```bash
+postgres123
+```
+
+2️⃣ Derrubar conexões ativas (OBRIGATÓRIO)
+
+Postgres não apaga banco com conexão aberta.
+
+```bash
+SELECT pg_terminate_backend(pid)
+FROM pg_stat_activity
+WHERE datname = 'multitenant_db';
+```
+
+
+(Altere o nome se for outro)
+
+3️⃣ Apagar o banco
+```bash
+DROP DATABASE multitenant_db;
+```
+
+
+4️⃣ Recriar o banco
+```bash
+CREATE DATABASE multitenant_db
+WITH OWNER = postgres
+ENCODING = 'UTF8'
+LC_COLLATE = 'Portuguese_Brazil.1252'
+LC_CTYPE   = 'Portuguese_Brazil.1252'
+TEMPLATE template0;
+```
+
+5️⃣ Sair
+
+```bash
+\q
+```
+
 ✅ Backend rodando em `http://localhost:4000`
 
 ## Passo 2: Configurar Frontend
@@ -200,6 +253,7 @@ npm install
 cd backend
 npm run prisma:generate
 ```
+
 
 ## 📚 Próximos Passos
 

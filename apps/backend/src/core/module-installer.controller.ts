@@ -208,4 +208,21 @@ export class ModuleInstallerController {
     async reloadConfig(@Param('slug') slug: string) {
         return await this.installer.reloadModuleConfig(slug);
     }
+
+    /**
+     * POST /configuracoes/sistema/modulos/:slug/run-migrations-seeds
+     * Executa novamente as migrations e seeds do módulo
+     */
+    @Post(':slug/run-migrations-seeds')
+    async runMigrationsAndSeeds(@Param('slug') slug: string) {
+        console.log(`🔄 Controller: Recebida requisição para executar migrations/seeds do módulo: ${slug}`);
+        try {
+            const result = await this.installer.runMigrationsAndSeeds(slug);
+            console.log(`✅ Controller: Sucesso ao executar migrations/seeds para ${slug}`);
+            return result;
+        } catch (error) {
+            console.error(`❌ Controller: Erro ao executar migrations/seeds para ${slug}:`, error);
+            throw error;
+        }
+    }
 }
