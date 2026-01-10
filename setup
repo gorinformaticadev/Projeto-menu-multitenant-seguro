@@ -1,0 +1,267 @@
+#!/bin/bash
+
+# SCRIPT INLINE - INSTALAÇÃO DIRETA SEM ARQUIVOS EXTERNOS
+# Uso: curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Projeto-menu-multitenant-seguro/main/setup | sudo bash -s dominio.com.br
+
+DOMINIO="$1"
+
+# Verificações
+if [ "$EUID" -ne 0 ]; then echo "ERRO: Execute como root"; exit 1; fi
+if [ -z "$DOMINIO" ]; then echo "USO: curl URL | sudo bash -s dominio.com.br"; exit 1; fi
+
+echo "🚀 INSTALAÇÃO DIRETA - 1 SEGUNDO"
+sleep 1
+
+# Diretório de trabalho
+WORK_DIR="/root/multitenant-system"
+rm -rf "$WORK_DIR"
+mkdir -p "$WORK_DIR"
+cd "$WORK_DIR"
+
+# Clonar repositório
+echo "📥 Baixando código..."
+git clone https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git .
+git checkout main
+
+# Instalar Docker
+echo "🐳 Verificando Docker..."
+if ! command -v docker &> /dev/null; then
+    curl -sSL https://get.docker.com | sh
+    systemctl start docker
+    systemctl enable docker
+fi
+
+# Gerar senhas HEXADECIMAIS (sem caracteres especiais)
+echo "🔐 Gerando configurações..."
+DB_PASS=$(openssl rand -hex 16)
+JWT_SEC=$(openssl rand -hex 32)
+ADMIN_PASS=$(openssl rand -hex 8)
+
+# Criar .env
+cat > .env << EOF
+DB_USER=multitenant_user
+DB_PASSWORD=$DB_PASS
+DB_NAME=multitenant_db
+DB_HOST=db
+DB_PORT=5432
+JWT_SECRET=$JWT_SEC
+JWT_EXPIRES_IN=7d
+NODE_ENV=production
+FRONTEND_URL=https://$DOMINIO
+API_URL=https://$DOMINIO/api
+BACKEND_PORT=4000
+FRONTEND_PORT=5000
+EOF
+
+# Criar docker-compose.prod.yml inline
+cat > docker-compose.prod.yml << 'EOF'
+version: '3.8'
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  backend:
+    build: ./apps/backend
+    ports:
+      - "${BACKEND_PORT}:4000"
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      FRONTEND_URL: ${FRONTEND_URL}
+      NODE_ENV: ${NODE_ENV}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+  frontend:
+    build: ./apps/frontend
+    ports:
+      - "${FRONTEND_PORT}:5000"
+    environment:
+      NEXT_PUBLIC_API_URL: ${API_URL}
+      NODE_ENV: ${NODE_ENV}
+    depends_on:
+      - backend
+    networks:
+      - app-network
+volumes:
+  postgres_data:
+networks:
+  app-network:
+    driver: bridge
+EOF
+
+# Iniciar sistema
+echo "🏗 Iniciando containers..."
+docker-compose -f docker-compose.prod.yml down 2>/dev/null || true
+docker-compose -f docker-compose.prod.yml up --build -d
+
+echo "⏱ Aguardando 15 segundos..."
+sleep 15
+
+# Verificar e inicializar
+echo "🔍 Verificando sistema..."
+if docker-compose -f docker-compose.prod.yml ps | grep -q "Up"; then
+    echo "🗄 Inicializando banco..."
+    docker-compose -f docker-compose.prod.yml exec -T backend npx prisma migrate deploy
+    docker-compose -f docker-compose.prod.yml exec -T backend npx ts-node prisma/seed.ts
+    
+    echo "✅ INSTALAÇÃO CONCLUÍDA!"
+    echo ""
+    echo "🎉 SISTEMA PRONTO EM https://$DOMINIO"
+    echo "👤 Credenciais: admin@system.com / $ADMIN_PASS"
+    echo "🔒 Banco: multitenant_user / $DB_PASS"
+else
+    echo "❌ ERRO: Containers não estão rodando"
+    docker-compose -f docker-compose.prod.yml ps
+    docker-compose -f docker-compose.prod.yml logs
+    exit 1
+fi#!/bin/bash
+
+# SCRIPT INLINE - INSTALAÇÃO DIRETA SEM ARQUIVOS EXTERNOS
+# Uso: curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Projeto-menu-multitenant-seguro/main/setup | sudo bash -s dominio.com.br
+
+DOMINIO="$1"
+
+# Verificações
+if [ "$EUID" -ne 0 ]; then echo "ERRO: Execute como root"; exit 1; fi
+if [ -z "$DOMINIO" ]; then echo "USO: curl URL | sudo bash -s dominio.com.br"; exit 1; fi
+
+echo "🚀 INSTALAÇÃO DIRETA - 1 SEGUNDO"
+sleep 1
+
+# Diretório de trabalho
+WORK_DIR="/root/multitenant-system"
+rm -rf "$WORK_DIR"
+mkdir -p "$WORK_DIR"
+cd "$WORK_DIR"
+
+# Clonar repositório
+echo "📥 Baixando código..."
+git clone https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git .
+git checkout main
+
+# Instalar Docker
+echo "🐳 Verificando Docker..."
+if ! command -v docker &> /dev/null; then
+    curl -sSL https://get.docker.com | sh
+    systemctl start docker
+    systemctl enable docker
+fi
+
+# Gerar senhas HEXADECIMAIS (sem caracteres especiais)
+echo "🔐 Gerando configurações..."
+DB_PASS=$(openssl rand -hex 16)
+JWT_SEC=$(openssl rand -hex 32)
+ADMIN_PASS=$(openssl rand -hex 8)
+
+# Criar .env
+cat > .env << EOF
+DB_USER=multitenant_user
+DB_PASSWORD=$DB_PASS
+DB_NAME=multitenant_db
+DB_HOST=db
+DB_PORT=5432
+JWT_SECRET=$JWT_SEC
+JWT_EXPIRES_IN=7d
+NODE_ENV=production
+FRONTEND_URL=https://$DOMINIO
+API_URL=https://$DOMINIO/api
+BACKEND_PORT=4000
+FRONTEND_PORT=5000
+EOF
+
+# Criar docker-compose.prod.yml inline
+cat > docker-compose.prod.yml << 'EOF'
+version: '3.8'
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  backend:
+    build: ./apps/backend
+    ports:
+      - "${BACKEND_PORT}:4000"
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      FRONTEND_URL: ${FRONTEND_URL}
+      NODE_ENV: ${NODE_ENV}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+  frontend:
+    build: ./apps/frontend
+    ports:
+      - "${FRONTEND_PORT}:5000"
+    environment:
+      NEXT_PUBLIC_API_URL: ${API_URL}
+      NODE_ENV: ${NODE_ENV}
+    depends_on:
+      - backend
+    networks:
+      - app-network
+volumes:
+  postgres_data:
+networks:
+  app-network:
+    driver: bridge
+EOF
+
+# Iniciar sistema
+echo "🏗 Iniciando containers..."
+docker-compose -f docker-compose.prod.yml down 2>/dev/null || true
+docker-compose -f docker-compose.prod.yml up --build -d
+
+echo "⏱ Aguardando 15 segundos..."
+sleep 15
+
+# Verificar e inicializar
+echo "🔍 Verificando sistema..."
+if docker-compose -f docker-compose.prod.yml ps | grep -q "Up"; then
+    echo "🗄 Inicializando banco..."
+    docker-compose -f docker-compose.prod.yml exec -T backend npx prisma migrate deploy
+    docker-compose -f docker-compose.prod.yml exec -T backend npx ts-node prisma/seed.ts
+    
+    echo "✅ INSTALAÇÃO CONCLUÍDA!"
+    echo ""
+    echo "🎉 SISTEMA PRONTO EM https://$DOMINIO"
+    echo "👤 Credenciais: admin@system.com / $ADMIN_PASS"
+    echo "🔒 Banco: multitenant_user / $DB_PASS"
+else
+    echo "❌ ERRO: Containers não estão rodando"
+    docker-compose -f docker-compose.prod.yml ps
+    docker-compose -f docker-compose.prod.yml logs
+    exit 1
+fi
