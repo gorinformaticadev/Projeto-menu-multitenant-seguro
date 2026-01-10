@@ -17,6 +17,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
+import { WsJwtGuard } from '@common/guards/ws-jwt.guard';
 import { NotificationService } from './notification.service';
 import { Notification } from './notification.entity';
 
@@ -28,11 +29,37 @@ interface AuthenticatedSocket extends Socket {
   };
 }
 
+@UseGuards(WsJwtGuard)
 @WebSocketGateway({
   namespace: '/notifications',
   cors: {
-    origin: '*',
+    origin: (origin, callback) => {
+      // Domínios de produção
+      const allowedOrigins = [
+        process.env.FRONTEND_URL,
+        process.env.FRONTEND_URL?.replace('https://', 'wss://'), // Protocolo WebSocket
+      ].filter(Boolean);
+      
+      // Domínios de desenvolvimento
+      if (process.env.NODE_ENV !== 'production') {
+        allowedOrigins.push(
+          'http://localhost:5000',
+          'http://localhost:3000',
+          'ws://localhost:5000',
+          'ws://localhost:3000'
+        );
+      }
+      
+      // Permitir se não houver origem (apps móveis, conexões diretas) ou estiver na lista permitida
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origem não permitida: ${origin}`));
+      }
+    },
     credentials: true,
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Authorization', 'Content-Type'],
   },
 })
 export class NotificationGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -51,28 +78,15 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
 
   async handleConnection(client: AuthenticatedSocket) {
     try {
-      // Extrair token do handshake
-      const token = client.handshake.auth?.token || client.handshake.headers?.authorization?.replace('Bearer ', '');
+      // O cliente.user já está populado pelo WsJwtGuard
+      const user = client.user;
       
-      if (!token) {
-        this.logger.warn(`Cliente rejeitado - sem token: ${client.id}`);
-        client.disconnect();
-        return;
-      }
-
-      // Aqui você validaria o JWT token e extrairia o usuário
-      // Por simplicidade, vou assumir que o token é válido
-      // Em produção, use o JwtService para validar
-      
-      // Mock de usuário - SUBSTITUIR por validação real do JWT
-      const user = await this.validateToken(token);
       if (!user) {
-        this.logger.warn(`Cliente rejeitado - token inválido: ${client.id}`);
-        client.disconnect();
+        this.logger.warn(`Cliente rejeitado - usuário não autenticado: ${client.id}`);
+        client.disconnect(true);
         return;
       }
 
-      client.user = user;
       this.connectedClients.set(client.id, client);
 
       // Entrar nas salas apropriadas
@@ -86,7 +100,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
 
     } catch (error) {
       this.logger.error(`Erro na conexão do cliente ${client.id}:`, error);
-      client.disconnect();
+      client.disconnect(true);
     }
   }
 
@@ -114,8 +128,17 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
         this.logger.log(`Notificação marcada como lida via Socket.IO: ${data.id}`);
       }
     } catch (error) {
-      this.logger.error(`Erro ao marcar notificação como lida: ${data.id}`, error);
-      client.emit('notification:error', { message: 'Erro ao marcar como lida' });
+      this.logger.error(`Erro ao marcar notificação como lida: ${data.id}`, {
+        error: error.message,
+        stack: error.stack,
+        clientId: client.id,
+        userId: client.user?.id,
+        timestamp: new Date().toISOString()
+      });
+      client.emit('notification:error', { 
+        message: 'Não foi possível processar a solicitação',
+        code: 'MARK_READ_FAILED'
+      });
     }
   }
 
@@ -132,8 +155,17 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
       
       this.logger.log(`${count} notificações marcadas como lidas via Socket.IO`);
     } catch (error) {
-      this.logger.error('Erro ao marcar todas como lidas:', error);
-      client.emit('notification:error', { message: 'Erro ao marcar todas como lidas' });
+      this.logger.error('Erro ao marcar todas como lidas:', {
+        error: error.message,
+        stack: error.stack,
+        clientId: client.id,
+        userId: client.user?.id,
+        timestamp: new Date().toISOString()
+      });
+      client.emit('notification:error', { 
+        message: 'Não foi possível processar a solicitação',
+        code: 'MARK_ALL_READ_FAILED'
+      });
     }
   }
 
@@ -158,8 +190,17 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
         this.logger.log(`Notificação deletada via Socket.IO: ${data.id}`);
       }
     } catch (error) {
-      this.logger.error(`Erro ao deletar notificação: ${data.id}`, error);
-      client.emit('notification:error', { message: 'Erro ao deletar notificação' });
+      this.logger.error(`Erro ao deletar notificação: ${data.id}`, {
+        error: error.message,
+        stack: error.stack,
+        clientId: client.id,
+        userId: client.user?.id,
+        timestamp: new Date().toISOString()
+      });
+      client.emit('notification:error', { 
+        message: 'Não foi possível processar a solicitação',
+        code: 'DELETE_NOTIFICATION_FAILED'
+      });
     }
   }
 
