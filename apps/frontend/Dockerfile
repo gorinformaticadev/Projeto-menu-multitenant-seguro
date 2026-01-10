@@ -1,16 +1,21 @@
-# Etapa de construção
+# Dockerfile para Frontend - Corrigido
 FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copiar package files e instalar dependências
-COPY frontend/package*.json ./
-RUN npm ci
+# Instalar dependências do sistema
+RUN apk add --no-cache openssl
+
+# Copiar package files
+COPY apps/frontend/package*.json ./
+
+# Instalar dependências
+RUN npm ci && npm cache clean --force
 
 # Copiar código fonte
-COPY frontend/. .
+COPY apps/frontend/. .
 
-# Construir aplicação
+# Build da aplicação
 RUN npm run build
 
 # Etapa de produção
@@ -18,24 +23,22 @@ FROM node:18-alpine AS production
 
 WORKDIR /app
 
-# Criar usuário não-root
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nextjs -u 1001
+# Instalar openssl
+RUN apk add --no-cache openssl
 
-# Copiar dependências de produção
-COPY --from=builder /app/package*.json ./
+# Copiar package files
+COPY apps/frontend/package*.json ./
+
+# Instalar apenas dependências de produção
 RUN npm ci --only=production && npm cache clean --force
 
-# Copiar build
+# Copiar build do builder
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/node_modules ./node_modules
 
-# Copiar arquivos essenciais
-COPY --from=builder /app/next.config.js ./
-COPY --from=builder /app/next-env.d.ts ./
-
-USER nextjs
-
+# Expor porta
 EXPOSE 5000
 
+# Comando de inicialização
 CMD ["npm", "start"]
