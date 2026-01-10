@@ -110,5 +110,98 @@ export class SecurityConfigService {
       smtpPassword,
     };
   }
+
+  /**
+   * Obtém configuração de rate limiting adaptativo por ambiente
+   */
+  async getRateLimitConfig() {
+    const config = await this.getConfig();
+    
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    return {
+      enabled: isProduction ? config.rateLimitProdEnabled : config.rateLimitDevEnabled,
+      requests: isProduction ? config.rateLimitProdRequests : config.rateLimitDevRequests,
+      window: isProduction ? config.rateLimitProdWindow : config.rateLimitDevWindow,
+      isProduction
+    };
+  }
+
+  /**
+   * Obtém configuração de tokens e sessões
+   */
+  async getTokenSessionConfig() {
+    const config = await this.getConfig();
+    
+    return {
+      tokenCleanupEnabled: config.tokenCleanupEnabled,
+      tokenCleanupIntervalHours: config.tokenCleanupIntervalHours,
+      maxActiveSessionsPerUser: config.maxActiveSessionsPerUser,
+      refreshTokenRotation: config.refreshTokenRotation,
+      sessionTimeoutMinutes: config.sessionTimeoutMinutes
+    };
+  }
+
+  /**
+   * Obtém todas as configurações de segurança em um objeto único
+   */
+  async getFullConfig() {
+    const config = await this.getConfig();
+    
+    return {
+      // Rate Limiting
+      rateLimit: {
+        login: {
+          maxAttempts: config.loginMaxAttempts,
+          lockDurationMinutes: config.loginLockDurationMinutes,
+          windowMinutes: config.loginWindowMinutes
+        },
+        global: {
+          maxRequests: config.globalMaxRequests,
+          windowMinutes: config.globalWindowMinutes
+        },
+        adaptive: await this.getRateLimitConfig()
+      },
+      
+      // Password Policy
+      password: {
+        minLength: config.passwordMinLength,
+        requireUppercase: config.passwordRequireUppercase,
+        requireLowercase: config.passwordRequireLowercase,
+        requireNumbers: config.passwordRequireNumbers,
+        requireSpecial: config.passwordRequireSpecial,
+        reuseLimit: config.passwordReuseLimit
+      },
+      
+      // JWT & Sessions
+      tokens: {
+        accessTokenExpiresIn: config.accessTokenExpiresIn,
+        refreshTokenExpiresIn: config.refreshTokenExpiresIn,
+        sessionTimeoutMinutes: config.sessionTimeoutMinutes,
+        ...await this.getTokenSessionConfig()
+      },
+      
+      // 2FA
+      twoFactor: {
+        enabled: config.twoFactorEnabled,
+        required: config.twoFactorRequired,
+        requiredForAdmins: config.twoFactorRequiredForAdmins,
+        suggested: config.twoFactorSuggested
+      },
+      
+      // Email
+      email: {
+        verificationRequired: config.emailVerificationRequired,
+        verificationLevel: config.emailVerificationLevel
+      },
+      
+      // Platform
+      platform: {
+        name: config.platformName,
+        email: config.platformEmail,
+        phone: config.platformPhone
+      }
+    };
+  }
 }
 

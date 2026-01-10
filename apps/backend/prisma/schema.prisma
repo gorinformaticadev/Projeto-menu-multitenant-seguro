@@ -168,6 +168,21 @@ model SecurityConfig {
   platformName               String?  @default("Sistema Multitenant")
   platformEmail              String?
   platformPhone              String?
+  
+  // Rate Limiting por ambiente
+  rateLimitDevEnabled        Boolean  @default(true)
+  rateLimitProdEnabled       Boolean  @default(true)
+  rateLimitDevRequests       Int      @default(1000)  // requests por minuto em DEV
+  rateLimitProdRequests      Int      @default(100)   // requests por minuto em PROD
+  rateLimitDevWindow         Int      @default(1)     // minutos
+  rateLimitProdWindow        Int      @default(1)     // minutos
+  
+  // Configurações de tokens e sessão
+  tokenCleanupEnabled        Boolean  @default(true)
+  tokenCleanupIntervalHours  Int      @default(24)
+  maxActiveSessionsPerUser   Int      @default(5)
+  refreshTokenRotation       Boolean  @default(true)
+  
   updatedAt                  DateTime @updatedAt
   updatedBy                  String?
 

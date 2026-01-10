@@ -32,6 +32,60 @@ export class UpdateSecurityConfigDto {
   @Max(60)
   globalWindowMinutes?: number;
 
+  // Rate Limiting por ambiente
+  @IsOptional()
+  @IsBoolean()
+  rateLimitDevEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  rateLimitProdEnabled?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10000)
+  rateLimitDevRequests?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  rateLimitProdRequests?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(60)
+  rateLimitDevWindow?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(60)
+  rateLimitProdWindow?: number;
+
+  // Configurações de tokens e sessão
+  @IsOptional()
+  @IsBoolean()
+  tokenCleanupEnabled?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(168) // Até 1 semana
+  tokenCleanupIntervalHours?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  maxActiveSessionsPerUser?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  refreshTokenRotation?: boolean;
+
   // Senha
   @IsOptional()
   @IsInt()
