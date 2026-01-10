@@ -8,6 +8,8 @@ import * as cookieParser from 'cookie-parser';
 import { SentryService } from './common/services/sentry.service';
 import { SentryExceptionFilter } from './common/filters/sentry-exception.filter';
 import { validateSecurityConfig } from './common/utils/security.utils';
+import { createAdapter } from '@socket.io/redis-adapter';
+import { Cluster } from 'ioredis';
 
 async function bootstrap() {
   // ============================================
@@ -32,6 +34,73 @@ async function bootstrap() {
   // Carregamento dinâmico de módulos via register()
   const dynamicModule = await AppModule.register();
   const app = await NestFactory.create<NestExpressApplication>(dynamicModule);
+
+  // ============================================
+  // 🔧 REDIS ADAPTER PARA ESCALABILIDADE HORIZONTAL
+  // ============================================
+  if (process.env.REDIS_HOST) {
+    console.log('🔧 Configurando Redis adapter para Socket.IO...');
+    
+    try {
+      // Configuração do cluster Redis
+      const redisOptions = {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT) || 6379,
+        password: process.env.REDIS_PASSWORD,
+        retryDelayOnFailover: 100,
+        maxRetriesPerRequest: 3,
+        connectTimeout: 10000,
+      };
+
+      // Criar clientes Redis para pub/sub
+      const pubClient = new Cluster([
+        { host: redisOptions.host, port: redisOptions.port }
+      ], {
+        redisOptions: { password: redisOptions.password }
+      });
+
+      const subClient = pubClient.duplicate();
+
+      // Aguardar conexão Redis
+      await Promise.all([
+        pubClient.ping(),
+        subClient.ping()
+      ]);
+
+      // Obter instância do servidor HTTP
+      const server = app.getHttpServer();
+      
+      // Configurar Socket.IO com adaptador Redis
+      const io = require('socket.io')(server, {
+        cors: {
+          origin: [
+            process.env.FRONTEND_URL || 'http://localhost:5000',
+            'http://localhost:5000',
+            'http://localhost:3000'
+          ],
+          credentials: true,
+          methods: ['GET', 'POST'],
+          allowedHeaders: ['Authorization', 'Content-Type'],
+        },
+        transports: ['websocket', 'polling'],
+        allowEIO3: true
+      });
+
+      // Aplicar adaptador Redis
+      io.adapter(createAdapter(pubClient, subClient));
+
+      // Tornar instância io disponível na aplicação
+      app.set('io', io);
+      
+      console.log('✅ Redis adapter configurado com sucesso');
+      
+    } catch (error) {
+      console.error('❌ Falha ao configurar Redis adapter:', error.message);
+      console.warn('⚠️  Continuando sem Redis adapter (modo standalone)');
+    }
+  } else {
+    console.log('ℹ️  Redis não configurado - usando modo standalone');
+  }
 
   // ============================================
   // 🔒 COOKIE PARSER - Necessário para CSRF protection

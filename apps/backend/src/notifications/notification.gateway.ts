@@ -21,6 +21,16 @@ import { WsJwtGuard } from '@common/guards/ws-jwt.guard';
 import { NotificationService } from './notification.service';
 import { Notification } from './notification.entity';
 
+interface ConnectionMetrics {
+  totalConnections: number;
+  activeConnections: number;
+  peakConnections: number;
+  connectionAttempts: number;
+  failedConnections: number;
+  avgConnectionDuration: number;
+  connectionFailureRate: number;
+}
+
 interface AuthenticatedSocket extends Socket {
   user?: {
     id: string;
@@ -68,21 +78,101 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
 
   private readonly logger = new Logger(NotificationGateway.name);
   private connectedClients = new Map<string, AuthenticatedSocket>();
+  private connectionMetrics: ConnectionMetrics = {
+    totalConnections: 0,
+    activeConnections: 0,
+    peakConnections: 0,
+    connectionAttempts: 0,
+    failedConnections: 0,
+    avgConnectionDuration: 0,
+    connectionFailureRate: 0
+  };
+  private connectionStartTimes = new Map<string, number>();
+  private monitoringInterval: NodeJS.Timeout;
 
   constructor(
     private notificationService: NotificationService,
     private jwtService: JwtService,
     private configService: ConfigService,
     private prismaService: PrismaService
-  ) {}
+  ) {
+    this.startMonitoring();
+  }
+
+  private startMonitoring() {
+    this.monitoringInterval = setInterval(() => {
+      this.updateMetrics();
+      this.checkThresholds();
+      this.logMetrics();
+    }, 60000); // A cada minuto
+  }
+
+  private updateMetrics() {
+    const currentActive = this.connectedClients.size;
+    this.connectionMetrics.activeConnections = currentActive;
+    this.connectionMetrics.peakConnections = Math.max(
+      this.connectionMetrics.peakConnections,
+      currentActive
+    );
+
+    // Calcular taxa de falha
+    if (this.connectionMetrics.connectionAttempts > 0) {
+      this.connectionMetrics.connectionFailureRate = 
+        (this.connectionMetrics.failedConnections / this.connectionMetrics.connectionAttempts) * 100;
+    }
+  }
+
+  private checkThresholds() {
+    const maxConnections = parseInt(process.env.MAX_WEBSOCKET_CONNECTIONS) || 1000;
+    
+    // Alertar sobre uso alto de conexões
+    if (this.connectionMetrics.activeConnections > maxConnections * 0.8) {
+      this.logger.warn('ALTO_USO_CONEXOES', {
+        active: this.connectionMetrics.activeConnections,
+        threshold: maxConnections * 0.8,
+        percentage: (this.connectionMetrics.activeConnections / maxConnections * 100).toFixed(2)
+      });
+    }
+
+    // Alertar sobre alta taxa de falhas
+    if (this.connectionMetrics.connectionFailureRate > 5) {
+      this.logger.error('ALTA_TAXA_FALHAS_CONEXAO', {
+        failureRate: this.connectionMetrics.connectionFailureRate,
+        failed: this.connectionMetrics.failedConnections,
+        attempts: this.connectionMetrics.connectionAttempts
+      });
+    }
+  }
+
+  private logMetrics() {
+    this.logger.log('METRICAS_CONEXOES', {
+      ...this.connectionMetrics,
+      timestamp: new Date().toISOString(),
+      memoryUsage: process.memoryUsage(),
+      uptime: process.uptime()
+    });
+  }
+
+  // Lifecycle hook para limpeza
+  onModuleDestroy() {
+    if (this.monitoringInterval) {
+      clearInterval(this.monitoringInterval);
+    }
+  }
 
   async handleConnection(client: AuthenticatedSocket) {
     try {
+      // Rastrear início da conexão para métricas
+      this.connectionMetrics.totalConnections++;
+      this.connectionMetrics.connectionAttempts++;
+      this.connectionStartTimes.set(client.id, Date.now());
+      
       // O cliente.user já está populado pelo WsJwtGuard
       const user = client.user;
       
       if (!user) {
         this.logger.warn(`Cliente rejeitado - usuário não autenticado: ${client.id}`);
+        this.connectionMetrics.failedConnections++;
         client.disconnect(true);
         return;
       }
@@ -100,11 +190,23 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
 
     } catch (error) {
       this.logger.error(`Erro na conexão do cliente ${client.id}:`, error);
+      this.connectionMetrics.failedConnections++;
       client.disconnect(true);
     }
   }
 
   handleDisconnect(client: AuthenticatedSocket) {
+    // Calcular duração da conexão
+    const startTime = this.connectionStartTimes.get(client.id);
+    if (startTime) {
+      const duration = Date.now() - startTime;
+      this.connectionMetrics.avgConnectionDuration = 
+        ((this.connectionMetrics.avgConnectionDuration * (this.connectionMetrics.totalConnections - 1)) + duration) 
+        / this.connectionMetrics.totalConnections;
+      
+      this.connectionStartTimes.delete(client.id);
+    }
+    
     this.connectedClients.delete(client.id);
     this.logger.log(`Cliente desconectado: ${client.id}`);
   }
