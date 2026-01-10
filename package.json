@@ -20,6 +20,7 @@
   },
   "scripts": {
     "versao": "git add . && git commit -m \"chore: Update\" || echo Commit existente. Prosseguindo... && npm run release && git push --follow-tags",
+    "commit": "npx cz",
     "release": "standard-version"
   },
   "devDependencies": {
@@ -34,5 +35,10 @@
     "commitizen": {
       "path": "./node_modules/cz-conventional-changelog"
     }
+  },
+  "main": "index.js",
+  "keywords": [],
+  "bugs": {
+    "url": "https://github.com/gorinformatica/menu-multitenant/issues"
   }
 }
