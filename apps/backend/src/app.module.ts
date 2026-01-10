@@ -1,7 +1,8 @@
 import { Module, NestModule, MiddlewareConsumer, DynamicModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { CsrfGuard } from "./common/guards/csrf.guard";
 import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './core/prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
@@ -75,6 +76,11 @@ import { CronModule } from './core/cron/cron.module';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    // CSRF Protection Global
+    {
+      provide: APP_GUARD,
+      useClass: CsrfGuard,
     },
     // Serviço de limpeza de tokens
     TokenCleanupService,

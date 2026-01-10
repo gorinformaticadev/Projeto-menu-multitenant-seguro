@@ -8,6 +8,7 @@ import * as cookieParser from 'cookie-parser';
 import { SentryService } from './common/services/sentry.service';
 import { SentryExceptionFilter } from './common/filters/sentry-exception.filter';
 import { validateSecurityConfig } from './common/utils/security.utils';
+import { SecretManagerService } from './common/services/secret-manager.nest.service';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { Cluster } from 'ioredis';
 
@@ -30,6 +31,31 @@ async function bootstrap() {
   }
 
   console.log('✅ Configurações de segurança validadas com sucesso');
+
+  // ============================================
+  // 🔐 SECRET MANAGEMENT - Carregar secrets antes da inicialização
+  // ============================================
+  console.log('🔐 Inicializando Secret Manager...');
+  
+  try {
+    const secretManager = new SecretManagerService();
+    await secretManager.initialize();
+    
+    // Validar secrets críticos
+    if (!secretManager.validateCriticalSecrets()) {
+      console.error('❌ Secrets críticos ausentes!');
+      process.exit(1);
+    }
+    
+    console.log('✅ Secret Manager inicializado com sucesso');
+  } catch (error) {
+    console.error('❌ Falha ao inicializar Secret Manager:', error.message);
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    } else {
+      console.warn('⚠️  Continuando em modo desenvolvimento sem Secret Manager');
+    }
+  }
 
   // Carregamento dinâmico de módulos via register()
   const dynamicModule = await AppModule.register();
