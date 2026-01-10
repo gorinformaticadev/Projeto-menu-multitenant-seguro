@@ -52,6 +52,7 @@ model User {
   auditLogs                AuditLog[]
   passwordResetTokens      PasswordResetToken[]
   refreshTokens            RefreshToken[]
+  blacklistedTokens        BlacklistedToken[]
   tenant                   Tenant?              @relation(fields: [tenantId], references: [id])
   preferences              UserPreferences?
 
@@ -103,6 +104,21 @@ model PasswordResetToken {
   @@index([expiresAt])
   @@index([usedAt])
   @@map("password_reset_tokens")
+}
+
+model BlacklistedToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@index([createdAt])
+  @@map("blacklisted_tokens")
 }
 
 model AuditLog {

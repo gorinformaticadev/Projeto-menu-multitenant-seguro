@@ -13,8 +13,9 @@ export class RolesGuard implements CanActivate {
       context.getClass(),
     ]);
 
-    if (!requiredRoles) {
-      return true;
+    // POLÍTICA DE SEGURANÇA: Negar por padrão se não especificado
+    if (!requiredRoles || requiredRoles.length === 0) {
+      throw new ForbiddenException('Acesso negado - permissões não definidas');
     }
 
     const { user } = context.switchToHttp().getRequest();
@@ -26,7 +27,7 @@ export class RolesGuard implements CanActivate {
     const hasRole = requiredRoles.some((role) => user.role === role);
     
     if (!hasRole) {
-      throw new ForbiddenException('VocÃª nÃ£o tem permissÃ£o para acessar este recurso');
+      throw new ForbiddenException(`Permissão insuficiente. Requer: ${requiredRoles.join(', ')}`);
     }
 
     return true;

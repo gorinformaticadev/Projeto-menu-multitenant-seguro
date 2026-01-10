@@ -8,6 +8,7 @@ import { EmailVerificationService } from './email-verification.service';
 import { PasswordResetService } from './password-reset.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { TokenBlacklistService } from '../common/services/token-blacklist.service';
 import { AuditModule } from '../audit/audit.module';
 import { EmailModule } from '../email/email.module';
 
@@ -27,7 +28,7 @@ import { EmailModule } from '../email/email.module';
     EmailModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, TwoFactorService, EmailVerificationService, PasswordResetService, JwtStrategy],
-  exports: [AuthService, TwoFactorService, EmailVerificationService, PasswordResetService],
+  providers: [AuthService, TwoFactorService, EmailVerificationService, PasswordResetService, JwtStrategy, TokenBlacklistService],
+  exports: [AuthService, TwoFactorService, EmailVerificationService, PasswordResetService, TokenBlacklistService],
 })
 export class AuthModule {}

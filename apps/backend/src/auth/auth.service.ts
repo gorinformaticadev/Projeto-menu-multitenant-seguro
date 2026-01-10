@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TwoFactorService } from './two-factor.service';
+import { TokenBlacklistService } from '../common/services/token-blacklist.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { LoginDto } from './dto/login.dto';
@@ -19,6 +20,7 @@ export class AuthService {
     private auditService: AuditService,
     @Inject(forwardRef(() => TwoFactorService))
     private twoFactorService: TwoFactorService,
+    private tokenBlacklistService: TokenBlacklistService,
   ) { }
 
   async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string) {
@@ -317,16 +319,27 @@ export class AuthService {
   }
 
   /**
-   * Logout - invalida refresh token
+   * Logout - invalida refresh token e adiciona à blacklist
    */
   async logout(refreshToken: string, userId: string, ipAddress?: string, userAgent?: string) {
-    // Remover refresh token
-    await this.prisma.refreshToken.deleteMany({
-      where: {
-        token: refreshToken,
-        userId,
-      },
+    // Buscar o refresh token para obter a data de expiração
+    const storedToken = await this.prisma.refreshToken.findUnique({
+      where: { token: refreshToken },
     });
+
+    if (storedToken) {
+      // Adicionar token à blacklist
+      await this.tokenBlacklistService.blacklistToken(
+        refreshToken,
+        storedToken.expiresAt,
+        userId
+      );
+
+      // Remover refresh token do banco
+      await this.prisma.refreshToken.delete({
+        where: { id: storedToken.id },
+      });
+    }
 
     // Log de logout
     await this.auditService.log({
