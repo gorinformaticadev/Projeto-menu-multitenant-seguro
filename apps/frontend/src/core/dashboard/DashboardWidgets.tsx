@@ -9,7 +9,8 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { moduleRegistry, ModuleDashboardWidget } from '@/lib/module-registry';
+import { moduleRegistry } from '@/lib/module-registry';
+import { DashboardWidget } from '@/core/contracts/DashboardWidget';
 
 // Componentes de widgets disponíveis
 const widgetComponents: Record<string, React.ComponentType<any>> = {
@@ -50,7 +51,7 @@ const widgetComponents: Record<string, React.ComponentType<any>> = {
 
 export function DashboardWidgets() {
   const { user } = useAuth();
-  const [widgets, setWidgets] = useState<ModuleDashboardWidget[]>([]);
+  const [widgets, setWidgets] = useState<DashboardWidget[]>([]);
 
   useEffect(() => {
     loadWidgets();
@@ -82,7 +83,9 @@ export function DashboardWidgets() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {widgets.map((widget) => {
-        const WidgetComponent = widgetComponents[widget.component];
+        const WidgetComponent = typeof widget.component === 'string' 
+          ? widgetComponents[widget.component] 
+          : widget.component;
         
         if (!WidgetComponent) {
           console.warn(`Componente de widget não encontrado: ${widget.component}`);
