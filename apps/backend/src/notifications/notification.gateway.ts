@@ -101,56 +101,73 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
 
   private startMonitoring() {
     this.monitoringInterval = setInterval(() => {
-      this.updateMetrics();
-      this.checkThresholds();
-      this.logMetrics();
+      try {
+        this.updateMetrics();
+        this.checkThresholds();
+        this.logMetrics();
+      } catch (error) {
+        // CRÍTICO: Nunca permitir que erros de monitoramento quebrem outras operações
+        this.logger.error('Erro no monitoramento do gateway (não crítico):', error);
+      }
     }, 60000); // A cada minuto
   }
 
   private updateMetrics() {
-    const currentActive = this.connectedClients.size;
-    this.connectionMetrics.activeConnections = currentActive;
-    this.connectionMetrics.peakConnections = Math.max(
-      this.connectionMetrics.peakConnections,
-      currentActive
-    );
+    try {
+      const currentActive = this.connectedClients.size;
+      this.connectionMetrics.activeConnections = currentActive;
+      this.connectionMetrics.peakConnections = Math.max(
+        this.connectionMetrics.peakConnections,
+        currentActive
+      );
 
-    // Calcular taxa de falha
-    if (this.connectionMetrics.connectionAttempts > 0) {
-      this.connectionMetrics.connectionFailureRate = 
-        (this.connectionMetrics.failedConnections / this.connectionMetrics.connectionAttempts) * 100;
+      // Calcular taxa de falha
+      if (this.connectionMetrics.connectionAttempts > 0) {
+        this.connectionMetrics.connectionFailureRate = 
+          (this.connectionMetrics.failedConnections / this.connectionMetrics.connectionAttempts) * 100;
+      }
+    } catch (error) {
+      this.logger.error('Erro ao atualizar métricas:', error);
     }
   }
 
   private checkThresholds() {
-    const maxConnections = parseInt(process.env.MAX_WEBSOCKET_CONNECTIONS) || 1000;
-    
-    // Alertar sobre uso alto de conexões
-    if (this.connectionMetrics.activeConnections > maxConnections * 0.8) {
-      this.logger.warn('ALTO_USO_CONEXOES', {
-        active: this.connectionMetrics.activeConnections,
-        threshold: maxConnections * 0.8,
-        percentage: (this.connectionMetrics.activeConnections / maxConnections * 100).toFixed(2)
-      });
-    }
+    try {
+      const maxConnections = parseInt(process.env.MAX_WEBSOCKET_CONNECTIONS) || 1000;
+      
+      // Alertar sobre uso alto de conexões
+      if (this.connectionMetrics.activeConnections > maxConnections * 0.8) {
+        this.logger.warn('ALTO_USO_CONEXOES', {
+          active: this.connectionMetrics.activeConnections,
+          threshold: maxConnections * 0.8,
+          percentage: (this.connectionMetrics.activeConnections / maxConnections * 100).toFixed(2)
+        });
+      }
 
-    // Alertar sobre alta taxa de falhas
-    if (this.connectionMetrics.connectionFailureRate > 5) {
-      this.logger.error('ALTA_TAXA_FALHAS_CONEXAO', {
-        failureRate: this.connectionMetrics.connectionFailureRate,
-        failed: this.connectionMetrics.failedConnections,
-        attempts: this.connectionMetrics.connectionAttempts
-      });
+      // Alertar sobre alta taxa de falhas - APENAS LOG, NUNCA THROW
+      if (this.connectionMetrics.connectionFailureRate > 5) {
+        this.logger.warn('ALTA_TAXA_FALHAS_CONEXAO', {
+          connectionFailureRate: this.connectionMetrics.connectionFailureRate,
+          failedConnections: this.connectionMetrics.failedConnections,
+          connectionAttempts: this.connectionMetrics.connectionAttempts
+        });
+      }
+    } catch (error) {
+      this.logger.error('Erro ao verificar thresholds:', error);
     }
   }
 
   private logMetrics() {
-    this.logger.log('METRICAS_CONEXOES', {
-      ...this.connectionMetrics,
-      timestamp: new Date().toISOString(),
-      memoryUsage: process.memoryUsage(),
-      uptime: process.uptime()
-    });
+    try {
+      this.logger.log('METRICAS_CONEXOES', {
+        ...this.connectionMetrics,
+        timestamp: new Date().toISOString(),
+        memoryUsage: process.memoryUsage(),
+        uptime: process.uptime()
+      });
+    } catch (error) {
+      this.logger.error('Erro ao logar métricas:', error);
+    }
   }
 
   // Lifecycle hook para limpeza

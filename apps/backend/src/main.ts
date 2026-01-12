@@ -308,19 +308,19 @@ async function bootstrap() {
   // ============================================
   // 🧹 SANITIZAÇÃO - Remove espaços e caracteres perigosos
   // ============================================
-  const { SanitizationPipe } = await import('./common/pipes/sanitization.pipe');
-  app.useGlobalPipes(new SanitizationPipe());
+  // const { SanitizationPipe } = await import('./common/pipes/sanitization.pipe');
+  // app.useGlobalPipes(new SanitizationPipe()); // TEMPORARIAMENTE DESABILITADO
 
   // ============================================
   // ✅ VALIDAÇÃO - Rigorosa em todos os endpoints
   // ============================================
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
+  // app.useGlobalPipes(
+  //   new ValidationPipe({
+  //     whitelist: true,
+  //     forbidNonWhitelisted: true,
+  //     transform: true,
+  //   }),
+  // ); // TEMPORARIAMENTE DESABILITADO
 
   const port = process.env.PORT || 4000;
   await app.listen(port);

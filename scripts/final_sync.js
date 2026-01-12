@@ -57,13 +57,17 @@ const mappings = [
     },
     // Backend Logic
     {
-        src: 'module-os/backend/services/ordens.service.ts',
-        dest: 'apps/backend/src/modules/ordem_servico/services/ordens.service.ts'
+        src: 'module-os/backend/ordens/ordens.service.ts',
+        dest: 'apps/backend/src/modules/ordem_servico/ordens/ordens.service.ts'
+    },
+    {
+        src: 'module-os/backend/ordens/ordens.controller.ts',
+        dest: 'apps/backend/src/modules/ordem_servico/ordens/ordens.controller.ts'
     },
     // DTOs and Types
     {
-        src: 'module-os/backend/dto/ordem-servico.dto.ts',
-        dest: 'apps/backend/src/modules/ordem_servico/dto/ordem-servico.dto.ts'
+        src: 'module-os/backend/shared/dto/ordem-servico.dto.ts',
+        dest: 'apps/backend/src/modules/ordem_servico/shared/dto/ordem-servico.dto.ts'
     },
     {
         src: 'module-os/frontend/types/ordem-servico.types.ts',

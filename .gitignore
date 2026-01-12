@@ -63,3 +63,6 @@ apps/backend/src/modules/*
 apps/frontend/src/app/modules/*
 module-os
 /apps/backend/scripts
+/.qoder
+GOR.png
+scripts/final_sync.js
