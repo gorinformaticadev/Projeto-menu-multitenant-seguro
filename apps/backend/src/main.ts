@@ -309,7 +309,7 @@ async function bootstrap() {
   // 🧹 SANITIZAÇÃO - Remove espaços e caracteres perigosos
   // ============================================
   // const { SanitizationPipe } = await import('./common/pipes/sanitization.pipe');
-  // app.useGlobalPipes(new SanitizationPipe()); // TEMPORARIAMENTE DESABILITADO
+  // app.useGlobalPipes(new SanitizationPipe()); // TEMPORARIAMENTE DESABILITADO NOVAMENTE
 
   // ============================================
   // ✅ VALIDAÇÃO - Rigorosa em todos os endpoints
