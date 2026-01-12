@@ -151,9 +151,14 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
           failedConnections: this.connectionMetrics.failedConnections,
           connectionAttempts: this.connectionMetrics.connectionAttempts
         });
+        
+        // CRÍTICO: NUNCA fazer throw aqui - apenas log
+        // Isso estava causando o HTTP 500 anteriormente
       }
     } catch (error) {
-      this.logger.error('Erro ao verificar thresholds:', error);
+      // CRÍTICO: Capturar QUALQUER erro e apenas logar
+      this.logger.error('Erro ao verificar thresholds (não crítico):', error);
+      // NUNCA re-throw o erro
     }
   }
 
@@ -325,21 +330,34 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
 
   /**
    * Emite nova notificação para usuários apropriados
+   * CRÍTICO: Nunca deve falhar ou quebrar requisições HTTP
    */
   async emitNewNotification(notification: Notification) {
     try {
       const rooms = this.determineTargetRooms(notification);
       
       for (const room of rooms) {
-        this.server.to(room).emit('notification:new', notification);
-        this.logger.log(`Nova notificação emitida para sala: ${room}`);
+        try {
+          this.server.to(room).emit('notification:new', notification);
+          this.logger.log(`Nova notificação emitida para sala: ${room}`);
+        } catch (roomError) {
+          // CRÍTICO: Erro em uma sala não deve afetar outras
+          this.logger.error(`Erro ao emitir para sala ${room}:`, roomError);
+        }
       }
 
       // Atualizar contagem de não lidas para usuários afetados
-      await this.updateUnreadCounts(notification);
+      try {
+        await this.updateUnreadCounts(notification);
+      } catch (countError) {
+        // CRÍTICO: Erro na contagem não deve quebrar a emissão
+        this.logger.error('Erro ao atualizar contagens (não crítico):', countError);
+      }
       
     } catch (error) {
-      this.logger.error('Erro ao emitir nova notificação:', error);
+      // CRÍTICO: NUNCA permitir que este método falhe
+      this.logger.error('Erro ao emitir nova notificação (não crítico):', error);
+      // NUNCA re-throw - isso quebraria requisições HTTP
     }
   }
 
