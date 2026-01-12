@@ -232,11 +232,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // console.log('📦 Carregando módulos...');
           await moduleRegistry.loadModules();
           // console.log('✅ Módulos carregados');
-        } catch (error) {
-          console.error("Erro ao carregar usuário:", error);
-          SecureStorage.removeToken();
-          setToken(null);
-          delete api.defaults.headers.common["Authorization"];
+        } catch (error: any) {
+          console.error("❌ Erro ao carregar usuário:", error);
+          
+          // Verificar se é erro de autenticação
+          const status = error.response?.status;
+          const message = error.response?.data?.message || error.message || '';
+          
+          const authErrors = [
+            'token inválido',
+            'token expirado', 
+            'sessão expirada',
+            'unauthorized',
+            'jwt expired',
+            'jwt malformed',
+            'invalid token',
+            'token expired'
+          ];
+
+          const isAuthError = status === 401 || 
+                             status === 403 || 
+                             authErrors.some(err => message.toLowerCase().includes(err.toLowerCase()));
+
+          if (isAuthError) {
+            console.warn('⚠️ Token inválido ou expirado, limpando autenticação');
+            // Limpar dados de autenticação
+            SecureStorage.clear();
+            setToken(null);
+            setUser(null);
+            delete api.defaults.headers.common["Authorization"];
+            
+            // Se estiver em uma rota protegida, redirecionar
+            if (typeof window !== 'undefined' && window.location.pathname.startsWith('/modules/')) {
+              window.location.href = '/';
+            }
+          }
         }
       }
 
