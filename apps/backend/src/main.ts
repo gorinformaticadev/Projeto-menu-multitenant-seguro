@@ -1,3 +1,4 @@
+// Forced reload to check module loading debug logs
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
@@ -36,17 +37,17 @@ async function bootstrap() {
   // 🔐 SECRET MANAGEMENT - Carregar secrets antes da inicialização
   // ============================================
   console.log('🔐 Inicializando Secret Manager...');
-  
+
   try {
     const secretManager = new SecretManagerService();
     await secretManager.initialize();
-    
+
     // Validar secrets críticos
     if (!secretManager.validateCriticalSecrets()) {
       console.error('❌ Secrets críticos ausentes!');
       process.exit(1);
     }
-    
+
     console.log('✅ Secret Manager inicializado com sucesso');
   } catch (error) {
     console.error('❌ Falha ao inicializar Secret Manager:', error.message);
@@ -66,7 +67,7 @@ async function bootstrap() {
   // ============================================
   if (process.env.REDIS_HOST) {
     console.log('🔧 Configurando Redis adapter para Socket.IO...');
-    
+
     try {
       // Configuração do cluster Redis
       const redisOptions = {
@@ -95,7 +96,7 @@ async function bootstrap() {
 
       // Obter instância do servidor HTTP
       const server = app.getHttpServer();
-      
+
       // Configurar Socket.IO com adaptador Redis
       const io = require('socket.io')(server, {
         cors: {
@@ -117,9 +118,9 @@ async function bootstrap() {
 
       // Tornar instância io disponível na aplicação
       app.set('io', io);
-      
+
       console.log('✅ Redis adapter configurado com sucesso');
-      
+
     } catch (error) {
       console.error('❌ Falha ao configurar Redis adapter:', error.message);
       console.warn('⚠️  Continuando sem Redis adapter (modo standalone)');
