@@ -1,5 +1,5 @@
 # Dockerfile para Frontend - Corrigido
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -10,16 +10,18 @@ RUN apk add --no-cache openssl
 COPY apps/frontend/package*.json ./
 
 # Instalar dependências
-RUN npm ci && npm cache clean --force
+RUN npm install --legacy-peer-deps
 
 # Copiar código fonte
 COPY apps/frontend/. .
 
 # Build da aplicação
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 RUN npm run build
 
 # Etapa de produção
-FROM node:18-alpine AS production
+FROM node:20-alpine AS production
 
 WORKDIR /app
 
@@ -30,7 +32,7 @@ RUN apk add --no-cache openssl
 COPY apps/frontend/package*.json ./
 
 # Instalar apenas dependências de produção
-RUN npm ci --only=production && npm cache clean --force
+RUN npm install --omit=dev --legacy-peer-deps && npm cache clean --force
 
 # Copiar build do builder
 COPY --from=builder /app/.next ./.next

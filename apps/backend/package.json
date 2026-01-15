@@ -23,7 +23,7 @@
     "pre-deploy": "npm run security:check && npm run build"
   },
   "dependencies": {
-    "@nestjs/common": "^10.3.0",
+    "@nestjs/common": "^11.1.11",
     "@nestjs/config": "^3.1.1",
     "@nestjs/core": "^11.1.11",
     "@nestjs/jwt": "^10.2.0",

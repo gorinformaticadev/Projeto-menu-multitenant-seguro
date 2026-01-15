@@ -1,5 +1,5 @@
 # Dockerfile para Backend - Corrigido
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -10,16 +10,19 @@ RUN apk add --no-cache openssl python3 make g++
 COPY apps/backend/package*.json ./
 
 # Instalar dependências
-RUN npm ci --only=production && npm cache clean --force
+RUN npm install --legacy-peer-deps
 
 # Copiar código fonte
 COPY apps/backend/. .
+
+# Gerar cliente Prisma
+RUN npx prisma generate
 
 # Build da aplicação
 RUN npm run build
 
 # Etapa de produção
-FROM node:18-alpine AS production
+FROM node:20-alpine AS production
 
 WORKDIR /app
 
@@ -30,7 +33,7 @@ RUN apk add --no-cache openssl
 COPY apps/backend/package*.json ./
 
 # Instalar apenas dependências de produção
-RUN npm ci --only=production && npm cache clean --force
+RUN npm install --omit=dev --legacy-peer-deps && npm cache clean --force
 
 # Copiar build do builder
 COPY --from=builder /app/dist ./dist

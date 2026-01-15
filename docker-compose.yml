@@ -2,73 +2,83 @@ version: '3.8'
 
 services:
   db:
-    image: postgres:15
-    container_name: multitenant-db-prod
+    image: postgres:15-alpine
+    container_name: multitenant-db
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-multitenant}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backups:/backups
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - app-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    restart: always
 
   backend:
-    build: ./backend
-    container_name: multitenant-backend-prod
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: multitenant-backend
     ports:
       - "4000:4000"
     environment:
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public&sslmode=require
-      - JWT_SECRET=${JWT_SECRET}
-      - FRONTEND_URL=${FRONTEND_URL}
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-multitenant}?schema=public
+      - JWT_SECRET=${JWT_SECRET:-supersecret}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5000}
       - NODE_ENV=production
       - PORT=4000
-    volumes:
-      - ./backend/uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy
     networks:
       - app-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    restart: always
 
   frontend:
-    build: ./frontend
-    container_name: multitenant-frontend-prod
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+    container_name: multitenant-frontend
     ports:
       - "5000:5000"
     environment:
-      - NEXT_PUBLIC_API_URL=${API_URL}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:4000}
       - NODE_ENV=production
     depends_on:
       - backend
     networks:
       - app-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    restart: always
 
-volumes:
-  postgres_data:
+  migrator:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+      target: builder
+    container_name: multitenant-migrator
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed"
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-multitenant}?schema=public
+    working_dir: /app
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: on-failure:3
 
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  postgres_data:
