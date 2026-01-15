@@ -8,8 +8,9 @@ import { Request, Response, NextFunction } from 'express';
 @Injectable()
 export class HttpsRedirectMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
-    // Apenas em produção
-    if (process.env.NODE_ENV !== 'production') {
+    // Apenas em produção e não em localhost
+    const isLocalhost = req.headers.host?.includes('localhost') || req.headers.host?.includes('127.0.0.1');
+    if (process.env.NODE_ENV !== 'production' || isLocalhost) {
       return next();
     }
 

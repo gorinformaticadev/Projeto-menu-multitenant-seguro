@@ -35,6 +35,7 @@ export class CspMiddleware implements NestMiddleware {
         'https:',
         'blob:',
         isProduction ? '' : 'http://localhost:4000',
+        isProduction ? '' : 'https://localhost:4000',
       ].filter(Boolean),
 
       // Fontes
@@ -46,7 +47,9 @@ export class CspMiddleware implements NestMiddleware {
         frontendUrl,
         process.env.SENTRY_DSN ? 'https://*.sentry.io' : '',
         isProduction ? '' : 'http://localhost:4000',
+        isProduction ? '' : 'https://localhost:4000',
         isProduction ? '' : 'http://localhost:5000',
+        isProduction ? '' : 'https://localhost:5000',
       ].filter(Boolean),
 
       // Frames - bloqueia completamente (anti-clickjacking)

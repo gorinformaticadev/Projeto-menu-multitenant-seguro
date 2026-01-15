@@ -159,16 +159,24 @@ async function bootstrap() {
             'https:',
             'blob:',
             'http://localhost:4000',
+            'https://localhost:4000',
             'http://localhost:5000',
+            'https://localhost:5000',
             'http://localhost:3000',
+            'https://localhost:3000',
           ], // Permite imagens do próprio servidor e frontend
           connectSrc: [
             "'self'",
             'http://localhost:4000',
+            'https://localhost:4000',
             'http://localhost:5000',
+            'https://localhost:5000',
             'http://localhost:3000',
-            'ws://localhost:4000', // WebSocket para hot reload
+            'https://localhost:3000',
+            'ws://localhost:4000',
+            'wss://localhost:4000',
             'ws://localhost:5000',
+            'wss://localhost:5000',
             isProduction ? process.env.FRONTEND_URL || '' : '',
           ].filter(Boolean), // Remove strings vazias
           fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
@@ -324,7 +332,7 @@ async function bootstrap() {
   // ); // TEMPORARIAMENTE DESABILITADO
 
   const port = process.env.PORT || 4000;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
   console.log(`🚀 Backend rodando em http://localhost:${port}`);
   console.log(`🛡️  Headers de segurança ativados (Helmet)`);
 }
