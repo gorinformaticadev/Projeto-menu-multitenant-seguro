@@ -1,4 +1,4 @@
-// Forced reload to check module loading debug logs
+// Forced reload to check module loading debug logs v3
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
