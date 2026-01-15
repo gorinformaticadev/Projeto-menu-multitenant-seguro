@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,7 +38,9 @@ interface Tenant {
   ativo: boolean;
 }
 
-export default function UsuariosPage() {
+export const dynamic = 'force-dynamic';
+
+function UsuariosContent() {
   const searchParams = useSearchParams();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [selectedTenantId, setSelectedTenantId] = useState<string>("");
@@ -511,5 +513,13 @@ export default function UsuariosPage() {
         </Dialog>
       </div>
     </ProtectedRoute>
+  );
+}
+
+export default function UsuariosPage() {
+  return (
+    <Suspense fallback={<div className="flex h-screen items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>}>
+      <UsuariosContent />
+    </Suspense>
   );
 }

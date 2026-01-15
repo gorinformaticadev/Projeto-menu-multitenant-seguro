@@ -57,7 +57,6 @@ const nextConfig = {
   },
   // Configure build output
   output: 'standalone', // For containerized deployments
-
   // Transpile local module packages
   // transpilePackages: ['@modules/sistema'],
 }

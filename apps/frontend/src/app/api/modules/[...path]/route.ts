@@ -16,21 +16,22 @@ import { existsSync } from 'fs';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  props: { params: Promise<{ path: string[] }> }
 ) {
+  const params = await props.params;
   try {
     const path = params.path;
     console.log('📂 API Modules - Requisição para:', path);
 
     // Determinar caminho base dos módulos
     const cwd = process.cwd();
-    const modulesBasePath = cwd.endsWith('frontend') 
+    const modulesBasePath = cwd.endsWith('frontend')
       ? resolve(cwd, '..', 'modules')
       : resolve(cwd, 'modules');
 
     // Construir caminho do arquivo
     let filePath: string;
-    
+
     // Caso especial: ModuleCore.js está na raiz de modules/
     if (path.length === 1 && path[0] === 'ModuleCore.js') {
       filePath = join(modulesBasePath, 'ModuleCore.js');
@@ -97,7 +98,7 @@ export async function GET(
 
   } catch (error) {
     console.error('❌ Erro ao servir arquivo do módulo:', error);
-    
+
     return NextResponse.json(
       {
         error: 'Erro ao carregar arquivo',

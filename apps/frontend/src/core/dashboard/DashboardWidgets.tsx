@@ -9,7 +9,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { moduleRegistry } from '@/lib/module-registry';
+import { moduleRegistry, ModuleDashboardWidget } from '@/lib/module-registry';
 import { DashboardWidget } from '@/core/contracts/DashboardWidget';
 
 // Componentes de widgets disponíveis
@@ -22,7 +22,7 @@ const widgetComponents: Record<string, React.ComponentType<any>> = {
       </p>
     </div>
   ),
-  
+
   StatsWidget: () => (
     <div className="p-6 bg-card rounded-lg border">
       <h3 className="text-lg font-semibold mb-2">Estatísticas</h3>
@@ -38,7 +38,7 @@ const widgetComponents: Record<string, React.ComponentType<any>> = {
       </div>
     </div>
   ),
-  
+
   SampleWidget: () => (
     <div className="p-4 bg-card rounded-lg border">
       <h4 className="font-medium mb-1">Módulo Sample</h4>
@@ -51,7 +51,7 @@ const widgetComponents: Record<string, React.ComponentType<any>> = {
 
 export function DashboardWidgets() {
   const { user } = useAuth();
-  const [widgets, setWidgets] = useState<DashboardWidget[]>([]);
+  const [widgets, setWidgets] = useState<ModuleDashboardWidget[]>([]);
 
   useEffect(() => {
     loadWidgets();
@@ -83,17 +83,17 @@ export function DashboardWidgets() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {widgets.map((widget) => {
-        const WidgetComponent = typeof widget.component === 'string' 
-          ? widgetComponents[widget.component] 
+        const WidgetComponent = typeof widget.component === 'string'
+          ? widgetComponents[widget.component]
           : widget.component;
-        
+
         if (!WidgetComponent) {
           console.warn(`Componente de widget não encontrado: ${widget.component}`);
           return null;
         }
 
         return (
-          <div key={widget.id} className={getWidgetSizeClass(widget.size)}>
+          <div key={widget.id} className={getWidgetSizeClass((widget as any).size)}>
             <WidgetComponent />
           </div>
         );

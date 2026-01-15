@@ -254,6 +254,16 @@ class ModuleRegistry {
   getModule(slug: string): ModuleData | undefined {
     return this.apiModules.find(m => m.slug === slug);
   }
+
+  // Compatibility methods for useModulesManager hook
+  getAvailableModules(): string[] {
+    return this.apiModules.map(m => m.slug);
+  }
+
+  getModuleMenus(slug: string): ModuleMenu[] {
+    const module = this.getModule(slug);
+    return module?.menus || [];
+  }
 }
 
 export const moduleRegistry = ModuleRegistry.getInstance();

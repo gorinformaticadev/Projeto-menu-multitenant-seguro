@@ -121,3 +121,68 @@
 [2026-01-15T12:36:33.114Z] ✅✅✅ MÓDULO ORDEM_SERVICO CARREGADO!!!
 [2026-01-15T12:36:33.133Z] 🔩 OrdensController instanciado!
 [2026-01-15T12:36:33.134Z] 🔩 ConfiguracoesController instanciado!
+[2026-01-15T13:06:59.142Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-15T13:06:59.286Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-15T13:06:59.287Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\Projeto-menu-multitenant-seguro\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-15T13:07:00.993Z] [Loader] ⚠️ Classe Ordem_servicoModule não encontrada em D:\github\Projeto-menu-multitenant-seguro\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-15T13:07:00.994Z] [Loader] 🔄 Usando classe alternativa encontrada: OrdemServicoModule
+[2026-01-15T13:07:00.994Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 1
+[2026-01-15T13:07:01.023Z] ✅✅✅ MÓDULO ORDEM_SERVICO CARREGADO!!!
+[2026-01-15T13:07:01.042Z] 🔩 OrdensController instanciado!
+[2026-01-15T13:07:01.043Z] 🔩 ConfiguracoesController instanciado!
+[2026-01-15T13:07:43.125Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-15T13:08:01.148Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-15T13:08:10.474Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-15T13:08:10.475Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\Projeto-menu-multitenant-seguro\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-15T13:08:21.936Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-15T13:08:22.004Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-15T13:08:22.004Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\Projeto-menu-multitenant-seguro\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-15T13:08:23.218Z] [Loader] ⚠️ Classe Ordem_servicoModule não encontrada em D:\github\Projeto-menu-multitenant-seguro\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-15T13:08:23.219Z] [Loader] 🔄 Usando classe alternativa encontrada: OrdemServicoModule
+[2026-01-15T13:08:23.219Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 1
+[2026-01-15T13:08:23.253Z] ✅✅✅ MÓDULO ORDEM_SERVICO CARREGADO!!!
+[2026-01-15T13:08:23.281Z] 🔩 OrdensController instanciado!
+[2026-01-15T13:08:23.282Z] 🔩 ConfiguracoesController instanciado!
+[2026-01-15T13:09:58.894Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-15T13:09:58.958Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-15T13:09:58.959Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\Projeto-menu-multitenant-seguro\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-15T13:10:00.028Z] [Loader] ⚠️ Classe Ordem_servicoModule não encontrada em D:\github\Projeto-menu-multitenant-seguro\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-15T13:10:00.029Z] [Loader] 🔄 Usando classe alternativa encontrada: OrdemServicoModule
+[2026-01-15T13:10:00.030Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 1
+[2026-01-15T13:10:00.050Z] ✅✅✅ MÓDULO ORDEM_SERVICO CARREGADO!!!
+[2026-01-15T13:10:00.075Z] 🔩 OrdensController instanciado!
+[2026-01-15T13:10:00.077Z] 🔩 ConfiguracoesController instanciado!
+[2026-01-15T13:10:36.401Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-15T13:10:36.469Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-15T13:10:36.469Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\Projeto-menu-multitenant-seguro\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-15T13:10:37.982Z] [Loader] ⚠️ Classe Ordem_servicoModule não encontrada em D:\github\Projeto-menu-multitenant-seguro\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-15T13:10:37.983Z] [Loader] 🔄 Usando classe alternativa encontrada: OrdemServicoModule
+[2026-01-15T13:10:37.984Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 1
+[2026-01-15T13:10:38.007Z] ✅✅✅ MÓDULO ORDEM_SERVICO CARREGADO!!!
+[2026-01-15T13:10:38.028Z] 🔩 OrdensController instanciado!
+[2026-01-15T13:10:38.031Z] 🔩 ConfiguracoesController instanciado!
+[2026-01-15T13:32:12.545Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-15T13:32:12.709Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-15T13:32:12.710Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\Projeto-menu-multitenant-seguro\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-15T13:32:14.018Z] [Loader] ⚠️ Classe Ordem_servicoModule não encontrada em D:\github\Projeto-menu-multitenant-seguro\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-15T13:32:14.019Z] [Loader] 🔄 Usando classe alternativa encontrada: OrdemServicoModule
+[2026-01-15T13:32:14.019Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 1
+[2026-01-15T13:32:14.042Z] ✅✅✅ MÓDULO ORDEM_SERVICO CARREGADO!!!
+[2026-01-15T13:32:14.068Z] 🔩 OrdensController instanciado!
+[2026-01-15T13:32:14.070Z] 🔩 ConfiguracoesController instanciado!
+[2026-01-15T15:08:00.379Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-15T15:08:07.222Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-15T15:08:07.223Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\Projeto-menu-multitenant-seguro\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-15T15:08:09.925Z] [Loader] ⚠️ Classe Ordem_servicoModule não encontrada em D:\github\Projeto-menu-multitenant-seguro\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-15T15:08:09.926Z] [Loader] 🔄 Usando classe alternativa encontrada: OrdemServicoModule
+[2026-01-15T15:08:09.927Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 1
+[2026-01-15T15:08:09.970Z] ✅✅✅ MÓDULO ORDEM_SERVICO CARREGADO!!!
+[2026-01-15T15:08:27.519Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-15T15:08:28.826Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-15T15:08:28.827Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\Projeto-menu-multitenant-seguro\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-15T15:08:31.101Z] [Loader] ⚠️ Classe Ordem_servicoModule não encontrada em D:\github\Projeto-menu-multitenant-seguro\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-15T15:08:31.102Z] [Loader] 🔄 Usando classe alternativa encontrada: OrdemServicoModule
+[2026-01-15T15:08:31.102Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 1
+[2026-01-15T15:08:31.125Z] ✅✅✅ MÓDULO ORDEM_SERVICO CARREGADO!!!
+[2026-01-15T15:08:31.145Z] 🔩 OrdensController instanciado!
+[2026-01-15T15:08:31.147Z] 🔩 ConfiguracoesController instanciado!

@@ -19,6 +19,8 @@ export interface User {
     nomeFantasia: string;
     cnpjCpf: string;
     telefone: string;
+    logoUrl?: string;
+    email?: string;
   } | null;
   twoFactorEnabled?: boolean;
 }
@@ -56,16 +58,16 @@ const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 // Chave de criptografia derivada do fingerprint do navegador
 const getEncryptionKey = async (): Promise<string> => {
   if (typeof window === "undefined") return "fallback-key-32-chars-long-12345";
-  
+
   try {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx) return "fallback-key-32-chars-long-12345";
-    
+
     ctx.textBaseline = 'top';
     ctx.font = '14px Arial';
     ctx.fillText('Browser fingerprint', 2, 2);
-    
+
     const fingerprint = canvas.toDataURL();
     const encoder = new TextEncoder();
     const data = encoder.encode(fingerprint);
@@ -132,8 +134,8 @@ const SecureStorage = {
         if (tokenCookie) {
           return tokenCookie.split('=')[1];
         }
-      } catch {}
-      
+      } catch { }
+
       // Fallback para sessionStorage
       const encrypted = sessionStorage.getItem("@App:token");
       if (encrypted) {
@@ -174,8 +176,8 @@ const SecureStorage = {
         if (tokenCookie) {
           return tokenCookie.split('=')[1];
         }
-      } catch {}
-      
+      } catch { }
+
       // Fallback para sessionStorage
       const encrypted = sessionStorage.getItem("@App:refreshToken");
       if (encrypted) {
@@ -227,21 +229,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Buscar dados atualizados do usuário
           const response = await api.get("/auth/me");
           setUser(response.data);
-          
+
           // Carregar módulos após autenticação bem-sucedida
           // console.log('📦 Carregando módulos...');
           await moduleRegistry.loadModules();
           // console.log('✅ Módulos carregados');
         } catch (error: any) {
           console.error("❌ Erro ao carregar usuário:", error);
-          
+
           // Verificar se é erro de autenticação
           const status = error.response?.status;
           const message = error.response?.data?.message || error.message || '';
-          
+
           const authErrors = [
             'token inválido',
-            'token expirado', 
+            'token expirado',
             'sessão expirada',
             'unauthorized',
             'jwt expired',
@@ -250,9 +252,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             'token expired'
           ];
 
-          const isAuthError = status === 401 || 
-                             status === 403 || 
-                             authErrors.some(err => message.toLowerCase().includes(err.toLowerCase()));
+          const isAuthError = status === 401 ||
+            status === 403 ||
+            authErrors.some(err => message.toLowerCase().includes(err.toLowerCase()));
 
           if (isAuthError) {
             console.warn('⚠️ Token inválido ou expirado, limpando autenticação');
@@ -261,7 +263,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setToken(null);
             setUser(null);
             delete api.defaults.headers.common["Authorization"];
-            
+
             // Se estiver em uma rota protegida, redirecionar
             if (typeof window !== 'undefined' && window.location.pathname.startsWith('/modules/')) {
               window.location.href = '/';
@@ -318,7 +320,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Atualizar estado do usuário
       setToken(accessToken);
       setUser(userData);
-      
+
       // Carregar módulos após login
       // console.log('📦 Carregando módulos...');
       await moduleRegistry.loadModules();
@@ -379,7 +381,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Atualizar estado do usuário
       setToken(accessToken);
       setUser(userData);
-      
+
       // Carregar módulos após login com 2FA
       // console.log('📦 Carregando módulos...');
       await moduleRegistry.loadModules();
