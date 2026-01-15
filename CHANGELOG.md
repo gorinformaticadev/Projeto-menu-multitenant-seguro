@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.5.1](https://github.com/gorinformatica/menu-multitenant/compare/v0.5.0...v0.5.1) (2026-01-15)
+
+
+### Features
+
+* **backend:** Adicionada a funcionalidade de registro de depuração em arquivo para o carregador de módulos dinâmico ([85718d5](https://github.com/gorinformatica/menu-multitenant/commit/85718d56bd91b520e4f28db7a1e50f2ebbdfdb2a))
+* **frontend:** Adiciona proteção de rotas e aprimora o tratamento de erros ([0c98517](https://github.com/gorinformatica/menu-multitenant/commit/0c98517b8ad4857e36466392c7e4ccbe9261aa16))
+* **frontend:** Adicionadas dependências do editor de texto avançado TipTap e atualizados os componentes da interface do usuário ([46cf117](https://github.com/gorinformatica/menu-multitenant/commit/46cf117cb674977e22206f231161ec01d0cbcb3d))
+* **frontend:** Adicionar componente de grupo de botões de opção ([e07daa5](https://github.com/gorinformatica/menu-multitenant/commit/e07daa533e406e31c21d7723695c4bc0a400bd59))
+
 ## [0.5.0](https://github.com/gorinformatica/menu-multitenant/compare/v0.3.0...v0.5.0) (2026-01-10)
 
 
