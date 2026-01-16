@@ -92,14 +92,14 @@ jobs:
       with:
         context: ./apps/backend
         push: true
-        tags: ${{ secrets.DOCKER_USERNAME }}/multitenant-backend:latest
+        tags: ${{ secrets.DOCKERHUB_USERNAME }}/multitenant-backend:latest
 
     - name: Build and push frontend
       uses: docker/build-push-action@v4
       with:
         context: ./apps/frontend
         push: true
-        tags: ${{ secrets.DOCKER_USERNAME }}/multitenant-frontend:latest
+        tags: ${{ secrets.DOCKERHUB_USERNAME }}/multitenant-frontend:latest
 
   deploy:
     needs: build
