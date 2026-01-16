@@ -1,49 +1,64 @@
-# Dockerfile para Backend - Corrigido
+# Multi-stage build for NestJS backend
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Instalar dependências do sistema
+# Install system dependencies for Prisma
 RUN apk add --no-cache openssl python3 make g++
 
-# Copiar package files
-COPY apps/backend/package*.json ./
+# Copy package files
+COPY package*.json ./
 
-# Instalar dependências
-RUN npm install --legacy-peer-deps
+# Install dependencies
+RUN npm ci --only=production=false
 
-# Copiar código fonte
-COPY apps/backend/. .
+# Copy source code
+COPY . .
 
-# Gerar cliente Prisma
+# Generate Prisma client
 RUN npx prisma generate
 
-# Build da aplicação
+# Build application
 RUN npm run build
 
-# Etapa de produção
+# Production stage
 FROM node:20-alpine AS production
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nestjs -u 1001
 
 WORKDIR /app
 
-# Instalar openssl para JWT
+# Install openssl for JWT operations
 RUN apk add --no-cache openssl
 
-# Copiar package files
-COPY apps/backend/package*.json ./
+# Copy package files
+COPY package*.json ./
 
-# Instalar apenas dependências de produção
-RUN npm install --omit=dev --legacy-peer-deps && npm cache clean --force
+# Install only production dependencies
+RUN npm ci --omit=dev && npm cache clean --force
 
-# Copiar build do builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
+# Copy built application from builder stage
+COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma
 
-# Criar diretório de uploads
-RUN mkdir -p uploads
+# Create uploads directory with proper permissions
+RUN mkdir -p uploads && chown -R nestjs:nodejs uploads
 
-# Expor porta
-EXPOSE 4000
+# Switch to non-root user
+USER nestjs
 
-# Comando de inicialização
+# Set production environment
+ENV NODE_ENV=production
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3000/health || exit 1
+
+# Expose port
+EXPOSE 3000
+
+# Start application
 CMD ["node", "dist/main.js"]
