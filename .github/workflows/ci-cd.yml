@@ -5,11 +5,22 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
+  release:
+    types: [ published ]
+
+env:
+  REGISTRY: docker.io
+  BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/multitenant-backend
+  FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/multitenant-frontend
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
     services:
       postgres:
         image: postgres:15
@@ -26,12 +37,12 @@ jobs:
           - 5432:5432
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Setup Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
         cache: 'npm'
 
     - name: Install backend dependencies
@@ -43,6 +54,12 @@ jobs:
       run: |
         cd apps/frontend
         npm ci
+
+    - name: Update Prisma to v7 (CI/CD compatibility)
+      run: |
+        cd apps/backend
+        npm install prisma@latest --save-dev
+        npm install @prisma/client@latest
 
     - name: Generate Prisma Client
       run: |
@@ -71,46 +88,79 @@ jobs:
         echo "Tests will be added when test suite is implemented"
 
   build:
-    needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    needs: test
+    if: github.ref == 'refs/heads/main' || github.event_name == 'release'
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
+
+    - name: Extract metadata
+      id: meta
+      run: |
+        if [ "${{ github.event_name }}" = "release" ]; then
+          VERSION=${GITHUB_REF#refs/tags/v}
+          SHA=${GITHUB_SHA::8}
+          BACKEND_TAGS="${BACKEND_IMAGE}:${VERSION},${BACKEND_IMAGE}:sha-${SHA}"
+          FRONTEND_TAGS="${FRONTEND_IMAGE}:${VERSION},${FRONTEND_IMAGE}:sha-${SHA}"
+        else
+          VERSION="latest"
+          BACKEND_TAGS="${BACKEND_IMAGE}:${VERSION}"
+          FRONTEND_TAGS="${FRONTEND_IMAGE}:${VERSION}"
+        fi
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "backend_tags=${BACKEND_TAGS}" >> $GITHUB_OUTPUT
+        echo "frontend_tags=${FRONTEND_TAGS}" >> $GITHUB_OUTPUT
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+      uses: docker/setup-buildx-action@v3
 
-    - name: Login to DockerHub
-      uses: docker/login-action@v2
+    - name: Validate Docker Hub secrets
+      run: |
+        echo "🔍 Validating Docker Hub secrets..."
+
+        if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
+          echo "❌ ERROR: DOCKERHUB_USERNAME secret is missing or empty"
+          exit 1
+        fi
+
+        if [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
+          echo "❌ ERROR: DOCKERHUB_TOKEN secret is missing or empty"
+          exit 1
+        fi
+
+        echo "✅ All Docker Hub secrets are valid and available"
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Build and push backend
-      uses: docker/build-push-action@v4
+    - name: Build and push backend image
+      uses: docker/build-push-action@v5
       with:
         context: ./apps/backend
         push: true
-        tags: ${{ secrets.DOCKER_USERNAME }}/multitenant-backend:latest
+        tags: ${{ steps.meta.outputs.backend_tags }}
+        labels: |
+          org.opencontainers.image.title=Multitenant Backend
+          org.opencontainers.image.description=NestJS backend for multitenant system
+          org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+          org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.source=https://github.com/${{ github.repository }}
 
-    - name: Build and push frontend
-      uses: docker/build-push-action@v4
+    - name: Build and push frontend image
+      uses: docker/build-push-action@v5
       with:
         context: ./apps/frontend
         push: true
-        tags: ${{ secrets.DOCKER_USERNAME }}/multitenant-frontend:latest
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-    - name: Deploy to production
-      run: |
-        echo "Deployment steps would go here"
-        echo "This would typically involve:"
-        echo "1. Connecting to production server"
-        echo "2. Pulling latest images"
-        echo "3. Running docker-compose up -d"
+        tags: ${{ steps.meta.outputs.frontend_tags }}
+        labels: |
+          org.opencontainers.image.title=Multitenant Frontend
+          org.opencontainers.image.description=Next.js frontend for multitenant system
+          org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+          org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.source=https://github.com/${{ github.repository }}

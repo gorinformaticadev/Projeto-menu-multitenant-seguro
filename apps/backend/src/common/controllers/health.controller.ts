@@ -2,18 +2,18 @@ import { Controller, Get } from '@nestjs/common';
 
 @Controller('health')
 export class HealthController {
-  constructor() {}
+  constructor() { }
 
   @Get('websocket')
   async websocketHealth() {
     try {
       // Verificar conectividade Redis (se configurado)
       const redisStatus = process.env.REDIS_HOST ? 'configured' : 'not_configured';
-      
+
       // Métricas básicas do processo
       const memoryUsage = process.memoryUsage();
       const uptime = process.uptime();
-      
+
       return {
         status: 'ok',
         timestamp: new Date().toISOString(),
@@ -30,6 +30,15 @@ export class HealthController {
         error: error.message
       };
     }
+  }
+
+  @Get()
+  health() {
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      service: 'multitenant-backend'
+    };
   }
 
   @Get('ping')

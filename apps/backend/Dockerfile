@@ -1,49 +1,43 @@
-# Dockerfile para Backend - Corrigido
-FROM node:20-alpine AS builder
-
+# =========================
+# Base
+# =========================
+FROM node:20-alpine AS base
 WORKDIR /app
 
-# Instalar dependências do sistema
-RUN apk add --no-cache openssl python3 make g++
+# =========================
+# Builder
+# =========================
+FROM base AS builder
 
-# Copiar package files
-COPY apps/backend/package*.json ./
+COPY package*.json ./
+RUN npm install --legacy-peer-deps --no-audit --no-fund
 
-# Instalar dependências
-RUN npm install --legacy-peer-deps
+COPY . .
 
-# Copiar código fonte
-COPY apps/backend/. .
-
-# Gerar cliente Prisma
-RUN npx prisma generate
-
-# Build da aplicação
 RUN npm run build
 
-# Etapa de produção
-FROM node:20-alpine AS production
+# =========================
+# Production dependencies
+# =========================
+FROM base AS prod-deps
 
-WORKDIR /app
+COPY package*.json ./
 
-# Instalar openssl para JWT
-RUN apk add --no-cache openssl
+# ⚠️ IMPORTANTE:
+# npm ci NÃO funciona corretamente com workspaces aqui
+RUN npm install --omit=dev --legacy-peer-deps --no-audit --no-fund
 
-# Copiar package files
-COPY apps/backend/package*.json ./
+# =========================
+# Runtime
+# =========================
+FROM base AS runner
 
-# Instalar apenas dependências de produção
-RUN npm install --omit=dev --legacy-peer-deps && npm cache clean --force
+ENV NODE_ENV=production
 
-# Copiar build do builder
+COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/prisma ./prisma
 
-# Criar diretório de uploads
-RUN mkdir -p uploads
+EXPOSE 3000
 
-# Expor porta
-EXPOSE 4000
-
-# Comando de inicialização
-CMD ["node", "dist/main.js"]
+CMD ["sh", "-c", "npx prisma generate && npx prisma migrate deploy && node dist/main.js"]

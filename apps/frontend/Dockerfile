@@ -1,46 +1,49 @@
-# Dockerfile para Frontend - Corrigido
+# Multi-stage build for Next.js 14 frontend with standalone output
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Instalar dependências do sistema
-RUN apk add --no-cache openssl
+# Install system dependencies
+RUN apk add --no-cache libc6-compat
 
-# Copiar package files
-COPY apps/frontend/package*.json ./
+# Copy package files
+COPY package*.json ./
 
-# Instalar dependências
-RUN npm install --legacy-peer-deps
+# Install dependencies
+RUN npm ci --only=production=false
 
-# Copiar código fonte
-COPY apps/frontend/. .
+# Copy source code
+COPY . .
 
-# Build da aplicação
-ARG NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+# Build application with standalone output
 RUN npm run build
 
-# Etapa de produção
+# Production stage
 FROM node:20-alpine AS production
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nextjs -u 1001
 
 WORKDIR /app
 
-# Instalar openssl
-RUN apk add --no-cache openssl
+# Copy standalone build from builder stage
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Copiar package files
-COPY apps/frontend/package*.json ./
+# Switch to non-root user
+USER nextjs
 
-# Instalar apenas dependências de produção
-RUN npm install --omit=dev --legacy-peer-deps && npm cache clean --force
+# Set production environment
+ENV NODE_ENV=production
 
-# Copiar build do builder
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/node_modules ./node_modules
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3000/api/health || exit 1
 
-# Expor porta
-EXPOSE 5000
+# Expose port
+EXPOSE 3000
 
-# Comando de inicialização
-CMD ["npm", "start"]
+# Start application
+CMD ["node", "server.js"]

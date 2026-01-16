@@ -1,77 +1,97 @@
 version: '3.8'
 
 services:
-  db:
-    image: postgres:15
-    container_name: multitenant-db-prod
-    environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
-    ports:
-      - "${DB_PORT}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  backend:
-    build:
-      context: .
-      dockerfile: apps/backend/Dockerfile
-    container_name: multitenant-backend-prod
-    ports:
-      - "${BACKEND_PORT}:4000"
-    environment:
-      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public
-      JWT_SECRET: ${JWT_SECRET}
-      FRONTEND_URL: ${FRONTEND_URL}
-      NODE_ENV: ${NODE_ENV}
-      PORT: 4000
-    volumes:
-      - ./apps/backend/uploads:/app/uploads
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
-
   frontend:
-    build:
-      context: .
-      dockerfile: apps/frontend/Dockerfile
-    container_name: multitenant-frontend-prod
+    image: ${DOCKERHUB_USERNAME}/multitenant-frontend:latest
+    container_name: multitenant-frontend
+    restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT}:5000"
+      - "3000:3000"
     environment:
-      NEXT_PUBLIC_API_URL: ${API_URL}
-      NODE_ENV: ${NODE_ENV}
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://backend:3000
     depends_on:
       - backend
     networks:
-      - app-network
+      - multitenant-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000/api/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:3000/api/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
+
+  backend:
+    image: ${DOCKERHUB_USERNAME}/multitenant-backend:latest
+    container_name: multitenant-backend
     restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - FRONTEND_URL=http://frontend:3000
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - uploads:/app/uploads
+    networks:
+      - multitenant-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:3000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  db:
+    image: postgres:15
+    container_name: multitenant-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=multitenant
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - multitenant-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d multitenant" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: multitenant-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - multitenant-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  uploads:
+    driver: local
 
 networks:
-  app-network:
+  multitenant-network:
     driver: bridge
