@@ -14,6 +14,11 @@ import { readFile } from 'fs/promises';
 import { join, resolve, extname } from 'path';
 import { existsSync } from 'fs';
 
+// Required for static export with dynamic routes
+export async function generateStaticParams() {
+  return [];
+}
+
 export async function GET(
   request: NextRequest,
   props: { params: Promise<{ path: string[] }> }
