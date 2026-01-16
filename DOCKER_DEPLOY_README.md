@@ -1,7 +1,10 @@
 # 🚀 Deploy Docker - Guia de Configuração
 
 ## 📋 Problema Identificado
-O pipeline CI/CD estava falhando no login do Docker Hub devido a configuração incorreta dos secrets.
+O pipeline CI/CD estava falhando no login do Docker Hub devido a dois problemas:
+
+1. **Secrets com nomes incorretos** (resolvido)
+2. **Workflow rodando em contexto sem secrets** (resolvido)
 
 ## ✅ Solução Aplicada
 
@@ -17,6 +20,10 @@ O pipeline CI/CD estava falhando no login do Docker Hub devido a configuração 
 ### 2. **Workflow Pages Desabilitado** (`.github/workflows/pages.yml`)
 - **Motivo**: GitHub Pages é incompatível com aplicações SSR
 - **Solução**: Workflow desabilitado para evitar builds desnecessários
+
+### 3. **Workflow CI/CD Corrigido** (`.github/workflows/ci-cd.yml`)
+- **Problema**: Job `build` herdava contexto sem secrets de PRs
+- **Solução**: Job `test` só roda em push, job `build` independente
 
 ## 🔐 Configuração dos Secrets no GitHub
 

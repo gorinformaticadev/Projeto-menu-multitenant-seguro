@@ -5,11 +5,13 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
+    types: [opened, synchronize, reopened]
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+    if: github.event_name == 'push'  # Só roda em push, não em PR
+
     services:
       postgres:
         image: postgres:15
@@ -71,9 +73,8 @@ jobs:
         echo "Tests will be added when test suite is implemented"
 
   build:
-    needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'  # Só roda em push para main
 
     steps:
     - uses: actions/checkout@v3
