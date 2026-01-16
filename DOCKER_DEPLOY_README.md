@@ -13,8 +13,8 @@ O pipeline CI/CD estava falhando no login do Docker Hub devido a dois problemas:
 - name: Login to DockerHub
   uses: docker/login-action@v2
   with:
-    username: ${{ secrets.DOCKERHUB_USERNAME }}
-    password: ${{ secrets.DOCKERHUB_TOKEN }}
+    username: ${{ secrets.DOCKER_USERNAME }}
+    password: ${{ secrets.DOCKER_TOKEN }}
 ```
 
 ### 2. **Workflow Pages Desabilitado** (`.github/workflows/pages.yml`)
@@ -39,8 +39,8 @@ Este erro indica que os secrets não estão configurados ou estão vazios.
 
 #### 2. Crie os secrets necessários
 ```
-DOCKERHUB_USERNAME    # Seu username do Docker Hub
-DOCKERHUB_TOKEN       # Token de acesso (não a senha!)
+DOCKER_USERNAME    # Seu username do Docker Hub
+DOCKER_TOKEN       # Token de acesso (não a senha!)
 ```
 
 #### 3. Como gerar o Docker Hub Token
@@ -54,15 +54,15 @@ DOCKERHUB_TOKEN       # Token de acesso (não a senha!)
 
 #### 4. Verificação dos Secrets
 Após criar, os secrets devem aparecer na lista:
-- ✅ `DOCKERHUB_USERNAME` (com valor definido)
-- ✅ `DOCKERHUB_TOKEN` (com valor definido)
+- ✅ `DOCKER_USERNAME` (com valor definido)
+- ✅ `DOCKER_TOKEN` (com valor definido)
 
 ### 🧪 Teste Local (Opcional)
 Antes de commitar, teste o login localmente:
 
 ```bash
 # Substitua pelos seus valores
-echo "YOUR_DOCKERHUB_TOKEN" | docker login -u YOUR_USERNAME --password-stdin
+echo "YOUR_DOCKER_TOKEN" | docker login -u YOUR_USERNAME --password-stdin
 
 # Se funcionar, verá: "Login Succeeded"
 ```
@@ -75,8 +75,8 @@ O workflow agora:
 3. ✅ Push para Docker Hub com tag `latest`
 
 ### Tags das Imagens
-- **Backend**: `{DOCKERHUB_USERNAME}/multitenant-backend:latest`
-- **Frontend**: `{DOCKERHUB_USERNAME}/multitenant-frontend:latest`
+- **Backend**: `{DOCKER_USERNAME}/multitenant-backend:latest`
+- **Frontend**: `{DOCKER_USERNAME}/multitenant-frontend:latest`
 
 ### 🔧 Alternativa: Login Manual no Workflow
 Se o `docker/login-action` continuar falhando, use login manual:
@@ -84,7 +84,7 @@ Se o `docker/login-action` continuar falhando, use login manual:
 ```yaml
 - name: Login to DockerHub
   run: |
-    echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+    echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 ```
 
 ## 🚀 Próximos Passos
@@ -110,8 +110,8 @@ docker run -p 3000:3000 multitenant-frontend
 ### Deploy em produção
 ```bash
 # Pull das imagens
-docker pull {DOCKERHUB_USERNAME}/multitenant-backend:latest
-docker pull {DOCKERHUB_USERNAME}/multitenant-frontend:latest
+docker pull {DOCKER_USERNAME}/multitenant-backend:latest
+docker pull {DOCKER_USERNAME}/multitenant-frontend:latest
 
 # Usar docker-compose para orquestração
 docker-compose up -d
