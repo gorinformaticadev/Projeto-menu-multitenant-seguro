@@ -36,32 +36,32 @@ jobs:
 
     - name: Install backend dependencies
       run: |
-        cd backend
+        cd apps/backend
         npm ci
 
     - name: Install frontend dependencies
       run: |
-        cd frontend
+        cd apps/frontend
         npm ci
 
     - name: Generate Prisma Client
       run: |
-        cd backend
+        cd apps/backend
         npm run prisma:generate
 
     - name: Run backend lint
       run: |
-        cd backend
+        cd apps/backend
         npm run lint
 
     - name: Run frontend lint
       run: |
-        cd frontend
+        cd apps/frontend
         npm run lint
 
     - name: Run security audit
       run: |
-        cd backend
+        cd apps/backend
         npm audit --audit-level=moderate || true
         cd ../frontend
         npm audit --audit-level=moderate || true
@@ -90,14 +90,14 @@ jobs:
     - name: Build and push backend
       uses: docker/build-push-action@v4
       with:
-        context: ./backend
+        context: ./apps/backend
         push: true
         tags: ${{ secrets.DOCKER_USERNAME }}/multitenant-backend:latest
 
     - name: Build and push frontend
       uses: docker/build-push-action@v4
       with:
-        context: ./frontend
+        context: ./apps/frontend
         push: true
         tags: ${{ secrets.DOCKER_USERNAME }}/multitenant-frontend:latest
 

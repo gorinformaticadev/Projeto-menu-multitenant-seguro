@@ -4,6 +4,7 @@ const nextConfig = {
   poweredByHeader: false, // Remove X-Powered-By header
   compress: true, // Enable gzip compression
   images: {
+    unoptimized: process.env.NEXT_PUBLIC_IS_GH_PAGES === 'true',
     domains: ['localhost'], // Restrict image domains for security
     formats: ['image/webp', 'image/avif'], // Optimize image formats
   },
@@ -56,7 +57,7 @@ const nextConfig = {
     optimizeCss: true, // Optimize CSS
   },
   // Configure build output
-  output: 'standalone', // For containerized deployments
+  output: process.env.NEXT_PUBLIC_IS_GH_PAGES === 'true' ? 'export' : 'standalone', // Export for GH Pages, standalone for Docker
   // Transpile local module packages
   // transpilePackages: ['@modules/sistema'],
 }

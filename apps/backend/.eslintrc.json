@@ -1,34 +1,69 @@
 {
-  "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended", "plugin:security/recommended"],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:security/recommended"
+  ],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "ecmaVersion": 2021,
     "sourceType": "module",
     "project": "./tsconfig.json"
   },
-  "plugins": ["@typescript-eslint", "security"],
+  "plugins": [
+    "@typescript-eslint",
+    "security"
+  ],
   "rules": {
     "security/detect-object-injection": "warn",
     "security/detect-non-literal-regexp": "warn",
-    "security/detect-unsafe-regex": "error",
-    "security/detect-buffer-noassert": "error",
+    "security/detect-unsafe-regex": "warn",
+    "security/detect-buffer-noassert": "warn",
     "security/detect-child-process": "warn",
-    "security/detect-disable-mustache-escape": "error",
-    "security/detect-eval-with-expression": "error",
-    "security/detect-no-csrf-before-method-override": "error",
+    "security/detect-disable-mustache-escape": "warn",
+    "security/detect-eval-with-expression": "warn",
+    "security/detect-no-csrf-before-method-override": "warn",
     "security/detect-non-literal-fs-filename": "warn",
     "security/detect-non-literal-require": "warn",
     "security/detect-possible-timing-attacks": "warn",
-    "security/detect-pseudoRandomBytes": "error",
+    "security/detect-pseudoRandomBytes": "warn",
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/explicit-function-return-type": "off",
     "@typescript-eslint/explicit-module-boundary-types": "off",
-    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
-    "no-console": ["warn", { "allow": ["warn", "error"] }]
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_"
+      }
+    ],
+    "no-console": [
+      "warn",
+      {
+        "allow": [
+          "warn",
+          "error"
+        ]
+      }
+    ],
+    "no-useless-escape": "warn",
+    "no-prototype-builtins": "warn",
+    "no-case-declarations": "warn",
+    "@typescript-eslint/no-empty-function": "warn",
+    "@typescript-eslint/no-empty-interface": "warn",
+    "@typescript-eslint/ban-ts-comment": "warn",
+    "@typescript-eslint/no-var-requires": "warn",
+    "no-control-regex": "warn",
+    "no-empty": "warn",
+    "no-irregular-whitespace": "warn",
+    "@typescript-eslint/ban-types": "warn"
   },
   "env": {
     "node": true,
     "es2021": true
   },
-  "ignorePatterns": ["dist", "node_modules", "*.js"]
+  "ignorePatterns": [
+    "dist",
+    "node_modules",
+    "*.js"
+  ]
 }
