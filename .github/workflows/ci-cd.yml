@@ -18,6 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' || github.event_name == 'pull_request'
 
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+
     services:
       postgres:
         image: postgres:15
@@ -51,6 +54,12 @@ jobs:
       run: |
         cd apps/frontend
         npm ci
+
+    - name: Update Prisma to v7 (CI/CD compatibility)
+      run: |
+        cd apps/backend
+        npm install prisma@latest --save-dev
+        npm install @prisma/client@latest
 
     - name: Generate Prisma Client
       run: |
