@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.5.2](https://github.com/gorinformatica/menu-multitenant/compare/v0.5.1...v0.5.2) (2026-01-16)
+
+
+### Features
+
+* Implement comprehensive security hardening including CSP, HTTPS redirection, and enhanced secret management. ([7aaa5e7](https://github.com/gorinformatica/menu-multitenant/commit/7aaa5e70f24b1c3e9e65de4e6ce0504b2bacd77d))
+* Introduce Dockerization for backend and frontend services, add a database migrator, and include a setup script with environment examples. ([6b5742e](https://github.com/gorinformatica/menu-multitenant/commit/6b5742eec45c968b1bb2a13272ad43abda981548))
+
 ### [0.5.1](https://github.com/gorinformatica/menu-multitenant/compare/v0.5.0...v0.5.1) (2026-01-15)
 
 
