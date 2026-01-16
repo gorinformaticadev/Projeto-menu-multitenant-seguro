@@ -1,16 +1,29 @@
 # 🚀 Deploy Docker - Guia de Configuração
 
 ## 📋 Problema Identificado
-O pipeline CI/CD estava falhando no login do Docker Hub devido a dois problemas:
-
-1. **Secrets com nomes incorretos** (resolvido)
-2. **Workflow rodando em contexto sem secrets** (resolvido)
+O pipeline CI/CD estava falhando no login do Docker Hub devido a configuração incompleta dos secrets no GitHub.
 
 ## ✅ Solução Aplicada
 
-### 1. **Workflow Corrigido** (`.github/workflows/ci-cd.yml`)
+### 1. **Workflow Corrigido com Validação Robusta** (`.github/workflows/ci-cd.yml`)
 ```yaml
-- name: Login to DockerHub
+- name: Validate Docker Hub secrets
+  run: |
+    echo "🔍 Validating Docker Hub secrets..."
+
+    if [ -z "${{ secrets.DOCKER_USERNAME }}" ]; then
+      echo "❌ ERROR: DOCKER_USERNAME secret is missing or empty"
+      exit 1
+    fi
+
+    if [ -z "${{ secrets.DOCKER_TOKEN }}" ]; then
+      echo "❌ ERROR: DOCKER_TOKEN secret is missing or empty"
+      exit 1
+    fi
+
+    echo "✅ All Docker Hub secrets are valid and available"
+
+- name: Login to Docker Hub
   uses: docker/login-action@v2
   with:
     username: ${{ secrets.DOCKER_USERNAME }}
@@ -21,9 +34,10 @@ O pipeline CI/CD estava falhando no login do Docker Hub devido a dois problemas:
 - **Motivo**: GitHub Pages é incompatível com aplicações SSR
 - **Solução**: Workflow desabilitado para evitar builds desnecessários
 
-### 3. **Workflow CI/CD Corrigido** (`.github/workflows/ci-cd.yml`)
-- **Problema**: Job `build` herdava contexto sem secrets de PRs
-- **Solução**: Job `test` só roda em push, job `build` independente
+### 3. **Contexto do Workflow Corrigido**
+- Job `test` só roda em push (não herda contexto de PR)
+- Job `build` independente e só roda em main
+- Validação robusta dos secrets antes do login
 
 ## 🔐 Configuração dos Secrets no GitHub
 
@@ -50,7 +64,7 @@ DOCKER_TOKEN       # Token de acesso (não a senha!)
 4. Dê um nome descritivo (ex: `github-actions`)
 5. Selecione permissão **Read, Write, Delete**
 6. **IMPORTANTE**: Copie o token imediatamente (ele só aparece uma vez!)
-7. Cole no secret `DOCKERHUB_TOKEN` do GitHub
+7. Cole no secret `DOCKER_TOKEN` do GitHub
 
 #### 4. Verificação dos Secrets
 Após criar, os secrets devem aparecer na lista:
