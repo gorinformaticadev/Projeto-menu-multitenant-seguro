@@ -49,14 +49,14 @@ interface LoadedModule {
 
 export async function GET(request: NextRequest) {
   console.log('🔍 API: Descobrindo módulos...');
-  
+
   try {
     // Determinar caminho dos módulos
     const cwd = process.cwd();
-    const modulesPath = cwd.endsWith('frontend') 
+    const modulesPath = cwd.endsWith('frontend')
       ? resolve(cwd, '..', 'modules')
       : resolve(cwd, 'modules');
-    
+
     console.log('📂 Caminho dos módulos:', modulesPath);
 
     if (!existsSync(modulesPath)) {
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
 
     const entries = await readdir(modulesPath, { withFileTypes: true });
     const moduleDirectories = entries.filter(entry => entry.isDirectory());
-    
+
     console.log(`📂 Encontrados ${moduleDirectories.length} diretórios de módulos`);
 
     const modules: Record<string, LoadedModule> = {};
@@ -82,11 +82,11 @@ export async function GET(request: NextRequest) {
     for (const dir of moduleDirectories) {
       const moduleName = dir.name;
       console.log(`🔄 Processando módulo: ${moduleName}`);
-      
+
       try {
         const loadedModule = await loadModule(modulesPath, moduleName);
         modules[moduleName] = loadedModule;
-        
+
         if (loadedModule.isValid) {
           validCount++;
           if (loadedModule.config.enabled) {
@@ -95,11 +95,11 @@ export async function GET(request: NextRequest) {
         } else {
           failedCount++;
         }
-        
+
       } catch (error) {
         console.error(`❌ Erro ao carregar módulo ${moduleName}:`, error);
         failedCount++;
-        
+
         // Registrar módulo com erro
         modules[moduleName] = {
           config: {
@@ -134,7 +134,7 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Erro ao descobrir módulos:', error);
-    
+
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Erro desconhecido',
@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
  */
 async function loadModule(modulesPath: string, moduleName: string): Promise<LoadedModule> {
   const modulePath = join(modulesPath, moduleName);
-  
+
   // 1. Carregar e validar configuração
   const config = await loadModuleConfig(modulePath);
   if (!config) {
@@ -199,30 +199,30 @@ async function loadModuleConfig(modulePath: string): Promise<ModuleConfig | null
   // 1. Tentar carregar module.config.json (prioritário)
   const configJsonPath = join(modulePath, 'module.config.json');
   const configTsPath = join(modulePath, 'module.config.ts');
-  
+
   try {
     // Priorizar JSON se existir
     if (existsSync(configJsonPath)) {
       console.log(`📄 Carregando module.config.json de ${modulePath}`);
       const configContent = await readFile(configJsonPath, 'utf-8');
       const config = JSON.parse(configContent);
-      
+
       // Validar campos obrigatórios
       if (!config.name || !config.slug) {
         throw new Error('Campos obrigatórios (name, slug) não encontrados na configuração JSON');
       }
-      
+
       return config as ModuleConfig;
     }
-    
+
     // Fallback para TypeScript (legado)
     if (existsSync(configTsPath)) {
       console.log(`📄 Carregando module.config.ts de ${modulePath} (fallback)`);
       return await loadModuleConfigFromTS(configTsPath);
     }
-    
+
     throw new Error('Nenhum arquivo de configuração encontrado (module.config.json ou module.config.ts)');
-    
+
   } catch (error) {
     console.error('❌ Erro ao carregar configuração do módulo:', error);
     return null;
@@ -235,7 +235,7 @@ async function loadModuleConfig(modulePath: string): Promise<ModuleConfig | null
 async function loadModuleConfigFromTS(configPath: string): Promise<ModuleConfig | null> {
   try {
     const configContent = await readFile(configPath, 'utf-8');
-    
+
     // Validação básica de segurança
     if (configContent.includes('eval(') || configContent.includes('Function(')) {
       throw new Error('Código inseguro detectado na configuração');
@@ -243,30 +243,30 @@ async function loadModuleConfigFromTS(configPath: string): Promise<ModuleConfig 
 
     // Extrair configuração usando regex mais robusta
     const moduleConfigMatch = configContent.match(/export\s+const\s+moduleConfig\s*=\s*({[\s\S]*?})\s*(?:as\s+const)?;?\s*$/m);
-    
+
     if (!moduleConfigMatch) {
       throw new Error('Configuração moduleConfig não encontrada');
     }
 
     // Parser mais seguro para extrair valores
     const configText = moduleConfigMatch[1];
-    
+
     // Extrair campos usando regex individual (mais seguro que eval)
     const extractField = (fieldName: string, defaultValue?: any) => {
       // Regex melhorado para capturar strings entre aspas ou valores booleanos
       const fieldRegex = new RegExp(`${fieldName}\\s*:\\s*(['"]?)([^'"\n,}]*?)\\1(?:[,\s}]|$)`, 'i');
       const match = configText.match(fieldRegex);
       if (!match) return defaultValue;
-      
-      let value = match[2].trim();
-      
+
+      const value = match[2].trim();
+
       // Converter booleanos
       if (value === 'true') {
         return true;
       } else if (value === 'false') {
         return false;
       }
-      
+
       // Retornar string sem aspas
       return value;
     };
@@ -276,7 +276,7 @@ async function loadModuleConfigFromTS(configPath: string): Promise<ModuleConfig 
     const slug = extractField('slug');
     const version = extractField('version', '1.0.0');
     const enabled = extractField('enabled', false);
-    
+
     // Validar campos obrigatórios
     if (!name || !slug) {
       throw new Error('Campos obrigatórios (name, slug) não encontrados na configuração');
@@ -311,36 +311,36 @@ async function loadModulePages(modulePath: string): Promise<ModulePage[] | null>
   // 1. Tentar carregar module.pages.json (prioritário)
   const pagesJsonPath = join(modulePath, 'module.pages.json');
   const pagesTsPath = join(modulePath, 'module.pages.ts');
-  
+
   try {
     // Priorizar JSON se existir
     if (existsSync(pagesJsonPath)) {
       console.log(`📄 Carregando module.pages.json de ${modulePath}`);
       const pagesContent = await readFile(pagesJsonPath, 'utf-8');
       const pages = JSON.parse(pagesContent);
-      
+
       // Validar estrutura
       if (!Array.isArray(pages)) {
         throw new Error('module.pages.json deve ser um array');
       }
-      
+
       for (const page of pages) {
         if (!page.id || !page.path || !page.component) {
           throw new Error('Página inválida: campos obrigatórios (id, path, component) não encontrados');
         }
       }
-      
+
       return pages as ModulePage[];
     }
-    
+
     // Fallback para TypeScript (legado)
     if (existsSync(pagesTsPath)) {
       console.log(`📄 Carregando module.pages.ts de ${modulePath} (fallback)`);
       return await loadModulePagesFromTS(pagesTsPath);
     }
-    
+
     throw new Error('Nenhum arquivo de páginas encontrado (module.pages.json ou module.pages.ts)');
-    
+
   } catch (error) {
     console.error('❌ Erro ao carregar páginas do módulo:', error);
     return null;
@@ -353,7 +353,7 @@ async function loadModulePages(modulePath: string): Promise<ModulePage[] | null>
 async function loadModulePagesFromTS(pagesPath: string): Promise<ModulePage[] | null> {
   try {
     const pagesContent = await readFile(pagesPath, 'utf-8');
-    
+
     // Validação de segurança
     if (pagesContent.includes('eval(') || pagesContent.includes('Function(')) {
       throw new Error('Código inseguro detectado nas páginas');
@@ -361,7 +361,7 @@ async function loadModulePagesFromTS(pagesPath: string): Promise<ModulePage[] | 
 
     // Extrair páginas - regex mais flexivel
     const pagesMatch = pagesContent.match(/export\s+const\s+modulePages\s*=\s*(\[[\s\S]*?\])\s*(?:as\s+const)?\s*;?/);
-    
+
     if (!pagesMatch) {
       throw new Error('Array modulePages não encontrado');
     }
@@ -373,13 +373,13 @@ async function loadModulePagesFromTS(pagesPath: string): Promise<ModulePage[] | 
       const cleanedArray = pagesMatch[1]
         .replace(/\/\/.*$/gm, '')  // Remover comentários de linha
         .replace(/\/\*[\s\S]*?\*\//g, '');  // Remover comentários de bloco
-      
+
       pages = eval(`(${cleanedArray})`);
     } catch (evalError) {
       console.error('❌️ Erro ao fazer parse do array de páginas:', evalError);
       throw new Error('Erro ao fazer parse do array modulePages');
     }
-    
+
     // Validar estrutura das páginas
     if (!Array.isArray(pages)) {
       throw new Error('modulePages deve ser um array');
@@ -418,7 +418,7 @@ function validateModuleSecurity(config: ModuleConfig, pages: ModulePage[]): void
     if (!page.path.startsWith('/')) {
       throw new Error(`Path inválido na página ${page.id}: deve começar com /`);
     }
-    
+
     if (page.path.includes('..') || page.path.includes('//')) {
       throw new Error(`Path inseguro na página ${page.id}: contém caracteres perigosos`);
     }
