@@ -20,24 +20,45 @@ O pipeline CI/CD estava falhando no login do Docker Hub devido a configuração 
 
 ## 🔐 Configuração dos Secrets no GitHub
 
-### Passo 1: Acesse as configurações do repositório
+### ❌ Erro Atual: "Username and password required"
+Este erro indica que os secrets não estão configurados ou estão vazios.
+
+### ✅ Passo a Passo para Configurar
+
+#### 1. Acesse as configurações do repositório
 1. Vá para o seu repositório no GitHub
 2. Clique em **Settings** → **Secrets and variables** → **Actions**
+3. Clique em **New repository secret**
 
-### Passo 2: Crie os secrets necessários
+#### 2. Crie os secrets necessários
 ```
 DOCKERHUB_USERNAME    # Seu username do Docker Hub
 DOCKERHUB_TOKEN       # Token de acesso (não a senha!)
 ```
 
-### Passo 3: Como gerar o Docker Hub Token
+#### 3. Como gerar o Docker Hub Token
 1. Acesse [Docker Hub](https://hub.docker.com/)
 2. Vá para **Account Settings** → **Security**
 3. Clique em **New Access Token**
 4. Dê um nome descritivo (ex: `github-actions`)
 5. Selecione permissão **Read, Write, Delete**
-6. Copie o token gerado
+6. **IMPORTANTE**: Copie o token imediatamente (ele só aparece uma vez!)
 7. Cole no secret `DOCKERHUB_TOKEN` do GitHub
+
+#### 4. Verificação dos Secrets
+Após criar, os secrets devem aparecer na lista:
+- ✅ `DOCKERHUB_USERNAME` (com valor definido)
+- ✅ `DOCKERHUB_TOKEN` (com valor definido)
+
+### 🧪 Teste Local (Opcional)
+Antes de commitar, teste o login localmente:
+
+```bash
+# Substitua pelos seus valores
+echo "YOUR_DOCKERHUB_TOKEN" | docker login -u YOUR_USERNAME --password-stdin
+
+# Se funcionar, verá: "Login Succeeded"
+```
 
 ## 🐳 Build e Push das Imagens
 
@@ -49,6 +70,15 @@ O workflow agora:
 ### Tags das Imagens
 - **Backend**: `{DOCKERHUB_USERNAME}/multitenant-backend:latest`
 - **Frontend**: `{DOCKERHUB_USERNAME}/multitenant-frontend:latest`
+
+### 🔧 Alternativa: Login Manual no Workflow
+Se o `docker/login-action` continuar falhando, use login manual:
+
+```yaml
+- name: Login to DockerHub
+  run: |
+    echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+```
 
 ## 🚀 Próximos Passos
 
