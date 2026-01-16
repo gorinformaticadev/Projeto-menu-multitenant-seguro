@@ -1,10 +1,5 @@
 import ModulePageClient from "./ModulePageClient";
 
-// Required for static export with dynamic routes
-export function generateStaticParams() {
-    return [];
-}
-
 interface PageProps {
     params: {
         module: string;

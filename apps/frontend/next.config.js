@@ -57,7 +57,7 @@ const nextConfig = {
     optimizeCss: true, // Optimize CSS
   },
   // Configure build output
-  output: process.env.NEXT_PUBLIC_IS_GH_PAGES === 'true' ? 'export' : 'standalone', // Export for GH Pages, standalone for Docker
+  output: 'standalone', // Always use standalone for SSR support
   // Transpile local module packages
   // transpilePackages: ['@modules/sistema'],
 }
