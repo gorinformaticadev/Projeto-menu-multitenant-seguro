@@ -3,6 +3,11 @@
 import React from 'react';
 import { useParams } from 'next/navigation';
 
+// Required for static export with dynamic routes
+export function generateStaticParams() {
+    return [];
+}
+
 /**
  * Loader dinâmico de páginas de módulos (FALLBACK)
  * 

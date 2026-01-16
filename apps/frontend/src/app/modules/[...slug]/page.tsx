@@ -5,6 +5,11 @@ import { useParams } from 'next/navigation';
 import { AllModuleRoutes } from '../../../lib/modules-registry';
 import { match } from 'path-to-regexp'; // Se disponível, ou implementar logic simples
 
+// Required for static export with dynamic routes
+export function generateStaticParams() {
+  return [];
+}
+
 // match simples para evitar dep extra se não estiver instalada, 
 // mas se o projeto já tiver, melhor.
 // Vou usar lógica manual robusta para garantir zero deps novas.
@@ -19,12 +24,12 @@ export default function DynamicModulePage() {
   let matchParams = {};
 
   // Debug: Verificar o que está chegando e o que temos registrado
-  console.log('🔍 [DynamicModulePage] Debug:', { 
-    currentPath, 
-    routesCount: AllModuleRoutes.length, 
+  console.log('🔍 [DynamicModulePage] Debug:', {
+    currentPath,
+    routesCount: AllModuleRoutes.length,
     availablePaths: AllModuleRoutes.map(r => r.path),
     slug,
-    params 
+    params
   });
 
   for (const route of AllModuleRoutes) {

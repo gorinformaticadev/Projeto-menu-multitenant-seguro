@@ -5,6 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import api from "@/lib/api";
 import { Loader2, Package } from "lucide-react";
 
+// Required for static export with dynamic routes
+export function generateStaticParams() {
+  return [
+    { locale: 'pt-BR' },
+    { locale: 'en' },
+    { locale: 'es' }
+  ];
+}
+
 export default function ModeloPage() {
   const [data, setData] = useState<{ message: string; timestamp: string } | null>(null);
   const [loading, setLoading] = useState(true);
