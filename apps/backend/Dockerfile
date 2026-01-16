@@ -1,18 +1,19 @@
-# Multi-stage build for NestJS backend
-FROM node:20-alpine AS builder
+# Multi-stage build for NestJS backend with Prisma
+FROM node:20-alpine AS base
+
+# Install system dependencies for Prisma
+RUN apk add --no-cache openssl python3 make g++ curl
 
 WORKDIR /app
 
-# Install system dependencies for Prisma
-RUN apk add --no-cache openssl python3 make g++
-
-# Copy package files
+# Dependencies stage
+FROM base AS deps
 COPY package*.json ./
+RUN npm ci --only=production=false --no-audit --no-fund
 
-# Install dependencies
-RUN npm ci --only=production=false
-
-# Copy source code
+# Build stage
+FROM base AS builder
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Generate Prisma client
@@ -21,8 +22,13 @@ RUN npx prisma generate
 # Build application
 RUN npm run build
 
+# Production dependencies stage
+FROM base AS prod-deps
+COPY package*.json ./
+RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
+
 # Production stage
-FROM node:20-alpine AS production
+FROM base AS production
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
@@ -30,22 +36,17 @@ RUN addgroup -g 1001 -S nodejs && \
 
 WORKDIR /app
 
-# Install openssl for JWT operations
-RUN apk add --no-cache openssl
+# Copy production dependencies
+COPY --from=prod-deps --chown=nestjs:nodejs /app/node_modules ./node_modules
 
-# Copy package files
-COPY package*.json ./
-
-# Install only production dependencies
-RUN npm ci --omit=dev && npm cache clean --force
-
-# Copy built application from builder stage
+# Copy built application and Prisma files
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
-COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nestjs:nodejs /app/package.json ./
 
 # Create uploads directory with proper permissions
-RUN mkdir -p uploads && chown -R nestjs:nodejs uploads
+RUN mkdir -p uploads uploads/logos uploads/temp uploads/secure && \
+    chown -R nestjs:nodejs uploads
 
 # Switch to non-root user
 USER nestjs
