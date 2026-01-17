@@ -1,0 +1,44 @@
+{
+    "name": "module-whatsapp",
+    "displayName": "WhatsApp Whaileys",
+    "version": "1.0.0",
+    "description": "Módulo de integração WhatsApp usando Whaileys",
+    "author": "Dev Team",
+    "category": "communication",
+    "config": {
+        "permissions": [
+            "module-whatsapp:read",
+            "module-whatsapp:write",
+            "module-whatsapp:connect"
+        ],
+        "routes": [
+            {
+                "path": "/modules/module-whatsapp",
+                "title": "WhatsApp Chat",
+                "protected": true,
+                "permissions": [
+                    "module-whatsapp:read"
+                ]
+            },
+            {
+                "path": "/modules/module-whatsapp/connect",
+                "title": "Conectar WhatsApp",
+                "protected": true,
+                "permissions": [
+                    "module-whatsapp:connect"
+                ]
+            }
+        ],
+        "menuItems": [
+            {
+                "label": "WhatsApp",
+                "icon": "message-circle",
+                "path": "/modules/module-whatsapp",
+                "order": 10,
+                "permissions": [
+                    "module-whatsapp:read"
+                ]
+            }
+        ]
+    }
+}

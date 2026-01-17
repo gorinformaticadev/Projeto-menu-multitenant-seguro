@@ -1,0 +1,11 @@
+{
+    "name": "module-whatsapp-backend",
+    "version": "1.0.0",
+    "description": "Backend logic for WhatsApp Module",
+    "dependencies": {
+        "whaileys": "github:canove/whaileys",
+        "qrcode-terminal": "^0.12.0",
+        "pino": "^7.0.0",
+        "@hapi/boom": "^9.0.0"
+    }
+}

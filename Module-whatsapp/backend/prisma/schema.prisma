@@ -1,0 +1,147 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// MultitenancyNote: All models have a tenantId field to support automatic filtering.
+// This should be handled by a global Prisma middleware/interceptor or NestJS Guard.
+
+model WhatsAppSession {
+  id             String   @id @default(uuid())
+  tenantId       String
+  name           String
+  phoneNumber    String?  @map("phone_number")
+  status         String   @default("disconnected") // disconnected, connecting, connected, qr_ready
+  qrCode         String?  @map("qr_code")
+  profilePicture String?  @map("profile_picture")
+  businessName   String?  @map("business_name")
+  
+  conversations  Conversation[]
+  contacts       Contact[]
+  quickReplies   QuickReply[]
+  tags           Tag[]
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("whatsapp_sessions")
+}
+
+model Conversation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  sessionId       String   @map("session_id")
+  
+  // Contact info cache
+  contactId       String?  @map("contact_id")
+  contactPhone    String   @map("contact_phone")
+  contactName     String?  @map("contact_name")
+  contactPicture  String?  @map("contact_picture")
+  
+  lastMessage     String?  @map("last_message")
+  lastMessageTime DateTime? @map("last_message_time")
+  unreadCount     Int      @default(0) @map("unread_count")
+  
+  status          String   @default("open") // open, attending, waiting, resolved
+  assignedTo      String?  @map("assigned_to")
+  
+  isPinned        Boolean  @default(false) @map("is_pinned")
+  isMuted         Boolean  @default(false) @map("is_muted")
+  isArchived      Boolean  @default(false) @map("is_archived")
+
+  session         WhatsAppSession @relation(fields: [sessionId], references: [id])
+  messages        Message[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("conversations")
+}
+
+model Message {
+  id              String   @id @default(uuid())
+  tenantId        String
+  conversationId  String   @map("conversation_id")
+  sessionId       String   @map("session_id")
+  
+  messageId       String   @unique @map("message_id") // WhatsApp Message ID
+  fromPhone       String   @map("from_phone")
+  toPhone         String   @map("to_phone")
+  type            String   @default("text") // text, image, video, document...
+  
+  content         String?
+  mediaUrl        String?  @map("media_url")
+  mediaMimeType   String?  @map("media_mime_type")
+  mediaFilename   String?  @map("media_filename")
+  
+  isFromMe        Boolean  @default(false) @map("is_from_me")
+  status          String   @default("pending") // pending, sent, delivered, read, failed
+  
+  quotedMessageId String?  @map("quoted_message_id")
+  quotedContent   String?  @map("quoted_content")
+  
+  timestamp       DateTime @default(now())
+
+  conversation    Conversation @relation(fields: [conversationId], references: [id])
+
+  @@map("messages")
+}
+
+model Contact {
+  id              String   @id @default(uuid())
+  tenantId        String
+  sessionId       String   @map("session_id")
+  
+  phone           String
+  name            String?
+  pushName        String?  @map("push_name")
+  profilePicture  String?  @map("profile_picture")
+  
+  isGroup         Boolean  @default(false) @map("is_group")
+  isBusiness      Boolean  @default(false) @map("is_business")
+  
+  tags            String[] // Arrays are supported in PostgreSQL
+  notes           String?
+  
+  session         WhatsAppSession @relation(fields: [sessionId], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("contacts")
+}
+
+model QuickReply {
+  id          String   @id @default(uuid())
+  tenantId    String
+  sessionId   String   @map("session_id")
+  
+  shortcut    String
+  title       String?
+  content     String
+  mediaUrl    String?  @map("media_url")
+
+  session     WhatsAppSession @relation(fields: [sessionId], references: [id])
+
+  @@map("quick_replies")
+}
+
+model Tag {
+  id          String   @id @default(uuid())
+  tenantId    String
+  sessionId   String   @map("session_id")
+  
+  name        String
+  color       String
+
+  session     WhatsAppSession @relation(fields: [sessionId], references: [id])
+
+  @@map("tags")
+}
