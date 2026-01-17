@@ -17,7 +17,7 @@ RUN npm install --legacy-peer-deps --no-audit --no-fund
 
 COPY . .
 
-RUN npx prisma generate
+# RUN npx prisma generate
 RUN npm run build
 
 # =========================
