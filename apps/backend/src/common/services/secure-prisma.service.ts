@@ -1,17 +1,36 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 
+// Type for model delegate names
+type ModelDelegate =
+  | 'tenant'
+  | 'user'
+  | 'auditLog'
+  | 'passwordResetToken'
+  | 'blacklistedToken'
+  | 'securityConfig'
+  | 'emailConfiguration'
+  | 'systemSettings'
+  | 'updateLog'
+  | 'module'
+  | 'moduleMenu'
+  | 'moduleTenant'
+  | 'moduleMigration'
+  | 'notification'
+  | 'secureFile'
+  | 'cronSchedule';
+
 @Injectable()
 export class SecurePrismaService {
   private readonly logger = new Logger(SecurePrismaService.name);
-  
-  constructor(private prisma: PrismaService) {}
+
+  constructor(private prisma: PrismaService) { }
 
   /**
    * Wrapper seguro para findMany com validação automática de tenant isolation
    */
   async findManySecure<T>(
-    model: keyof PrismaClient,
+    model: ModelDelegate,
     where: any,
     tenantId: string,
     userRole: string,
@@ -25,8 +44,8 @@ export class SecurePrismaService {
   ): Promise<T[]> {
     try {
       // Aplicar tenant isolation automaticamente
-      const tenantWhere = userRole !== 'SUPER_ADMIN' 
-        ? { ...where, tenantId } 
+      const tenantWhere = userRole !== 'SUPER_ADMIN'
+        ? { ...where, tenantId }
         : where;
 
       // Adicionar logging de segurança para operações sensíveis
@@ -36,7 +55,7 @@ export class SecurePrismaService {
         hasTenantFilter: userRole !== 'SUPER_ADMIN'
       });
 
-      const result = await this.prisma[model].findMany({
+      const result = await (this.prisma as any)[model].findMany({
         where: tenantWhere,
         select: options.select,
         include: options.include,
@@ -56,7 +75,7 @@ export class SecurePrismaService {
    * Wrapper seguro para findUnique com validação de ownership
    */
   async findUniqueSecure<T>(
-    model: keyof PrismaClient,
+    model: ModelDelegate,
     where: any,
     tenantId: string,
     userRole: string,
@@ -66,7 +85,7 @@ export class SecurePrismaService {
     } = {}
   ): Promise<T | null> {
     try {
-      const result = await this.prisma[model].findUnique({
+      const result = await (this.prisma as any)[model].findUnique({
         where,
         select: options.select,
         include: options.include
@@ -109,7 +128,7 @@ export class SecurePrismaService {
    * Wrapper seguro para create com validação de tenant
    */
   async createSecure<T>(
-    model: keyof PrismaClient,
+    model: ModelDelegate,
     data: any,
     tenantId: string,
     userId: string,
@@ -130,7 +149,7 @@ export class SecurePrismaService {
         hasExplicitTenant: !!data.tenantId
       });
 
-      const result = await this.prisma[model].create({
+      const result = await (this.prisma as any)[model].create({
         data: secureData
       });
 
@@ -153,7 +172,7 @@ export class SecurePrismaService {
    * Wrapper seguro para update com validação de ownership
    */
   async updateSecure<T>(
-    model: keyof PrismaClient,
+    model: ModelDelegate,
     where: any,
     data: any,
     tenantId: string,
@@ -179,7 +198,7 @@ export class SecurePrismaService {
         userId
       });
 
-      const result = await this.prisma[model].update({
+      const result = await (this.prisma as any)[model].update({
         where,
         data: {
           ...data,
@@ -207,7 +226,7 @@ export class SecurePrismaService {
    * Wrapper seguro para delete com validação de ownership
    */
   async deleteSecure<T>(
-    model: keyof PrismaClient,
+    model: ModelDelegate,
     where: any,
     tenantId: string,
     userId: string,
@@ -233,7 +252,7 @@ export class SecurePrismaService {
         userRole
       });
 
-      const result = await this.prisma[model].delete({
+      const result = await (this.prisma as any)[model].delete({
         where
       });
 
@@ -259,24 +278,24 @@ export class SecurePrismaService {
     return query.replace(/\$\d+/g, (match, index) => {
       const paramIndex = parseInt(match.slice(1)) - 1;
       const param = params[paramIndex];
-      
+
       if (param === null || param === undefined) {
         return 'NULL';
       }
-      
+
       if (typeof param === 'string') {
         // Escapar aspas simples
         return `'${param.replace(/'/g, "''")}'`;
       }
-      
+
       if (typeof param === 'number') {
         return String(param);
       }
-      
+
       if (param instanceof Date) {
         return `'${param.toISOString()}'`;
       }
-      
+
       // Para objetos/arrays, converter para JSON
       return `'${JSON.stringify(param).replace(/'/g, "''")}'`;
     });
@@ -288,7 +307,7 @@ export class SecurePrismaService {
   async executeRawSecure(query: string, params: any[] = []): Promise<any> {
     try {
       const sanitizedQuery = this.sanitizeRawQuery(query, params);
-      
+
       this.logger.debug('Executando query raw sanitizada', {
         queryPreview: sanitizedQuery.substring(0, 200) + (sanitizedQuery.length > 200 ? '...' : '')
       });
@@ -312,8 +331,3 @@ export class SecurePrismaService {
     };
   }
 }
-
-// Tipo auxiliar para o PrismaClient
-type PrismaClient = {
-  [K in keyof typeof import('@prisma/client').PrismaClient]: any;
-};

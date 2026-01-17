@@ -9,15 +9,12 @@ WORKDIR /app
 # =========================
 FROM base AS builder
 
-# Set dummy DATABASE_URL for Prisma generate to work
-ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
-
 COPY package*.json ./
 RUN npm install --legacy-peer-deps --no-audit --no-fund
 
 COPY . .
 
-# RUN npx prisma generate
+RUN npx prisma generate
 RUN npm run build
 
 # =========================
