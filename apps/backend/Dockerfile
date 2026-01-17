@@ -10,7 +10,7 @@ WORKDIR /app
 FROM base AS builder
 
 COPY package*.json ./
-RUN npm install --no-audit --no-fund
+RUN npm install --legacy-peer-deps --no-audit --no-fund
 
 COPY . .
 
@@ -26,7 +26,7 @@ COPY package*.json ./
 
 # ⚠️ IMPORTANTE:
 # npm ci NÃO funciona corretamente com workspaces aqui
-RUN npm install --omit=dev --no-audit --no-fund
+RUN npm install --omit=dev --legacy-peer-deps --no-audit --no-fund
 
 # =========================
 # Runtime
