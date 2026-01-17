@@ -1,23 +1,40 @@
-FROM node:20-alpine AS builder
-
+# =========================
+# Base
+# =========================
+FROM node:20-alpine AS base
 WORKDIR /app
 
-# Copia arquivos do monorepo
-COPY package.json package-lock.json ./
-COPY apps/frontend ./apps/frontend
+# =========================
+# Builder
+# =========================
+FROM base AS builder
 
-# Instala dependências do workspace
-RUN npm install --workspaces --include-workspace-root
+COPY package*.json ./
+COPY apps/frontend/package*.json ./apps/frontend/
+RUN npm install --workspaces --include-workspace-root --frozen-lockfile
 
-WORKDIR /app/apps/frontend
-RUN npm run build
+COPY . .
+RUN npm run build --workspace=frontend
 
+# =========================
+# Runner
+# =========================
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-COPY --from=builder /app/apps/frontend/.next ./.next
+ENV NODE_ENV=production
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
 COPY --from=builder /app/apps/frontend/public ./public
-COPY --from=builder /app/apps/frontend/package.json ./package.json
+COPY --from=builder --chown=nextjs:nodejs /app/apps/frontend/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/frontend/.next/static ./.next/static
+
+USER nextjs
 
 EXPOSE 4000
-CMD ["npm", "start"]
+
+ENV PORT=4000
+
+CMD ["node", "server.js"]
