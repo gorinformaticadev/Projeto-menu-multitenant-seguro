@@ -218,7 +218,7 @@ export default function LoginPage() {
                 <Checkbox
                   id="rememberMe"
                   checked={rememberMe}
-                  onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                  onCheckedChange={(checked: boolean) => setRememberMe(checked as boolean)}
                   disabled={loading}
                   className="h-5 w-5 border-white/10 rounded bg-black/20 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 checkbox-shadow text-white"
                 />
