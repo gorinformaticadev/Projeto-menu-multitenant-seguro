@@ -5,7 +5,16 @@ const nextConfig = {
   compress: true, // Enable gzip compression
   images: {
     unoptimized: process.env.NEXT_PUBLIC_IS_GH_PAGES === 'true',
-    domains: ['localhost'], // Restrict image domains for security
+    remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+      },
+      {
+        protocol: 'https',
+        hostname: '**',
+      }
+    ],
     formats: ['image/webp', 'image/avif'], // Optimize image formats
   },
   async headers() {

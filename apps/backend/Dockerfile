@@ -13,7 +13,9 @@ COPY package*.json ./
 RUN npm install --legacy-peer-deps --no-audit --no-fund
 
 COPY . .
+ENV DATABASE_URL="postgresql://user:pass@localhost:5432/dummy"
 
+RUN npx prisma generate
 RUN npm run build
 
 # =========================

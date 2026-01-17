@@ -247,7 +247,7 @@ export function Sidebar() {
         <nav className="space-y-1">
           {/* Renderiza todos os itens em ordem global: Dashboard -> Administração -> Módulos */}
           {(() => {
-            const allRenderItems: JSX.Element[] = [];
+            const allRenderItems: React.JSX.Element[] = [];
 
             // Cria uma lista de todos os itens e grupos com suas ordens
             const renderQueue: Array<{

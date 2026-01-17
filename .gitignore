@@ -60,9 +60,19 @@ modules/demo-completo.zip
 /packages
 
 apps/backend/src/modules/*
-apps/frontend/src/app/modules/*
+# apps/frontend/src/app/modules/* (Removido para permitir build no CI)
 module-os
 /apps/backend/scripts
 /.qoder
 GOR.png
 scripts/final_sync.js
+build_error_v2.txt
+build_error_v3.txt
+build_error_v4.txt
+build_error_v5.txt
+build_error_v6.txt
+build_error_v10.txt
+build_error_v11.txt
+build_error_v7.txt
+build_error_v8.txt
+build_error_v9.txt
