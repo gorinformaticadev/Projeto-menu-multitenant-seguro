@@ -1,11 +1,12 @@
 import ModeloClient from "./ModeloClient";
 
 interface PageProps {
-  params: {
+  params: Promise<{
     locale: string;
-  };
+  }>;
 }
 
-export default function ModeloPage({ params }: PageProps) {
-  return <ModeloClient locale={params.locale} />;
+export default async function ModeloPage({ params }: PageProps) {
+  const { locale } = await params;
+  return <ModeloClient locale={locale} />;
 }
