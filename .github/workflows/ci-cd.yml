@@ -19,7 +19,7 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'pull_request'
 
     env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
     services:
       postgres:
