@@ -1,44 +1,23 @@
-# =========================
-# Builder
-# =========================
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copia apenas o necessário para instalar deps
-COPY package.json ./
+# Copia arquivos do monorepo
+COPY package.json package-lock.json ./
+COPY apps/frontend ./apps/frontend
 
-# Sem lockfile → npm install
-RUN npm install
+# Instala dependências do workspace
+RUN npm install --workspaces --include-workspace-root
 
-# Copia o restante do frontend
-COPY . .
-
-# Build do Next.js
+WORKDIR /app/apps/frontend
 RUN npm run build
 
-# =========================
-# Runtime
-# =========================
-FROM node:20-alpine AS runtime
-
-# Usuário não-root
-RUN addgroup -S nodejs && adduser -S nextjs -G nodejs
-
+FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Copia standalone output
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder /app/apps/frontend/.next ./.next
+COPY --from=builder /app/apps/frontend/public ./public
+COPY --from=builder /app/apps/frontend/package.json ./package.json
 
-# Configurações
-ENV NODE_ENV=production
-ENV PORT=5000
-ENV HOSTNAME=0.0.0.0
-
-USER nextjs
-
-EXPOSE 5000
-
-CMD ["node", "server.js"]
+EXPOSE 4000
+CMD ["npm", "start"]
