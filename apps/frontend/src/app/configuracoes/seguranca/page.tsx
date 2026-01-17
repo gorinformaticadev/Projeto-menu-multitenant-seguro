@@ -102,7 +102,7 @@ export default function SecurityConfigPage() {
 
     try {
       setSaving(true);
-      
+
       // Enviar apenas os campos permitidos (sem id, updatedAt, updatedBy)
       const updateData = {
         loginMaxAttempts: config.loginMaxAttempts,
@@ -121,7 +121,7 @@ export default function SecurityConfigPage() {
         twoFactorRequired: config.twoFactorRequired,
         sessionTimeoutMinutes: config.sessionTimeoutMinutes,
       };
-      
+
       const response = await api.put("/security-config", updateData);
 
       // Atualizar cache local
@@ -197,370 +197,370 @@ export default function SecurityConfigPage() {
       {/* Aviso */}
       <Card className="border-yellow-200 bg-yellow-50">
         <CardContent className="pt-6">
-            <div className="flex gap-3">
-              <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-yellow-800">
-                <p className="font-medium mb-1">Atenção!</p>
-                <p>
-                  Alterações nas configurações de segurança afetam todo o sistema.
-                  Certifique-se de entender o impacto antes de salvar.
-                </p>
-              </div>
+          <div className="flex gap-3">
+            <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-yellow-800">
+              <p className="font-medium mb-1">Atenção!</p>
+              <p>
+                Alterações nas configurações de segurança afetam todo o sistema.
+                Certifique-se de entender o impacto antes de salvar.
+              </p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
 
 
 
-        {/* Controle de Login */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Controle de Tentativas de Login</CardTitle>
-            <CardDescription>
-              Configure o bloqueio automático de contas após múltiplas tentativas de login falhas
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <Label htmlFor="loginMaxAttempts">
-                  Máximo de Tentativas de Login
-                </Label>
-                <Input
-                  id="loginMaxAttempts"
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={config.loginMaxAttempts}
-                  onChange={(e) =>
-                    updateConfig("loginMaxAttempts", parseInt(e.target.value))
-                  }
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Número de tentativas antes de bloquear a conta (1-100)
-                </p>
-              </div>
-
-              <div>
-                <Label htmlFor="loginLockDurationMinutes">
-                  Duração do Bloqueio (minutos)
-                </Label>
-                <Input
-                  id="loginLockDurationMinutes"
-                  type="number"
-                  min="5"
-                  max="1440"
-                  value={config.loginLockDurationMinutes}
-                  onChange={(e) =>
-                    updateConfig("loginLockDurationMinutes", parseInt(e.target.value))
-                  }
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Tempo que a conta ficará bloqueada (5-1440 minutos / até 24h)
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Rate Limiting Global */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Rate Limiting Global</CardTitle>
-            <CardDescription>
-              Controle o número de requisições permitidas para prevenir ataques DDoS
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <Label htmlFor="globalMaxRequests">
-                  Requisições Globais (por período)
-                </Label>
-                <Input
-                  id="globalMaxRequests"
-                  type="number"
-                  min="10"
-                  max="1000"
-                  value={config.globalMaxRequests}
-                  onChange={(e) =>
-                    updateConfig("globalMaxRequests", parseInt(e.target.value))
-                  }
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Número máximo de requisições globais (10-1000)
-                </p>
-              </div>
-
-              <div>
-                <Label htmlFor="globalWindowMinutes">
-                  Janela Global (minutos)
-                </Label>
-                <Input
-                  id="globalWindowMinutes"
-                  type="number"
-                  min="1"
-                  max="60"
-                  value={config.globalWindowMinutes}
-                  onChange={(e) =>
-                    updateConfig("globalWindowMinutes", parseInt(e.target.value))
-                  }
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Período para contagem de requisições globais (1-60 minutos)
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Política de Senha */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Política de Senha</CardTitle>
-            <CardDescription>
-              Defina os requisitos mínimos para senhas de usuários
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      {/* Controle de Login */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Controle de Tentativas de Login</CardTitle>
+          <CardDescription>
+            Configure o bloqueio automático de contas após múltiplas tentativas de login falhas
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <Label htmlFor="passwordMinLength">
-                Tamanho Mínimo da Senha
+              <Label htmlFor="loginMaxAttempts">
+                Máximo de Tentativas de Login
               </Label>
               <Input
-                id="passwordMinLength"
+                id="loginMaxAttempts"
                 type="number"
-                min="6"
-                max="32"
-                value={config.passwordMinLength}
+                min="1"
+                max="100"
+                value={config.loginMaxAttempts}
                 onChange={(e) =>
-                  updateConfig("passwordMinLength", parseInt(e.target.value))
+                  updateConfig("loginMaxAttempts", parseInt(e.target.value))
                 }
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Número mínimo de caracteres (6-32)
+                Número de tentativas antes de bloquear a conta (1-100)
               </p>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="passwordRequireUppercase">
-                    Exigir Letra Maiúscula
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Senha deve conter pelo menos uma letra maiúscula
-                  </p>
-                </div>
-                <Switch
-                  id="passwordRequireUppercase"
-                  checked={config.passwordRequireUppercase}
-                  onCheckedChange={(checked) =>
-                    updateConfig("passwordRequireUppercase", checked)
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="passwordRequireLowercase">
-                    Exigir Letra Minúscula
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Senha deve conter pelo menos uma letra minúscula
-                  </p>
-                </div>
-                <Switch
-                  id="passwordRequireLowercase"
-                  checked={config.passwordRequireLowercase}
-                  onCheckedChange={(checked) =>
-                    updateConfig("passwordRequireLowercase", checked)
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="passwordRequireNumbers">
-                    Exigir Números
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Senha deve conter pelo menos um número
-                  </p>
-                </div>
-                <Switch
-                  id="passwordRequireNumbers"
-                  checked={config.passwordRequireNumbers}
-                  onCheckedChange={(checked) =>
-                    updateConfig("passwordRequireNumbers", checked)
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="passwordRequireSpecial">
-                    Exigir Caractere Especial
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Senha deve conter pelo menos um caractere especial (!@#$%...)
-                  </p>
-                </div>
-                <Switch
-                  id="passwordRequireSpecial"
-                  checked={config.passwordRequireSpecial}
-                  onCheckedChange={(checked) =>
-                    updateConfig("passwordRequireSpecial", checked)
-                  }
-                />
-              </div>
+            <div>
+              <Label htmlFor="loginLockDurationMinutes">
+                Duração do Bloqueio (minutos)
+              </Label>
+              <Input
+                id="loginLockDurationMinutes"
+                type="number"
+                min="5"
+                max="1440"
+                value={config.loginLockDurationMinutes}
+                onChange={(e) =>
+                  updateConfig("loginLockDurationMinutes", parseInt(e.target.value))
+                }
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Tempo que a conta ficará bloqueada (5-1440 minutos / até 24h)
+              </p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Autenticação de Dois Fatores */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Autenticação de Dois Fatores (2FA)</CardTitle>
-            <CardDescription>
-              Configure se o 2FA está disponível para usuários e se deve ser obrigatório
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="twoFactorEnabled">
-                    Habilitar 2FA Globalmente
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Permite que usuários configurem autenticação de dois fatores em suas contas
-                  </p>
-                </div>
-                <Switch
-                  id="twoFactorEnabled"
-                  checked={config.twoFactorEnabled}
-                  onCheckedChange={(checked) =>
-                    updateConfig("twoFactorEnabled", checked)
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="twoFactorRequired">
-                    Tornar 2FA Obrigatório
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Todos os usuários devem configurar 2FA para acessar o sistema
-                  </p>
-                </div>
-                <Switch
-                  id="twoFactorRequired"
-                  checked={config.twoFactorRequired}
-                  disabled={!config.twoFactorEnabled}
-                  onCheckedChange={(checked) =>
-                    updateConfig("twoFactorRequired", checked)
-                  }
-                />
-              </div>
-
-              {!config.twoFactorEnabled && (
-                <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                  <div className="text-xs text-yellow-800">
-                    <p className="font-medium mb-1">2FA Desabilitado</p>
-                    <p>
-                      Quando o 2FA estiver desabilitado, os usuários não poderão configurar
-                      autenticação de dois fatores em suas contas.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {config.twoFactorEnabled && config.twoFactorRequired && (
-                <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <Shield className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <div className="text-xs text-blue-800">
-                    <p className="font-medium mb-1">2FA Obrigatório</p>
-                    <p>
-                      Todos os usuários serão obrigados a configurar 2FA no próximo login.
-                      Usuários existentes sem 2FA configurado serão redirecionados para configuração.
-                    </p>
-                  </div>
-                </div>
-              )}
+      {/* Rate Limiting Global */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Rate Limiting Global</CardTitle>
+          <CardDescription>
+            Controle o número de requisições permitidas para prevenir ataques DDoS
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label htmlFor="globalMaxRequests">
+                Requisições Globais (por período)
+              </Label>
+              <Input
+                id="globalMaxRequests"
+                type="number"
+                min="10"
+                max="1000"
+                value={config.globalMaxRequests}
+                onChange={(e) =>
+                  updateConfig("globalMaxRequests", parseInt(e.target.value))
+                }
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Número máximo de requisições globais (10-1000)
+              </p>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* JWT e Sessão */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Tokens e Sessão</CardTitle>
-            <CardDescription>
-              Configure o tempo de expiração de tokens e logout automático por inatividade
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label htmlFor="globalWindowMinutes">
+                Janela Global (minutos)
+              </Label>
+              <Input
+                id="globalWindowMinutes"
+                type="number"
+                min="1"
+                max="60"
+                value={config.globalWindowMinutes}
+                onChange={(e) =>
+                  updateConfig("globalWindowMinutes", parseInt(e.target.value))
+                }
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Período para contagem de requisições globais (1-60 minutos)
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Política de Senha */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Política de Senha</CardTitle>
+          <CardDescription>
+            Defina os requisitos mínimos para senhas de usuários
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="passwordMinLength">
+              Tamanho Mínimo da Senha
+            </Label>
+            <Input
+              id="passwordMinLength"
+              type="number"
+              min="6"
+              max="32"
+              value={config.passwordMinLength}
+              onChange={(e) =>
+                updateConfig("passwordMinLength", parseInt(e.target.value))
+              }
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Número mínimo de caracteres (6-32)
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="accessTokenExpiresIn">
-                  Expiração do Access Token
+                <Label htmlFor="passwordRequireUppercase">
+                  Exigir Letra Maiúscula
                 </Label>
-                <Input
-                  id="accessTokenExpiresIn"
-                  type="text"
-                  placeholder="15m, 1h, 1d"
-                  value={config.accessTokenExpiresIn}
-                  onChange={(e) =>
-                    updateConfig("accessTokenExpiresIn", e.target.value)
-                  }
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Formato: 15m (minutos), 1h (horas), 1d (dias)
+                <p className="text-xs text-muted-foreground">
+                  Senha deve conter pelo menos uma letra maiúscula
                 </p>
               </div>
-
-              <div>
-                <Label htmlFor="refreshTokenExpiresIn">
-                  Expiração do Refresh Token
-                </Label>
-                <Input
-                  id="refreshTokenExpiresIn"
-                  type="text"
-                  placeholder="7d, 30d"
-                  value={config.refreshTokenExpiresIn}
-                  onChange={(e) =>
-                    updateConfig("refreshTokenExpiresIn", e.target.value)
-                  }
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Formato: 7d (dias), 30d (dias)
-                </p>
-              </div>
-
-              <div>
-                <Label htmlFor="sessionTimeoutMinutes">
-                  Logout por Inatividade (minutos)
-                </Label>
-                <Input
-                  id="sessionTimeoutMinutes"
-                  type="number"
-                  min="5"
-                  max="1440"
-                  value={config.sessionTimeoutMinutes}
-                  onChange={(e) =>
-                    updateConfig("sessionTimeoutMinutes", parseInt(e.target.value))
-                  }
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Tempo de inatividade antes de deslogar automaticamente (5-1440 minutos / até 24h)
-                </p>
-              </div>
+              <Switch
+                id="passwordRequireUppercase"
+                checked={config.passwordRequireUppercase}
+                onCheckedChange={(checked: boolean) =>
+                  updateConfig("passwordRequireUppercase", checked)
+                }
+              />
             </div>
-          </CardContent>
-        </Card>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="passwordRequireLowercase">
+                  Exigir Letra Minúscula
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Senha deve conter pelo menos uma letra minúscula
+                </p>
+              </div>
+              <Switch
+                id="passwordRequireLowercase"
+                checked={config.passwordRequireLowercase}
+                onCheckedChange={(checked: boolean) =>
+                  updateConfig("passwordRequireLowercase", checked)
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="passwordRequireNumbers">
+                  Exigir Números
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Senha deve conter pelo menos um número
+                </p>
+              </div>
+              <Switch
+                id="passwordRequireNumbers"
+                checked={config.passwordRequireNumbers}
+                onCheckedChange={(checked: boolean) =>
+                  updateConfig("passwordRequireNumbers", checked)
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="passwordRequireSpecial">
+                  Exigir Caractere Especial
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Senha deve conter pelo menos um caractere especial (!@#$%...)
+                </p>
+              </div>
+              <Switch
+                id="passwordRequireSpecial"
+                checked={config.passwordRequireSpecial}
+                onCheckedChange={(checked: boolean) =>
+                  updateConfig("passwordRequireSpecial", checked)
+                }
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Autenticação de Dois Fatores */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Autenticação de Dois Fatores (2FA)</CardTitle>
+          <CardDescription>
+            Configure se o 2FA está disponível para usuários e se deve ser obrigatório
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="twoFactorEnabled">
+                  Habilitar 2FA Globalmente
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Permite que usuários configurem autenticação de dois fatores em suas contas
+                </p>
+              </div>
+              <Switch
+                id="twoFactorEnabled"
+                checked={config.twoFactorEnabled}
+                onCheckedChange={(checked: boolean) =>
+                  updateConfig("twoFactorEnabled", checked)
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="twoFactorRequired">
+                  Tornar 2FA Obrigatório
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Todos os usuários devem configurar 2FA para acessar o sistema
+                </p>
+              </div>
+              <Switch
+                id="twoFactorRequired"
+                checked={config.twoFactorRequired}
+                disabled={!config.twoFactorEnabled}
+                onCheckedChange={(checked: boolean) =>
+                  updateConfig("twoFactorRequired", checked)
+                }
+              />
+            </div>
+
+            {!config.twoFactorEnabled && (
+              <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-yellow-800">
+                  <p className="font-medium mb-1">2FA Desabilitado</p>
+                  <p>
+                    Quando o 2FA estiver desabilitado, os usuários não poderão configurar
+                    autenticação de dois fatores em suas contas.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {config.twoFactorEnabled && config.twoFactorRequired && (
+              <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <Shield className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-blue-800">
+                  <p className="font-medium mb-1">2FA Obrigatório</p>
+                  <p>
+                    Todos os usuários serão obrigados a configurar 2FA no próximo login.
+                    Usuários existentes sem 2FA configurado serão redirecionados para configuração.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* JWT e Sessão */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Tokens e Sessão</CardTitle>
+          <CardDescription>
+            Configure o tempo de expiração de tokens e logout automático por inatividade
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label htmlFor="accessTokenExpiresIn">
+                Expiração do Access Token
+              </Label>
+              <Input
+                id="accessTokenExpiresIn"
+                type="text"
+                placeholder="15m, 1h, 1d"
+                value={config.accessTokenExpiresIn}
+                onChange={(e) =>
+                  updateConfig("accessTokenExpiresIn", e.target.value)
+                }
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Formato: 15m (minutos), 1h (horas), 1d (dias)
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="refreshTokenExpiresIn">
+                Expiração do Refresh Token
+              </Label>
+              <Input
+                id="refreshTokenExpiresIn"
+                type="text"
+                placeholder="7d, 30d"
+                value={config.refreshTokenExpiresIn}
+                onChange={(e) =>
+                  updateConfig("refreshTokenExpiresIn", e.target.value)
+                }
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Formato: 7d (dias), 30d (dias)
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="sessionTimeoutMinutes">
+                Logout por Inatividade (minutos)
+              </Label>
+              <Input
+                id="sessionTimeoutMinutes"
+                type="number"
+                min="5"
+                max="1440"
+                value={config.sessionTimeoutMinutes}
+                onChange={(e) =>
+                  updateConfig("sessionTimeoutMinutes", parseInt(e.target.value))
+                }
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Tempo de inatividade antes de deslogar automaticamente (5-1440 minutos / até 24h)
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Configurações de Email */}
       <EmailConfigSection />
