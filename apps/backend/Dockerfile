@@ -2,10 +2,6 @@
 # Base
 # =========================
 FROM node:20-alpine AS base
-
-# Install system dependencies for Prisma
-RUN apk add --no-cache openssl python3 make g++ curl
-
 WORKDIR /app
 
 # =========================
@@ -14,7 +10,7 @@ WORKDIR /app
 FROM base AS builder
 
 COPY package*.json ./
-RUN npm ci
+RUN npm install --no-audit --no-fund
 
 COPY . .
 
