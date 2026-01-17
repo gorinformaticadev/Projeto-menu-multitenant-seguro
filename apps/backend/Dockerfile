@@ -9,11 +9,15 @@ WORKDIR /app
 # =========================
 FROM base AS builder
 
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
+
 COPY package*.json ./
 RUN npm install --legacy-peer-deps --no-audit --no-fund
 
 COPY . .
 
+RUN npx prisma generate
 RUN npm run build
 
 # =========================
