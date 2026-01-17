@@ -9,8 +9,8 @@ WORKDIR /app
 # =========================
 FROM base AS builder
 
-ARG DATABASE_URL
-ENV DATABASE_URL=$DATABASE_URL
+# Set dummy DATABASE_URL for Prisma generate to work
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 
 COPY package*.json ./
 RUN npm install --legacy-peer-deps --no-audit --no-fund
