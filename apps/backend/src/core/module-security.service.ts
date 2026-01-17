@@ -1,10 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
 import { Prisma, PrismaClient } from '@prisma/client';
-import {
-    PrismaClientKnownRequestError,
-    PrismaClientValidationError
-} from '@prisma/client/runtime/library';
 
 /**
  * Serviço de Segurança para Módulos
@@ -183,7 +179,7 @@ export class ModuleSecurityService {
 
         } catch (error) {
             // Tratamento robusto de erros de schema
-            if (error instanceof PrismaClientKnownRequestError) {
+            if (error instanceof Prisma.PrismaClientKnownRequestError) {
                 // P2010: Erro de query SQL (coluna inexistente, etc)
                 // P2021: Tabela não existe
                 if (error.code === 'P2010' || error.code === 'P2021') {
@@ -198,7 +194,7 @@ export class ModuleSecurityService {
                         `❌ Prisma error listing modules for tenant ${tenantId} (${error.code}): ${error.message}`
                     );
                 }
-            } else if (error instanceof PrismaClientValidationError) {
+            } else if (error instanceof Prisma.PrismaClientValidationError) {
                 // Erro de validação do Prisma (campo inexistente no modelo, etc)
                 this.logger.error(
                     `❌ Validation error listing modules for tenant ${tenantId}: ${error.message}`
