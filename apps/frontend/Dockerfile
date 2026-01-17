@@ -5,43 +5,40 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copiar apenas os arquivos do app frontend
-COPY package.json package-lock.json ./
+# Copia apenas o necessário para instalar deps
+COPY package.json ./
 
-# Instalar dependências com lockfile
-RUN npm ci
+# Sem lockfile → npm install
+RUN npm install
 
-# Copiar código-fonte
+# Copia o restante do frontend
 COPY . .
 
-# Build Next.js (standalone)
+# Build do Next.js
 RUN npm run build
 
 # =========================
-# Production
+# Runtime
 # =========================
-FROM node:20-alpine AS production
+FROM node:20-alpine AS runtime
 
-# Criar usuário não-root
+# Usuário não-root
 RUN addgroup -S nodejs && adduser -S nextjs -G nodejs
 
 WORKDIR /app
 
-# Copiar build standalone
+# Copia standalone output
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Variáveis de ambiente
+# Configurações
 ENV NODE_ENV=production
 ENV PORT=5000
 ENV HOSTNAME=0.0.0.0
 
-# Usuário não-root
 USER nextjs
 
-# Expor porta correta
 EXPOSE 5000
 
-# Iniciar Next.js
 CMD ["node", "server.js"]
