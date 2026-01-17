@@ -14,7 +14,6 @@ RUN npm install --legacy-peer-deps --no-audit --no-fund
 
 COPY . .
 
-RUN npx prisma generate
 RUN npm run build
 
 # =========================
@@ -37,8 +36,8 @@ ENV NODE_ENV=production
 
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 3000
 
-CMD ["node", "dist/main.js"]
+CMD ["sh", "-c", "npx prisma generate && npx prisma migrate deploy && node dist/main.js"]
