@@ -15,7 +15,7 @@ export default nextConfig.map(c => {
             }
         };
     }
-    if (c.name === 'next' || (c.plugins && c.plugins['@next/next'])) {
+    if (c.name === 'next' || (c.plugins && (c.plugins['@next/next'] || c.plugins['react-hooks']))) {
         return {
             ...c,
             rules: {
@@ -23,6 +23,11 @@ export default nextConfig.map(c => {
                 "react/no-unescaped-entities": "warn",
                 "@next/next/no-assign-module-variable": "warn",
                 "@next/next/no-img-element": "warn",
+                "react-hooks/set-state-in-effect": "warn",
+                "react-hooks/immutability": "warn",
+                "react-hooks/exhaustive-deps": "warn",
+                "react-hooks/purity": "warn",
+                "react-hooks/static-components": "warn",
             }
         };
     }
