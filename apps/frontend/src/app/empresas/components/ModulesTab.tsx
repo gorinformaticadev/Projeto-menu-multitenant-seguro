@@ -190,7 +190,7 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
                         <Switch
                           checked={isEnabled}
                           disabled={!canToggle}
-                          onCheckedChange={(checked) => {
+                          onCheckedChange={(checked: boolean) => {
                             handleToggleModule(module.slug, isEnabled);
                           }}
                         />

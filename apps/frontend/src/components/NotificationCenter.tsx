@@ -207,7 +207,7 @@ export function NotificationCenter() {
                             <Checkbox
                                 id="select-all"
                                 checked={isAllSelected}
-                                onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                                onCheckedChange={(checked: boolean) => handleSelectAll(checked as boolean)}
                             />
                             <label htmlFor="select-all" className="text-sm font-medium text-gray-700 cursor-pointer">
                                 Todos
@@ -325,7 +325,7 @@ export function NotificationCenter() {
                                     <div className="pt-1">
                                         <Checkbox
                                             checked={isSelected}
-                                            onCheckedChange={(checked) => handleSelect(notification.id, checked as boolean)}
+                                            onCheckedChange={(checked: boolean) => handleSelect(notification.id, checked as boolean)}
                                         />
                                     </div>
 

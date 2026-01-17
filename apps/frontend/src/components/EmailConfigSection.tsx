@@ -62,23 +62,23 @@ export default function EmailConfigSection() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        
+
         // Get predefined providers
         const providersRes = await api.get("/email-config/providers");
         setProviders(providersRes.data);
-        
+
         // Get all configs
         const configsRes = await api.get("/email-config");
         setConfigs(configsRes.data);
-        
+
         // Get active config
         const activeRes = await api.get("/email-config/active");
         setActiveConfig(activeRes.data);
-        
+
         // Get SMTP credentials from security config
         const credentialsRes = await api.get("/email-config/smtp-credentials");
         setSecurityConfig(credentialsRes.data);
-        
+
         // If there's an active config, populate the form
         if (activeRes.data) {
           setFormData({
@@ -115,12 +115,12 @@ export default function EmailConfigSection() {
   // Handle provider selection
   const handleProviderSelect = (providerName: string) => {
     setSelectedProvider(providerName);
-    
+
     // If "custom" is selected, don't prefill the form
     if (providerName === "custom") {
       return;
     }
-    
+
     const provider = providers.find(p => p.providerName === providerName);
     if (provider) {
       setFormData({
@@ -145,7 +145,7 @@ export default function EmailConfigSection() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      
+
       // Save SMTP credentials in security config
       if (formData.smtpUser || formData.smtpPass) {
         await api.put("/security-config", {
@@ -153,7 +153,7 @@ export default function EmailConfigSection() {
           smtpPassword: formData.smtpPass
         });
       }
-      
+
       // Prepare data for saving email configuration (without credentials for security)
       const saveData = {
         providerName: selectedProvider || "Custom",
@@ -162,15 +162,15 @@ export default function EmailConfigSection() {
         encryption: formData.encryption,
         authMethod: formData.authMethod,
       };
-      
+
       // Create new configuration
       const response = await api.post("/email-config", saveData);
-      
+
       // Update local state
       const newConfigs = [...configs, response.data];
       setConfigs(newConfigs);
       setActiveConfig(response.data);
-      
+
       toast({
         title: "Configuração salva",
         description: "As configurações de email foram salvas com sucesso",
@@ -213,14 +213,14 @@ export default function EmailConfigSection() {
 
     try {
       setTesting(true);
-      
+
       // Send test email with credentials
-      await api.post("/email-config/test", { 
+      await api.post("/email-config/test", {
         email: testEmail,
         smtpUser: formData.smtpUser,
         smtpPass: formData.smtpPass
       });
-      
+
       toast({
         title: "Email de teste enviado",
         description: `Email de teste enviado com sucesso para ${testEmail}`,
@@ -267,7 +267,7 @@ export default function EmailConfigSection() {
           Configurações de Email
         </CardTitle>
         <CardDescription>
-          Configure o servidor de email padrão da plataforma. 
+          Configure o servidor de email padrão da plataforma.
           <strong>Apenas uma configuração de email pode estar ativa por vez.</strong>
         </CardDescription>
       </CardHeader>
@@ -317,7 +317,7 @@ export default function EmailConfigSection() {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground mt-1">
-              <strong>Gmail, Hotmail/Outlook e Titan</strong> já estão pré-configurados. 
+              <strong>Gmail, Hotmail/Outlook e Titan</strong> já estão pré-configurados.
               Selecione um provedor e informe apenas suas credenciais de acesso.
             </p>
           </div>
@@ -355,9 +355,9 @@ export default function EmailConfigSection() {
               <Label htmlFor="encryption">
                 Tipo de Criptografia
               </Label>
-              <Select 
-                value={formData.encryption} 
-                onValueChange={(value) => handleInputChange("encryption", value)}
+              <Select
+                value={formData.encryption}
+                onValueChange={(value: string) => handleInputChange("encryption", value)}
               >
                 <SelectTrigger id="encryption">
                   <SelectValue placeholder="Selecione..." />
@@ -410,7 +410,7 @@ export default function EmailConfigSection() {
               />
             </div>
           </div>
-          
+
 
         </div>
 
@@ -419,7 +419,7 @@ export default function EmailConfigSection() {
             <Play className="h-4 w-4 mr-2" />
             Testar Conexão
           </Button>
-          
+
           <Button onClick={handleSave} disabled={saving}>
             <Save className="h-4 w-4 mr-2" />
             {saving ? "Salvando..." : "Salvar Configuração"}
