@@ -242,12 +242,12 @@ async function bootstrap() {
   const uploadsPath = join(process.cwd(), 'uploads');
   app.useStaticAssets(uploadsPath, {
     prefix: '/uploads',
-    setHeaders: (res, _stat) => {
+    setHeaders: (res, filePath) => {
       // Headers de segurança para arquivos estáticos
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
       // Detecta se é um arquivo de logo
-      const isLogoFile = path.includes('logos/');
+      const isLogoFile = filePath.includes('logos/');
 
       if (isLogoFile) {
         // CORS permissivo para logos (recursos públicos visuais)

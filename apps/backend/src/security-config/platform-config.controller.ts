@@ -1,4 +1,4 @@
- import { Controller, Get, Put, Body } from '@nestjs/common';
+ import { Controller, Get, Put, Body, UseGuards, Req } from '@nestjs/common';
 
 import { SkipThrottle } from '@nestjs/throttler';
 import { PlatformConfigService } from './platform-config.service';
@@ -51,7 +51,7 @@ export class PlatformConfigController {
   @Roles(Role.SUPER_ADMIN)
   async updatePlatformConfig(
     @Body() dto: UpdatePlatformConfigDto,
-    @Request() req: any,
+    @Req() req: any,
   ) {
     return this.platformConfigService.updatePlatformConfig(
       dto.platformName,

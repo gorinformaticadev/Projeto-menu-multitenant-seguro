@@ -1,4 +1,4 @@
- import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
+ import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { EmailConfigService } from './email-config.service';
 import { CreateEmailConfigDto, UpdateEmailConfigDto } from './dto/email-config.dto';
@@ -76,7 +76,7 @@ export class EmailConfigController {
   @Roles(Role.SUPER_ADMIN)
   async createConfig(
     @Body() dto: CreateEmailConfigDto,
-    @Request() req: any,
+    @Req() req: any,
   ) {
     return this.emailConfigService.createConfig(dto, req.user.id);
   }
@@ -92,7 +92,7 @@ export class EmailConfigController {
   async updateConfig(
     @Param('id') id: string,
     @Body() dto: UpdateEmailConfigDto,
-    @Request() req: any,
+    @Req() req: any,
   ) {
     return this.emailConfigService.updateConfig(id, dto, req.user.id);
   }
@@ -107,7 +107,7 @@ export class EmailConfigController {
   @Roles(Role.SUPER_ADMIN)
   async activateConfig(
     @Param('id') id: string,
-    @Request() req: any,
+    @Req() req: any,
   ) {
     return this.emailConfigService.activateConfig(id, req.user.id);
   }
@@ -136,7 +136,7 @@ export class EmailConfigController {
     @Body('email') email: string,
     @Body('smtpUser') smtpUser: string,
     @Body('smtpPass') smtpPass: string,
-    @Request() req: any,
+    @Req() req: any,
   ) {
     return this.emailConfigService.testConfig(email, smtpUser, smtpPass, req.user, this.emailService);
   }

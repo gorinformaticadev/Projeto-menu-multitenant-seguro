@@ -6,12 +6,21 @@ import { PrismaService } from '@core/prisma/prisma.service';
 import { getPlatformName, getPlatformEmail } from '@core/common/constants/platform.constants';
 import { SecurityConfigService } from '@core/security-config/security-config.service';
 
+interface EmailConfig {
+  smtpHost: string;
+  smtpPort: number;
+  encryption: string;
+  smtpUsername?: string;
+  smtpPassword?: string;
+  authMethod?: string;
+}
+
 @Injectable()
 export class EmailService implements OnModuleInit {
   private transporter: Transporter;
   private readonly logger = new Logger(EmailService.name);
   private isEnabled: boolean;
-  private dbConfig: unknown = null;
+  private dbConfig: EmailConfig | null = null;
 
 
   constructor(
@@ -408,7 +417,7 @@ export class EmailService implements OnModuleInit {
       await tempTransporter.verify();
       this.logger.log('âœ… ConexÃ£o SMTP verificada com sucesso');
 
-      const html = await this.getTestEmailTemplate(name, _config);
+      const html = await this.getTestEmailTemplate(name, config);
 
       this.logger.log('Enviando email de teste...');
       const platformName = await getPlatformName();

@@ -199,7 +199,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
         return;
       }
 
-      this.connectedClients.set(client.id, _client);
+      this.connectedClients.set(client.id, client);
 
       // Entrar nas salas apropriadas
       await this.joinRooms(client);

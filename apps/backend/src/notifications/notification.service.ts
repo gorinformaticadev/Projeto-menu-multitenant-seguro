@@ -242,8 +242,7 @@ export class NotificationService {
       where.tenantId = { in: dto.tenantIds };
     }
 
-    // 3. Buscar Usuários Alvo
-    // @ts-expect-error - Acessando user via prisma client genérico
+    // Buscar Usuários Alvo
     const users = await this.prisma.user.findMany({
       where,
       select: { id: true, tenantId: true }

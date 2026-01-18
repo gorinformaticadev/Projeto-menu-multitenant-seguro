@@ -128,7 +128,7 @@ export class NotificationsController {
   @Post('batch-delete')
   async deleteMany(@Body() body: { ids: string[] }, @Request() req) {
     try {
-      // let idsToDelete = body.ids;
+      let idsToDelete = body.ids;
 
       // Sanitização robusta para garantir array puro de strings
       if (Array.isArray(idsToDelete)) {

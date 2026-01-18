@@ -36,7 +36,7 @@ export class SecurityConfigService {
     const config = await this.getConfig();
     
     // Criptografar credenciais SMTP se fornecidas
-    const updateData: unknown = { ...dto, updatedBy: userId };
+    const updateData: any = { ...dto, updatedBy: userId };
     
     if (dto.smtpPassword) {
       updateData.smtpPassword = encryptSensitiveData(dto.smtpPassword);

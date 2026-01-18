@@ -66,7 +66,7 @@ export class PlatformConfigService {
       // Get or create security config
       let securityConfig = await this.prisma.securityConfig.findFirst();
       
-      const updateData: unknown = {
+      const updateData: any = {
         updatedBy: userId,
       };
 

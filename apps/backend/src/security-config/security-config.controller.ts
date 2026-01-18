@@ -1,4 +1,4 @@
- import { Controller, Get, Put, Body } from '@nestjs/common';
+ import { Controller, Get, Put, Body, UseGuards, Req } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { SecurityConfigService } from './security-config.service';
 import { UpdateSecurityConfigDto } from './dto/update-security-config.dto';
@@ -38,7 +38,7 @@ export class SecurityConfigController {
   @Roles(Role.SUPER_ADMIN)
   async updateConfig(
     @Body() dto: UpdateSecurityConfigDto,
-    @Request() req: any,
+    @Req() req: any,
   ) {
     return this.securityConfigService.updateConfig(dto, req.user.id);
   }

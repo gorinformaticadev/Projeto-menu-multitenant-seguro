@@ -281,7 +281,7 @@ export class ModuleStructureValidator {
      * Valida que o módulo não existe ainda
      */
     static validateModuleNotExists(moduleName: string, modulesPath: string): void {
-        const _modulePath = path.join(modulesPath, _moduleName);
+        const modulePath = path.join(modulesPath, moduleName);
 
         if (fs.existsSync(modulePath)) {
             throw new BadRequestException(

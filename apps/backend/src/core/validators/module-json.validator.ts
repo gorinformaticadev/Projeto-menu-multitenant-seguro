@@ -30,6 +30,104 @@ export class ModuleJsonValidator {
             throw new BadRequestException('module.json inválido ou ausente');
         }
 
+        const json = moduleJson as Record<string, unknown>;
+
+        // Validações obrigatórias
+        if (typeof json.name !== 'string') {
+            throw new BadRequestException('Campo "name" é obrigatório e deve ser uma string');
+        }
+
+        if (typeof json.displayName !== 'string') {
+            throw new BadRequestException('Campo "displayName" é obrigatório e deve ser uma string');
+        }
+
+        if (typeof json.version !== 'string') {
+            throw new BadRequestException('Campo "version" é obrigatório e deve ser uma string');
+        }
+
+        // Validações opcionais
+        if (json.description !== undefined && typeof json.description !== 'string') {
+            throw new BadRequestException('Campo "description" deve ser uma string');
+        }
+
+        if (json.author !== undefined && typeof json.author !== 'string') {
+            throw new BadRequestException('Campo "author" deve ser uma string');
+        }
+
+        if (json.category !== undefined && typeof json.category !== 'string') {
+            throw new BadRequestException('Campo "category" deve ser uma string');
+        }
+
+        if (json.enabled !== undefined && typeof json.enabled !== 'boolean') {
+            throw new BadRequestException('Campo "enabled" deve ser um boolean');
+        }
+
+        // Validação de dependencies
+        if (json.dependencies !== undefined &&
+            json.dependencies !== null &&
+            !Array.isArray(json.dependencies)) {
+            throw new BadRequestException('Campo "dependencies" deve ser um array ou null');
+        }
+
+        if (json.dependencies && Array.isArray(json.dependencies)) {
+            for (let i = 0; i < json.dependencies.length; i++) {
+                const dep = json.dependencies[i];
+                if (typeof dep !== 'string') {
+                    throw new BadRequestException(`Dependência no índice ${i} deve ser uma string`);
+                }
+            }
+        }
+
+        // Validação de defaultConfig
+        if (json.defaultConfig !== undefined &&
+            json.defaultConfig !== null &&
+            typeof json.defaultConfig !== 'object') {
+            throw new BadRequestException('Campo "defaultConfig" deve ser um objeto ou null');
+        }
+
+        // Validação de menus
+        if (json.menus !== undefined &&
+            json.menus !== null &&
+            !Array.isArray(json.menus)) {
+            throw new BadRequestException('Campo "menus" deve ser um array ou null');
+        }
+
+        // Validações de formato
+        const nameRegex = /^[a-zA-Z0-9_-]+$/;
+        const versionRegex = /^\d+\.\d+\.\d+$/;
+
+        if (!nameRegex.test(json.name)) {
+            throw new BadRequestException('Campo "name" deve conter apenas letras, números, hífens e underscores');
+        }
+
+        // Validação de tamanho
+        if (json.name.length < 2 || json.name.length > 50) {
+            throw new BadRequestException('Campo "name" deve ter entre 2 e 50 caracteres');
+        }
+
+        // Validação de versão
+        if (!versionRegex.test(json.version)) {
+            throw new BadRequestException('Campo "version" deve seguir o formato semver (ex: 1.0.0)');
+        }
+
+        // Validação de displayName
+        if (json.displayName.length < 2 || json.displayName.length > 100) {
+            throw new BadRequestException('Campo "displayName" deve ter entre 2 e 100 caracteres');
+        }
+
+        // Validação final de dependencies
+        if (json.dependencies && Array.isArray(json.dependencies)) {
+            for (let i = 0; i < json.dependencies.length; i++) {
+                const depSlug = json.dependencies[i];
+                if (typeof depSlug !== 'string' || !nameRegex.test(depSlug)) {
+                    throw new BadRequestException(`Dependência "${depSlug}" deve seguir o formato de nome válido`);
+                }
+            }
+        }
+
+        return json as ModuleJson;
+        }
+
         // Validar campos obrigatórios
         this.validateRequiredFields(moduleJson);
 
