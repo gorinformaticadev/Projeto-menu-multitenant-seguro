@@ -30,7 +30,7 @@ PORT=3001
 ```
 
 ```bash
-# Gerar Prisma Client
+# Gerar Prisma Client 
 npm run prisma:generate
 
 # Criar banco de dados e executar migrations

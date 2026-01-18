@@ -1,46 +1,6 @@
 {
-  "name": "menu-multitenant",
-  "version": "0.5.2",
-  "description": "Sistema Multitenant Seguro desenvolvido pela GOR Informática",
-  "author": "GOR Informática <contato@gorinformatica.com.br>",
-  "license": "AGPL-3.0",
-  "homepage": "https://www.gorinformatica.com.br",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/gorinformatica/menu-multitenant.git"
-  },
   "private": true,
   "workspaces": [
-    "apps/*",
-    "packages/modules/*"
-  ],
-  "dependencies": {
-    "axios": "^1.13.2",
-    "node-fetch": "^3.3.2",
-    "react": "19.2.3",
-    "react-dom": "19.2.3"
-  },
-  "scripts": {
-    "versao": "git add . && git commit -m \"chore: Update\" || echo Commit existente. Prosseguindo... && npm run release && git push --follow-tags",
-    "commit": "npx cz",
-    "release": "standard-version"
-  },
-  "devDependencies": {
-    "@commitlint/cli": "^20.2.0",
-    "@commitlint/config-conventional": "^20.2.0",
-    "commitizen": "^4.3.1",
-    "cz-conventional-changelog": "^3.3.0",
-    "husky": "^9.1.7",
-    "standard-version": "^9.5.0"
-  },
-  "config": {
-    "commitizen": {
-      "path": "./node_modules/cz-conventional-changelog"
-    }
-  },
-  "main": "index.js",
-  "keywords": [],
-  "bugs": {
-    "url": "https://github.com/gorinformatica/menu-multitenant/issues"
-  }
+    "apps/*"
+  ]
 }

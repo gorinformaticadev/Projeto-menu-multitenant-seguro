@@ -167,21 +167,16 @@ model SecurityConfig {
   platformName               String?  @default("Sistema Multitenant")
   platformEmail              String?
   platformPhone              String?
-  
-  // Rate Limiting por ambiente
   rateLimitDevEnabled        Boolean  @default(true)
   rateLimitProdEnabled       Boolean  @default(true)
-  rateLimitDevRequests       Int      @default(1000)  // requests por minuto em DEV
-  rateLimitProdRequests      Int      @default(100)   // requests por minuto em PROD
-  rateLimitDevWindow         Int      @default(1)     // minutos
-  rateLimitProdWindow        Int      @default(1)     // minutos
-  
-  // Configurações de tokens e sessão
+  rateLimitDevRequests       Int      @default(1000)
+  rateLimitProdRequests      Int      @default(100)
+  rateLimitDevWindow         Int      @default(1)
+  rateLimitProdWindow        Int      @default(1)
   tokenCleanupEnabled        Boolean  @default(true)
   tokenCleanupIntervalHours  Int      @default(24)
   maxActiveSessionsPerUser   Int      @default(5)
   refreshTokenRotation       Boolean  @default(true)
-  
   updatedAt                  DateTime @updatedAt
   updatedBy                  String?
 
@@ -334,7 +329,7 @@ model Notification {
   tenantId  String?
   userId    String?
   context   String?
-  data      String    @default("{}")
+  data      Json      @default("{}")
   read      Boolean   @default(false)
   readAt    DateTime?
   createdAt DateTime  @default(now())
@@ -367,7 +362,7 @@ model SecureFile {
   lastAccessedAt DateTime?
   accessCount    Int       @default(0)
   deletedAt      DateTime?
-  metadata       String?
+  metadata       Json?
 
   @@index([tenantId])
   @@index([moduleName])
@@ -376,6 +371,22 @@ model SecureFile {
   @@index([tenantId, moduleName, documentType])
   @@index([deletedAt])
   @@map("secure_files")
+}
+
+model CronSchedule {
+  id            String   @id @default(uuid())
+  origem        String
+  modulo        String?
+  identificador String
+  descricao     String?
+  expressao     String
+  ativo         Boolean  @default(true)
+  editavel      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([modulo, identificador])
+  @@map("cron_schedules")
 }
 
 enum Role {
@@ -396,20 +407,4 @@ enum ModuleStatus {
 enum MigrationType {
   migration
   seed
-}
-
-model CronSchedule {
-  id            String   @id @default(uuid())
-  origem        String   // "core" | "modulo"
-  modulo        String?
-  identificador String
-  descricao     String?
-  expressao     String
-  ativo         Boolean  @default(true)
-  editavel      Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@unique([modulo, identificador])
-  @@map("cron_schedules")
 }

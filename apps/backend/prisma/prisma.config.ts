@@ -1,9 +1,8 @@
-import { defineConfig } from 'prisma/config'
+import { PrismaConfig } from "@prisma/adapter-node";
 
-export default defineConfig({
-    client: {
-        adapter: {
-            url: process.env.DATABASE_URL!,
-        },
+export default {
+    datasource: {
+        provider: "postgresql",
+        url: process.env.DATABASE_URL,
     },
-})
+} satisfies PrismaConfig;
