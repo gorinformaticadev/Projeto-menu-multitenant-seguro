@@ -1,40 +1,49 @@
-# =========================
-# Base
-# =========================
-FROM node:20-alpine AS base
+# Multi-stage build for Next.js 14 frontend with standalone output
+FROM node:20-alpine AS builder
+
 WORKDIR /app
 
-# =========================
-# Builder
-# =========================
-FROM base AS builder
+# Install system dependencies
+RUN apk add --no-cache libc6-compat
 
+# Copy package files
 COPY package*.json ./
-COPY apps/frontend/package*.json ./apps/frontend/
-RUN npm install --workspaces --include-workspace-root --frozen-lockfile
 
+# Install dependencies
+RUN npm ci --only=production=false
+
+# Copy source code
 COPY . .
-RUN npm run build --workspace=frontend
 
-# =========================
-# Runner
-# =========================
-FROM node:20-alpine AS runner
+# Build application with standalone output
+RUN npm run build
+
+# Production stage
+FROM node:20-alpine AS production
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nextjs -u 1001
+
 WORKDIR /app
 
-ENV NODE_ENV=production
+# Copy standalone build from builder stage
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-COPY --from=builder /app/apps/frontend/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/apps/frontend/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/apps/frontend/.next/static ./.next/static
-
+# Switch to non-root user
 USER nextjs
 
-EXPOSE 4000
+# Set production environment
+ENV NODE_ENV=production
 
-ENV PORT=4000
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3000/api/health || exit 1
 
+# Expose port
+EXPOSE 3000
+
+# Start application
 CMD ["node", "server.js"]

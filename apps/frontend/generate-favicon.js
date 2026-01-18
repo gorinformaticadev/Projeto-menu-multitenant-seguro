@@ -13,5 +13,4 @@ console.log('📁 Localização:', svgPath);
 console.log('');
 console.log('🎨 Para gerar favicon.ico, use uma das opções:');
 console.log('');
-console.log('1️⃣  Online (Recurso Externo)');
-console.log('2️⃣  Com Sharp: npm install sharp && node -e "require(\'sharp\')(\'public/favicon.svg\').toFile(\'public/favicon.ico\')"');
+console.log('1️⃣  Online (R
