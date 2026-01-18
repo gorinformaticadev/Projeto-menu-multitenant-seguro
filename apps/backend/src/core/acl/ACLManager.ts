@@ -3,7 +3,7 @@
  * Gerencia roles, permissões e verificações de acesso
  */
 
-import { User, Permission } from '../contracts/types';
+import { User, Permission, Role } from '../contracts/types';
 
 /**
  * Definição de Role com permissões
@@ -18,7 +18,7 @@ export interface RoleDefinition {
  * Gerenciador de ACL
  */
 export class ACLManager {
-  private roles: Map<stringDefinition> = new Map();
+  private roles: Map<string, RoleDefinition> = new Map();
   private permissions: Map<string, Permission> = new Map();
 
   constructor() {
@@ -31,10 +31,10 @@ export class ACLManager {
    */
   private initializeDefaultRoles(): void {
     // SUPER_ADMIN - acesso total
-    this.registerRole('SUPER_ADMIN', ['*'], 'Administrador do sistema com acesso total');
+    this.registerRole(Role.SUPER_ADMIN, ['*'], 'Administrador do sistema com acesso total');
 
     // ADMIN - administração de tenant
-    this.registerRole('ADMIN', [
+    this.registerRole(Role.ADMIN, [
       'users.view',
       'users.create',
       'users.edit',
@@ -44,14 +44,14 @@ export class ACLManager {
     ], 'Administrador do tenant');
 
     // USER - usuário padrão
-    this.registerRole('USER', [
+    this.registerRole(Role.USER, [
       'dashboard.view',
       'profile.view',
       'profile.edit',
     ], 'Usuário padrão');
 
     // CLIENT - cliente externo
-    this.registerRole('CLIENT', [
+    this.registerRole(Role.CLIENT, [
       'profile.view',
       'profile.edit',
     ], 'Cliente externo');
@@ -93,7 +93,7 @@ export class ACLManager {
    */
   public addPermissionsToRole(roleName: string, permissions: string[]): void {
     const role = this.roles.get(roleName);
-    
+
     if (!role) {
       throw new Error(`Role "${roleName}" não encontrada`);
     }
@@ -110,7 +110,7 @@ export class ACLManager {
    */
   public removePermissionsFromRole(roleName: string, permissions: string[]): void {
     const role = this.roles.get(roleName);
-    
+
     if (!role) {
       throw new Error(`Role "${roleName}" não encontrada`);
     }
@@ -294,16 +294,21 @@ export class ACLManager {
    */
   public debug(): void {
     this.roles.forEach((role, _name) => {
+      console.log(`Role: ${role.name}`);
       if (role.description) {
-      // Empty implementation
-    }
+        console.log(`  Description: ${role.description}`);
+      }
       console.log(`    Permissions: ${role.permissions.join(', ')}`);
     });
 
     this.permissions.forEach((permission, _name) => {
+      console.log(`Permission: ${permission.name}`);
+      if (permission.description) {
+        console.log(`  Description: ${permission.description}`);
+      }
       if (permission.module) {
-      // Empty implementation
-    }
+        console.log(`  Module: ${permission.module}`);
+      }
     });
   }
 }

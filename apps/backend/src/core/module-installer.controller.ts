@@ -27,9 +27,7 @@ import { memoryStorage } from 'multer';
 @Roles(Role.SUPER_ADMIN)
 export class ModuleInstallerController {
     // Controller refreshed
-    constructor(private readonly installer: ModuleInstallerService) {
-      // Empty implementation
-    }
+    constructor(private readonly installer: ModuleInstallerService) { }
 
     /**
      * GET /configuracoes/sistema/modulos
@@ -102,12 +100,8 @@ export class ModuleInstallerController {
                 console.log('Detalhes do buffer:', {
                     type: typeof file.buffer,
                     constructor: (file.buffer as any)?.constructor?.name,
-                    keys: object.keys(file.buffer || {
-      // Empty implementation
-    }).slice(0, 20),
-                    values: object.values(file.buffer || {
-      // Empty implementation
-    }).slice(0, 10)
+                    keys: Object.keys(file.buffer || {}).slice(0, 20),
+                    values: Object.values(file.buffer || {}).slice(0, 10)
                 });
                 throw new BadRequestException('Buffer inválido - não foi possível converter: ' + conversionError.message);
             }

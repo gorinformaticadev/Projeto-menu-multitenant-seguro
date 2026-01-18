@@ -1,4 +1,4 @@
- import { Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 
 export interface AuditLogData {
@@ -12,9 +12,7 @@ export interface AuditLogData {
 
 @Injectable()
 export class AuditService {
-  constructor(private prisma: PrismaService) {
-      // Empty implementation
-    }
+  constructor(private prisma: PrismaService) { }
 
   /**
    * Criar log de auditoria
@@ -33,7 +31,7 @@ export class AuditService {
   }
 
   /**
-   * Buscar logs com filtros e paginaÃ§Ã£o
+   * Buscar logs com filtros e paginação
    */
   async findAll(params: {
     page?: number;
@@ -48,9 +46,7 @@ export class AuditService {
     const limit = params.limit || 50;
     const skip = (page - 1) * limit;
 
-    const where: unknown = {
-      // Empty implementation
-    };
+    const where: any = {};
 
     if (params.action) {
       where.action = params.action;
@@ -65,9 +61,7 @@ export class AuditService {
     }
 
     if (params.startDate || params.endDate) {
-      where.createdAt = {
-      // Empty implementation
-    };
+      where.createdAt = {};
       if (params.startDate) {
         where.createdAt.gte = params.startDate;
       }
@@ -129,17 +123,13 @@ export class AuditService {
   }
 
   /**
-   * EstatÃ­sticas de logs
+   * Estatísticas de logs
    */
   async getStats(params: { startDate?: Date; endDate?: Date; tenantId?: string }) {
-    const where: unknown = {
-      // Empty implementation
-    };
+    const where: any = {};
 
     if (params.startDate || params.endDate) {
-      where.createdAt = {
-      // Empty implementation
-    };
+      where.createdAt = {};
       if (params.startDate) {
         where.createdAt.gte = params.startDate;
       }
@@ -191,4 +181,3 @@ export class AuditService {
     };
   }
 }
-

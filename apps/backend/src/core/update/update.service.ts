@@ -1,4 +1,4 @@
- import { Injectable, Logger, HttpException } from '@nestjs/common';
+import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ExecuteUpdateDto, UpdateConfigDto, UpdateStatusDto } from './dto/update.dto';
@@ -28,9 +28,7 @@ export class UpdateService {
   constructor(
     private prisma: PrismaService,
     private auditService: AuditService,
-  ) {
-      // Empty implementation
-    }
+  ) { }
 
   /**
    * Verifica se hÃ¡ atualizaÃ§Ãµes disponÃ­veis no repositÃ³rio Git
@@ -41,7 +39,7 @@ export class UpdateService {
       this.logger.log('Iniciando verificaÃ§Ã£o de atualizaÃ§Ãµes...');
 
       // Buscar configuraÃ§Ãµes do sistema
-      const settings = await this.getSystemSettings();
+      const settings: any = await this.getSystemSettings();
 
       if (!settings.gitUsername || !settings.gitRepository) {
         this.logger.warn('ConfiguraÃ§Ãµes do Git nÃ£o encontradas');
@@ -102,7 +100,7 @@ export class UpdateService {
     ipAddress?: string,
     userAgent?: string,
   ): Promise<{ success: boolean; logId: string; message: string }> {
-    let updateLog: unknown;
+    let updateLog: any;
 
     try {
       this.logger.log(`Iniciando atualizaÃ§Ã£o para versÃ£o ${updateData.version}...`);
@@ -190,7 +188,7 @@ export class UpdateService {
         message: `AtualizaÃ§Ã£o para ${updateData.version} concluÃ­da com sucesso`,
       };
 
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error('Erro durante atualizaÃ§Ã£o:', error);
 
       if (updateLog) {
@@ -227,7 +225,7 @@ export class UpdateService {
    * Retorna status atual do sistema de atualizaÃ§Ãµes
    */
   async getUpdateStatus(): Promise<UpdateStatusDto> {
-    const settings = await this.getSystemSettings();
+    const settings: any = await this.getSystemSettings();
 
     return {
       currentVersion: settings.appVersion || '1.0.0',
@@ -248,7 +246,7 @@ export class UpdateService {
   ): Promise<{ success: boolean; message: string }> {
     try {
       // Criptografar token se fornecido
-      const updateData: unknown = { ...config, updatedBy };
+      const updateData: any = { ...config, updatedBy };
 
       if (config.gitToken) {
         updateData.gitToken = this.encryptToken(config.gitToken);
@@ -263,7 +261,7 @@ export class UpdateService {
         tenantId: null,
         ipAddress: undefined,
         userAgent: undefined,
-        details: { configFields: object.keys(config) },
+        details: { configFields: Object.keys(config) },
       });
 
       this.logger.log('ConfiguraÃ§Ãµes do sistema de updates atualizadas');
@@ -312,7 +310,7 @@ export class UpdateService {
     });
 
     if (!log) {
-      throw new HttpException('Log nÃ£o encontrado'.NOT_FOUND);
+      throw new HttpException('Log nÃ£o encontrado', HttpStatus.NOT_FOUND);
     }
 
     return log;
@@ -341,8 +339,8 @@ export class UpdateService {
   /**
    * Atualiza configuraÃ§Ãµes do sistema
    */
-  private async updateSystemSettings(data: unknown): Promise<void> {
-    const settings = await this.getSystemSettings();
+  private async updateSystemSettings(data: any): Promise<void> {
+    const settings: any = await this.getSystemSettings();
 
     await (this.prisma as any).systemSettings.update({
       where: { id: settings.id },

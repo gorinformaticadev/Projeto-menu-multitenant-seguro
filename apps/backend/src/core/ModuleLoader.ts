@@ -63,7 +63,7 @@ export class ModuleLoader implements OnModuleInit {
      */
     private async registerDiscoveredModule(slug: string) {
         try {
-            const _modulePath = path.join(this.modulesPath, slug);
+            const modulePath = path.join(this.modulesPath, slug);
             const moduleJsonPath = path.join(modulePath, 'module.json');
 
             if (!fs.existsSync(moduleJsonPath)) {
@@ -120,23 +120,24 @@ export class ModuleLoader implements OnModuleInit {
      */
     private async loadModule(moduleData: unknown) {
         try {
-            const _modulePath = path.join(this.modulesPath, moduleData.slug);
+            const moduleSlug = (moduleData as any).slug;
+            const modulePath = path.join(this.modulesPath, moduleSlug);
             const moduleEntry = this.findModuleEntry(modulePath);
 
             if (!moduleEntry) {
-                this.logger.warn(`⚠️ Arquivo de entrada não encontrado para ${moduleData.slug}`);
+                this.logger.warn(`⚠️ Arquivo de entrada não encontrado para ${moduleSlug}`);
                 return;
             }
 
             // Importar dinamicamente (com validação de segurança)
             const moduleExports = await this.safeImport(moduleEntry);
 
-            if (!this.validateModuleContract(moduleExports.default || moduleExports)) {
-                this.logger.error(`❌ Contrato inválido para módulo ${moduleData.slug}`);
+            if (!this.validateModuleContract(moduleExports)) {
+                this.logger.error(`❌ Contrato inválido para módulo ${moduleSlug}`);
                 return;
             }
 
-            const moduleContract: ModuleContract = moduleExports.default || moduleExports;
+            const moduleContract: ModuleContract = (moduleExports as any).default || moduleExports;
 
             // Registrar no módulo
             await moduleContract.register(this.coreContext);
@@ -149,17 +150,20 @@ export class ModuleLoader implements OnModuleInit {
                 updatedAt: new Date()
             };
 
-            this.loadedModules.set(moduleData.slug, registeredModule);
-            this.logger.log(`🚀 Módulo carregado com sucesso: ${moduleData.slug}`);
+            this.loadedModules.set(moduleSlug, registeredModule);
+            this.logger.log(`🚀 Módulo carregado com sucesso: ${moduleSlug}`);
 
         } catch (error) {
-            this.logger.error(`❌ Erro ao carregar módulo ${moduleData.slug}:`, error);
+            const moduleSlug = (moduleData as any).slug;
+            this.logger.error(`❌ Erro ao carregar módulo ${moduleSlug}:`, error);
 
             // Atualizar status no banco
-            await this.prisma.module.update({
-                where: { slug: moduleData.slug },
-                data: { status: ModuleStatus.disabled }
-            });
+            if (moduleSlug) {
+                await this.prisma.module.update({
+                    where: { slug: moduleSlug },
+                    data: { status: ModuleStatus.disabled }
+                });
+            }
         }
     }
 
@@ -201,12 +205,13 @@ export class ModuleLoader implements OnModuleInit {
      * Valida se o módulo implementa o contrato obrigatório
      */
     private validateModuleContract(moduleExport: unknown): moduleExport is ModuleContract {
+        const m = (moduleExport as any)?.default || moduleExport;
         return (
-            moduleExport &&
-            typeof moduleExport.name === 'string' &&
-            typeof moduleExport.slug === 'string' &&
-            typeof moduleExport.version === 'string' &&
-            typeof moduleExport.register === 'function'
+            m &&
+            typeof m.name === 'string' &&
+            typeof m.slug === 'string' &&
+            typeof m.version === 'string' &&
+            typeof m.register === 'function'
         );
     }
 
@@ -235,7 +240,7 @@ export class ModuleLoader implements OnModuleInit {
             });
 
             // Permite ativação de módulos db_ready ou disabled
-            if (!moduleData || 
+            if (!moduleData ||
                 (moduleData.status !== ModuleStatus.db_ready && moduleData.status !== ModuleStatus.disabled)) {
                 this.logger.warn(`⚠️ Não é possível ativar módulo ${slug} com status: ${moduleData?.status}`);
                 return false;
@@ -288,4 +293,3 @@ export class ModuleLoader implements OnModuleInit {
         }
     }
 }
-

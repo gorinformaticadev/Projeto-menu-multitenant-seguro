@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
@@ -8,9 +8,7 @@ import { join } from 'path';
 
 @Injectable()
 export class TenantsService {
-  constructor(private prisma: PrismaService) {
-      // Empty implementation
-    }
+  constructor(private prisma: PrismaService) { }
 
   async findAll() {
     return this.prisma.tenant.findMany({
@@ -34,7 +32,7 @@ export class TenantsService {
     });
 
     if (!tenant) {
-      throw new NotFoundException('Empresa nÃ£o encontrada');
+      throw new NotFoundException('Empresa não encontrada');
     }
 
     return tenant;
@@ -43,7 +41,7 @@ export class TenantsService {
   async create(createTenantDto: CreateTenantDto) {
     const { email, cnpjCpf, nomeFantasia, nomeResponsavel, telefone, adminEmail, adminPassword, adminName } = createTenantDto;
 
-    // Verifica se jÃ¡ existe tenant com o mesmo email ou CNPJ/CPF
+    // Verifica se já existe tenant com o mesmo email ou CNPJ/CPF
     const existingTenant = await this.prisma.tenant.findFirst({
       where: {
         OR: [{ email }, { cnpjCpf }],
@@ -51,22 +49,22 @@ export class TenantsService {
     });
 
     if (existingTenant) {
-      throw new ConflictException('JÃ¡ existe uma empresa com este email ou CNPJ/CPF');
+      throw new ConflictException('Já existe uma empresa com este email ou CNPJ/CPF');
     }
 
-    // Verifica se jÃ¡ existe usuÃ¡rio com o email do admin
+    // Verifica se já existe usuário com o email do admin
     const existingUser = await this.prisma.user.findUnique({
       where: { email: adminEmail },
     });
 
     if (existingUser) {
-      throw new ConflictException('JÃ¡ existe um usuÃ¡rio com este email');
+      throw new ConflictException('Já existe um usuário com este email');
     }
 
     // Hash da senha do admin
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
-    // Cria o tenant e o usuÃ¡rio admin em uma transaÃ§Ã£o
+    // Cria o tenant e o usuário admin em uma transação
     return this.prisma.$transaction(async (prisma) => {
       // Cria o tenant
       const tenant = await (prisma as any).tenant.create({
@@ -79,7 +77,7 @@ export class TenantsService {
         },
       });
 
-      // Cria o usuÃ¡rio admin do tenant
+      // Cria o usuário admin do tenant
       await (prisma as any).user.create({
         data: {
           email: adminEmail,
@@ -90,6 +88,23 @@ export class TenantsService {
         },
       });
 
+      // Buscar todos os módulos ativos do sistema
+      const activeModules = await (prisma as any).module.findMany({
+        where: { status: 'active' },
+      });
+
+      // Vincular módulos ao novo tenant (DESABILITADOS por padrão)
+      // Cada tenant deve ativar os módulos que deseja usar
+      if (activeModules.length > 0) {
+        await (prisma as any).moduleTenant.createMany({
+          data: activeModules.map((module) => ({
+            tenantId: tenant.id,
+            moduleId: module.id,
+            enabled: false, // ✅ Módulos desabilitados por padrão
+          })),
+        });
+      }
+
       return tenant;
     });
   }
@@ -98,7 +113,7 @@ export class TenantsService {
     // Verifica se o tenant existe
     await this.findOne(id);
 
-    // Se estÃ¡ atualizando email ou CNPJ, verifica duplicaÃ§Ã£o
+    // Se está atualizando email ou CNPJ, verifica duplicação
     if (updateTenantDto.email || updateTenantDto.cnpjCpf) {
       const existingTenant = await this.prisma.tenant.findFirst({
         where: {
@@ -106,12 +121,8 @@ export class TenantsService {
             { id: { not: id } },
             {
               OR: [
-                updateTenantDto.email ? { email: updateTenantDto.email } : {
-      // Empty implementation
-    },
-                updateTenantDto.cnpjCpf ? { cnpjCpf: updateTenantDto.cnpjCpf } : {
-      // Empty implementation
-    },
+                updateTenantDto.email ? { email: updateTenantDto.email } : {},
+                updateTenantDto.cnpjCpf ? { cnpjCpf: updateTenantDto.cnpjCpf } : {},
               ],
             },
           ],
@@ -119,7 +130,7 @@ export class TenantsService {
       });
 
       if (existingTenant) {
-        throw new ConflictException('JÃ¡ existe uma empresa com este email ou CNPJ/CPF');
+        throw new ConflictException('Já existe uma empresa com este email ou CNPJ/CPF');
       }
     }
 
@@ -132,9 +143,9 @@ export class TenantsService {
   async toggleStatus(id: string) {
     const tenant = await this.findOne(id);
 
-    // Bloqueia a desativaÃ§Ã£o da empresa padrÃ£o (Empresa Exemplo LTDA)
+    // Bloqueia a desativação da empresa padrão (Empresa Exemplo LTDA)
     if (tenant.email === 'empresa1@example.com' && tenant.ativo) {
-      throw new BadRequestException('A empresa padrÃ£o do sistema nÃ£o pode ser desativada');
+      throw new BadRequestException('A empresa padrão do sistema não pode ser desativada');
     }
 
     return this.prisma.tenant.update({
@@ -149,7 +160,7 @@ export class TenantsService {
     // Verifica se o tenant existe
     await this.findOne(id);
 
-    // Busca o usuÃ¡rio admin do tenant
+    // Busca o usuário admin do tenant
     const admin = await this.prisma.user.findFirst({
       where: {
         tenantId: id,
@@ -158,7 +169,7 @@ export class TenantsService {
     });
 
     if (!admin) {
-      throw new NotFoundException('Administrador do tenant nÃ£o encontrado');
+      throw new NotFoundException('Administrador do tenant não encontrado');
     }
 
     // Hash da nova senha
@@ -182,7 +193,7 @@ export class TenantsService {
         const oldLogoPath = join(process.cwd(), 'uploads', 'logos', tenant.logoUrl);
         await unlink(oldLogoPath);
       } catch (error) {
-        // Ignora erro se o arquivo nÃ£o existir
+        // Ignora erro se o arquivo não existir
       }
     }
 
@@ -197,18 +208,18 @@ export class TenantsService {
     const tenant = await this.findOne(id);
 
     if (!tenant.logoUrl) {
-      throw new BadRequestException('Esta empresa nÃ£o possui logo');
+      throw new BadRequestException('Esta empresa não possui logo');
     }
 
-    // Remove o arquivo fÃ­sico
+    // Remove o arquivo físico
     try {
       const logoPath = join(process.cwd(), 'uploads', 'logos', tenant.logoUrl);
       await unlink(logoPath);
     } catch (error) {
-      // Ignora erro se o arquivo nÃ£o existir
+      // Ignora erro se o arquivo não existir
     }
 
-    // Remove a referÃªncia do banco
+    // Remove a referência do banco
     return this.prisma.tenant.update({
       where: { id },
       data: { logoUrl: null },
@@ -218,19 +229,19 @@ export class TenantsService {
   async remove(id: string) {
     const tenant = await this.findOne(id);
 
-    // NÃ£o permite deletar a empresa padrÃ£o
+    // Não permite deletar a empresa padrão
     if (tenant.email === 'empresa1@example.com') {
-      throw new BadRequestException('A empresa padrÃ£o do sistema nÃ£o pode ser deletada');
+      throw new BadRequestException('A empresa padrão do sistema não pode ser deletada');
     }
 
-    // Verifica se hÃ¡ usuÃ¡rios vinculados
+    // Verifica se há usuários vinculados
     const usersCount = await this.prisma.user.count({
       where: { tenantId: id },
     });
 
     if (usersCount > 0) {
       throw new BadRequestException(
-        `NÃ£o Ã© possÃ­vel deletar esta empresa pois existem ${usersCount} usuÃ¡rio(s) vinculado(s). Delete os usuÃ¡rios primeiro.`,
+        `Não é possível deletar esta empresa pois existem ${usersCount} usuário(s) vinculado(s). Delete os usuários primeiro.`,
       );
     }
 
@@ -240,7 +251,7 @@ export class TenantsService {
         const logoPath = join(process.cwd(), 'uploads', 'logos', tenant.logoUrl);
         await unlink(logoPath);
       } catch (error) {
-        // Ignora erro se o arquivo nÃ£o existir
+        // Ignora erro se o arquivo não existir
       }
     }
 
@@ -298,7 +309,7 @@ export class TenantsService {
     });
 
     if (!tenant) {
-      throw new NotFoundException('Empresa nÃ£o encontrada');
+      throw new NotFoundException('Empresa não encontrada');
     }
 
     return {
@@ -306,5 +317,34 @@ export class TenantsService {
       nomeFantasia: tenant.nomeFantasia,
     };
   }
-}
 
+  // Métodos para gerenciamento de módulos dos tenants
+
+  async getTenantActiveModules(tenantId: string) {
+    // Método temporariamente desabilitado - usar ModuleSecurityService
+    return {
+      activeModules: [],
+      modules: [],
+    };
+  }
+
+  async activateModuleForTenant(tenantId: string, moduleName: string) {
+    // Método temporariamente desabilitado - usar ModuleInstallerService
+    throw new BadRequestException('Use o novo sistema de módulos');
+  }
+
+  async deactivateModuleForTenant(tenantId: string, moduleName: string) {
+    // Método temporariamente desabilitado - usar ModuleInstallerService
+    throw new BadRequestException('Use o novo sistema de módulos');
+  }
+
+  async toggleModuleForTenant(tenantId: string, moduleName: string) {
+    // Método temporariamente desabilitado - usar ModuleInstallerService
+    throw new BadRequestException('Use o novo sistema de módulos');
+  }
+
+  async configureTenantModule(tenantId: string, moduleName: string, config: unknown) {
+    // Método temporariamente desabilitado - usar ModuleInstallerService
+    throw new BadRequestException('Use o novo sistema de módulos');
+  }
+}

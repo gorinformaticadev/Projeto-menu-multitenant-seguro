@@ -30,104 +30,6 @@ export class ModuleJsonValidator {
             throw new BadRequestException('module.json inválido ou ausente');
         }
 
-        const json = moduleJson as Record<string, unknown>;
-
-        // Validações obrigatórias
-        if (typeof json.name !== 'string') {
-            throw new BadRequestException('Campo "name" é obrigatório e deve ser uma string');
-        }
-
-        if (typeof json.displayName !== 'string') {
-            throw new BadRequestException('Campo "displayName" é obrigatório e deve ser uma string');
-        }
-
-        if (typeof json.version !== 'string') {
-            throw new BadRequestException('Campo "version" é obrigatório e deve ser uma string');
-        }
-
-        // Validações opcionais
-        if (json.description !== undefined && typeof json.description !== 'string') {
-            throw new BadRequestException('Campo "description" deve ser uma string');
-        }
-
-        if (json.author !== undefined && typeof json.author !== 'string') {
-            throw new BadRequestException('Campo "author" deve ser uma string');
-        }
-
-        if (json.category !== undefined && typeof json.category !== 'string') {
-            throw new BadRequestException('Campo "category" deve ser uma string');
-        }
-
-        if (json.enabled !== undefined && typeof json.enabled !== 'boolean') {
-            throw new BadRequestException('Campo "enabled" deve ser um boolean');
-        }
-
-        // Validação de dependencies
-        if (json.dependencies !== undefined &&
-            json.dependencies !== null &&
-            !Array.isArray(json.dependencies)) {
-            throw new BadRequestException('Campo "dependencies" deve ser um array ou null');
-        }
-
-        if (json.dependencies && Array.isArray(json.dependencies)) {
-            for (let i = 0; i < json.dependencies.length; i++) {
-                const dep = json.dependencies[i];
-                if (typeof dep !== 'string') {
-                    throw new BadRequestException(`Dependência no índice ${i} deve ser uma string`);
-                }
-            }
-        }
-
-        // Validação de defaultConfig
-        if (json.defaultConfig !== undefined &&
-            json.defaultConfig !== null &&
-            typeof json.defaultConfig !== 'object') {
-            throw new BadRequestException('Campo "defaultConfig" deve ser um objeto ou null');
-        }
-
-        // Validação de menus
-        if (json.menus !== undefined &&
-            json.menus !== null &&
-            !Array.isArray(json.menus)) {
-            throw new BadRequestException('Campo "menus" deve ser um array ou null');
-        }
-
-        // Validações de formato
-        const nameRegex = /^[a-zA-Z0-9_-]+$/;
-        const versionRegex = /^\d+\.\d+\.\d+$/;
-
-        if (!nameRegex.test(json.name)) {
-            throw new BadRequestException('Campo "name" deve conter apenas letras, números, hífens e underscores');
-        }
-
-        // Validação de tamanho
-        if (json.name.length < 2 || json.name.length > 50) {
-            throw new BadRequestException('Campo "name" deve ter entre 2 e 50 caracteres');
-        }
-
-        // Validação de versão
-        if (!versionRegex.test(json.version)) {
-            throw new BadRequestException('Campo "version" deve seguir o formato semver (ex: 1.0.0)');
-        }
-
-        // Validação de displayName
-        if (json.displayName.length < 2 || json.displayName.length > 100) {
-            throw new BadRequestException('Campo "displayName" deve ter entre 2 e 100 caracteres');
-        }
-
-        // Validação final de dependencies
-        if (json.dependencies && Array.isArray(json.dependencies)) {
-            for (let i = 0; i < json.dependencies.length; i++) {
-                const depSlug = json.dependencies[i];
-                if (typeof depSlug !== 'string' || !nameRegex.test(depSlug)) {
-                    throw new BadRequestException(`Dependência "${depSlug}" deve seguir o formato de nome válido`);
-                }
-            }
-        }
-
-        return json as ModuleJson;
-        }
-
         // Validar campos obrigatórios
         this.validateRequiredFields(moduleJson);
 
@@ -144,11 +46,12 @@ export class ModuleJsonValidator {
      * Valida presença de campos obrigatórios
      */
     private static validateRequiredFields(moduleJson: unknown): void {
+        const json = moduleJson as Record<string, any>;
         const requiredFields = ['name', 'displayName', 'version'];
         const missingFields: string[] = [];
 
         for (const field of requiredFields) {
-            if (!moduleJson[field]) {
+            if (!json[field]) {
                 missingFields.push(field);
             }
         }
@@ -164,52 +67,54 @@ export class ModuleJsonValidator {
      * Valida tipos de dados dos campos
      */
     private static validateFieldTypes(moduleJson: unknown): void {
+        const json = moduleJson as Record<string, any>;
+
         // name: string
-        if (typeof moduleJson.name !== 'string') {
+        if (typeof json.name !== 'string') {
             throw new BadRequestException('Campo "name" deve ser string');
         }
 
         // displayName: string
-        if (typeof moduleJson.displayName !== 'string') {
+        if (typeof json.displayName !== 'string') {
             throw new BadRequestException('Campo "displayName" deve ser string');
         }
 
         // version: string
-        if (typeof moduleJson.version !== 'string') {
+        if (typeof json.version !== 'string') {
             throw new BadRequestException('Campo "version" deve ser string');
         }
 
         // description: string (opcional)
-        if (moduleJson.description !== undefined && typeof moduleJson.description !== 'string') {
+        if (json.description !== undefined && typeof json.description !== 'string') {
             throw new BadRequestException('Campo "description" deve ser string');
         }
 
         // author: string (opcional)
-        if (moduleJson.author !== undefined && typeof moduleJson.author !== 'string') {
+        if (json.author !== undefined && typeof json.author !== 'string') {
             throw new BadRequestException('Campo "author" deve ser string');
         }
 
         // category: string (opcional)
-        if (moduleJson.category !== undefined && typeof moduleJson.category !== 'string') {
+        if (json.category !== undefined && typeof json.category !== 'string') {
             throw new BadRequestException('Campo "category" deve ser string');
         }
 
         // enabled: boolean (opcional)
-        if (moduleJson.enabled !== undefined && typeof moduleJson.enabled !== 'boolean') {
+        if (json.enabled !== undefined && typeof json.enabled !== 'boolean') {
             throw new BadRequestException('Campo "enabled" deve ser boolean');
         }
 
         // dependencies: string[] | null (opcional)
-        if (moduleJson.dependencies !== undefined &&
-            moduleJson.dependencies !== null &&
-            !Array.isArray(moduleJson.dependencies)) {
+        if (json.dependencies !== undefined &&
+            json.dependencies !== null &&
+            !Array.isArray(json.dependencies)) {
             throw new BadRequestException('Campo "dependencies" deve ser array de strings ou null');
         }
 
         // Validar se dependencies é array de strings
-        if (moduleJson.dependencies && Array.isArray(moduleJson.dependencies)) {
-            for (let i = 0; i < moduleJson.dependencies.length; i++) {
-                const dep = moduleJson.dependencies[i];
+        if (json.dependencies && Array.isArray(json.dependencies)) {
+            for (let i = 0; i < json.dependencies.length; i++) {
+                const dep = json.dependencies[i];
                 if (typeof dep !== 'string' || dep.trim() === '') {
                     throw new BadRequestException(
                         `Dependência ${i + 1} deve ser string não vazia`
@@ -219,16 +124,16 @@ export class ModuleJsonValidator {
         }
 
         // defaultConfig: object (opcional)
-        if (moduleJson.defaultConfig !== undefined && 
-            moduleJson.defaultConfig !== null && 
-            typeof moduleJson.defaultConfig !== 'object') {
+        if (json.defaultConfig !== undefined &&
+            json.defaultConfig !== null &&
+            typeof json.defaultConfig !== 'object') {
             throw new BadRequestException('Campo "defaultConfig" deve ser objeto ou null');
         }
 
         // menus: array (opcional)
-        if (moduleJson.menus !== undefined && 
-            moduleJson.menus !== null && 
-            !Array.isArray(moduleJson.menus)) {
+        if (json.menus !== undefined &&
+            json.menus !== null &&
+            !Array.isArray(json.menus)) {
             throw new BadRequestException('Campo "menus" deve ser array ou null');
         }
     }
@@ -237,38 +142,40 @@ export class ModuleJsonValidator {
      * Valida valores específicos dos campos
      */
     private static validateFieldValues(moduleJson: unknown): void {
+        const json = moduleJson as Record<string, any>;
+
         // name: apenas letras, números, hífen e underscore
         const nameRegex = /^[a-zA-Z0-9_-]+$/;
-        if (!nameRegex.test(moduleJson.name)) {
+        if (!nameRegex.test(json.name)) {
             throw new BadRequestException(
                 'Campo "name" deve conter apenas letras, números, hífen e underscore'
             );
         }
 
         // name: comprimento
-        if (moduleJson.name.length < 2 || moduleJson.name.length > 50) {
+        if (json.name.length < 2 || json.name.length > 50) {
             throw new BadRequestException('Campo "name" deve ter entre 2 e 50 caracteres');
         }
 
         // version: formato semântico (X.Y.Z)
         const versionRegex = /^\d+\.\d+\.\d+$/;
-        if (!versionRegex.test(moduleJson.version)) {
+        if (!versionRegex.test(json.version)) {
             throw new BadRequestException(
                 'Campo "version" deve seguir formato semântico (ex: 1.0.0)'
             );
         }
 
         // displayName: comprimento
-        if (moduleJson.displayName.length < 2 || moduleJson.displayName.length > 100) {
+        if (json.displayName.length < 2 || json.displayName.length > 100) {
             throw new BadRequestException('Campo "displayName" deve ter entre 2 e 100 caracteres');
         }
 
         // Validar que cada dependência é um slug válido
-        if (moduleJson.dependencies && Array.isArray(moduleJson.dependencies)) {
-            for (let i = 0; i < moduleJson.dependencies.length; i++) {
-                const depSlug = moduleJson.dependencies[i];
+        if (json.dependencies && Array.isArray(json.dependencies)) {
+            for (let i = 0; i < json.dependencies.length; i++) {
+                const depSlug = json.dependencies[i];
                 const depRegex = /^[a-zA-Z0-9_-]+$/;
-                
+
                 if (!depRegex.test(depSlug)) {
                     throw new BadRequestException(
                         `Dependência ${i + 1} (${depSlug}) deve conter apenas letras, números, hífen e underscore`

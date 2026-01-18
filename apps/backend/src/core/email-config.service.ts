@@ -1,4 +1,4 @@
- import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { CreateEmailConfigDto, UpdateEmailConfigDto } from './dto/email-config.dto';
 import { EmailConfiguration } from '@prisma/client';
@@ -9,9 +9,7 @@ export class EmailConfigService {
 
   constructor(
     private prisma: PrismaService,
-  ) {
-      // Empty implementation
-    }
+  ) { }
 
   /**
    * Get predefined email provider configurations
@@ -25,7 +23,7 @@ export class EmailConfigService {
         smtpPort: 465,
         encryption: 'SSL',
         authMethod: 'LOGIN',
-        description: 'ConfiguraÃ§Ã£o recomendada para Gmail com SSL/TLS',
+        description: 'Configuração recomendada para Gmail com SSL/TLS',
       },
       {
         providerName: 'Gmail (STARTTLS - Port 587)',
@@ -33,7 +31,7 @@ export class EmailConfigService {
         smtpPort: 587,
         encryption: 'STARTTLS',
         authMethod: 'LOGIN',
-        description: 'ConfiguraÃ§Ã£o alternativa para Gmail com STARTTLS',
+        description: 'Configuração alternativa para Gmail com STARTTLS',
       },
       // Hotmail/Outlook SMTP configuration
       {
@@ -42,7 +40,7 @@ export class EmailConfigService {
         smtpPort: 587,
         encryption: 'STARTTLS',
         authMethod: 'LOGIN',
-        description: 'ConfiguraÃ§Ã£o para Hotmail e Outlook.com',
+        description: 'Configuração para Hotmail e Outlook.com',
       },
       // Titan Mail SMTP configuration
       {
@@ -51,7 +49,7 @@ export class EmailConfigService {
         smtpPort: 465,
         encryption: 'SSL',
         authMethod: 'LOGIN',
-        description: 'ConfiguraÃ§Ã£o para Titan Email',
+        description: 'Configuração para Titan Email',
       },
     ];
   }
@@ -82,13 +80,11 @@ export class EmailConfigService {
    */
   async createConfig(dto: CreateEmailConfigDto, userId: string): Promise<EmailConfiguration> {
     this.logger.log(`Creating new email configuration for user ${userId}`);
-    
+
     // Delete all existing configurations (only one email config allowed)
     const existingConfigs = await this.prisma.emailConfiguration.findMany();
     if (existingConfigs.length > 0) {
-      await this.prisma.emailConfiguration.deleteMany({
-      // Empty implementation
-    });
+      await this.prisma.emailConfiguration.deleteMany({});
       this.logger.log(`Deleted ${existingConfigs.length} existing email configurations`);
     }
 
@@ -111,7 +107,7 @@ export class EmailConfigService {
    */
   async updateConfig(id: string, dto: UpdateEmailConfigDto, userId: string): Promise<EmailConfiguration> {
     this.logger.log(`Updating email configuration ${id} by user ${userId}`);
-    
+
     // Since only one configuration exists, just update it
     const updatedConfig = await this.prisma.emailConfiguration.update({
       where: { id },
@@ -141,7 +137,7 @@ export class EmailConfigService {
    */
   async activateConfig(id: string, userId: string): Promise<EmailConfiguration> {
     this.logger.log(`Activating email configuration ${id} by user ${userId}`);
-    
+
     // Since only one configuration exists, just ensure it's active
     const activatedConfig = await this.prisma.emailConfiguration.update({
       where: { id },
@@ -167,9 +163,7 @@ export class EmailConfigService {
       };
     } catch (error) {
       this.logger.error('Error fetching SMTP credentials:', error);
-      return {
-      // Empty implementation
-    };
+      return {};
     }
   }
 
@@ -177,23 +171,23 @@ export class EmailConfigService {
    * Test email configuration by sending a test email
    * Note: This method now requires the emailService to be passed in
    */
-  async testConfig(email: string, smtpUser: string, smtpPass: string, user: any, emailService: unknown): Promise<{ success: boolean; message: string }> {
+  async testConfig(email: string, smtpUser: string, smtpPass: string, user: any, emailService: any): Promise<{ success: boolean; message: string }> {
     try {
       this.logger.log(`Testing email configuration for user ${user.id} to ${email}`);
-      
+
       // Get active configuration
       const config = await this.getActiveConfig();
-      
+
       if (!config) {
         this.logger.warn('No active email configuration found');
-        return { 
-          success: false, 
-          message: 'Nenhuma configuraÃ§Ã£o de email ativa encontrada. Configure um provedor de email primeiro.' 
+        return {
+          success: false,
+          message: 'Nenhuma configuração de email ativa encontrada. Configure um provedor de email primeiro.'
         };
       }
-      
+
       this.logger.log(`Using email configuration: ${config.providerName} (${config.smtpHost}:${config.smtpPort})`);
-      
+
       // Send test email with credentials
       const sent = await emailService.sendTestEmail(
         email,
@@ -202,27 +196,27 @@ export class EmailConfigService {
         smtpUser,
         smtpPass
       );
-      
+
       if (sent) {
-        this.logger.log(`âœ… Test email sent successfully by user ${user.id} to ${email}`);
-        return { 
-          success: true, 
-          message: `Email de teste enviado com sucesso para ${email}. Verifique sua caixa de entrada.` 
+        this.logger.log(`✅ Test email sent successfully by user ${user.id} to ${email}`);
+        return {
+          success: true,
+          message: `Email de teste enviado com sucesso para ${email}. Verifique sua caixa de entrada.`
         };
       } else {
-        this.logger.warn(`âŒ Failed to send test email to ${email}`);
-        return { 
-          success: false, 
-          message: 'Falha ao enviar email de teste. Verifique as configuraÃ§Ãµes e credenciais.' 
+        this.logger.warn(`❌ Failed to send test email to ${email}`);
+        return {
+          success: false,
+          message: 'Falha ao enviar email de teste. Verifique as configurações e credenciais.'
         };
       }
     } catch (error) {
-      this.logger.error(`âŒ Error testing email configuration for ${email}:`, error);
-      
+      this.logger.error(`❌ Error testing email configuration for ${email}:`, error);
+
       // Return the specific error message from the email service
-      return { 
-        success: false, 
-        message: error.message || 'Erro desconhecido ao testar configuraÃ§Ã£o de email'
+      return {
+        success: false,
+        message: error.message || 'Erro desconhecido ao testar configuração de email'
       };
     }
   }

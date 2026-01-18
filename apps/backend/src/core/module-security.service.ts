@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
 import { PrismaClient } from '@prisma/client';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * Serviço de Segurança para Módulos
@@ -10,9 +12,7 @@ import { PrismaClient } from '@prisma/client';
 export class ModuleSecurityService {
     private readonly logger = new Logger(ModuleSecurityService.name);
 
-    constructor(private readonly prisma: PrismaService) {
-      // Empty implementation
-    }
+    constructor(private readonly prisma: PrismaService) { }
 
     /**
      * Valida se um módulo pode ser executado
@@ -63,11 +63,7 @@ export class ModuleSecurityService {
         try {
             const _modulePath = `modules/${slug}`;
 
-            // Verificar se existe module.json
-            import fs from 'fs';
-            import path from 'path';
-
-            const moduleJsonPath = path.join(process.cwd(), modulePath, 'module.json');
+            const moduleJsonPath = path.join(process.cwd(), _modulePath, 'module.json');
             if (!fs.existsSync(moduleJsonPath)) {
                 errors.push('module.json não encontrado');
                 return { valid: false, errors };
@@ -85,8 +81,8 @@ export class ModuleSecurityService {
             }
 
             // Verificar estrutura de pastas
-            const hasBackend = fs.existsSync(path.join(process.cwd(), modulePath, 'backend'));
-            const hasFrontend = fs.existsSync(path.join(process.cwd(), modulePath, 'frontend'));
+            const hasBackend = fs.existsSync(path.join(process.cwd(), _modulePath, 'backend'));
+            const hasFrontend = fs.existsSync(path.join(process.cwd(), _modulePath, 'frontend'));
 
             if (!hasBackend && !hasFrontend) {
                 errors.push('Módulo deve ter pelo menos backend ou frontend');
@@ -213,7 +209,7 @@ export class ModuleSecurityService {
     /**
      * Constrói árvore hierárquica de menus
      */
-    private buildMenuTree(menus: unknown[]): unknown[] {
+    private buildMenuTree(menus: any[]): any[] {
         // Separar menus pai (sem parentId) e filhos
         const parentMenus = menus.filter(m => !m.parentId);
         const childMenus = menus.filter(m => m.parentId);

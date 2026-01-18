@@ -4,10 +4,10 @@ import { PrismaService } from '@core/prisma/prisma.service';
 @Injectable()
 export class SecurePrismaService {
   private readonly logger = new Logger(SecurePrismaService.name);
-  
+
   constructor(private prisma: PrismaService) {
-      // Empty implementation
-    }
+    // Empty implementation
+  }
 
   /**
    * Wrapper seguro para findMany com validação automática de tenant isolation
@@ -24,19 +24,19 @@ export class SecurePrismaService {
       skip?: number;
       take?: number;
     } = {
-      // Empty implementation
-    }
+        // Empty implementation
+      }
   ): Promise<T[]> {
     try {
       // Aplicar tenant isolation automaticamente
-      const tenantWhere = userRole !== 'SUPER_ADMIN' 
-        ? { ...where, tenantId } 
+      const tenantWhere = userRole !== 'SUPER_ADMIN'
+        ? { ...where, tenantId }
         : where;
 
       // Adicionar logging de segurança para operações sensíveis
       this.logger.debug(`Busca segura em ${String(model)} para tenant ${tenantId}`, {
         userRole,
-        whereKeys: object.keys(where),
+        whereKeys: Object.keys(where),
         hasTenantFilter: userRole !== 'SUPER_ADMIN'
       });
 
@@ -68,8 +68,8 @@ export class SecurePrismaService {
       select?: unknown;
       include?: unknown;
     } = {
-      // Empty implementation
-    }
+        // Empty implementation
+      }
   ): Promise<T | null> {
     try {
       const result = await this.prisma[model].findUnique({
@@ -265,24 +265,24 @@ export class SecurePrismaService {
     return query.replace(/\$\d+/g, (match, _index) => {
       const paramIndex = parseInt(match.slice(1)) - 1;
       const param = params[paramIndex];
-      
+
       if (param === null || param === undefined) {
         return 'NULL';
       }
-      
+
       if (typeof param === 'string') {
         // Escapar aspas simples
         return `'${param.replace(/'/g, "''")}'`;
       }
-      
+
       if (typeof param === 'number') {
         return String(param);
       }
-      
+
       if (param instanceof Date) {
         return `'${param.toISOString()}'`;
       }
-      
+
       // Para objetos/arrays, converter para JSON
       return `'${JSON.stringify(param).replace(/'/g, "''")}'`;
     });
@@ -294,7 +294,7 @@ export class SecurePrismaService {
   async executeRawSecure(query: string, params: unknown[] = []): Promise<unknown> {
     try {
       const sanitizedQuery = this.sanitizeRawQuery(query, params);
-      
+
       this.logger.debug('Executando query raw sanitizada', {
         queryPreview: sanitizedQuery.substring(0, 200) + (sanitizedQuery.length > 200 ? '...' : '')
       });

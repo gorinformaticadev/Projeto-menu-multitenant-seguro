@@ -1,8 +1,9 @@
- import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { AuditService } from '../audit/audit.service';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class EmailVerificationService {
@@ -11,12 +12,10 @@ export class EmailVerificationService {
     private jwtService: JwtService,
     private emailService: EmailService,
     private auditService: AuditService,
-  ) {
-      // Empty implementation
-    }
+  ) { }
 
   /**
-   * Gerar e enviar token de verificaÃ§Ã£o de email
+   * Gerar e enviar token de verificação de email
    */
   async sendVerificationEmail(userId: string): Promise<{ message: string }> {
     const user = await this.prisma.user.findUnique({
@@ -24,20 +23,20 @@ export class EmailVerificationService {
     });
 
     if (!user) {
-      throw new BadRequestException('UsuÃ¡rio nÃ£o encontrado');
+      throw new BadRequestException('Usuário não encontrado');
     }
 
     if (user.emailVerified) {
-      throw new BadRequestException('Email jÃ¡ verificado');
+      throw new BadRequestException('Email já verificado');
     }
 
-    // Gerar token JWT de verificaÃ§Ã£o (vÃ¡lido por 24 horas)
+    // Gerar token JWT de verificação (válido por 24 horas)
     const verificationToken = this.jwtService.sign(
       { userId: user.id, email: user.email, type: 'email_verification' },
       { expiresIn: '24h' }
     );
 
-    // Calcular expiraÃ§Ã£o
+    // Calcular expiração
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
 
@@ -61,7 +60,7 @@ export class EmailVerificationService {
       details: { email: user.email },
     });
 
-    return { message: 'Email de verificaÃ§Ã£o enviado com sucesso' };
+    return { message: 'Email de verificação enviado com sucesso' };
   }
 
   /**
@@ -73,42 +72,41 @@ export class EmailVerificationService {
       const payload = this.jwtService.verify(token);
 
       if (payload.type !== 'email_verification') {
-        throw new BadRequestException('Token invÃ¡lido');
+        throw new BadRequestException('Token inválido');
       }
 
-      // Buscar usuÃ¡rio
+      // Buscar usuário
       const user = await this.prisma.user.findUnique({
         where: { id: payload.userId },
       });
 
       if (!user) {
-        throw new BadRequestException('UsuÃ¡rio nÃ£o encontrado');
+        throw new BadRequestException('Usuário não encontrado');
       }
 
       if (user.emailVerified) {
-        throw new BadRequestException('Email jÃ¡ verificado');
+        throw new BadRequestException('Email já verificado');
       }
 
       // Verificar se é o token mais recente (usando comparação de tempo constante)
-      import crypto from 'crypto';
       const tokenBuffer = Buffer.from(token, 'utf8');
       const storedTokenBuffer = Buffer.from(user.emailVerificationToken || '', 'utf8');
-      
+
       // Garantir que os buffers tenham o mesmo tamanho para evitar timing attacks
       const maxLength = Math.max(tokenBuffer.length, storedTokenBuffer.length);
       const paddedToken = Buffer.alloc(maxLength);
       const paddedStoredToken = Buffer.alloc(maxLength);
-      
+
       tokenBuffer.copy(paddedToken);
       storedTokenBuffer.copy(paddedStoredToken);
-      
+
       if (!crypto.timingSafeEqual(paddedToken, paddedStoredToken)) {
         throw new BadRequestException('Token inválido ou expirado');
       }
 
-      // Verificar expiraÃ§Ã£o
+      // Verificar expiração
       if (user.emailVerificationExpires && user.emailVerificationExpires < new Date()) {
-        throw new BadRequestException('Token expirado. Solicite um novo email de verificaÃ§Ã£o.');
+        throw new BadRequestException('Token expirado. Solicite um novo email de verificação.');
       }
 
       // Marcar email como verificado
@@ -132,17 +130,17 @@ export class EmailVerificationService {
       return { message: 'Email verificado com sucesso!' };
     } catch (error) {
       if (error.name === 'JsonWebTokenError') {
-        throw new BadRequestException('Token invÃ¡lido');
+        throw new BadRequestException('Token inválido');
       }
       if (error.name === 'TokenExpiredError') {
-        throw new BadRequestException('Token expirado. Solicite um novo email de verificaÃ§Ã£o.');
+        throw new BadRequestException('Token expirado. Solicite um novo email de verificação.');
       }
       throw error;
     }
   }
 
   /**
-   * Verificar se email estÃ¡ verificado e se deve bloquear acesso
+   * Verificar se email está verificado e se deve bloquear acesso
    */
   async checkEmailVerification(userId: string): Promise<{
     verified: boolean;
@@ -156,14 +154,14 @@ export class EmailVerificationService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('UsuÃ¡rio nÃ£o encontrado');
+      throw new UnauthorizedException('Usuário não encontrado');
     }
 
     const securityConfig = await this.prisma.securityConfig.findFirst();
     const required = securityConfig?.emailVerificationRequired || false;
     const level = securityConfig?.emailVerificationLevel || 'SOFT';
 
-    // Se email jÃ¡ verificado, permitir acesso
+    // Se email já verificado, permitir acesso
     if (user.emailVerified) {
       return {
         verified: true,
@@ -173,25 +171,25 @@ export class EmailVerificationService {
       };
     }
 
-    // Se verificaÃ§Ã£o nÃ£o Ã© obrigatÃ³ria, apenas avisar
+    // Se verificação não é obrigatória, apenas avisar
     if (!required) {
       return {
         verified: false,
         required: false,
         level: 'SOFT',
         shouldBlock: false,
-        message: 'Recomendamos verificar seu email para maior seguranÃ§a',
+        message: 'Recomendamos verificar seu email para maior segurança',
       };
     }
 
-    // VerificaÃ§Ã£o obrigatÃ³ria - verificar nÃ­vel
+    // Verificação obrigatória - verificar nível
     if (level === 'SOFT') {
       return {
         verified: false,
         required: true,
         level: 'SOFT',
         shouldBlock: false,
-        message: 'Por favor, verifique seu email. Um link de verificaÃ§Ã£o foi enviado.',
+        message: 'Por favor, verifique seu email. Um link de verificação foi enviado.',
       };
     } else if (level === 'MODERATE') {
       return {
@@ -219,4 +217,3 @@ export class EmailVerificationService {
     };
   }
 }
-

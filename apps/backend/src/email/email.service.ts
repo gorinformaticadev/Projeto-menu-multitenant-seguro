@@ -1,26 +1,17 @@
- import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
 import { PrismaService } from '@core/prisma/prisma.service';
-import { getPlatformName, getPlatformEmail } from '@core/common/constants/platform.constants';
+import { getPlatformName } from '@core/common/constants/platform.constants';
 import { SecurityConfigService } from '@core/security-config/security-config.service';
-
-interface EmailConfig {
-  smtpHost: string;
-  smtpPort: number;
-  encryption: string;
-  smtpUsername?: string;
-  smtpPassword?: string;
-  authMethod?: string;
-}
 
 @Injectable()
 export class EmailService implements OnModuleInit {
   private transporter: Transporter;
   private readonly logger = new Logger(EmailService.name);
   private isEnabled: boolean;
-  private dbConfig: EmailConfig | null = null;
+  private dbConfig: any = null;
 
 
   constructor(
@@ -51,10 +42,10 @@ export class EmailService implements OnModuleInit {
       const smtpCredentials = await this.securityConfigService.getSmtpCredentials();
 
       let smtpConfig;
-      
+
       if (this.dbConfig) {
         // Use database configuration
-        this.logger.log('Usando configuraÃ§Ã£o de email do banco de dados');
+        this.logger.log('Usando configuração de email do banco de dados');
         smtpConfig = {
           host: this.dbConfig.smtpHost,
           port: this.dbConfig.smtpPort,
@@ -65,7 +56,7 @@ export class EmailService implements OnModuleInit {
         };
       } else {
         // Fallback to environment variables
-        this.logger.log('Usando configuraÃ§Ã£o de email do arquivo .env');
+        this.logger.log('Usando configuração de email do arquivo .env');
         smtpConfig = {
           host: this.config.get('SMTP_HOST'),
           port: parseInt(this.config.get('SMTP_PORT', '587')),
@@ -98,25 +89,25 @@ export class EmailService implements OnModuleInit {
         this.transporter = nodemailer.createTransport(smtpConfig);
         this.logger.log('Email service configurado e ativo');
       } else {
-        this.logger.warn('Email service desabilitado - SMTP_HOST nÃ£o configurado');
+        this.logger.warn('Email service desabilitado - SMTP_HOST não configurado');
       }
     } catch (error) {
-      this.logger.error('Erro ao inicializar o serviÃ§o de email:', error);
+      this.logger.error('Erro ao inicializar o serviço de email:', error);
       this.isEnabled = false;
     }
   }
 
   /**
-   * Enviar email de verificaÃ§Ã£o
+   * Enviar email de verificação
    */
   async sendVerificationEmail(email: string, name: string, token: string, smtpUser?: string, smtpPass?: string): Promise<boolean> {
     if (!this.isEnabled) {
-      this.logger.warn(`Email de verificaÃ§Ã£o nÃ£o enviado (serviÃ§o desabilitado): ${email}`);
+      this.logger.warn(`Email de verificação não enviado (serviço desabilitado): ${email}`);
       return false;
     }
 
     const verificationUrl = `${this.config.get('FRONTEND_URL')}/verify-email?token=${token}`;
-    const html = await this.getVerificationEmailTemplate(name, verificationUrl);
+    const html = this.getVerificationEmailTemplate(name, verificationUrl);
 
     // If database configuration is active and credentials are provided, use them
     if (this.dbConfig && smtpUser && smtpPass) {
@@ -139,50 +130,50 @@ export class EmailService implements OnModuleInit {
         html,
       });
 
-      this.logger.log(`Email de verificaÃ§Ã£o enviado para: ${email}`);
+      this.logger.log(`Email de verificação enviado para: ${email}`);
       return true;
     } catch (error) {
-      this.logger.error(`Erro ao enviar email de verificaÃ§Ã£o para ${email}:`, error);
+      this.logger.error(`Erro ao enviar email de verificação para ${email}:`, error);
       return false;
     }
   }
 
   /**
-   * Enviar email de recuperaÃ§Ã£o de senha
+   * Enviar email de recuperação de senha
    */
   async sendPasswordResetEmail(email: string, name: string, token: string): Promise<boolean> {
     if (!this.isEnabled) {
-      this.logger.warn(`Email de recuperaÃ§Ã£o nÃ£o enviado (serviÃ§o desabilitado): ${email}`);
+      this.logger.warn(`Email de recuperação não enviado (serviço desabilitado): ${email}`);
       return false;
     }
 
     const resetUrl = `${this.config.get('FRONTEND_URL')}/reset-password?token=${token}`;
 
-    const html = await this.getPasswordResetEmailTemplate(name, resetUrl);
+    const html = this.getPasswordResetEmailTemplate(name, resetUrl);
 
     try {
       const platformName = await getPlatformName();
       await this.transporter.sendMail({
         from: `"${this.config.get('EMAIL_FROM_NAME', platformName)}" <${this.config.get('EMAIL_FROM', 'noreply@example.com')}>`,
         to: email,
-        subject: `RecuperaÃ§Ã£o de senha - ${platformName}`,
+        subject: `Recuperação de senha - ${platformName}`,
         html,
       });
 
-      this.logger.log(`Email de recuperaÃ§Ã£o enviado para: ${email}`);
+      this.logger.log(`Email de recuperação enviado para: ${email}`);
       return true;
     } catch (error) {
-      this.logger.error(`Erro ao enviar email de recuperaÃ§Ã£o para ${email}:`, error);
+      this.logger.error(`Erro ao enviar email de recuperação para ${email}:`, error);
       return false;
     }
   }
 
   /**
-   * Enviar alerta de seguranÃ§a
+   * Enviar alerta de segurança
    */
   async sendSecurityAlert(email: string, name: string, alertType: string, details: string): Promise<boolean> {
     if (!this.isEnabled) {
-      this.logger.warn(`Alerta de seguranÃ§a nÃ£o enviado (serviÃ§o desabilitado): ${email}`);
+      this.logger.warn(`Alerta de segurança não enviado (serviço desabilitado): ${email}`);
       return false;
     }
 
@@ -193,25 +184,22 @@ export class EmailService implements OnModuleInit {
       await this.transporter.sendMail({
         from: `"${this.config.get('EMAIL_FROM_NAME', platformName)}" <${this.config.get('EMAIL_FROM', 'noreply@example.com')}>`,
         to: email,
-        subject: `Alerta de SeguranÃ§a - ${alertType}`,
+        subject: `Alerta de Segurança - ${alertType}`,
         html,
       });
 
-      this.logger.log(`Alerta de seguranÃ§a enviado para: ${email}`);
+      this.logger.log(`Alerta de segurança enviado para: ${email}`);
       return true;
     } catch (error) {
-      this.logger.error(`Erro ao enviar alerta de seguranÃ§a para ${email}:`, error);
+      this.logger.error(`Erro ao enviar alerta de segurança para ${email}:`, error);
       return false;
     }
   }
 
   /**
-   * Template de email de verificaÃ§Ã£o
+   * Template de email de verificação
    */
-  private async getVerificationEmailTemplate(name: string, verificationUrl: string): Promise<string> {
-    const platformName = await getPlatformName();
-    const platformEmail = await getPlatformEmail();
-    
+  private getVerificationEmailTemplate(name: string, verificationUrl: string): string {
     return `
       <!DOCTYPE html>
       <html>
@@ -229,23 +217,22 @@ export class EmailService implements OnModuleInit {
       <body>
         <div class="container">
           <div class="header">
-            <h1>VerificaÃ§Ã£o de Email - ${platformName}</h1>
+            <h1>Verificação de Email</h1>
           </div>
           <div class="content">
-            <p>OlÃ¡ <strong>${name}</strong>,</p>
-            <p>Obrigado por se cadastrar no ${platformName}! Para completar seu cadastro, precisamos verificar seu endereÃ§o de email.</p>
-            <p>Clique no botÃ£o abaixo para verificar seu email:</p>
+            <p>Olá <strong>${name}</strong>,</p>
+            <p>Obrigado por se cadastrar no nosso sistema! Para completar seu cadastro, precisamos verificar seu endereço de email.</p>
+            <p>Clique no botão abaixo para verificar seu email:</p>
             <center>
               <a href="${verificationUrl}" class="button">Verificar Email</a>
             </center>
             <p>Ou copie e cole o link abaixo no seu navegador:</p>
             <p style="word-break: break-all; color: #666; font-size: 12px;">${verificationUrl}</p>
             <p><strong>Este link expira em 24 horas.</strong></p>
-            <p>Se vocÃª nÃ£o se cadastrou no ${platformName}, ignore este email.</p>
+            <p>Se você não se cadastrou no nosso sistema, ignore este email.</p>
           </div>
           <div class="footer">
-            <p>Este Ã© um email automÃ¡tico. Por favor, nÃ£o responda.</p>
-            <p>Para suporte, entre em contato: ${platformEmail}</p>
+            <p>Este é um email automático. Por favor, não responda.</p>
           </div>
         </div>
       </body>
@@ -254,12 +241,9 @@ export class EmailService implements OnModuleInit {
   }
 
   /**
-   * Template de email de recuperaÃ§Ã£o de senha
+   * Template de email de recuperação de senha
    */
-  private async getPasswordResetEmailTemplate(name: string, resetUrl: string): Promise<string> {
-    const platformName = await getPlatformName();
-    const platformEmail = await getPlatformEmail();
-    
+  private getPasswordResetEmailTemplate(name: string, resetUrl: string): string {
     return `
       <!DOCTYPE html>
       <html>
@@ -278,24 +262,24 @@ export class EmailService implements OnModuleInit {
       <body>
         <div class="container">
           <div class="header">
-            <h1>RecuperaÃ§Ã£o de Senha - ${platformName}</h1>
+            <h1>Recuperação de Senha</h1>
           </div>
           <div class="content">
-            <p>OlÃ¡ <strong>${name}</strong>,</p>
-            <p>Recebemos uma solicitaÃ§Ã£o para redefinir a senha da sua conta no ${platformName}.</p>
+            <p>Olá <strong>${name}</strong>,</p>
+            <p>Recebemos uma solicitação para redefinir a senha da sua conta.</p>
             <div class="warning">
-              âš ï¸ <strong>AtenÃ§Ã£o:</strong> Se vocÃª nÃ£o solicitou a redefiniÃ§Ã£o de senha, ignore este email e entre em contato com o suporte em ${platformEmail} imediatamente.
+              ⚠️ <strong>Atenção:</strong> Se você não solicitou a redefinição de senha, ignore este email e entre em contato com o suporte imediatamente.
             </div>
-            <p>Clique no botÃ£o abaixo para criar uma nova senha:</p>
+            <p>Clique no botão abaixo para criar uma nova senha:</p>
             <center>
               <a href="${resetUrl}" class="button">Redefinir Senha</a>
             </center>
             <p>Ou copie e cole o link abaixo no seu navegador:</p>
             <p style="word-break: break-all; color: #666; font-size: 12px;">${resetUrl}</p>
-            <p><strong>Este link expira em 1 hora por seguranÃ§a.</strong></p>
+            <p><strong>Este link expira em 1 hora por segurança.</strong></p>
           </div>
           <div class="footer">
-            <p>Este Ã© um email automÃ¡tico. Por favor, nÃ£o responda.</p>
+            <p>Este é um email automático. Por favor, não responda.</p>
           </div>
         </div>
       </body>
@@ -304,7 +288,7 @@ export class EmailService implements OnModuleInit {
   }
 
   /**
-   * Template de alerta de seguranÃ§a
+   * Template de alerta de segurança
    */
   private getSecurityAlertTemplate(name: string, alertType: string, details: string): string {
     return `
@@ -324,26 +308,26 @@ export class EmailService implements OnModuleInit {
       <body>
         <div class="container">
           <div class="header">
-            <h1>ðŸš¨ Alerta de SeguranÃ§a</h1>
+            <h1>🚨 Alerta de Segurança</h1>
           </div>
           <div class="content">
-            <p>OlÃ¡ <strong>${name}</strong>,</p>
-            <p>Detectamos uma atividade relacionada Ã  seguranÃ§a da sua conta:</p>
+            <p>Olá <strong>${name}</strong>,</p>
+            <p>Detectamos uma atividade relacionada à segurança da sua conta:</p>
             <div class="alert">
               <strong>Tipo:</strong> ${alertType}<br>
               <strong>Detalhes:</strong> ${details}<br>
               <strong>Data/Hora:</strong> ${new Date().toLocaleString('pt-BR')}
             </div>
-            <p>Se vocÃª reconhece esta atividade, nenhuma aÃ§Ã£o Ã© necessÃ¡ria.</p>
-            <p>Se vocÃª <strong>nÃ£o</strong> reconhece esta atividade:</p>
+            <p>Se você reconhece esta atividade, nenhuma ação é necessária.</p>
+            <p>Se você <strong>não</strong> reconhece esta atividade:</p>
             <ul>
               <li>Altere sua senha imediatamente</li>
-              <li>Ative a autenticaÃ§Ã£o de dois fatores (2FA)</li>
+              <li>Ative a autenticação de dois fatores (2FA)</li>
               <li>Entre em contato com o suporte</li>
             </ul>
           </div>
           <div class="footer">
-            <p>Este Ã© um email automÃ¡tico. Por favor, nÃ£o responda.</p>
+            <p>Este é um email automático. Por favor, não responda.</p>
           </div>
         </div>
       </body>
@@ -356,7 +340,7 @@ export class EmailService implements OnModuleInit {
    */
   async sendTestEmail(email: string, name: string, config: any, smtpUser: string, smtpPass: string): Promise<boolean> {
     this.logger.log(`Iniciando teste de email para: ${email}`);
-    
+
     // If no credentials provided, try to get from database
     if ((!smtpUser || !smtpPass) && this.prisma) {
       this.logger.log('Buscando credenciais SMTP do banco de dados...');
@@ -367,7 +351,7 @@ export class EmailService implements OnModuleInit {
           smtpPass = smtpCredentials.smtpPassword;
           this.logger.log('Credenciais SMTP encontradas no banco de dados');
         } else {
-          this.logger.warn('Credenciais SMTP nÃ£o encontradas no banco de dados');
+          this.logger.warn('Credenciais SMTP não encontradas no banco de dados');
         }
       } catch (error) {
         this.logger.error('Erro ao buscar credenciais SMTP do banco:', error);
@@ -375,20 +359,20 @@ export class EmailService implements OnModuleInit {
     }
 
     if (!smtpUser || !smtpPass) {
-      this.logger.error(`Email de teste nÃ£o enviado - credenciais ausentes para: ${email}`);
-      throw new Error('Credenciais SMTP nÃ£o configuradas. Configure usuÃ¡rio e senha SMTP primeiro.');
+      this.logger.error(`Email de teste não enviado - credenciais ausentes para: ${email}`);
+      throw new Error('Credenciais SMTP não configuradas. Configure usuário e senha SMTP primeiro.');
     }
 
     if (!config || !config.smtpHost || !config.smtpPort) {
-      this.logger.error('ConfiguraÃ§Ã£o de email invÃ¡lida ou ausente');
-      throw new Error('ConfiguraÃ§Ã£o de email nÃ£o encontrada. Configure um provedor de email primeiro.');
+      this.logger.error('Configuração de email inválida ou ausente');
+      throw new Error('Configuração de email não encontrada. Configure um provedor de email primeiro.');
     }
 
-    this.logger.log(`ConfiguraÃ§Ã£o SMTP: ${config.smtpHost}:${config.smtpPort} (${config.encryption})`);
+    this.logger.log(`Configuração SMTP: ${config.smtpHost}:${config.smtpPort} (${config.encryption})`);
 
     try {
       // Create a temporary transporter with the provided credentials
-      const transporterConfig: unknown = {
+      const transporterConfig: any = {
         host: config.smtpHost,
         port: config.smtpPort,
         secure: config.encryption === 'SSL', // true for port 465, false for other ports
@@ -409,58 +393,58 @@ export class EmailService implements OnModuleInit {
         };
       }
 
-      this.logger.log('Criando transporter temporÃ¡rio para teste...');
+      this.logger.log('Criando transporter temporário para teste...');
       const tempTransporter = nodemailer.createTransport(transporterConfig);
 
       // Verify connection before sending
-      this.logger.log('Verificando conexÃ£o SMTP...');
+      this.logger.log('Verificando conexão SMTP...');
       await tempTransporter.verify();
-      this.logger.log('âœ… ConexÃ£o SMTP verificada com sucesso');
+      this.logger.log('✅ Conexão SMTP verificada com sucesso');
 
-      const html = await this.getTestEmailTemplate(name, config);
+      const html = this.getTestEmailTemplate(name, config);
 
       this.logger.log('Enviando email de teste...');
       const platformName = await getPlatformName();
-      
+
       const info = await tempTransporter.sendMail({
         from: `"${platformName}" <${smtpUser}>`,
         to: email,
-        subject: `Teste de ConfiguraÃ§Ã£o de Email - ${platformName}`,
+        subject: `Teste de Configuração de Email - ${platformName}`,
         html,
       });
 
-      this.logger.log(`âœ… Email de teste enviado com sucesso para: ${email}`);
+      this.logger.log(`✅ Email de teste enviado com sucesso para: ${email}`);
       this.logger.log(`Message ID: ${info.messageId}`);
-      
+
       if (info.response) {
         this.logger.log(`SMTP Response: ${info.response}`);
       }
 
       return true;
     } catch (error) {
-      this.logger.error(`âŒ Erro detalhado ao enviar email de teste para ${email}:`);
+      this.logger.error(`❌ Erro detalhado ao enviar email de teste para ${email}:`);
       this.logger.error(`Erro: ${error.message}`);
-      
+
       if (error.code) {
-        this.logger.error(`CÃ³digo: ${error.code}`);
+        this.logger.error(`Código: ${error.code}`);
       }
-      
+
       if (error.response) {
         this.logger.error(`Resposta SMTP: ${error.response}`);
       }
 
       // Provide more specific error messages
       let errorMessage = 'Erro ao enviar email de teste: ';
-      
+
       if (error.code === 'EAUTH') {
-        errorMessage += 'Falha na autenticaÃ§Ã£o. Verifique usuÃ¡rio e senha SMTP.';
+        errorMessage += 'Falha na autenticação. Verifique usuário e senha SMTP.';
         if (config.smtpHost?.includes('gmail')) {
           errorMessage += ' Para Gmail, use uma "Senha de app" em vez da senha normal.';
         }
       } else if (error.code === 'ECONNECTION') {
-        errorMessage += 'Falha na conexÃ£o. Verifique servidor e porta SMTP.';
+        errorMessage += 'Falha na conexão. Verifique servidor e porta SMTP.';
       } else if (error.code === 'ETIMEDOUT') {
-        errorMessage += 'Timeout na conexÃ£o. Verifique se a porta nÃ£o estÃ¡ bloqueada.';
+        errorMessage += 'Timeout na conexão. Verifique se a porta não está bloqueada.';
       } else {
         errorMessage += error.message;
       }
@@ -473,10 +457,10 @@ export class EmailService implements OnModuleInit {
    * Send email with database configuration and provided credentials
    */
   async sendEmailWithCredentials(
-    email: string, 
-    subject: string, 
-    html: string, 
-    smtpUser: string, 
+    email: string,
+    subject: string,
+    html: string,
+    smtpUser: string,
     smtpPass: string
   ): Promise<boolean> {
     // If no credentials provided, try to get from database
@@ -493,7 +477,7 @@ export class EmailService implements OnModuleInit {
     }
 
     if (!this.dbConfig || !smtpUser || !smtpPass) {
-      this.logger.warn(`Email nÃ£o enviado (configuraÃ§Ã£o ou credenciais ausentes): ${email}`);
+      this.logger.warn(`Email não enviado (configuração ou credenciais ausentes): ${email}`);
       return false;
     }
 
@@ -513,7 +497,7 @@ export class EmailService implements OnModuleInit {
       });
 
       const platformName = await getPlatformName();
-      
+
       await tempTransporter.sendMail({
         from: `"${platformName}" <${smtpUser}>`,
         to: email,
@@ -532,9 +516,7 @@ export class EmailService implements OnModuleInit {
   /**
    * Template de email de teste
    */
-  private async getTestEmailTemplate(name: string, config: unknown): Promise<string> {
-    const platformName = await getPlatformName();
-    const platformEmail = await getPlatformEmail();
+  private getTestEmailTemplate(name: string, config: any): string {
     return `
       <!DOCTYPE html>
       <html>
@@ -552,24 +534,23 @@ export class EmailService implements OnModuleInit {
       <body>
         <div class="container">
           <div class="header">
-            <h1>âœ… ConfiguraÃ§Ã£o de Email Confirmada - ${platformName}</h1>
+            <h1>✅ Configuração de Email Confirmada</h1>
           </div>
           <div class="content">
-            <p>OlÃ¡ <strong>${name}</strong>,</p>
-            <p>Esta Ã© uma mensagem de teste para confirmar que sua configuraÃ§Ã£o de email do ${platformName} estÃ¡ funcionando corretamente.</p>
+            <p>Olá <strong>${name}</strong>,</p>
+            <p>Esta é uma mensagem de teste para confirmar que sua configuração de email está funcionando corretamente.</p>
             
             <div class="config-details">
-              <h3>Detalhes da ConfiguraÃ§Ã£o:</h3>
+              <h3>Detalhes da Configuração:</h3>
               <p><strong>Servidor SMTP:</strong> ${config.smtpHost}:${config.smtpPort}</p>
               <p><strong>Criptografia:</strong> ${config.encryption}</p>
-              <p><strong>MÃ©todo de AutenticaÃ§Ã£o:</strong> ${config.authMethod}</p>
+              <p><strong>Método de Autenticação:</strong> ${config.authMethod}</p>
             </div>
             
-            <p>Se vocÃª recebeu este email, sua configuraÃ§Ã£o de email estÃ¡ pronta para uso!</p>
+            <p>Se você recebeu este email, sua configuração de email está pronta para uso!</p>
           </div>
           <div class="footer">
-            <p>Este Ã© um email automÃ¡tico. Por favor, nÃ£o responda.</p>
-            <p>Para suporte, entre em contato: ${platformEmail}</p>
+            <p>Este é um email automático. Por favor, não responda.</p>
           </div>
         </div>
       </body>
@@ -584,4 +565,3 @@ export class EmailService implements OnModuleInit {
     await this.initializeTransporter();
   }
 }
-

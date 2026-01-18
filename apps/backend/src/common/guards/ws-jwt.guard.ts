@@ -11,15 +11,13 @@ export class WsJwtGuard implements CanActivate {
     private jwtService: JwtService,
     private configService: ConfigService,
     private prismaService: PrismaService,
-  ) {
-      // Empty implementation
-    }
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     try {
       const client = context.switchToWs().getClient();
       const token = this.extractToken(client);
-      
+
       if (!token) {
         this.logger.warn('Conexão WebSocket rejeitada: Nenhum token fornecido');
         return false;
@@ -45,7 +43,7 @@ export class WsJwtGuard implements CanActivate {
       }
 
       // Anexar contexto do usuário ao cliente
-      client.user = {
+      (client as any).user = {
         id: user.id,
         tenantId: user.tenantId,
         role: user.role,
@@ -62,9 +60,9 @@ export class WsJwtGuard implements CanActivate {
     }
   }
 
-  private extractToken(client: unknown): string | null {
-    return client.handshake?.auth?.token || 
-           client.handshake?.headers?.authorization?.replace('Bearer ', '') ||
-           null;
+  private extractToken(client: any): string | null {
+    return client.handshake?.auth?.token ||
+      client.handshake?.headers?.authorization?.replace('Bearer ', '') ||
+      null;
   }
 }

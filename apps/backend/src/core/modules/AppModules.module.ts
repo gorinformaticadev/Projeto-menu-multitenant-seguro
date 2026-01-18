@@ -1,13 +1,11 @@
-import { Module, Logger } from '@nestjs/common';
+import { Module, Logger, DynamicModule } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import * as path from 'path';
 import { PrismaModule } from '@core/prisma/prisma.module';
 import { CommonModule } from '@common/common.module';
 import { NotificationsModule } from '../../notifications/notifications.module';
 
-@Module({
-      // Empty implementation
-    })
+@Module({})
 export class AppModulesModule {
     private static readonly logger = new Logger(AppModulesModule.name);
 

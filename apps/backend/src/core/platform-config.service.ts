@@ -1,4 +1,4 @@
- import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 
 export interface PlatformConfig {
@@ -14,9 +14,7 @@ export class PlatformConfigService {
   private cacheTimestamp: number = 0;
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 
-  constructor(private prisma: PrismaService) {
-      // Empty implementation
-    }
+  constructor(private prisma: PrismaService) { }
 
   /**
    * Get platform configuration with caching
@@ -29,7 +27,7 @@ export class PlatformConfigService {
 
     try {
       const securityConfig = await this.prisma.securityConfig.findFirst();
-      
+
       const config: PlatformConfig = {
         platformName: securityConfig?.platformName || 'Sistema Multitenant',
         platformEmail: securityConfig?.platformEmail || 'contato@sistema.com',
@@ -43,7 +41,7 @@ export class PlatformConfigService {
       return config;
     } catch (error) {
       this.logger.error('Error fetching platform configuration:', error);
-      
+
       // Return default values on error
       return {
         platformName: 'Sistema Multitenant',
@@ -65,8 +63,8 @@ export class PlatformConfigService {
     try {
       // Get or create security config
       let securityConfig = await this.prisma.securityConfig.findFirst();
-      
-      const updateData: unknown = {
+
+      const updateData: any = {
         updatedBy: userId,
       };
 
@@ -96,7 +94,7 @@ export class PlatformConfigService {
       this.cachedConfig = null;
 
       this.logger.log(`Platform configuration updated by user ${userId}`);
-      
+
       return await this.getPlatformConfig();
     } catch (error) {
       this.logger.error('Error updating platform configuration:', error);

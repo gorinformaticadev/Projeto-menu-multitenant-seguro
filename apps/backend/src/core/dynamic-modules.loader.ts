@@ -48,7 +48,7 @@ export class DynamicModulesLoader {
                     const moduleDirName = mod.slug.toLowerCase();
                     const moduleFileName = mod.slug.toLowerCase() + '.module';
 
-                    const _modulePath = path.resolve(
+                    const modulePath = path.resolve(
                         __dirname,
                         `../modules/${moduleDirName}/${moduleFileName}`
                     );

@@ -1,4 +1,4 @@
- import { Controller, Post, Body, Ip, UseGuards, Get } from '@nestjs/common';
+import { Controller, Post, Body, Ip, UseGuards, Get, Req } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { TwoFactorService } from './two-factor.service';
@@ -23,14 +23,12 @@ export class AuthController {
     private twoFactorService: TwoFactorService,
     private emailVerificationService: EmailVerificationService,
     private passwordResetService: PasswordResetService,
-  ) {
-      // Empty implementation
-    }
+  ) { }
 
   /**
    * POST /auth/login
    * Rate Limiting: 5 tentativas por minuto
-   * CSRF: Desabilitado - endpoint pÃºblico de autenticaÃ§Ã£o
+   * CSRF: Desabilitado - endpoint público de autenticação
    */
   @SkipCsrf()
   @Post('login')
@@ -47,7 +45,7 @@ export class AuthController {
   /**
    * POST /auth/refresh
    * Renovar access token usando refresh token
-   * CSRF: Desabilitado - usa refresh token como autenticaÃ§Ã£o
+   * CSRF: Desabilitado - usa refresh token como autenticação
    */
   @SkipCsrf()
   @Post('refresh')
@@ -79,7 +77,7 @@ export class AuthController {
   /**
    * POST /auth/login-2fa
    * Login com 2FA
-   * CSRF: Desabilitado - endpoint pÃºblico de autenticaÃ§Ã£o
+   * CSRF: Desabilitado - endpoint público de autenticação
    */
   @SkipCsrf()
   @Post('login-2fa')
@@ -99,7 +97,7 @@ export class AuthController {
    */
   @Get('2fa/generate')
   @UseGuards(JwtAuthGuard)
-  async generate2FA(@Req() req: unknown) {
+  async generate2FA(@Req() req: any) {
     return this.twoFactorService.generateSecret(req.user.id);
   }
 
@@ -109,7 +107,7 @@ export class AuthController {
    */
   @Post('2fa/enable')
   @UseGuards(JwtAuthGuard)
-  async enable2FA(@Body() verify2FADto: Verify2FADto, @Req() req: unknown) {
+  async enable2FA(@Body() verify2FADto: Verify2FADto, @Req() req: any) {
     return this.twoFactorService.enable(req.user.id, verify2FADto.token);
   }
 
@@ -119,48 +117,48 @@ export class AuthController {
    */
   @Post('2fa/disable')
   @UseGuards(JwtAuthGuard)
-  async disable2FA(@Body() verify2FADto: Verify2FADto, @Req() req: unknown) {
+  async disable2FA(@Body() verify2FADto: Verify2FADto, @Req() req: any) {
     return this.twoFactorService.disable(req.user.id, verify2FADto.token);
   }
   /**
    * GET /auth/2fa/status
-   * Verificar status de 2FA do usuÃ¡rio logado
+   * Verificar status de 2FA do usuário logado
    */
   @Get('2fa/status')
   @UseGuards(JwtAuthGuard)
-  async get2FAStatus(@Req() req: unknown) {
+  async get2FAStatus(@Req() req: any) {
     const user = await this.authService.getProfile(req.user.id);
     return {
       enabled: user.twoFactorEnabled || false,
-      suggested: true, // Esta informaÃ§Ã£o virÃ¡ da configuraÃ§Ã£o de seguranÃ§a
+      suggested: true, // Esta informação virá da configuração de segurança
     };
   }
 
   /**
    * GET /auth/me
-   * Retornar dados do usuÃ¡rio logado
+   * Retornar dados do usuário logado
    */
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  async getProfile(@Req() req: unknown) {
+  async getProfile(@Req() req: any) {
     return this.authService.getProfile(req.user.id);
   }
 
   /**
    * POST /auth/email/send-verification
-   * Enviar email de verificaÃ§Ã£o
+   * Enviar email de verificação
    */
   @Post('email/send-verification')
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 3, ttl: 3600000 } }) // 3 tentativas por hora
-  async sendVerificationEmail(@Req() req: unknown) {
+  async sendVerificationEmail(@Req() req: any) {
     return this.emailVerificationService.sendVerificationEmail(req.user.id);
   }
 
   /**
    * POST /auth/email/verify
    * Verificar email com token
-   * CSRF: Desabilitado - endpoint pÃºblico
+   * CSRF: Desabilitado - endpoint público
    */
   @SkipCsrf()
   @Post('email/verify')
@@ -171,18 +169,18 @@ export class AuthController {
 
   /**
    * GET /auth/email/status
-   * Verificar status de verificaÃ§Ã£o de email
+   * Verificar status de verificação de email
    */
   @Get('email/status')
   @UseGuards(JwtAuthGuard)
-  async checkEmailVerification(@Req() req: unknown) {
+  async checkEmailVerification(@Req() req: any) {
     return this.emailVerificationService.checkEmailVerification(req.user.id);
   }
 
   /**
    * POST /auth/forgot-password
-   * Solicitar recuperaÃ§Ã£o de senha
-   * CSRF: Desabilitado - endpoint pÃºblico
+   * Solicitar recuperação de senha
+   * CSRF: Desabilitado - endpoint público
    */
   @SkipCsrf()
   @Post('forgot-password')
@@ -194,7 +192,7 @@ export class AuthController {
   /**
    * POST /auth/reset-password
    * Redefinir senha com token
-   * CSRF: Desabilitado - endpoint pÃºblico
+   * CSRF: Desabilitado - endpoint público
    */
   @SkipCsrf()
   @Post('reset-password')
@@ -206,4 +204,3 @@ export class AuthController {
     );
   }
 }
-

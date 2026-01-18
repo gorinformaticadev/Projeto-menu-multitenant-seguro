@@ -9,9 +9,7 @@ export class SecurityLogGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
     private auditService: AuditService
-  ) {
-      // Empty implementation
-    }
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const securityLogOptions = this.reflector.getAllAndOverride<SecurityLogOptions>(
@@ -24,9 +22,9 @@ export class SecurityLogGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest<Request>();
-    
+
     // Coletar informações baseadas nas opções
-    const logData: unknown = {
+    const logData: any = {
       action: securityLogOptions.action
     };
 
@@ -60,7 +58,7 @@ export class SecurityLogGuard implements CanActivate {
     }
 
     // Detalhes personalizados
-    const details: unknown = {
+    const details: any = {
       method: request.method,
       url: request.url,
       timestamp: new Date().toISOString(),
@@ -99,11 +97,9 @@ export class SecurityLogGuard implements CanActivate {
     );
   }
 
-  private sanitizeParams(params: unknown): any {
-    const sanitized: unknown = {
-      // Empty implementation
-    };
-    
+  private sanitizeParams(params: any): any {
+    const sanitized: any = {};
+
     // Campos sensíveis que devem ser mascarados
     const sensitiveFields = [
       'password', 'senha', 'token', 'authorization', 'auth',
@@ -111,7 +107,7 @@ export class SecurityLogGuard implements CanActivate {
     ];
 
     for (const [key, value] of Object.entries(params)) {
-      if (sensitiveFields.some(field => 
+      if (sensitiveFields.some(field =>
         key.toLowerCase().includes(field.toLowerCase())
       )) {
         sanitized[key] = '[REDACTED]';

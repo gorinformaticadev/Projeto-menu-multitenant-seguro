@@ -21,9 +21,7 @@ export const SKIP_CSRF_KEY = 'skipCsrf';
  */
 @Injectable()
 export class CsrfGuard implements CanActivate {
-  constructor(private reflector: Reflector) {
-      // Empty implementation
-    }
+  constructor(private reflector: Reflector) { }
 
   canActivate(context: ExecutionContext): boolean {
     // Verifica se a rota está marcada para pular CSRF
@@ -39,7 +37,7 @@ export class CsrfGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const response = context.switchToHttp().getResponse();
     const method = request.method.toUpperCase();
-    
+
     // Validar origem da requisição
     if (!this.isValidOrigin(request)) {
       throw new ForbiddenException('Origem da requisição inválida');
@@ -64,7 +62,7 @@ export class CsrfGuard implements CanActivate {
         this.setCsrfToken(request, response);
         return true;
       }
-      
+
       // Se apenas um estiver presente, permitir em DEV
       if (cookieToken || headerToken) {
         return true;
@@ -80,7 +78,7 @@ export class CsrfGuard implements CanActivate {
       this.logSuspiciousActivity(request, 'TOKEN_MISMATCH');
       throw new ForbiddenException('Token CSRF inválido');
     }
-    
+
     // Validar timestamp do token (opcional, para tokens com expiração)
     if (!this.isValidTokenAge(cookieToken)) {
       this.logSuspiciousActivity(request, 'TOKEN_EXPIRED');
@@ -93,7 +91,7 @@ export class CsrfGuard implements CanActivate {
   /**
    * Gera e define token CSRF no cookie
    */
-  private setCsrfToken(request: unknown, response: unknown): void {
+  private setCsrfToken(request: any, response: any): void {
     // Se já existe token válido, não gerar novo
     if (request.cookies?.['XSRF-TOKEN']) {
       return;
@@ -117,20 +115,20 @@ export class CsrfGuard implements CanActivate {
   /**
    * Valida a origem da requisição
    */
-  private isValidOrigin(request: unknown): boolean {
+  private isValidOrigin(request: any): boolean {
     const origin = request.headers.origin;
     const referer = request.headers.referer;
-    
+
     // Em ambiente de desenvolvimento, ser mais permissivo
     if (process.env.NODE_ENV !== 'production') {
       // Permitir localhost e IPs locais
       if (origin) {
         try {
           const originUrl = new URL(origin);
-          if (originUrl.hostname === 'localhost' || 
-              originUrl.hostname === '127.0.0.1' ||
-              originUrl.hostname.startsWith('192.168.') ||
-              originUrl.hostname.startsWith('10.')) {
+          if (originUrl.hostname === 'localhost' ||
+            originUrl.hostname === '127.0.0.1' ||
+            originUrl.hostname.startsWith('192.168.') ||
+            originUrl.hostname.startsWith('10.')) {
             return true;
           }
         } catch {
@@ -139,31 +137,31 @@ export class CsrfGuard implements CanActivate {
       }
       return true; // Permitir tudo em DEV
     }
-    
+
     // Lista de origens permitidas
     const allowedOrigins = [
       process.env.FRONTEND_URL,
       'https://seu-dominio.com',
       'https://www.seu-dominio.com'
     ].filter(Boolean);
-    
+
     // Validar Origin header
     if (origin && allowedOrigins.includes(origin)) {
       return true;
     }
-    
+
     // Validar Referer header como fallback
     if (referer) {
       try {
         const refererUrl = new URL(referer);
-        return allowedOrigins.some(allowed => 
+        return allowedOrigins.some(allowed =>
           refererUrl.origin === allowed
         );
       } catch {
         return false;
       }
     }
-    
+
     return false;
   }
 
@@ -180,7 +178,7 @@ export class CsrfGuard implements CanActivate {
   /**
    * Log de atividades suspeitas
    */
-  private logSuspiciousActivity(request: unknown, reason: string): void {
+  private logSuspiciousActivity(request: any, reason: string): void {
     console.warn('🚨 Atividade suspeita detectada:', {
       reason,
       ip: request.ip || request.connection?.remoteAddress,

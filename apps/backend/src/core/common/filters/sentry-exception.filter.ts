@@ -15,7 +15,7 @@ export class SentryExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    const _status =
+    const status =
       exception instanceof HttpException
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
@@ -37,10 +37,10 @@ export class SentryExceptionFilter implements ExceptionFilter {
         },
         user: (request as any).user
           ? {
-              id: (request as any).user.id,
-              email: (request as any).user.email,
-              role: (request as any).user.role,
-            }
+            id: (request as any).user.id,
+            email: (request as any).user.email,
+            role: (request as any).user.role,
+          }
           : undefined,
       });
     }

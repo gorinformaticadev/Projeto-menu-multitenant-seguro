@@ -1,4 +1,4 @@
- import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { EmailConfigService } from './email-config.service';
 import { CreateEmailConfigDto, UpdateEmailConfigDto } from './dto/email-config.dto';
@@ -15,13 +15,11 @@ export class EmailConfigController {
   constructor(
     private readonly emailConfigService: EmailConfigService,
     private readonly emailService: EmailService,
-  ) {
-      // Empty implementation
-    }
+  ) { }
 
   /**
    * GET /email-config/providers
-   * Obter lista de provedores de email prÃ©-configurados
+   * Obter lista de provedores de email pré-configurados
    * Apenas SUPER_ADMIN
    */
   @SkipThrottle()
@@ -33,7 +31,7 @@ export class EmailConfigController {
 
   /**
    * GET /email-config
-   * Obter todas as configuraÃ§Ãµes de email
+   * Obter todas as configurações de email
    * Apenas SUPER_ADMIN
    */
   @SkipThrottle()
@@ -45,8 +43,8 @@ export class EmailConfigController {
 
   /**
    * GET /email-config/active
-   * Obter configuraÃ§Ã£o de email ativa
-   * PÃºblico para uso no serviÃ§o de email
+   * Obter configuração de email ativa
+   * Público para uso no serviço de email
    */
   @SkipThrottle()
   @Get('active')
@@ -68,7 +66,7 @@ export class EmailConfigController {
 
   /**
    * POST /email-config
-   * Criar nova configuraÃ§Ã£o de email
+   * Criar nova configuração de email
    * Apenas SUPER_ADMIN
    */
   @SkipThrottle()
@@ -83,7 +81,7 @@ export class EmailConfigController {
 
   /**
    * PUT /email-config/:id
-   * Atualizar configuraÃ§Ã£o de email
+   * Atualizar configuração de email
    * Apenas SUPER_ADMIN
    */
   @SkipThrottle()
@@ -99,7 +97,7 @@ export class EmailConfigController {
 
   /**
    * PUT /email-config/:id/activate
-   * Ativar configuraÃ§Ã£o de email
+   * Ativar configuração de email
    * Apenas SUPER_ADMIN
    */
   @SkipThrottle()
@@ -114,7 +112,7 @@ export class EmailConfigController {
 
   /**
    * DELETE /email-config/:id
-   * Remover configuraÃ§Ã£o de email
+   * Remover configuração de email
    * Apenas SUPER_ADMIN
    */
   @SkipThrottle()
@@ -126,7 +124,7 @@ export class EmailConfigController {
 
   /**
    * POST /email-config/test
-   * Testar configuraÃ§Ã£o de email
+   * Testar configuração de email
    * Apenas SUPER_ADMIN
    */
   @SkipThrottle()

@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { ModuleStatus } from '@prisma/client';
 import { CronService } from '@core/cron/cron.service';
@@ -8,9 +8,7 @@ export class TenantModuleService {
     constructor(
         private readonly prisma: PrismaService,
         private readonly cronService: CronService
-    ) {
-      // Empty implementation
-    }
+    ) { }
 
     private async countActiveTenantsForModule(moduleId: string): Promise<number> {
         return this.prisma.moduleTenant.count({
@@ -134,9 +132,8 @@ export class TenantModuleService {
         });
 
         // Parar crons relacionados ao módulo e tenant
-        // Parar crons relacionados ao módulo e tenant
         // 1. Tenta parar crons ESPECÍFICOS deste tenant
-        await this.cronService.stopJobsForModule(moduleName, _tenantId);
+        await this.cronService.stopJobsForModule(moduleName, tenantId);
 
         // 2. Verifica se este era o ÚLTIMO tenant ativo para este módulo
         const activeCount = await this.countActiveTenantsForModule(module.id);
@@ -194,7 +191,7 @@ export class TenantModuleService {
      * Ativa módulo (alias para activateModuleForTenant)
      */
     async enableModule(tenantId: string, moduleSlug: string): Promise<boolean> {
-        await this.activateModuleForTenant(moduleSlug, _tenantId);
+        await this.activateModuleForTenant(moduleSlug, tenantId);
         return true;
     }
 
@@ -202,7 +199,7 @@ export class TenantModuleService {
      * Desativa módulo (alias para deactivateModuleForTenant)
      */
     async disableModule(tenantId: string, moduleSlug: string): Promise<boolean> {
-        await this.deactivateModuleForTenant(moduleSlug, _tenantId);
+        await this.deactivateModuleForTenant(moduleSlug, tenantId);
         return true;
     }
 }

@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, UseGuards, Req } from '@nestjs/common';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ModuleSecurityService } from './module-security.service';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -10,9 +10,7 @@ import { CurrentUser } from './decorators/current-user.decorator';
 @Controller('me')
 @UseGuards(JwtAuthGuard)
 export class UserModulesController {
-    constructor(private readonly moduleSecurity: ModuleSecurityService) {
-      // Empty implementation
-    }
+    constructor(private readonly moduleSecurity: ModuleSecurityService) { }
 
     /**
      * GET /api/me/modules
@@ -21,7 +19,7 @@ export class UserModulesController {
     @Get('modules')
     async getMyModules(
         @CurrentUser() user: any,
-        @Req() req: unknown) {
+        @Req() req: any) {
         const tenantId = req.tenantId || user.tenantId;
 
         if (!tenantId) {

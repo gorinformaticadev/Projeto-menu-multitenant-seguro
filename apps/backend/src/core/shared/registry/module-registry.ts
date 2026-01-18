@@ -9,21 +9,21 @@
  * - Comportamento previsível e determinístico
  */
 
-import { 
-  IModuleRegistry, 
-  ModuleContribution, 
-  ModuleMenuItem, 
-  ModuleDashboardWidget, 
-  ModuleTaskbarItem, 
-  ModuleUserMenuItem, 
-  ModuleNotification 
+import {
+  IModuleRegistry,
+  ModuleContribution,
+  ModuleMenuItem,
+  ModuleDashboardWidget,
+  ModuleTaskbarItem,
+  ModuleUserMenuItem,
+  ModuleNotification
 } from '../types/module.types';
 
 class ModuleRegistry implements IModuleRegistry {
   private static instance: ModuleRegistry;
   private contributions: Map<string, ModuleContribution> = new Map();
 
-  private // Empty constructor removed
+  private constructor() { }
 
   static getInstance(): ModuleRegistry {
     if (!ModuleRegistry.instance) {
@@ -43,7 +43,7 @@ class ModuleRegistry implements IModuleRegistry {
     }
 
     this.contributions.set(contribution.id, contribution);
-    }
+  }
 
   /**
    * Remove um módulo do registro
@@ -51,7 +51,7 @@ class ModuleRegistry implements IModuleRegistry {
   unregister(moduleId: string): void {
     if (this.contributions.has(moduleId)) {
       this.contributions.delete(moduleId);
-      }
+    }
   }
 
   /**
@@ -89,8 +89,8 @@ class ModuleRegistry implements IModuleRegistry {
       }
 
       // Filtra itens baseado em permissões/roles
-      const filteredItems = contribution.sidebar.filter(item => 
-        this.hasAccess(item.roles, item.permissions, userpermissions)
+      const filteredItems = contribution.sidebar.filter(item =>
+        this.hasAccess(item.roles, item.permissions, userRole, permissions)
       );
 
       items.push(...filteredItems);
@@ -117,8 +117,8 @@ class ModuleRegistry implements IModuleRegistry {
         continue;
       }
 
-      const filteredWidgets = contribution.dashboard.filter(widget => 
-        this.hasAccess(widget.roles, widget.permissions, userpermissions)
+      const filteredWidgets = contribution.dashboard.filter(widget =>
+        this.hasAccess(widget.roles, widget.permissions, userRole, permissions)
       );
 
       widgets.push(...filteredWidgets);
@@ -144,8 +144,8 @@ class ModuleRegistry implements IModuleRegistry {
         continue;
       }
 
-      const filteredItems = contribution.taskbar.filter(item => 
-        this.hasAccess(item.roles, item.permissions, userpermissions)
+      const filteredItems = contribution.taskbar.filter(item =>
+        this.hasAccess(item.roles, item.permissions, userRole, permissions)
       );
 
       items.push(...filteredItems);
@@ -171,8 +171,8 @@ class ModuleRegistry implements IModuleRegistry {
         continue;
       }
 
-      const filteredItems = contribution.userMenu.filter(item => 
-        this.hasAccess(item.roles, item.permissions, userpermissions)
+      const filteredItems = contribution.userMenu.filter(item =>
+        this.hasAccess(item.roles, item.permissions, userRole, permissions)
       );
 
       items.push(...filteredItems);
@@ -198,8 +198,8 @@ class ModuleRegistry implements IModuleRegistry {
         continue;
       }
 
-      const filteredNotifications = contribution.notifications.filter(notification => 
-        this.hasAccess(notification.roles, notification.permissions, userpermissions)
+      const filteredNotifications = contribution.notifications.filter(notification =>
+        this.hasAccess(notification.roles, notification.permissions, userRole, permissions)
       );
 
       notifications.push(...filteredNotifications);
@@ -212,9 +212,9 @@ class ModuleRegistry implements IModuleRegistry {
    * Verifica se o usuário tem acesso baseado em roles e permissões
    */
   private hasAccess(
-    itemRoles?: string[], 
-    itemPermissions?: string[], 
-    userRole?: string, 
+    itemRoles?: string[],
+    itemPermissions?: string[],
+    userRole?: string,
     userPermissions?: string[]
   ): boolean {
     // Se item não especifica restrições → acesso liberado
@@ -231,7 +231,7 @@ class ModuleRegistry implements IModuleRegistry {
 
     // Verifica permissões
     if (itemPermissions && userPermissions) {
-      const hasPermission = itemPermissions.some(permission => 
+      const hasPermission = itemPermissions.some(permission =>
         userPermissions.includes(permission)
       );
       if (hasPermission) {

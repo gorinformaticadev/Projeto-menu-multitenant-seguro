@@ -1,4 +1,4 @@
- import { Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
 import { TenantModuleService } from '@core/modules/engine/backend/tenant-module.service';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
@@ -8,9 +8,7 @@ import { Role } from '@prisma/client';
 @Controller('tenants/:tenantId/modules')
 @UseGuards(RolesGuard)
 export class TenantModulesController {
-  constructor(private readonly tenantModuleService: TenantModuleService) {
-      // Empty implementation
-    }
+  constructor(private readonly tenantModuleService: TenantModuleService) { }
 
   @Get(':moduleName/status')
   @Roles(Role.SUPER_ADMIN)
@@ -18,7 +16,7 @@ export class TenantModulesController {
     @Param('tenantId') tenantId: string,
     @Param('moduleName') moduleName: string
   ) {
-    const isActive = await this.tenantModuleService.isModuleActiveForTenant(moduleName, _tenantId);
+    const isActive = await this.tenantModuleService.isModuleActiveForTenant(moduleName, tenantId);
     return { moduleName, tenantId, active: isActive };
   }
 
@@ -28,8 +26,8 @@ export class TenantModulesController {
     @Param('tenantId') tenantId: string,
     @Param('moduleName') moduleName: string
   ) {
-    await this.tenantModuleService.activateModuleForTenant(moduleName, _tenantId);
-    return { message: `MÃ³dulo ${moduleName} ativado para o tenant ${tenantId}` };
+    await this.tenantModuleService.activateModuleForTenant(moduleName, tenantId);
+    return { message: `Módulo ${moduleName} ativado para o tenant ${tenantId}` };
   }
 
   @Post(':moduleName/deactivate')
@@ -38,8 +36,8 @@ export class TenantModulesController {
     @Param('tenantId') tenantId: string,
     @Param('moduleName') moduleName: string
   ) {
-    await this.tenantModuleService.deactivateModuleForTenant(moduleName, _tenantId);
-    return { message: `MÃ³dulo ${moduleName} desativado para o tenant ${tenantId}` };
+    await this.tenantModuleService.deactivateModuleForTenant(moduleName, tenantId);
+    return { message: `Módulo ${moduleName} desativado para o tenant ${tenantId}` };
   }
 
   @Get('active')

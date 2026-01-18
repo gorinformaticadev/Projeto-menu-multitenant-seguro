@@ -27,7 +27,7 @@ export async function loadExternalModules(): Promise<void> {
     }
 
     const _data = await response.json();
-    const modules = data.modules || [];
+    const modules = _data.modules || [];
 
     console.log(`📦 ${modules.length} módulo(s) encontrado(s) no banco de dados`);
 
@@ -41,7 +41,7 @@ export async function loadExternalModules(): Promise<void> {
       }
     }
 
-    } catch (error) {
+  } catch (error) {
     console.error('❌ Erro ao carregar lista de módulos:', error);
   }
 }
@@ -50,7 +50,7 @@ export async function loadExternalModules(): Promise<void> {
  * Carrega um módulo específico dinamicamente
  * Tenta importar o módulo baseado em convenção de nomes
  */
-async function loadModuleDynamically(moduleData: unknown): Promise<void> {
+async function loadModuleDynamically(moduleData: any): Promise<void> {
   const { slug, name, menus } = moduleData;
 
   try {
@@ -67,7 +67,7 @@ async function loadModuleDynamically(moduleData: unknown): Promise<void> {
     if (moduleDefinition && moduleDefinition.default) {
       // Módulo tem definição completa - registrar
       moduleRegistry.register(moduleDefinition.default);
-      } else {
+    } else {
       // Módulo não tem definição - criar contribuição básica baseada nos dados da API
       const basicContribution: ModuleContribution = {
         id: slug,
@@ -85,7 +85,7 @@ async function loadModuleDynamically(moduleData: unknown): Promise<void> {
       };
 
       moduleRegistry.register(basicContribution);
-      }
+    }
 
   } catch (error) {
     console.warn(`⚠️ Não foi possível carregar definição de ${slug}, usando fallback`);

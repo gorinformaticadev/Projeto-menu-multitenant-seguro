@@ -1,0 +1,334 @@
+src/app.module.ts(89,36): error TS2304: Cannot find name 'DynamicModule'.
+src/audit/guards/security-log.guard.ts(37,17): error TS2339: Property 'userId' does not exist on type 'unknown'.
+src/audit/guards/security-log.guard.ts(38,17): error TS2339: Property 'userName' does not exist on type 'unknown'.
+src/audit/guards/security-log.guard.ts(39,17): error TS2339: Property 'userEmail' does not exist on type 'unknown'.
+src/audit/guards/security-log.guard.ts(40,17): error TS2339: Property 'userRole' does not exist on type 'unknown'.
+src/audit/guards/security-log.guard.ts(48,17): error TS2339: Property 'tenantId' does not exist on type 'unknown'.
+src/audit/guards/security-log.guard.ts(54,15): error TS2339: Property 'ipAddress' does not exist on type 'unknown'.
+src/audit/guards/security-log.guard.ts(59,15): error TS2339: Property 'userAgent' does not exist on type 'unknown'.
+src/audit/guards/security-log.guard.ts(72,15): error TS2339: Property 'params' does not exist on type 'unknown'.
+src/audit/guards/security-log.guard.ts(76,15): error TS2339: Property 'query' does not exist on type 'unknown'.
+src/audit/guards/security-log.guard.ts(79,13): error TS2339: Property 'details' does not exist on type 'unknown'.
+src/audit/guards/security-log.guard.ts(83,35): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'AuditLogData'.
+  Property 'action' is missing in type '{}' but required in type 'AuditLogData'.
+src/auth/auth.service.ts(105,20): error TS2339: Property 'isLocked' does not exist on type 'unknown'.
+src/auth/auth.service.ts(106,20): error TS2339: Property 'lockedAt' does not exist on type 'unknown'.
+src/auth/auth.service.ts(107,20): error TS2339: Property 'lockedUntil' does not exist on type 'unknown'.
+src/auth/auth.service.ts(366,23): error TS2304: Cannot find name 'now'.
+src/auth/auth.service.ts(374,25): error TS2304: Cannot find name 'now'.
+src/auth/auth.service.ts(376,25): error TS2304: Cannot find name 'now'.
+src/auth/auth.service.ts(378,25): error TS2304: Cannot find name 'now'.
+src/auth/auth.service.ts(380,25): error TS2304: Cannot find name 'now'.
+src/auth/auth.service.ts(382,25): error TS2304: Cannot find name 'now'.
+src/auth/email-verification.service.ts(93,7): error TS1232: An import declaration can only be used at the top level of a namespace or module.
+src/auth/strategies/jwt.strategy.ts(23,28): error TS2339: Property 'sub' does not exist on type 'unknown'.
+src/auth/strategies/jwt.strategy.ts(32,19): error TS2339: Property 'sub' does not exist on type 'unknown'.
+src/auth/strategies/jwt.strategy.ts(33,22): error TS2339: Property 'email' does not exist on type 'unknown'.
+src/auth/strategies/jwt.strategy.ts(34,21): error TS2339: Property 'role' does not exist on type 'unknown'.
+src/auth/strategies/jwt.strategy.ts(35,25): error TS2339: Property 'tenantId' does not exist on type 'unknown'.
+src/common/filters/sentry-exception.filter.ts(29,9): error TS2365: Operator '>=' cannot be applied to types 'string' and 'number'.
+src/common/filters/sentry-exception.filter.ts(49,21): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+src/common/guards/csrf.guard.ts(98,17): error TS2339: Property 'cookies' does not exist on type 'unknown'.
+src/common/guards/csrf.guard.ts(108,14): error TS2339: Property 'cookie' does not exist on type 'unknown'.
+src/common/guards/csrf.guard.ts(121,28): error TS2339: Property 'headers' does not exist on type 'unknown'.
+src/common/guards/csrf.guard.ts(122,29): error TS2339: Property 'headers' does not exist on type 'unknown'.
+src/common/guards/csrf.guard.ts(186,19): error TS2339: Property 'ip' does not exist on type 'unknown'.
+src/common/guards/csrf.guard.ts(186,33): error TS2339: Property 'connection' does not exist on type 'unknown'.
+src/common/guards/csrf.guard.ts(187,26): error TS2339: Property 'headers' does not exist on type 'unknown'.
+src/common/guards/csrf.guard.ts(188,23): error TS2339: Property 'method' does not exist on type 'unknown'.
+src/common/guards/csrf.guard.ts(189,20): error TS2339: Property 'url' does not exist on type 'unknown'.
+src/common/guards/roles.guard.ts(20,17): error TS2304: Cannot find name 'ForbiddenException'.
+src/common/guards/roles.guard.ts(26,17): error TS2304: Cannot find name 'ForbiddenException'.
+src/common/guards/roles.guard.ts(32,17): error TS2304: Cannot find name 'ForbiddenException'.
+src/common/guards/ws-jwt.guard.ts(66,19): error TS2339: Property 'handshake' does not exist on type 'unknown'.
+src/common/guards/ws-jwt.guard.ts(67,19): error TS2339: Property 'handshake' does not exist on type 'unknown'.
+src/common/pipes/sanitization.pipe.ts(36,23): error TS2407: The right-hand side of a 'for...in' statement must be of type 'any', an object type or a type parameter, but here has type 'unknown'.
+src/common/services/secret-manager.service.ts(136,7): error TS1232: An import declaration can only be used at the top level of a namespace or module.
+src/common/services/secret-manager.service.ts(136,23): error TS2307: Cannot find module 'aws-sdk' or its corresponding type declarations.
+src/common/services/secret-manager.service.ts(150,42): error TS2339: Property 'getSecretValue' does not exist on type 'unknown'.
+src/common/services/secret-manager.service.ts(178,14): error TS2339: Property 'Description' does not exist on type 'unknown'.
+src/common/services/secret-manager.service.ts(181,40): error TS2339: Property 'createSecret' does not exist on type 'unknown'.
+src/common/services/secret-manager.service.ts(197,25): error TS2339: Property 'deleteSecret' does not exist on type 'unknown'.
+src/common/services/secret-manager.service.ts(216,16): error TS2339: Property 'Filters' does not exist on type 'unknown'.
+src/common/services/secret-manager.service.ts(219,42): error TS2339: Property 'listSecrets' does not exist on type 'unknown'.
+src/common/services/secret-manager.service.ts(222,22): error TS2339: Property 'Name' does not exist on type 'unknown'.
+src/common/services/secret-manager.service.ts(224,25): error TS2339: Property 'LastChangedDate' does not exist on type 'unknown'.
+src/common/services/secret-manager.service.ts(225,38): error TS2339: Property 'CreatedDate' does not exist on type 'unknown'.
+src/common/services/secret-manager.service.ts(226,43): error TS2339: Property 'LastChangedDate' does not exist on type 'unknown'.
+src/common/services/secret-manager.service.ts(227,29): error TS2339: Property 'Description' does not exist on type 'unknown'.
+src/common/services/secret-manager.service.ts(240,25): error TS2339: Property 'listSecrets' does not exist on type 'unknown'.
+src/common/services/secure-prisma.service.ts(39,20): error TS2304: Cannot find name 'object'.
+src/common/services/sentry.service.ts(42,17): error TS2304: Cannot find name 'data'.
+src/common/services/sentry.service.ts(42,32): error TS2304: Cannot find name 'data'.
+src/common/services/sentry.service.ts(43,17): error TS2304: Cannot find name 'data'.
+src/common/services/sentry.service.ts(43,39): error TS2304: Cannot find name 'data'.
+src/common/services/sentry.service.ts(44,17): error TS2304: Cannot find name 'data'.
+src/common/services/sentry.service.ts(44,35): error TS2304: Cannot find name 'data'.
+src/common/services/sentry.service.ts(45,17): error TS2304: Cannot find name 'data'.
+src/common/services/sentry.service.ts(45,37): error TS2304: Cannot find name 'data'.
+src/common/services/sentry.service.ts(46,17): error TS2304: Cannot find name 'data'.
+src/common/services/sentry.service.ts(46,36): error TS2304: Cannot find name 'data'.
+src/common/services/sentry.service.ts(48,34): error TS2304: Cannot find name 'data'.
+src/common/services/sentry.service.ts(63,7): error TS2322: Type 'Record<string, unknown>' is not assignable to type 'never'.
+src/common/services/token-blacklist.service.ts(84,17): error TS2552: Cannot find name 'now'. Did you mean '_now'?
+src/core/acl/ACLManager.ts(21,18): error TS2314: Generic type 'Map<K, V>' requires 2 type argument(s).
+src/core/acl/ACLManager.ts(21,22): error TS2304: Cannot find name 'stringDefinition'.
+src/core/acl/ACLManager.ts(133,23): error TS2304: Cannot find name 'Role'.
+src/core/auth.service.ts(103,20): error TS2339: Property 'isLocked' does not exist on type 'unknown'.
+src/core/auth.service.ts(104,20): error TS2339: Property 'lockedAt' does not exist on type 'unknown'.
+src/core/auth.service.ts(105,20): error TS2339: Property 'lockedUntil' does not exist on type 'unknown'.
+src/core/auth.service.ts(353,23): error TS2552: Cannot find name 'now'. Did you mean '_now'?
+src/core/auth.service.ts(361,25): error TS2552: Cannot find name 'now'. Did you mean '_now'?
+src/core/auth.service.ts(363,25): error TS2552: Cannot find name 'now'. Did you mean '_now'?
+src/core/auth.service.ts(365,25): error TS2552: Cannot find name 'now'. Did you mean '_now'?
+src/core/auth.service.ts(367,25): error TS2552: Cannot find name 'now'. Did you mean '_now'?
+src/core/auth.service.ts(369,25): error TS2552: Cannot find name 'now'. Did you mean '_now'?
+src/core/auth/auth.service.ts(103,20): error TS2339: Property 'isLocked' does not exist on type 'unknown'.
+src/core/auth/auth.service.ts(104,20): error TS2339: Property 'lockedAt' does not exist on type 'unknown'.
+src/core/auth/auth.service.ts(105,20): error TS2339: Property 'lockedUntil' does not exist on type 'unknown'.
+src/core/auth/auth.service.ts(353,23): error TS2304: Cannot find name 'now'.
+src/core/auth/auth.service.ts(361,25): error TS2304: Cannot find name 'now'.
+src/core/auth/auth.service.ts(363,25): error TS2304: Cannot find name 'now'.
+src/core/auth/auth.service.ts(365,25): error TS2304: Cannot find name 'now'.
+src/core/auth/auth.service.ts(367,25): error TS2304: Cannot find name 'now'.
+src/core/auth/auth.service.ts(369,25): error TS2304: Cannot find name 'now'.
+src/core/auth/email-verification.service.ts(93,7): error TS1232: An import declaration can only be used at the top level of a namespace or module.
+src/core/auth/strategies/jwt.strategy.ts(23,28): error TS2339: Property 'sub' does not exist on type 'unknown'.
+src/core/auth/strategies/jwt.strategy.ts(32,19): error TS2339: Property 'sub' does not exist on type 'unknown'.
+src/core/auth/strategies/jwt.strategy.ts(33,22): error TS2339: Property 'email' does not exist on type 'unknown'.
+src/core/auth/strategies/jwt.strategy.ts(34,21): error TS2339: Property 'role' does not exist on type 'unknown'.
+src/core/auth/strategies/jwt.strategy.ts(35,25): error TS2339: Property 'tenantId' does not exist on type 'unknown'.
+src/core/common/filters/sentry-exception.filter.ts(29,9): error TS2365: Operator '>=' cannot be applied to types 'string' and 'number'.
+src/core/common/filters/sentry-exception.filter.ts(49,21): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+src/core/common/guards/csrf.guard.ts(71,17): error TS2339: Property 'cookies' does not exist on type 'unknown'.
+src/core/common/guards/csrf.guard.ts(81,14): error TS2339: Property 'cookie' does not exist on type 'unknown'.
+src/core/common/guards/roles.guard.ts(25,17): error TS2304: Cannot find name 'ForbiddenException'.
+src/core/common/guards/roles.guard.ts(31,17): error TS2304: Cannot find name 'ForbiddenException'.
+src/core/common/pipes/sanitization.pipe.ts(36,23): error TS2407: The right-hand side of a 'for...in' statement must be of type 'any', an object type or a type parameter, but here has type 'unknown'.
+src/core/common/services/sentry.service.ts(42,17): error TS2304: Cannot find name 'data'.
+src/core/common/services/sentry.service.ts(42,32): error TS2304: Cannot find name 'data'.
+src/core/common/services/sentry.service.ts(43,17): error TS2304: Cannot find name 'data'.
+src/core/common/services/sentry.service.ts(43,39): error TS2304: Cannot find name 'data'.
+src/core/common/services/sentry.service.ts(44,17): error TS2304: Cannot find name 'data'.
+src/core/common/services/sentry.service.ts(44,35): error TS2304: Cannot find name 'data'.
+src/core/common/services/sentry.service.ts(45,17): error TS2304: Cannot find name 'data'.
+src/core/common/services/sentry.service.ts(45,37): error TS2304: Cannot find name 'data'.
+src/core/common/services/sentry.service.ts(46,17): error TS2304: Cannot find name 'data'.
+src/core/common/services/sentry.service.ts(46,36): error TS2304: Cannot find name 'data'.
+src/core/common/services/sentry.service.ts(48,34): error TS2304: Cannot find name 'data'.
+src/core/common/services/sentry.service.ts(63,7): error TS2322: Type 'Record<string, unknown>' is not assignable to type 'never'.
+src/core/context/ContextFactory.ts(30,13): error TS2304: Cannot find name 'RequestInstance'.
+src/core/context/ContextFactory.ts(48,16): error TS2304: Cannot find name 'Environment'.
+src/core/context/ContextFactory.ts(122,14): error TS2304: Cannot find name 'RequestInstance'.
+src/core/context/CoreContext.ts(105,22): error TS2304: Cannot find name 'RequestInstance'.
+src/core/context/CoreContext.ts(150,25): error TS2304: Cannot find name 'Environment'.
+src/core/csrf.guard.ts(71,17): error TS2339: Property 'cookies' does not exist on type 'unknown'.
+src/core/csrf.guard.ts(81,14): error TS2339: Property 'cookie' does not exist on type 'unknown'.
+src/core/dynamic-modules.loader.ts(56,57): error TS2304: Cannot find name 'modulePath'.
+src/core/dynamic-modules.loader.ts(59,51): error TS2304: Cannot find name 'modulePath'.
+src/core/dynamic-modules.loader.ts(69,79): error TS2304: Cannot find name 'modulePath'.
+src/core/email-config.controller.ts(13,2): error TS2304: Cannot find name 'UseGuards'.
+src/core/email-config.controller.ts(79,6): error TS2348: Value of type '{ new (input: RequestInfo | URL, init?: RequestInit): Request; prototype: Request; }' is not callable. Did you mean to include 'new'?
+src/core/email-config.controller.ts(95,6): error TS2348: Value of type '{ new (input: RequestInfo | URL, init?: RequestInit): Request; prototype: Request; }' is not callable. Did you mean to include 'new'?
+src/core/email-config.controller.ts(110,6): error TS2348: Value of type '{ new (input: RequestInfo | URL, init?: RequestInit): Request; prototype: Request; }' is not callable. Did you mean to include 'new'?
+src/core/email-config.controller.ts(139,6): error TS2348: Value of type '{ new (input: RequestInfo | URL, init?: RequestInit): Request; prototype: Request; }' is not callable. Did you mean to include 'new'?
+src/core/email-config.service.ts(198,39): error TS2339: Property 'sendTestEmail' does not exist on type 'unknown'.
+src/core/email-verification.service.ts(93,7): error TS1232: An import declaration can only be used at the top level of a namespace or module.
+src/core/email.service.ts(50,31): error TS2339: Property 'smtpHost' does not exist on type 'unknown'.
+src/core/email.service.ts(51,31): error TS2339: Property 'smtpPort' does not exist on type 'unknown'.
+src/core/email.service.ts(52,33): error TS2339: Property 'encryption' does not exist on type 'unknown'.
+src/core/email.service.ts(53,30): error TS2339: Property 'encryption' does not exist on type 'unknown'.
+src/core/email.service.ts(53,73): error TS2339: Property 'encryption' does not exist on type 'unknown'.
+src/core/email.service.ts(390,27): error TS2339: Property 'tls' does not exist on type 'unknown'.
+src/core/email.service.ts(404,52): error TS2304: Cannot find name '_config'.
+src/core/email.service.ts(487,29): error TS2339: Property 'smtpHost' does not exist on type 'unknown'.
+src/core/email.service.ts(488,29): error TS2339: Property 'smtpPort' does not exist on type 'unknown'.
+src/core/email.service.ts(489,31): error TS2339: Property 'encryption' does not exist on type 'unknown'.
+src/core/email.service.ts(490,28): error TS2339: Property 'encryption' does not exist on type 'unknown'.
+src/core/email.service.ts(490,71): error TS2339: Property 'encryption' does not exist on type 'unknown'.
+src/core/email.service.ts(545,59): error TS2339: Property 'smtpHost' does not exist on type 'unknown'.
+src/core/email.service.ts(545,78): error TS2339: Property 'smtpPort' does not exist on type 'unknown'.
+src/core/email.service.ts(546,58): error TS2339: Property 'encryption' does not exist on type 'unknown'.
+src/core/email.service.ts(547,71): error TS2339: Property 'authMethod' does not exist on type 'unknown'.
+src/core/email/email.service.ts(50,31): error TS2339: Property 'smtpHost' does not exist on type 'unknown'.
+src/core/email/email.service.ts(51,31): error TS2339: Property 'smtpPort' does not exist on type 'unknown'.
+src/core/email/email.service.ts(52,33): error TS2339: Property 'encryption' does not exist on type 'unknown'.
+src/core/email/email.service.ts(53,30): error TS2339: Property 'encryption' does not exist on type 'unknown'.
+src/core/email/email.service.ts(53,73): error TS2339: Property 'encryption' does not exist on type 'unknown'.
+src/core/email/email.service.ts(390,27): error TS2339: Property 'tls' does not exist on type 'unknown'.
+src/core/email/email.service.ts(404,52): error TS2304: Cannot find name '_config'.
+src/core/email/email.service.ts(487,29): error TS2339: Property 'smtpHost' does not exist on type 'unknown'.
+src/core/email/email.service.ts(488,29): error TS2339: Property 'smtpPort' does not exist on type 'unknown'.
+src/core/email/email.service.ts(489,31): error TS2339: Property 'encryption' does not exist on type 'unknown'.
+src/core/email/email.service.ts(490,28): error TS2339: Property 'encryption' does not exist on type 'unknown'.
+src/core/email/email.service.ts(490,71): error TS2339: Property 'encryption' does not exist on type 'unknown'.
+src/core/email/email.service.ts(545,59): error TS2339: Property 'smtpHost' does not exist on type 'unknown'.
+src/core/email/email.service.ts(545,78): error TS2339: Property 'smtpPort' does not exist on type 'unknown'.
+src/core/email/email.service.ts(546,58): error TS2339: Property 'encryption' does not exist on type 'unknown'.
+src/core/email/email.service.ts(547,71): error TS2339: Property 'authMethod' does not exist on type 'unknown'.
+src/core/filters/sentry-exception.filter.ts(29,9): error TS2365: Operator '>=' cannot be applied to types 'string' and 'number'.
+src/core/filters/sentry-exception.filter.ts(49,21): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+src/core/guards/csrf.guard.ts(71,17): error TS2339: Property 'cookies' does not exist on type 'unknown'.
+src/core/guards/csrf.guard.ts(81,14): error TS2339: Property 'cookie' does not exist on type 'unknown'.
+src/core/guards/roles.guard.ts(25,17): error TS2304: Cannot find name 'ForbiddenException'.
+src/core/guards/roles.guard.ts(31,17): error TS2304: Cannot find name 'ForbiddenException'.
+src/core/jwt.strategy.ts(23,28): error TS2339: Property 'sub' does not exist on type 'unknown'.
+src/core/jwt.strategy.ts(32,19): error TS2339: Property 'sub' does not exist on type 'unknown'.
+src/core/jwt.strategy.ts(33,22): error TS2339: Property 'email' does not exist on type 'unknown'.
+src/core/jwt.strategy.ts(34,21): error TS2339: Property 'role' does not exist on type 'unknown'.
+src/core/jwt.strategy.ts(35,25): error TS2339: Property 'tenantId' does not exist on type 'unknown'.
+src/core/module-installer.controller.ts(105,27): error TS2552: Cannot find name 'object'. Did you mean 'Object'?
+src/core/module-installer.controller.ts(108,29): error TS2552: Cannot find name 'object'. Did you mean 'Object'?
+src/core/module-installer.service.ts(389,45): error TS2339: Property 'label' does not exist on type 'unknown'.
+src/core/module-installer.service.ts(390,44): error TS2339: Property 'icon' does not exist on type 'unknown'.
+src/core/module-installer.service.ts(391,45): error TS2339: Property 'route' does not exist on type 'unknown'.
+src/core/module-installer.service.ts(392,48): error TS2339: Property 'parentId' does not exist on type 'unknown'.
+src/core/module-installer.service.ts(393,45): error TS2339: Property 'order' does not exist on type 'unknown'.
+src/core/module-installer.service.ts(394,50): error TS2339: Property 'permission' does not exist on type 'unknown'.
+src/core/module-installer.service.ts(395,50): error TS2339: Property 'isUserMenu' does not exist on type 'unknown'.
+src/core/module-resolver.service.ts(34,28): error TS2304: Cannot find name 'modulePath'.
+src/core/module-resolver.service.ts(39,16): error TS2304: Cannot find name 'modulePath'.
+src/core/module-resolver.service.ts(122,14): error TS2304: Cannot find name 'modulePath'.
+src/core/module-resolver.service.ts(163,23): error TS2304: Cannot find name 'modulePath'.
+src/core/module-resolver.service.ts(164,25): error TS2304: Cannot find name 'modulePath'.
+src/core/module-security.service.ts(67,13): error TS1232: An import declaration can only be used at the top level of a namespace or module.
+src/core/module-security.service.ts(68,13): error TS1232: An import declaration can only be used at the top level of a namespace or module.
+src/core/module-security.service.ts(70,61): error TS2304: Cannot find name 'modulePath'.
+src/core/module-security.service.ts(88,71): error TS2304: Cannot find name 'modulePath'.
+src/core/module-security.service.ts(89,72): error TS2304: Cannot find name 'modulePath'.
+src/core/module-security.service.ts(218,50): error TS2339: Property 'parentId' does not exist on type 'unknown'.
+src/core/module-security.service.ts(219,48): error TS2339: Property 'parentId' does not exist on type 'unknown'.
+src/core/module-security.service.ts(223,24): error TS2339: Property 'id' does not exist on type 'unknown'.
+src/core/module-security.service.ts(224,27): error TS2339: Property 'label' does not exist on type 'unknown'.
+src/core/module-security.service.ts(225,26): error TS2339: Property 'icon' does not exist on type 'unknown'.
+src/core/module-security.service.ts(226,27): error TS2339: Property 'route' does not exist on type 'unknown'.
+src/core/module-security.service.ts(227,27): error TS2339: Property 'order' does not exist on type 'unknown'.
+src/core/module-security.service.ts(228,32): error TS2339: Property 'permission' does not exist on type 'unknown'.
+src/core/module-security.service.ts(230,40): error TS2339: Property 'parentId' does not exist on type 'unknown'.
+src/core/module-security.service.ts(230,60): error TS2339: Property 'id' does not exist on type 'unknown'.
+src/core/module-security.service.ts(232,31): error TS2339: Property 'id' does not exist on type 'unknown'.
+src/core/module-security.service.ts(233,34): error TS2339: Property 'label' does not exist on type 'unknown'.
+src/core/module-security.service.ts(234,33): error TS2339: Property 'icon' does not exist on type 'unknown'.
+src/core/module-security.service.ts(235,34): error TS2339: Property 'route' does not exist on type 'unknown'.
+src/core/module-security.service.ts(236,34): error TS2339: Property 'order' does not exist on type 'unknown'.
+src/core/module-security.service.ts(237,39): error TS2339: Property 'permission' does not exist on type 'unknown'.
+src/core/ModuleLoader.ts(67,46): error TS2304: Cannot find name 'modulePath'.
+src/core/ModuleLoader.ts(90,61): error TS2304: Cannot find name 'modulePath'.
+src/core/ModuleLoader.ts(91,62): error TS2304: Cannot find name 'modulePath'.
+src/core/ModuleLoader.ts(123,72): error TS2339: Property 'slug' does not exist on type 'unknown'.
+src/core/ModuleLoader.ts(124,54): error TS2304: Cannot find name 'modulePath'.
+src/core/ModuleLoader.ts(127,90): error TS2339: Property 'slug' does not exist on type 'unknown'.
+src/core/ModuleLoader.ts(134,60): error TS2339: Property 'default' does not exist on type 'unknown'.
+src/core/ModuleLoader.ts(135,81): error TS2339: Property 'slug' does not exist on type 'unknown'.
+src/core/ModuleLoader.ts(139,66): error TS2339: Property 'default' does not exist on type 'unknown'.
+src/core/ModuleLoader.ts(152,47): error TS2339: Property 'slug' does not exist on type 'unknown'.
+src/core/ModuleLoader.ts(153,76): error TS2339: Property 'slug' does not exist on type 'unknown'.
+src/core/ModuleLoader.ts(156,71): error TS2339: Property 'slug' does not exist on type 'unknown'.
+src/core/ModuleLoader.ts(160,43): error TS2339: Property 'slug' does not exist on type 'unknown'.
+src/core/ModuleLoader.ts(206,33): error TS2339: Property 'name' does not exist on type 'unknown'.
+src/core/ModuleLoader.ts(207,33): error TS2339: Property 'slug' does not exist on type 'unknown'.
+src/core/ModuleLoader.ts(208,33): error TS2339: Property 'version' does not exist on type 'unknown'.
+src/core/ModuleLoader.ts(209,33): error TS2339: Property 'register' does not exist on type 'unknown'.
+src/core/modules/AppModules.module.ts(14,37): error TS2304: Cannot find name 'DynamicModule'.
+src/core/modules/tenant-modules/tenant-modules.controller.ts(21,89): error TS2552: Cannot find name '_tenantId'. Did you mean 'tenantId'?
+src/core/modules/tenant-modules/tenant-modules.controller.ts(31,72): error TS2552: Cannot find name '_tenantId'. Did you mean 'tenantId'?
+src/core/modules/tenant-modules/tenant-modules.controller.ts(41,74): error TS2552: Cannot find name '_tenantId'. Did you mean 'tenantId'?
+src/core/pipes/sanitization.pipe.ts(36,23): error TS2407: The right-hand side of a 'for...in' statement must be of type 'any', an object type or a type parameter, but here has type 'unknown'.
+src/core/platform-config.controller.ts(26,2): error TS2304: Cannot find name 'UseGuards'.
+src/core/platform-config.controller.ts(53,6): error TS2348: Value of type '{ new (input: URL | RequestInfo, init?: RequestInit): Request; prototype: Request; }' is not callable. Did you mean to include 'new'?
+src/core/platform-config.service.ts(73,50): error TS2339: Property 'platformName' does not exist on type 'unknown'.
+src/core/platform-config.service.ts(74,51): error TS2339: Property 'platformEmail' does not exist on type 'unknown'.
+src/core/platform-config.service.ts(75,51): error TS2339: Property 'platformPhone' does not exist on type 'unknown'.
+src/core/platform-config.service.ts(87,13): error TS2698: Spread types may only be created from object types.
+src/core/roles.guard.ts(25,17): error TS2304: Cannot find name 'ForbiddenException'.
+src/core/roles.guard.ts(31,17): error TS2304: Cannot find name 'ForbiddenException'.
+src/core/sanitization.pipe.ts(36,23): error TS2407: The right-hand side of a 'for...in' statement must be of type 'any', an object type or a type parameter, but here has type 'unknown'.
+src/core/secure-files/secure-files.controller.ts(141,22): error TS2339: Property 'user' does not exist on type 'unknown'.
+src/core/secure-files/secure-files.controller.ts(152,22): error TS2339: Property 'user' does not exist on type 'unknown'.
+src/core/secure-files/secure-files.controller.ts(163,22): error TS2339: Property 'user' does not exist on type 'unknown'.
+src/core/secure-files/secure-files.service.ts(76,24): error TS2554: Expected 2 arguments, but got 1.
+src/core/secure-files/secure-files.service.ts(76,36): error TS2339: Property 'filePath' does not exist on type 'File'.
+src/core/secure-files/secure-files.service.ts(170,31): error TS2304: Cannot find name 'filePath'.
+src/core/secure-files/secure-files.service.ts(172,59): error TS2304: Cannot find name 'filePath'.
+src/core/secure-files/secure-files.service.ts(195,41): error TS2304: Cannot find name 'filePath'.
+src/core/secure-files/secure-files.service.ts(198,37): error TS2304: Cannot find name 'filePath'.
+src/core/secure-files/secure-files.service.ts(301,13): error TS2339: Property 'moduleName' does not exist on type 'unknown'.
+src/core/secure-files/secure-files.service.ts(305,13): error TS2339: Property 'documentType' does not exist on type 'unknown'.
+src/core/security-config.controller.ts(13,2): error TS2304: Cannot find name 'UseGuards'.
+src/core/security-config.controller.ts(41,6): error TS2348: Value of type '{ new (input: URL | RequestInfo, init?: RequestInit): Request; prototype: Request; }' is not callable. Did you mean to include 'new'?
+src/core/security-config.service.ts(42,18): error TS2339: Property 'smtpPassword' does not exist on type 'unknown'.
+src/core/security-config.service.ts(46,18): error TS2339: Property 'smtpUsername' does not exist on type 'unknown'.
+src/core/security-config/email-config.controller.ts(13,2): error TS2304: Cannot find name 'UseGuards'.
+src/core/security-config/email-config.controller.ts(79,6): error TS2348: Value of type '{ new (input: URL | RequestInfo, init?: RequestInit): Request; prototype: Request; }' is not callable. Did you mean to include 'new'?
+src/core/security-config/email-config.controller.ts(95,6): error TS2348: Value of type '{ new (input: URL | RequestInfo, init?: RequestInit): Request; prototype: Request; }' is not callable. Did you mean to include 'new'?
+src/core/security-config/email-config.controller.ts(110,6): error TS2348: Value of type '{ new (input: URL | RequestInfo, init?: RequestInit): Request; prototype: Request; }' is not callable. Did you mean to include 'new'?
+src/core/security-config/email-config.controller.ts(139,6): error TS2348: Value of type '{ new (input: URL | RequestInfo, init?: RequestInit): Request; prototype: Request; }' is not callable. Did you mean to include 'new'?
+src/core/security-config/email-config.service.ts(198,39): error TS2339: Property 'sendTestEmail' does not exist on type 'unknown'.
+src/core/security-config/platform-config.controller.ts(49,4): error TS2304: Cannot find name 'UseGuards'.
+src/core/security-config/platform-config.controller.ts(53,6): error TS2348: Value of type '{ new (input: URL | RequestInfo, init?: RequestInit): Request; prototype: Request; }' is not callable. Did you mean to include 'new'?
+src/core/security-config/platform-config.service.ts(73,50): error TS2339: Property 'platformName' does not exist on type 'unknown'.
+src/core/security-config/platform-config.service.ts(74,51): error TS2339: Property 'platformEmail' does not exist on type 'unknown'.
+src/core/security-config/platform-config.service.ts(75,51): error TS2339: Property 'platformPhone' does not exist on type 'unknown'.
+src/core/security-config/platform-config.service.ts(87,13): error TS2698: Spread types may only be created from object types.
+src/core/security-config/security-config.controller.ts(13,2): error TS2304: Cannot find name 'UseGuards'.
+src/core/security-config/security-config.controller.ts(41,6): error TS2348: Value of type '{ new (input: URL | RequestInfo, init?: RequestInit): Request; prototype: Request; }' is not callable. Did you mean to include 'new'?
+src/core/security-config/security-config.service.ts(42,18): error TS2339: Property 'smtpPassword' does not exist on type 'unknown'.
+src/core/security-config/security-config.service.ts(46,18): error TS2339: Property 'smtpUsername' does not exist on type 'unknown'.
+src/core/sentry-exception.filter.ts(29,9): error TS2365: Operator '>=' cannot be applied to types 'string' and 'number'.
+src/core/sentry-exception.filter.ts(49,21): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+src/core/sentry.service.ts(42,17): error TS2304: Cannot find name 'data'.
+src/core/sentry.service.ts(42,32): error TS2304: Cannot find name 'data'.
+src/core/sentry.service.ts(43,17): error TS2304: Cannot find name 'data'.
+src/core/sentry.service.ts(43,39): error TS2304: Cannot find name 'data'.
+src/core/sentry.service.ts(44,17): error TS2304: Cannot find name 'data'.
+src/core/sentry.service.ts(44,35): error TS2304: Cannot find name 'data'.
+src/core/sentry.service.ts(45,17): error TS2304: Cannot find name 'data'.
+src/core/sentry.service.ts(45,37): error TS2304: Cannot find name 'data'.
+src/core/sentry.service.ts(46,17): error TS2304: Cannot find name 'data'.
+src/core/sentry.service.ts(46,36): error TS2304: Cannot find name 'data'.
+src/core/sentry.service.ts(48,34): error TS2304: Cannot find name 'data'.
+src/core/sentry.service.ts(63,7): error TS2322: Type 'Record<string, unknown>' is not assignable to type 'never'.
+src/core/services/module-database-executor.service.ts(54,53): error TS2304: Cannot find name '_tenantId'.
+src/core/services/module-database-executor.service.ts(82,53): error TS2304: Cannot find name '_tenantId'.
+src/core/services/module-database-executor.service.ts(111,53): error TS2304: Cannot find name '_tenantId'.
+src/core/services/module-database-executor.service.ts(138,76): error TS2304: Cannot find name '_tenantId'.
+src/core/services/sentry.service.ts(42,17): error TS2304: Cannot find name 'data'.
+src/core/services/sentry.service.ts(42,32): error TS2304: Cannot find name 'data'.
+src/core/services/sentry.service.ts(43,17): error TS2304: Cannot find name 'data'.
+src/core/services/sentry.service.ts(43,39): error TS2304: Cannot find name 'data'.
+src/core/services/sentry.service.ts(44,17): error TS2304: Cannot find name 'data'.
+src/core/services/sentry.service.ts(44,35): error TS2304: Cannot find name 'data'.
+src/core/services/sentry.service.ts(45,17): error TS2304: Cannot find name 'data'.
+src/core/services/sentry.service.ts(45,37): error TS2304: Cannot find name 'data'.
+src/core/services/sentry.service.ts(46,17): error TS2304: Cannot find name 'data'.
+src/core/services/sentry.service.ts(46,36): error TS2304: Cannot find name 'data'.
+src/core/services/sentry.service.ts(48,34): error TS2304: Cannot find name 'data'.
+src/core/services/sentry.service.ts(63,7): error TS2322: Type 'Record<string, unknown>' is not assignable to type 'never'.
+src/core/shared/modules/module-loader.ts(30,21): error TS2304: Cannot find name 'data'.
+src/core/shared/modules/module-loader.ts(54,11): error TS2339: Property 'slug' does not exist on type '{}'.
+src/core/shared/modules/module-loader.ts(54,17): error TS2339: Property 'name' does not exist on type '{}'.
+src/core/shared/modules/module-loader.ts(54,23): error TS2339: Property 'menus' does not exist on type '{}'.
+src/core/shared/registry/module-registry.ts(93,54): error TS2304: Cannot find name 'userpermissions'.
+src/core/shared/registry/module-registry.ts(121,58): error TS2304: Cannot find name 'userpermissions'.
+src/core/shared/registry/module-registry.ts(148,54): error TS2304: Cannot find name 'userpermissions'.
+src/core/shared/registry/module-registry.ts(175,54): error TS2304: Cannot find name 'userpermissions'.
+src/core/shared/registry/module-registry.ts(202,70): error TS2304: Cannot find name 'userpermissions'.
+src/core/strategies/jwt.strategy.ts(23,28): error TS2339: Property 'sub' does not exist on type 'unknown'.
+src/core/strategies/jwt.strategy.ts(32,19): error TS2339: Property 'sub' does not exist on type 'unknown'.
+src/core/strategies/jwt.strategy.ts(33,22): error TS2339: Property 'email' does not exist on type 'unknown'.
+src/core/strategies/jwt.strategy.ts(34,21): error TS2339: Property 'role' does not exist on type 'unknown'.
+src/core/strategies/jwt.strategy.ts(35,25): error TS2339: Property 'tenantId' does not exist on type 'unknown'.
+src/core/tenant-modules.controller.ts(21,89): error TS2552: Cannot find name '_tenantId'. Did you mean 'tenantId'?
+src/core/tenant-modules.controller.ts(31,72): error TS2552: Cannot find name '_tenantId'. Did you mean 'tenantId'?
+src/core/tenant-modules.controller.ts(41,74): error TS2552: Cannot find name '_tenantId'. Did you mean 'tenantId'?
+src/core/tenant-modules/tenant-modules.controller.ts(21,89): error TS2552: Cannot find name '_tenantId'. Did you mean 'tenantId'?
+src/core/tenant-modules/tenant-modules.controller.ts(31,72): error TS2552: Cannot find name '_tenantId'. Did you mean 'tenantId'?
+src/core/tenant-modules/tenant-modules.controller.ts(41,74): error TS2552: Cannot find name '_tenantId'. Did you mean 'tenantId'?
+src/core/tenants/tenants.controller.ts(265,32): error TS2339: Property 'toggleModuleForTenant' does not exist on type 'TenantsService'.
+src/core/tenants/tenants.controller.ts(274,32): error TS2339: Property 'toggleModuleForTenant' does not exist on type 'TenantsService'.
+src/core/tenants/tenants.controller.ts(285,32): error TS2339: Property 'configureTenantModule' does not exist on type 'TenantsService'.
+src/core/tenants/tenants.service.ts(37,17): error TS2304: Cannot find name 'NotFoundException'.
+src/core/tenants/tenants.service.ts(72,35): error TS2339: Property 'tenant' does not exist on type 'unknown'.
+src/core/tenants/tenants.service.ts(83,20): error TS2339: Property 'user' does not exist on type 'unknown'.
+src/core/tenants/tenants.service.ts(161,17): error TS2304: Cannot find name 'NotFoundException'.
+src/core/tenants/tenants.service.ts(339,17): error TS2304: Cannot find name 'NotFoundException'.

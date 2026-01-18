@@ -28,10 +28,8 @@ export class SanitizationPipe implements PipeTransform {
     return value;
   }
 
-  private sanitizeObject(obj: unknown): any {
-    const sanitized: unknown = {
-      // Empty implementation
-    };
+  private sanitizeObject(obj: any): any {
+    const sanitized: any = {};
 
     for (const key in obj) {
       if (Object.prototype.hasOwnProperty.call(obj, key)) {
@@ -61,9 +59,7 @@ export class SanitizationPipe implements PipeTransform {
     // Remove tags HTML e atributos perigosos, mas mantém texto seguro
     sanitized = sanitizeHtml(sanitized, {
       allowedTags: [], // Remove TODAS as tags HTML
-      allowedAttributes: {
-      // Empty implementation
-    }, // Remove TODOS os atributos
+      allowedAttributes: {}, // Remove TODOS os atributos
       disallowedTagsMode: 'recursiveEscape', // Escapa o conteúdo das tags em vez de remover
     });
 

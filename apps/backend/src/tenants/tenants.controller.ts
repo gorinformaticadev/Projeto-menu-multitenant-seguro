@@ -24,8 +24,8 @@ export class TenantsController {
     private tenantsService: TenantsService,
     private tenantModuleService: TenantModuleService
   ) {
-      // Empty implementation
-    }
+    // Empty implementation
+  }
 
   // Assinaturas de arquivos vÃ¡lidas (magic numbers)
   private readonly FILE_SIGNATURES = {
@@ -44,7 +44,7 @@ export class TenantsController {
 
     try {
       // Ler os primeiros bytes do arquivo
-      const _filePath = path.join(process.cwd(), 'uploads', 'logos', file.filename);
+      const filePath = path.join(process.cwd(), 'uploads', 'logos', file.filename);
       const buffer = fs.readFileSync(filePath);
 
       const signature = this.FILE_SIGNATURES[file.mimetype];
@@ -197,7 +197,7 @@ export class TenantsController {
   // Endpoints para gerenciamento de mÃ³dulos dos tenants
 
   @Get('my-tenant/modules/active')
-  @Roles(Role.ADMIN.SUPER_ADMIN)
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   @SkipThrottle()
   async getMyTenantActiveModules(@Req() req: ExpressRequest & { user: any }) {
     if (!req.user.tenantId) {
@@ -252,7 +252,7 @@ export class TenantsController {
   }
 
   @Post('my-tenant/modules/:moduleName/toggle')
-  @Roles(Role.ADMIN.SUPER_ADMIN)
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   @SkipThrottle()
   @UseInterceptors(DuplicateRequestInterceptor)
   async toggleMyTenantModule(@Param('moduleName') moduleName: string, @Req() req: ExpressRequest & { user: any }) {
@@ -262,7 +262,7 @@ export class TenantsController {
       }
       throw new BadRequestException('UsuÃ¡rio sem vinculo com tenant.');
     }
-    return this.tenantsService.toggleModuleForTenant(req.user.tenantId, _moduleName);
+    return this.tenantsService.toggleModuleForTenant(req.user.tenantId, moduleName);
   }
 
   @Post(':id/modules/:moduleName/toggle')
@@ -271,7 +271,7 @@ export class TenantsController {
   @SkipThrottle()
   @UseInterceptors(DuplicateRequestInterceptor)
   async toggleModuleForTenant(@Param('id') id: string, @Param('moduleName') moduleName: string) {
-    return this.tenantsService.toggleModuleForTenant(id, _moduleName);
+    return this.tenantsService.toggleModuleForTenant(id, moduleName);
   }
 
   @Put(':id/modules/:moduleName/config')

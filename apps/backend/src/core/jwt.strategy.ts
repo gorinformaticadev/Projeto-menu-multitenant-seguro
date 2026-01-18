@@ -1,4 +1,4 @@
- import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
@@ -17,17 +17,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: unknown) {
-    // Valida se o usuÃ¡rio ainda existe
+  async validate(payload: any) {
+    // Valida se o usuário ainda existe
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
     });
 
     if (!user) {
-      throw new UnauthorizedException('UsuÃ¡rio nÃ£o encontrado');
+      throw new UnauthorizedException('Usuário não encontrado');
     }
 
-    // Retorna o objeto user que serÃ¡ anexado ao request
+    // Retorna o objeto user que será anexado ao request
     return {
       id: payload.sub,
       email: payload.email,
@@ -36,4 +36,3 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     };
   }
 }
-

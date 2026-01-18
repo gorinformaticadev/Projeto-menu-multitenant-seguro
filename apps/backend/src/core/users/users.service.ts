@@ -1,4 +1,4 @@
- import { Injectable, ConflictException, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, ConflictException, BadRequestException, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -9,8 +9,8 @@ import { Role } from '@prisma/client';
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {
-      // Empty implementation
-    }
+    // Empty implementation
+  }
 
   async create(createUserDto: CreateUserDto) {
     const { email, password, name, role, tenantId } = createUserDto;
@@ -115,7 +115,7 @@ export class UsersService {
     }
 
     // Se estÃ¡ atualizando senha, faz o hash
-    const data: unknown = { ...updateUserDto };
+    const data: any = { ...updateUserDto };
     if (updateUserDto.password && updateUserDto.password.trim() !== '') {
       data.password = await bcrypt.hash(updateUserDto.password, 10);
     } else {

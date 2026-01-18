@@ -35,7 +35,7 @@ export class SentryService {
 
           // Remover dados sensíveis do body
           if (event.request.data) {
-            const _data = typeof event.request.data === 'string'
+            const data = typeof event.request.data === 'string'
               ? JSON.parse(event.request.data)
               : event.request.data;
 
@@ -53,14 +53,14 @@ export class SentryService {
       },
     });
 
-    }
+  }
 
   /**
    * Capturar exceção manualmente
    */
   captureException(exception: any, context?: Record<string, unknown>) {
     Sentry.captureException(exception, {
-      contexts: context,
+      extra: context,
     });
   }
 
@@ -79,7 +79,7 @@ export class SentryService {
       id: user.id,
       email: user.email,
       role: user.role,
-    });
+    } as any);
   }
 
   /**

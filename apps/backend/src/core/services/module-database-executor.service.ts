@@ -51,7 +51,7 @@ export class ModuleDatabaseExecutorService {
 
             // Se tenantId fornecido, configura isolamento
             if (tenantId) {
-                await this.setTenantContext(client, _tenantId);
+                await this.setTenantContext(client, tenantId);
             }
 
             // Executa o SQL completo
@@ -79,7 +79,7 @@ export class ModuleDatabaseExecutorService {
             await client.query('BEGIN');
 
             if (tenantId) {
-                await this.setTenantContext(client, _tenantId);
+                await this.setTenantContext(client, tenantId);
             }
 
             for (const query of queries) {
@@ -103,15 +103,15 @@ export class ModuleDatabaseExecutorService {
     /**
      * Executa query e retorna resultados
      */
-    async executeQuery<T = any>(sql: string, tenantId?: string): Promise<T[]> {
+    async executeQuery<T = any>(sql: string, params: any[] = [], tenantId?: string): Promise<T[]> {
         const client = await this.pool.connect();
 
         try {
             if (tenantId) {
-                await this.setTenantContext(client, _tenantId);
+                await this.setTenantContext(client, tenantId);
             }
 
-            const result = await client.query(sql);
+            const result = await client.query(sql, params);
             return result.rows;
 
         } catch (error) {
@@ -135,7 +135,7 @@ export class ModuleDatabaseExecutorService {
             )
         `;
 
-        const result = await this.executeQuery<{ exists: boolean }>(query, _tenantId);
+        const result = await this.executeQuery<{ exists: boolean }>(query, [tableName], tenantId);
         return result[0]?.exists || false;
     }
 

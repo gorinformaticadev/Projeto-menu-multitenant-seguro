@@ -1,11 +1,13 @@
-import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch, Delete, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch, Delete, UseInterceptors, UploadedFile, BadRequestException, Req } from '@nestjs/common';
 import { Request as ExpressRequest } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SkipThrottle } from '@nestjs/throttler';
+import { DuplicateRequestInterceptor } from '@core/common/interceptors/duplicate-request.interceptor';
 import { TenantsService } from './tenants.service';
-import { CreateTenantDto } from './dto/create-tenant.dto';
-import { UpdateTenantDto } from './dto/update-tenant.dto';
-import { ChangeAdminPasswordDto } from './dto/change-admin-password.dto';
+import { TenantModuleService } from '../modules/engine/backend/tenant-module.service';
+import { CreateTenantDto } from '../../tenants/dto/create-tenant.dto';
+import { UpdateTenantDto } from '../../tenants/dto/update-tenant.dto';
+import { ChangeAdminPasswordDto } from '../../tenants/dto/change-admin-password.dto';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { Roles } from '@core/common/decorators/roles.decorator';
@@ -18,11 +20,14 @@ import { multerConfig } from '@core/common/config/multer.config';
 @Controller('tenants')
 @UseGuards(RolesGuard)
 export class TenantsController {
-  constructor(private tenantsService: TenantsService) {
-      // Empty implementation
-    }
+  constructor(
+    private tenantsService: TenantsService,
+    private tenantModuleService: TenantModuleService
+  ) {
+    // Empty implementation
+  }
 
-  // Assinaturas de arquivos vÃ¡lidas (magic numbers)
+  // Assinaturas de arquivos válidas (magic numbers)
   private readonly FILE_SIGNATURES = {
     'image/jpeg': [0xFF, 0xD8, 0xFF],
     'image/png': [0x89, 0x50, 0x4E, 0x47],
@@ -36,34 +41,34 @@ export class TenantsController {
   private async validateFileSignature(file: Express.Multer.File): Promise<void> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     try {
       // Ler os primeiros bytes do arquivo
-      const _filePath = path.join(process.cwd(), 'uploads', 'logos', file.filename);
+      const filePath = path.join(process.cwd(), 'uploads', 'logos', file.filename);
       const buffer = fs.readFileSync(filePath);
-      
+
       const signature = this.FILE_SIGNATURES[file.mimetype];
       if (!signature) {
-        // Remover arquivo invÃ¡lido
+        // Remover arquivo inválido
         fs.unlinkSync(filePath);
-        throw new BadRequestException('Tipo de arquivo nÃ£o suportado');
+        throw new BadRequestException('Tipo de arquivo não suportado');
       }
-      
+
       // Verificar assinatura
       for (let i = 0; i < signature.length; i++) {
         if (buffer[i] !== signature[i]) {
-          // Remover arquivo com assinatura invÃ¡lida
+          // Remover arquivo com assinatura inválida
           fs.unlinkSync(filePath);
-          throw new BadRequestException('Arquivo corrompido ou tipo invÃ¡lido');
+          throw new BadRequestException('Arquivo corrompido ou tipo inválido');
         }
       }
-      
-      // VerificaÃ§Ã£o adicional: tamanho mÃ­nimo para ser uma imagem vÃ¡lida
+
+      // Verificação adicional: tamanho mínimo para ser uma imagem válida
       if (buffer.length < 100) {
         fs.unlinkSync(filePath);
-        throw new BadRequestException('Arquivo muito pequeno para ser uma imagem vÃ¡lida');
+        throw new BadRequestException('Arquivo muito pequeno para ser uma imagem válida');
       }
-      
+
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
@@ -119,10 +124,10 @@ export class TenantsController {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo foi enviado');
     }
-    
-    // ValidaÃ§Ã£o adicional de seguranÃ§a: verificar assinatura do arquivo
+
+    // Validação adicional de segurança: verificar assinatura do arquivo
     await this.validateFileSignature(file);
-    
+
     return this.tenantsService.updateLogo(req.user.tenantId, file.filename);
   }
 
@@ -150,29 +155,22 @@ export class TenantsController {
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
   @UseInterceptors(FileInterceptor('logo', multerConfig))
-  async uploadLogo(
-    @Param('id') id: string,
-    @UploadedFile() file: Express.Multer.File,
-    @Req() req: ExpressRequest & { user: any },
-  ) {
+  async uploadLogo(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo foi enviado');
     }
-    
+
     // Validação adicional de segurança: verificar assinatura do arquivo
     await this.validateFileSignature(file);
-    
-    return this.tenantsService.updateLogo(id, file.filename, req.user?.id);
+
+    return this.tenantsService.updateLogo(id, file.filename);
   }
 
   @Patch(':id/remove-logo')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
-  async removeLogo(
-    @Param('id') id: string,
-    @Req() req: ExpressRequest & { user: any },
-  ) {
-    return this.tenantsService.removeLogo(id, req.user?.id);
+  async removeLogo(@Param('id') id: string) {
+    return this.tenantsService.removeLogo(id);
   }
 
   @Delete(':id')
@@ -195,5 +193,95 @@ export class TenantsController {
   async getTenantLogo(@Param('id') id: string) {
     return this.tenantsService.getTenantLogo(id);
   }
-}
 
+  // Endpoints para gerenciamento de módulos dos tenants
+
+  @Get('my-tenant/modules/active')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  @SkipThrottle()
+  async getMyTenantActiveModules(@Req() req: ExpressRequest & { user: any }) {
+    if (!req.user.tenantId) {
+      if (req.user.role === Role.SUPER_ADMIN) {
+        // Se for SUPER_ADMIN sem tenant, retornamos uma lista vazia ou erro.
+        // Para facilitar o desenvolvimento, vamos lançar um aviso claro.
+        throw new BadRequestException('SUPER_ADMIN não possui contexto de tenant. Use um usuário ADMIN de tenant.');
+      }
+      throw new BadRequestException('Usuário sem vinculo com tenant.');
+    }
+    const modules = await this.tenantModuleService.getModulesForTenant(req.user.tenantId);
+    return {
+      modules: modules.filter(m => m.enabled).map(m => ({
+        name: m.slug,
+        isActive: m.enabled
+      })),
+      activeModules: modules.filter(m => m.enabled).map(m => m.slug)
+    };
+  }
+
+  @Get(':id/modules/active')
+  @Roles(Role.SUPER_ADMIN)
+  @SkipTenantIsolation()
+  @SkipThrottle()
+  async getTenantActiveModules(@Param('id') id: string) {
+    const modules = await this.tenantModuleService.getModulesForTenant(id);
+    return {
+      modules: modules.filter(m => m.enabled).map(m => ({
+        name: m.slug,
+        isActive: m.enabled
+      })),
+      activeModules: modules.filter(m => m.enabled).map(m => m.slug)
+    };
+  }
+
+  @Post(':id/modules/:moduleName/activate')
+  @Roles(Role.SUPER_ADMIN)
+  @SkipTenantIsolation()
+  @SkipThrottle()
+  async activateModuleForTenant(@Param('id') id: string, @Param('moduleName') moduleName: string) {
+    await this.tenantModuleService.activateModuleForTenant(moduleName, id);
+    return { message: `Módulo ${moduleName} ativado para o tenant ${id}` };
+  }
+
+  @Post(':id/modules/:moduleName/deactivate')
+  @Roles(Role.SUPER_ADMIN)
+  @SkipTenantIsolation()
+  @SkipThrottle()
+  async deactivateModuleForTenant(@Param('id') id: string, @Param('moduleName') moduleName: string) {
+    await this.tenantModuleService.deactivateModuleForTenant(moduleName, id);
+    return { message: `Módulo ${moduleName} desativado para o tenant ${id}` };
+  }
+
+  @Post('my-tenant/modules/:moduleName/toggle')
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  @SkipThrottle()
+  @UseInterceptors(DuplicateRequestInterceptor)
+  async toggleMyTenantModule(@Param('moduleName') moduleName: string, @Req() req: ExpressRequest & { user: any }) {
+    if (!req.user.tenantId) {
+      if (req.user.role === Role.SUPER_ADMIN) {
+        throw new BadRequestException('SUPER_ADMIN não possui contexto de tenant. Use um usuário ADMIN de tenant.');
+      }
+      throw new BadRequestException('Usuário sem vinculo com tenant.');
+    }
+    return this.tenantsService.toggleModuleForTenant(req.user.tenantId, moduleName);
+  }
+
+  @Post(':id/modules/:moduleName/toggle')
+  @Roles(Role.SUPER_ADMIN)
+  @SkipTenantIsolation()
+  @SkipThrottle()
+  @UseInterceptors(DuplicateRequestInterceptor)
+  async toggleModuleForTenant(@Param('id') id: string, @Param('moduleName') moduleName: string) {
+    return this.tenantsService.toggleModuleForTenant(id, moduleName);
+  }
+
+  @Put(':id/modules/:moduleName/config')
+  @Roles(Role.SUPER_ADMIN)
+  @SkipTenantIsolation()
+  @SkipThrottle()
+  async configureTenantModule(
+    @Param('id') id: string,
+    @Param('moduleName') moduleName: string,
+    @Body() config: unknown) {
+    return this.tenantsService.configureTenantModule(id, moduleName, config);
+  }
+}

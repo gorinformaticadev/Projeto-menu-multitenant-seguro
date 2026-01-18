@@ -1,4 +1,4 @@
- import { Controller, Get, Put, Body } from '@nestjs/common';
+import { Controller, Get, Put, Body, UseGuards, Request } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { PlatformConfigService } from './platform-config.service';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
@@ -25,14 +25,12 @@ export class UpdatePlatformConfigDto {
 @Controller('platform-config')
 @UseGuards(RolesGuard)
 export class PlatformConfigController {
-  constructor(private readonly platformConfigService: PlatformConfigService) {
-      // Empty implementation
-    }
+  constructor(private readonly platformConfigService: PlatformConfigService) { }
 
   /**
    * GET /platform-config
-   * Obter configuraÃ§Ãµes da plataforma
-   * PÃºblico para todos os usuÃ¡rios autenticados
+   * Obter configurações da plataforma
+   * Público para todos os usuários autenticados
    */
   @SkipThrottle()
   @Get()
@@ -42,7 +40,7 @@ export class PlatformConfigController {
 
   /**
    * PUT /platform-config
-   * Atualizar configuraÃ§Ãµes da plataforma
+   * Atualizar configurações da plataforma
    * Apenas SUPER_ADMIN
    */
   @SkipThrottle()
@@ -63,7 +61,7 @@ export class PlatformConfigController {
   /**
    * GET /platform-config/name
    * Obter apenas o nome da plataforma
-   * PÃºblico (sem autenticaÃ§Ã£o) para uso em templates
+   * Público (sem autenticação) para uso em templates
    */
   @SkipThrottle()
   @Get('name')
@@ -76,7 +74,7 @@ export class PlatformConfigController {
   /**
    * GET /platform-config/email
    * Obter apenas o email da plataforma
-   * PÃºblico (sem autenticaÃ§Ã£o) para uso em templates
+   * Público (sem autenticação) para uso em templates
    */
   @SkipThrottle()
   @Get('email')
@@ -89,7 +87,7 @@ export class PlatformConfigController {
   /**
    * GET /platform-config/phone
    * Obter apenas o telefone da plataforma
-   * PÃºblico (sem autenticaÃ§Ã£o) para uso em templates
+   * Público (sem autenticação) para uso em templates
    */
   @SkipThrottle()
   @Get('phone')

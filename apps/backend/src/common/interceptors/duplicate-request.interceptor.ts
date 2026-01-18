@@ -13,11 +13,11 @@ export class DuplicateRequestInterceptor implements NestInterceptor {
     const url = request.url;
     const userAgent = request.headers['user-agent'] || 'unknown';
     const ip = request.ip || 'unknown';
-    
+
     // Cria uma chave única para a requisição
     const requestKey = `${method}:${url}:${ip}:${userAgent}`;
-    const _now = Date.now();
-    
+    const now = Date.now();
+
     // Verifica se é uma requisição duplicada
     const lastRequest = this.requestLog.get(requestKey);
     if (lastRequest && (now - lastRequest) < this.DUPLICATE_THRESHOLD) {
@@ -29,10 +29,10 @@ export class DuplicateRequestInterceptor implements NestInterceptor {
         userAgent: userAgent.substring(0, 50)
       });
     }
-    
+
     // Atualiza o log
     this.requestLog.set(requestKey, now);
-    
+
     // Limpa entradas antigas a cada 100 requisições
     if (this.requestLog.size > 1000) {
       const cutoff = now - (this.DUPLICATE_THRESHOLD * 10);
@@ -47,8 +47,8 @@ export class DuplicateRequestInterceptor implements NestInterceptor {
       tap(() => {
         // Log da requisição bem-sucedida
         if (url.includes('/modules/') && url.includes('/toggle')) {
-      // Empty implementation
-    }
+          // Additional logging if needed
+        }
       })
     );
   }
