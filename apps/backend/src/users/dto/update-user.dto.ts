@@ -41,9 +41,7 @@ function IsValidPassword(validationOptions?: ValidationOptions) {
             if (config.passwordRequireUppercase && !/[A-Z]/.test(value)) return false;
             if (config.passwordRequireLowercase && !/[a-z]/.test(value)) return false;
             if (config.passwordRequireNumbers && !/\d/.test(value)) return false;
-            if (config.passwordRequireSpecial && !/[!@#$%^&*()_+\-=[\]{
-      // Empty implementation
-    };':"\\|,.<>/?]/.test(value)) return false;
+            if (config.passwordRequireSpecial && !/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value)) return false;
 
             return true;
           } catch (error) {

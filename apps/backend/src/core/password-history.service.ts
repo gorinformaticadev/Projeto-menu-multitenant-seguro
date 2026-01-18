@@ -207,9 +207,7 @@ export class PasswordHistoryService {
       feedback.push('Adicione nÃºmeros');
     }
 
-    if (/[!@#$%^&*()_+\-=[\]{
-      // Empty implementation
-    };':"\\|,.<>/?]/.test(password)) {
+    if (/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
       score += 10;
     } else {
       feedback.push('Adicione caracteres especiais');

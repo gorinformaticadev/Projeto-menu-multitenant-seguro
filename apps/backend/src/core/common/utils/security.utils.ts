@@ -10,7 +10,7 @@ import * as bcrypt from 'bcrypt';
  */
 export function generateSecurePassword(length: number = 16): string {
   const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-  let _password = '';
+  let password = '';
   
   // Garantir pelo menos um de cada tipo
   password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; // lowercase
