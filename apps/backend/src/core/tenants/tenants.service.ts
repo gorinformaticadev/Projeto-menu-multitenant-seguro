@@ -3,13 +3,12 @@ import { PrismaService } from '@core/prisma/prisma.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import * as bcrypt from 'bcrypt';
-import { Role } from '@prisma/client';
 import { unlink } from 'fs/promises';
 import { join } from 'path';
 
 @Injectable()
 export class TenantsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async findAll() {
     return this.prisma.tenant.findMany({
@@ -66,7 +65,7 @@ export class TenantsService {
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
     // Cria o tenant e o usuÃ¡rio admin em uma transaÃ§Ã£o
-    return this.prisma.$transaction(async (prisma) => {
+    return (this.prisma as any).$transaction(async (prisma: any) => {
       // Cria o tenant
       const tenant = await prisma.tenant.create({
         data: {
@@ -84,7 +83,7 @@ export class TenantsService {
           email: adminEmail,
           password: hashedPassword,
           name: adminName,
-          role: Role.ADMIN,
+          role: 'ADMIN',
           tenantId: tenant.id,
         },
       });
@@ -148,7 +147,7 @@ export class TenantsService {
     const admin = await this.prisma.user.findFirst({
       where: {
         tenantId: id,
-        role: Role.ADMIN,
+        role: 'ADMIN',
       },
     });
 

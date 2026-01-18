@@ -28,7 +28,7 @@ export class UpdateService {
   constructor(
     private prisma: PrismaService,
     private auditService: AuditService,
-  ) {}
+  ) { }
 
   /**
    * Verifica se hÃ¡ atualizaÃ§Ãµes disponÃ­veis no repositÃ³rio Git
@@ -40,7 +40,7 @@ export class UpdateService {
 
       // Buscar configuraÃ§Ãµes do sistema
       const settings = await this.getSystemSettings();
-      
+
       if (!settings.gitUsername || !settings.gitRepository) {
         this.logger.warn('ConfiguraÃ§Ãµes do Git nÃ£o encontradas');
         return { updateAvailable: false };
@@ -48,10 +48,10 @@ export class UpdateService {
 
       // Construir URL do repositÃ³rio
       const repoUrl = `https://github.com/${settings.gitUsername}/${settings.gitRepository}.git`;
-      
+
       // Buscar tags remotas
       const { stdout } = await execAsync(`git ls-remote --tags ${repoUrl}`);
-      
+
       // Extrair versÃµes vÃ¡lidas (semver)
       const tags = stdout
         .split('\n')
@@ -68,7 +68,7 @@ export class UpdateService {
 
       const latestVersion = semver.clean(tags[0])!;
       const currentVersion = semver.clean(settings.appVersion || '1.0.0')!;
-      
+
       const updateAvailable = semver.gt(latestVersion, currentVersion);
 
       // Atualizar status no banco
@@ -101,7 +101,7 @@ export class UpdateService {
     userAgent?: string,
   ): Promise<{ success: boolean; logId: string; message: string }> {
     let updateLog: any;
-    
+
     try {
       this.logger.log(`Iniciando atualizaÃ§Ã£o para versÃ£o ${updateData.version}...`);
 
@@ -142,17 +142,17 @@ export class UpdateService {
       // Executar script de atualizaÃ§Ã£o
       const scriptPath = path.join(process.cwd(), 'scripts', 'update.sh');
       const command = `bash ${scriptPath} ${updateData.version} ${updateData.packageManager}`;
-      
+
       this.logger.log(`Executando comando: ${command}`);
-      
+
       const startTime = Date.now();
       const { stdout, stderr } = await execAsync(command, {
         timeout: 30 * 60 * 1000, // 30 minutos timeout
         cwd: process.cwd(),
       });
-      
+
       const duration = Math.floor((Date.now() - startTime) / 1000);
-      
+
       // Atualizar log como sucesso
       await (this.prisma as any).updateLog.update({
         where: { id: updateLog.id },
@@ -226,7 +226,7 @@ export class UpdateService {
    */
   async getUpdateStatus(): Promise<UpdateStatusDto> {
     const settings = await this.getSystemSettings();
-    
+
     return {
       currentVersion: settings.appVersion || '1.0.0',
       availableVersion: settings.availableVersion || undefined,
@@ -247,7 +247,7 @@ export class UpdateService {
     try {
       // Criptografar token se fornecido
       const updateData: any = { ...config, updatedBy };
-      
+
       if (config.gitToken) {
         updateData.gitToken = this.encryptToken(config.gitToken);
       }
@@ -321,7 +321,7 @@ export class UpdateService {
    */
   private async getSystemSettings(): Promise<any> {
     let settings = await (this.prisma as any).systemSettings.findFirst();
-    
+
     if (!settings) {
       settings = await (this.prisma as any).systemSettings.create({
         data: {
@@ -332,7 +332,7 @@ export class UpdateService {
         },
       });
     }
-    
+
     return settings;
   }
 
@@ -341,7 +341,7 @@ export class UpdateService {
    */
   private async updateSystemSettings(data: any): Promise<void> {
     const settings = await this.getSystemSettings();
-    
+
     await (this.prisma as any).systemSettings.update({
       where: { id: settings.id },
       data: { ...data, updatedAt: new Date() },
@@ -352,18 +352,22 @@ export class UpdateService {
    * Criptografa token Git para armazenamento seguro
    */
   private encryptToken(token: string): string {
-    const cipher = crypto.createCipher('aes-256-cbc', this.encryptionKey);
+    // Usar IV fixo baseado na chave para compatibilidade
+    const iv = crypto.scryptSync(this.encryptionKey, 'salt', 16);
+    const cipher = crypto.createCipheriv('aes-256-cbc', this.encryptionKey.substring(0, 32), iv);
     let encrypted = cipher.update(token, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    return encrypted;
+    return iv.toString('hex') + ':' + encrypted;
   }
 
   /**
    * Descriptografa token Git
    */
   private decryptToken(encryptedToken: string): string {
-    const decipher = crypto.createDecipher('aes-256-cbc', this.encryptionKey);
-    let decrypted = decipher.update(encryptedToken, 'hex', 'utf8');
+    const [ivHex, encrypted] = encryptedToken.split(':');
+    const iv = Buffer.from(ivHex, 'hex');
+    const decipher = crypto.createDecipheriv('aes-256-cbc', this.encryptionKey.substring(0, 32), iv);
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return decrypted;
   }

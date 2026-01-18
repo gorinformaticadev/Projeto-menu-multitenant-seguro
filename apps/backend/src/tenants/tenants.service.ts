@@ -3,7 +3,6 @@ import { PrismaService } from '@core/prisma/prisma.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import * as bcrypt from 'bcrypt';
-import { Role, ModuleStatus } from '@prisma/client';
 import { unlink } from 'fs/promises';
 import { join } from 'path';
 
@@ -68,7 +67,7 @@ export class TenantsService {
     // Cria o tenant e o usuÃ¡rio admin em uma transaÃ§Ã£o
     return this.prisma.$transaction(async (prisma) => {
       // Cria o tenant
-      const tenant = await prisma.tenant.create({
+      const tenant = await (prisma as any).tenant.create({
         data: {
           email,
           cnpjCpf,
@@ -79,25 +78,25 @@ export class TenantsService {
       });
 
       // Cria o usuÃ¡rio admin do tenant
-      await prisma.user.create({
+      await (prisma as any).user.create({
         data: {
           email: adminEmail,
           password: hashedPassword,
           name: adminName,
-          role: Role.ADMIN,
+          role: 'ADMIN',
           tenantId: tenant.id,
         },
       });
 
       // Buscar todos os mÃ³dulos ativos do sistema
-      const activeModules = await prisma.module.findMany({
-        where: { status: ModuleStatus.active },
+      const activeModules = await (prisma as any).module.findMany({
+        where: { status: 'active' },
       });
 
       // Vincular mÃ³dulos ao novo tenant (DESABILITADOS por padrÃ£o)
       // Cada tenant deve ativar os mÃ³dulos que deseja usar
       if (activeModules.length > 0) {
-        await prisma.moduleTenant.createMany({
+        await (prisma as any).moduleTenant.createMany({
           data: activeModules.map((module) => ({
             tenantId: tenant.id,
             moduleId: module.id,
@@ -165,7 +164,7 @@ export class TenantsService {
     const admin = await this.prisma.user.findFirst({
       where: {
         tenantId: id,
-        role: Role.ADMIN,
+        role: 'ADMIN',
       },
     });
 

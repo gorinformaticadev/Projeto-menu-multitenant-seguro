@@ -9,10 +9,14 @@ export class DynamicModulesLoader {
 
     static async load(prisma: PrismaService): Promise<Type<any>[]> {
         try {
-            const logFile = 'd:/github/Projeto-menu-multitenant-seguro/module_loading_debug.log';
+            const logFile = path.join(process.cwd(), 'module_loading_debug.log');
             const log = (msg: string) => {
-                const timestamp = new Date().toISOString();
-                fs.appendFileSync(logFile, `[${timestamp}] [Loader] ${msg}\n`);
+                try {
+                    const timestamp = new Date().toISOString();
+                    fs.appendFileSync(logFile, `[${timestamp}] [Loader] ${msg}\n`);
+                } catch (error) {
+                    // Ignore log file errors
+                }
                 this.logger.log(msg);
             };
 
