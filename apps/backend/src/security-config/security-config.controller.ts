@@ -1,4 +1,4 @@
- import { Controller, Get, Put, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Put, Body, UseGuards, Req } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { SecurityConfigService } from './security-config.service';
 import { UpdateSecurityConfigDto } from './dto/update-security-config.dto';
@@ -10,15 +10,15 @@ import { Role } from '@prisma/client';
 
 @SkipThrottle()
 @Controller('security-config')
-@UseGuards(RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class SecurityConfigController {
   constructor(private readonly securityConfigService: SecurityConfigService) {
-      // Empty implementation
-    }
+    // Empty implementation
+  }
 
   /**
    * GET /security-config
-   * Obter configuraÃ§Ãµes de seguranÃ§a
+   * Obter configurações de segurança
    * Apenas SUPER_ADMIN
    */
   @SkipThrottle()
@@ -30,7 +30,7 @@ export class SecurityConfigController {
 
   /**
    * PUT /security-config
-   * Atualizar configuraÃ§Ãµes de seguranÃ§a
+   * Atualizar configurações de segurança
    * Apenas SUPER_ADMIN
    */
   @SkipThrottle()
@@ -45,7 +45,7 @@ export class SecurityConfigController {
 
   /**
    * GET /security-config/password-policy
-   * Obter polÃ­tica de senha (pÃºblico para validaÃ§Ã£o no frontend)
+   * Obter política de senha (público para validação no frontend)
    */
   @Public()
   @SkipThrottle()
@@ -56,7 +56,7 @@ export class SecurityConfigController {
 
   /**
    * GET /security-config/2fa-status
-   * Verificar se 2FA estÃ¡ habilitado globalmente (pÃºblico)
+   * Verificar se 2FA está habilitado globalmente (público)
    */
   @Public()
   @SkipThrottle()
@@ -71,7 +71,7 @@ export class SecurityConfigController {
 
   /**
    * GET /security-config/full
-   * Obter configuraÃ§Ãµes de seguranÃ§a completas (pÃºblico para validaÃ§Ã£o no frontend)
+   * Obter configurações de segurança completas (público para validação no frontend)
    */
   @Public()
   @SkipThrottle()
@@ -92,4 +92,3 @@ export class SecurityConfigController {
     };
   }
 }
-

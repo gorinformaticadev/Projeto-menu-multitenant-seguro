@@ -109,3 +109,104 @@ Require stack:
 - D:\github\2026\apps\backend\src\main.ts
 [2026-01-18T10:48:25.480Z] [Loader]    ➜ Verifique se a pasta/arquivo existe em: src/modules/ordem_servico/
 [2026-01-18T10:48:25.480Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 0
+[2026-01-18T10:55:52.920Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-18T10:55:53.176Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-18T10:55:53.176Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-18T10:55:53.178Z] [Loader] ❌ Falha ao carregar módulo ordem_servico: Cannot find module 'D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module'
+Require stack:
+- D:\github\2026\apps\backend\src\core\dynamic-modules.loader.ts
+- D:\github\2026\apps\backend\src\app.module.ts
+- D:\github\2026\apps\backend\src\main.ts
+[2026-01-18T10:55:53.179Z] [Loader]    ➜ Verifique se a pasta/arquivo existe em: src/modules/ordem_servico/
+[2026-01-18T10:55:53.180Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 0
+[2026-01-18T10:56:17.235Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-18T10:56:17.356Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-18T10:56:17.357Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-18T10:56:17.358Z] [Loader] ❌ Falha ao carregar módulo ordem_servico: Cannot find module 'D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module'
+Require stack:
+- D:\github\2026\apps\backend\src\core\dynamic-modules.loader.ts
+- D:\github\2026\apps\backend\src\app.module.ts
+- D:\github\2026\apps\backend\src\main.ts
+[2026-01-18T10:56:17.358Z] [Loader]    ➜ Verifique se a pasta/arquivo existe em: src/modules/ordem_servico/
+[2026-01-18T10:56:17.358Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 0
+[2026-01-18T10:57:49.303Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-18T10:57:54.207Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-18T10:57:54.207Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-18T10:57:54.209Z] [Loader] ❌ Falha ao carregar módulo ordem_servico: Cannot find module 'D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module'
+Require stack:
+- D:\github\2026\apps\backend\src\core\dynamic-modules.loader.ts
+- D:\github\2026\apps\backend\src\app.module.ts
+- D:\github\2026\apps\backend\src\main.ts
+[2026-01-18T10:57:54.210Z] [Loader]    ➜ Verifique se a pasta/arquivo existe em: src/modules/ordem_servico/
+[2026-01-18T10:57:54.210Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 0
+[2026-01-18T11:05:02.234Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-18T11:05:02.610Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-18T11:05:02.611Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-18T11:05:02.611Z] [Loader] ❌ Falha ao carregar módulo ordem_servico: Cannot find module 'D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module'
+Require stack:
+- D:\github\2026\apps\backend\src\core\dynamic-modules.loader.ts
+- D:\github\2026\apps\backend\src\app.module.ts
+- D:\github\2026\apps\backend\src\main.ts
+[2026-01-18T11:05:02.612Z] [Loader]    ➜ Verifique se a pasta/arquivo existe em: src/modules/ordem_servico/
+[2026-01-18T11:05:02.612Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 0
+[2026-01-18T11:05:51.288Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-18T11:05:51.410Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-18T11:05:51.410Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-18T11:05:51.411Z] [Loader] ❌ Falha ao carregar módulo ordem_servico: Cannot find module 'D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module'
+Require stack:
+- D:\github\2026\apps\backend\src\core\dynamic-modules.loader.ts
+- D:\github\2026\apps\backend\src\app.module.ts
+- D:\github\2026\apps\backend\src\main.ts
+[2026-01-18T11:05:51.412Z] [Loader]    ➜ Verifique se a pasta/arquivo existe em: src/modules/ordem_servico/
+[2026-01-18T11:05:51.412Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 0
+[2026-01-18T11:06:25.397Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-18T11:06:25.519Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-18T11:06:25.520Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-18T11:06:25.521Z] [Loader] ❌ Falha ao carregar módulo ordem_servico: Cannot find module 'D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module'
+Require stack:
+- D:\github\2026\apps\backend\src\core\dynamic-modules.loader.ts
+- D:\github\2026\apps\backend\src\app.module.ts
+- D:\github\2026\apps\backend\src\main.ts
+[2026-01-18T11:06:25.521Z] [Loader]    ➜ Verifique se a pasta/arquivo existe em: src/modules/ordem_servico/
+[2026-01-18T11:06:25.521Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 0
+[2026-01-18T11:06:36.949Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-18T11:06:37.066Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-18T11:06:37.066Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-18T11:06:37.067Z] [Loader] ❌ Falha ao carregar módulo ordem_servico: Cannot find module 'D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module'
+Require stack:
+- D:\github\2026\apps\backend\src\core\dynamic-modules.loader.ts
+- D:\github\2026\apps\backend\src\app.module.ts
+- D:\github\2026\apps\backend\src\main.ts
+[2026-01-18T11:06:37.068Z] [Loader]    ➜ Verifique se a pasta/arquivo existe em: src/modules/ordem_servico/
+[2026-01-18T11:06:37.068Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 0
+[2026-01-18T11:06:50.827Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-18T11:06:50.950Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-18T11:06:50.951Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-18T11:06:50.951Z] [Loader] ❌ Falha ao carregar módulo ordem_servico: Cannot find module 'D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module'
+Require stack:
+- D:\github\2026\apps\backend\src\core\dynamic-modules.loader.ts
+- D:\github\2026\apps\backend\src\app.module.ts
+- D:\github\2026\apps\backend\src\main.ts
+[2026-01-18T11:06:50.952Z] [Loader]    ➜ Verifique se a pasta/arquivo existe em: src/modules/ordem_servico/
+[2026-01-18T11:06:50.953Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 0
+[2026-01-18T11:07:05.699Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-18T11:07:05.814Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-18T11:07:05.814Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-18T11:07:05.815Z] [Loader] ❌ Falha ao carregar módulo ordem_servico: Cannot find module 'D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module'
+Require stack:
+- D:\github\2026\apps\backend\src\core\dynamic-modules.loader.ts
+- D:\github\2026\apps\backend\src\app.module.ts
+- D:\github\2026\apps\backend\src\main.ts
+[2026-01-18T11:07:05.816Z] [Loader]    ➜ Verifique se a pasta/arquivo existe em: src/modules/ordem_servico/
+[2026-01-18T11:07:05.816Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 0
+[2026-01-18T11:07:21.689Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-18T11:07:21.810Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-18T11:07:21.811Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-18T11:07:21.812Z] [Loader] ❌ Falha ao carregar módulo ordem_servico: Cannot find module 'D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module'
+Require stack:
+- D:\github\2026\apps\backend\src\core\dynamic-modules.loader.ts
+- D:\github\2026\apps\backend\src\app.module.ts
+- D:\github\2026\apps\backend\src\main.ts
+[2026-01-18T11:07:21.812Z] [Loader]    ➜ Verifique se a pasta/arquivo existe em: src/modules/ordem_servico/
+[2026-01-18T11:07:21.813Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 0
+[2026-01-18T11:07:58.813Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...

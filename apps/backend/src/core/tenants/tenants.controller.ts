@@ -18,7 +18,7 @@ import { multerConfig } from '@core/common/config/multer.config';
 
 @SkipThrottle()
 @Controller('tenants')
-@UseGuards(RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class TenantsController {
   constructor(
     private tenantsService: TenantsService,
@@ -194,16 +194,12 @@ export class TenantsController {
     return this.tenantsService.getTenantLogo(id);
   }
 
-  // Endpoints para gerenciamento de módulos dos tenants
-
   @Get('my-tenant/modules/active')
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   @SkipThrottle()
   async getMyTenantActiveModules(@Req() req: ExpressRequest & { user: any }) {
     if (!req.user.tenantId) {
       if (req.user.role === Role.SUPER_ADMIN) {
-        // Se for SUPER_ADMIN sem tenant, retornamos uma lista vazia ou erro.
-        // Para facilitar o desenvolvimento, vamos lançar um aviso claro.
         throw new BadRequestException('SUPER_ADMIN não possui contexto de tenant. Use um usuário ADMIN de tenant.');
       }
       throw new BadRequestException('Usuário sem vinculo com tenant.');

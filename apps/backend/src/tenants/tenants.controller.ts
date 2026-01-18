@@ -18,7 +18,7 @@ import { multerConfig } from '@core/common/config/multer.config';
 
 @SkipThrottle()
 @Controller('tenants')
-@UseGuards(RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class TenantsController {
   constructor(
     private tenantsService: TenantsService,
@@ -27,7 +27,7 @@ export class TenantsController {
     // Empty implementation
   }
 
-  // Assinaturas de arquivos vÃ¡lidas (magic numbers)
+  // Assinaturas de arquivos válidas (magic numbers)
   private readonly FILE_SIGNATURES = {
     'image/jpeg': [0xFF, 0xD8, 0xFF],
     'image/png': [0x89, 0x50, 0x4E, 0x47],
@@ -49,24 +49,24 @@ export class TenantsController {
 
       const signature = this.FILE_SIGNATURES[file.mimetype];
       if (!signature) {
-        // Remover arquivo invÃ¡lido
+        // Remover arquivo inválido
         fs.unlinkSync(filePath);
-        throw new BadRequestException('Tipo de arquivo nÃ£o suportado');
+        throw new BadRequestException('Tipo de arquivo não suportado');
       }
 
       // Verificar assinatura
       for (let i = 0; i < signature.length; i++) {
         if (buffer[i] !== signature[i]) {
-          // Remover arquivo com assinatura invÃ¡lida
+          // Remover arquivo com assinatura inválida
           fs.unlinkSync(filePath);
-          throw new BadRequestException('Arquivo corrompido ou tipo invÃ¡lido');
+          throw new BadRequestException('Arquivo corrompido ou tipo inválido');
         }
       }
 
-      // VerificaÃ§Ã£o adicional: tamanho mÃ­nimo para ser uma imagem vÃ¡lida
+      // Verificação adicional: tamanho mínimo para ser uma imagem válida
       if (buffer.length < 100) {
         fs.unlinkSync(filePath);
-        throw new BadRequestException('Arquivo muito pequeno para ser uma imagem vÃ¡lida');
+        throw new BadRequestException('Arquivo muito pequeno para ser uma imagem válida');
       }
 
     } catch (error) {
@@ -125,7 +125,7 @@ export class TenantsController {
       throw new BadRequestException('Nenhum arquivo foi enviado');
     }
 
-    // ValidaÃ§Ã£o adicional de seguranÃ§a: verificar assinatura do arquivo
+    // Validação adicional de segurança: verificar assinatura do arquivo
     await this.validateFileSignature(file);
 
     return this.tenantsService.updateLogo(req.user.tenantId, file.filename);
@@ -160,7 +160,7 @@ export class TenantsController {
       throw new BadRequestException('Nenhum arquivo foi enviado');
     }
 
-    // ValidaÃ§Ã£o adicional de seguranÃ§a: verificar assinatura do arquivo
+    // Validação adicional de segurança: verificar assinatura do arquivo
     await this.validateFileSignature(file);
 
     return this.tenantsService.updateLogo(id, file.filename);
@@ -194,19 +194,15 @@ export class TenantsController {
     return this.tenantsService.getTenantLogo(id);
   }
 
-  // Endpoints para gerenciamento de mÃ³dulos dos tenants
-
   @Get('my-tenant/modules/active')
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   @SkipThrottle()
   async getMyTenantActiveModules(@Req() req: ExpressRequest & { user: any }) {
     if (!req.user.tenantId) {
       if (req.user.role === Role.SUPER_ADMIN) {
-        // Se for SUPER_ADMIN sem tenant, retornamos uma lista vazia ou erro.
-        // Para facilitar o desenvolvimento, vamos lanÃ§ar um aviso claro.
-        throw new BadRequestException('SUPER_ADMIN nÃ£o possui contexto de tenant. Use um usuÃ¡rio ADMIN de tenant.');
+        throw new BadRequestException('SUPER_ADMIN não possui contexto de tenant. Use um usuário ADMIN de tenant.');
       }
-      throw new BadRequestException('UsuÃ¡rio sem vinculo com tenant.');
+      throw new BadRequestException('Usuário sem vinculo com tenant.');
     }
     const modules = await this.tenantModuleService.getModulesForTenant(req.user.tenantId);
     return {
@@ -258,9 +254,9 @@ export class TenantsController {
   async toggleMyTenantModule(@Param('moduleName') moduleName: string, @Req() req: ExpressRequest & { user: any }) {
     if (!req.user.tenantId) {
       if (req.user.role === Role.SUPER_ADMIN) {
-        throw new BadRequestException('SUPER_ADMIN nÃ£o possui contexto de tenant. Use um usuÃ¡rio ADMIN de tenant.');
+        throw new BadRequestException('SUPER_ADMIN não possui contexto de tenant. Use um usuário ADMIN de tenant.');
       }
-      throw new BadRequestException('UsuÃ¡rio sem vinculo com tenant.');
+      throw new BadRequestException('Usuário sem vinculo com tenant.');
     }
     return this.tenantsService.toggleModuleForTenant(req.user.tenantId, moduleName);
   }
@@ -285,4 +281,3 @@ export class TenantsController {
     return this.tenantsService.configureTenantModule(id, moduleName, config);
   }
 }
-

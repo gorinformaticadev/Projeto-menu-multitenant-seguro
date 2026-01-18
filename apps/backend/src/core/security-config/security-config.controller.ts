@@ -10,7 +10,7 @@ import { Role } from '@prisma/client';
 
 @SkipThrottle()
 @Controller('security-config')
-@UseGuards(RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class SecurityConfigController {
   constructor(private readonly securityConfigService: SecurityConfigService) { }
 
@@ -82,6 +82,11 @@ export class SecurityConfigController {
       twoFactorSuggested: config.twoFactorSuggested || true,
       emailVerificationRequired: config.emailVerificationRequired || false,
       emailVerificationLevel: config.emailVerificationLevel || 'SOFT',
+      passwordMinLength: config.passwordMinLength,
+      passwordRequireUppercase: config.passwordRequireUppercase,
+      passwordRequireLowercase: config.passwordRequireLowercase,
+      passwordRequireNumbers: config.passwordRequireNumbers,
+      passwordRequireSpecial: config.passwordRequireSpecial,
     };
   }
 }

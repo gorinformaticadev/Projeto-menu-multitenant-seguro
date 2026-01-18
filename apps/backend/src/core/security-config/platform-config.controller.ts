@@ -1,9 +1,10 @@
 import { Controller, Get, Put, Body, UseGuards, Request } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { PlatformConfigService } from './platform-config.service';
-import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
+import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { Roles } from '@core/common/decorators/roles.decorator';
+import { Public } from '@core/common/decorators/public.decorator';
 import { Role } from '@prisma/client';
 import { IsString, IsOptional } from 'class-validator';
 
@@ -23,15 +24,16 @@ export class UpdatePlatformConfigDto {
 
 @SkipThrottle()
 @Controller('platform-config')
-@UseGuards(RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class PlatformConfigController {
   constructor(private readonly platformConfigService: PlatformConfigService) { }
 
   /**
    * GET /platform-config
    * Obter configurações da plataforma
-   * Público para todos os usuários autenticados
+   * Público para inicialização do frontend (Login Page etc)
    */
+  @Public()
   @SkipThrottle()
   @Get()
   async getPlatformConfig() {
@@ -63,6 +65,7 @@ export class PlatformConfigController {
    * Obter apenas o nome da plataforma
    * Público (sem autenticação) para uso em templates
    */
+  @Public()
   @SkipThrottle()
   @Get('name')
   async getPlatformName() {
@@ -76,6 +79,7 @@ export class PlatformConfigController {
    * Obter apenas o email da plataforma
    * Público (sem autenticação) para uso em templates
    */
+  @Public()
   @SkipThrottle()
   @Get('email')
   async getPlatformEmail() {
@@ -89,6 +93,7 @@ export class PlatformConfigController {
    * Obter apenas o telefone da plataforma
    * Público (sem autenticação) para uso em templates
    */
+  @Public()
   @SkipThrottle()
   @Get('phone')
   async getPlatformPhone() {

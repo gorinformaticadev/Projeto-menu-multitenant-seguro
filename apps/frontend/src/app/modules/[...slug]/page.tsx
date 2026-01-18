@@ -1,11 +1,12 @@
 import DynamicModulePageClient from "./DynamicModulePageClient";
 
 interface PageProps {
-  params: {
+  params: Promise<{
     slug: string[];
-  };
+  }>;
 }
 
-export default function DynamicModulePage({ params }: PageProps) {
-  return <DynamicModulePageClient slug={params.slug} />;
+export default async function DynamicModulePage({ params }: PageProps) {
+  const resolvedParams = await params;
+  return <DynamicModulePageClient slug={resolvedParams.slug} />;
 }
