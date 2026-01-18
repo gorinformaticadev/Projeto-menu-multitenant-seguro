@@ -1,5 +1,5 @@
 
-import { DynamicModule, Logger, Type } from '@nestjs/common';
+import { Logger, Type } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service'; // Adjusted path
 import * as path from 'path';
 import * as fs from 'fs';
@@ -48,7 +48,7 @@ export class DynamicModulesLoader {
                     const moduleDirName = mod.slug.toLowerCase();
                     const moduleFileName = mod.slug.toLowerCase() + '.module';
 
-                    const modulePath = path.resolve(
+                    const _modulePath = path.resolve(
                         __dirname,
                         `../modules/${moduleDirName}/${moduleFileName}`
                     );

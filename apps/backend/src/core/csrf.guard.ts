@@ -21,7 +21,9 @@ export const SKIP_CSRF_KEY = 'skipCsrf';
  */
 @Injectable()
 export class CsrfGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(private reflector: Reflector) {
+      // Empty implementation
+    }
 
   canActivate(context: ExecutionContext): boolean {
     // Verifica se a rota está marcada para pular CSRF
@@ -64,7 +66,7 @@ export class CsrfGuard implements CanActivate {
   /**
    * Gera e define token CSRF no cookie
    */
-  private setCsrfToken(request: any, response: any): void {
+  private setCsrfToken(request: unknown, response: unknown): void {
     // Se já existe token válido, não gerar novo
     if (request.cookies?.['XSRF-TOKEN']) {
       return;

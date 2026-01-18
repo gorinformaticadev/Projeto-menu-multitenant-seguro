@@ -12,7 +12,7 @@ import {
  */
 @ValidatorConstraint({ name: 'validTenantId', async: false })
 export class ValidTenantIdValidator implements ValidatorConstraintInterface {
-  validate(value: any, args: ValidationArguments) {
+  validate(value: unknown, args: ValidationArguments) {
     const object = args.object as any;
     const userTenantId = object.user?.tenantId;
     const userRole = object.user?.role;
@@ -40,7 +40,7 @@ export class ValidTenantIdValidator implements ValidatorConstraintInterface {
  * Decorator para validar tenantId em DTOs
  */
 export function IsValidTenantId(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       target: object.constructor,
       propertyName: propertyName,
@@ -56,7 +56,7 @@ export function IsValidTenantId(validationOptions?: ValidationOptions) {
  */
 @ValidatorConstraint({ name: 'validUuidFormat', async: false })
 export class ValidUuidFormatValidator implements ValidatorConstraintInterface {
-  validate(value: any) {
+  validate(value: unknown) {
     if (!value) return false;
     
     // Aceitar string ou array de strings
@@ -80,7 +80,7 @@ export class ValidUuidFormatValidator implements ValidatorConstraintInterface {
  * Decorator para validar formato UUID
  */
 export function IsValidUuid(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       target: object.constructor,
       propertyName: propertyName,
@@ -96,7 +96,7 @@ export function IsValidUuid(validationOptions?: ValidationOptions) {
  */
 @ValidatorConstraint({ name: 'reasonablePayloadSize', async: false })
 export class ReasonablePayloadSizeValidator implements ValidatorConstraintInterface {
-  validate(value: any, args: ValidationArguments) {
+  validate(value: unknown, args: ValidationArguments) {
     const maxSize = args.constraints[0] || 10000; // 10KB por padrão
     
     if (!value) return true;
@@ -119,7 +119,7 @@ export class ReasonablePayloadSizeValidator implements ValidatorConstraintInterf
  * Decorator para limitar tamanho de payloads
  */
 export function HasReasonableSize(maxSize?: number, validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       target: object.constructor,
       propertyName: propertyName,

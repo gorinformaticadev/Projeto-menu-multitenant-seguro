@@ -23,7 +23,7 @@ class ModuleRegistry implements IModuleRegistry {
   private static instance: ModuleRegistry;
   private contributions: Map<string, ModuleContribution> = new Map();
 
-  private constructor() {}
+  private // Empty constructor removed
 
   static getInstance(): ModuleRegistry {
     if (!ModuleRegistry.instance) {
@@ -43,8 +43,7 @@ class ModuleRegistry implements IModuleRegistry {
     }
 
     this.contributions.set(contribution.id, contribution);
-    console.log(`Módulo registrado: ${contribution.id} v${contribution.version}`);
-  }
+    }
 
   /**
    * Remove um módulo do registro
@@ -52,8 +51,7 @@ class ModuleRegistry implements IModuleRegistry {
   unregister(moduleId: string): void {
     if (this.contributions.has(moduleId)) {
       this.contributions.delete(moduleId);
-      console.log(`Módulo removido: ${moduleId}`);
-    }
+      }
   }
 
   /**
@@ -92,7 +90,7 @@ class ModuleRegistry implements IModuleRegistry {
 
       // Filtra itens baseado em permissões/roles
       const filteredItems = contribution.sidebar.filter(item => 
-        this.hasAccess(item.roles, item.permissions, userRole, permissions)
+        this.hasAccess(item.roles, item.permissions, userpermissions)
       );
 
       items.push(...filteredItems);
@@ -120,7 +118,7 @@ class ModuleRegistry implements IModuleRegistry {
       }
 
       const filteredWidgets = contribution.dashboard.filter(widget => 
-        this.hasAccess(widget.roles, widget.permissions, userRole, permissions)
+        this.hasAccess(widget.roles, widget.permissions, userpermissions)
       );
 
       widgets.push(...filteredWidgets);
@@ -147,7 +145,7 @@ class ModuleRegistry implements IModuleRegistry {
       }
 
       const filteredItems = contribution.taskbar.filter(item => 
-        this.hasAccess(item.roles, item.permissions, userRole, permissions)
+        this.hasAccess(item.roles, item.permissions, userpermissions)
       );
 
       items.push(...filteredItems);
@@ -174,7 +172,7 @@ class ModuleRegistry implements IModuleRegistry {
       }
 
       const filteredItems = contribution.userMenu.filter(item => 
-        this.hasAccess(item.roles, item.permissions, userRole, permissions)
+        this.hasAccess(item.roles, item.permissions, userpermissions)
       );
 
       items.push(...filteredItems);
@@ -201,7 +199,7 @@ class ModuleRegistry implements IModuleRegistry {
       }
 
       const filteredNotifications = contribution.notifications.filter(notification => 
-        this.hasAccess(notification.roles, notification.permissions, userRole, permissions)
+        this.hasAccess(notification.roles, notification.permissions, userpermissions)
       );
 
       notifications.push(...filteredNotifications);

@@ -1,4 +1,4 @@
-﻿import { Injectable } from '@nestjs/common';
+ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 
 export interface AuditLogData {
@@ -7,12 +7,14 @@ export interface AuditLogData {
   tenantId?: string;
   ipAddress?: string;
   userAgent?: string;
-  details?: any;
+  details?: Record<string, unknown>;
 }
 
 @Injectable()
 export class AuditService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {
+      // Empty implementation
+    }
 
   /**
    * Criar log de auditoria
@@ -46,7 +48,9 @@ export class AuditService {
     const limit = params.limit || 50;
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: unknown = {
+      // Empty implementation
+    };
 
     if (params.action) {
       where.action = params.action;
@@ -61,7 +65,9 @@ export class AuditService {
     }
 
     if (params.startDate || params.endDate) {
-      where.createdAt = {};
+      where.createdAt = {
+      // Empty implementation
+    };
       if (params.startDate) {
         where.createdAt.gte = params.startDate;
       }
@@ -126,10 +132,14 @@ export class AuditService {
    * EstatÃ­sticas de logs
    */
   async getStats(params: { startDate?: Date; endDate?: Date; tenantId?: string }) {
-    const where: any = {};
+    const where: unknown = {
+      // Empty implementation
+    };
 
     if (params.startDate || params.endDate) {
-      where.createdAt = {};
+      where.createdAt = {
+      // Empty implementation
+    };
       if (params.startDate) {
         where.createdAt.gte = params.startDate;
       }

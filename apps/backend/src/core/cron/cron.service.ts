@@ -29,7 +29,9 @@ export class CronService implements OnModuleInit {
     constructor(
         private schedulerRegistry: SchedulerRegistry,
         private prisma: PrismaService
-    ) { }
+    ) {
+      // Empty implementation
+    }
 
     async onModuleInit() {
         this.logger.log('Inicializando Cron Service...');
@@ -189,7 +191,9 @@ export class CronService implements OnModuleInit {
             if (this.schedulerRegistry.doesExist('cron', key)) {
                 this.schedulerRegistry.deleteCronJob(key);
             }
-        } catch (e) { }
+        } catch (error) {
+      // Error handled silently
+    }
     }
 
     delete(key: string) {
@@ -204,7 +208,9 @@ export class CronService implements OnModuleInit {
             if (j.job) {
                 try {
                     j.definition.nextRun = j.job.nextDate().toJSDate();
-                } catch (e) { }
+                } catch (error) {
+      // Error handled silently
+    }
             }
             return j.definition;
         });

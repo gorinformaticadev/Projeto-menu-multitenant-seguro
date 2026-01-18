@@ -11,7 +11,9 @@ export class WsJwtGuard implements CanActivate {
     private jwtService: JwtService,
     private configService: ConfigService,
     private prismaService: PrismaService,
-  ) {}
+  ) {
+      // Empty implementation
+    }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     try {
@@ -60,7 +62,7 @@ export class WsJwtGuard implements CanActivate {
     }
   }
 
-  private extractToken(client: any): string | null {
+  private extractToken(client: unknown): string | null {
     return client.handshake?.auth?.token || 
            client.handshake?.headers?.authorization?.replace('Bearer ', '') ||
            null;

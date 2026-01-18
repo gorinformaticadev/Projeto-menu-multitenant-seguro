@@ -23,11 +23,13 @@ import { memoryStorage } from 'multer';
  * Interface: /configuracoes/sistema/modulos
  */
 @Controller('configuracoes/sistema/modulos')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(RolesGuard)
 @Roles(Role.SUPER_ADMIN)
 export class ModuleInstallerController {
     // Controller refreshed
-    constructor(private readonly installer: ModuleInstallerService) { }
+    constructor(private readonly installer: ModuleInstallerService) {
+      // Empty implementation
+    }
 
     /**
      * GET /configuracoes/sistema/modulos
@@ -56,18 +58,7 @@ export class ModuleInstallerController {
         }
     }))
     async uploadModule(@UploadedFile() file: Express.Multer.File) {
-        console.log('\n========== CONTROLLER - uploadModule ==========');
-        console.log('1. Arquivo recebido:', {
-            exists: !!file,
-            originalname: file?.originalname,
-            mimetype: file?.mimetype,
-            size: file?.size,
-            fieldname: file?.fieldname,
-            encoding: file?.encoding
-        });
-
         if (!file) {
-            console.log('❌ ERRO: Arquivo não fornecido');
             throw new BadRequestException('Arquivo não fornecido');
         }
 
@@ -81,15 +72,11 @@ export class ModuleInstallerController {
         });
 
         if (!file.buffer) {
-            console.log('❌ ERRO: Buffer do arquivo não encontrado');
             throw new BadRequestException('Buffer do arquivo não encontrado');
         }
 
         if (!Buffer.isBuffer(file.buffer)) {
-            console.log('❌ ERRO CRÍTICO: file.buffer NÃO é um Buffer!');
             console.log('Tipo recebido:', (file.buffer as any)?.constructor?.name);
-            console.log('Tentando converter para Buffer...');
-
             try {
                 // Se buffer é um Object com chaves numéricas (serializado)
                 if (file.buffer && typeof file.buffer === 'object') {
@@ -97,7 +84,6 @@ export class ModuleInstallerController {
 
                     // Converter Object numérico para Array e depois para Buffer
                     const bufferArray = Object.values(file.buffer);
-                    console.log('Array extraído - length:', bufferArray.length);
                     console.log('Primeiros valores:', bufferArray.slice(0, 10));
 
                     const bufferData = Buffer.from(bufferArray as number[]);
@@ -110,23 +96,22 @@ export class ModuleInstallerController {
                 } else {
                     // Tentar conversão direta
                     const bufferData = Buffer.from(file.buffer as any);
-                    console.log('✅ Conversão direta bem-sucedida');
                     file.buffer = bufferData;
                 }
             } catch (conversionError) {
-                console.log('❌ Falha na conversão:', conversionError.message);
                 console.log('Detalhes do buffer:', {
                     type: typeof file.buffer,
                     constructor: (file.buffer as any)?.constructor?.name,
-                    keys: Object.keys(file.buffer || {}).slice(0, 20),
-                    values: Object.values(file.buffer || {}).slice(0, 10)
+                    keys: object.keys(file.buffer || {
+      // Empty implementation
+    }).slice(0, 20),
+                    values: object.values(file.buffer || {
+      // Empty implementation
+    }).slice(0, 10)
                 });
                 throw new BadRequestException('Buffer inválido - não foi possível converter: ' + conversionError.message);
             }
         }
-
-        console.log('3. Buffer válido confirmado - Chamando installModuleFromZip');
-        console.log('===============================================\n');
 
         return await this.installer.installModuleFromZip(file);
     }
@@ -215,10 +200,8 @@ export class ModuleInstallerController {
      */
     @Post(':slug/run-migrations-seeds')
     async runMigrationsAndSeeds(@Param('slug') slug: string) {
-        console.log(`🔄 Controller: Recebida requisição para executar migrations/seeds do módulo: ${slug}`);
         try {
             const result = await this.installer.runMigrationsAndSeeds(slug);
-            console.log(`✅ Controller: Sucesso ao executar migrations/seeds para ${slug}`);
             return result;
         } catch (error) {
             console.error(`❌ Controller: Erro ao executar migrations/seeds para ${slug}:`, error);

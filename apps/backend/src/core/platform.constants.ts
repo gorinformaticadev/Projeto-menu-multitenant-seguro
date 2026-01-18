@@ -1,4 +1,4 @@
-﻿import { PlatformConfigService } from '@core/security-config/platform-config.service';
+ import { PlatformConfigService } from '@core/security-config/platform-config.service';
 
 /**
  * Default platform configuration values

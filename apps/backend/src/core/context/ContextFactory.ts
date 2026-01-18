@@ -14,7 +14,7 @@ import {
   DashboardManager,
   ACLManager,
 } from './CoreContext';
-import { Tenant, User, Environment, RequestInstance, ResponseInstance } from '../contracts/types';
+import { Tenant, User, ResponseInstance } from '../contracts/types';
 import { EventBus } from '../events/EventBus';
 
 /**

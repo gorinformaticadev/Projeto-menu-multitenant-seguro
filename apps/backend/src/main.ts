@@ -16,7 +16,6 @@ async function bootstrap() {
   // ============================================
   // 🔒 VALIDAÇÃO DE SEGURANÇA NA INICIALIZAÇÃO
   // ============================================
-  console.log('🔒 Validando configurações de segurança...');
   const securityValidation = validateSecurityConfig();
 
   if (!securityValidation.isValid) {
@@ -30,13 +29,9 @@ async function bootstrap() {
     securityValidation.warnings.forEach(warning => console.warn(`   - ${warning}`));
   }
 
-  console.log('✅ Configurações de segurança validadas com sucesso');
-
   // ============================================
   // 🔐 SECRET MANAGEMENT - Carregar secrets antes da inicialização
   // ============================================
-  console.log('🔐 Inicializando Secret Manager...');
-
   try {
     const secretManager = new SecretManagerService();
     await secretManager.initialize();
@@ -47,8 +42,7 @@ async function bootstrap() {
       process.exit(1);
     }
 
-    console.log('✅ Secret Manager inicializado com sucesso');
-  } catch (error) {
+    } catch (error) {
     console.error('❌ Falha ao inicializar Secret Manager:', error.message);
     if (process.env.NODE_ENV === 'production') {
       process.exit(1);
@@ -65,8 +59,6 @@ async function bootstrap() {
   // 🔧 REDIS ADAPTER PARA ESCALABILIDADE HORIZONTAL
   // ============================================
   if (process.env.REDIS_HOST) {
-    console.log('🔧 Configurando Redis adapter para Socket.IO...');
-
     try {
       // Configuração do cluster Redis
       const redisOptions = {
@@ -97,7 +89,8 @@ async function bootstrap() {
       const server = app.getHttpServer();
 
       // Configurar Socket.IO com adaptador Redis
-      const io = require('socket.io')(server, {
+      const { Server } = require('socket.io');
+      const io = new Server(server, {
         cors: {
           origin: [
             process.env.FRONTEND_URL || 'http://localhost:5000',
@@ -118,15 +111,13 @@ async function bootstrap() {
       // Tornar instância io disponível na aplicação
       app.set('io', io);
 
-      console.log('✅ Redis adapter configurado com sucesso');
-
-    } catch (error) {
+      } catch (error) {
       console.error('❌ Falha ao configurar Redis adapter:', error.message);
       console.warn('⚠️  Continuando sem Redis adapter (modo standalone)');
     }
   } else {
-    console.log('ℹ️  Redis não configurado - usando modo standalone');
-  }
+      // Empty implementation
+    }
 
   // ============================================
   // 🔒 COOKIE PARSER - Necessário para CSRF protection
@@ -136,7 +127,7 @@ async function bootstrap() {
   // ============================================
   // 📊 MONITORAMENTO - Sentry
   // ============================================
-  const sentryService = app.get(SentryService);
+  const _sentryService = app.get(SentryService);
   app.useGlobalFilters(new SentryExceptionFilter());
 
   // ============================================
@@ -243,16 +234,15 @@ async function bootstrap() {
   // 🔒 HTTPS ENFORCEMENT - Apenas em produção
   // ============================================
   if (isProduction) {
-    console.log('🔒 HTTPS Enforcement ativado');
-  }
+      // Empty implementation
+    }
 
   // Servir arquivos estáticos (logos)
   // Usa process.cwd() que sempre aponta para a raiz do projeto
   const uploadsPath = join(process.cwd(), 'uploads');
-  console.log('📁 Servindo arquivos estáticos de:', uploadsPath);
   app.useStaticAssets(uploadsPath, {
     prefix: '/uploads',
-    setHeaders: (res, path, stat) => {
+    setHeaders: (res, _stat) => {
       // Headers de segurança para arquivos estáticos
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
@@ -271,8 +261,8 @@ async function bootstrap() {
         res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache por 24 horas
 
         if (!isProduction) {
-          console.log('🖼️  Servindo logo:', path);
-        }
+      // Empty implementation
+    }
       } else {
         // CORS restritivo para outros arquivos estáticos
         const allowedOrigins = [
@@ -332,7 +322,6 @@ async function bootstrap() {
 
   const port = process.env.PORT || 4000;
   await app.listen(port, '0.0.0.0');
-  console.log(`🚀 Backend rodando em http://localhost:${port}`);
   console.log(`🛡️  Headers de segurança ativados (Helmet)`);
 }
 bootstrap();

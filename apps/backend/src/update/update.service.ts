@@ -1,4 +1,4 @@
-﻿import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
+ import { Injectable, Logger, HttpException } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ExecuteUpdateDto, UpdateConfigDto, UpdateStatusDto } from './dto/update.dto';
@@ -28,7 +28,9 @@ export class UpdateService {
   constructor(
     private prisma: PrismaService,
     private auditService: AuditService,
-  ) { }
+  ) {
+      // Empty implementation
+    }
 
   /**
    * Verifica se hÃ¡ atualizaÃ§Ãµes disponÃ­veis no repositÃ³rio Git
@@ -100,7 +102,7 @@ export class UpdateService {
     ipAddress?: string,
     userAgent?: string,
   ): Promise<{ success: boolean; logId: string; message: string }> {
-    let updateLog: any;
+    let updateLog: unknown;
 
     try {
       this.logger.log(`Iniciando atualizaÃ§Ã£o para versÃ£o ${updateData.version}...`);
@@ -246,7 +248,7 @@ export class UpdateService {
   ): Promise<{ success: boolean; message: string }> {
     try {
       // Criptografar token se fornecido
-      const updateData: any = { ...config, updatedBy };
+      const updateData: unknown = { ...config, updatedBy };
 
       if (config.gitToken) {
         updateData.gitToken = this.encryptToken(config.gitToken);
@@ -261,7 +263,7 @@ export class UpdateService {
         tenantId: null,
         ipAddress: undefined,
         userAgent: undefined,
-        details: { configFields: Object.keys(config) },
+        details: { configFields: object.keys(config) },
       });
 
       this.logger.log('ConfiguraÃ§Ãµes do sistema de updates atualizadas');
@@ -304,13 +306,13 @@ export class UpdateService {
   /**
    * Retorna detalhes de um log especÃ­fico
    */
-  async getUpdateLogDetails(logId: string): Promise<any> {
+  async getUpdateLogDetails(logId: string): Promise<unknown> {
     const log = await (this.prisma as any).updateLog.findUnique({
       where: { id: logId },
     });
 
     if (!log) {
-      throw new HttpException('Log nÃ£o encontrado', HttpStatus.NOT_FOUND);
+      throw new HttpException('Log nÃ£o encontrado'.NOT_FOUND);
     }
 
     return log;
@@ -319,7 +321,7 @@ export class UpdateService {
   /**
    * Busca ou cria configuraÃ§Ãµes do sistema
    */
-  private async getSystemSettings(): Promise<any> {
+  private async getSystemSettings(): Promise<unknown> {
     let settings = await (this.prisma as any).systemSettings.findFirst();
 
     if (!settings) {
@@ -339,7 +341,7 @@ export class UpdateService {
   /**
    * Atualiza configuraÃ§Ãµes do sistema
    */
-  private async updateSystemSettings(data: any): Promise<void> {
+  private async updateSystemSettings(data: unknown): Promise<void> {
     const settings = await this.getSystemSettings();
 
     await (this.prisma as any).systemSettings.update({

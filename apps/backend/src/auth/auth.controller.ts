@@ -1,4 +1,4 @@
-﻿import { Controller, Post, Body, Req, Ip, UseGuards, Get } from '@nestjs/common';
+ import { Controller, Post, Body, Ip, UseGuards, Get } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { TwoFactorService } from './two-factor.service';
@@ -23,7 +23,9 @@ export class AuthController {
     private twoFactorService: TwoFactorService,
     private emailVerificationService: EmailVerificationService,
     private passwordResetService: PasswordResetService,
-  ) {}
+  ) {
+      // Empty implementation
+    }
 
   /**
    * POST /auth/login
@@ -97,7 +99,7 @@ export class AuthController {
    */
   @Get('2fa/generate')
   @UseGuards(JwtAuthGuard)
-  async generate2FA(@Req() req: any) {
+  async generate2FA(@Req() req: unknown) {
     return this.twoFactorService.generateSecret(req.user.id);
   }
 
@@ -107,7 +109,7 @@ export class AuthController {
    */
   @Post('2fa/enable')
   @UseGuards(JwtAuthGuard)
-  async enable2FA(@Body() verify2FADto: Verify2FADto, @Req() req: any) {
+  async enable2FA(@Body() verify2FADto: Verify2FADto, @Req() req: unknown) {
     return this.twoFactorService.enable(req.user.id, verify2FADto.token);
   }
 
@@ -117,7 +119,7 @@ export class AuthController {
    */
   @Post('2fa/disable')
   @UseGuards(JwtAuthGuard)
-  async disable2FA(@Body() verify2FADto: Verify2FADto, @Req() req: any) {
+  async disable2FA(@Body() verify2FADto: Verify2FADto, @Req() req: unknown) {
     return this.twoFactorService.disable(req.user.id, verify2FADto.token);
   }
   /**
@@ -126,7 +128,7 @@ export class AuthController {
    */
   @Get('2fa/status')
   @UseGuards(JwtAuthGuard)
-  async get2FAStatus(@Req() req: any) {
+  async get2FAStatus(@Req() req: unknown) {
     const user = await this.authService.getProfile(req.user.id);
     return {
       enabled: user.twoFactorEnabled || false,
@@ -140,7 +142,7 @@ export class AuthController {
    */
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  async getProfile(@Req() req: any) {
+  async getProfile(@Req() req: unknown) {
     return this.authService.getProfile(req.user.id);
   }
 
@@ -151,7 +153,7 @@ export class AuthController {
   @Post('email/send-verification')
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 3, ttl: 3600000 } }) // 3 tentativas por hora
-  async sendVerificationEmail(@Req() req: any) {
+  async sendVerificationEmail(@Req() req: unknown) {
     return this.emailVerificationService.sendVerificationEmail(req.user.id);
   }
 
@@ -173,7 +175,7 @@ export class AuthController {
    */
   @Get('email/status')
   @UseGuards(JwtAuthGuard)
-  async checkEmailVerification(@Req() req: any) {
+  async checkEmailVerification(@Req() req: unknown) {
     return this.emailVerificationService.checkEmailVerification(req.user.id);
   }
 

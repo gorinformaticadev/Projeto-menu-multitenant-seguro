@@ -1,4 +1,4 @@
-﻿import {
+ import {
   Controller,
   Get,
   Post,
@@ -31,7 +31,9 @@ import { Throttle } from '@nestjs/throttler';
 @Controller('api/update')
 @UseGuards(JwtAuthGuard)
 export class UpdateController {
-  constructor(private updateService: UpdateService) {}
+  constructor(private updateService: UpdateService) {
+      // Empty implementation
+    }
 
   /**
    * GET /api/update/status

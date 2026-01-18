@@ -16,7 +16,7 @@ export class DuplicateRequestInterceptor implements NestInterceptor {
     
     // Cria uma chave única para a requisição
     const requestKey = `${method}:${url}:${ip}:${userAgent}`;
-    const now = Date.now();
+    const _now = Date.now();
     
     // Verifica se é uma requisição duplicada
     const lastRequest = this.requestLog.get(requestKey);
@@ -47,8 +47,8 @@ export class DuplicateRequestInterceptor implements NestInterceptor {
       tap(() => {
         // Log da requisição bem-sucedida
         if (url.includes('/modules/') && url.includes('/toggle')) {
-          console.log(`✅ [TOGGLE] Requisição processada: ${method} ${url}`);
-        }
+      // Empty implementation
+    }
       })
     );
   }

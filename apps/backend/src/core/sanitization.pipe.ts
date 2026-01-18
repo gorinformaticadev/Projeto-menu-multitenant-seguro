@@ -7,7 +7,7 @@ import * as sanitizeHtml from 'sanitize-html';
  */
 @Injectable()
 export class SanitizationPipe implements PipeTransform {
-  transform(value: any, metadata: ArgumentMetadata) {
+  transform(value: unknown, metadata: ArgumentMetadata) {
     if (!value) return value;
 
     // Se for objeto, sanitiza recursivamente
@@ -28,11 +28,13 @@ export class SanitizationPipe implements PipeTransform {
     return value;
   }
 
-  private sanitizeObject(obj: any): any {
-    const sanitized: any = {};
+  private sanitizeObject(obj: unknown): any {
+    const sanitized: unknown = {
+      // Empty implementation
+    };
 
     for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
         const value = obj[key];
 
         if (typeof value === 'string') {
@@ -59,7 +61,9 @@ export class SanitizationPipe implements PipeTransform {
     // Remove tags HTML e atributos perigosos, mas mantém texto seguro
     sanitized = sanitizeHtml(sanitized, {
       allowedTags: [], // Remove TODAS as tags HTML
-      allowedAttributes: {}, // Remove TODOS os atributos
+      allowedAttributes: {
+      // Empty implementation
+    }, // Remove TODOS os atributos
       disallowedTagsMode: 'recursiveEscape', // Escapa o conteúdo das tags em vez de remover
     });
 

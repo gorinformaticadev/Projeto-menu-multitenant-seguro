@@ -9,7 +9,9 @@ export class SecurityLogGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
     private auditService: AuditService
-  ) {}
+  ) {
+      // Empty implementation
+    }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const securityLogOptions = this.reflector.getAllAndOverride<SecurityLogOptions>(
@@ -24,7 +26,7 @@ export class SecurityLogGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     
     // Coletar informações baseadas nas opções
-    const logData: any = {
+    const logData: unknown = {
       action: securityLogOptions.action
     };
 
@@ -58,7 +60,7 @@ export class SecurityLogGuard implements CanActivate {
     }
 
     // Detalhes personalizados
-    const details: any = {
+    const details: unknown = {
       method: request.method,
       url: request.url,
       timestamp: new Date().toISOString(),
@@ -97,8 +99,10 @@ export class SecurityLogGuard implements CanActivate {
     );
   }
 
-  private sanitizeParams(params: any): any {
-    const sanitized: any = {};
+  private sanitizeParams(params: unknown): any {
+    const sanitized: unknown = {
+      // Empty implementation
+    };
     
     // Campos sensíveis que devem ser mascarados
     const sensitiveFields = [

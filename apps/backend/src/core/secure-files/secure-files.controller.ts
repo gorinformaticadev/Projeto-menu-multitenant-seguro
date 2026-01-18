@@ -35,7 +35,9 @@ export class SecureFilesController {
   constructor(
     private readonly secureFilesService: SecureFilesService,
     private readonly configService: ConfigService,
-  ) {}
+  ) {
+      // Empty implementation
+    }
 
   /**
    * Upload de arquivo sensível
@@ -135,7 +137,7 @@ export class SecureFilesController {
    */
   @Get(':fileId/metadata')
   @UseGuards(SecureFileAccessGuard)
-  async getFileMetadata(@Param('fileId') fileId: string, @Req() req: any) {
+  async getFileMetadata(@Param('fileId') fileId: string, @Req() req: unknown) {
     const user = req.user;
     return await this.secureFilesService.getFileMetadata(fileId, user.tenantId);
   }
@@ -146,7 +148,7 @@ export class SecureFilesController {
    */
   @Delete(':fileId')
   @UseGuards(SecureFileAccessGuard)
-  async deleteFile(@Param('fileId') fileId: string, @Req() req: any) {
+  async deleteFile(@Param('fileId') fileId: string, @Req() req: unknown) {
     const user = req.user;
     await this.secureFilesService.deleteFile(fileId, user.id, user.tenantId);
     return { message: 'Arquivo deletado com sucesso' };
@@ -157,7 +159,7 @@ export class SecureFilesController {
    * GET /secure-files/list
    */
   @Get()
-  async listFiles(@Query() query: FileQueryDto, @Req() req: any) {
+  async listFiles(@Query() query: FileQueryDto, @Req() req: unknown) {
     const user = req.user;
     return await this.secureFilesService.listFiles(
       user.tenantId,

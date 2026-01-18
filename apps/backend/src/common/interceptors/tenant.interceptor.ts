@@ -12,7 +12,9 @@ export const SKIP_TENANT_ISOLATION = 'skipTenantIsolation';
 
 @Injectable()
 export class TenantInterceptor implements NestInterceptor {
-  constructor(private reflector: Reflector) {}
+  constructor(private reflector: Reflector) {
+      // Empty implementation
+    }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();

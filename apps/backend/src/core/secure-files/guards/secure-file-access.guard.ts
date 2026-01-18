@@ -15,7 +15,9 @@ import { PrismaService } from '@core/prisma/prisma.service';
  */
 @Injectable()
 export class SecureFileAccessGuard implements CanActivate {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {
+      // Empty implementation
+    }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();

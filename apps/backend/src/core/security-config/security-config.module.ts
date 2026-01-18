@@ -1,4 +1,4 @@
-﻿import { Module, forwardRef } from '@nestjs/common';
+ import { Module, forwardRef } from '@nestjs/common';
 import { SecurityConfigController } from './security-config.controller';
 import { SecurityConfigService } from './security-config.service';
 import { EmailConfigController } from './email-config.controller';
@@ -14,4 +14,6 @@ import { EmailModule } from '../email/email.module';
   providers: [SecurityConfigService, EmailConfigService, PlatformConfigService],
   exports: [SecurityConfigService, EmailConfigService, PlatformConfigService],
 })
-export class SecurityConfigModule {}
+export class SecurityConfigModule {
+      // Empty implementation
+    }

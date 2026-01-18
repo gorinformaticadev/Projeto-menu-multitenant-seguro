@@ -30,4 +30,6 @@ import { EmailModule } from '../email/email.module';
   providers: [AuthService, TwoFactorService, EmailVerificationService, PasswordResetService, JwtStrategy],
   exports: [AuthService, TwoFactorService, EmailVerificationService, PasswordResetService],
 })
-export class AuthModule {}
+export class AuthModule {
+      // Empty implementation
+    }

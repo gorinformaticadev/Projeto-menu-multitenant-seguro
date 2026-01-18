@@ -14,4 +14,6 @@ import { PrismaModule } from '@core/prisma/prisma.module';
   providers: [SecureFilesService, SecureFileAccessGuard],
   exports: [SecureFilesService], // Exportar para uso por outros módulos
 })
-export class SecureFilesModule {}
+export class SecureFilesModule {
+      // Empty implementation
+    }

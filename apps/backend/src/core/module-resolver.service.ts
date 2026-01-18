@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -29,7 +29,7 @@ export class ModuleResolverService {
      * @returns Caminho absoluto do módulo ou null se não existir
      */
     resolveModulePath(moduleSlug: string): string | null {
-        const modulePath = path.join(this.modulesBasePath, moduleSlug);
+        const _modulePath = path.join(this.modulesBasePath, moduleSlug);
 
         if (!fs.existsSync(modulePath)) {
             // this.logger.warn(`⚠️ Diretório do módulo não encontrado: ${modulePath}`);
@@ -117,7 +117,7 @@ export class ModuleResolverService {
      * @param moduleSlug - Slug do módulo
      */
     async validateAndDisableIfMissing(moduleSlug: string): Promise<void> {
-        const modulePath = this.resolveModulePath(moduleSlug);
+        const _modulePath = this.resolveModulePath(moduleSlug);
 
         if (!modulePath) {
             this.logger.warn(`⚠️ Código-fonte do módulo ${moduleSlug} não encontrado. Desativando...`);
@@ -155,7 +155,7 @@ export class ModuleResolverService {
         });
 
         return modules.map(module => {
-            const modulePath = this.resolveModulePath(module.slug);
+            const _modulePath = this.resolveModulePath(module.slug);
             return {
                 slug: module.slug,
                 name: module.name,

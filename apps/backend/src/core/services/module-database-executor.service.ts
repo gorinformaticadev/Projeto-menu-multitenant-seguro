@@ -51,7 +51,7 @@ export class ModuleDatabaseExecutorService {
 
             // Se tenantId fornecido, configura isolamento
             if (tenantId) {
-                await this.setTenantContext(client, tenantId);
+                await this.setTenantContext(client, _tenantId);
             }
 
             // Executa o SQL completo
@@ -79,7 +79,7 @@ export class ModuleDatabaseExecutorService {
             await client.query('BEGIN');
 
             if (tenantId) {
-                await this.setTenantContext(client, tenantId);
+                await this.setTenantContext(client, _tenantId);
             }
 
             for (const query of queries) {
@@ -108,7 +108,7 @@ export class ModuleDatabaseExecutorService {
 
         try {
             if (tenantId) {
-                await this.setTenantContext(client, tenantId);
+                await this.setTenantContext(client, _tenantId);
             }
 
             const result = await client.query(sql);
@@ -135,7 +135,7 @@ export class ModuleDatabaseExecutorService {
             )
         `;
 
-        const result = await this.executeQuery<{ exists: boolean }>(query, tenantId);
+        const result = await this.executeQuery<{ exists: boolean }>(query, _tenantId);
         return result[0]?.exists || false;
     }
 

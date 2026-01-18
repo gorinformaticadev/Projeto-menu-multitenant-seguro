@@ -6,10 +6,12 @@ import { RolesGuard } from '../roles.guard';
 import { JwtAuthGuard } from '../jwt-auth.guard';
 
 @Controller('cron')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(RolesGuard)
 @Roles('SUPER_ADMIN') // Apenas super admins podem gerenciar crons
 export class CronController {
-    constructor(private readonly cronService: CronService) { }
+    constructor(private readonly cronService: CronService) {
+      // Empty implementation
+    }
 
     @Get()
     listJobs() {

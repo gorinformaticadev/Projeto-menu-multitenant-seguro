@@ -1,4 +1,4 @@
-﻿import { IsString, IsNotEmpty } from 'class-validator';
+ import { IsString, IsNotEmpty } from 'class-validator';
 import { IsStrongPassword } from '@core/common/validators/password.validator';
 
 export class ChangePasswordDto {

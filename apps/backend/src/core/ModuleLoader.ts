@@ -63,7 +63,7 @@ export class ModuleLoader implements OnModuleInit {
      */
     private async registerDiscoveredModule(slug: string) {
         try {
-            const modulePath = path.join(this.modulesPath, slug);
+            const _modulePath = path.join(this.modulesPath, slug);
             const moduleJsonPath = path.join(modulePath, 'module.json');
 
             if (!fs.existsSync(moduleJsonPath)) {
@@ -118,9 +118,9 @@ export class ModuleLoader implements OnModuleInit {
     /**
      * Carrega um módulo específico (apenas se autorizado pelo CORE)
      */
-    private async loadModule(moduleData: any) {
+    private async loadModule(moduleData: unknown) {
         try {
-            const modulePath = path.join(this.modulesPath, moduleData.slug);
+            const _modulePath = path.join(this.modulesPath, moduleData.slug);
             const moduleEntry = this.findModuleEntry(modulePath);
 
             if (!moduleEntry) {
@@ -182,7 +182,7 @@ export class ModuleLoader implements OnModuleInit {
     /**
      * Importação segura com validações básicas
      */
-    private async safeImport(modulePath: string): Promise<any> {
+    private async safeImport(modulePath: string): Promise<unknown> {
         // Validações de segurança básicas
         if (!modulePath.startsWith(this.modulesPath)) {
             throw new Error('Tentativa de importação fora do diretório de módulos');
@@ -200,7 +200,7 @@ export class ModuleLoader implements OnModuleInit {
     /**
      * Valida se o módulo implementa o contrato obrigatório
      */
-    private validateModuleContract(moduleExport: any): moduleExport is ModuleContract {
+    private validateModuleContract(moduleExport: unknown): moduleExport is ModuleContract {
         return (
             moduleExport &&
             typeof moduleExport.name === 'string' &&

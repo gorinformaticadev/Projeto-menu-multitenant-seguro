@@ -4,4 +4,6 @@ import { TenantModulesController } from './tenant-modules.controller';
 @Module({
   controllers: [TenantModulesController],
 })
-export class TenantModulesModule {}
+export class TenantModulesModule {
+      // Empty implementation
+    }

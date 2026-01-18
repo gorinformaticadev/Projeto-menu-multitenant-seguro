@@ -1,4 +1,4 @@
-﻿import { IsEmail, IsString, IsOptional, MinLength, IsEnum, IsBoolean, registerDecorator, ValidationOptions, ValidationArguments } from 'class-validator';
+ import { IsEmail, IsString, IsOptional, MinLength, IsEnum, IsBoolean, registerDecorator, ValidationOptions, ValidationArguments } from 'class-validator';
 import { Role } from '@prisma/client';
 import { PrismaService } from '@core/prisma/prisma.service';
 
@@ -11,7 +11,7 @@ function IsValidPassword(validationOptions?: ValidationOptions) {
       propertyName: propertyName,
       options: validationOptions,
       validator: {
-        async validate(value: any, _args: ValidationArguments) {
+        async validate(value: unknown, _args: ValidationArguments) {
           if (!value || typeof value !== 'string' || value.trim() === '') return true; // Se nÃ£o hÃ¡ senha, Ã© vÃ¡lido (para ediÃ§Ã£o)
 
           try {
@@ -31,7 +31,7 @@ function IsValidPassword(validationOptions?: ValidationOptions) {
               if (requireUppercase && !/[A-Z]/.test(value)) return false;
               if (requireLowercase && !/[a-z]/.test(value)) return false;
               if (requireNumbers && !/\d/.test(value)) return false;
-              if (requireSpecial && !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(value)) return false;
+              if (requireSpecial && !/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value)) return false;
 
               return true;
             }
@@ -41,7 +41,9 @@ function IsValidPassword(validationOptions?: ValidationOptions) {
             if (config.passwordRequireUppercase && !/[A-Z]/.test(value)) return false;
             if (config.passwordRequireLowercase && !/[a-z]/.test(value)) return false;
             if (config.passwordRequireNumbers && !/\d/.test(value)) return false;
-            if (config.passwordRequireSpecial && !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(value)) return false;
+            if (config.passwordRequireSpecial && !/[!@#$%^&*()_+\-=[\]{
+      // Empty implementation
+    };':"\\|,.<>/?]/.test(value)) return false;
 
             return true;
           } catch (error) {
@@ -59,7 +61,9 @@ function IsValidPassword(validationOptions?: ValidationOptions) {
 
 export class UpdateUserDto {
   @IsOptional()
-  @IsEmail({}, { message: 'Email invÃ¡lido' })
+  @IsEmail({
+      // Empty implementation
+    }, { message: 'Email invÃ¡lido' })
   email?: string;
 
   @IsOptional()
@@ -68,7 +72,7 @@ export class UpdateUserDto {
   name?: string;
 
   @IsOptional()
-  @IsEnum(Role, { message: 'Role invÃ¡lida' })
+  @IsEnum({ message: 'Role invÃ¡lida' })
   role?: Role;
 
   @IsOptional()

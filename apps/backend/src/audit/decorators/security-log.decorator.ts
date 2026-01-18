@@ -25,7 +25,7 @@ export interface SecurityLogOptions {
  *   includeTenant: true,
  *   customDetails: { operation: 'view_financial_data' }
  * })
- * async sensitiveOperation(@Body() data: any) {
+ * async sensitiveOperation(@Body() data: unknown) {
  *   // operação sensível
  * }
  */

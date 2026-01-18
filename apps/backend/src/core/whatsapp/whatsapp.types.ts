@@ -35,7 +35,7 @@ export interface WhatsAppSession {
 
 export interface WhatsAppEvent {
   type: 'message_received' | 'message_sent' | 'contact_online' | 'contact_offline';
-  data: any;
+  data: unknown;
   tenantId: string;
   timestamp: Date;
 }

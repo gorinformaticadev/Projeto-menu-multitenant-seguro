@@ -1,4 +1,4 @@
-﻿import { Injectable, Logger } from '@nestjs/common';
+ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 
 export interface PlatformConfig {
@@ -14,7 +14,9 @@ export class PlatformConfigService {
   private cacheTimestamp: number = 0;
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {
+      // Empty implementation
+    }
 
   /**
    * Get platform configuration with caching
@@ -64,7 +66,7 @@ export class PlatformConfigService {
       // Get or create security config
       let securityConfig = await this.prisma.securityConfig.findFirst();
       
-      const updateData: any = {
+      const updateData: unknown = {
         updatedBy: userId,
       };
 

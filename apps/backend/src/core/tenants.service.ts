@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
@@ -8,7 +8,9 @@ import { join } from 'path';
 
 @Injectable()
 export class TenantsService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {
+      // Empty implementation
+    }
 
   async findAll() {
     return this.prisma.tenant.findMany({
@@ -104,8 +106,12 @@ export class TenantsService {
             { id: { not: id } },
             {
               OR: [
-                updateTenantDto.email ? { email: updateTenantDto.email } : {},
-                updateTenantDto.cnpjCpf ? { cnpjCpf: updateTenantDto.cnpjCpf } : {},
+                updateTenantDto.email ? { email: updateTenantDto.email } : {
+      // Empty implementation
+    },
+                updateTenantDto.cnpjCpf ? { cnpjCpf: updateTenantDto.cnpjCpf } : {
+      // Empty implementation
+    },
               ],
             },
           ],

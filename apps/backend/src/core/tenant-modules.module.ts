@@ -9,4 +9,6 @@ import { PrismaModule } from './prisma/prisma.module';
   providers: [TenantModuleService],
   exports: [TenantModuleService],
 })
-export class TenantModulesModule {}
+export class TenantModulesModule {
+      // Empty implementation
+    }

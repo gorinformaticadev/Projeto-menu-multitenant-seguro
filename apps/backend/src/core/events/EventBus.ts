@@ -17,7 +17,7 @@ export class EventBus {
     'tenant:resolved',
   ]);
 
-  private constructor() {}
+  private // Empty constructor removed
 
   /**
    * Obtém instância única do Event Bus

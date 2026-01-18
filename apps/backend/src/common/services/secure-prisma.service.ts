@@ -5,7 +5,9 @@ import { PrismaService } from '@core/prisma/prisma.service';
 export class SecurePrismaService {
   private readonly logger = new Logger(SecurePrismaService.name);
   
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {
+      // Empty implementation
+    }
 
   /**
    * Wrapper seguro para findMany com validação automática de tenant isolation
@@ -16,12 +18,14 @@ export class SecurePrismaService {
     tenantId: string,
     userRole: string,
     options: {
-      select?: any;
-      include?: any;
-      orderBy?: any;
+      select?: unknown;
+      include?: unknown;
+      orderBy?: unknown;
       skip?: number;
       take?: number;
-    } = {}
+    } = {
+      // Empty implementation
+    }
   ): Promise<T[]> {
     try {
       // Aplicar tenant isolation automaticamente
@@ -32,7 +36,7 @@ export class SecurePrismaService {
       // Adicionar logging de segurança para operações sensíveis
       this.logger.debug(`Busca segura em ${String(model)} para tenant ${tenantId}`, {
         userRole,
-        whereKeys: Object.keys(where),
+        whereKeys: object.keys(where),
         hasTenantFilter: userRole !== 'SUPER_ADMIN'
       });
 
@@ -61,9 +65,11 @@ export class SecurePrismaService {
     tenantId: string,
     userRole: string,
     options: {
-      select?: any;
-      include?: any;
-    } = {}
+      select?: unknown;
+      include?: unknown;
+    } = {
+      // Empty implementation
+    }
   ): Promise<T | null> {
     try {
       const result = await this.prisma[model].findUnique({
@@ -255,8 +261,8 @@ export class SecurePrismaService {
   /**
    * Previnir injeção de SQL em raw queries
    */
-  sanitizeRawQuery(query: string, params: any[]): string {
-    return query.replace(/\$\d+/g, (match, index) => {
+  sanitizeRawQuery(query: string, params: unknown[]): string {
+    return query.replace(/\$\d+/g, (match, _index) => {
       const paramIndex = parseInt(match.slice(1)) - 1;
       const param = params[paramIndex];
       
@@ -285,7 +291,7 @@ export class SecurePrismaService {
   /**
    * Executar query raw com sanitização
    */
-  async executeRawSecure(query: string, params: any[] = []): Promise<any> {
+  async executeRawSecure(query: string, params: unknown[] = []): Promise<unknown> {
     try {
       const sanitizedQuery = this.sanitizeRawQuery(query, params);
       
@@ -315,5 +321,5 @@ export class SecurePrismaService {
 
 // Tipo auxiliar para o PrismaClient
 type PrismaClient = {
-  [K in keyof typeof import('@prisma/client').PrismaClient]: any;
+  [K in keyof typeof import('@prisma/client').PrismaClient]: unknown;
 };

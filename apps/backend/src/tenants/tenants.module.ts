@@ -9,4 +9,6 @@ import { TenantModulesModule } from '../core/tenant-modules.module';
   providers: [TenantsService],
   exports: [TenantsService],
 })
-export class TenantsModule {}
+export class TenantsModule {
+      // Empty implementation
+    }

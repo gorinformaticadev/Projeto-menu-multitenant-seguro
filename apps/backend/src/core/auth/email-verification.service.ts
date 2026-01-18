@@ -1,4 +1,4 @@
-﻿import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
+ import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { EmailService } from '../email/email.service';
@@ -11,7 +11,9 @@ export class EmailVerificationService {
     private jwtService: JwtService,
     private emailService: EmailService,
     private auditService: AuditService,
-  ) {}
+  ) {
+      // Empty implementation
+    }
 
   /**
    * Gerar e enviar token de verificaÃ§Ã£o de email
@@ -87,9 +89,21 @@ export class EmailVerificationService {
         throw new BadRequestException('Email jÃ¡ verificado');
       }
 
-      // Verificar se Ã© o token mais recente
-      if (user.emailVerificationToken !== token) {
-        throw new BadRequestException('Token invÃ¡lido ou expirado');
+      // Verificar se é o token mais recente (usando comparação de tempo constante)
+      import crypto from 'crypto';
+      const tokenBuffer = Buffer.from(token, 'utf8');
+      const storedTokenBuffer = Buffer.from(user.emailVerificationToken || '', 'utf8');
+      
+      // Garantir que os buffers tenham o mesmo tamanho para evitar timing attacks
+      const maxLength = Math.max(tokenBuffer.length, storedTokenBuffer.length);
+      const paddedToken = Buffer.alloc(maxLength);
+      const paddedStoredToken = Buffer.alloc(maxLength);
+      
+      tokenBuffer.copy(paddedToken);
+      storedTokenBuffer.copy(paddedStoredToken);
+      
+      if (!crypto.timingSafeEqual(paddedToken, paddedStoredToken)) {
+        throw new BadRequestException('Token inválido ou expirado');
       }
 
       // Verificar expiraÃ§Ã£o

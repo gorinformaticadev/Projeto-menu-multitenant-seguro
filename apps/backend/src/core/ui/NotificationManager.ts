@@ -38,8 +38,7 @@ export class NotificationManager {
       enabled: true,
     });
 
-    console.log(`📢 Canal de notificação registrado: ${name}`);
-  }
+    }
 
   /**
    * Remove um canal de notificação
@@ -50,7 +49,7 @@ export class NotificationManager {
     const removed = this.channels.delete(name);
     
     if (removed) {
-      console.log(`Canal de notificação removido: ${name}`);
+      // Empty implementation
     }
     
     return removed;
@@ -66,8 +65,7 @@ export class NotificationManager {
     
     if (channel) {
       channel.enabled = enabled;
-      console.log(`Canal "${name}" ${enabled ? 'habilitado' : 'desabilitado'}`);
-    }
+      }
   }
 
   /**
@@ -175,17 +173,13 @@ export class NotificationManager {
    * Debug - lista todos os canais
    */
   public debug(): void {
-    console.log('=== Notification Manager Debug ===');
     console.log(`Total channels: ${this.count()}`);
     console.log(`Enabled: ${this.getChannels(true).length}`);
-    console.log('\nChannels:');
-    
-    this.channels.forEach((channel, name) => {
-      const status = channel.enabled ? '✅' : '❌';
-      console.log(`  ${status} ${name}`);
+    this.channels.forEach((channel, _name) => {
+      const _status = channel.enabled ? '✅' : '❌';
       if (channel.description) {
-        console.log(`      ${channel.description}`);
-      }
+      // Empty implementation
+    }
     });
   }
 }

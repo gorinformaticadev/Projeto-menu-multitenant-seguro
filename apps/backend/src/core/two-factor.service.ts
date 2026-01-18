@@ -1,4 +1,4 @@
-﻿import { Injectable } from '@nestjs/common';
+ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
@@ -7,7 +7,9 @@ import { encryptSensitiveData, decryptSensitiveData } from '@core/common/utils/s
 
 @Injectable()
 export class TwoFactorService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {
+      // Empty implementation
+    }
 
   /**
    * Gerar secret para 2FA

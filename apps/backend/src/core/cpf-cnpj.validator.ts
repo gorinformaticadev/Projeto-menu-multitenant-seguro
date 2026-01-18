@@ -126,14 +126,14 @@ export function formatCPFOrCNPJ(value: string): string {
  * Decorator para validação de CPF ou CNPJ
  */
 export function IsValidCPFOrCNPJ(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       name: 'isValidCPFOrCNPJ',
       target: object.constructor,
       propertyName: propertyName,
       options: validationOptions,
       validator: {
-        validate(value: any, args: ValidationArguments) {
+        validate(value: unknown, args: ValidationArguments) {
           if (typeof value !== 'string') return false;
           return isValidCPFOrCNPJ(value);
         },
@@ -149,14 +149,14 @@ export function IsValidCPFOrCNPJ(validationOptions?: ValidationOptions) {
  * Decorator para validação específica de CPF
  */
 export function IsValidCPF(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       name: 'isValidCPF',
       target: object.constructor,
       propertyName: propertyName,
       options: validationOptions,
       validator: {
-        validate(value: any, args: ValidationArguments) {
+        validate(value: unknown, args: ValidationArguments) {
           if (typeof value !== 'string') return false;
           return isValidCPF(value);
         },
@@ -172,14 +172,14 @@ export function IsValidCPF(validationOptions?: ValidationOptions) {
  * Decorator para validação específica de CNPJ
  */
 export function IsValidCNPJ(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       name: 'isValidCNPJ',
       target: object.constructor,
       propertyName: propertyName,
       options: validationOptions,
       validator: {
-        validate(value: any, args: ValidationArguments) {
+        validate(value: unknown, args: ValidationArguments) {
           if (typeof value !== 'string') return false;
           return isValidCNPJ(value);
         },

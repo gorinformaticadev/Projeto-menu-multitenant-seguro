@@ -1,4 +1,4 @@
-﻿import { Injectable, Logger } from '@nestjs/common';
+ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { CreateEmailConfigDto, UpdateEmailConfigDto } from './dto/email-config.dto';
 import { EmailConfiguration } from '@prisma/client';
@@ -9,7 +9,9 @@ export class EmailConfigService {
 
   constructor(
     private prisma: PrismaService,
-  ) {}
+  ) {
+      // Empty implementation
+    }
 
   /**
    * Get predefined email provider configurations
@@ -84,7 +86,9 @@ export class EmailConfigService {
     // Delete all existing configurations (only one email config allowed)
     const existingConfigs = await this.prisma.emailConfiguration.findMany();
     if (existingConfigs.length > 0) {
-      await this.prisma.emailConfiguration.deleteMany({});
+      await this.prisma.emailConfiguration.deleteMany({
+      // Empty implementation
+    });
       this.logger.log(`Deleted ${existingConfigs.length} existing email configurations`);
     }
 
@@ -163,7 +167,9 @@ export class EmailConfigService {
       };
     } catch (error) {
       this.logger.error('Error fetching SMTP credentials:', error);
-      return {};
+      return {
+      // Empty implementation
+    };
     }
   }
 
@@ -171,7 +177,7 @@ export class EmailConfigService {
    * Test email configuration by sending a test email
    * Note: This method now requires the emailService to be passed in
    */
-  async testConfig(email: string, smtpUser: string, smtpPass: string, user: any, emailService: any): Promise<{ success: boolean; message: string }> {
+  async testConfig(email: string, smtpUser: string, smtpPass: string, user: any, emailService: unknown): Promise<{ success: boolean; message: string }> {
     try {
       this.logger.log(`Testing email configuration for user ${user.id} to ${email}`);
       

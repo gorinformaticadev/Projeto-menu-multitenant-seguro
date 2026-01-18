@@ -1,11 +1,13 @@
-﻿import { IsEmail, IsNotEmpty, IsString, Matches, MinLength } from 'class-validator';
+ import { IsEmail, IsNotEmpty, IsString, Matches, MinLength } from 'class-validator';
 import { Trim, ToLowerCase, NormalizeSpaces } from '@core/common/decorators/sanitize.decorator';
 import { IsValidCPFOrCNPJ } from '@core/common/validators/cpf-cnpj.validator';
 
 export class CreateTenantDto {
   @Trim()
   @ToLowerCase()
-  @IsEmail({}, { message: 'Email invÃ¡lido' })
+  @IsEmail({
+      // Empty implementation
+    }, { message: 'Email invÃ¡lido' })
   @IsNotEmpty({ message: 'Email Ã© obrigatÃ³rio' })
   email: string;
 
@@ -32,12 +34,14 @@ export class CreateTenantDto {
   @Trim()
   @IsString()
   @IsNotEmpty({ message: 'Telefone Ã© obrigatÃ³rio' })
-  @Matches(/^[\d\s\(\)\-\+]+$/, { message: 'Telefone invÃ¡lido' })
+  @Matches(/^[\d\s()\-+]+$/, { message: 'Telefone invÃ¡lido' })
   telefone: string;
 
   @Trim()
   @ToLowerCase()
-  @IsEmail({}, { message: 'Email do administrador invÃ¡lido' })
+  @IsEmail({
+      // Empty implementation
+    }, { message: 'Email do administrador invÃ¡lido' })
   @IsNotEmpty({ message: 'Email do administrador Ã© obrigatÃ³rio' })
   adminEmail: string;
 

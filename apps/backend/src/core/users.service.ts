@@ -1,4 +1,4 @@
-﻿import { Injectable, ConflictException, NotFoundException, BadRequestException, UnauthorizedException } from '@nestjs/common';
+ import { Injectable, ConflictException, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -8,7 +8,9 @@ import { Role } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {
+      // Empty implementation
+    }
 
   async create(createUserDto: CreateUserDto) {
     const { email, password, name, role, tenantId } = createUserDto;
@@ -50,7 +52,9 @@ export class UsersService {
   }
 
   async findAll(tenantId?: string) {
-    const where = tenantId ? { tenantId } : {};
+    const where = tenantId ? { tenantId } : {
+      // Empty implementation
+    };
 
     const users = await this.prisma.user.findMany({
       where,
@@ -111,7 +115,7 @@ export class UsersService {
     }
 
     // Se estÃ¡ atualizando senha, faz o hash
-    const data: any = { ...updateUserDto };
+    const data: unknown = { ...updateUserDto };
     if (updateUserDto.password && updateUserDto.password.trim() !== '') {
       data.password = await bcrypt.hash(updateUserDto.password, 10);
     } else {

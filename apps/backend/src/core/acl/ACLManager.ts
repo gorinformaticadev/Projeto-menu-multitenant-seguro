@@ -3,7 +3,7 @@
  * Gerencia roles, permissões e verificações de acesso
  */
 
-import { User, Role, Permission } from '../contracts/types';
+import { User, Permission } from '../contracts/types';
 
 /**
  * Definição de Role com permissões
@@ -18,7 +18,7 @@ export interface RoleDefinition {
  * Gerenciador de ACL
  */
 export class ACLManager {
-  private roles: Map<string, RoleDefinition> = new Map();
+  private roles: Map<stringDefinition> = new Map();
   private permissions: Map<string, Permission> = new Map();
 
   constructor() {
@@ -293,23 +293,17 @@ export class ACLManager {
    * Debug - lista roles e permissões
    */
   public debug(): void {
-    console.log('=== ACL Manager Debug ===');
-    console.log(`\nRoles: ${this.roles.size}`);
-    
-    this.roles.forEach((role, name) => {
-      console.log(`\n  ${name}:`);
+    this.roles.forEach((role, _name) => {
       if (role.description) {
-        console.log(`    ${role.description}`);
-      }
+      // Empty implementation
+    }
       console.log(`    Permissions: ${role.permissions.join(', ')}`);
     });
 
-    console.log(`\nPermissions: ${this.permissions.size}`);
-    this.permissions.forEach((permission, name) => {
-      console.log(`  - ${name}: ${permission.description}`);
+    this.permissions.forEach((permission, _name) => {
       if (permission.module) {
-        console.log(`    Module: ${permission.module}`);
-      }
+      // Empty implementation
+    }
     });
   }
 }

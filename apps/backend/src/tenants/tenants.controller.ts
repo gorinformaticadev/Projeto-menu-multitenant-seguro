@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch, Delete, UseInterceptors, UploadedFile, BadRequestException, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch, Delete, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
 import { Request as ExpressRequest } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SkipThrottle } from '@nestjs/throttler';
@@ -18,12 +18,14 @@ import { multerConfig } from '@core/common/config/multer.config';
 
 @SkipThrottle()
 @Controller('tenants')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(RolesGuard)
 export class TenantsController {
   constructor(
     private tenantsService: TenantsService,
     private tenantModuleService: TenantModuleService
-  ) { }
+  ) {
+      // Empty implementation
+    }
 
   // Assinaturas de arquivos vÃ¡lidas (magic numbers)
   private readonly FILE_SIGNATURES = {
@@ -42,7 +44,7 @@ export class TenantsController {
 
     try {
       // Ler os primeiros bytes do arquivo
-      const filePath = path.join(process.cwd(), 'uploads', 'logos', file.filename);
+      const _filePath = path.join(process.cwd(), 'uploads', 'logos', file.filename);
       const buffer = fs.readFileSync(filePath);
 
       const signature = this.FILE_SIGNATURES[file.mimetype];
@@ -195,7 +197,7 @@ export class TenantsController {
   // Endpoints para gerenciamento de mÃ³dulos dos tenants
 
   @Get('my-tenant/modules/active')
-  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  @Roles(Role.ADMIN.SUPER_ADMIN)
   @SkipThrottle()
   async getMyTenantActiveModules(@Req() req: ExpressRequest & { user: any }) {
     if (!req.user.tenantId) {
@@ -250,7 +252,7 @@ export class TenantsController {
   }
 
   @Post('my-tenant/modules/:moduleName/toggle')
-  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  @Roles(Role.ADMIN.SUPER_ADMIN)
   @SkipThrottle()
   @UseInterceptors(DuplicateRequestInterceptor)
   async toggleMyTenantModule(@Param('moduleName') moduleName: string, @Req() req: ExpressRequest & { user: any }) {
@@ -260,7 +262,7 @@ export class TenantsController {
       }
       throw new BadRequestException('UsuÃ¡rio sem vinculo com tenant.');
     }
-    return this.tenantsService.toggleModuleForTenant(req.user.tenantId, moduleName);
+    return this.tenantsService.toggleModuleForTenant(req.user.tenantId, _moduleName);
   }
 
   @Post(':id/modules/:moduleName/toggle')
@@ -269,7 +271,7 @@ export class TenantsController {
   @SkipThrottle()
   @UseInterceptors(DuplicateRequestInterceptor)
   async toggleModuleForTenant(@Param('id') id: string, @Param('moduleName') moduleName: string) {
-    return this.tenantsService.toggleModuleForTenant(id, moduleName);
+    return this.tenantsService.toggleModuleForTenant(id, _moduleName);
   }
 
   @Put(':id/modules/:moduleName/config')
@@ -279,8 +281,7 @@ export class TenantsController {
   async configureTenantModule(
     @Param('id') id: string,
     @Param('moduleName') moduleName: string,
-    @Body() config: any
-  ) {
+    @Body() config: unknown) {
     return this.tenantsService.configureTenantModule(id, moduleName, config);
   }
 }

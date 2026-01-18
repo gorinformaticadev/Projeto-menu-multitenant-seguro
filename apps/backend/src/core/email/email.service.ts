@@ -1,4 +1,4 @@
-﻿import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
@@ -11,7 +11,7 @@ export class EmailService implements OnModuleInit {
   private transporter: Transporter;
   private readonly logger = new Logger(EmailService.name);
   private isEnabled: boolean;
-  private dbConfig: any = null;
+  private dbConfig: unknown = null;
 
 
   constructor(
@@ -268,7 +268,7 @@ export class EmailService implements OnModuleInit {
             <p>OlÃ¡ <strong>${name}</strong>,</p>
             <p>Recebemos uma solicitaÃ§Ã£o para redefinir a senha da sua conta.</p>
             <div class="warning">
-              âš ï¸ <strong>AtenÃ§Ã£o:</strong> Se vocÃª nÃ£o solicitou a redefiniÃ§Ã£o de senha, ignore este email e entre em contato com o suporte imediatamente.
+              âš ï¸ <strong>AtenÃ§Ã£o:</strong> Se vocÃª nÃ£o solicitou a redefiniÃ§Ã£o de senha, ignore este email e entre em contato com o suporte imediatamente.
             </div>
             <p>Clique no botÃ£o abaixo para criar uma nova senha:</p>
             <center>
@@ -312,7 +312,7 @@ export class EmailService implements OnModuleInit {
           </div>
           <div class="content">
             <p>OlÃ¡ <strong>${name}</strong>,</p>
-            <p>Detectamos uma atividade relacionada Ã  seguranÃ§a da sua conta:</p>
+            <p>Detectamos uma atividade relacionada Ã  seguranÃ§a da sua conta:</p>
             <div class="alert">
               <strong>Tipo:</strong> ${alertType}<br>
               <strong>Detalhes:</strong> ${details}<br>
@@ -372,7 +372,7 @@ export class EmailService implements OnModuleInit {
 
     try {
       // Create a temporary transporter with the provided credentials
-      const transporterConfig: any = {
+      const transporterConfig: unknown = {
         host: config.smtpHost,
         port: config.smtpPort,
         secure: config.encryption === 'SSL', // true for port 465, false for other ports
@@ -401,7 +401,7 @@ export class EmailService implements OnModuleInit {
       await tempTransporter.verify();
       this.logger.log('âœ… ConexÃ£o SMTP verificada com sucesso');
 
-      const html = this.getTestEmailTemplate(name, config);
+      const html = this.getTestEmailTemplate(name, _config);
 
       this.logger.log('Enviando email de teste...');
       const platformName = await getPlatformName();
@@ -516,7 +516,7 @@ export class EmailService implements OnModuleInit {
   /**
    * Template de email de teste
    */
-  private getTestEmailTemplate(name: string, config: any): string {
+  private getTestEmailTemplate(name: string, config: unknown): string {
     return `
       <!DOCTYPE html>
       <html>

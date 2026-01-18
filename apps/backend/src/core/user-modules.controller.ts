@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ModuleSecurityService } from './module-security.service';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -11,7 +11,7 @@ import { CurrentUser } from './decorators/current-user.decorator';
 @UseGuards(JwtAuthGuard)
 export class UserModulesController {
     constructor(private readonly moduleSecurity: ModuleSecurityService) {
-        console.log('🔧 UserModulesController inicializado');
+      // Empty implementation
     }
 
     /**
@@ -21,21 +21,15 @@ export class UserModulesController {
     @Get('modules')
     async getMyModules(
         @CurrentUser() user: any,
-        @Req() req: any
-    ) {
-        console.log('📡 GET /me/modules chamado');
-
+        @Req() req: unknown) {
         const tenantId = req.tenantId || user.tenantId;
 
         if (!tenantId) {
-            console.log('⚠️ Nenhum tenantId encontrado');
             return { modules: [] };
         }
 
-        console.log(`🔍 Buscando módulos para tenant: ${tenantId}`);
         const modules = await this.moduleSecurity.getAvailableModules(tenantId);
 
-        console.log(`✅ Retornando ${modules.length} módulos`);
         return { modules };
     }
 }

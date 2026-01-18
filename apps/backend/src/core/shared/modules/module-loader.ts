@@ -15,8 +15,6 @@ import { ModuleContribution } from '../types/module.types';
  * Não há lista fixa - os módulos são descobertos dinamicamente
  */
 export async function loadExternalModules(): Promise<void> {
-  console.log('🔄 Carregando módulos externos dinamicamente...');
-
   try {
     // Buscar módulos ativos da API
     const response = await fetch('/api/me/modules', {
@@ -28,7 +26,7 @@ export async function loadExternalModules(): Promise<void> {
       return;
     }
 
-    const data = await response.json();
+    const _data = await response.json();
     const modules = data.modules || [];
 
     console.log(`📦 ${modules.length} módulo(s) encontrado(s) no banco de dados`);
@@ -43,8 +41,7 @@ export async function loadExternalModules(): Promise<void> {
       }
     }
 
-    console.log('✅ Carregamento de módulos externos concluído');
-  } catch (error) {
+    } catch (error) {
     console.error('❌ Erro ao carregar lista de módulos:', error);
   }
 }
@@ -53,15 +50,13 @@ export async function loadExternalModules(): Promise<void> {
  * Carrega um módulo específico dinamicamente
  * Tenta importar o módulo baseado em convenção de nomes
  */
-async function loadModuleDynamically(moduleData: any): Promise<void> {
+async function loadModuleDynamically(moduleData: unknown): Promise<void> {
   const { slug, name, menus } = moduleData;
 
   try {
     // Tentar carregar definição do módulo se existir
     // Convenção: @modules/{slug}/frontend/index.ts exporta ModuleContribution
-    const modulePath = `@modules/${slug}/frontend`;
-
-    console.log(`📦 Tentando carregar definição de ${slug}...`);
+    const _modulePath = `@modules/${slug}/frontend`;
 
     // Import dinâmico (pode falhar se módulo não tiver definição frontend)
     const moduleDefinition = await import(
@@ -72,8 +67,7 @@ async function loadModuleDynamically(moduleData: any): Promise<void> {
     if (moduleDefinition && moduleDefinition.default) {
       // Módulo tem definição completa - registrar
       moduleRegistry.register(moduleDefinition.default);
-      console.log(`✅ Módulo ${slug} registrado com definição completa`);
-    } else {
+      } else {
       // Módulo não tem definição - criar contribuição básica baseada nos dados da API
       const basicContribution: ModuleContribution = {
         id: slug,
@@ -91,8 +85,7 @@ async function loadModuleDynamically(moduleData: any): Promise<void> {
       };
 
       moduleRegistry.register(basicContribution);
-      console.log(`✅ Módulo ${slug} registrado com contribuição básica`);
-    }
+      }
 
   } catch (error) {
     console.warn(`⚠️ Não foi possível carregar definição de ${slug}, usando fallback`);

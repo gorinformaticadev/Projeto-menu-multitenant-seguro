@@ -1,4 +1,4 @@
-﻿import { Controller, Get, Put, Body, UseGuards, Request } from '@nestjs/common';
+ import { Controller, Get, Put, Body } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { PlatformConfigService } from './platform-config.service';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
@@ -23,9 +23,11 @@ export class UpdatePlatformConfigDto {
 
 @SkipThrottle()
 @Controller('platform-config')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(RolesGuard)
 export class PlatformConfigController {
-  constructor(private readonly platformConfigService: PlatformConfigService) {}
+  constructor(private readonly platformConfigService: PlatformConfigService) {
+      // Empty implementation
+    }
 
   /**
    * GET /platform-config

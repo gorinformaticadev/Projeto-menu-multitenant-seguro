@@ -1,11 +1,13 @@
-﻿import { Injectable, NotFoundException } from '@nestjs/common';
+ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { UpdateSecurityConfigDto } from './dto/update-security-config.dto';
 import { encryptSensitiveData, decryptSensitiveData } from '@core/common/utils/security.utils';
 
 @Injectable()
 export class SecurityConfigService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {
+      // Empty implementation
+    }
 
   /**
    * ObtÃ©m a configuraÃ§Ã£o de seguranÃ§a atual
@@ -17,7 +19,9 @@ export class SecurityConfigService {
     if (!config) {
       // Criar configuraÃ§Ã£o padrÃ£o
       config = await this.prisma.securityConfig.create({
-        data: {},
+        data: {
+      // Empty implementation
+    },
       });
     }
 
@@ -32,7 +36,7 @@ export class SecurityConfigService {
     const config = await this.getConfig();
     
     // Criptografar credenciais SMTP se fornecidas
-    const updateData: any = { ...dto, updatedBy: userId };
+    const updateData: unknown = { ...dto, updatedBy: userId };
     
     if (dto.smtpPassword) {
       updateData.smtpPassword = encryptSensitiveData(dto.smtpPassword);

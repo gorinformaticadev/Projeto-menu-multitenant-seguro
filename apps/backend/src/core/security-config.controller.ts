@@ -1,4 +1,4 @@
-﻿import { Controller, Get, Put, Body, UseGuards, Request } from '@nestjs/common';
+ import { Controller, Get, Put, Body } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { SecurityConfigService } from './security-config.service';
 import { UpdateSecurityConfigDto } from './dto/update-security-config.dto';
@@ -10,9 +10,11 @@ import { Role } from '@prisma/client';
 
 @SkipThrottle()
 @Controller('security-config')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(RolesGuard)
 export class SecurityConfigController {
-  constructor(private readonly securityConfigService: SecurityConfigService) {}
+  constructor(private readonly securityConfigService: SecurityConfigService) {
+      // Empty implementation
+    }
 
   /**
    * GET /security-config

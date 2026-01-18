@@ -22,7 +22,6 @@ export class SecretManagerService implements OnModuleInit {
     if (this.isInitialized) return;
 
     try {
-      console.log('🔐 Inicializando Secret Manager...');
       this.secretManager = await SecretManagerFactory.createSecretManager();
       
       // Carregar secrets da aplicação
@@ -112,15 +111,12 @@ export class SecretManagerService implements OnModuleInit {
       'SENTRY_DSN'
     ];
 
-    console.log('🔐 Carregando secrets da aplicação...');
-    
     for (const secretName of secretsToLoad) {
       try {
         const secret = await this.getSecret(secretName);
         if (secret?.value) {
           process.env[secretName] = secret.value;
-          console.log(`  ✅ ${secretName}`);
-        } else {
+          } else {
           console.warn(`  ⚠️  ${secretName} não encontrado`);
         }
       } catch (error) {
@@ -161,8 +157,7 @@ export class SecretManagerService implements OnModuleInit {
 
     await this.putSecret(name, value, `Desenvolvimento - ${new Date().toISOString()}`);
     process.env[name] = value;
-    console.log(`✅ Secret de desenvolvimento definido: ${name}`);
-  }
+    }
 
   /**
    * Limpa secrets sensíveis da memória (quando possível)

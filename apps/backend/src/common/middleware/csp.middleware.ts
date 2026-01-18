@@ -75,7 +75,9 @@ export class CspMiddleware implements NestMiddleware {
       'form-action': ["'self'"],
 
       // Upgrade insecure requests (apenas em produção)
-      ...(isProduction ? { 'upgrade-insecure-requests': [] } : {}),
+      ...(isProduction ? { 'upgrade-insecure-requests': [] } : {
+      // Empty implementation
+    }),
 
       // Report URI - endpoint para receber violações
       'report-uri': ['/api/csp-report'],

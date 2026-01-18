@@ -1,10 +1,12 @@
-﻿import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+ import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
 import { Trim, ToLowerCase } from '@core/common/decorators/sanitize.decorator';
 
 export class LoginDto {
   @Trim()
   @ToLowerCase()
-  @IsEmail({}, { message: 'Email invÃ¡lido' })
+  @IsEmail({
+      // Empty implementation
+    }, { message: 'Email invÃ¡lido' })
   @IsNotEmpty({ message: 'Email Ã© obrigatÃ³rio' })
   email: string;
 

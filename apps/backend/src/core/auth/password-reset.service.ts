@@ -1,4 +1,4 @@
-﻿import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+ import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { JwtService } from '@nestjs/jwt';
@@ -14,7 +14,9 @@ export class PasswordResetService {
     private emailService: EmailService,
     private jwtService: JwtService,
     private config: ConfigService,
-  ) {}
+  ) {
+      // Empty implementation
+    }
 
   /**
    * Solicitar recuperaÃ§Ã£o de senha

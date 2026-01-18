@@ -128,23 +128,18 @@ export class DashboardManager {
    * Debug - lista todos os widgets
    */
   public debug(): void {
-    console.log('=== Dashboard Manager Debug ===');
     console.log(`Total widgets: ${this.count()}`);
-    console.log('\nWidgets:');
-    
     this.widgets
       .sort((a, b) => a.order - b.order)
       .forEach(widget => {
         console.log(`  [${widget.order}] ${widget.title} (${widget.id})`);
-        console.log(`      Size: ${widget.size}`);
-        console.log(`      Component: ${widget.component}`);
         if (widget.permissions || widget.roles) {
           console.log(`      Permissions: ${widget.permissions?.join(', ') || 'none'}`);
           console.log(`      Roles: ${widget.roles?.join(', ') || 'none'}`);
         }
         if (widget.refresh) {
-          console.log(`      Refresh: ${widget.refresh}ms`);
-        }
+      // Empty implementation
+    }
       });
   }
 }

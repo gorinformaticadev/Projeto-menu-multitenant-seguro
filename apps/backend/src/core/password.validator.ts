@@ -1,4 +1,4 @@
-﻿import {
+ import {
   registerDecorator,
   ValidationOptions,
   ValidatorConstraint,
@@ -19,7 +19,9 @@ export interface PasswordPolicy {
 @ValidatorConstraint({ name: 'IsStrongPassword', async: true })
 @Injectable()
 export class IsStrongPasswordConstraint implements ValidatorConstraintInterface {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {
+      // Empty implementation
+    }
 
   async validate(password: string, args: ValidationArguments): Promise<boolean> {
     if (!password) return false;
@@ -69,7 +71,7 @@ export class IsStrongPasswordConstraint implements ValidatorConstraintInterface 
     }
 
     // Caracteres especiais
-    if (policy.requireSpecial && !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    if (policy.requireSpecial && !/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
       return false;
     }
 

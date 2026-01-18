@@ -18,7 +18,9 @@ export interface EndpointRateLimit {
 
 @Injectable()
 export class RateLimitConfigService {
-  constructor(private configService: ConfigService) {}
+  constructor(private configService: ConfigService) {
+      // Empty implementation
+    }
 
   /**
    * Configurações padrão de rate limiting

@@ -1,4 +1,4 @@
-﻿import { SetMetadata } from '@nestjs/common';
+ import { SetMetadata } from '@nestjs/common';
 import { SKIP_CSRF_KEY } from '@core/guards/csrf.guard';
 
 /**

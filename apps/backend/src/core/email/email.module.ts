@@ -1,4 +1,4 @@
-﻿import { Module, forwardRef } from '@nestjs/common';
+ import { Module, forwardRef } from '@nestjs/common';
 import { EmailService } from './email.service';
 import { PrismaModule } from '@core/prisma/prisma.module';
 import { SecurityConfigModule } from '@core/security-config/security-config.module';
@@ -8,5 +8,7 @@ import { SecurityConfigModule } from '@core/security-config/security-config.modu
   providers: [EmailService],
   exports: [EmailService],
 })
-export class EmailModule {}
+export class EmailModule {
+      // Empty implementation
+    }
 

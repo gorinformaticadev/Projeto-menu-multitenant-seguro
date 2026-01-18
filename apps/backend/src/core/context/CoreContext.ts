@@ -3,17 +3,17 @@
  * Objeto imutável que contém tudo que um módulo precisa para operar
  */
 
-import { Tenant, User, Environment, RequestInstance, ResponseInstance } from '../contracts/types';
+import { Tenant, User, ResponseInstance } from '../contracts/types';
 import { EventBus } from '../events/EventBus';
 
 /**
  * Interface do Database Connection (será implementado depois)
  */
 export interface DatabaseConnection {
-  connection: any;
-  transaction<T>(callback: (trx: any) => Promise<T>): Promise<T>;
+  connection: unknown;
+  transaction<T>(callback: (trx: unknown) => Promise<T>): Promise<T>;
   runModuleMigrations(moduleSlug: string): Promise<void>;
-  raw(sql: string, params?: any[]): Promise<any>;
+  raw(sql: string, params?: Record<string, unknown>[]): Promise<unknown>;
 }
 
 /**
@@ -30,36 +30,36 @@ export interface CacheManager {
  * Interface do Logger (será implementado depois)
  */
 export interface Logger {
-  info(message: string, meta?: any): void;
-  error(message: string, error?: Error, meta?: any): void;
-  warn(message: string, meta?: any): void;
-  debug(message: string, meta?: any): void;
+  info(message: string, meta?: unknown): void;
+  error(message: string, error?: Error, meta?: unknown): void;
+  warn(message: string, meta?: unknown): void;
+  debug(message: string, meta?: unknown): void;
 }
 
 /**
  * Interface do Router Manager (será implementado depois)
  */
 export interface RouterManager {
-  register(path: string, handler: any): void;
-  getRoutes(): any[];
+  register(path: string, handler: unknown): void;
+  getRoutes(): unknown[];
 }
 
 /**
  * Interface do Notification Manager (será implementado depois)
  */
 export interface NotificationManager {
-  registerChannel(name: string, handler: any): void;
-  send(channel: string, message: any, targets: any[]): Promise<void>;
-  broadcast(message: any): Promise<void>;
+  registerChannel(name: string, handler: unknown): void;
+  send(channel: string, message: any, targets: unknown[]): Promise<void>;
+  broadcast(message: unknown): Promise<void>;
 }
 
 /**
  * Interface do Menu Manager (será implementado depois)
  */
 export interface MenuManager {
-  add(item: any): void;
+  add(item: unknown): void;
   remove(id: string): void;
-  getItems(user: User | null): any[];
+  getItems(user: User | null): unknown[];
   clear(): void;
 }
 
@@ -67,9 +67,9 @@ export interface MenuManager {
  * Interface do Dashboard Manager (será implementado depois)
  */
 export interface DashboardManager {
-  addWidget(widget: any): void;
+  addWidget(widget: unknown): void;
   removeWidget(id: string): void;
-  getWidgets(user: User | null): any[];
+  getWidgets(user: User | null): unknown[];
   clear(): void;
 }
 

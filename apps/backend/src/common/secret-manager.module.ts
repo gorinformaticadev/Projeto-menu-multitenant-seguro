@@ -6,4 +6,6 @@ import { SecretManagerService } from './services/secret-manager.nest.service';
   providers: [SecretManagerService],
   exports: [SecretManagerService],
 })
-export class SecretManagerModule {}
+export class SecretManagerModule {
+      // Empty implementation
+    }

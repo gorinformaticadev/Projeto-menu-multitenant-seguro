@@ -6,7 +6,9 @@ import { Request } from 'express';
 
 @Injectable()
 export class SecurityAuditInterceptor implements NestInterceptor {
-  constructor(private auditService: AuditService) { }
+  constructor(private auditService: AuditService) {
+      // Empty implementation
+    }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest<Request>();

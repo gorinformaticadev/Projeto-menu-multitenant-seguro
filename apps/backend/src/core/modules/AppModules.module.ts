@@ -1,11 +1,13 @@
-import { DynamicModule, Module, Logger } from '@nestjs/common';
+import { Module, Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import * as path from 'path';
 import { PrismaModule } from '@core/prisma/prisma.module';
 import { CommonModule } from '@common/common.module';
 import { NotificationsModule } from '../../notifications/notifications.module';
 
-@Module({})
+@Module({
+      // Empty implementation
+    })
 export class AppModulesModule {
     private static readonly logger = new Logger(AppModulesModule.name);
 
@@ -38,7 +40,7 @@ export class AppModulesModule {
                 if (!mod.backendEntry) continue;
 
                 try {
-                    const modulePath = path.resolve(process.cwd(), mod.backendEntry);
+                    const _modulePath = path.resolve(process.cwd(), mod.backendEntry);
                     this.logger.log(`⏳ Loading module: ${mod.slug} (Path: ${modulePath})`);
 
                     // Importação dinâmica com caminho absoluto

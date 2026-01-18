@@ -1,4 +1,4 @@
-﻿import { Module } from '@nestjs/common';
+ import { Module } from '@nestjs/common';
 import { IsStrongPasswordConstraint } from './password.validator';
 import { 
   ValidTenantIdValidator, 
@@ -22,5 +22,7 @@ import { PrismaModule } from '@core/prisma/prisma.module';
     ReasonablePayloadSizeValidator
   ],
 })
-export class ValidatorsModule {}
+export class ValidatorsModule {
+      // Empty implementation
+    }
 

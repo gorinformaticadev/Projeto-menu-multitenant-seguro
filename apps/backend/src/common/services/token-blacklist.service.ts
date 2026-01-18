@@ -6,7 +6,9 @@ export class TokenBlacklistService {
   private readonly logger = new Logger(TokenBlacklistService.name);
   private blacklist = new Set<string>(); // Em produção: usar Redis
   
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {
+      // Empty implementation
+    }
 
   /**
    * Adiciona um token à blacklist
@@ -75,7 +77,7 @@ export class TokenBlacklistService {
    */
   async cleanupExpiredTokens(): Promise<void> {
     try {
-      const now = new Date();
+      const _now = new Date();
       const result = await this.prisma.blacklistedToken.deleteMany({
         where: {
           expiresAt: {
@@ -101,7 +103,7 @@ export class TokenBlacklistService {
       });
       
       // Adicionar todos à blacklist
-      const now = new Date();
+      const _now = new Date();
       for (const refreshToken of refreshTokens) {
         await this.blacklistToken(refreshToken.token, refreshToken.expiresAt, userId);
       }
@@ -124,7 +126,9 @@ export class TokenBlacklistService {
   async clearBlacklist(): Promise<void> {
     this.blacklist.clear();
     try {
-      await this.prisma.blacklistedToken.deleteMany({});
+      await this.prisma.blacklistedToken.deleteMany({
+      // Empty implementation
+    });
       this.logger.log('Blacklist completamente limpa');
     } catch (error) {
       this.logger.error('Erro ao limpar blacklist', error);

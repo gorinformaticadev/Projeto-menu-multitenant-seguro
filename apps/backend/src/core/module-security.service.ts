@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 /**
  * Serviço de Segurança para Módulos
@@ -10,7 +10,9 @@ import { Prisma, PrismaClient } from '@prisma/client';
 export class ModuleSecurityService {
     private readonly logger = new Logger(ModuleSecurityService.name);
 
-    constructor(private readonly prisma: PrismaService) { }
+    constructor(private readonly prisma: PrismaService) {
+      // Empty implementation
+    }
 
     /**
      * Valida se um módulo pode ser executado
@@ -59,11 +61,11 @@ export class ModuleSecurityService {
         const errors: string[] = [];
 
         try {
-            const modulePath = `modules/${slug}`;
+            const _modulePath = `modules/${slug}`;
 
             // Verificar se existe module.json
-            const fs = require('fs');
-            const path = require('path');
+            import fs from 'fs';
+            import path from 'path';
 
             const moduleJsonPath = path.join(process.cwd(), modulePath, 'module.json');
             if (!fs.existsSync(moduleJsonPath)) {
@@ -194,14 +196,6 @@ export class ModuleSecurityService {
                         `❌ Prisma error listing modules for tenant ${tenantId} (${(error as any).code}): ${error.message}`
                     );
                 }
-            } else if (error instanceof Error) {
-                // Erro de validação do Prisma (campo inexistente no modelo, etc)
-                this.logger.error(
-                    `❌ Validation error listing modules for tenant ${tenantId}: ${error.message}`
-                );
-                this.logger.warn(
-                    '⚠️ This may indicate a mismatch between Prisma schema and database.'
-                );
             } else {
                 // Erro genérico
                 this.logger.error(
@@ -219,7 +213,7 @@ export class ModuleSecurityService {
     /**
      * Constrói árvore hierárquica de menus
      */
-    private buildMenuTree(menus: any[]): any[] {
+    private buildMenuTree(menus: unknown[]): unknown[] {
         // Separar menus pai (sem parentId) e filhos
         const parentMenus = menus.filter(m => !m.parentId);
         const childMenus = menus.filter(m => m.parentId);

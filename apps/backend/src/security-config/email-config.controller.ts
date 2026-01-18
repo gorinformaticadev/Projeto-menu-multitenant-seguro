@@ -1,4 +1,4 @@
-﻿import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, HttpStatus } from '@nestjs/common';
+ import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { EmailConfigService } from './email-config.service';
 import { CreateEmailConfigDto, UpdateEmailConfigDto } from './dto/email-config.dto';
@@ -10,12 +10,14 @@ import { EmailService } from '../email/email.service';
 
 @SkipThrottle()
 @Controller('email-config')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(RolesGuard)
 export class EmailConfigController {
   constructor(
     private readonly emailConfigService: EmailConfigService,
     private readonly emailService: EmailService,
-  ) {}
+  ) {
+      // Empty implementation
+    }
 
   /**
    * GET /email-config/providers

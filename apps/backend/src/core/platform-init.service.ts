@@ -1,4 +1,4 @@
-﻿import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { PlatformConfigService } from '@core/security-config/platform-config.service';
 import { initializePlatformConfig, PLATFORM } from '@core/constants/platform.constants';
 
@@ -6,7 +6,9 @@ import { initializePlatformConfig, PLATFORM } from '@core/constants/platform.con
 export class PlatformInitService implements OnModuleInit {
   private readonly logger = new Logger(PlatformInitService.name);
 
-  constructor(private platformConfigService: PlatformConfigService) {}
+  constructor(private platformConfigService: PlatformConfigService) {
+      // Empty implementation
+    }
 
   async onModuleInit() {
     try {

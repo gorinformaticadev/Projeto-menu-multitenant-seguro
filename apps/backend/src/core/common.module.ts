@@ -1,7 +1,6 @@
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { CspReportController } from './controllers/csp-report.controller';
 import { CspMiddleware } from './middleware/csp.middleware';
-import { StaticCorsMiddleware } from './middleware/static-cors.middleware';
 import { PlatformInitService } from './services/platform-init.service';
 import { SecurityConfigModule } from '@core/security-config/security-config.module';
 import { UserModulesController } from './user-modules.controller';

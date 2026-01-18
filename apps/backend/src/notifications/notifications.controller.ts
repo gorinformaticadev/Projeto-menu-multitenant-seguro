@@ -25,7 +25,9 @@ export class NotificationsController {
   constructor(
     private notificationService: NotificationService,
     // private notificationGateway: NotificationGateway // TEMPORARIAMENTE DESABILITADO
-  ) { }
+  ) {
+      // Empty implementation
+    }
 
   /**
    * Cria uma nova notificação
@@ -126,9 +128,7 @@ export class NotificationsController {
   @Post('batch-delete')
   async deleteMany(@Body() body: { ids: string[] }, @Request() req) {
     try {
-      // console.log('🗑️ [Batch Delete] IDs recebidos:', body);
-
-      let idsToDelete = body.ids;
+      // let idsToDelete = body.ids;
 
       // Sanitização robusta para garantir array puro de strings
       if (Array.isArray(idsToDelete)) {

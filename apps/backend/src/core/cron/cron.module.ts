@@ -11,4 +11,6 @@ import { CronController } from './cron.controller';
     controllers: [CronController],
     exports: [CronService],
 })
-export class CronModule { }
+export class CronModule {
+      // Empty implementation
+    }

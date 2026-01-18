@@ -2,7 +2,7 @@
  * NOTIFICATION SERVICE - Lógica de negócio e persistência
  */
 
-import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import {
   Notification,
@@ -16,7 +16,9 @@ import { BroadcastNotificationDto } from './notification.dto';
 export class NotificationService {
   private readonly logger = new Logger(NotificationService.name);
 
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {
+      // Empty implementation
+    }
 
   /**
    * Cria uma nova notificação
@@ -48,7 +50,7 @@ export class NotificationService {
   /**
    * Busca notificações para o dropdown (últimas 10)
    */
-  async findForDropdown(user: any): Promise<NotificationResponse> {
+  async findForDropdown(user: unknown): Promise<NotificationResponse> {
     const where = this.buildWhereClause(user);
 
     const [notifications, total, unreadCount] = await Promise.all([
@@ -104,7 +106,7 @@ export class NotificationService {
   /**
    * Marca notificação como lida
    */
-  async markAsRead(id: string, user: any): Promise<Notification | null> {
+  async markAsRead(id: string, user: unknown): Promise<Notification | null> {
     const where = {
       id,
       ...this.buildWhereClause(user)
@@ -130,7 +132,7 @@ export class NotificationService {
   /**
    * Marca notificação como NÃO lida
    */
-  async markAsUnread(id: string, user: any): Promise<Notification | null> {
+  async markAsUnread(id: string, user: unknown): Promise<Notification | null> {
     const where = {
       id,
       ...this.buildWhereClause(user)
@@ -174,7 +176,7 @@ export class NotificationService {
   /**
    * Deleta uma notificação
    */
-  async delete(id: string, user: any): Promise<Notification | null> {
+  async delete(id: string, user: unknown): Promise<Notification | null> {
     const where = {
       id,
       ...this.buildWhereClause(user)
@@ -196,7 +198,7 @@ export class NotificationService {
   /**
    * Deleta múltiplas notificações
    */
-  async deleteMany(ids: string[], user: any): Promise<number> {
+  async deleteMany(ids: string[], user: unknown): Promise<number> {
     const where = {
       id: { in: ids },
       ...this.buildWhereClause(user)
@@ -213,7 +215,7 @@ export class NotificationService {
   /**
    * Conta notificações não lidas
    */
-  async countUnread(user: any): Promise<number> {
+  async countUnread(user: unknown): Promise<number> {
     const where = {
       ...this.buildWhereClause(user),
       read: false
@@ -225,7 +227,7 @@ export class NotificationService {
   /**
    * Envia notificação em massa (Broadcast)
    */
-  async broadcast(dto: BroadcastNotificationDto, authorInfo: any): Promise<{ count: number }> {
+  async broadcast(dto: BroadcastNotificationDto, authorInfo: unknown): Promise<{ count: number }> {
     const where: any = {};
 
     // 1. Filtro de Target (Role)
@@ -241,7 +243,7 @@ export class NotificationService {
     }
 
     // 3. Buscar Usuários Alvo
-    // @ts-ignore - Acessando user via prisma client genérico
+    // @ts-expect-error - Acessando user via prisma client genérico
     const users = await this.prisma.user.findMany({
       where,
       select: { id: true, tenantId: true }
@@ -288,7 +290,7 @@ export class NotificationService {
   /**
    * Busca uma notificação por ID
    */
-  async findById(id: string, user: any): Promise<Notification | null> {
+  async findById(id: string, user: unknown): Promise<Notification | null> {
     const where = {
       id,
       ...this.buildWhereClause(user)

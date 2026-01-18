@@ -10,7 +10,7 @@ import * as bcrypt from 'bcrypt';
  */
 export function generateSecurePassword(length: number = 16): string {
   const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-  let password = '';
+  let _password = '';
   
   // Garantir pelo menos um de cada tipo
   password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; // lowercase
@@ -153,7 +153,7 @@ export function decryptSensitiveData(encryptedData: string, key?: string): strin
     if (!encryptedLegacy) throw new Error('Dados vazios');
 
     // MODO LEGADO INSEGURO - Apenas para leitura de dados antigos
-    // @ts-ignore
+    // @ts-expect-error -- Legacy code compatibility
     const decipher = crypto.createDecipher('aes-256-cbc', encryptionKey);
     
     let decrypted = decipher.update(encryptedLegacy, 'hex', 'utf8');
@@ -216,7 +216,7 @@ export function validatePasswordStrength(password: string): {
   }
   
   // Caracteres especiais
-  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
     errors.push('Senha deve conter pelo menos um caractere especial');
   } else {
     score += 1;

@@ -1,4 +1,4 @@
-﻿import { Injectable, UnauthorizedException, Inject, forwardRef } from '@nestjs/common';
+ import { Injectable, UnauthorizedException, Inject, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@core/prisma/prisma.service';
@@ -19,7 +19,9 @@ export class AuthService {
     private auditService: AuditService,
     @Inject(forwardRef(() => TwoFactorService))
     private twoFactorService: TwoFactorService,
-  ) { }
+  ) {
+      // Empty implementation
+    }
 
   async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string) {
     const { email, password } = loginDto;
@@ -88,7 +90,7 @@ export class AuthService {
       const newAttempts = user.loginAttempts + 1;
 
       // Atualizar tentativas
-      const updateData: any = {
+      const updateData: unknown = {
         loginAttempts: newAttempts,
         lastFailedLoginAt: new Date(),
       };
@@ -343,7 +345,7 @@ export class AuthService {
    * Calcular data de expiraÃ§Ã£o baseado em string (ex: "7d", "30d")
    */
   private calculateExpirationDate(expiresIn: string): Date {
-    const now = new Date();
+    const _now = new Date();
     const match = expiresIn.match(/^(\d+)([smhd])$/);
 
     if (!match) {

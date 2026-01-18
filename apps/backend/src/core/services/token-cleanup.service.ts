@@ -1,4 +1,4 @@
-﻿import { Injectable, Logger } from '@nestjs/common';
+ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '@core/prisma/prisma.service';
 
@@ -14,7 +14,9 @@ import { PrismaService } from '@core/prisma/prisma.service';
 export class TokenCleanupService {
   private readonly logger = new Logger(TokenCleanupService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {
+      // Empty implementation
+    }
 
   /**
    * Limpa tokens expirados a cada 6 horas

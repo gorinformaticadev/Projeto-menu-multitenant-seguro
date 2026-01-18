@@ -194,7 +194,7 @@ export class ModuleInstallerService {
             if (relativePath.includes('..')) continue;
 
             let targetPath = '';
-            const data = entry.getData();
+            const _data = entry.getData();
 
             // Lógica de Distribuição Atualizada - PRESERVANDO ESTRUTURA
             if (relativePath.startsWith('frontend/')) {
@@ -216,7 +216,7 @@ export class ModuleInstallerService {
             if (targetPath) {
                 const tDir = path.dirname(targetPath);
                 if (!fs.existsSync(tDir)) fs.mkdirSync(tDir, { recursive: true });
-                fs.writeFileSync(targetPath, data);
+                fs.writeFileSync(targetPath, _data);
             }
         }
     }
@@ -302,7 +302,7 @@ export class ModuleInstallerService {
         const module = await this.prisma.module.findUnique({ where: { slug } });
         if (!module) throw new BadRequestException('Módulo não encontrado');
 
-        const modulePath = path.join(this.backendModulesPath, slug);
+        const _modulePath = path.join(this.backendModulesPath, slug);
         const count = await this.executeMigrations(slug, modulePath, 'migration');
 
         return { success: true, count, message: 'Migrações executadas com sucesso' };
@@ -312,7 +312,7 @@ export class ModuleInstallerService {
         const module = await this.prisma.module.findUnique({ where: { slug } });
         if (!module) throw new BadRequestException('Módulo não encontrado');
 
-        const modulePath = path.join(this.backendModulesPath, slug);
+        const _modulePath = path.join(this.backendModulesPath, slug);
         const count = await this.executeMigrations(slug, modulePath, 'seed');
 
         await this.prisma.module.update({
@@ -327,7 +327,7 @@ export class ModuleInstallerService {
         const module = await this.prisma.module.findUnique({ where: { slug } });
         if (!module) throw new BadRequestException('Módulo não encontrado');
 
-        const modulePath = path.join(this.backendModulesPath, slug);
+        const _modulePath = path.join(this.backendModulesPath, slug);
         const migs = await this.executeMigrations(slug, modulePath, 'migration');
         const seeds = await this.executeMigrations(slug, modulePath, 'seed');
 
@@ -345,7 +345,7 @@ export class ModuleInstallerService {
         const module = await this.prisma.module.findUnique({ where: { slug } });
         if (!module) throw new BadRequestException('Módulo não encontrado');
 
-        const modulePath = path.join(this.backendModulesPath, slug);
+        const _modulePath = path.join(this.backendModulesPath, slug);
 
         // Tentar module.json primeiro, depois module.config.json
         let moduleJsonPath = path.join(modulePath, 'module.json');
@@ -435,7 +435,7 @@ export class ModuleInstallerService {
         const module = await this.prisma.module.findUnique({ where: { slug } });
         if (!module) throw new BadRequestException('Módulo não encontrado');
 
-        const modulePath = path.join(this.backendModulesPath, slug);
+        const _modulePath = path.join(this.backendModulesPath, slug);
         if (!fs.existsSync(modulePath)) {
             throw new BadRequestException(`Módulo não encontrado no disco: ${modulePath}`);
         }
@@ -526,7 +526,7 @@ export class ModuleInstallerService {
 
             try {
                 this.logger.log(`🚀 Executando ${type}: ${file}`);
-                const filePath = path.join(migrationsPath, file);
+                const _filePath = path.join(migrationsPath, file);
                 const sql = fs.readFileSync(filePath, 'utf-8');
 
                 // Log do SQL para debug (apenas primeiras linhas)
@@ -578,7 +578,7 @@ export class ModuleInstallerService {
         return { module, migrations: module.migrations, menus: module.menus };
     }
 
-    async uninstallModule(slug: string, options: any) {
+    async uninstallModule(slug: string, options: unknown) {
         const module = await this.prisma.module.findUnique({ where: { slug } });
         if (!module) throw new BadRequestException('Módulo não encontrado');
 
@@ -600,7 +600,7 @@ export class ModuleInstallerService {
         return { success: true, message: 'Módulo desinstalado.' };
     }
 
-    private async registerModuleMenus(moduleId: string, menus: any[]) {
+    private async registerModuleMenus(moduleId: string, menus: unknown[]) {
         for (const menu of menus) {
             await this.prisma.moduleMenu.create({
                 data: {

@@ -1,9 +1,11 @@
-﻿import { IsEmail, IsString, IsOptional, Matches, MinLength, IsBoolean } from 'class-validator';
+ import { IsEmail, IsString, IsOptional, Matches, MinLength, IsBoolean } from 'class-validator';
 import { IsValidCPFOrCNPJ } from '@core/common/validators/cpf-cnpj.validator';
 
 export class UpdateTenantDto {
   @IsOptional()
-  @IsEmail({}, { message: 'Email invÃ¡lido' })
+  @IsEmail({
+      // Empty implementation
+    }, { message: 'Email invÃ¡lido' })
   email?: string;
 
   @IsOptional()
@@ -23,7 +25,7 @@ export class UpdateTenantDto {
 
   @IsOptional()
   @IsString()
-  @Matches(/^[\d\s\(\)\-\+]+$/, { message: 'Telefone invÃ¡lido' })
+  @Matches(/^[\d\s()\-+]+$/, { message: 'Telefone invÃ¡lido' })
   telefone?: string;
 
   @IsOptional()

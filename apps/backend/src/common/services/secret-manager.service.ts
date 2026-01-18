@@ -128,12 +128,12 @@ export class LocalSecretManager implements SecretManager {
  * AWS Secrets Manager Implementation
  */
 export class AWSSecretManager implements SecretManager {
-  private client: any; // AWS.SecretsManager
+  private client: unknown; // AWS.SecretsManager
   
   constructor() {
     try {
       // Import dinâmico para evitar dependência obrigatória
-      const AWS = require('aws-sdk');
+      import AWS from 'aws-sdk';
       this.client = new AWS.SecretsManager({
         region: process.env.AWS_REGION || 'us-east-1'
       });
@@ -169,7 +169,7 @@ export class AWSSecretManager implements SecretManager {
       throw new Error('AWS Secrets Manager não disponível');
     }
     
-    const params: any = {
+    const params: unknown = {
       Name: name,
       SecretString: value
     };
@@ -209,14 +209,16 @@ export class AWSSecretManager implements SecretManager {
     if (!this.client) return [];
     
     try {
-      const params: any = {};
+      const params: unknown = {
+      // Empty implementation
+    };
       if (prefix) {
         params.Filters = [{ Key: 'name', Values: [prefix] }];
       }
       
       const response = await this.client.listSecrets(params).promise();
       
-      return response.SecretList.map((secret: any) => ({
+      return response.SecretList.map((secret: unknown) => ({
         name: secret.Name,
         value: '', // Não retornamos o valor em listagens
         version: secret.LastChangedDate,
@@ -259,7 +261,7 @@ export class SecretManagerFactory {
     if (process.env.SECRET_PROVIDER === 'aws' || process.env.AWS_SECRET_ACCESS_KEY) {
       const awsManager = new AWSSecretManager();
       if (await awsManager.isAvailable()) {
-        console.log('✅ Usando AWS Secrets Manager');
+        // Using AWS Secrets Manager
         return awsManager;
       }
     }
@@ -267,23 +269,23 @@ export class SecretManagerFactory {
     // 2. Azure Key Vault (implementação futura)
     if (process.env.SECRET_PROVIDER === 'azure' || process.env.AZURE_CLIENT_ID) {
       // Implementar Azure Key Vault
-      console.log('⚠️  Azure Key Vault ainda não implementado');
+      console.warn('⚠️  Azure Key Vault ainda não implementado');
     }
     
     // 3. HashiCorp Vault (implementação futura)
     if (process.env.SECRET_PROVIDER === 'vault' || process.env.VAULT_ADDR) {
       // Implementar HashiCorp Vault
-      console.log('⚠️  HashiCorp Vault ainda não implementado');
+      console.warn('⚠️  HashiCorp Vault ainda não implementado');
     }
     
     // 4. Google Secret Manager (implementação futura)
     if (process.env.SECRET_PROVIDER === 'google' || process.env.GOOGLE_APPLICATION_CREDENTIALS) {
       // Implementar Google Secret Manager
-      console.log('⚠️  Google Secret Manager ainda não implementado');
+      console.warn('⚠️  Google Secret Manager ainda não implementado');
     }
     
     // 5. Default: Local Secret Manager
-    console.log('ℹ️  Usando Local Secret Manager (desenvolvimento)');
+    // Using Local Secret Manager (desenvolvimento)
     return new LocalSecretManager();
   }
   
@@ -305,7 +307,7 @@ export class SecretManagerFactory {
         const secret = await secretManager.getSecret(secretName);
         if (secret && secret.value) {
           process.env[secretName] = secret.value;
-          console.log(`✅ Secret carregado: ${secretName}`);
+          // Secret loaded successfully
         } else {
           console.warn(`⚠️  Secret não encontrado: ${secretName}`);
         }
@@ -321,7 +323,7 @@ export class SecretManagerFactory {
  */
 export class SecretLoaderMiddleware {
   static async loadSecrets(): Promise<void> {
-    console.log('🔐 Carregando secrets...');
+    // Loading secrets...
     await SecretManagerFactory.loadApplicationSecrets();
     
     // Validar secrets críticos
@@ -332,6 +334,6 @@ export class SecretLoaderMiddleware {
       }
     }
     
-    console.log('✅ Todos os secrets carregados com sucesso');
+    // All secrets loaded successfully
   }
 }

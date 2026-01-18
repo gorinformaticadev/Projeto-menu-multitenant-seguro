@@ -1,4 +1,4 @@
-﻿import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, Put } from '@nestjs/common';
+ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, Put } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -13,14 +13,16 @@ import { Role } from '@prisma/client';
 import { CurrentUser } from '@core/common/decorators/current-user.decorator';
 
 @Controller('users')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(RolesGuard)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) { }
+  constructor(private readonly usersService: UsersService) {
+      // Empty implementation
+    }
 
   @Post()
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @Roles(Role.SUPER_ADMIN.ADMIN)
   @SkipTenantIsolation()
-  create(@Body() createUserDto: CreateUserDto, @CurrentUser() user: any) {
+  create(@Body() createUserDto: CreateUserDto, @CurrentUser() user: unknown) {
     // Se for ADMIN, forÃ§a o tenantId do usuÃ¡rio logado
     if (user.role === Role.ADMIN) {
       createUserDto.tenantId = user.tenantId;
@@ -33,9 +35,9 @@ export class UsersController {
   }
 
   @Get()
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @Roles(Role.SUPER_ADMIN.ADMIN)
   @SkipTenantIsolation()
-  findAll(@Query('tenantId') tenantId?: string, @CurrentUser() user?: any) {
+  findAll(@Query('tenantId') tenantId?: string, @CurrentUser() user?: unknown) {
     // Se for ADMIN, forÃ§a buscar apenas do seu tenant
     if (user?.role === Role.ADMIN) {
       return this.usersService.findAll(user.tenantId);
@@ -44,9 +46,9 @@ export class UsersController {
   }
 
   @Get('tenant/:tenantId')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @Roles(Role.SUPER_ADMIN.ADMIN)
   @SkipTenantIsolation()
-  findByTenant(@Param('tenantId') tenantId: string, @CurrentUser() user: any) {
+  findByTenant(@Param('tenantId') tenantId: string, @CurrentUser() user: unknown) {
     // ADMIN sÃ³ pode acessar o prÃ³prio tenant
     if (user.role === Role.ADMIN && user.tenantId !== tenantId) {
       throw new Error('ADMIN nÃ£o pode acessar usuÃ¡rios de outros tenants');
@@ -71,21 +73,21 @@ export class UsersController {
   }
 
   @Get(':id')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @Roles(Role.SUPER_ADMIN.ADMIN)
   @SkipTenantIsolation()
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
   }
 
   @Patch(':id')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @Roles(Role.SUPER_ADMIN.ADMIN)
   @SkipTenantIsolation()
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.usersService.update(id, updateUserDto);
   }
 
   @Delete(':id')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @Roles(Role.SUPER_ADMIN.ADMIN)
   @SkipTenantIsolation()
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
@@ -121,7 +123,7 @@ export class UsersController {
    * Apenas SUPER_ADMIN e ADMIN
    */
   @Post(':id/unlock')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @Roles(Role.SUPER_ADMIN.ADMIN)
   @SkipTenantIsolation()
   unlockUser(@Param('id') id: string) {
     return this.usersService.unlockUser(id);

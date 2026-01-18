@@ -5,4 +5,6 @@ import { TenantModuleService } from './tenant-module.service';
     providers: [TenantModuleService],
     exports: [TenantModuleService],
 })
-export class ModuleEngineModule { }
+export class ModuleEngineModule {
+      // Empty implementation
+    }

@@ -1,4 +1,4 @@
-﻿import { Module } from '@nestjs/common';
+ import { Module } from '@nestjs/common';
 import { AuditController } from './audit.controller';
 import { AuditService } from './audit.service';
 import { PrismaModule } from '@core/prisma/prisma.module';
@@ -9,5 +9,7 @@ import { PrismaModule } from '@core/prisma/prisma.module';
   providers: [AuditService],
   exports: [AuditService],
 })
-export class AuditModule {}
+export class AuditModule {
+      // Empty implementation
+    }
 

@@ -1,4 +1,4 @@
-﻿import { Module } from '@nestjs/common';
+ import { Module } from '@nestjs/common';
 import { UpdateController } from './update.controller';
 import { UpdateService } from './update.service';
 import { UpdateCronService } from './update-cron.service';
@@ -21,4 +21,6 @@ import { AuditModule } from '../audit/audit.module';
   providers: [UpdateService, UpdateCronService],
   exports: [UpdateService],
 })
-export class UpdateModule {}
+export class UpdateModule {
+      // Empty implementation
+    }

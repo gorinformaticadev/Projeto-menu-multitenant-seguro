@@ -1,4 +1,4 @@
-﻿import { Injectable, Logger } from '@nestjs/common';
+ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { UpdateService } from './update.service';
 import { PrismaService } from '@core/prisma/prisma.service';
@@ -6,7 +6,7 @@ import { PrismaService } from '@core/prisma/prisma.service';
 /**
  * ServiÃ§o de CronJob para verificaÃ§Ã£o automÃ¡tica de atualizaÃ§Ãµes
  * 
- * Executa diariamente Ã  meia-noite para verificar se hÃ¡ novas versÃµes
+ * Executa diariamente Ã  meia-noite para verificar se hÃ¡ novas versÃµes
  * disponÃ­veis no repositÃ³rio Git configurado
  */
 @Injectable()
@@ -16,10 +16,12 @@ export class UpdateCronService {
   constructor(
     private updateService: UpdateService,
     private prisma: PrismaService,
-  ) {}
+  ) {
+      // Empty implementation
+    }
 
   /**
-   * CronJob que executa diariamente Ã  meia-noite
+   * CronJob que executa diariamente Ã  meia-noite
    * Verifica automaticamente por novas versÃµes disponÃ­veis
    */
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)

@@ -10,4 +10,6 @@ import { WhatsAppBus } from './whatsapp.bus';
   providers: [WhatsAppGateway, WhatsAppBus],
   exports: [WhatsAppBus],
 })
-export class WhatsAppModule {}
+export class WhatsAppModule {
+      // Empty implementation
+    }

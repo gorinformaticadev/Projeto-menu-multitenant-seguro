@@ -12,9 +12,9 @@ export interface ModuleJson {
     category?: string;
     enabled?: boolean;
     dependencies?: string[] | null;  // string[] | null conforme especificado
-    defaultConfig?: any;
-    menus?: any[];
-    [key: string]: any;
+    defaultConfig?: unknown;
+    menus?: unknown[];
+    [key: string]: unknown;
 }
 
 /**
@@ -25,7 +25,7 @@ export class ModuleJsonValidator {
     /**
      * Valida o conteúdo do module.json
      */
-    static validate(moduleJson: any): ModuleJson {
+    static validate(moduleJson: unknown): ModuleJson {
         if (!moduleJson || typeof moduleJson !== 'object') {
             throw new BadRequestException('module.json inválido ou ausente');
         }
@@ -45,7 +45,7 @@ export class ModuleJsonValidator {
     /**
      * Valida presença de campos obrigatórios
      */
-    private static validateRequiredFields(moduleJson: any): void {
+    private static validateRequiredFields(moduleJson: unknown): void {
         const requiredFields = ['name', 'displayName', 'version'];
         const missingFields: string[] = [];
 
@@ -65,7 +65,7 @@ export class ModuleJsonValidator {
     /**
      * Valida tipos de dados dos campos
      */
-    private static validateFieldTypes(moduleJson: any): void {
+    private static validateFieldTypes(moduleJson: unknown): void {
         // name: string
         if (typeof moduleJson.name !== 'string') {
             throw new BadRequestException('Campo "name" deve ser string');
@@ -138,7 +138,7 @@ export class ModuleJsonValidator {
     /**
      * Valida valores específicos dos campos
      */
-    private static validateFieldValues(moduleJson: any): void {
+    private static validateFieldValues(moduleJson: unknown): void {
         // name: apenas letras, números, hífen e underscore
         const nameRegex = /^[a-zA-Z0-9_-]+$/;
         if (!nameRegex.test(moduleJson.name)) {

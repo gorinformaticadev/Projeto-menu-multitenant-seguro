@@ -4,7 +4,7 @@
  */
 
 import { MenuItem, MenuGroup } from '../contracts/MenuItem';
-import { User, Role } from '../contracts/types';
+import { User } from '../contracts/types';
 
 /**
  * Gerenciador de menus
@@ -142,10 +142,7 @@ export class MenuManager {
    * Debug - lista todos os itens
    */
   public debug(): void {
-    console.log('=== Menu Manager Debug ===');
     console.log(`Total items: ${this.count()}`);
-    console.log('\nItems:');
-    
     this.items
       .sort((a, b) => a.order - b.order)
       .forEach(item => {
@@ -156,8 +153,8 @@ export class MenuManager {
         }
         if (item.children && item.children.length > 0) {
           item.children.forEach(child => {
-            console.log(`      → ${child.label}`);
-          });
+      // Empty implementation
+    });
         }
       });
   }

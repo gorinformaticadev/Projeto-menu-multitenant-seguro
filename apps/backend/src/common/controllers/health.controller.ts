@@ -2,7 +2,7 @@ import { Controller, Get } from '@nestjs/common';
 
 @Controller('health')
 export class HealthController {
-  constructor() { }
+  // Empty constructor removed
 
   @Get('websocket')
   async websocketHealth() {

@@ -2,7 +2,7 @@
  * NOTIFICATION DTOs - Data Transfer Objects
  */
 
-import { IsString, IsOptional, IsEnum, IsObject, IsUUID, IsBoolean, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsObject, IsUUID, IsBoolean } from 'class-validator';
 
 export class CreateNotificationDto {
   @IsString()
@@ -44,7 +44,7 @@ export class BroadcastNotificationDto {
   scope: string;
 
   @IsOptional()
-  tenantIds?: any[];
+  tenantIds?: unknown[];
 
   @IsOptional()
   target: string;

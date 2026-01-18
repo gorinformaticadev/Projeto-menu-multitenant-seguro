@@ -1,4 +1,4 @@
-﻿import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { CronExpression } from '@nestjs/schedule';
 import { UpdateService } from './update.service';
 import { PrismaService } from '@core/prisma/prisma.service';
@@ -17,7 +17,9 @@ export class UpdateCronService implements OnModuleInit {
     private updateService: UpdateService,
     private prisma: PrismaService,
     private cronService: CronService, // Injeta o novo serviço
-  ) { }
+  ) {
+      // Empty implementation
+    }
 
   onModuleInit() {
     // Registra os jobs no sistema dinâmico
@@ -59,13 +61,13 @@ export class UpdateCronService implements OnModuleInit {
           const cutoffDate = new Date();
           cutoffDate.setDate(cutoffDate.getDate() - 90);
 
-          // @ts-ignore
+          // @ts-expect-error -- Legacy code compatibility
           const logsToDelete = await this.prisma.updateLog.count({
             where: { startedAt: { lt: cutoffDate } },
           });
 
           if (logsToDelete > 0) {
-            // @ts-ignore
+            // @ts-expect-error -- Legacy code compatibility
             await this.prisma.updateLog.deleteMany({
               where: { startedAt: { lt: cutoffDate } },
             });

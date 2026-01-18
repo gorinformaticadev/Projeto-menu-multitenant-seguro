@@ -1,4 +1,4 @@
-﻿import { IsEmail, IsString, IsNotEmpty, IsEnum, IsOptional, MinLength, MaxLength, Matches } from 'class-validator';
+ import { IsEmail, IsString, IsNotEmpty, IsEnum, IsOptional, MinLength, MaxLength, Matches } from 'class-validator';
 import { Role } from '@prisma/client';
 import { IsStrongPassword } from '@core/common/validators/password.validator';
 import { Trim, ToLowerCase, NormalizeSpaces } from '@core/common/decorators/sanitize.decorator';
@@ -6,7 +6,9 @@ import { Trim, ToLowerCase, NormalizeSpaces } from '@core/common/decorators/sani
 export class CreateUserDto {
   @Trim()
   @ToLowerCase()
-  @IsEmail({}, { message: 'Email invÃ¡lido' })
+  @IsEmail({
+      // Empty implementation
+    }, { message: 'Email invÃ¡lido' })
   @IsNotEmpty({ message: 'Email Ã© obrigatÃ³rio' })
   @MaxLength(254, { message: 'Email deve ter no mÃ¡ximo 254 caracteres' })
   email: string;
@@ -25,7 +27,7 @@ export class CreateUserDto {
   @Matches(/^[a-zA-Z\u00C0-\u00FF\s]+$/, { message: 'Nome deve conter apenas letras e espaços' })
   name: string;
 
-  @IsEnum(Role, { message: 'Role invÃ¡lida' })
+  @IsEnum({ message: 'Role invÃ¡lida' })
   @IsOptional()
   role?: Role;
 

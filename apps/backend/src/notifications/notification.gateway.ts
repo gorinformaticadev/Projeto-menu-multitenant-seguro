@@ -199,7 +199,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
         return;
       }
 
-      this.connectedClients.set(client.id, client);
+      this.connectedClients.set(client.id, _client);
 
       // Entrar nas salas apropriadas
       await this.joinRooms(client);
@@ -467,7 +467,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     return [];
   }
 
-  private async validateToken(token: string): Promise<any> {
+  private async validateToken(token: string): Promise<unknown> {
     try {
       // Validar JWT token usando o JwtService
       const payload = this.jwtService.verify(token, {

@@ -65,7 +65,7 @@ export class SecureFilesService {
       const storedName = `${uuidv4()}.${extension}`;
 
       // 4. Criar diretório dinâmico
-      const filePath = await this.createSecureDirectory(
+      const _filePath = await this.createSecureDirectory(
         tenantId,
         moduleName,
         documentType,
@@ -73,7 +73,7 @@ export class SecureFilesService {
       );
 
       // 5. Mover arquivo para destino final
-      await fsPromises.rename(file.path, filePath);
+      await fsPromises.rename(file.filePath);
 
       // 6. Registrar metadata no banco
       const secureFile = await this.prisma.secureFile.create({
@@ -158,7 +158,7 @@ export class SecureFilesService {
     }
 
     // 4. Construir path do arquivo
-    const filePath = this.getFilePath(
+    const _filePath = this.getFilePath(
       file.tenantId,
       file.moduleName,
       file.documentType,
@@ -292,7 +292,7 @@ export class SecureFilesService {
     moduleName?: string,
     documentType?: string,
   ) {
-    const where: any = {
+    const where: unknown = {
       tenantId,
       deletedAt: null, // Apenas arquivos não deletados
     };

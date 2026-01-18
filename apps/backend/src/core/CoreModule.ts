@@ -13,4 +13,6 @@ import { ModuleLoader } from './ModuleLoader';
         // CoreContext
     ],
 })
-export class CoreModule { }
+export class CoreModule {
+      // Empty implementation
+    }

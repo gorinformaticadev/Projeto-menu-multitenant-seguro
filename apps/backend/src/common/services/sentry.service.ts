@@ -14,7 +14,6 @@ export class SentryService {
 
     // Apenas inicializar se DSN estiver configurado
     if (!dsn) {
-      console.log('⚠️  Sentry DSN não configurado - Monitoramento desabilitado');
       return;
     }
 
@@ -25,7 +24,7 @@ export class SentryService {
       // Performance Monitoring
       tracesSampleRate: environment === 'production' ? 0.1 : 1.0, // 10% em produção, 100% em dev
       // Filtrar dados sensíveis
-      beforeSend(event, hint) {
+      beforeSend(event, _hint) {
         // Remover dados sensíveis
         if (event.request) {
           // Remover headers sensíveis
@@ -36,7 +35,7 @@ export class SentryService {
 
           // Remover dados sensíveis do body
           if (event.request.data) {
-            const data = typeof event.request.data === 'string'
+            const _data = typeof event.request.data === 'string'
               ? JSON.parse(event.request.data)
               : event.request.data;
 
@@ -54,13 +53,12 @@ export class SentryService {
       },
     });
 
-    console.log('✅ Sentry inicializado');
-  }
+    }
 
   /**
    * Capturar exceção manualmente
    */
-  captureException(exception: any, context?: any) {
+  captureException(exception: any, context?: Record<string, unknown>) {
     Sentry.captureException(exception, {
       contexts: context,
     });
@@ -94,7 +92,7 @@ export class SentryService {
   /**
    * Adicionar breadcrumb (rastro de ações)
    */
-  addBreadcrumb(message: string, category: string, data?: any) {
+  addBreadcrumb(message: string, category: string, data?: Record<string, unknown>) {
     Sentry.addBreadcrumb({
       message,
       category,

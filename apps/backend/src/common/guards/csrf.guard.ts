@@ -21,7 +21,9 @@ export const SKIP_CSRF_KEY = 'skipCsrf';
  */
 @Injectable()
 export class CsrfGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(private reflector: Reflector) {
+      // Empty implementation
+    }
 
   canActivate(context: ExecutionContext): boolean {
     // Verifica se a rota está marcada para pular CSRF
@@ -91,7 +93,7 @@ export class CsrfGuard implements CanActivate {
   /**
    * Gera e define token CSRF no cookie
    */
-  private setCsrfToken(request: any, response: any): void {
+  private setCsrfToken(request: unknown, response: unknown): void {
     // Se já existe token válido, não gerar novo
     if (request.cookies?.['XSRF-TOKEN']) {
       return;
@@ -115,7 +117,7 @@ export class CsrfGuard implements CanActivate {
   /**
    * Valida a origem da requisição
    */
-  private isValidOrigin(request: any): boolean {
+  private isValidOrigin(request: unknown): boolean {
     const origin = request.headers.origin;
     const referer = request.headers.referer;
     
@@ -178,7 +180,7 @@ export class CsrfGuard implements CanActivate {
   /**
    * Log de atividades suspeitas
    */
-  private logSuspiciousActivity(request: any, reason: string): void {
+  private logSuspiciousActivity(request: unknown, reason: string): void {
     console.warn('🚨 Atividade suspeita detectada:', {
       reason,
       ip: request.ip || request.connection?.remoteAddress,

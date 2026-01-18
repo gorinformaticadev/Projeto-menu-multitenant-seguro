@@ -1,10 +1,12 @@
-﻿import { Injectable } from '@nestjs/common';
+ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class PasswordHistoryService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {
+      // Empty implementation
+    }
 
   /**
    * Verificar se a senha jÃ¡ foi usada recentemente
@@ -32,7 +34,7 @@ export class PasswordHistoryService {
       for (let i = 0; i < passwordHistory.length; i++) {
         const isMatch = await bcrypt.compare(newPassword, passwordHistory[i]);
         if (isMatch) {
-          const positionInHistory = i + 1;
+          const _positionInHistory = i + 1;
           return {
             isReused: true,
             message: `Esta senha jÃ¡ foi utilizada recentemente. VocÃª nÃ£o pode reutilizar as Ãºltimas ${reuseLimit} senhas.`,
@@ -123,7 +125,7 @@ export class PasswordHistoryService {
       errors.push('A senha deve conter pelo menos um nÃºmero');
     }
 
-    if (requireSpecial && !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    if (requireSpecial && !/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
       errors.push('A senha deve conter pelo menos um caractere especial');
     }
 
@@ -205,7 +207,9 @@ export class PasswordHistoryService {
       feedback.push('Adicione nÃºmeros');
     }
 
-    if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    if (/[!@#$%^&*()_+\-=[\]{
+      // Empty implementation
+    };':"\\|,.<>/?]/.test(password)) {
       score += 10;
     } else {
       feedback.push('Adicione caracteres especiais');

@@ -101,5 +101,4 @@ export function registerCoreModule(): void {
 
   // Registra o módulo core
   moduleRegistry.register(coreContribution);
-  console.log('Módulo Core registrado com sucesso');
-}
+  }
