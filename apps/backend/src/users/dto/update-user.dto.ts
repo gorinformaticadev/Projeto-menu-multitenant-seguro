@@ -1,17 +1,17 @@
-﻿import { IsEmail, IsString, IsOptional, MinLength, IsEnum, IsBoolean, ValidateIf, registerDecorator, ValidationOptions, ValidationArguments } from 'class-validator';
+﻿import { IsEmail, IsString, IsOptional, MinLength, IsEnum, IsBoolean, registerDecorator, ValidationOptions, ValidationArguments } from 'class-validator';
 import { Role } from '@prisma/client';
 import { PrismaService } from '@core/prisma/prisma.service';
 
 // Validador personalizado para senha baseado nas configuraÃ§Ãµes
 function IsValidPassword(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       name: 'isValidPassword',
       target: object.constructor,
       propertyName: propertyName,
       options: validationOptions,
       validator: {
-        async validate(value: any, args: ValidationArguments) {
+        async validate(value: any, _args: ValidationArguments) {
           if (!value || typeof value !== 'string' || value.trim() === '') return true; // Se nÃ£o hÃ¡ senha, Ã© vÃ¡lido (para ediÃ§Ã£o)
 
           try {
@@ -49,7 +49,7 @@ function IsValidPassword(validationOptions?: ValidationOptions) {
             return value.length >= 8 && /[A-Z]/.test(value) && /[a-z]/.test(value) && /\d/.test(value);
           }
         },
-        defaultMessage(args: ValidationArguments) {
+        defaultMessage(_args: ValidationArguments) {
           return 'A senha nÃ£o atende aos requisitos de seguranÃ§a configurados';
         },
       },

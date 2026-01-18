@@ -6,12 +6,12 @@ import { Request } from 'express';
 
 @Injectable()
 export class SecurityAuditInterceptor implements NestInterceptor {
-  constructor(private auditService: AuditService) {}
+  constructor(private auditService: AuditService) { }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest<Request>();
     const response = context.switchToHttp().getResponse();
-    
+
     // Coletar informações básicas
     const startTime = Date.now();
     const userAgent = request.get('user-agent') || '';
@@ -72,7 +72,7 @@ export class SecurityAuditInterceptor implements NestInterceptor {
     ];
 
     const operationKey = `${method} ${url.split('?')[0]}`;
-    
+
     if (criticalOperations.includes(operationKey) || statusCode >= 400) {
       this.auditService.log({
         action: `SECURITY_${statusCode < 400 ? 'SUCCESS' : 'FAILED'}_${method}_${url.replace(/\//g, '_').toUpperCase()}`,
