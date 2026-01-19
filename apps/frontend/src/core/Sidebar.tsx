@@ -18,7 +18,7 @@ interface SidebarItem {
 }
 
 // Mapeamento de ícones para componentes Lucide
-const iconMap: Record<string, any> = {
+const iconMap: Record<string, React.ComponentType> = {
   LayoutDashboard,
   Building2,
   Settings,

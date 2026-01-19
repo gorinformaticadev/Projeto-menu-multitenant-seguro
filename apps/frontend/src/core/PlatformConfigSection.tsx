@@ -54,7 +54,8 @@ export default function PlatformConfigSection() {
         title: "Configurações salvas",
         description: "As configurações da plataforma foram atualizadas com sucesso",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
       toast({
         title: "Erro ao salvar configurações",
         description: error.response?.data?.message || "Erro desconhecido",

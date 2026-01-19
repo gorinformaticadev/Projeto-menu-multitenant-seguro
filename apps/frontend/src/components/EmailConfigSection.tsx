@@ -1,3 +1,18 @@
+// Utilitário para extrair mensagem de erro de objetos desconhecidos
+type ErrorWithResponse = { response?: { data?: { message?: string } } };
+type ErrorWithMessage = { message?: string };
+function getErrorMessage(err: unknown): string {
+  if (typeof err === 'object' && err !== null) {
+    const e = err as ErrorWithResponse & ErrorWithMessage;
+    if (e.response?.data?.message) {
+      return e.response.data.message;
+    }
+    if (e.message) {
+      return e.message;
+    }
+  }
+  return 'Erro desconhecido';
+}
 "use client";
 
 import { useState, useEffect } from "react";
@@ -98,10 +113,11 @@ export default function EmailConfigSection() {
             smtpPass: "", // Don't load password for security
           }));
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error instanceof Error ? error : new Error(String(error));
         toast({
           title: "Erro ao carregar configurações de email",
-          description: error.response?.data?.message || "Erro desconhecido",
+          description: getErrorMessage(err),
           variant: "destructive",
         });
       } finally {
@@ -175,10 +191,11 @@ export default function EmailConfigSection() {
         title: "Configuração salva",
         description: "As configurações de email foram salvas com sucesso",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
       toast({
         title: "Erro ao salvar configuração",
-        description: error.response?.data?.message || "Erro desconhecido",
+        description: getErrorMessage(err),
         variant: "destructive",
       });
     } finally {
@@ -190,7 +207,7 @@ export default function EmailConfigSection() {
   const handleDeleteCredentials = async () => {
     try {
       // We're not implementing this anymore since we're using SecurityConfig
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Handle error silently
     }
   };
@@ -225,10 +242,11 @@ export default function EmailConfigSection() {
         title: "Email de teste enviado",
         description: `Email de teste enviado com sucesso para ${testEmail}`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
       toast({
         title: "Erro ao enviar email de teste",
-        description: error.response?.data?.message || "Erro desconhecido",
+        description: getErrorMessage(err),
         variant: "destructive",
       });
     } finally {

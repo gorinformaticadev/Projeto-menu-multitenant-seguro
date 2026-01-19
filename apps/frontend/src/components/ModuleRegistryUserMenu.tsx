@@ -10,8 +10,9 @@ import { moduleRegistry, ModuleUserMenuItem } from '@/lib/module-registry';
 import * as LucideIcons from 'lucide-react';
 
 // Helper para ícones dinâmicos
-const getIconComponent = (iconName: string): any => {
-  return (LucideIcons as any)[iconName] || LucideIcons.HelpCircle;
+const getIconComponent = (iconName: string): React.ComponentType | undefined => {
+  const Icon = (LucideIcons as Record<string, React.ComponentType | undefined>)[iconName];
+  return Icon || LucideIcons.HelpCircle;
 };
 
 interface Props {

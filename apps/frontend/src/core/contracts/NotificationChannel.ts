@@ -32,7 +32,7 @@ export interface NotificationMessage {
   message: string;
   
   /** Dados adicionais */
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
   
   /** Link de ação */
   actionUrl?: string;

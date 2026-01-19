@@ -4,12 +4,14 @@
 
 'use client';
 
+
 import React, { createContext, useContext, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
+import { Notification } from '@/types/notifications';
 
 interface NotificationContextType {
-  notifications: any[];
+  notifications: Notification[];
   unreadCount: number;
   isConnected: boolean;
   connectionError: string | null;

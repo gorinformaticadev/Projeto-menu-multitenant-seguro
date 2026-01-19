@@ -8,7 +8,7 @@
 // Tipos para o bridge
 export interface ModuleBridgeAPI {
   // Utilitários de UI
-  createElement: (tag: string, props?: any, ...children: any[]) => HTMLElement;
+  createElement: (tag: string, props?: Record<string, unknown>, ...children: (string | HTMLElement)[]) => HTMLElement;
   createButton: (text: string, onClick: () => void, variant?: 'primary' | 'secondary' | 'success' | 'danger') => HTMLElement;
   createCard: (title: string, content: HTMLElement | string) => HTMLElement;
   createAlert: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => HTMLElement;
@@ -20,7 +20,7 @@ export interface ModuleBridgeAPI {
   navigate: (path: string) => void;
   
   // Dados do usuário (mock para módulos independentes)
-  getCurrentUser: () => Promise<any>;
+  getCurrentUser: () => Promise<unknown>;
   
   // Utilitários
   formatDate: (date: Date | string) => string;
@@ -47,7 +47,7 @@ export interface ModuleBridgeAPI {
 export class ModuleBridge implements ModuleBridgeAPI {
   
   // Função helper para criar elementos DOM
-  createElement(tag: string, props: any = {}, ...children: any[]): HTMLElement {
+  createElement(tag: string, props: Record<string, unknown> = {}, ...children: (string | HTMLElement)[]): HTMLElement {
     const element = document.createElement(tag);
     
     // Aplicar propriedades
@@ -157,7 +157,7 @@ export class ModuleBridge implements ModuleBridgeAPI {
   }
 
   // Obter dados do usuário atual (mock)
-  async getCurrentUser(): Promise<any> {
+  async getCurrentUser(): Promise<unknown> {
     // Em um sistema real, isso faria uma chamada à API
     // Por enquanto, retornar dados mock
     return new Promise((resolve) => {
@@ -219,5 +219,5 @@ export const moduleBridge = new ModuleBridge();
 
 // Disponibilizar globalmente para módulos
 if (typeof window !== 'undefined') {
-  (window as any).ModuleBridge = moduleBridge;
+  (window as unknown as { ModuleBridge: ModuleBridge }).ModuleBridge = moduleBridge;
 }

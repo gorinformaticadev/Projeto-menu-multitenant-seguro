@@ -12,7 +12,7 @@ export interface TenantModule {
   description: string;
   version: string;
   isActive: boolean;
-  config?: any;
+  config?: Record<string, unknown>;
   activatedAt?: string | null;
   deactivatedAt?: string | null;
 }
@@ -52,12 +52,12 @@ class ModulesService {
   /**
    * Ativa um módulo para um tenant específico (SUPER_ADMIN apenas)
    */
-  async activateModuleForTenant(tenantId: string, moduleName: string): Promise<any> {
+  async activateModuleForTenant(tenantId: string, moduleName: string): Promise<unknown> {
     try {
       const response = await api.post(`/tenants/${tenantId}/modules/${moduleName}/activate`);
       console.log(`✅ Módulo ${moduleName} ativado para tenant ${tenantId}`);
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       console.error(`❌ Erro ao ativar módulo ${moduleName} para tenant ${tenantId}:`, error);
       throw error;
     }
@@ -66,12 +66,12 @@ class ModulesService {
   /**
    * Desativa um módulo para um tenant específico (SUPER_ADMIN apenas)
    */
-  async deactivateModuleForTenant(tenantId: string, moduleName: string): Promise<any> {
+  async deactivateModuleForTenant(tenantId: string, moduleName: string): Promise<unknown> {
     try {
       const response = await api.post(`/tenants/${tenantId}/modules/${moduleName}/deactivate`);
       console.log(`❌ Módulo ${moduleName} desativado para tenant ${tenantId}`);
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       console.error(`❌ Erro ao desativar módulo ${moduleName} para tenant ${tenantId}:`, error);
       throw error;
     }
@@ -80,7 +80,7 @@ class ModulesService {
   /**
    * Alterna o status de um módulo para o próprio tenant (ADMIN)
    */
-  async toggleMyTenantModule(moduleName: string): Promise<any> {
+  async toggleMyTenantModule(moduleName: string): Promise<unknown> {
     const timestamp = new Date().toISOString();
     console.log(`📡 [SERVICE] ${timestamp} - Iniciando toggleMyTenantModule para: ${moduleName}`);
     
@@ -97,7 +97,7 @@ class ModulesService {
   /**
    * Alterna o status de um módulo para um tenant específico (SUPER_ADMIN apenas)
    */
-  async toggleModuleForTenant(tenantId: string, moduleName: string): Promise<any> {
+  async toggleModuleForTenant(tenantId: string, moduleName: string): Promise<unknown> {
     try {
       const response = await api.post(`/tenants/${tenantId}/modules/${moduleName}/toggle`);
       console.log(`🔄 Status do módulo ${moduleName} alternado para tenant ${tenantId}`);
@@ -111,7 +111,7 @@ class ModulesService {
   /**
    * Configura um módulo para um tenant específico (SUPER_ADMIN apenas)
    */
-  async configureTenantModule(tenantId: string, moduleName: string, config: any): Promise<any> {
+  async configureTenantModule(tenantId: string, moduleName: string, config: Record<string, unknown>): Promise<unknown> {
     try {
       const response = await api.put(`/tenants/${tenantId}/modules/${moduleName}/config`, config);
       console.log(`⚙️ Módulo ${moduleName} configurado para tenant ${tenantId}`);

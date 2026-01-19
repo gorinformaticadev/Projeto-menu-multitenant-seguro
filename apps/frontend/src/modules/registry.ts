@@ -8,7 +8,7 @@
  */
 
 // Imports dinâmicos para lazy loading
-export const modulePages: Record<string, Record<string, () => Promise<any>>> = {
+export const modulePages: Record<string, Record<string, () => Promise<unknown>>> = {
   // 'sistema': {
   //   '/ajustes': () => import('@modules/sistema/frontend/pages/ajustes.tsx'),
   // },

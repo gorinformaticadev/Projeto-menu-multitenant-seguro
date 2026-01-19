@@ -7,7 +7,7 @@
 
 // import { ModuleRoutes as Routes_sistema } from '../../../../modules/sistema/frontend/routes';
 
-export const AllModuleRoutes: any[] = [
+export const AllModuleRoutes: unknown[] = [
   // Rotas de módulos instalados aparecerão aqui
   // DEPRECATED: Use /modules/[module]/[...slug] com registry.ts
 ];

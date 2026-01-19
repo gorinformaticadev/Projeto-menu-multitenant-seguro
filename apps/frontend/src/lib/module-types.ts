@@ -7,7 +7,7 @@ export interface DashboardWidgetDefinition {
     type: WidgetType;
     title: string;
     description?: string;
-    component: ComponentType<any>;
+    component: ComponentType<unknown>;
     gridSize?: { w: number; h: number };
     permissions?: string[];
     icon?: string;
@@ -28,7 +28,7 @@ export interface FrontendModuleDefinition {
     id: string;
     name: string;
     widgets?: DashboardWidgetDefinition[];
-    routes?: Record<string, ComponentType<any>>;
+    routes?: Record<string, ComponentType<unknown>>;
     navItems?: SidebarItem[];
 
     // Lifecycle hooks

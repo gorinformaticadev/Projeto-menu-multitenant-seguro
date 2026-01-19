@@ -46,7 +46,8 @@ export function PlatformConfigProvider({ children }: { children: ReactNode }) {
         timestamp: Date.now()
       }));
       
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error(String(err));
       console.warn('Failed to fetch platform config:', err);
       setError(err.message || 'Failed to load platform configuration');
       setConfig(DEFAULT_PLATFORM_CONFIG);

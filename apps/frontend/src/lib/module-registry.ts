@@ -121,7 +121,7 @@ class ModuleRegistry {
           module: apiModule.slug,
           icon: 'Package',
           gridSize: { w: 1, h: 1 }
-        } as any);
+        } as unknown as ModuleDashboardWidget);
       }
     }
 
@@ -131,13 +131,13 @@ class ModuleRegistry {
   /**
    * Métodos de compatibilidade mantidos
    */
-  getSidebarItems(userRole?: string): any[] {
+  getSidebarItems(userRole?: string): ModuleMenu[] {
     // Mantém lógica antiga de menus vindos do JSON por enquanto
     // Idealmente migraria para codeDefinitions[slug].navItems
     return this.getGroupedSidebarItems(userRole).ungrouped;
   }
 
-  getGroupedSidebarItems(userRole?: string) {
+  getGroupedSidebarItems(userRole?: string): { ungrouped: ModuleMenu[]; groups: Record<string, ModuleMenu[]>; groupOrder: string[] } {
     // Lógica original preservada para Sidebar por enquanto
     const coreItems = [
       { id: 'dashboard', name: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard', order: 1 }
@@ -152,7 +152,7 @@ class ModuleRegistry {
       );
     }
 
-    const groups: Record<string, any[]> = {};
+    const groups: Record<string, ModuleMenu[]> = {};
     const groupOrder: string[] = [];
 
     if (adminItems.length > 0) {
@@ -194,10 +194,10 @@ class ModuleRegistry {
    * Retorna itens da taskbar baseado nos módulos ativos
    * Taskbar = atalhos rápidos para funcionalidades principais
    */
-  getTaskbarItems(userRole?: string): any[] {
+  getTaskbarItems(userRole?: string): Array<{ id: string; name: string; icon: string; href: string; order: number }>{
     if (!this.isLoaded) return [];
 
-    const taskbarItems: any[] = [];
+    const taskbarItems: Array<{ id: string; name: string; icon: string; href: string; order: number }> = [];
 
     // Para cada módulo ativo, verificar se tem menus marcados para taskbar
     for (const mod of this.apiModules) {

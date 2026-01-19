@@ -41,7 +41,7 @@ export interface DashboardWidget {
   refresh?: number;
   
   /** Propriedades customizadas para o componente */
-  props?: Record<string, any>;
+  props?: Record<string, unknown>;
   
   /** Se o widget pode ser fechado pelo usuário */
   closeable?: boolean;

@@ -20,8 +20,10 @@ interface ModuleTaskbarItem {
 }
 
 // Helper para ícones dinâmicos
-const getIconComponent = (iconName: string): any => {
-  return (LucideIcons as any)[iconName] || LucideIcons.HelpCircle;
+const getIconComponent = (iconName: string): React.ComponentType | undefined => {
+  // LucideIcons é um objeto de componentes React
+  const Icon = (LucideIcons as Record<string, React.ComponentType | undefined>)[iconName];
+  return Icon || LucideIcons.HelpCircle;
 };
 
 export function ModuleRegistryTaskbar() {
