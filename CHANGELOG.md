@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.0.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.5.2...v2.0.0) (2026-01-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **frontend:** Next.js major version update may introduce breaking changes in API or behavior
+* **backend:** Prisma v7 upgrade requires database URL configuration changes and may affect existing migrations. Test thoroughly before deploying.
+* **frontend:** Next.js downgrade may affect compatibility with v16 features
+
+### Features
+
+* Add CI/CD pipeline with test, lint, audit, and Docker image build/push steps for backend and frontend applications. ([7459bb4](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/7459bb4f7e053b9abe94cd731f380c534e2d824e))
+* Add multi-stage Dockerfile for NestJS backend with Prisma, production setup, and health checks. ([46a506a](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/46a506ab2c6d5c4c23454241109d2bccf2ceb59e))
+* Initialize backend project with CI/CD pipeline and Prisma configuration. ([fdb21c8](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/fdb21c81c92a4f27a27d66a7eb13bf9742d6b885))
+* Introduce initial NestJS backend application with its dependencies and related debug logs. ([63fed09](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/63fed099ee2a830d54118fd759010051d33cf1f8))
+
+
+### Bug Fixes
+
+* **modules:** Correções de modulos ([fc3590d](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/fc3590db2d5682fa48713bd9bc0518f96eea3ab9))
+* padroniza secrets Docker Hub ([fdce607](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/fdce607b6db11205fb63239474b96aa4026b81b1))
+* **prisma:** migrate datasource URL to prisma.config.ts (Prisma 7) ([c9a4885](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/c9a4885356e925738376c8047d2e8e05a2aabce7))
+* resolve conflito no .gitignore após merge da CI ([3065439](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/30654391339c1e76175a4b7b284066ff34fca9b3))
+* **sistema:** Introduce email configuration management with a dedicated UI and backend API, alongside new core UI components and cron job management. ([892eba7](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/892eba7a57883557c64765d605ae8ee0e93773b8))
+* **usuarios:** Correção da pagina de usuários ([db83602](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/db8360219fb4d8f3f80706e28c241af19d86d350))
+
+
+* **backend:** upgrade Prisma to v7.2.0 with adapter support ([a19f832](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/a19f8329b46de332a2c48449a8d5ab5f8d4c5c33))
+* **frontend:** downgrade Next.js to 15.1.11 and adapt async params ([11a4530](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/11a45302b71b9030e36835771b80293c6ef54943))
+
+
+### build
+
+* **frontend:** migrate configs to ES modules and update Next.js ([a570753](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/a570753d5313a3e7d70d30ad959423a3a0b91af8))
+
 ### [0.5.2](https://github.com/gorinformatica/menu-multitenant/compare/v0.5.1...v0.5.2) (2026-01-16)
 
 
