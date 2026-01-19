@@ -1,24 +1,22 @@
-# Multi-stage build for Next.js 14 frontend with standalone output
+# Multi-stage build for Next.js frontend with standalone output
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system deps
 RUN apk add --no-cache libc6-compat
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production=false
+# Use lockfile if present
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-# Copy source code
 COPY . .
 
-# Build application with standalone output
+# Build application
 RUN npm run build
 
-# Production stage
 FROM node:20-alpine AS production
 
 # Create non-root user
@@ -32,18 +30,14 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Switch to non-root user
 USER nextjs
 
-# Set production environment
 ENV NODE_ENV=production
+ENV PORT=5000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3000/api/health || exit 1
+    CMD curl -f http://localhost:${PORT}/api/health || exit 1
 
-# Expose port
-EXPOSE 3000
+EXPOSE 5000
 
-# Start application
 CMD ["node", "server.js"]

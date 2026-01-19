@@ -44,48 +44,76 @@ jobs:
       with:
         node-version: '20'
         cache: 'npm'
+        cache-dependency-path: |
+          apps/backend/package-lock.json
+          apps/frontend/package-lock.json
 
-    - name: Install backend dependencies
+    - name: Ensure DATABASE_URL (fallback to service)
+      run: |
+        if [ -z "${{ env.DATABASE_URL }}" ]; then
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db" >> $GITHUB_ENV
+          echo "Using local Postgres service for tests"
+        else
+          echo "Using DATABASE_URL from secrets"
+        fi
+
+    - name: Wait for Postgres to be ready
+      run: |
+        for i in $(seq 1 30); do
+          pg_isready -h localhost -p 5432 -U postgres && break
+          echo "Waiting for Postgres..."
+          sleep 2
+        done
+
+    - name: Install backend dependencies (safe)
       run: |
         cd apps/backend
-        npm ci
+        if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+          npm ci
+        else
+          npm install
+        fi
 
-    - name: Install frontend dependencies
+    - name: Install frontend dependencies (safe)
       run: |
         cd apps/frontend
-        npm ci
-
-    - name: Update Prisma to v7 (CI/CD compatibility)
-      run: |
-        cd apps/backend
-        npm install prisma@latest --save-dev
-        npm install @prisma/client@latest
+        if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+          npm ci
+        else
+          npm install
+        fi
 
     - name: Generate Prisma Client
       run: |
         cd apps/backend
-        npm run prisma:generate
+        npx prisma generate
 
     - name: Run backend lint
       run: |
         cd apps/backend
-        npm run lint
+        npm run lint --if-present
 
     - name: Run frontend lint
       run: |
         cd apps/frontend
-        npm run lint
+        npm run lint --if-present
 
-    - name: Run security audit
+    - name: Run security audit (non-blocking)
+      run: |
+        cd apps/backend || exit 0
+        npm audit --audit-level=moderate || true
+        cd ../frontend || exit 0
+        npm audit --audit-level=moderate || true
+
+    - name: Run backend tests (if present)
       run: |
         cd apps/backend
-        npm audit --audit-level=moderate || true
-        cd ../frontend
-        npm audit --audit-level=moderate || true
+        npm run test --if-present
 
-    - name: Run tests (when implemented)
+    - name: Run frontend tests (if present)
       run: |
-        echo "Tests will be added when test suite is implemented"
+        cd apps/frontend
+        npm run test --if-present
 
   build:
     runs-on: ubuntu-latest
@@ -99,7 +127,7 @@ jobs:
       id: meta
       run: |
         if [ "${{ github.event_name }}" = "release" ]; then
-          VERSION=${GITHUB_REF#refs/tags/v}
+          VERSION="${{ github.ref_name }}"
           SHA=${GITHUB_SHA::8}
           BACKEND_TAGS="${BACKEND_IMAGE}:${VERSION},${BACKEND_IMAGE}:sha-${SHA}"
           FRONTEND_TAGS="${FRONTEND_IMAGE}:${VERSION},${FRONTEND_IMAGE}:sha-${SHA}"
@@ -118,18 +146,15 @@ jobs:
     - name: Validate Docker Hub secrets
       run: |
         echo "🔍 Validating Docker Hub secrets..."
-
         if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
           echo "❌ ERROR: DOCKERHUB_USERNAME secret is missing or empty"
           exit 1
         fi
-
         if [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
           echo "❌ ERROR: DOCKERHUB_TOKEN secret is missing or empty"
           exit 1
         fi
-
-        echo "✅ All Docker Hub secrets are valid and available"
+        echo "✅ Docker Hub secrets found"
 
     - name: Login to Docker Hub
       uses: docker/login-action@v3
