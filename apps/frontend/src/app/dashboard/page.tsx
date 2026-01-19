@@ -14,8 +14,11 @@ import { ModuleRegistryWidgets } from "@/components/ModuleRegistryWidgets";
 import { PlatformName } from "@/components/PlatformInfo";
 
 // Helper para ícones dinâmicos
-const getIconComponent = (iconName: string): React.ComponentType<any> => {
-  return (LucideIcons as unknown as Record<string, React.ComponentType<any>>)[iconName] || LucideIcons.HelpCircle;
+import type { SVGProps } from "react";
+type LucideIconComponent = (props: SVGProps<SVGSVGElement>) => JSX.Element;
+const getIconComponent = (iconName: string): LucideIconComponent => {
+  const icons = LucideIcons as unknown as Record<string, LucideIconComponent>;
+  return icons[iconName] || LucideIcons.HelpCircle;
 };
 
 export default function DashboardPage() {

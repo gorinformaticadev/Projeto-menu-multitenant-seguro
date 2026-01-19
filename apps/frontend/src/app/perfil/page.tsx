@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { TwoFactorSetup } from "@/components/TwoFactorSetup";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,26 +37,7 @@ export default function PerfilPage() {
     telefone: "",
   });
 
-  useEffect(() => {
-    if (user?.id) {
-      loadUserData();
-      setProfileData({
-        name: user.name || "",
-        email: user.email || "",
-      });
-
-      // Inicializar dados da tenant se for ADMIN
-      if (user.role === "ADMIN" && user.tenant) {
-        setTenantData({
-          nomeFantasia: user.tenant.nomeFantasia || "",
-          cnpjCpf: user.tenant.cnpjCpf || "",
-          telefone: user.tenant.telefone || "",
-        });
-      }
-    }
-  }, [user?.id, user?.name, user?.email, user?.role, user?.tenant, loadUserData]);
-
-  async function loadUserData(force = false) {
+  const loadUserData = useCallback(async (force = false) => {
     if (!user?.id) return;
 
     const cacheKey = `user-profile-${user.id}`;
@@ -100,7 +81,26 @@ export default function PerfilPage() {
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
     }
-  }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (user?.id) {
+      loadUserData();
+      setProfileData({
+        name: user.name || "",
+        email: user.email || "",
+      });
+
+      // Inicializar dados da tenant se for ADMIN
+      if (user.role === "ADMIN" && user.tenant) {
+        setTenantData({
+          nomeFantasia: user.tenant.nomeFantasia || "",
+          cnpjCpf: user.tenant.cnpjCpf || "",
+          telefone: user.tenant.telefone || "",
+        });
+      }
+    }
+  }, [user?.id, user?.name, user?.email, user?.role, user?.tenant, loadUserData]);
 
   async function handleUpdateProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -221,7 +221,7 @@ export default function PerfilPage() {
           nomeFantasia: tenantData.nomeFantasia,
           cnpjCpf: tenantData.cnpjCpf,
           telefone: tenantData.telefone,
-        } as Record<string, unknown>,
+        } as any,
       });
 
       toast({
@@ -353,77 +353,77 @@ export default function PerfilPage() {
 
       {/* Alterar Senha */}
       <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Key className="h-5 w-5" />
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Key className="h-5 w-5" />
+            Alterar Senha
+          </CardTitle>
+          <CardDescription>
+            Mantenha sua senha segura e atualizada
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!showChangePassword ? (
+            <Button onClick={() => setShowChangePassword(true)}>
               Alterar Senha
-            </CardTitle>
-            <CardDescription>
-              Mantenha sua senha segura e atualizada
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!showChangePassword ? (
-              <Button onClick={() => setShowChangePassword(true)}>
-                Alterar Senha
-              </Button>
-            ) : (
-              <form onSubmit={handleChangePassword} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="currentPassword">Senha Atual</Label>
-                  <Input
-                    id="currentPassword"
-                    type="password"
-                    value={passwordData.currentPassword}
-                    onChange={(e) =>
-                      setPasswordData({ ...passwordData, currentPassword: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <PasswordInput
-                  id="newPassword"
-                  label="Nova Senha"
-                  value={passwordData.newPassword}
-                  onChange={(value, isValid) => {
-                    setPasswordData({ ...passwordData, newPassword: value });
-                    setIsNewPasswordValid(isValid);
-                  }}
-                  showValidation={true}
-                  showStrengthMeter={true}
-                  showConfirmation={true}
-                  confirmPassword={passwordData.confirmPassword}
-                  onConfirmChange={(value, matches) => {
-                    setPasswordData({ ...passwordData, confirmPassword: value });
-                    setPasswordsMatch(matches);
-                  }}
-                  placeholder="Digite sua nova senha"
+            </Button>
+          ) : (
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="currentPassword">Senha Atual</Label>
+                <Input
+                  id="currentPassword"
+                  type="password"
+                  value={passwordData.currentPassword}
+                  onChange={(e) =>
+                    setPasswordData({ ...passwordData, currentPassword: e.target.value })
+                  }
                   required
                 />
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setShowChangePassword(false);
-                      setPasswordData({
-                        currentPassword: "",
-                        newPassword: "",
-                        confirmPassword: "",
-                      });
-                      setIsNewPasswordValid(false);
-                      setPasswordsMatch(false);
-                    }}
-                    disabled={loading}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={loading || !isNewPasswordValid || !passwordsMatch}>
-                    {loading ? "Salvando..." : "Salvar Nova Senha"}
-                  </Button>
-                </div>
-              </form>
-            )}
+              </div>
+              <PasswordInput
+                id="newPassword"
+                label="Nova Senha"
+                value={passwordData.newPassword}
+                onChange={(value, isValid) => {
+                  setPasswordData({ ...passwordData, newPassword: value });
+                  setIsNewPasswordValid(isValid);
+                }}
+                showValidation={true}
+                showStrengthMeter={true}
+                showConfirmation={true}
+                confirmPassword={passwordData.confirmPassword}
+                onConfirmChange={(value, matches) => {
+                  setPasswordData({ ...passwordData, confirmPassword: value });
+                  setPasswordsMatch(matches);
+                }}
+                placeholder="Digite sua nova senha"
+                required
+              />
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowChangePassword(false);
+                    setPasswordData({
+                      currentPassword: "",
+                      newPassword: "",
+                      confirmPassword: "",
+                    });
+                    setIsNewPasswordValid(false);
+                    setPasswordsMatch(false);
+                  }}
+                  disabled={loading}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={loading || !isNewPasswordValid || !passwordsMatch}>
+                  {loading ? "Salvando..." : "Salvar Nova Senha"}
+                </Button>
+              </div>
+            </form>
+          )}
         </CardContent>
       </Card>
 

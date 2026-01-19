@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu, Shield, FileText, HelpCircle, Package, Home, BookOpen, Rocket, BarChart3, FolderKanban, Tags } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { Button } from "./ui/button";
-// @ts-expect-error - moduleRegistry é válido
+
 import { moduleRegistry } from "@/lib/module-registry";
 
 // Interface local para itens de menu
@@ -69,31 +69,7 @@ export function Sidebar() {
     };
   }, [isExpanded]);
 
-  // Carrega itens do menu do Module Registry
-  useEffect(() => {
-    loadMenuItems();
-  }, [user, loadMenuItems]);
-
-  // Escuta mudanças no status dos módulos
-  useEffect(() => {
-    const handleModuleStatusChange = () => {
-      loadMenuItems();
-    };
-
-    window.addEventListener('moduleStatusChanged', handleModuleStatusChange);
-    return () => {
-      window.removeEventListener('moduleStatusChanged', handleModuleStatusChange);
-    };
-  }, [loadMenuItems]);
-
-  // Recolhe o sidebar quando a rota muda (especialmente útil em mobile)
-  useEffect(() => {
-    if (isExpanded) {
-      setIsExpanded(false);
-    }
-  }, [pathname, isExpanded]); // Dependência no pathname para reagir a mudanças de rota
-
-  const loadMenuItems = () => {
+  const loadMenuItems = useCallback(() => {
     try {
       // Core agrega itens de todos os módulos registrados
       const grouped = moduleRegistry.getGroupedSidebarItems(user?.role);
@@ -105,7 +81,7 @@ export function Sidebar() {
       //   detalhes: grouped
       // });
 
-      setGroupedItems(grouped);
+      setGroupedItems(grouped as any); // Cast temporário para evitar incompatibilidade
 
       // const totalItems = grouped.ungrouped.length + Object.values(grouped.groups).flat().length;
       // console.log('📋 Itens do menu carregados:', totalItems);
@@ -151,9 +127,35 @@ export function Sidebar() {
         );
       }
 
-      setGroupedItems({ ungrouped: basicItems, groups: {}, groupOrder: [] });
+      setGroupedItems({ ungrouped: basicItems, groups: {}, groupOrder: [] } as any);
     }
-  };
+  }, [user?.role]);
+
+  // Carrega itens do menu do Module Registry
+  useEffect(() => {
+    loadMenuItems();
+  }, [user, loadMenuItems]);
+
+  // Escuta mudanças no status dos módulos
+  useEffect(() => {
+    const handleModuleStatusChange = () => {
+      loadMenuItems();
+    };
+
+    window.addEventListener('moduleStatusChanged', handleModuleStatusChange);
+    return () => {
+      window.removeEventListener('moduleStatusChanged', handleModuleStatusChange);
+    };
+  }, [loadMenuItems]);
+
+  // Recolhe o sidebar quando a rota muda (especialmente útil em mobile)
+  useEffect(() => {
+    if (isExpanded) {
+      setIsExpanded(false);
+    }
+  }, [pathname, isExpanded]); // Dependência no pathname para reagir a mudanças de rota
+
+
 
   // Função para alternar expansão de grupos (comportamento accordion)
   const toggleGroup = (groupId: string) => {
@@ -253,11 +255,11 @@ export function Sidebar() {
             const renderQueue: Array<{
               type: 'item' | 'group';
               order: number;
-              data: Record<string, unknown>;
+              data: any;
             }> = [];
 
             // Adiciona itens não agrupados à fila
-            groupedItems.ungrouped.forEach((item: Record<string, unknown>) => {
+            groupedItems.ungrouped.forEach((item) => {
               renderQueue.push({
                 type: 'item',
                 order: item.order || 999,
@@ -286,7 +288,7 @@ export function Sidebar() {
                   const iconName = mainMenu?.icon;
 
                   const DynamicIcon = iconName
-                    ? (LucideIcons as any)[iconName] || Package
+                    ? (LucideIcons as unknown as Record<string, React.ComponentType<any>>)[iconName] || Package
                     : Package;
 
                   config = {

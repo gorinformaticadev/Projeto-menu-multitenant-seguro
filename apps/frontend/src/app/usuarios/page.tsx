@@ -60,32 +60,6 @@ function UsuariosContent() {
     password: "",
   });
 
-  useEffect(() => {
-    // Se for ADMIN, não carrega tenants e usa o próprio tenant
-    if (user?.role === "ADMIN" && user?.tenantId) {
-      setSelectedTenantId(user.tenantId);
-      setLoading(false);
-    } else if (user?.role === "SUPER_ADMIN") {
-      loadTenants();
-    }
-  }, [user, loadTenants]);
-
-  useEffect(() => {
-    const tenantIdFromUrl = searchParams.get("tenantId");
-    if (tenantIdFromUrl && user?.role === "SUPER_ADMIN") {
-      setSelectedTenantId(tenantIdFromUrl);
-    }
-  }, [searchParams, user]);
-
-  useEffect(() => {
-    if (selectedTenantId) {
-      loadUsers();
-    } else {
-      setUsers([]);
-    }
-  }, [selectedTenantId, loadUsers]);
-
-  // Handlers de formulário - movidos para o nível superior para conformidade com Rules of Hooks
   const handleTenantSelectChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedTenantId(e.target.value);
   }, []);
@@ -106,7 +80,7 @@ function UsuariosContent() {
     setFormData(prev => ({ ...prev, password: value }));
   }, []);
 
-  async function loadTenants() {
+  const loadTenants = useCallback(async () => {
     const cacheKey = 'tenants-list-cache';
     const cacheTTL = 5 * 60 * 1000; // 5 minutos
 
@@ -143,9 +117,9 @@ function UsuariosContent() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [toast]);
 
-  async function loadUsers() {
+  const loadUsers = useCallback(async () => {
     if (!selectedTenantId) return;
 
     setLoadingUsers(true);
@@ -161,7 +135,32 @@ function UsuariosContent() {
     } finally {
       setLoadingUsers(false);
     }
-  }
+  }, [selectedTenantId, toast]);
+
+  useEffect(() => {
+    // Se for ADMIN, não carrega tenants e usa o próprio tenant
+    if (user?.role === "ADMIN" && user?.tenantId) {
+      setSelectedTenantId(user.tenantId);
+      setLoading(false);
+    } else if (user?.role === "SUPER_ADMIN") {
+      loadTenants();
+    }
+  }, [user, loadTenants]);
+
+  useEffect(() => {
+    const tenantIdFromUrl = searchParams.get("tenantId");
+    if (tenantIdFromUrl && user?.role === "SUPER_ADMIN") {
+      setSelectedTenantId(tenantIdFromUrl);
+    }
+  }, [searchParams, user]);
+
+  useEffect(() => {
+    if (selectedTenantId) {
+      loadUsers();
+    } else {
+      setUsers([]);
+    }
+  }, [selectedTenantId, loadUsers]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

@@ -4,14 +4,14 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { moduleRegistry, ModuleUserMenuItem } from '@/lib/module-registry';
 import * as LucideIcons from 'lucide-react';
 
 // Helper para ícones dinâmicos
 const getIconComponent = (iconName: string): React.ComponentType | undefined => {
-  const Icon = (LucideIcons as Record<string, React.ComponentType | undefined>)[iconName];
+  const Icon = (LucideIcons as unknown as Record<string, React.ComponentType<any>>)[iconName];
   return Icon || LucideIcons.HelpCircle;
 };
 
@@ -22,6 +22,18 @@ interface Props {
 export function ModuleRegistryUserMenu({ onItemClick }: Props) {
   const { user } = useAuth();
   const [userMenuItems, setUserMenuItems] = useState<ModuleUserMenuItem[]>([]);
+
+  const loadUserMenuItems = useCallback(() => {
+    try {
+      // console.log('🔍 [ModuleRegistryUserMenu] Carregando itens do menu do usuário...');
+      const items = moduleRegistry.getUserMenuItems(user?.role);
+      setUserMenuItems(items);
+      // console.log('✅ [ModuleRegistryUserMenu] Itens carregados:', items.length);
+      // console.log('👤 [ModuleRegistryUserMenu] Detalhes:', items);
+    } catch (error) {
+      console.error('❌ [ModuleRegistryUserMenu] Erro ao carregar menu do usuário:', error);
+    }
+  }, [user?.role]);
 
   useEffect(() => {
     loadUserMenuItems();
@@ -39,17 +51,7 @@ export function ModuleRegistryUserMenu({ onItemClick }: Props) {
     };
   }, [loadUserMenuItems]);
 
-  const loadUserMenuItems = () => {
-    try {
-      // console.log('🔍 [ModuleRegistryUserMenu] Carregando itens do menu do usuário...');
-      const items = moduleRegistry.getUserMenuItems(user?.role);
-      setUserMenuItems(items);
-      // console.log('✅ [ModuleRegistryUserMenu] Itens carregados:', items.length);
-      // console.log('👤 [ModuleRegistryUserMenu] Detalhes:', items);
-    } catch (error) {
-      console.error('❌ [ModuleRegistryUserMenu] Erro ao carregar menu do usuário:', error);
-    }
-  };
+
 
   if (userMenuItems.length === 0) {
     // console.log('⚠️ [ModuleRegistryUserMenu] Nenhum item para renderizar');

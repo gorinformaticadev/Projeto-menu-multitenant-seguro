@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlatformName } from "@/hooks/usePlatformConfig";
 import { useSystemVersion } from "@/hooks/useSystemVersion";
@@ -123,18 +124,18 @@ export function TopBar() {
       message: string;
       time: string;
     }[] = [
-      // Descomente as linhas abaixo para testar com notificações
-      // {
-      //   title: "Novo usuário cadastrado",
-      //   message: "João Silva se cadastrou na plataforma",
-      //   time: "há 5 minutos"
-      // },
-      // {
-      //   title: "Backup concluído",
-      //   message: "Backup automático realizado com sucesso",
-      //   time: "há 1 hora"
-      // }
-    ];
+        // Descomente as linhas abaixo para testar com notificações
+        // {
+        //   title: "Novo usuário cadastrado",
+        //   message: "João Silva se cadastrou na plataforma",
+        //   time: "há 5 minutos"
+        // },
+        // {
+        //   title: "Backup concluído",
+        //   message: "Backup automático realizado com sucesso",
+        //   time: "há 1 hora"
+        // }
+      ];
     setNotifications(exampleNotifications);
   }, []);
 
@@ -145,11 +146,15 @@ export function TopBar() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             {masterLogo ? (
-              <img 
-                src={`${API_URL}/uploads/logos/${masterLogo}`} 
-                alt="Logo"
-                className="h-10 w-auto object-contain"
-              />
+              <div className="relative h-10 w-32">
+                <Image
+                  src={`${API_URL}/uploads/logos/${masterLogo}`}
+                  alt="Logo"
+                  fill
+                  className="object-contain object-left"
+                  unoptimized
+                />
+              </div>
             ) : (
               <div className="h-10 w-10 bg-primary rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-lg">S</span>
@@ -185,9 +190,9 @@ export function TopBar() {
 
           {/* Notificações */}
           <div className="relative" ref={notificationsRef}>
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               className="relative"
               onClick={() => setShowNotifications(!showNotifications)}
             >
@@ -203,7 +208,7 @@ export function TopBar() {
                 <div className="px-4 py-2 border-b border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900">Notificações</h3>
                 </div>
-                
+
                 {notifications.length === 0 ? (
                   <div className="px-4 py-8 text-center">
                     <Bell className="h-8 w-8 text-gray-300 mx-auto mb-2" />
@@ -232,10 +237,10 @@ export function TopBar() {
                     ))}
                   </div>
                 )}
-                
+
                 {notifications.length > 0 && (
                   <div className="px-4 py-2 border-t border-gray-200">
-                    <button 
+                    <button
                       className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                       onClick={() => {
                         setNotifications([]);
@@ -259,16 +264,18 @@ export function TopBar() {
             >
               {/* Logo do Tenant do Usuário */}
               {userTenantLogo ? (
-                <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-100">
-                  <img 
-                    src={`${API_URL}/uploads/logos/${userTenantLogo}?t=${Date.now()}`} 
+                <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 relative">
+                  <Image
+                    src={`${API_URL}/uploads/logos/${userTenantLogo}?t=${Date.now()}`}
                     alt="Logo Tenant"
-                    className="w-full h-full object-cover"
+                    fill
+                    className="object-cover"
+                    unoptimized
                     onError={(e) => {
                       console.error('Erro ao carregar logo do tenant no menu:', userTenantLogo);
                       const target = e.currentTarget;
                       target.style.display = 'none';
-                      const fallback = target.parentElement?.querySelector('.fallback-avatar');
+                      const fallback = target.parentElement?.parentElement?.querySelector('.fallback-avatar');
                       if (fallback) {
                         fallback.classList.remove('hidden');
                       }
@@ -299,16 +306,18 @@ export function TopBar() {
                   <div className="flex items-center gap-3 mb-2">
                     {/* Logo da Tenant no Menu */}
                     {userTenantLogo ? (
-                      <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 flex-shrink-0">
-                        <img 
-                          src={`${API_URL}/uploads/logos/${userTenantLogo}?t=${Date.now()}`} 
+                      <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 flex-shrink-0 relative">
+                        <Image
+                          src={`${API_URL}/uploads/logos/${userTenantLogo}?t=${Date.now()}`}
                           alt="Logo Tenant"
-                          className="w-full h-full object-cover"
+                          fill
+                          className="object-cover"
+                          unoptimized
                           onError={(e) => {
                             console.error('Erro ao carregar logo do tenant no dropdown:', userTenantLogo);
                             const target = e.currentTarget;
                             target.style.display = 'none';
-                            const fallback = target.parentElement?.querySelector('.fallback-avatar-dropdown');
+                            const fallback = target.parentElement?.parentElement?.querySelector('.fallback-avatar-dropdown');
                             if (fallback) {
                               fallback.classList.remove('hidden');
                             }
@@ -340,7 +349,7 @@ export function TopBar() {
                   <User className="h-4 w-4" />
                   Meu Perfil
                 </a>
-                
+
                 {/* Versão do Sistema */}
                 {user?.role === "SUPER_ADMIN" ? (
                   <a
@@ -364,7 +373,7 @@ export function TopBar() {
                     </div>
                   </div>
                 )}
-                
+
                 <div className="border-t border-gray-200 mt-2 pt-2">
                   <button
                     onClick={() => {

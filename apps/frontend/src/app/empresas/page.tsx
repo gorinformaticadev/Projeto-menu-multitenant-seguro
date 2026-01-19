@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,12 +10,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import api, { API_URL } from "@/lib/api";
-import { Plus, Building2, Mail, Phone, User, FileText, Eye, Edit, Power, Lock, UserPlus, Image as ImageIcon, Upload, X, Users, Trash2, Package } from "lucide-react";
+import { Plus, Building2, Mail, Phone, User, Eye, Edit, Power, Lock, UserPlus, Image as ImageIcon, Upload, X, Users, Trash2, Package } from "lucide-react";
 import { CPFCNPJInput } from "@/components/ui/cpf-cnpj-input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 
 import { ModulesTab } from "./components/ModulesTab";
 
@@ -85,19 +86,7 @@ export default function EmpresasPage() {
   const [isPasswordValid, setIsPasswordValid] = useState(false);
   const [passwordsMatch, setPasswordsMatch] = useState(false);
 
-  useEffect(() => {
-    // Garante que o estado submitting seja false na inicialização
-    setSubmitting(false);
-
-    // Debounce para evitar múltiplas chamadas em React StrictMode
-    const timeoutId = setTimeout(() => {
-      loadTenants();
-    }, 100);
-
-    return () => clearTimeout(timeoutId);
-  }, []);
-
-  async function loadTenants() {
+  const loadTenants = useCallback(async () => {
     try {
       // Cache simples para evitar múltiplas chamadas
       const cacheKey = 'tenants-list-cache';
@@ -159,7 +148,19 @@ export default function EmpresasPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [toast]);
+
+  useEffect(() => {
+    // Garante que o estado submitting seja false na inicialização
+    setSubmitting(false);
+
+    // Debounce para evitar múltiplas chamadas em React StrictMode
+    const timeoutId = setTimeout(() => {
+      loadTenants();
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
+  }, [loadTenants]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -219,10 +220,10 @@ export default function EmpresasPage() {
       // Invalidar cache antes de recarregar
       localStorage.removeItem('tenants-list-cache');
       loadTenants();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao cadastrar empresa",
-        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as any).response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     } finally {
@@ -255,10 +256,10 @@ export default function EmpresasPage() {
       // Invalidar cache antes de recarregar
       localStorage.removeItem('tenants-list-cache');
       loadTenants();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao atualizar empresa",
-        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as any).response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     } finally {
@@ -304,10 +305,10 @@ export default function EmpresasPage() {
       setPasswordData({ newPassword: "", confirmPassword: "" });
       setIsPasswordValid(false);
       setPasswordsMatch(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao alterar senha",
-        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as any).response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     } finally {
@@ -327,10 +328,10 @@ export default function EmpresasPage() {
       // Invalidar cache antes de recarregar
       localStorage.removeItem('tenants-list-cache');
       loadTenants();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro",
-        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as any).response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     }
@@ -370,10 +371,10 @@ export default function EmpresasPage() {
       // Invalidar cache antes de recarregar
       localStorage.removeItem('tenants-list-cache');
       loadTenants();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao deletar empresa",
-        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as any).response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     } finally {
@@ -476,10 +477,10 @@ export default function EmpresasPage() {
       // Invalidar cache antes de recarregar
       localStorage.removeItem('tenants-list-cache');
       loadTenants();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao fazer upload do logo",
-        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as any).response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     } finally {
@@ -506,10 +507,10 @@ export default function EmpresasPage() {
       // Invalidar cache antes de recarregar
       localStorage.removeItem('tenants-list-cache');
       loadTenants();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao remover logo",
-        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as any).response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     } finally {
@@ -575,7 +576,7 @@ export default function EmpresasPage() {
                       id="cnpjCpf"
                       label="CNPJ/CPF"
                       value={formData.cnpjCpf}
-                      onChange={(value, isValid) => setFormData({ ...formData, cnpjCpf: value })}
+                      onChange={(value, _isValid) => setFormData({ ...formData, cnpjCpf: value })}
                       disabled={submitting}
                       showValidation={true}
                     />
@@ -744,13 +745,12 @@ export default function EmpresasPage() {
                     <div className={`rounded-full shadow-sm ${tenant.ativo ? 'bg-gradient-to-br from-primary to-primary/80' : 'bg-gray-400'} relative overflow-hidden flex items-center justify-center w-12 h-12 p-0`}>
                       {tenant.logoUrl ? (
                         <>
-                          <img
+                          <Image
                             src={`${API_URL}/uploads/logos/${tenant.logoUrl}?t=${Date.now()}`}
                             alt={tenant.nomeFantasia}
-                            className="w-full h-full object-cover rounded-full logo-image"
-                            onLoad={() => {
-                              console.log(`Logo carregado: ${tenant.nomeFantasia} - ${tenant.logoUrl}`);
-                            }}
+                            fill
+                            className="object-cover rounded-full logo-image"
+                            unoptimized
                             onError={(e) => {
                               console.error(`Erro ao carregar logo: ${tenant.nomeFantasia} - ${API_URL}/uploads/logos/${tenant.logoUrl}`);
                               const target = e.currentTarget;
@@ -1028,7 +1028,7 @@ export default function EmpresasPage() {
                 id="edit-cnpjCpf"
                 label="CNPJ/CPF"
                 value={formData.cnpjCpf}
-                onChange={(value, isValid) => setFormData({ ...formData, cnpjCpf: value })}
+                onChange={(value, _isValid) => setFormData({ ...formData, cnpjCpf: value })}
                 disabled={submitting}
                 showValidation={true}
               />
@@ -1139,6 +1139,7 @@ export default function EmpresasPage() {
                 <div className="space-y-2">
                   <Label>Logo Atual</Label>
                   <div className="flex items-center justify-center p-4 border rounded-lg bg-muted">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={`${API_URL}/uploads/logos/${selectedTenant.logoUrl}?t=${logoTimestamp}`}
                       alt="Logo atual"
@@ -1181,11 +1182,13 @@ export default function EmpresasPage() {
               {logoPreview && (
                 <div className="space-y-2">
                   <Label>Pré-visualização</Label>
-                  <div className="flex items-center justify-center p-4 border rounded-lg bg-muted">
-                    <img
+                  <div className="flex items-center justify-center p-4 border rounded-lg bg-muted relative h-40 w-full">
+                    <Image
                       src={logoPreview}
                       alt="Pré-visualização"
-                      className="max-h-32 object-contain"
+                      fill
+                      className="object-contain p-2"
+                      unoptimized // Necessário para preview de blob local
                     />
                   </div>
                 </div>

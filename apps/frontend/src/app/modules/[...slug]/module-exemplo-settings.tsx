@@ -8,15 +8,15 @@
 
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Settings, 
-  Package, 
+import {
+  Settings,
+  Package,
   ToggleLeft,
   ToggleRight,
   Info,
@@ -28,12 +28,12 @@ export default function ModuleExemploSettingsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   const [mode, setMode] = useState<'independent' | 'integrated'>('integrated');
   const [loading, setLoading] = useState(false);
 
   // Carregar módulo independente
-  const loadIndependentModule = async () => {
+  const loadIndependentModule = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -43,19 +43,19 @@ export default function ModuleExemploSettingsPage() {
       }
 
       const moduleCode = await response.text();
-      
+
       // Executar o código do módulo JavaScript
       const moduleFunction = new Function('window', 'document', moduleCode);
-      
+
       moduleFunction(window, document);
-      
+
       // Obter e renderizar o componente
-      const ModuleComponent = (window as any).ModuleExemploSettingsPage;
+      const ModuleComponent = (window as unknown as { ModuleExemploSettingsPage: any }).ModuleExemploSettingsPage;
 
       if (containerRef.current && ModuleComponent) {
         const moduleInstance = ModuleComponent();
         const renderedElement = moduleInstance.render();
-        
+
         containerRef.current.innerHTML = '';
         containerRef.current.appendChild(renderedElement);
       }
@@ -70,13 +70,13 @@ export default function ModuleExemploSettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   // Alternar entre modos
   const toggleMode = () => {
     const newMode = mode === 'independent' ? 'integrated' : 'independent';
     setMode(newMode);
-    
+
     if (newMode === 'independent') {
       loadIndependentModule();
     }
@@ -87,7 +87,7 @@ export default function ModuleExemploSettingsPage() {
     if (mode === 'independent') {
       loadIndependentModule();
     }
-  }, [mode]);
+  }, [mode, loadIndependentModule]);
 
   // Versão integrada (com funcionalidades do sistema principal)
   const renderIntegratedVersion = () => (
@@ -103,7 +103,7 @@ export default function ModuleExemploSettingsPage() {
             <p className="text-gray-600">Versão integrada com funcionalidades avançadas</p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
             Versão Integrada
@@ -125,7 +125,7 @@ export default function ModuleExemploSettingsPage() {
             Alterne entre a versão independente e integrada do módulo
           </CardDescription>
         </CardHeader>
-        
+
         <CardContent>
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
             <div>
@@ -133,7 +133,7 @@ export default function ModuleExemploSettingsPage() {
                 {mode === 'integrated' ? 'Versão Integrada' : 'Versão Independente'}
               </p>
               <p className="text-xs text-gray-600">
-                {mode === 'integrated' 
+                {mode === 'integrated'
                   ? 'Com acesso a contextos, hooks e componentes do sistema principal'
                   : 'Módulo completamente independente, sem dependências externas'
                 }
@@ -169,7 +169,7 @@ export default function ModuleExemploSettingsPage() {
               Dados obtidos do contexto de autenticação
             </CardDescription>
           </CardHeader>
-          
+
           <CardContent className="space-y-4">
             <div className="p-3 bg-gray-50 rounded-lg">
               <h4 className="font-medium text-sm text-gray-900 mb-2">Usuário Atual</h4>
@@ -207,7 +207,7 @@ export default function ModuleExemploSettingsPage() {
               Funcionalidades disponíveis apenas na versão integrada
             </CardDescription>
           </CardHeader>
-          
+
           <CardContent className="space-y-4">
             <Button
               onClick={() => toast({
@@ -239,7 +239,7 @@ export default function ModuleExemploSettingsPage() {
                 <div className="text-sm">
                   <p className="font-medium text-green-900 mb-1">Sistema Híbrido</p>
                   <p className="text-green-700">
-                    Esta versão combina o módulo independente com as funcionalidades 
+                    Esta versão combina o módulo independente com as funcionalidades
                     avançadas do sistema principal através de componentes proxy.
                   </p>
                 </div>
@@ -257,7 +257,7 @@ export default function ModuleExemploSettingsPage() {
             Entenda as diferenças entre as duas abordagens
           </CardDescription>
         </CardHeader>
-        
+
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -271,7 +271,7 @@ export default function ModuleExemploSettingsPage() {
                 <li>• Funcionalidades avançadas</li>
               </ul>
             </div>
-            
+
             <div className="space-y-2">
               <h4 className="font-medium text-green-600">🏗️ Versão Independente</h4>
               <ul className="text-sm text-gray-600 space-y-1">
@@ -305,7 +305,7 @@ export default function ModuleExemploSettingsPage() {
             Versão Integrada
           </Button>
         </div>
-        
+
         {/* Container para módulo independente */}
         <div ref={containerRef} className="min-h-screen">
           {loading && (

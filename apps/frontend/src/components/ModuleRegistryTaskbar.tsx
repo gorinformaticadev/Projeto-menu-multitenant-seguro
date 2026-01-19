@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { moduleRegistry } from '@/lib/module-registry';
 import { Button } from './ui/button';
@@ -22,13 +22,42 @@ interface ModuleTaskbarItem {
 // Helper para ícones dinâmicos
 const getIconComponent = (iconName: string): React.ComponentType | undefined => {
   // LucideIcons é um objeto de componentes React
-  const Icon = (LucideIcons as Record<string, React.ComponentType | undefined>)[iconName];
+  const Icon = (LucideIcons as unknown as Record<string, React.ComponentType<any>>)[iconName];
   return Icon || LucideIcons.HelpCircle;
 };
 
 export function ModuleRegistryTaskbar() {
   const { user } = useAuth();
   const [taskbarItems, setTaskbarItems] = useState<ModuleTaskbarItem[]>([]);
+
+  const loadTaskbarItems = useCallback(() => {
+    try {
+      // console.log('🔍 [ModuleRegistryTaskbar] Carregando itens da taskbar...');
+
+      // Verificação de segurança: método existe?
+      if (typeof moduleRegistry.getTaskbarItems !== 'function') {
+        console.warn('⚠️ [ModuleRegistryTaskbar] Método getTaskbarItems não disponível no moduleRegistry');
+        setTaskbarItems([]);
+        return;
+      }
+
+      const items = moduleRegistry.getTaskbarItems(user?.role);
+
+      // Validação defensiva: items é um array?
+      if (!Array.isArray(items)) {
+        console.warn('⚠️ [ModuleRegistryTaskbar] getTaskbarItems não retornou um array válido');
+        setTaskbarItems([]);
+        return;
+      }
+
+      setTaskbarItems(items);
+      // console.log('✅ [ModuleRegistryTaskbar] Itens da taskbar carregados:', items.length);
+      // console.log('🔧 [ModuleRegistryTaskbar] Detalhes:', items);
+    } catch (error) {
+      console.warn('⚠️ [ModuleRegistryTaskbar] Erro ao carregar taskbar:', error);
+      setTaskbarItems([]);
+    }
+  }, [user?.role]);
 
   useEffect(() => {
     loadTaskbarItems();
@@ -46,41 +75,14 @@ export function ModuleRegistryTaskbar() {
     };
   }, [loadTaskbarItems]);
 
-  const loadTaskbarItems = () => {
-    try {
-      // console.log('🔍 [ModuleRegistryTaskbar] Carregando itens da taskbar...');
-      
-      // Verificação de segurança: método existe?
-      if (typeof moduleRegistry.getTaskbarItems !== 'function') {
-        console.warn('⚠️ [ModuleRegistryTaskbar] Método getTaskbarItems não disponível no moduleRegistry');
-        setTaskbarItems([]);
-        return;
-      }
 
-      const items = moduleRegistry.getTaskbarItems(user?.role);
-      
-      // Validação defensiva: items é um array?
-      if (!Array.isArray(items)) {
-        console.warn('⚠️ [ModuleRegistryTaskbar] getTaskbarItems não retornou um array válido');
-        setTaskbarItems([]);
-        return;
-      }
-
-      setTaskbarItems(items);
-      // console.log('✅ [ModuleRegistryTaskbar] Itens da taskbar carregados:', items.length);
-      // console.log('🔧 [ModuleRegistryTaskbar] Detalhes:', items);
-    } catch (error) {
-      console.warn('⚠️ [ModuleRegistryTaskbar] Erro ao carregar taskbar:', error);
-      setTaskbarItems([]);
-    }
-  };
 
   if (taskbarItems.length === 0) {
     // console.log('⚠️ [ModuleRegistryTaskbar] Nenhum item para renderizar, taskbar oculta');
     return null;
   }
 
- // console.log('✅ [ModuleRegistryTaskbar] Renderizando taskbar com', taskbarItems.length, 'item(s)');
+  // console.log('✅ [ModuleRegistryTaskbar] Renderizando taskbar com', taskbarItems.length, 'item(s)');
 
   return (
     <div className="fixed bottom-4 right-4 z-50">
