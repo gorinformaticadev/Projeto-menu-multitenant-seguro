@@ -154,10 +154,8 @@ export function Sidebar() {
 
   // Recolhe o sidebar quando a rota muda (especialmente útil em mobile)
   useEffect(() => {
-    if (isExpanded) {
-      setIsExpanded(false);
-    }
-  }, [pathname, isExpanded]); // Dependência no pathname para reagir a mudanças de rota
+    setIsExpanded(false);
+  }, [pathname]);
 
 
 

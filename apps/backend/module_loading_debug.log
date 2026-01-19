@@ -262,3 +262,13 @@ Require stack:
 - D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\apps\backend\src\main.ts
 [2026-01-19T18:03:22.540Z] [Loader]    ➜ Verifique se a pasta/arquivo existe em: src/modules/sistema/
 [2026-01-19T18:03:22.541Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 0
+[2026-01-19T18:05:31.742Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-19T18:05:31.867Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-19T18:05:31.868Z] [Loader] ⏳ Carregando: sistema de D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\apps\backend\src\modules\sistema\sistema.module
+[2026-01-19T18:05:31.869Z] [Loader] ❌ Falha ao carregar módulo sistema: Cannot find module 'D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\apps\backend\src\modules\sistema\sistema.module'
+Require stack:
+- D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\apps\backend\src\core\dynamic-modules.loader.ts
+- D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\apps\backend\src\app.module.ts
+- D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\apps\backend\src\main.ts
+[2026-01-19T18:05:31.870Z] [Loader]    ➜ Verifique se a pasta/arquivo existe em: src/modules/sistema/
+[2026-01-19T18:05:31.871Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 0
