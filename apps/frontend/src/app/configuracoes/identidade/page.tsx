@@ -6,7 +6,7 @@ import { Building2 } from "lucide-react";
 import PlatformConfigSection from "@/components/PlatformConfigSection";
 
 export default function IdentidadePage() {
-  const { user } = useAuth();
+  // const { user } = useAuth();
 
   return (
     <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>

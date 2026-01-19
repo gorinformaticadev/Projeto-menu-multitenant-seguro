@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
-import { Upload, Package, Trash2, Info, AlertTriangle, CheckCircle, Settings, XCircle, Clock, Power, PowerOff, Database, RefreshCw } from "lucide-react";
+import { Upload, Package, Trash2, Info, AlertTriangle, Settings, Power, PowerOff, Database, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,8 +15,7 @@ import {
   getStatusBadgeConfig,
   getStatusGuidance,
   getDisabledTooltip,
-  type InstalledModule,
-  type ModuleStatus
+  type InstalledModule
 } from "@/lib/module-utils";
 
 // **NOVAS INTERFACES:** Controle de Migrations
@@ -30,17 +29,17 @@ interface MigrationRecord {
   errorMessage: string | null;
 }
 
-interface ModuleMigrationStatus {
-  moduleName: string;
-  pendingMigrations: number;
-  pendingSeeds: number;
-  completedMigrations: number;
-  completedSeeds: number;
-  failedMigrations: number;
-  failedSeeds: number;
-  migrations: MigrationRecord[];
-  seeds: MigrationRecord[];
-}
+// interface ModuleMigrationStatus {
+//   moduleName: string;
+//   pendingMigrations: number;
+//   pendingSeeds: number;
+//   completedMigrations: number;
+//   completedSeeds: number;
+//   failedMigrations: number;
+//   failedSeeds: number;
+//   migrations: MigrationRecord[];
+//   seeds: MigrationRecord[];
+// }
 
 // **INTERFACE ATUALIZADA** - Agora importada de module-utils
 // interface InstalledModule já está definida em @/lib/module-utils
@@ -74,10 +73,10 @@ export function ModuleManagement() {
       const response = await api.get("/configuracoes/sistema/modulos");
       // A API retorna array de módulos com status
       setModules(response.data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao carregar módulos",
-        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as any)?.response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     } finally {
@@ -293,7 +292,7 @@ export function ModuleManagement() {
 
       // 2. Executar Seeds
       setDbUpdateStatus("Rodando Seeds...");
-      const seedResponse = await api.post(`/configuracoes/sistema/modulos/${moduleName}/run-seeds`);
+      await api.post(`/configuracoes/sistema/modulos/${moduleName}/run-seeds`);
 
       toast({
         title: "Banco de dados atualizado!",
@@ -366,6 +365,7 @@ export function ModuleManagement() {
     try {
       // Endpoint: /configuracoes/sistema/modulos/:slug/reload-config
       const response = await api.post(`/configuracoes/sistema/modulos/${moduleName}/reload-config`);
+  await api.post(`/configuracoes/sistema/modulos/${moduleName}/reload-config`);
 
       toast({
         title: "Configuração Recarregada!",
@@ -601,7 +601,7 @@ export function ModuleManagement() {
                 <div className="text-center py-8 text-muted-foreground">
                   <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
                   <p>Nenhum módulo instalado no sistema</p>
-                  <p className="text-sm mt-2">Use a aba "Instalar Módulos" para adicionar novos módulos</p>
+                  <p className="text-sm mt-2">Use a aba &quot;Instalar Módulos&quot; para adicionar novos módulos</p>
                 </div>
               ) : (
                 <div className="space-y-4">

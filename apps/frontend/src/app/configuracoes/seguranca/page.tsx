@@ -84,7 +84,7 @@ export default function SecurityConfigPage() {
       } catch (error: any) {
         toast({
           title: "Erro ao carregar configurações",
-          description: error.response?.data?.message || "Erro desconhecido",
+          description: (error as any)?.response?.data?.message || "Erro desconhecido",
           variant: "destructive",
         });
       } finally {
@@ -140,7 +140,7 @@ export default function SecurityConfigPage() {
     } catch (error: any) {
       toast({
         title: "Erro ao salvar",
-        description: error.response?.data?.message || "Erro desconhecido",
+        description: (error as any)?.response?.data?.message || "Erro desconhecido",
         variant: "destructive",
       });
     } finally {
@@ -148,7 +148,7 @@ export default function SecurityConfigPage() {
     }
   };
 
-  const updateConfig = (field: keyof SecurityConfig, value: any) => {
+  const updateConfig = (field: keyof SecurityConfig, value: unknown) => {
     if (!config) return;
     setConfig({ ...config, [field]: value });
   };

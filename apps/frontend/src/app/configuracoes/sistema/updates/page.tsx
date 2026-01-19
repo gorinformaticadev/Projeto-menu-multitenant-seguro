@@ -91,7 +91,7 @@ export default function UpdatesPage() {
   useEffect(() => {
     loadStatus();
     loadLogs();
-  }, []);
+  }, [loadStatus, loadLogs]);
 
   /**
    * Carrega status atual do sistema
@@ -104,7 +104,7 @@ export default function UpdatesPage() {
     } catch (error: any) {
       toast({
         title: 'Erro ao carregar status',
-        description: error.response?.data?.message || 'Erro interno do servidor',
+        description: (error as any)?.response?.data?.message || 'Erro interno do servidor',
         variant: 'destructive',
       });
     } finally {
@@ -127,10 +127,10 @@ export default function UpdatesPage() {
       });
       
       await loadStatus();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Erro na verificação',
-        description: error.response?.data?.message || 'Erro interno do servidor',
+        description: (error as any)?.response?.data?.message || 'Erro interno do servidor',
         variant: 'destructive',
       });
     } finally {
@@ -169,7 +169,7 @@ export default function UpdatesPage() {
     } catch (error: any) {
       toast({
         title: 'Erro na atualização',
-        description: error.response?.data?.message || 'Erro interno do servidor',
+        description: (error as any)?.response?.data?.message || 'Erro interno do servidor',
         variant: 'destructive',
       });
     } finally {
@@ -196,7 +196,7 @@ export default function UpdatesPage() {
     } catch (error: any) {
       toast({
         title: 'Erro ao salvar configurações',
-        description: error.response?.data?.message || 'Erro interno do servidor',
+        description: (error as any)?.response?.data?.message || 'Erro interno do servidor',
         variant: 'destructive',
       });
     } finally {
@@ -215,7 +215,7 @@ export default function UpdatesPage() {
     } catch (error: any) {
       toast({
         title: 'Erro ao carregar histórico',
-        description: error.response?.data?.message || 'Erro interno do servidor',
+        description: (error as any)?.response?.data?.message || 'Erro interno do servidor',
         variant: 'destructive',
       });
     } finally {
@@ -238,7 +238,7 @@ export default function UpdatesPage() {
     } catch (error: any) {
       toast({
         title: 'Erro no teste de conexão',
-        description: error.response?.data?.message || 'Erro interno do servidor',
+        description: (error as any)?.response?.data?.message || 'Erro interno do servidor',
         variant: 'destructive',
       });
     }
@@ -391,7 +391,7 @@ export default function UpdatesPage() {
             <div className="flex items-start gap-3 p-4 border border-yellow-200 bg-yellow-50 rounded-lg">
               <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-yellow-800">
-                Sistema não configurado. Configure o repositório Git na aba "Configurações" para habilitar atualizações automáticas.
+                Sistema não configurado. Configure o repositório Git na aba &quot;Configurações&quot; para habilitar atualizações automáticas.
               </div>
             </div>
           )}
@@ -401,7 +401,7 @@ export default function UpdatesPage() {
               <Download className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-blue-800">
                 Nova versão disponível: {status.availableVersion}. 
-                Clique em "Executar Atualização" para atualizar o sistema.
+                Clique em &quot;Executar Atualização&quot; para atualizar o sistema.
               </div>
             </div>
           )}

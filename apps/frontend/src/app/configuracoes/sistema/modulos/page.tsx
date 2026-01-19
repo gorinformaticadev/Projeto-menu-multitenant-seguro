@@ -6,7 +6,7 @@ import { Package } from "lucide-react";
 import { ModuleManagement } from "./components/ModuleManagement";
 
 export default function ModulosPage() {
-  const { user } = useAuth();
+  // const { user } = useAuth();
 
   return (
     <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>

@@ -44,7 +44,7 @@ export default function CronJobsPage() {
 
     useEffect(() => {
         fetchJobs();
-    }, []);
+    }, [fetchJobs]);
 
     const handleTrigger = async (key: string) => {
         try {
