@@ -1,4 +1,4 @@
-import { ComponentType, ReactNode } from 'react';
+import { ComponentType } from 'react';
 
 export type WidgetType = 'summary_card' | 'chart' | 'list' | 'action_button';
 

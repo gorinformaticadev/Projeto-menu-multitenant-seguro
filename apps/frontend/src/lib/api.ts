@@ -12,14 +12,14 @@ const api = axios.create({
 // Tipos para fila de falhas
 interface FailedRequest {
   resolve: (token: string) => void;
-  reject: (error: any) => void;
+  reject: (error: unknown) => void;
 }
 
 // Flag para evitar múltiplas renovações simultâneas
 let isRefreshing = false;
 let failedQueue: FailedRequest[] = [];
 
-const processQueue = (error: any, token: string | null = null) => {
+const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue.forEach((prom) => {
     if (error) {
       prom.reject(error);
@@ -144,7 +144,7 @@ const doLogout = () => {
 // Interceptor para renovação automática de tokens
 api.interceptors.response.use(
   (response) => response,
-  async (error: AxiosError | any) => {
+  async (error: AxiosError | unknown) => {
     const originalRequest = error.config;
 
     // Erros que devem causar logout imediato
@@ -223,7 +223,7 @@ api.interceptors.response.use(
         // Retentar requisição original
         originalRequest.headers["Authorization"] = `Bearer ${accessToken}`;
         return api(originalRequest);
-      } catch (refreshError: any) {
+      } catch (refreshError: unknown) {
         // Falha ao renovar, fazer logout
         processQueue(refreshError, null);
         doLogout();

@@ -159,7 +159,7 @@ export function useNotifications(): UseNotificationsReturn {
     };
 
     // Listener para todas marcadas como lidas
-    const handleAllRead = (data: { count: number }) => {
+    const handleAllRead = (_data: { count: number }) => {
       if (!isActiveRef.current) return;
 
       setNotifications(prev =>
@@ -288,7 +288,7 @@ export function useNotifications(): UseNotificationsReturn {
 
       // 2. Socket.IO para updates em tempo real (apenas se habilitado)
       if (SOCKET_ENABLED) {
-        const socket = socketClient.connect(token);
+        socketClient.connect(token);
         const cleanup = setupSocketListeners();
 
         return () => {

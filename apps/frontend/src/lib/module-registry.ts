@@ -12,7 +12,7 @@
  */
 
 import api, { API_URL } from './api';
-import { FrontendModuleDefinition, DashboardWidgetDefinition, SidebarItem } from './module-types';
+import { FrontendModuleDefinition, DashboardWidgetDefinition } from './module-types';
 
 export interface ModuleMenu {
   id?: string;

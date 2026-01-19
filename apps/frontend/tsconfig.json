@@ -39,6 +39,13 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
+    "eslint.config.js",
+    "next.config.js",
+    "postcss.config.js",
+    "generate-favicon.js",
+    "scripts/generate-module-index.js"
+  ],
+  "exclude": [
     "node_modules"
   ]
 }

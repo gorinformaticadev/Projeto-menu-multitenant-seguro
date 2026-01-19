@@ -88,7 +88,7 @@ class SocketClient {
   /**
    * Registra listener para eventos
    */
-  on(event: string, callback: (...args: any[]) => void): void {
+  on(event: string, callback: (...args: unknown[]) => void): void {
     if (this.socket) {
       this.socket.on(event, callback);
     }
@@ -97,7 +97,7 @@ class SocketClient {
   /**
    * Remove listener de eventos
    */
-  off(event: string, callback?: (...args: any[]) => void): void {
+  off(event: string, callback?: (...args: unknown[]) => void): void {
     if (this.socket) {
       this.socket.off(event, callback);
     }

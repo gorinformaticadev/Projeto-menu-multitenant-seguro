@@ -103,7 +103,8 @@ export function usePlatformConfig() {
         }
       } catch (err: any) {
         if (mounted) {
-          setError(err.message || 'Failed to load platform configuration');
+          const errorMsg = err instanceof Error ? err.message : 'Failed to load platform configuration';
+          setError(errorMsg);
           setConfig(DEFAULT_PLATFORM_CONFIG);
         }
       } finally {
@@ -129,7 +130,8 @@ export function usePlatformConfig() {
       setConfig(platformConfig);
       setError(null);
     } catch (err: any) {
-      setError(err.message || 'Failed to refresh platform configuration');
+      const errorMsg = err instanceof Error ? err.message : 'Failed to refresh platform configuration';
+      setError(errorMsg);
       setConfig(DEFAULT_PLATFORM_CONFIG);
     } finally {
       setLoading(false);
