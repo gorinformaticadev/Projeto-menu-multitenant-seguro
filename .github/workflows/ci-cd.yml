@@ -83,22 +83,45 @@ jobs:
           npm install
         fi
 
-    - name: Check Prisma version (debug)
+    - name: Ensure Prisma available & Generate Prisma Client
       run: |
         cd apps/backend
-        if [ -f node_modules/prisma/package.json ]; then
-          echo "local prisma:" $(node -e "console.log(require('./node_modules/prisma/package.json').version)")
-        else
-          echo "local prisma not found"
-        fi
-        npm --version
-        node --version
 
-    - name: Generate Prisma Client (use local install)
-      run: |
-        cd apps/backend
-        # use the local prisma binary via npm script to guarantee version pinned by package.json + lockfile
-        npm run prisma:generate
+        echo "Checking local prisma version..."
+        if [ -f node_modules/prisma/package.json ]; then
+          node -e "console.log('local prisma:', require('./node_modules/prisma/package.json').version)"
+        else
+          echo "Local prisma not found in node_modules"
+        fi
+
+        # If prisma binary not present, ensure dependencies are installed.
+        if [ -x ./node_modules/.bin/prisma ]; then
+          echo "prisma binary present, proceeding to generate"
+        else
+          echo "prisma binary missing; installing backend dependencies now (ensuring prisma is installed)"
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+          # Re-check if prisma exists after install
+          if [ -x ./node_modules/.bin/prisma ]; then
+            echo "prisma binary installed by npm, proceeding"
+          else
+            echo "prisma still missing after install — installing prisma@6 and @prisma/client@6 as temporary fallback"
+            # NOTE: fallback installs specific versions to avoid prisma@7 incompatibility with schema v6
+            npm install prisma@^6 @prisma/client@^6 --no-audit --no-fund
+          fi
+        fi
+
+        # Use the local prisma to generate the client (via npm script to ensure correct binary)
+        if [ -f package.json ] && grep -q "\"prisma:generate\"" package.json >/dev/null 2>&1; then
+          npm run prisma:generate || (echo "npm run prisma:generate failed" && exit 1)
+        else
+          # direct call if no npm script exists
+          ./node_modules/.bin/prisma generate || (echo "prisma generate failed" && exit 1)
+        fi
 
     - name: Run backend lint
       run: |
