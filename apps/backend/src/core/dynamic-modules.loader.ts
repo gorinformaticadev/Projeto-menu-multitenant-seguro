@@ -79,6 +79,21 @@ export class DynamicModulesLoader {
                     log(`❌ Falha ao carregar módulo ${mod.slug}: ${err.message}`);
                     if (err.code === 'MODULE_NOT_FOUND') {
                         log(`   ➜ Verifique se a pasta/arquivo existe em: src/modules/${mod.slug}/`);
+
+                        // Auto-disable module in database to prevent future errors
+                        try {
+                            log(`⚠️ ALERTA: Módulo ${mod.slug} possui arquivos ausentes.`);
+                            log(`⚠️ AÇÃO AUTOMÁTICA: Desabilitando módulo no banco de dados...`);
+
+                            await prisma.module.update({
+                                where: { id: mod.id },
+                                data: { status: 'disabled' }
+                            });
+
+                            log(`✅ SUCESSO: Módulo ${mod.slug} foi marcado como 'disabled'.`);
+                        } catch (dbErr) {
+                            log(`❌ ERRO: Não foi possível desabilitar o módulo ${mod.slug}: ${dbErr.message}`);
+                        }
                     }
                 }
             }

@@ -77,4 +77,5 @@ build_error_v7.txt
 build_error_v8.txt
 build_error_v9.txt
 apps/backend/module_loading_debug.log
-/apps/frontend/src/app/modules
+#/apps/frontend/src/app/modules
+*.log
