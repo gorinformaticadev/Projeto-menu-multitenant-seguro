@@ -134,7 +134,9 @@ const SecureStorage = {
         if (tokenCookie) {
           return tokenCookie.split('=')[1];
         }
-      } catch { }
+      } catch (e) {
+        // Ignora erro ao ler cookie
+      }
 
       // Fallback para sessionStorage
       const encrypted = sessionStorage.getItem("@App:token");
@@ -176,7 +178,9 @@ const SecureStorage = {
         if (tokenCookie) {
           return tokenCookie.split('=')[1];
         }
-      } catch { }
+      } catch (e) {
+        // Ignora erro ao ler cookie
+      }
 
       // Fallback para sessionStorage
       const encrypted = sessionStorage.getItem("@App:refreshToken");

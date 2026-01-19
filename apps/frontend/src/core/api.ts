@@ -42,14 +42,17 @@ const getSecureToken = async (): Promise<string | null> => {
     if (tokenCookie) {
       return tokenCookie.split('=')[1];
     }
-  } catch {}
+  } catch (e) {
+    // Ignora erro ao ler cookie
+  }
   
   // Fallback para sessionStorage criptografado
   const encrypted = sessionStorage.getItem("@App:token");
   if (encrypted) {
     try {
       return atob(encrypted); // Descriptografia simples
-    } catch {
+    } catch (e) {
+      // Erro ao decodificar token
       return null;
     }
   }
@@ -67,7 +70,9 @@ const getSecureRefreshToken = async (): Promise<string | null> => {
     if (tokenCookie) {
       return tokenCookie.split('=')[1];
     }
-  } catch {}
+  } catch (e) {
+    // Ignora erro ao ler cookie
+  }
   
   // Fallback para sessionStorage criptografado
   const encrypted = sessionStorage.getItem("@App:refreshToken");

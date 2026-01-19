@@ -14,7 +14,7 @@ function Calendar({
     classNames,
     showOutsideDays = true,
     ...props
-}: CalendarProps) {
+}: CalendarProps & { orientation?: 'left' | 'right' }) {
     return (
         <DayPicker
             showOutsideDays={showOutsideDays}

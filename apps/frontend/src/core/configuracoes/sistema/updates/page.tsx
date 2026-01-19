@@ -391,7 +391,7 @@ export default function UpdatesPage() {
             <div className="flex items-start gap-3 p-4 border border-yellow-200 bg-yellow-50 rounded-lg">
               <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-yellow-800">
-                Sistema não configurado. Configure o repositório Git na aba "Configurações" para habilitar atualizações automáticas.
+                Sistema não configurado. Configure o repositório Git na aba &quot;Configurações&quot; para habilitar atualizações automáticas.
               </div>
             </div>
           )}

@@ -184,7 +184,7 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
                   <div className="text-sm text-blue-800">
                     <p className="font-medium mb-1">Como funciona?</p>
                     <ol className="list-decimal list-inside space-y-1">
-                      <li>Clique em "Ativar 2FA"</li>
+                      <li>Clique em &quot;Ativar 2FA&quot;</li>
                       <li>Escaneie o QR Code com Google Authenticator</li>
                       <li>Digite o código de 6 dígitos para confirmar</li>
                       <li>Pronto! Sua conta está mais segura</li>

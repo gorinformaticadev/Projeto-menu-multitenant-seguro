@@ -39,6 +39,7 @@ export default [
         Audio: 'readonly',
         NodeJS: 'readonly',
         React: 'readonly',
+        crypto: 'readonly',
       },
     },
     plugins: {

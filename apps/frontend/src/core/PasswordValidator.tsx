@@ -38,7 +38,7 @@ export function PasswordValidator({ password, showRequirements = true }: Passwor
       hasUppercase: policy.requireUppercase ? /[A-Z]/.test(password) : true,
       hasLowercase: policy.requireLowercase ? /[a-z]/.test(password) : true,
       hasNumbers: policy.requireNumbers ? /\d/.test(password) : true,
-      hasSpecial: policy.requireSpecial ? /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password) : true,
+      hasSpecial: policy.requireSpecial ? /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(password) : true,
       isValid: false,
     };
 
@@ -120,7 +120,7 @@ export function validatePassword(password: string, policy: any): ValidationResul
     hasUppercase: policy.requireUppercase ? /[A-Z]/.test(password) : true,
     hasLowercase: policy.requireLowercase ? /[a-z]/.test(password) : true,
     hasNumbers: policy.requireNumbers ? /\d/.test(password) : true,
-    hasSpecial: policy.requireSpecial ? /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password) : true,
+    hasSpecial: policy.requireSpecial ? /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(password) : true,
     isValid: false,
   };
 }

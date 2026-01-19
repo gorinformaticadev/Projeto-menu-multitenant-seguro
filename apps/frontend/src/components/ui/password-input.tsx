@@ -86,7 +86,7 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
         hasUppercase: policy.requireUppercase ? /[A-Z]/.test(value) : true,
         hasLowercase: policy.requireLowercase ? /[a-z]/.test(value) : true,
         hasNumbers: policy.requireNumbers ? /\d/.test(value) : true,
-        hasSpecial: policy.requireSpecial ? /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(value) : true,
+        hasSpecial: policy.requireSpecial ? /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(value) : true,
         isValid: false,
         strength: 'weak',
         score: 0,
