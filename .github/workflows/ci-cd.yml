@@ -83,10 +83,16 @@ jobs:
           npm install
         fi
 
-    - name: Generate Prisma Client
+    - name: Generate Prisma Client (Check Version)
       run: |
         cd apps/backend
-        npx prisma generate
+        echo "Checking local prisma version..."
+        if [ -f node_modules/prisma/package.json ]; then
+            node -e "console.log('Local prisma version:', require('./node_modules/prisma/package.json').version)"
+        else
+            echo "Local prisma not found in node_modules"
+        fi
+        npm run prisma:generate
 
     - name: Run backend lint
       run: |
