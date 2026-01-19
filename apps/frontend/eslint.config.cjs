@@ -38,9 +38,12 @@ for (const f of legacyFiles) {
 }
 
 if (legacyPath) {
-    // Reuse the legacy config via FlatCompat (recommended migration path)
+    // Use compat.config() to load the specific legacy file
+    // However, specifically for next/core-web-vitals, it's safer to just extend the named configs if possible.
+    // Given we know it's a specific file, let's load it and convert it.
+    const legacyConfig = require(legacyPath);
     module.exports = [
-        ...compat.extendFlatConfig(legacyPath),
+        ...compat.config(legacyConfig),
         {
             ignores: ['node_modules/**', '.next/**'],
         },
@@ -48,6 +51,7 @@ if (legacyPath) {
 } else {
     // Minimal, safe flat config to let ESLint run without legacy config.
     module.exports = [
+        ...compat.extends("next/core-web-vitals", "next/typescript"),
         {
             linterOptions: { reportUnusedDisableDirectives: true },
             languageOptions: {
@@ -55,7 +59,6 @@ if (legacyPath) {
                 sourceType: 'module',
             },
             ignores: ['node_modules/**', '.next/**'],
-            // no custom rules here; rely on project's legacy config when migrated
         },
     ];
 }
