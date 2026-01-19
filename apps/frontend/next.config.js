@@ -71,4 +71,4 @@ const nextConfig = {
   // transpilePackages: ['@modules/sistema'],
 }
 
-module.exports = nextConfig
+export default nextConfig

@@ -1,7 +1,11 @@
 // Script simples para gerar favicon.ico a partir do SVG
 // Execute: node generate-favicon.js
 
-const path = require('path');
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Ler o SVG
 const svgPath = path.join(__dirname, 'public', 'favicon.svg');
