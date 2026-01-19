@@ -35,11 +35,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     // Retorna o objeto user que será anexado ao request
+    // Retorna o objeto user que será anexado ao request
+    // IMPORTANTE: Usar dados do BANCO, pois o token pode estar desatualizado (ex: role alterada)
     return {
-      id: payload.sub,
-      email: payload.email,
-      role: payload.role,
-      tenantId: payload.tenantId,
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      tenantId: user.tenantId,
     };
   }
 }

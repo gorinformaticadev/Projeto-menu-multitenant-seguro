@@ -35,8 +35,11 @@ export class ModuleInstallerService {
 
     /**
      * Lista todos os módulos com status
+     * Fonte da verdade: Banco de Dados
+     * Verifica integridade física (pastas)
      */
     async listModules() {
+        // 1. Buscar do Banco (Fonte da Verdade)
         const modules = await this.prisma.module.findMany({
             include: {
                 _count: {
@@ -50,22 +53,56 @@ export class ModuleInstallerService {
             orderBy: { name: 'asc' }
         });
 
-        return modules.map(module => ({
-            slug: module.slug,
-            name: module.name,
-            version: module.version,
-            description: module.description,
-            status: module.status,
-            hasBackend: module.hasBackend,
-            hasFrontend: module.hasFrontend,
-            installedAt: module.installedAt,
-            activatedAt: module.activatedAt,
-            stats: {
-                tenants: module._count.tenantModules,
-                migrations: module._count.migrations,
-                menus: module._count.menus
+        // 2. Mapear e Verificar Integridade
+        return modules.map(module => {
+            let integrityStatus = 'ok';
+            let integrityMessage = '';
+            const missingFolders: string[] = [];
+
+            // Verificar Backend
+            if (module.hasBackend) {
+                const backendPath = path.join(this.backendModulesPath, module.slug);
+                if (!fs.existsSync(backendPath)) {
+                    missingFolders.push('backend');
+                }
             }
-        }));
+
+            // Verificar Frontend
+            if (module.hasFrontend) {
+                const frontendPath = path.join(this.frontendBase, module.slug);
+                if (!fs.existsSync(frontendPath)) {
+                    missingFolders.push('frontend');
+                }
+            }
+
+            if (missingFolders.length > 0) {
+                integrityStatus = 'corrupted';
+                integrityMessage = `Arquivos ausentes: ${missingFolders.join(', ')}`;
+            }
+
+            return {
+                slug: module.slug,
+                name: module.name,
+                version: module.version,
+                description: module.description,
+                status: integrityStatus === 'corrupted' ? 'corrupted' : module.status, // Sobrescreve status visualmente se corrompido
+                originalStatus: module.status,
+                hasBackend: module.hasBackend,
+                hasFrontend: module.hasFrontend,
+                installedAt: module.installedAt,
+                activatedAt: module.activatedAt,
+                integrity: {
+                    status: integrityStatus,
+                    message: integrityMessage,
+                    missingFolders
+                },
+                stats: {
+                    tenants: module._count.tenantModules,
+                    migrations: module._count.migrations,
+                    menus: module._count.menus
+                }
+            };
+        });
     }
 
     /**

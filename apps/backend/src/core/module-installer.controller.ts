@@ -23,7 +23,7 @@ import { memoryStorage } from 'multer';
  * Interface: /configuracoes/sistema/modulos
  */
 @Controller('configuracoes/sistema/modulos')
-@UseGuards(RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.SUPER_ADMIN)
 export class ModuleInstallerController {
     // Controller refreshed

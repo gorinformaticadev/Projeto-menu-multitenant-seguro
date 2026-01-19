@@ -13,11 +13,16 @@ interface SystemModule {
   name: string;
   version: string;
   description: string | null;
-  status: 'detected' | 'installed' | 'db_ready' | 'active' | 'disabled';
+  status: 'detected' | 'installed' | 'db_ready' | 'active' | 'disabled' | 'corrupted';
   hasBackend: boolean;
   hasFrontend: boolean;
   installedAt: string;
   activatedAt: string | null;
+  integrity?: {
+    status: string;
+    message: string;
+    missingFolders: string[];
+  };
 }
 
 interface TenantModuleStatus {
@@ -154,6 +159,7 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
                 const tenantStatus = tenantModules.find(tm => tm.slug === module.slug);
                 const isEnabled = tenantStatus?.enabled || false;
                 const canToggle = module.status === 'active';
+                const isCorrupted = module.status === 'corrupted';
 
                 return (
                   <div key={module.slug} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
@@ -166,17 +172,22 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
                         <span className="text-xs bg-muted px-2 py-1 rounded font-mono">
                           v{module.version}
                         </span>
-                        {module.status === 'active' && (
+
+                        {isCorrupted ? (
+                          <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded font-bold">
+                            Corrompido: {module.integrity?.message || 'Arquivos ausentes'}
+                          </span>
+                        ) : module.status === 'active' ? (
                           <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
                             Sistema: Ativo
                           </span>
-                        )}
-                        {module.status !== 'active' && (
+                        ) : (
                           <span className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
                             Sistema: {module.status}
                           </span>
                         )}
-                        {isEnabled && (
+
+                        {isEnabled && !isCorrupted && (
                           <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
                             Tenant: Ativo
                           </span>
@@ -187,11 +198,12 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
                       <div className="flex flex-col items-end gap-1">
                         <Switch
                           checked={isEnabled}
-                          disabled={!canToggle}
+                          disabled={!canToggle || isCorrupted}
                           onCheckedChange={() => {
                             handleToggleModule(module.slug, isEnabled);
                           }}
                         />
+
                         {!canToggle && (
                           <span className="text-xs text-muted-foreground">
                             Módulo não ativo
