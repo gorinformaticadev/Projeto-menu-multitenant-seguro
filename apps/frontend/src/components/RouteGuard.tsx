@@ -54,18 +54,18 @@ export function RouteGuard({ children }: RouteGuardProps) {
       }
 
       // Verificar se o token ainda é válido no backend
-      const response = await api.get('/auth/me');
+      await api.get('/auth/me');
       
       // Se chegou até aqui, o token é válido
       return {
         isValid: true
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Erro na validação de autenticação:', error);
 
       // Analisar o tipo de erro
-      const status = error.response?.status;
-      const message = error.response?.data?.message || error.message || 'Erro desconhecido';
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      const message = (error as { response?: { data?: { message?: string } }, message?: string })?.response?.data?.message || (error as { message?: string })?.message || 'Erro desconhecido';
 
       // Erros que indicam problemas de autenticação
       const authErrors = [
@@ -144,7 +144,7 @@ export function RouteGuard({ children }: RouteGuardProps) {
     };
 
     performValidation();
-  }, [needsProtection, authLoading, user, token, pathname, router]);
+  }, [needsProtection, authLoading, user, token, pathname, router, validateAuthentication]);
 
   // Se não precisa de proteção, renderiza normalmente
   if (!needsProtection) {

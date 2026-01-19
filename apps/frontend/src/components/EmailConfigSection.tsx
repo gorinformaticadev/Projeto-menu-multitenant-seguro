@@ -203,14 +203,6 @@ export default function EmailConfigSection() {
     }
   };
 
-  // Delete SMTP credentials
-  const handleDeleteCredentials = async () => {
-    try {
-      // We're not implementing this anymore since we're using SecurityConfig
-    } catch (error: unknown) {
-      // Handle error silently
-    }
-  };
 
   // Test email configuration
   const handleTestConnection = () => {

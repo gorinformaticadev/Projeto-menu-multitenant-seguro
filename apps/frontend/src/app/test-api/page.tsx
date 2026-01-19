@@ -5,7 +5,7 @@ import { useState } from 'react';
 // Declaração de tipo global para propriedades dinâmicas do window
 declare global {
   interface Window {
-    testModule?: () => any;
+    testModule?: () => unknown;
   }
 }
 

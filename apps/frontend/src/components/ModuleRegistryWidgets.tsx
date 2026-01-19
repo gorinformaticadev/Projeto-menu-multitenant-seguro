@@ -11,7 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { moduleRegistry, ModuleDashboardWidget } from '@/lib/module-registry';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Package, CheckCircle, Activity, Zap } from 'lucide-react';
+import { Package, CheckCircle } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
 // Helper para ícones dinâmicos

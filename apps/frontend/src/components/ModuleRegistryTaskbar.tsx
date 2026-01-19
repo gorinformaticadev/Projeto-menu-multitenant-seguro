@@ -32,7 +32,7 @@ export function ModuleRegistryTaskbar() {
 
   useEffect(() => {
     loadTaskbarItems();
-  }, [user]);
+  }, [user, loadTaskbarItems]);
 
   // Escuta mudanças no status dos módulos
   useEffect(() => {
@@ -44,7 +44,7 @@ export function ModuleRegistryTaskbar() {
     return () => {
       window.removeEventListener('moduleStatusChanged', handleModuleStatusChange);
     };
-  }, []);
+  }, [loadTaskbarItems]);
 
   const loadTaskbarItems = () => {
     try {

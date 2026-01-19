@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
-// @ts-ignore - moduleRegistry é válido
+// @ts-expect-error - moduleRegistry é válido
 import { moduleRegistry } from "@/lib/module-registry";
 
 export type Role = "SUPER_ADMIN" | "ADMIN" | "USER" | "CLIENT";
@@ -399,8 +399,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         requires2FA: false,
         user: userData
       };
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || "Código inválido";
+    } catch (error: unknown) {
+      let errorMessage = "Código inválido";
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        typeof (error as any).response === "object" &&
+        (error as any).response !== null &&
+        "data" in (error as any).response &&
+        typeof (error as any).response.data === "object" &&
+        (error as any).response.data !== null &&
+        "message" in (error as any).response.data
+      ) {
+        errorMessage = (error as any).response.data.message;
+      }
       return {
         success: false,
         requires2FA: false,

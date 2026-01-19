@@ -147,7 +147,7 @@ export function PasswordInputExample() {
               showStrengthMeter={true}
               showConfirmation={true}
               confirmPassword={confirmPassword3}
-              onConfirmChange={(value, matches) => {
+              onConfirmChange={(value, _matches) => {
                 setConfirmPassword3(value);
               }}
             />

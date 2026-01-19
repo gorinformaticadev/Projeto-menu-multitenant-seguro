@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu, Shield, FileText, HelpCircle, Package, Home, BookOpen, Rocket, BarChart3, FolderKanban, Tags } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { Button } from "./ui/button";
-// @ts-ignore - moduleRegistry é válido
+// @ts-expect-error - moduleRegistry é válido
 import { moduleRegistry } from "@/lib/module-registry";
 
 // Interface local para itens de menu
@@ -21,7 +21,7 @@ interface ModuleMenuItem {
 }
 
 // Mapeamento de ícones para componentes Lucide
-const iconMap: Record<string, any> = {
+const iconMap: Record<string, React.ComponentType> = {
   LayoutDashboard,
   Building2,
   Settings,
@@ -72,7 +72,7 @@ export function Sidebar() {
   // Carrega itens do menu do Module Registry
   useEffect(() => {
     loadMenuItems();
-  }, [user]);
+  }, [user, loadMenuItems]);
 
   // Escuta mudanças no status dos módulos
   useEffect(() => {
@@ -84,14 +84,14 @@ export function Sidebar() {
     return () => {
       window.removeEventListener('moduleStatusChanged', handleModuleStatusChange);
     };
-  }, []);
+  }, [loadMenuItems]);
 
   // Recolhe o sidebar quando a rota muda (especialmente útil em mobile)
   useEffect(() => {
     if (isExpanded) {
       setIsExpanded(false);
     }
-  }, [pathname]); // Dependência no pathname para reagir a mudanças de rota
+  }, [pathname, isExpanded]); // Dependência no pathname para reagir a mudanças de rota
 
   const loadMenuItems = () => {
     try {
@@ -107,7 +107,7 @@ export function Sidebar() {
 
       setGroupedItems(grouped);
 
-      const totalItems = grouped.ungrouped.length + Object.values(grouped.groups).flat().length;
+      // const totalItems = grouped.ungrouped.length + Object.values(grouped.groups).flat().length;
       // console.log('📋 Itens do menu carregados:', totalItems);
       // console.log('📋 Grupos encontrados:', Object.keys(grouped.groups));
     } catch (error) {
@@ -192,7 +192,7 @@ export function Sidebar() {
   };
 
   // Configuração dos grupos
-  const groupConfig: Record<string, { name: string; icon: any; order: number }> = {
+  const groupConfig: Record<string, { name: string; icon: React.ComponentType; order: number }> = {
     administration: {
       name: 'Administração',
       icon: Settings,
@@ -253,11 +253,11 @@ export function Sidebar() {
             const renderQueue: Array<{
               type: 'item' | 'group';
               order: number;
-              data: any;
+              data: Record<string, unknown>;
             }> = [];
 
             // Adiciona itens não agrupados à fila
-            groupedItems.ungrouped.forEach((item) => {
+            groupedItems.ungrouped.forEach((item: Record<string, unknown>) => {
               renderQueue.push({
                 type: 'item',
                 order: item.order || 999,
@@ -339,7 +339,7 @@ export function Sidebar() {
               } else if (queueItem.type === 'group') {
                 const { groupId, items, config } = queueItem.data;
                 const isGroupExpanded = expandedGroups[groupId];
-                const hasActiveItem = items.some((item: any) => pathname === item.href);
+                const hasActiveItem = items.some((item: { href: string }) => pathname === item.href);
 
                 allRenderItems.push(
                   <div key={groupId} className="pt-2">
@@ -370,7 +370,7 @@ export function Sidebar() {
                         {/* Itens do grupo */}
                         {isGroupExpanded && (
                           <div className="pl-4 space-y-1 ml-4">
-                            {items.filter((item: any) => item.name !== config.name).map((item: any) => {
+                            {items.filter((item: { name: string }) => item.name !== config.name).map((item: { id: string, href: string, icon: string, name: string }) => {
                               const isActive = pathname === item.href;
                               const Icon = iconMap[item.icon] || Menu;
 

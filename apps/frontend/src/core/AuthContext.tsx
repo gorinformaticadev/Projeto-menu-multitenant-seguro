@@ -250,10 +250,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(userData);
       router.push("/dashboard");
-    } catch (error: any) {
-      throw new Error(
-        error.response?.data?.message || "Erro ao fazer login"
-      );
+    } catch (error: unknown) {
+      let errorMessage = "Erro ao fazer login";
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        typeof (error as any).response === "object" &&
+        (error as any).response !== null &&
+        "data" in (error as any).response &&
+        typeof (error as any).response.data === "object" &&
+        (error as any).response.data !== null &&
+        "message" in (error as any).response.data
+      ) {
+        errorMessage = (error as any).response.data.message;
+      }
+      throw new Error(errorMessage);
     }
   }
 
@@ -288,16 +300,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         requires2FA: false,
         user: userData
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let errorMessage = "";
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        typeof (error as any).response === "object" &&
+        (error as any).response !== null &&
+        "data" in (error as any).response &&
+        typeof (error as any).response.data === "object" &&
+        (error as any).response.data !== null &&
+        "message" in (error as any).response.data
+      ) {
+        errorMessage = (error as any).response.data.message;
+      }
       // Verificar se é erro de 2FA
-      const errorMessage = error.response?.data?.message || "";
       if (errorMessage.includes("2FA") || errorMessage.includes("two-factor")) {
         return {
           success: false,
           requires2FA: true
         };
       }
-
       // Outros erros
       return {
         success: false,
@@ -343,8 +367,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         requires2FA: false,
         user: userData
       };
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || "Código inválido";
+    } catch (error: unknown) {
+      let errorMessage = "Código inválido";
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        typeof (error as any).response === "object" &&
+        (error as any).response !== null &&
+        "data" in (error as any).response &&
+        typeof (error as any).response.data === "object" &&
+        (error as any).response.data !== null &&
+        "message" in (error as any).response.data
+      ) {
+        errorMessage = (error as any).response.data.message;
+      }
       return {
         success: false,
         requires2FA: false,

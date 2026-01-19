@@ -25,7 +25,7 @@ export function ModuleRegistryUserMenu({ onItemClick }: Props) {
 
   useEffect(() => {
     loadUserMenuItems();
-  }, [user]);
+  }, [user, loadUserMenuItems]);
 
   // Escuta mudanças no status dos módulos
   useEffect(() => {
@@ -37,7 +37,7 @@ export function ModuleRegistryUserMenu({ onItemClick }: Props) {
     return () => {
       window.removeEventListener('moduleStatusChanged', handleModuleStatusChange);
     };
-  }, []);
+  }, [loadUserMenuItems]);
 
   const loadUserMenuItems = () => {
     try {

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -17,7 +17,6 @@ import {
     Filter,
     Check,
     EyeOff,
-    Eye,
     X,
     Search
 } from 'lucide-react';
@@ -37,7 +36,7 @@ interface Notification {
 export default function NotificacaoPage() {
     const { toast } = useToast();
     // Integração com o contexto global para atualizar o badge
-    const { refreshNotifications: refreshGlobalBadge, unreadCount: globalUnreadCount } = useNotificationContext();
+    const { refreshNotifications: refreshGlobalBadge } = useNotificationContext();
 
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(true);
@@ -140,9 +139,9 @@ export default function NotificacaoPage() {
             refreshGlobalBadge(); // Atualiza badge HEADER
             setSelectedIds([]);
             toast({ description: `${selectedIds.length} notificações excluídas.` });
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Bulk Delete Error:', error);
-            const msg = error.response?.data?.message || error.message;
+            const msg = (error as { response?: { data?: { message?: string } }, message?: string }).response?.data?.message || (error as { message?: string }).message;
             toast({
                 title: "Erro na Exclusão",
                 description: Array.isArray(msg) ? msg.join(', ') : msg,

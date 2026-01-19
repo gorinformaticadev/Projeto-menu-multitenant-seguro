@@ -68,7 +68,7 @@ function UsuariosContent() {
     } else if (user?.role === "SUPER_ADMIN") {
       loadTenants();
     }
-  }, [user]);
+  }, [user, loadTenants]);
 
   useEffect(() => {
     const tenantIdFromUrl = searchParams.get("tenantId");
@@ -83,7 +83,7 @@ function UsuariosContent() {
     } else {
       setUsers([]);
     }
-  }, [selectedTenantId]);
+  }, [selectedTenantId, loadUsers]);
 
   // Handlers de formulário - movidos para o nível superior para conformidade com Rules of Hooks
   const handleTenantSelectChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -102,7 +102,7 @@ function UsuariosContent() {
     setFormData(prev => ({ ...prev, role: e.target.value }));
   }, []);
 
-  const handlePasswordChange = useCallback((value: string, isValid: boolean) => {
+  const handlePasswordChange = useCallback((value: string) => {
     setFormData(prev => ({ ...prev, password: value }));
   }, []);
 
@@ -134,10 +134,10 @@ function UsuariosContent() {
         data: response.data,
         timestamp: Date.now()
       }));
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao carregar empresas",
-        description: error.response?.data?.message || "Ocorreu um erro",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro",
         variant: "destructive",
       });
     } finally {
@@ -152,10 +152,10 @@ function UsuariosContent() {
     try {
       const response = await api.get(`/users/tenant/${selectedTenantId}`);
       setUsers(response.data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao carregar usuários",
-        description: error.response?.data?.message || "Ocorreu um erro",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro",
         variant: "destructive",
       });
     } finally {
@@ -195,10 +195,10 @@ function UsuariosContent() {
       setEditingUser(null);
       setFormData({ email: "", name: "", role: "USER", password: "" });
       loadUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro",
-        description: error.response?.data?.message || "Ocorreu um erro",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro",
         variant: "destructive",
       });
     } finally {
@@ -213,10 +213,10 @@ function UsuariosContent() {
       await api.delete(`/users/${id}`);
       toast({ title: "Usuário deletado com sucesso!" });
       loadUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao deletar",
-        description: error.response?.data?.message || "Ocorreu um erro",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro",
         variant: "destructive",
       });
     }
@@ -229,10 +229,10 @@ function UsuariosContent() {
       await api.post(`/users/${id}/unlock`);
       toast({ title: "Usuário desbloqueado com sucesso!" });
       loadUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao desbloquear",
-        description: error.response?.data?.message || "Ocorreu um erro",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro",
         variant: "destructive",
       });
     }

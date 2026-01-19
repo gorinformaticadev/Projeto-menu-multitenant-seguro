@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Search, Calendar, User, Activity } from "lucide-react";
+import { FileText, Search, User, Activity } from "lucide-react";
 
 interface AuditLog {
   id: string;
@@ -70,10 +70,10 @@ export default function LogsPage() {
       const response = await api.get(`/audit-logs?${params}`);
       setLogs(response.data.data);
       setTotalPages(response.data.meta.totalPages);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao carregar logs",
-        description: error.response?.data?.message || "Erro desconhecido",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Erro desconhecido",
         variant: "destructive",
       });
     } finally {
@@ -96,7 +96,7 @@ export default function LogsPage() {
       fetchLogs();
       fetchStats();
     }
-  }, [page, user]);
+  }, [page, user, fetchLogs]);
 
   const handleSearch = () => {
     setPage(1);

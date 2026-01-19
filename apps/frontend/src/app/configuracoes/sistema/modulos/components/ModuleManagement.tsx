@@ -69,7 +69,7 @@ export function ModuleManagement() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     loadInstalledModules();

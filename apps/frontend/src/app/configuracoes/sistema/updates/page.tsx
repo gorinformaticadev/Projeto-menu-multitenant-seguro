@@ -107,7 +107,7 @@ export default function UpdatesPage() {
     } finally {
       setLoading(prev => ({ ...prev, status: false }));
     }
-  }, []);
+  }, [toast]);
 
   /**
    * Força verificação de novas versões
@@ -127,7 +127,7 @@ export default function UpdatesPage() {
     } catch (error: unknown) {
       toast({
         title: 'Erro na verificação',
-        description: (error as any)?.response?.data?.message || 'Erro interno do servidor',
+        description: (error as unknown as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Erro interno do servidor',
         variant: 'destructive',
       });
     } finally {
@@ -218,7 +218,7 @@ export default function UpdatesPage() {
     } finally {
       setLoading(prev => ({ ...prev, logs: false }));
     }
-  }, []);
+  }, [toast]);
 
   // Carregar dados iniciais
   useEffect(() => {

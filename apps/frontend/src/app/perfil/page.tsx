@@ -54,7 +54,7 @@ export default function PerfilPage() {
         });
       }
     }
-  }, [user?.id]);
+  }, [user?.id, user?.name, user?.email, user?.role, user?.tenant, loadUserData]);
 
   async function loadUserData(force = false) {
     if (!user?.id) return;
@@ -133,10 +133,10 @@ export default function PerfilPage() {
       setShowEditProfile(false);
       // Recarregar dados do usuário (forçar refresh do cache)
       await loadUserData(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao atualizar perfil",
-        description: error.response?.data?.message || "Erro desconhecido",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Erro desconhecido",
         variant: "destructive",
       });
     } finally {
@@ -183,10 +183,10 @@ export default function PerfilPage() {
       setIsNewPasswordValid(false);
       setPasswordsMatch(false);
       setShowChangePassword(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao alterar senha",
-        description: error.response?.data?.message || "Erro desconhecido",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Erro desconhecido",
         variant: "destructive",
       });
     } finally {
@@ -221,7 +221,7 @@ export default function PerfilPage() {
           nomeFantasia: tenantData.nomeFantasia,
           cnpjCpf: tenantData.cnpjCpf,
           telefone: tenantData.telefone,
-        } as any,
+        } as Record<string, unknown>,
       });
 
       toast({
@@ -229,10 +229,10 @@ export default function PerfilPage() {
         description: "Os dados da empresa foram atualizados com sucesso",
       });
       setShowEditTenant(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao atualizar empresa",
-        description: error.response?.data?.message || "Erro desconhecido",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Erro desconhecido",
         variant: "destructive",
       });
     } finally {

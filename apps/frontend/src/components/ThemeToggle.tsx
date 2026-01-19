@@ -1,5 +1,6 @@
 "use client";
 
+
 import * as React from "react";
 import { Moon, Sun, Monitor } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -19,10 +20,19 @@ export function ThemeToggle() {
 
         try {
             await api.patch('/users/preferences', { theme: newTheme });
-        } catch (error) {
+        } catch (error: unknown) {
             // Silencioso para o usuário, apenas log
-            // Silencioso para o usuário, apenas log com detalhes
-            const errorData = (error as any).response?.data || error;
+            let errorData = error;
+            if (
+                typeof error === 'object' &&
+                error !== null &&
+                'response' in error &&
+                typeof (error as any).response === 'object' &&
+                (error as any).response !== null &&
+                'data' in (error as any).response
+            ) {
+                errorData = (error as any).response.data;
+            }
             console.warn('Não foi possível salvar a preferência de tema:', errorData);
         }
     };

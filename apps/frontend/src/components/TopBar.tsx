@@ -16,11 +16,7 @@ import { Notification } from '@/types/notifications';
 import { ThemeToggle } from "./ThemeToggle";
 import { useTheme } from "next-themes";
 import * as LucideIcons from "lucide-react";
-
-// Helper para ícones dinâmicos
-const getIconComponent = (iconName: string): any => {
-  return (LucideIcons as any)[iconName] || LucideIcons.HelpCircle;
-};
+import Image from "next/image";
 
 export function TopBar() {
   const { user, logout } = useAuth();
@@ -30,7 +26,7 @@ export function TopBar() {
   const [userTenantLogo, setUserTenantLogo] = useState<string | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const { setTheme } = useTheme();
+  // const { setTheme } = useTheme();
 
   // Sincroniza tema da preferência do usuário
 
@@ -136,23 +132,22 @@ export function TopBar() {
     }
   };
 
-  const getNotificationColor = (type: string) => {
-    switch (type) {
-      case 'warning': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-      case 'error': return 'text-red-600 bg-red-50 border-red-200';
-      case 'success': return 'text-green-600 bg-green-50 border-green-200';
-      default: return 'text-blue-600 bg-blue-50 border-blue-200';
-    }
-  };
-
-  const getSeverityBadgeColor = (type: string) => {
-    switch (type) {
-      case 'warning': return 'bg-yellow-100 text-yellow-800';
-      case 'error': return 'bg-red-100 text-red-800';
-      case 'success': return 'bg-green-100 text-green-800';
-      default: return 'bg-blue-100 text-blue-800';
-    }
-  };
+  // const getNotificationColor = (type: string) => {
+  //   switch (type) {
+  //     case 'warning': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+  //     case 'error': return 'text-red-600 bg-red-50 border-red-200';
+  //     case 'success': return 'text-green-600 bg-green-50 border-green-200';
+  //     default: return 'text-blue-600 bg-blue-50 border-blue-200';
+  //   }
+  // };
+  // const getSeverityBadgeColor = (type: string) => {
+  //   switch (type) {
+  //     case 'warning': return 'bg-yellow-100 text-yellow-800';
+  //     case 'error': return 'bg-red-100 text-red-800';
+  //     case 'success': return 'bg-green-100 text-green-800';
+  //     default: return 'bg-blue-100 text-blue-800';
+  //   }
+  // };
 
   const formatNotificationTime = (dateInput: Date | string) => {
     const now = new Date();
@@ -185,10 +180,14 @@ export function TopBar() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             {masterLogo ? (
-              <img
+              <Image
                 src={`${API_URL}/uploads/logos/${masterLogo}`}
                 alt="Logo"
+                width={80}
+                height={40}
                 className="h-10 w-auto object-contain"
+                unoptimized
+                priority
               />
             ) : (
               <div className="h-10 w-10 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/20">
@@ -377,13 +376,16 @@ export function TopBar() {
               {/* Logo do Tenant do Usuário */}
               {userTenantLogo ? (
                 <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 dark:bg-secondary border border-gray-200 dark:border-border">
-                  <img
+                  <Image
                     src={`${API_URL}/uploads/logos/${userTenantLogo}?t=${Date.now()}`}
                     alt="Logo Tenant"
+                    width={40}
+                    height={40}
                     className="w-full h-full object-cover"
+                    unoptimized
                     onError={(e) => {
                       console.error('Erro ao carregar logo do tenant no menu:', userTenantLogo);
-                      const target = e.currentTarget;
+                      const target = e.currentTarget as HTMLImageElement;
                       target.style.display = 'none';
                       const fallback = target.parentElement?.querySelector('.fallback-avatar');
                       if (fallback) {
@@ -417,13 +419,16 @@ export function TopBar() {
                     {/* Logo da Tenant no Menu */}
                     {userTenantLogo ? (
                       <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 dark:bg-secondary border border-gray-200 dark:border-border flex-shrink-0">
-                        <img
+                        <Image
                           src={`${API_URL}/uploads/logos/${userTenantLogo}?t=${Date.now()}`}
                           alt="Logo Tenant"
+                          width={40}
+                          height={40}
                           className="w-full h-full object-cover"
+                          unoptimized
                           onError={(e) => {
                             console.error('Erro ao carregar logo do tenant no dropdown:', userTenantLogo);
-                            const target = e.currentTarget;
+                            const target = e.currentTarget as HTMLImageElement;
                             target.style.display = 'none';
                             const fallback = target.parentElement?.querySelector('.fallback-avatar-dropdown');
                             if (fallback) {

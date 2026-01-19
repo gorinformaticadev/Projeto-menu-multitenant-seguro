@@ -19,8 +19,6 @@ function ResetPasswordForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [isPasswordValid, setIsPasswordValid] = useState(false);
-  const [passwordsMatch, setPasswordsMatch] = useState(false);
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -87,11 +85,11 @@ function ResetPasswordForm() {
       // Redirect after success
       setTimeout(() => router.push("/login"), 3000);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         variant: "destructive",
         title: "Erro",
-        description: error.message || "Tente novamente mais tarde.",
+        description: (error as { message?: string })?.message || "Tente novamente mais tarde.",
       });
     } finally {
       setIsLoading(false);

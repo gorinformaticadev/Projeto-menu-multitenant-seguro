@@ -22,27 +22,27 @@ export default function ModulePageClient({ moduleSlug, slug }: ModulePageClientP
 
     console.log('🔎 [ModulePage] Buscando rota (fallback):', { moduleSlug, route });
 
-    const [Component, setComponent] = React.useState<React.ComponentType<any> | null>(null);
+    const [Component, setComponent] = React.useState<React.ComponentType<unknown> | null>(null);
     const [error, setError] = React.useState<string | null>(null);
     const [loading, setLoading] = React.useState(true);
 
     React.useEffect(() => {
         loadModuleComponent();
-    }, [moduleSlug, route]);
+    }, [moduleSlug, route, loadModuleComponent]);
 
-    async function loadModuleComponent() {
+    const loadModuleComponent = React.useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
 
             // Tenta carregar do diretório FRONTEND
             // Caminho relativo: ../../{moduleSlug}/{route}/page
-            const module = await import(
+            const importedModule = await import(
                 /* @vite-ignore */
                 `../../${moduleSlug}/${route}/page`
             );
 
-            const ComponentToLoad = module.default;
+            const ComponentToLoad = importedModule.default;
 
             if (!ComponentToLoad) {
                 throw new Error('O arquivo page.tsx não exporta um componente default');
@@ -51,7 +51,7 @@ export default function ModulePageClient({ moduleSlug, slug }: ModulePageClientP
             setComponent(() => ComponentToLoad);
             console.log('✅ [ModulePage] Componente carregado:', `${moduleSlug}/${route}`);
 
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(`❌ [ModulePage] Falha ao carregar ${moduleSlug}/${route}:`, err);
 
             const expectedPath = `apps/frontend/src/app/modules/${moduleSlug}/${route}/page.tsx`;
@@ -60,7 +60,7 @@ export default function ModulePageClient({ moduleSlug, slug }: ModulePageClientP
                 `Caminho buscado:\n${expectedPath}\n\n` +
                 `Verifique se o arquivo existe e se a URL contém o caminho completo (ex: /pages/dashboard).`;
 
-            if (err.message && (err.message.includes('Cannot find module') || err.code === 'MODULE_NOT_FOUND')) {
+            if (err instanceof Error && (err.message.includes('Cannot find module'))) {
                 errorMessage = `Módulo ou página não encontrada (${moduleSlug}/${route}).\n` +
                     `O arquivo não foi encontrado no build do Frontend.\n\n` +
                     `Caminho esperado: ${expectedPath}`;
@@ -70,7 +70,7 @@ export default function ModulePageClient({ moduleSlug, slug }: ModulePageClientP
         } finally {
             setLoading(false);
         }
-    }
+    }, [moduleSlug, route]);
 
     if (loading) {
         return (

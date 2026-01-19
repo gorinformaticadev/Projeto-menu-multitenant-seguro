@@ -14,8 +14,8 @@ export interface ModuleData {
   description?: string;
   isActive?: boolean;
   enabled?: boolean;
-  menus?: any[];
-  config?: any;
+  menus?: unknown[];
+  config?: Record<string, unknown>;
 }
 
 export function useModulesManager() {

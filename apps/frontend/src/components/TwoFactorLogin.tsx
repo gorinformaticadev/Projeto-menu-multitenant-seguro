@@ -16,8 +16,8 @@ interface TwoFactorLoginProps {
 }
 
 export function TwoFactorLogin({
-  email,
-  password,
+  email: _email,
+  password: _password,
   onSubmit,
   onBack,
   loading,

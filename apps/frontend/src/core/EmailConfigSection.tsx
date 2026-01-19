@@ -98,10 +98,24 @@ export default function EmailConfigSection() {
             smtpPass: "", // Don't load password for security
           }));
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
+        let errorMessage = "Erro desconhecido";
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          typeof (error as any).response === "object" &&
+          (error as any).response !== null &&
+          "data" in (error as any).response &&
+          typeof (error as any).response.data === "object" &&
+          (error as any).response.data !== null &&
+          "message" in (error as any).response.data
+        ) {
+          errorMessage = (error as any).response.data.message;
+        }
         toast({
           title: "Erro ao carregar configurações de email",
-          description: error.response?.data?.message || "Erro desconhecido",
+          description: errorMessage,
           variant: "destructive",
         });
       } finally {
@@ -175,10 +189,24 @@ export default function EmailConfigSection() {
         title: "Configuração salva",
         description: "As configurações de email foram salvas com sucesso",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let errorMessage = "Erro desconhecido";
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        typeof (error as any).response === "object" &&
+        (error as any).response !== null &&
+        "data" in (error as any).response &&
+        typeof (error as any).response.data === "object" &&
+        (error as any).response.data !== null &&
+        "message" in (error as any).response.data
+      ) {
+        errorMessage = (error as any).response.data.message;
+      }
       toast({
         title: "Erro ao salvar configuração",
-        description: error.response?.data?.message || "Erro desconhecido",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -190,7 +218,7 @@ export default function EmailConfigSection() {
   const handleDeleteCredentials = async () => {
     try {
       // We're not implementing this anymore since we're using SecurityConfig
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Handle error silently
     }
   };
@@ -225,10 +253,24 @@ export default function EmailConfigSection() {
         title: "Email de teste enviado",
         description: `Email de teste enviado com sucesso para ${testEmail}`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let errorMessage = "Erro desconhecido";
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        typeof (error as any).response === "object" &&
+        (error as any).response !== null &&
+        "data" in (error as any).response &&
+        typeof (error as any).response.data === "object" &&
+        (error as any).response.data !== null &&
+        "message" in (error as any).response.data
+      ) {
+        errorMessage = (error as any).response.data.message;
+      }
       toast({
         title: "Erro ao enviar email de teste",
-        description: error.response?.data?.message || "Erro desconhecido",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

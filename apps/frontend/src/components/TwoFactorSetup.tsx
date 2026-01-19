@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,7 +37,7 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
     } catch (error: unknown) {
       let message = "Erro desconhecido";
       if (error && typeof error === "object" && "response" in error && error.response && typeof error.response === "object" && "data" in error.response && error.response.data && typeof error.response.data === "object" && "message" in error.response.data) {
-        message = (error.response.data as any).message;
+        message = (error.response.data as { message?: string }).message;
       }
       toast({
         title: "Erro ao gerar QR Code",
@@ -74,7 +74,7 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
     } catch (error: unknown) {
       let message = "Código inválido";
       if (error && typeof error === "object" && "response" in error && error.response && typeof error.response === "object" && "data" in error.response && error.response.data && typeof error.response.data === "object" && "message" in error.response.data) {
-        message = (error.response.data as any).message;
+        message = (error.response.data as { message?: string }).message;
       }
       toast({
         title: "Erro ao ativar 2FA",
@@ -112,7 +112,7 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
     } catch (error: unknown) {
       let message = "Código inválido";
       if (error && typeof error === "object" && "response" in error && error.response && typeof error.response === "object" && "data" in error.response && error.response.data && typeof error.response.data === "object" && "message" in error.response.data) {
-        message = (error.response.data as any).message;
+        message = (error.response.data as { message?: string }).message;
       }
       toast({
         title: "Erro ao desativar 2FA",

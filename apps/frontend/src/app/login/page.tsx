@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+// import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { TwoFactorLogin } from "@/components/TwoFactorLogin";
 import { use2FALogin } from "@/hooks/use2FALogin";
@@ -151,9 +152,11 @@ export default function LoginPage() {
           {/* Logo Container - Glass Pop-out */}
           {masterLogo ? (
             <div className="inline-flex items-center justify-center relative rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 shadow-[8px_8px_16px_rgba(0,0,0,0.3),-4px_-4px_8px_rgba(255,255,255,0.05)]">
-              <img
+              <Image
                 src={`${API_URL}/uploads/logos/${masterLogo}`}
                 alt="Logo do Tenant"
+                width={80}
+                height={80}
                 className="h-20 w-auto object-contain relative z-10 drop-shadow-xl"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
@@ -162,6 +165,8 @@ export default function LoginPage() {
                     fallback.classList.remove('hidden');
                   }
                 }}
+                unoptimized
+                priority
               />
               <div className="bg-transparent rounded-xl w-20 h-20 flex items-center justify-center fallback-tenant-icon hidden">
                 <Building2 className="h-10 w-10 text-slate-300" />
