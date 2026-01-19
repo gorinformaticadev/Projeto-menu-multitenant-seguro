@@ -8,7 +8,8 @@ import {
     UploadedFile,
     Body,
     Param,
-    BadRequestException
+    BadRequestException,
+    Request
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -34,7 +35,7 @@ export class ModuleInstallerController {
      * Lista módulos instalados e disponíveis
      */
     @Get()
-    async listModules() {
+    async listModules(@Request() req) {
         return await this.installer.listModules();
     }
 
