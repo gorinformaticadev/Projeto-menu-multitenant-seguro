@@ -100,17 +100,39 @@ export default function SecurityConfigPage() {
   const handleSave = async () => {
     if (!config) return;
 
+    // Validar campos numéricos
+    const numericFields: (keyof SecurityConfig)[] = [
+      'loginMaxAttempts',
+      'loginLockDurationMinutes',
+      'globalMaxRequests',
+      'globalWindowMinutes',
+      'passwordMinLength',
+      'sessionTimeoutMinutes'
+    ];
+
+    for (const field of numericFields) {
+      const val = config[field];
+      if (val === "" || val === null || val === undefined || isNaN(Number(val))) {
+        toast({
+          title: "Erro de validação",
+          description: `Por favor, preencha corretamente o campo ${field}`,
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     try {
       setSaving(true);
 
       // Enviar apenas os campos permitidos (sem id, updatedAt, updatedBy)
       const updateData = {
-        loginMaxAttempts: config.loginMaxAttempts,
-        loginLockDurationMinutes: config.loginLockDurationMinutes,
-        loginWindowMinutes: config.loginWindowMinutes,
-        globalMaxRequests: config.globalMaxRequests,
-        globalWindowMinutes: config.globalWindowMinutes,
-        passwordMinLength: config.passwordMinLength,
+        loginMaxAttempts: Number(config.loginMaxAttempts),
+        loginLockDurationMinutes: Number(config.loginLockDurationMinutes),
+        loginWindowMinutes: Number(config.loginWindowMinutes),
+        globalMaxRequests: Number(config.globalMaxRequests),
+        globalWindowMinutes: Number(config.globalWindowMinutes),
+        passwordMinLength: Number(config.passwordMinLength),
         passwordRequireUppercase: config.passwordRequireUppercase,
         passwordRequireLowercase: config.passwordRequireLowercase,
         passwordRequireNumbers: config.passwordRequireNumbers,
@@ -119,7 +141,7 @@ export default function SecurityConfigPage() {
         refreshTokenExpiresIn: config.refreshTokenExpiresIn,
         twoFactorEnabled: config.twoFactorEnabled,
         twoFactorRequired: config.twoFactorRequired,
-        sessionTimeoutMinutes: config.sessionTimeoutMinutes,
+        sessionTimeoutMinutes: Number(config.sessionTimeoutMinutes),
       };
 
       const response = await api.put("/security-config", updateData);
@@ -233,7 +255,7 @@ export default function SecurityConfigPage() {
                 max="100"
                 value={config.loginMaxAttempts}
                 onChange={(e) =>
-                  updateConfig("loginMaxAttempts", parseInt(e.target.value))
+                  updateConfig("loginMaxAttempts", e.target.value === "" ? "" : parseInt(e.target.value))
                 }
               />
               <p className="text-xs text-muted-foreground mt-1">
@@ -252,7 +274,7 @@ export default function SecurityConfigPage() {
                 max="1440"
                 value={config.loginLockDurationMinutes}
                 onChange={(e) =>
-                  updateConfig("loginLockDurationMinutes", parseInt(e.target.value))
+                  updateConfig("loginLockDurationMinutes", e.target.value === "" ? "" : parseInt(e.target.value))
                 }
               />
               <p className="text-xs text-muted-foreground mt-1">
@@ -284,7 +306,7 @@ export default function SecurityConfigPage() {
                 max="1000"
                 value={config.globalMaxRequests}
                 onChange={(e) =>
-                  updateConfig("globalMaxRequests", parseInt(e.target.value))
+                  updateConfig("globalMaxRequests", e.target.value === "" ? "" : parseInt(e.target.value))
                 }
               />
               <p className="text-xs text-muted-foreground mt-1">
@@ -303,7 +325,7 @@ export default function SecurityConfigPage() {
                 max="60"
                 value={config.globalWindowMinutes}
                 onChange={(e) =>
-                  updateConfig("globalWindowMinutes", parseInt(e.target.value))
+                  updateConfig("globalWindowMinutes", e.target.value === "" ? "" : parseInt(e.target.value))
                 }
               />
               <p className="text-xs text-muted-foreground mt-1">
@@ -334,7 +356,7 @@ export default function SecurityConfigPage() {
               max="32"
               value={config.passwordMinLength}
               onChange={(e) =>
-                updateConfig("passwordMinLength", parseInt(e.target.value))
+                updateConfig("passwordMinLength", e.target.value === "" ? "" : parseInt(e.target.value))
               }
             />
             <p className="text-xs text-muted-foreground mt-1">
@@ -551,7 +573,7 @@ export default function SecurityConfigPage() {
                 max="1440"
                 value={config.sessionTimeoutMinutes}
                 onChange={(e) =>
-                  updateConfig("sessionTimeoutMinutes", parseInt(e.target.value))
+                  updateConfig("sessionTimeoutMinutes", e.target.value === "" ? "" : parseInt(e.target.value))
                 }
               />
               <p className="text-xs text-muted-foreground mt-1">
