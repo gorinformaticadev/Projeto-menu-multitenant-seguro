@@ -87,11 +87,8 @@ export default function UpdatesPage() {
   const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState('status');
 
-  // Carregar dados iniciais
-  useEffect(() => {
-    loadStatus();
-    loadLogs();
-  }, [loadStatus, loadLogs]);
+
+
 
   /**
    * Carrega status atual do sistema
@@ -222,6 +219,12 @@ export default function UpdatesPage() {
       setLoading(prev => ({ ...prev, logs: false }));
     }
   };
+
+  // Carregar dados iniciais
+  useEffect(() => {
+    loadStatus();
+    loadLogs();
+  }, [loadStatus, loadLogs]);
 
   /**
    * Testa conectividade com repositório

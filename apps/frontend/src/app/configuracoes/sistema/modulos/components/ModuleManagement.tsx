@@ -67,7 +67,7 @@ export function ModuleManagement() {
     } catch (error: unknown) {
       toast({
         title: "Erro ao carregar módulos",
-        description: (error as any)?.response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as unknown as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     } finally {
@@ -152,7 +152,7 @@ export function ModuleManagement() {
     } catch (error: any) {
       toast({
         title: "Erro no upload",
-        description: error.response?.data?.message || "Erro ao fazer upload do módulo",
+        description: (error as unknown as { response?: { data?: { message?: string } } })?.response?.data?.message || "Erro ao fazer upload do módulo",
         variant: "destructive",
       });
     } finally {
@@ -211,8 +211,8 @@ export function ModuleManagement() {
       await loadInstalledModules();
 
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || "Ocorreu um erro no servidor";
-      const status = error.response?.status;
+      const errorMessage = (error as unknown as { response?: { data?: { message?: string }, status?: number } })?.response?.data?.message || "Ocorreu um erro no servidor";
+      const status = (error as unknown as { response?: { status?: number } })?.response?.status;
 
       // Se não encontrado, atualiza a lista para remover o fantasma
       if (errorMessage === 'Módulo não encontrado' || status === 404) {
@@ -256,7 +256,7 @@ export function ModuleManagement() {
     } catch (error: any) {
       toast({
         title: "Erro ao carregar informações",
-        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as unknown as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     }
