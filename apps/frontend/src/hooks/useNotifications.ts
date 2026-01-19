@@ -198,7 +198,7 @@ export function useNotifications(): UseNotificationsReturn {
       setIsConnected(false);
     };
 
-    const handleConnectError = (error: any) => {
+    const handleConnectError = (error: unknown) => {
       if (!isActiveRef.current) return;
 
       console.error('❌ Erro de conexão Socket.IO:', error);

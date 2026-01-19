@@ -81,10 +81,10 @@ export default function SecurityConfigPage() {
           data: response.data,
           timestamp: Date.now()
         }));
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast({
           title: "Erro ao carregar configurações",
-          description: (error as unknown as { response?: { data?: { message?: string } } })?.response?.data?.message || "Erro desconhecido",
+          description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Erro desconhecido",
           variant: "destructive",
         });
       } finally {
@@ -137,10 +137,10 @@ export default function SecurityConfigPage() {
         title: "Configurações salvas",
         description: "As configurações de segurança foram atualizadas com sucesso",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao salvar",
-        description: (error as unknown as { response?: { data?: { message?: string } } })?.response?.data?.message || "Erro desconhecido",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Erro desconhecido",
         variant: "destructive",
       });
     } finally {

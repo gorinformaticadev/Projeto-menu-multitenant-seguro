@@ -5,7 +5,7 @@
  * Não gerencia estado complexo, apenas delega para moduleRegistry
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { moduleRegistry } from '@/lib/module-registry';
 
 export interface ModuleData {
@@ -36,7 +36,7 @@ export function useModulesManager() {
       setError(null);
 
       await moduleRegistry.loadModules();
-      
+
       // Obtém módulos do registry e atualiza estado
       const availableModules = moduleRegistry.getAvailableModules();
       const modulesData = availableModules.map(slug => ({
@@ -46,7 +46,7 @@ export function useModulesManager() {
         menus: moduleRegistry.getModuleMenus(slug),
         config: {} // TODO: buscar config se necessário
       }));
-      
+
       setModules(modulesData);
 
     } catch (err) {

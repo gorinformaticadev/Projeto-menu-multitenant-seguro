@@ -4,8 +4,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
-import { Package, Loader2 } from "lucide-react";
+import { Package } from "lucide-react";
 import api from "@/lib/api";
 import { modulesService } from "@/services/modules.service";
 
@@ -28,11 +27,10 @@ interface TenantModuleStatus {
 
 export function ModulesTab({ tenantId }: { tenantId: string }) {
   const { toast } = useToast();
-  const { user } = useAuth();
   const [systemModules, setSystemModules] = useState<SystemModule[]>([]);
   const [tenantModules, setTenantModules] = useState<TenantModuleStatus[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Debounce para evitar cliques múltiplos
   const lastClickTime = useRef<{ [key: string]: number }>({});
   const DEBOUNCE_DELAY = 1000; // 1 segundo
@@ -40,28 +38,28 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
   const loadModulesData = useCallback(async () => {
     try {
       setLoading(true);
-      
+
       // Buscar módulos do sistema
       const systemModulesResponse = await api.get('/configuracoes/sistema/modulos');
       setSystemModules(systemModulesResponse.data);
-      
+
       // Buscar módulos habilitados para o tenant
       const tenantModulesResponse = await api.get(`/tenants/${tenantId}/modules/active`);
       const enabledModules = tenantModulesResponse.data.modules || [];
-      
+
       // Mapear para formato de status
       const tenantStatus: TenantModuleStatus[] = systemModulesResponse.data.map((mod: SystemModule) => ({
         slug: mod.slug,
-        enabled: enabledModules.some((tm: any) => tm.name === mod.slug && tm.isActive)
+        enabled: enabledModules.some((tm: { name: string; isActive: boolean }) => tm.name === mod.slug && tm.isActive)
       }));
-      
+
       setTenantModules(tenantStatus);
-      
-    } catch (error: any) {
+
+    } catch (error: unknown) {
       console.error('Erro ao carregar módulos:', error);
       toast({
         title: "Erro ao carregar módulos",
-        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     } finally {
@@ -76,7 +74,7 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
   const handleToggleModule = useCallback(async (moduleSlug: string, currentStatus: boolean) => {
     const now = Date.now();
     const lastClick = lastClickTime.current[moduleSlug] || 0;
-    
+
     // Debounce - ignora cliques muito rápidos
     if (now - lastClick < DEBOUNCE_DELAY) {
       console.warn(`⚠️ [MODULES_TAB] Clique muito rápido em ${moduleSlug} - IGNORANDO (debounce)`);
@@ -88,7 +86,7 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
 
     try {
       // Optimistic update
-      setTenantModules(prev => prev.map(tm => 
+      setTenantModules(prev => prev.map(tm =>
         tm.slug === moduleSlug ? { ...tm, enabled: !currentStatus } : tm
       ));
 
@@ -106,19 +104,19 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
           description: `O módulo foi ativado para este tenant.`,
         });
       }
-      
+
       // Recarregar dados para confirmar
       await loadModulesData();
-      
-    } catch (error: any) {
+
+    } catch (error: unknown) {
       // Reverter optimistic update em caso de erro
-      setTenantModules(prev => prev.map(tm => 
+      setTenantModules(prev => prev.map(tm =>
         tm.slug === moduleSlug ? { ...tm, enabled: currentStatus } : tm
       ));
-      
+
       toast({
         title: "Erro ao atualizar módulo",
-        description: error.response?.data?.message || "Ocorreu um erro ao alterar o status do módulo",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro ao alterar o status do módulo",
         variant: "destructive",
       });
     }
@@ -156,7 +154,7 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
                 const tenantStatus = tenantModules.find(tm => tm.slug === module.slug);
                 const isEnabled = tenantStatus?.enabled || false;
                 const canToggle = module.status === 'active';
-                
+
                 return (
                   <div key={module.slug} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
                     <div className="flex-1 space-y-1 min-w-0">

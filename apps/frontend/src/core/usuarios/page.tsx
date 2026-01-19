@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
@@ -57,32 +57,7 @@ export default function UsuariosPage() {
     password: "",
   });
 
-  useEffect(() => {
-    // Se for ADMIN, não carrega tenants e usa o próprio tenant
-    if (user?.role === "ADMIN" && user?.tenantId) {
-      setSelectedTenantId(user.tenantId);
-      setLoading(false);
-    } else if (user?.role === "SUPER_ADMIN") {
-      loadTenants();
-    }
-  }, [user]);
-
-  useEffect(() => {
-    const tenantIdFromUrl = searchParams.get("tenantId");
-    if (tenantIdFromUrl && user?.role === "SUPER_ADMIN") {
-      setSelectedTenantId(tenantIdFromUrl);
-    }
-  }, [searchParams, user]);
-
-  useEffect(() => {
-    if (selectedTenantId) {
-      loadUsers();
-    } else {
-      setUsers([]);
-    }
-  }, [selectedTenantId]);
-
-  async function loadTenants() {
+  const loadTenants = useCallback(async () => {
     const cacheKey = 'tenants-list-cache';
     const cacheTTL = 5 * 60 * 1000; // 5 minutos
 
@@ -110,38 +85,63 @@ export default function UsuariosPage() {
         data: response.data,
         timestamp: Date.now()
       }));
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao carregar empresas",
-        description: error.response?.data?.message || "Ocorreu um erro",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  async function loadUsers() {
+  useEffect(() => {
+    // Se for ADMIN, não carrega tenants e usa o próprio tenant
+    if (user?.role === "ADMIN" && user?.tenantId) {
+      setSelectedTenantId(user.tenantId);
+      setLoading(false);
+    } else if (user?.role === "SUPER_ADMIN") {
+      loadTenants();
+    }
+  }, [user, loadTenants]);
+
+  useEffect(() => {
+    const tenantIdFromUrl = searchParams.get("tenantId");
+    if (tenantIdFromUrl && user?.role === "SUPER_ADMIN") {
+      setSelectedTenantId(tenantIdFromUrl);
+    }
+  }, [searchParams, user]);
+
+  const loadUsers = useCallback(async () => {
     if (!selectedTenantId) return;
-    
+
     setLoadingUsers(true);
     try {
       const response = await api.get(`/users/tenant/${selectedTenantId}`);
       setUsers(response.data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao carregar usuários",
-        description: error.response?.data?.message || "Ocorreu um erro",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro",
         variant: "destructive",
       });
     } finally {
       setLoadingUsers(false);
     }
-  }
+  }, [selectedTenantId]);
+
+  useEffect(() => {
+    if (selectedTenantId) {
+      loadUsers();
+    } else {
+      setUsers([]);
+    }
+  }, [selectedTenantId, loadUsers]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    
+
     if (!selectedTenantId) {
       toast({
         title: "Erro",
@@ -166,15 +166,15 @@ export default function UsuariosPage() {
         await api.post("/users", dataToSend);
         toast({ title: "Usuário criado com sucesso!" });
       }
-      
+
       setShowDialog(false);
       setEditingUser(null);
       setFormData({ email: "", name: "", role: "USER", password: "" });
       loadUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro",
-        description: error.response?.data?.message || "Ocorreu um erro",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro",
         variant: "destructive",
       });
     } finally {
@@ -189,10 +189,10 @@ export default function UsuariosPage() {
       await api.delete(`/users/${id}`);
       toast({ title: "Usuário deletado com sucesso!" });
       loadUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao deletar",
-        description: error.response?.data?.message || "Ocorreu um erro",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro",
         variant: "destructive",
       });
     }
@@ -205,10 +205,10 @@ export default function UsuariosPage() {
       await api.post(`/users/${id}/unlock`);
       toast({ title: "Usuário desbloqueado com sucesso!" });
       loadUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao desbloquear",
-        description: error.response?.data?.message || "Ocorreu um erro",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro",
         variant: "destructive",
       });
     }
@@ -391,9 +391,9 @@ export default function UsuariosPage() {
                     <CardContent>
                       <div className="flex gap-2">
                         {user.isLocked && (
-                          <Button 
-                            variant="default" 
-                            size="sm" 
+                          <Button
+                            variant="default"
+                            size="sm"
                             onClick={() => handleUnlock(user.id, user.name)}
                             className="bg-green-600 hover:bg-green-700"
                           >
@@ -466,7 +466,7 @@ export default function UsuariosPage() {
                   id="password"
                   label={editingUser ? "Nova Senha (deixe em branco para não alterar)" : "Senha"}
                   value={formData.password}
-                  onChange={(value, isValid) => setFormData(prev => ({ ...prev, password: value }))}
+                  onChange={(value, _isValid) => setFormData(prev => ({ ...prev, password: value }))}
                   showValidation={!editingUser || formData.password.length > 0}
                   showStrengthMeter={true}
                   placeholder={editingUser ? "Digite a nova senha (opcional)" : "Digite a senha"}

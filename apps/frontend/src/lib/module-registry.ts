@@ -194,7 +194,7 @@ class ModuleRegistry {
    * Retorna itens da taskbar baseado nos módulos ativos
    * Taskbar = atalhos rápidos para funcionalidades principais
    */
-  getTaskbarItems(userRole?: string): Array<{ id: string; name: string; icon: string; href: string; order: number }>{
+  getTaskbarItems(_userRole?: string): Array<{ id: string; name: string; icon: string; href: string; order: number }> {
     if (!this.isLoaded) return [];
 
     const taskbarItems: Array<{ id: string; name: string; icon: string; href: string; order: number }> = [];
@@ -221,7 +221,7 @@ class ModuleRegistry {
    * Retorna itens do menu do usuário baseado nos módulos ativos
    * User Menu = menu dropdown no canto superior direito
    */
-  getUserMenuItems(userRole?: string): ModuleUserMenuItem[] {
+  getUserMenuItems(_userRole?: string): ModuleUserMenuItem[] {
     if (!this.isLoaded) return [];
 
     const userMenuItems: ModuleUserMenuItem[] = [];
@@ -261,8 +261,8 @@ class ModuleRegistry {
   }
 
   getModuleMenus(slug: string): ModuleMenu[] {
-    const module = this.getModule(slug);
-    return module?.menus || [];
+    const mod = this.getModule(slug);
+    return mod?.menus || [];
   }
 }
 

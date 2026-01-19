@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -53,11 +53,7 @@ export function ModuleManagement() {
   const [showMigrationsSeedsDialog, setShowMigrationsSeedsDialog] = useState(false);
   const [selectedModuleForMigrations, setSelectedModuleForMigrations] = useState<InstalledModule | null>(null);
 
-  useEffect(() => {
-    loadInstalledModules();
-  }, []);
-
-  const loadInstalledModules = async () => {
+  const loadInstalledModules = useCallback(async () => {
     try {
       setLoading(true);
       // Usa o endpoint correto /configuracoes/sistema/modulos que retorna módulos globais
@@ -73,7 +69,11 @@ export function ModuleManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadInstalledModules();
+  }, [loadInstalledModules]);
 
   const handleFileSelect = () => {
     fileInputRef.current?.click();
@@ -149,10 +149,10 @@ export function ModuleManagement() {
         fileInputRef.current.value = '';
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro no upload",
-        description: (error as unknown as { response?: { data?: { message?: string } } })?.response?.data?.message || "Erro ao fazer upload do módulo",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Erro ao fazer upload do módulo",
         variant: "destructive",
       });
     } finally {
@@ -210,9 +210,9 @@ export function ModuleManagement() {
       setConfirmationInput(""); // Limpa input
       await loadInstalledModules();
 
-    } catch (error: any) {
-      const errorMessage = (error as unknown as { response?: { data?: { message?: string }, status?: number } })?.response?.data?.message || "Ocorreu um erro no servidor";
-      const status = (error as unknown as { response?: { status?: number } })?.response?.status;
+    } catch (error: unknown) {
+      const errorMessage = (error as { response?: { data?: { message?: string }, status?: number } })?.response?.data?.message || "Ocorreu um erro no servidor";
+      const status = (error as { response?: { status?: number } })?.response?.status;
 
       // Se não encontrado, atualiza a lista para remover o fantasma
       if (errorMessage === 'Módulo não encontrado' || status === 404) {
@@ -253,10 +253,10 @@ export function ModuleManagement() {
       // Ajustamos para exibir o módulo
       setSelectedModule(response.data.module);
       setShowInfoDialog(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao carregar informações",
-        description: (error as unknown as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     }
@@ -294,10 +294,10 @@ export function ModuleManagement() {
       // Recarregar lista de módulos para atualizar o status
       await loadInstalledModules();
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao atualizar banco de dados",
-        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     } finally {
@@ -319,10 +319,10 @@ export function ModuleManagement() {
       // Recarregar lista de módulos para atualizar o status
       await loadInstalledModules();
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao ativar módulo",
-        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     }
@@ -341,10 +341,10 @@ export function ModuleManagement() {
       // Recarregar lista de módulos para atualizar o status
       await loadInstalledModules();
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao desativar módulo",
-        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     }
@@ -355,8 +355,7 @@ export function ModuleManagement() {
 
     try {
       // Endpoint: /configuracoes/sistema/modulos/:slug/reload-config
-      const response = await api.post(`/configuracoes/sistema/modulos/${moduleName}/reload-config`);
-  await api.post(`/configuracoes/sistema/modulos/${moduleName}/reload-config`);
+      await api.post(`/configuracoes/sistema/modulos/${moduleName}/reload-config`);
 
       toast({
         title: "Configuração Recarregada!",
@@ -366,10 +365,10 @@ export function ModuleManagement() {
       // Recarregar lista de módulos
       await loadInstalledModules();
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao recarregar configuração",
-        description: error.response?.data?.message || "Ocorreu um erro ao recarregar a configuração",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro ao recarregar a configuração",
         variant: "destructive",
       });
     } finally {
@@ -382,7 +381,7 @@ export function ModuleManagement() {
 
     try {
       console.log(`🔄 Frontend: Executando migrations/seeds para ${moduleName}`);
-      
+
       // Endpoint: /configuracoes/sistema/modulos/:slug/run-migrations-seeds
       const response = await api.post(`/configuracoes/sistema/modulos/${moduleName}/run-migrations-seeds`);
 
@@ -396,12 +395,12 @@ export function ModuleManagement() {
       // Recarregar lista de módulos
       await loadInstalledModules();
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`❌ Frontend: Erro ao executar migrations/seeds:`, error);
-      
+
       toast({
         title: "Erro ao executar migrations/seeds",
-        description: error.response?.data?.message || "Ocorreu um erro ao executar migrations e seeds",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro ao executar migrations e seeds",
         variant: "destructive",
       });
     } finally {

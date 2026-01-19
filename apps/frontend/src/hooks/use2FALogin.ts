@@ -18,22 +18,22 @@ export function use2FALogin() {
     try {
       // Delegar para AuthContext
       const result = await loginWithCredentials(email, password);
-      
+
       if (result.success) {
         // Login concluído com sucesso - AuthContext já redirecionou
         return { success: true };
       }
-      
+
       if (result.requires2FA) {
         // 2FA necessário - atualizar estado da UI
         setRequires2FA(true);
         return { success: false, requires2FA: true };
       }
-      
+
       // Erro de login
       setError(result.error || "Erro ao fazer login");
       return { success: false, requires2FA: false };
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Erro inesperado
       setError("Erro ao fazer login");
       return { success: false, requires2FA: false };
@@ -58,7 +58,7 @@ export function use2FALogin() {
       // Erro no código 2FA
       setError(result.error || "Código inválido");
       return { success: false };
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Erro inesperado
       setError("Erro ao validar código");
       return { success: false };

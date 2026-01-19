@@ -95,15 +95,15 @@ export function usePlatformConfig() {
       try {
         setLoading(true);
         setError(null);
-        
+
         const platformConfig = await getPlatformConfig();
-        
+
         if (mounted) {
           setConfig(platformConfig);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (mounted) {
-          setError(err.message || 'Failed to load platform configuration');
+          setError((err as Error).message || 'Failed to load platform configuration');
           setConfig(DEFAULT_PLATFORM_CONFIG);
         }
       } finally {
@@ -123,13 +123,13 @@ export function usePlatformConfig() {
   const refreshConfig = async () => {
     clearPlatformConfigCache();
     setLoading(true);
-    
+
     try {
       const platformConfig = await getPlatformConfig();
       setConfig(platformConfig);
       setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Failed to refresh platform configuration');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Failed to refresh platform configuration');
       setConfig(DEFAULT_PLATFORM_CONFIG);
     } finally {
       setLoading(false);

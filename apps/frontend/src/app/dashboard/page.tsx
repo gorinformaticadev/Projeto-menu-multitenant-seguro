@@ -1,9 +1,10 @@
 "use client";
 
+import React from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { use2FAStatus } from "@/hooks/use2FAStatus";
 import { useModuleFeatures } from "@/hooks/useModuleFeatures";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Shield, Building2, Users, Settings, AlertTriangle } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,8 +14,8 @@ import { ModuleRegistryWidgets } from "@/components/ModuleRegistryWidgets";
 import { PlatformName } from "@/components/PlatformInfo";
 
 // Helper para ícones dinâmicos
-const getIconComponent = (iconName: string): any => {
-  return (LucideIcons as any)[iconName] || LucideIcons.HelpCircle;
+const getIconComponent = (iconName: string): React.ComponentType<any> => {
+  return (LucideIcons as unknown as Record<string, React.ComponentType<any>>)[iconName] || LucideIcons.HelpCircle;
 };
 
 export default function DashboardPage() {
