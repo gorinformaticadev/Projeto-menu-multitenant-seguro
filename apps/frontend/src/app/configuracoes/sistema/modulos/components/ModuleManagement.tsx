@@ -19,15 +19,6 @@ import {
 } from "@/lib/module-utils";
 
 // **NOVAS INTERFACES:** Controle de Migrations
-interface MigrationRecord {
-  id: string;
-  fileName: string;
-  type: 'MIGRATION' | 'SEED';
-  status: 'PENDING' | 'EXECUTING' | 'COMPLETED' | 'FAILED';
-  executedAt: string | null;
-  executionTime: number | null;
-  errorMessage: string | null;
-}
 
 // interface ModuleMigrationStatus {
 //   moduleName: string;

@@ -84,7 +84,7 @@ export default function SecurityConfigPage() {
       } catch (error: any) {
         toast({
           title: "Erro ao carregar configurações",
-          description: (error as any)?.response?.data?.message || "Erro desconhecido",
+          description: (error as unknown as any)?.response?.data?.message || "Erro desconhecido",
           variant: "destructive",
         });
       } finally {
@@ -140,7 +140,7 @@ export default function SecurityConfigPage() {
     } catch (error: any) {
       toast({
         title: "Erro ao salvar",
-        description: (error as any)?.response?.data?.message || "Erro desconhecido",
+        description: (error as unknown as any)?.response?.data?.message || "Erro desconhecido",
         variant: "destructive",
       });
     } finally {

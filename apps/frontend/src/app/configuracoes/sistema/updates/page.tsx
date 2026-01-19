@@ -104,7 +104,7 @@ export default function UpdatesPage() {
     } catch (error: any) {
       toast({
         title: 'Erro ao carregar status',
-        description: (error as any)?.response?.data?.message || 'Erro interno do servidor',
+        description: (error as unknown as any)?.response?.data?.message || 'Erro interno do servidor',
         variant: 'destructive',
       });
     } finally {
@@ -215,7 +215,7 @@ export default function UpdatesPage() {
     } catch (error: any) {
       toast({
         title: 'Erro ao carregar histórico',
-        description: (error as any)?.response?.data?.message || 'Erro interno do servidor',
+        description: (error as unknown as any)?.response?.data?.message || 'Erro interno do servidor',
         variant: 'destructive',
       });
     } finally {

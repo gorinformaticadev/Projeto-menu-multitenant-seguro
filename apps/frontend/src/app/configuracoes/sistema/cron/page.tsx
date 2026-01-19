@@ -26,7 +26,7 @@ export default function CronJobsPage() {
     const [jobs, setJobs] = useState<CronJob[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const fetchJobs = async () => {
+    const fetchJobs = useCallback(async () => {
         try {
             setLoading(true);
             const response = await api.get("/cron");

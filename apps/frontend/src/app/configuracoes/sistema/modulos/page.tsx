@@ -1,6 +1,5 @@
 "use client";
 
-import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Package } from "lucide-react";
 import { ModuleManagement } from "./components/ModuleManagement";
