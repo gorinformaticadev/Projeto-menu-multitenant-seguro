@@ -50,7 +50,10 @@ export default function ModuleExemploSettingsPage() {
       moduleFunction(window, document);
 
       // Obter e renderizar o componente
-      const ModuleComponent = (window as unknown as { ModuleExemploSettingsPage: any }).ModuleExemploSettingsPage;
+      interface WindowWithModule extends Window {
+        ModuleExemploSettingsPage: () => { render: () => HTMLElement };
+      }
+      const ModuleComponent = (window as unknown as WindowWithModule).ModuleExemploSettingsPage;
 
       if (containerRef.current && ModuleComponent) {
         const moduleInstance = ModuleComponent();

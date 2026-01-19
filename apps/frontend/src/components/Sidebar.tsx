@@ -81,7 +81,11 @@ export function Sidebar() {
       //   detalhes: grouped
       // });
 
-      setGroupedItems(grouped as any); // Cast temporário para evitar incompatibilidade
+      setGroupedItems(grouped as unknown as {
+        ungrouped: ModuleMenuItem[];
+        groups: Record<string, ModuleMenuItem[]>;
+        groupOrder: string[];
+      });
 
       // const totalItems = grouped.ungrouped.length + Object.values(grouped.groups).flat().length;
       // console.log('📋 Itens do menu carregados:', totalItems);
@@ -127,7 +131,7 @@ export function Sidebar() {
         );
       }
 
-      setGroupedItems({ ungrouped: basicItems, groups: {}, groupOrder: [] } as any);
+      setGroupedItems({ ungrouped: basicItems, groups: {}, groupOrder: [] });
     }
   }, [user?.role]);
 
@@ -252,11 +256,11 @@ export function Sidebar() {
             const allRenderItems: React.JSX.Element[] = [];
 
             // Cria uma lista de todos os itens e grupos com suas ordens
-            const renderQueue: Array<{
-              type: 'item' | 'group';
-              order: number;
-              data: any;
-            }> = [];
+            type RenderQueueItem =
+              | { type: 'item'; order: number; data: ModuleMenuItem }
+              | { type: 'group'; order: number; data: { groupId: string; items: ModuleMenuItem[]; config: { name: string; icon: React.ElementType; order: number } } };
+
+            const renderQueue: RenderQueueItem[] = [];
 
             // Adiciona itens não agrupados à fila
             groupedItems.ungrouped.forEach((item) => {
