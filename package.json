@@ -1,8 +1,12 @@
 {
   "private": true,
-  "workspaces": [
-    "apps/*"
-  ],
+  "workspaces": {
+    "packages": ["apps/*"],
+    "nohoist": [
+      "**/@eslint/**",
+      "**/eslint"
+    ]
+  },
   "overrides": {
     "diff": "^8.0.3"
   }
