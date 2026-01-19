@@ -101,10 +101,19 @@ export default function UpdatesPage() {
       setLoading(prev => ({ ...prev, status: true }));
       const response = await api.get('/api/update/status');
       setStatus(response.data);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let message = 'Erro interno do servidor';
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        typeof (error as { response?: { data?: { message?: unknown } } }).response?.data?.message === 'string'
+      ) {
+        message = (error as { response: { data: { message: string } } }).response.data.message;
+      }
       toast({
         title: 'Erro ao carregar status',
-        description: error.response?.data?.message || 'Erro interno do servidor',
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -127,10 +136,19 @@ export default function UpdatesPage() {
       });
       
       await loadStatus();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let message = 'Erro interno do servidor';
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        typeof (error as any).response?.data?.message === 'string'
+      ) {
+        message = (error as any).response.data.message;
+      }
       toast({
         title: 'Erro na verificação',
-        description: error.response?.data?.message || 'Erro interno do servidor',
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -166,10 +184,19 @@ export default function UpdatesPage() {
         loadLogs();
       }, 3000);
       
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let message = 'Erro interno do servidor';
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        typeof (error as any).response?.data?.message === 'string'
+      ) {
+        message = (error as any).response.data.message;
+      }
       toast({
         title: 'Erro na atualização',
-        description: error.response?.data?.message || 'Erro interno do servidor',
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -193,10 +220,19 @@ export default function UpdatesPage() {
       });
       
       await loadStatus();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let message = 'Erro interno do servidor';
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        typeof (error as any).response?.data?.message === 'string'
+      ) {
+        message = (error as any).response.data.message;
+      }
       toast({
         title: 'Erro ao salvar configurações',
-        description: error.response?.data?.message || 'Erro interno do servidor',
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -212,10 +248,19 @@ export default function UpdatesPage() {
       setLoading(prev => ({ ...prev, logs: true }));
       const response = await api.get('/api/update/logs?limit=20');
       setLogs(response.data.data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let message = 'Erro interno do servidor';
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        typeof (error as any).response?.data?.message === 'string'
+      ) {
+        message = (error as any).response.data.message;
+      }
       toast({
         title: 'Erro ao carregar histórico',
-        description: error.response?.data?.message || 'Erro interno do servidor',
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -235,10 +280,19 @@ export default function UpdatesPage() {
         description: response.data.message,
         variant: response.data.connected ? 'default' : 'destructive',
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let message = 'Erro interno do servidor';
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        typeof (error as any).response?.data?.message === 'string'
+      ) {
+        message = (error as any).response.data.message;
+      }
       toast({
         title: 'Erro no teste de conexão',
-        description: error.response?.data?.message || 'Erro interno do servidor',
+        description: message,
         variant: 'destructive',
       });
     }
@@ -363,10 +417,13 @@ export default function UpdatesPage() {
                     <Label className="text-sm font-medium">Status</Label>
                     <div>
                       {status.updateAvailable ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500 text-white">
-                          <Download className="w-3 h-3 mr-1" />
-                          Atualização Disponível
-                        </span>
+                        <>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500 text-white">
+                            <Download className="w-3 h-3 mr-1" />
+                            Atualização Disponível
+                          </span>
+                          <span className="ml-2">Clique em &quot;Executar Atualização&quot; para atualizar o sistema.</span>
+                        </>
                       ) : (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                           <CheckCircle className="w-3 h-3 mr-1" />
@@ -401,7 +458,7 @@ export default function UpdatesPage() {
               <Download className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-blue-800">
                 Nova versão disponível: {status.availableVersion}. 
-                Clique em "Executar Atualização" para atualizar o sistema.
+                Clique em &quot;Executar Atualização&quot; para atualizar o sistema.
               </div>
             </div>
           )}

@@ -1,5 +1,7 @@
 
+
 import * as React from "react"
+import PropTypes from 'prop-types';
 
 import { cn } from "@/lib/utils"
 
@@ -66,6 +68,9 @@ const TableRow = React.forwardRef<
     />
 ))
 TableRow.displayName = "TableRow"
+TableRow.propTypes = {
+    className: PropTypes.string,
+};
 
 const TableHead = React.forwardRef<
     HTMLTableCellElement,
@@ -81,6 +86,10 @@ const TableHead = React.forwardRef<
     />
 ))
 TableHead.displayName = "TableHead"
+TableHead.propTypes = {
+    className: PropTypes.string,
+};
+
 
 const TableCell = React.forwardRef<
     HTMLTableCellElement,
@@ -93,6 +102,9 @@ const TableCell = React.forwardRef<
     />
 ))
 TableCell.displayName = "TableCell"
+TableCell.propTypes = {
+    className: PropTypes.string,
+};
 
 const TableCaption = React.forwardRef<
     HTMLTableCaptionElement,

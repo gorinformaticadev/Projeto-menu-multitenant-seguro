@@ -34,10 +34,14 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
       setQrCode(response.data.qrCode);
       setSecret(response.data.secret);
       setShowSetup(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let message = "Erro desconhecido";
+      if (error && typeof error === "object" && "response" in error && error.response && typeof error.response === "object" && "data" in error.response && error.response.data && typeof error.response.data === "object" && "message" in error.response.data) {
+        message = (error.response.data as any).message;
+      }
       toast({
         title: "Erro ao gerar QR Code",
-        description: error.response?.data?.message || "Erro desconhecido",
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -67,10 +71,14 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
       setSecret(null);
       setVerificationCode("");
       onStatusChange();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let message = "Código inválido";
+      if (error && typeof error === "object" && "response" in error && error.response && typeof error.response === "object" && "data" in error.response && error.response.data && typeof error.response.data === "object" && "message" in error.response.data) {
+        message = (error.response.data as any).message;
+      }
       toast({
         title: "Erro ao ativar 2FA",
-        description: error.response?.data?.message || "Código inválido",
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -101,10 +109,14 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
       });
       setVerificationCode("");
       onStatusChange();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let message = "Código inválido";
+      if (error && typeof error === "object" && "response" in error && error.response && typeof error.response === "object" && "data" in error.response && error.response.data && typeof error.response.data === "object" && "message" in error.response.data) {
+        message = (error.response.data as any).message;
+      }
       toast({
         title: "Erro ao desativar 2FA",
-        description: error.response?.data?.message || "Código inválido",
+        description: message,
         variant: "destructive",
       });
     } finally {

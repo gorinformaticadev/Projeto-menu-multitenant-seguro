@@ -101,10 +101,14 @@ export default function UpdatesPage() {
       setLoading(prev => ({ ...prev, status: true }));
       const response = await api.get('/api/update/status');
       setStatus(response.data);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let message = 'Erro interno do servidor';
+      if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response && error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data) {
+        message = (error.response.data as any).message;
+      }
       toast({
         title: 'Erro ao carregar status',
-        description: error.response?.data?.message || 'Erro interno do servidor',
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -127,10 +131,14 @@ export default function UpdatesPage() {
       });
       
       await loadStatus();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let message = 'Erro interno do servidor';
+      if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response && error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data) {
+        message = (error.response.data as any).message;
+      }
       toast({
         title: 'Erro na verificação',
-        description: error.response?.data?.message || 'Erro interno do servidor',
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -166,10 +174,14 @@ export default function UpdatesPage() {
         loadLogs();
       }, 3000);
       
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let message = 'Erro interno do servidor';
+      if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response && error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data) {
+        message = (error.response.data as any).message;
+      }
       toast({
         title: 'Erro na atualização',
-        description: error.response?.data?.message || 'Erro interno do servidor',
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -193,10 +205,14 @@ export default function UpdatesPage() {
       });
       
       await loadStatus();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let message = 'Erro interno do servidor';
+      if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response && error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data) {
+        message = (error.response.data as any).message;
+      }
       toast({
         title: 'Erro ao salvar configurações',
-        description: error.response?.data?.message || 'Erro interno do servidor',
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -212,10 +228,14 @@ export default function UpdatesPage() {
       setLoading(prev => ({ ...prev, logs: true }));
       const response = await api.get('/api/update/logs?limit=20');
       setLogs(response.data.data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let message = 'Erro interno do servidor';
+      if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response && error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data) {
+        message = (error.response.data as any).message;
+      }
       toast({
         title: 'Erro ao carregar histórico',
-        description: error.response?.data?.message || 'Erro interno do servidor',
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -235,7 +255,11 @@ export default function UpdatesPage() {
         description: response.data.message,
         variant: response.data.connected ? 'default' : 'destructive',
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let message = 'Erro interno do servidor';
+      if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response && error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data) {
+        message = (error.response.data as any).message;
+      }
       toast({
         title: 'Erro no teste de conexão',
         description: error.response?.data?.message || 'Erro interno do servidor',
@@ -391,7 +415,7 @@ export default function UpdatesPage() {
             <div className="flex items-start gap-3 p-4 border border-yellow-200 bg-yellow-50 rounded-lg">
               <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-yellow-800">
-                Sistema não configurado. Configure o repositório Git na aba "Configurações" para habilitar atualizações automáticas.
+                Sistema não configurado. Configure o repositório Git na aba &quot;Configurações&quot; para habilitar atualizações automáticas.
               </div>
             </div>
           )}
@@ -401,7 +425,7 @@ export default function UpdatesPage() {
               <Download className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-blue-800">
                 Nova versão disponível: {status.availableVersion}. 
-                Clique em "Executar Atualização" para atualizar o sistema.
+                Clique em &quot;Executar Atualização&quot; para atualizar o sistema.
               </div>
             </div>
           )}
