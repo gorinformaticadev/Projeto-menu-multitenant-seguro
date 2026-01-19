@@ -7,46 +7,61 @@ import tsParser from '@typescript-eslint/parser';
 
 export default [
   js.configs.recommended,
-
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
-        ecmaVersion: 'latest',
+        ecmaVersion: 2022,
         sourceType: 'module',
-        ecmaFeatures: {
-          jsx: true
-        }
-      }
+        ecmaFeatures: { jsx: true },
+        project: ['./tsconfig.json'],
+      },
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        console: 'readonly',
+        setTimeout: 'readonly',
+        require: 'readonly',
+        __dirname: 'readonly',
+        process: 'readonly',
+        module: 'readonly',
+      },
     },
     plugins: {
+      '@typescript-eslint': tseslint,
       react,
       'react-hooks': reactHooks,
       '@next/next': nextPlugin,
-      '@typescript-eslint': tseslint
     },
     rules: {
-      /* React */
+      ...tseslint.configs.recommended.rules,
+      ...react.configs.recommended.rules,
+      ...reactHooks.configs.recommended.rules,
+      ...nextPlugin.configs.recommended.rules,
       'react/react-in-jsx-scope': 'off',
-      'react/no-unescaped-entities': 'warn',
-
-      /* React Hooks */
+      'react/jsx-uses-react': 'off',
+      'react/jsx-uses-vars': 'warn',
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
-
-      /* Next.js */
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/ban-ts-comment': 'warn',
+      '@typescript-eslint/prefer-ts-expect-error': 'warn',
       '@next/next/no-img-element': 'warn',
       '@next/next/no-assign-module-variable': 'warn',
-
-      /* TypeScript */
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': 'warn'
     },
     settings: {
       react: {
-        version: 'detect'
-      }
-    }
-  }
+        version: 'detect',
+      },
+    },
+  },
+  {
+    files: ['**/test-*.js', '**/debug-*.js'],
+    rules: {
+      'no-console': 'off',
+      'no-undef': 'off',
+    },
+  },
 ];
