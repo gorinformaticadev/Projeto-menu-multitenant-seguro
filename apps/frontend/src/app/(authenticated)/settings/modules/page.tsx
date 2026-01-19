@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, Package, CheckCircle, XCircle, AlertTriangle, Trash2, Power, PowerOff } from 'lucide-react';
+import { Upload, Package, CheckCircle, AlertTriangle, Trash2, Power, PowerOff } from 'lucide-react';
 import axios from 'axios';
 
 interface Module {
@@ -89,8 +89,12 @@ export default function ModulesManagementPage() {
             } else {
                 alert('Erro ao enviar módulo: ' + response.data.message);
             }
-        } catch (error: any) {
-            alert('Erro ao enviar módulo: ' + (error.response?.data?.message || error.message));
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                alert('Erro ao enviar módulo: ' + error.message);
+            } else {
+                alert('Erro ao enviar módulo: Erro desconhecido');
+            }
         } finally {
             setUploading(false);
         }
@@ -111,8 +115,12 @@ export default function ModulesManagementPage() {
             await axios.post(`/api/modules/${id}/enable`);
             alert('Módulo ativado com sucesso!');
             loadModules();
-        } catch (error: any) {
-            alert('Erro ao ativar módulo: ' + (error.response?.data?.message || error.message));
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                alert('Erro ao ativar módulo: ' + error.message);
+            } else {
+                alert('Erro ao ativar módulo: Erro desconhecido');
+            }
         }
     };
 

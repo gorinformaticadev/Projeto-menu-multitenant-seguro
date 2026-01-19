@@ -13,7 +13,7 @@ Sentry.init({
   environment: process.env.NODE_ENV,
   
   // Filtrar dados sensíveis
-  beforeSend(event, hint) {
+  beforeSend(event) {
     // Remover dados sensíveis
     if (event.request) {
       if (event.request.headers) {

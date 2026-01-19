@@ -15,8 +15,9 @@ import { Package, CheckCircle, Activity, Zap } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
 // Helper para ícones dinâmicos
-const getIconComponent = (iconName: string): any => {
-  return (LucideIcons as any)[iconName] || Package;
+const getIconComponent = (iconName: string): React.ComponentType | undefined => {
+  const Icon = (LucideIcons as Record<string, React.ComponentType | undefined>)[iconName];
+  return Icon || Package;
 };
 
 // Widget genérico para módulos
@@ -56,7 +57,17 @@ function GenericModuleWidget({ widget }: { widget: ModuleDashboardWidget }) {
 
 // Cores por módulo
 function getModuleColors(moduleSlug: string) {
-  const colorSchemes: Record<string, any> = {
+  type ColorScheme = {
+    border: string;
+    bg: string;
+    title: string;
+    badge: string;
+    value: string;
+    description: string;
+    label: string;
+    status: string;
+  };
+  const colorSchemes: Record<string, ColorScheme> = {
     sistema: {
       border: 'border-purple-200',
       bg: 'bg-purple-50/50',

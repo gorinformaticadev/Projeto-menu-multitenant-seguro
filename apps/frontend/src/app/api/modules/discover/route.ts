@@ -35,9 +35,9 @@ interface ModulePage {
 
 interface ModuleBootstrap {
   pages: ModulePage[];
-  routes?: any[];
-  menus?: any[];
-  permissions?: any[];
+  routes?: unknown[];
+  menus?: unknown[];
+  permissions?: unknown[];
 }
 
 interface LoadedModule {
@@ -252,9 +252,9 @@ async function loadModuleConfigFromTS(configPath: string): Promise<ModuleConfig 
     const configText = moduleConfigMatch[1];
 
     // Extrair campos usando regex individual (mais seguro que eval)
-    const extractField = (fieldName: string, defaultValue?: any) => {
+    const extractField = (fieldName: string, defaultValue?: unknown) => {
       // Regex melhorado para capturar strings entre aspas ou valores booleanos
-      const fieldRegex = new RegExp(`${fieldName}\\s*:\\s*(['"]?)([^'"\n,}]*?)\\1(?:[,\s}]|$)`, 'i');
+      const fieldRegex = new RegExp(`${fieldName}\s*:\s*(['"]?)([^'"\n,}]*?)\1(?:[\s,}]|$)`, 'i');
       const match = configText.match(fieldRegex);
       if (!match) return defaultValue;
 
