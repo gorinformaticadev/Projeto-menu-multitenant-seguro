@@ -1,16 +1,17 @@
 
 import { Controller, Get, Post, Put, Body, Param, UseGuards } from '@nestjs/common';
 import { CronService } from './cron.service';
-import { Roles } from '../roles.decorator';
-import { RolesGuard } from '../roles.guard';
-import { JwtAuthGuard } from '../jwt-auth.guard';
+import { Roles } from '../decorators/roles.decorator';
+import { RolesGuard } from '../guards/roles.guard';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { Role } from '@prisma/client';
 
 @Controller('cron')
-@UseGuards(RolesGuard)
-@Roles('SUPER_ADMIN') // Apenas super admins podem gerenciar crons
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.SUPER_ADMIN) // Apenas super admins podem gerenciar crons
 export class CronController {
     constructor(private readonly cronService: CronService) {
-      // Empty implementation
+        // Empty implementation
     }
 
     @Get()

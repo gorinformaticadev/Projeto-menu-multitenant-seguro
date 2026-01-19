@@ -1,3 +1,5 @@
+"use client";
+
 // Utilitário para extrair mensagem de erro de objetos desconhecidos
 type ErrorWithResponse = { response?: { data?: { message?: string } } };
 type ErrorWithMessage = { message?: string };
@@ -13,7 +15,6 @@ function getErrorMessage(err: unknown): string {
   }
   return 'Erro desconhecido';
 }
-"use client";
 
 import { useState, useEffect } from "react";
 import api from "@/lib/api";

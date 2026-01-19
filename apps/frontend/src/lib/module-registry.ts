@@ -58,6 +58,8 @@ class ModuleRegistry {
   private codeDefinitions: Map<string, FrontendModuleDefinition> = new Map(); // Dados do Código (Comportamento)
   private isLoaded: boolean = false;
 
+  private loadingPromise: Promise<void> | null = null;
+
   private constructor() { }
 
   static getInstance(): ModuleRegistry {
@@ -81,18 +83,39 @@ class ModuleRegistry {
 
   /**
    * Carrega módulos da API (Chamado ao logar)
+   * Prevents duplicate requests using a promise lock
    */
-  async loadModules(): Promise<void> {
-    try {
-      const response = await api.get<ModulesResponse>(`${API_URL}/me/modules`);
-      this.apiModules = response.data.modules.filter(m => m.enabled !== false);
-      this.isLoaded = true;
-      // console.log('✅ [ModuleRegistry] Módulos ativos carregados da API:', this.apiModules.length);
-    } catch (error) {
-      console.error('❌ [ModuleRegistry] Erro ao carregar módulos da API:', error);
-      this.apiModules = [];
-      this.isLoaded = false;
+  async loadModules(force: boolean = false): Promise<void> {
+    // Se já estiver carregado e não for forçado, retorna
+    if (this.isLoaded && !force) return;
+
+    // Se já houver uma requisição em andamento, retorna a promise dela
+    if (this.loadingPromise) {
+      return this.loadingPromise;
     }
+
+    this.loadingPromise = (async () => {
+      try {
+        const response = await api.get<ModulesResponse>(`${API_URL}/me/modules`);
+        this.apiModules = response.data.modules.filter(m => m.enabled !== false);
+        this.isLoaded = true;
+        // console.log('✅ [ModuleRegistry] Módulos ativos carregados da API:', this.apiModules.length);
+
+        // Disparar evento para componentes ouvirem
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('moduleStatusChanged'));
+        }
+      } catch (error) {
+        console.error('❌ [ModuleRegistry] Erro ao carregar módulos da API:', error);
+        this.apiModules = [];
+        this.isLoaded = false;
+        throw error; // Propagar erro para quem chamou saber
+      } finally {
+        this.loadingPromise = null;
+      }
+    })();
+
+    return this.loadingPromise;
   }
 
   /**
@@ -139,16 +162,16 @@ class ModuleRegistry {
 
   getGroupedSidebarItems(userRole?: string): { ungrouped: ModuleMenu[]; groups: Record<string, ModuleMenu[]>; groupOrder: string[] } {
     // Lógica original preservada para Sidebar por enquanto
-    const coreItems = [
-      { id: 'dashboard', name: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard', order: 1 }
+    const coreItems: ModuleMenu[] = [
+      { id: 'dashboard', label: 'Dashboard', route: '/dashboard', icon: 'LayoutDashboard', order: 1 }
     ];
 
-    const adminItems = [];
+    const adminItems: ModuleMenu[] = [];
     if (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') {
       adminItems.push(
-        { id: 'tenants', name: 'Empresas', href: '/empresas', icon: 'Building2', order: 10, group: 'administration' },
-        { id: 'users', name: 'Usuários', href: '/usuarios', icon: 'Users', order: 11, group: 'administration' },
-        { id: 'configuracoes', name: 'Configurações', href: '/configuracoes', icon: 'Settings', order: 12, group: 'administration' }
+        { id: 'tenants', label: 'Empresas', route: '/empresas', icon: 'Building2', order: 10 },
+        { id: 'users', label: 'Usuários', route: '/usuarios', icon: 'Users', order: 11 },
+        { id: 'configuracoes', label: 'Configurações', route: '/configuracoes', icon: 'Settings', order: 12 }
       );
     }
 
@@ -165,11 +188,11 @@ class ModuleRegistry {
       if (mod.menus && mod.menus.length > 0) {
         const items = mod.menus.map(m => ({
           id: m.id || m.route,
-          name: m.label,
-          href: m.route,
+          label: m.label,
+          route: m.route,
           icon: m.icon || 'Menu',
           order: m.order,
-          group: mod.slug
+          children: m.children
         }));
         groups[mod.slug] = items;
         groupOrder.push(mod.slug);

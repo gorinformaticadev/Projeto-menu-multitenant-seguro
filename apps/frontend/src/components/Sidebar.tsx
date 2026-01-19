@@ -14,8 +14,8 @@ import { moduleRegistry } from "@/lib/module-registry";
 // Interface local para itens de menu
 interface ModuleMenuItem {
   id: string;
-  name: string;
-  href: string;
+  label: string;
+  route: string;
   icon: string;
   order: number;
 }
@@ -74,31 +74,21 @@ export function Sidebar() {
       // Core agrega itens de todos os módulos registrados
       const grouped = moduleRegistry.getGroupedSidebarItems(user?.role);
 
-      // console.log('📋 [Sidebar] Itens agrupados recebidos:', {
-      //   ungrouped: grouped.ungrouped.length,
-      //   groups: Object.keys(grouped.groups),
-      //   groupOrder: grouped.groupOrder,
-      //   detalhes: grouped
-      // });
-
       setGroupedItems(grouped as unknown as {
         ungrouped: ModuleMenuItem[];
         groups: Record<string, ModuleMenuItem[]>;
         groupOrder: string[];
       });
 
-      // const totalItems = grouped.ungrouped.length + Object.values(grouped.groups).flat().length;
-      // console.log('📋 Itens do menu carregados:', totalItems);
-      // console.log('📋 Grupos encontrados:', Object.keys(grouped.groups));
     } catch (error) {
       console.warn('⚠️ Erro ao carregar itens do menu, usando menu básico:', error);
 
       // Em caso de erro, carrega menu básico do CORE
-      const basicItems = [
+      const basicItems: ModuleMenuItem[] = [
         {
           id: 'dashboard',
-          name: 'Dashboard',
-          href: '/dashboard',
+          label: 'Dashboard',
+          route: '/dashboard',
           icon: 'LayoutDashboard',
           order: 1
         }
@@ -109,22 +99,22 @@ export function Sidebar() {
         basicItems.push(
           {
             id: 'tenants',
-            name: 'Empresas',
-            href: '/empresas',
+            label: 'Empresas',
+            route: '/empresas',
             icon: 'Building2',
             order: 10
           },
           {
             id: 'users',
-            name: 'Usuários',
-            href: '/usuarios',
+            label: 'Usuários',
+            route: '/usuarios',
             icon: 'Users',
             order: 11
           },
           {
             id: 'configuracoes',
-            name: 'Configurações',
-            href: '/configuracoes',
+            label: 'Configurações',
+            route: '/configuracoes',
             icon: 'Settings',
             order: 12
           }
@@ -319,13 +309,13 @@ export function Sidebar() {
             renderQueue.forEach((queueItem) => {
               if (queueItem.type === 'item') {
                 const item = queueItem.data;
-                const isActive = pathname === item.href;
+                const isActive = pathname === item.route;
                 const Icon = iconMap[item.icon] || Menu;
 
                 allRenderItems.push(
                   <Link
                     key={item.id}
-                    href={item.href}
+                    href={item.route}
                     onClick={handleItemClick}
                     className={cn(
                       "flex items-center gap-2 px-3 py-2 text-sm font-medium transition-all duration-200 group relative",
@@ -334,16 +324,16 @@ export function Sidebar() {
                         : "text-muted-foreground/70 hover:text-foreground hover:bg-white/5 hover:opacity-100",
                       !isExpanded && "justify-center px-0"
                     )}
-                    title={!isExpanded ? item.name : undefined}
+                    title={!isExpanded ? item.label : undefined}
                   >
                     <Icon className="h-5 w-5 flex-shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
-                    {isExpanded && <span>{item.name}</span>}
+                    {isExpanded && <span>{item.label}</span>}
                   </Link>
                 );
               } else if (queueItem.type === 'group') {
                 const { groupId, items, config } = queueItem.data;
                 const isGroupExpanded = expandedGroups[groupId];
-                const hasActiveItem = items.some((item: { href: string }) => pathname === item.href);
+                const hasActiveItem = items.some((item) => pathname === item.route);
 
                 allRenderItems.push(
                   <div key={groupId} className="pt-2">
@@ -374,14 +364,14 @@ export function Sidebar() {
                         {/* Itens do grupo */}
                         {isGroupExpanded && (
                           <div className="pl-4 space-y-1 ml-4">
-                            {items.filter((item: { name: string }) => item.name !== config.name).map((item: { id: string, href: string, icon: string, name: string }) => {
-                              const isActive = pathname === item.href;
+                            {items.filter((item) => item.label !== config.name).map((item) => {
+                              const isActive = pathname === item.route;
                               const Icon = iconMap[item.icon] || Menu;
 
                               return (
                                 <Link
                                   key={item.id}
-                                  href={item.href}
+                                  href={item.route}
                                   onClick={handleItemClick}
                                   className={cn(
                                     "flex items-center gap-2 px-3 py-2 text-sm font-medium transition-all duration-200 group relative",
@@ -391,7 +381,7 @@ export function Sidebar() {
                                   )}
                                 >
                                   <Icon className="h-4 w-4" />
-                                  <span>{item.name}</span>
+                                  <span>{item.label}</span>
                                 </Link>
                               );
                             })}

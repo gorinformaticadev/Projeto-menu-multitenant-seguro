@@ -87,26 +87,51 @@ export function TopBar() {
   useEffect(() => {
     async function fetchUserTenantLogo() {
       if (user?.tenantId) {
+        const cacheKey = `tenant-logo-${user.tenantId}`;
+
         // Limpar cache antigo de outros tenants
         Object.keys(localStorage).forEach(key => {
-          if (key.startsWith('tenant-logo-') && key !== `tenant-logo-${user.tenantId}`) {
+          if (key.startsWith('tenant-logo-') && key !== cacheKey) {
             localStorage.removeItem(key);
           }
         });
 
+        // Tentar usar cache local primeiro
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          try {
+            const { logoUrl, timestamp } = JSON.parse(cached);
+            if (Date.now() - timestamp < 10 * 60 * 1000) { // 10 minutos
+              // console.log('🎨 Usando cache tenant logo:', logoUrl);
+              setUserTenantLogo(logoUrl);
+              return; // Usa cache e não faz requisição
+            }
+          } catch (e) {
+            localStorage.removeItem(cacheKey);
+          }
+        }
+
         try {
-          // SEMPRE buscar da API para garantir dados atualizados
-          const response = await api.get(`/tenants/public/${user.tenantId}/logo?_t=${Date.now()}`);
+          // Busca fresca se não houver cache válido
+          // Removido timestamp forçado para permitir cache HTTP se aplicável, 
+          // mas o cache local (acima) é a principal defesa contra 429
+          const response = await api.get(`/tenants/public/${user.tenantId}/logo`);
           const logoUrl = response.data?.logoUrl;
-          // console.log('🔄 Logo do tenant atualizado:', logoUrl);
+
           if (logoUrl) {
             setUserTenantLogo(logoUrl);
+            localStorage.setItem(cacheKey, JSON.stringify({
+              logoUrl,
+              timestamp: Date.now()
+            }));
           } else {
             setUserTenantLogo(null);
           }
         } catch (error) {
           console.error("Erro ao buscar logo do tenant:", error);
-          setUserTenantLogo(null);
+          // Em caso de erro, mantemos o que tiver no estado ou null, 
+          // mas não limpamos o cache imediatamente para evitar loops se o erro for intermitente (ex: 429)
+          if (!cached) setUserTenantLogo(null);
         }
       } else if (user?.role === "SUPER_ADMIN") {
         // SUPER_ADMIN usa o logo master
@@ -174,14 +199,10 @@ export function TopBar() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             {masterLogo ? (
-              <Image
+              <img
                 src={`${API_URL}/uploads/logos/${masterLogo}`}
                 alt="Logo"
-                width={80}
-                height={40}
                 className="h-10 w-auto object-contain"
-                unoptimized
-                priority
               />
             ) : (
               <div className="h-10 w-10 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/20">
@@ -370,13 +391,10 @@ export function TopBar() {
               {/* Logo do Tenant do Usuário */}
               {userTenantLogo ? (
                 <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 dark:bg-secondary border border-gray-200 dark:border-border">
-                  <Image
+                  <img
                     src={`${API_URL}/uploads/logos/${userTenantLogo}?t=${Date.now()}`}
                     alt="Logo Tenant"
-                    width={40}
-                    height={40}
                     className="w-full h-full object-cover"
-                    unoptimized
                     onError={(e) => {
                       console.error('Erro ao carregar logo do tenant no menu:', userTenantLogo);
                       const target = e.currentTarget as HTMLImageElement;
@@ -413,13 +431,10 @@ export function TopBar() {
                     {/* Logo da Tenant no Menu */}
                     {userTenantLogo ? (
                       <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 dark:bg-secondary border border-gray-200 dark:border-border flex-shrink-0">
-                        <Image
+                        <img
                           src={`${API_URL}/uploads/logos/${userTenantLogo}?t=${Date.now()}`}
                           alt="Logo Tenant"
-                          width={40}
-                          height={40}
                           className="w-full h-full object-cover"
-                          unoptimized
                           onError={(e) => {
                             console.error('Erro ao carregar logo do tenant no dropdown:', userTenantLogo);
                             const target = e.currentTarget as HTMLImageElement;

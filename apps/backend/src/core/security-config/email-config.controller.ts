@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Public } from '@core/common/decorators/public.decorator';
 import { SkipThrottle } from '@nestjs/throttler';
 import { EmailConfigService } from './email-config.service';
 import { CreateEmailConfigDto, UpdateEmailConfigDto } from './dto/email-config.dto';
@@ -10,7 +11,7 @@ import { EmailService } from '../email/email.service';
 
 @SkipThrottle()
 @Controller('email-config')
-@UseGuards(RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class EmailConfigController {
   constructor(
     private readonly emailConfigService: EmailConfigService,
@@ -47,6 +48,7 @@ export class EmailConfigController {
    * Público para uso no serviço de email
    */
   @SkipThrottle()
+  @Public()
   @Get('active')
   async getActiveConfig() {
     return this.emailConfigService.getActiveConfig();
