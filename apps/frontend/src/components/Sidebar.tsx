@@ -21,7 +21,7 @@ interface ModuleMenuItem {
 }
 
 // Mapeamento de ícones para componentes Lucide
-const iconMap: Record<string, React.ComponentType> = {
+const iconMap: Record<string, React.ElementType> = {
   LayoutDashboard,
   Building2,
   Settings,
@@ -288,7 +288,7 @@ export function Sidebar() {
                   const iconName = mainMenu?.icon;
 
                   const DynamicIcon = iconName
-                    ? (LucideIcons as unknown as Record<string, React.ComponentType<any>>)[iconName] || Package
+                    ? (LucideIcons as unknown as Record<string, React.ElementType>)[iconName] || Package
                     : Package;
 
                   config = {

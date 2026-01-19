@@ -37,6 +37,14 @@ interface Tenant {
   };
 }
 
+interface ApiError {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+}
+
 export default function EmpresasPage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -139,10 +147,10 @@ export default function EmpresasPage() {
         timestamp: Date.now()
       }));
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao carregar empresas",
-        description: error.response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as ApiError).response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     } finally {
@@ -223,7 +231,7 @@ export default function EmpresasPage() {
     } catch (error: unknown) {
       toast({
         title: "Erro ao cadastrar empresa",
-        description: (error as any).response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as ApiError).response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     } finally {
@@ -259,7 +267,7 @@ export default function EmpresasPage() {
     } catch (error: unknown) {
       toast({
         title: "Erro ao atualizar empresa",
-        description: (error as any).response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as ApiError).response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     } finally {
@@ -308,7 +316,7 @@ export default function EmpresasPage() {
     } catch (error: unknown) {
       toast({
         title: "Erro ao alterar senha",
-        description: (error as any).response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as ApiError).response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     } finally {
@@ -331,7 +339,7 @@ export default function EmpresasPage() {
     } catch (error: unknown) {
       toast({
         title: "Erro",
-        description: (error as any).response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as ApiError).response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     }
@@ -374,7 +382,7 @@ export default function EmpresasPage() {
     } catch (error: unknown) {
       toast({
         title: "Erro ao deletar empresa",
-        description: (error as any).response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as ApiError).response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     } finally {
@@ -480,7 +488,7 @@ export default function EmpresasPage() {
     } catch (error: unknown) {
       toast({
         title: "Erro ao fazer upload do logo",
-        description: (error as any).response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as ApiError).response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     } finally {
@@ -510,7 +518,7 @@ export default function EmpresasPage() {
     } catch (error: unknown) {
       toast({
         title: "Erro ao remover logo",
-        description: (error as any).response?.data?.message || "Ocorreu um erro no servidor",
+        description: (error as ApiError).response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     } finally {

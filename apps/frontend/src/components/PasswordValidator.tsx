@@ -114,7 +114,13 @@ export function PasswordValidator({ password, showRequirements = true }: Passwor
 }
 
 // Função utilitária para validar senha
-export function validatePassword(password: string, policy: Record<string, any>): ValidationResult {
+export function validatePassword(password: string, policy: {
+  minLength: number;
+  requireUppercase: boolean;
+  requireLowercase: boolean;
+  requireNumbers: boolean;
+  requireSpecial: boolean;
+}): ValidationResult {
   return {
     minLength: password.length >= policy.minLength,
     hasUppercase: policy.requireUppercase ? /[A-Z]/.test(password) : true,

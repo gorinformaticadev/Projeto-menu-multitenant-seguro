@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
@@ -31,8 +31,8 @@ export function RouteGuard({ children }: RouteGuardProps) {
   // Páginas que não precisam de autenticação
   const publicRoutes = [
     '/',
-    '/login', 
-    '/esqueci-senha', 
+    '/login',
+    '/esqueci-senha',
     '/redefinir-senha'
   ];
 
@@ -42,7 +42,7 @@ export function RouteGuard({ children }: RouteGuardProps) {
   const needsProtection = isModuleRoute && !isPublicRoute;
 
   // Função para validar autenticação no backend
-  const validateAuthentication = async (): Promise<AuthValidationResult> => {
+  const validateAuthentication = useCallback(async (): Promise<AuthValidationResult> => {
     try {
       // Se não tem token, não está autenticado
       if (!token) {
@@ -55,7 +55,7 @@ export function RouteGuard({ children }: RouteGuardProps) {
 
       // Verificar se o token ainda é válido no backend
       await api.get('/auth/me');
-      
+
       // Se chegou até aqui, o token é válido
       return {
         isValid: true
@@ -70,7 +70,7 @@ export function RouteGuard({ children }: RouteGuardProps) {
       // Erros que indicam problemas de autenticação
       const authErrors = [
         'token inválido',
-        'token expirado', 
+        'token expirado',
         'sessão expirada',
         'unauthorized',
         'jwt expired',
@@ -81,9 +81,9 @@ export function RouteGuard({ children }: RouteGuardProps) {
         'forbidden'
       ];
 
-      const isAuthError = status === 401 || 
-                         status === 403 || 
-                         authErrors.some(err => message.toLowerCase().includes(err.toLowerCase()));
+      const isAuthError = status === 401 ||
+        status === 403 ||
+        authErrors.some(err => message.toLowerCase().includes(err.toLowerCase()));
 
       return {
         isValid: false,
@@ -91,7 +91,7 @@ export function RouteGuard({ children }: RouteGuardProps) {
         shouldRedirect: isAuthError
       };
     }
-  };
+  }, [token]);
 
   // Efeito para validar autenticação quando necessário
   useEffect(() => {
@@ -119,9 +119,9 @@ export function RouteGuard({ children }: RouteGuardProps) {
 
       // Validar autenticação no backend
       setValidationState({ loading: true, isValid: false });
-      
+
       const validation = await validateAuthentication();
-      
+
       if (!validation.isValid) {
         console.warn('⚠️ Falha na validação de autenticação:', {
           pathname,

@@ -27,11 +27,10 @@ export function ThemeToggle() {
                 typeof error === 'object' &&
                 error !== null &&
                 'response' in error &&
-                typeof (error as any).response === 'object' &&
-                (error as any).response !== null &&
-                'data' in (error as any).response
+                (error as { response: { data: unknown } }).response &&
+                typeof (error as { response: { data: unknown } }).response.data === 'object'
             ) {
-                errorData = (error as any).response.data;
+                errorData = (error as { response: { data: unknown } }).response.data;
             }
             console.warn('Não foi possível salvar a preferência de tema:', errorData);
         }

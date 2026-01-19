@@ -206,6 +206,8 @@ export default function PerfilPage() {
       return;
     }
 
+    if (!user?.tenant) return;
+
     try {
       setLoading(true);
       await api.put('/tenants/my-tenant', {
@@ -217,11 +219,11 @@ export default function PerfilPage() {
       // Atualizar contexto de autenticação
       updateUser({
         tenant: {
-          ...user?.tenant,
+          ...user.tenant,
           nomeFantasia: tenantData.nomeFantasia,
           cnpjCpf: tenantData.cnpjCpf,
           telefone: tenantData.telefone,
-        } as any,
+        },
       });
 
       toast({

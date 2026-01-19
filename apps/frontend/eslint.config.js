@@ -78,4 +78,13 @@ export default [
       'no-undef': 'off',
     },
   },
+  {
+    ignores: ['src/core/**'],
+  },
+  {
+    files: ['**/*.js', 'scripts/**/*.js'],
+    rules: {
+      '@typescript-eslint/no-var-requires': 'off',
+    },
+  },
 ];

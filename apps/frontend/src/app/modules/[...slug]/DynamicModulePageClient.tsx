@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { notFound } from 'next/navigation';
+
 
 interface DynamicModulePageClientProps {
     slug: string[];

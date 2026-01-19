@@ -40,7 +40,7 @@ export default function CronJobsPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [toast]);
 
     useEffect(() => {
         fetchJobs();

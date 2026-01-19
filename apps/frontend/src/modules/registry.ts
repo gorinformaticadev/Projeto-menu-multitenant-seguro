@@ -26,6 +26,6 @@ export async function resolveModuleComponent(moduleSlug: string, route: string) 
     throw new Error(`Página não encontrada: ${moduleSlug}${route}`);
   }
 
-  const module = await pageLoader();
-  return module.default || module;
+  const loadedModule: any = await pageLoader();
+  return loadedModule.default || loadedModule;
 }

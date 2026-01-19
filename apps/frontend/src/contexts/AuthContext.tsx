@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
-// @ts-expect-error - moduleRegistry é válido
 import { moduleRegistry } from "@/lib/module-registry";
 
 export type Role = "SUPER_ADMIN" | "ADMIN" | "USER" | "CLIENT";
@@ -30,6 +29,16 @@ export interface LoginResult {
   requires2FA: boolean;
   user?: User;
   error?: string;
+}
+
+interface ApiError {
+  response?: {
+    data?: {
+      message?: string;
+    };
+    status?: number;
+  };
+  message?: string;
 }
 
 interface AuthContextData {
@@ -238,12 +247,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // console.log('📦 Carregando módulos...');
           await moduleRegistry.loadModules();
           // console.log('✅ Módulos carregados');
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const apiError = error as ApiError;
           console.error("❌ Erro ao carregar usuário:", error);
 
           // Verificar se é erro de autenticação
-          const status = error.response?.status;
-          const message = error.response?.data?.message || error.message || '';
+          const status = apiError.response?.status;
+          const message = apiError.response?.data?.message || apiError.message || '';
 
           const authErrors = [
             'token inválido',
@@ -294,9 +304,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(accessToken);
       setUser(userData);
       router.push("/dashboard");
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const apiError = error as ApiError;
       throw new Error(
-        error.response?.data?.message || "Erro ao fazer login"
+        apiError.response?.data?.message || "Erro ao fazer login"
       );
     }
   }
@@ -338,9 +349,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         requires2FA: false,
         user: userData
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const apiError = error as ApiError;
       // Verificar se é erro de 2FA
-      const errorMessage = error.response?.data?.message || "";
+      const errorMessage = apiError.response?.data?.message || "";
       if (errorMessage.includes("2FA") || errorMessage.includes("two-factor")) {
         return {
           success: false,
@@ -401,18 +413,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
     } catch (error: unknown) {
       let errorMessage = "Código inválido";
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        "response" in error &&
-        typeof (error as any).response === "object" &&
-        (error as any).response !== null &&
-        "data" in (error as any).response &&
-        typeof (error as any).response.data === "object" &&
-        (error as any).response.data !== null &&
-        "message" in (error as any).response.data
-      ) {
-        errorMessage = (error as any).response.data.message;
+      const apiError = error as ApiError;
+      if (apiError.response?.data?.message) {
+        errorMessage = apiError.response.data.message;
       }
       return {
         success: false,

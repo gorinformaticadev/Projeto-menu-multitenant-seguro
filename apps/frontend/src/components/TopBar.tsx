@@ -14,8 +14,6 @@ import { useNotificationContext } from '@/providers/NotificationProvider';
 import { AlertTriangle, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
 import { Notification } from '@/types/notifications';
 import { ThemeToggle } from "./ThemeToggle";
-import { useTheme } from "next-themes";
-import * as LucideIcons from "lucide-react";
 import Image from "next/image";
 
 export function TopBar() {
@@ -26,10 +24,6 @@ export function TopBar() {
   const [userTenantLogo, setUserTenantLogo] = useState<string | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  // const { setTheme } = useTheme();
-
-  // Sincroniza tema da preferência do usuário
-
 
   // Hook do sistema de notificações
   const {

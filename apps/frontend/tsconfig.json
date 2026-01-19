@@ -36,9 +36,7 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
-  ],
-  "exclude": [
+    ".next/dev/types/**/*.ts",
     "eslint.config.js",
     "next.config.js",
     "postcss.config.js",

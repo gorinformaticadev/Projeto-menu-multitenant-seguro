@@ -15,7 +15,7 @@ import { PlatformName } from "@/components/PlatformInfo";
 
 // Helper para ícones dinâmicos
 import type { SVGProps } from "react";
-type LucideIconComponent = (props: SVGProps<SVGSVGElement>) => JSX.Element;
+type LucideIconComponent = (props: SVGProps<SVGSVGElement>) => React.JSX.Element;
 const getIconComponent = (iconName: string): LucideIconComponent => {
   const icons = LucideIcons as unknown as Record<string, LucideIconComponent>;
   return icons[iconName] || LucideIcons.HelpCircle;

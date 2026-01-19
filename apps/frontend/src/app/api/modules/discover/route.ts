@@ -47,7 +47,7 @@ interface LoadedModule {
   loadError?: string;
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   console.log('🔍 API: Descobrindo módulos...');
 
   try {
@@ -254,7 +254,7 @@ async function loadModuleConfigFromTS(configPath: string): Promise<ModuleConfig 
     // Extrair campos usando regex individual (mais seguro que eval)
     const extractField = (fieldName: string, defaultValue?: unknown) => {
       // Regex melhorado para capturar strings entre aspas ou valores booleanos
-      const fieldRegex = new RegExp(`${fieldName}\s*:\s*(['"]?)([^'"\n,}]*?)\1(?:[\s,}]|$)`, 'i');
+      const fieldRegex = new RegExp(`${fieldName}\\s*:\\s*(['"]?)([^'"\\n,}]*?)\\1(?:[\\s,}]|$)`, 'i');
       const match = configText.match(fieldRegex);
       if (!match) return defaultValue;
 
@@ -284,15 +284,15 @@ async function loadModuleConfigFromTS(configPath: string): Promise<ModuleConfig 
 
     // Criar configuração
     const config: ModuleConfig = {
-      name,
-      slug,
-      version,
-      enabled,
-      permissionsStrict: extractField('permissionsStrict', true),
-      sandboxed: extractField('sandboxed', true),
-      author: extractField('author'),
-      description: extractField('description'),
-      category: extractField('category')
+      name: name as string,
+      slug: slug as string,
+      version: version as string,
+      enabled: enabled as boolean,
+      permissionsStrict: extractField('permissionsStrict', true) as boolean,
+      sandboxed: extractField('sandboxed', true) as boolean,
+      author: extractField('author') as string | undefined,
+      description: extractField('description') as string | undefined,
+      category: extractField('category') as string | undefined
     };
 
     return config;
