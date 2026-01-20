@@ -462,12 +462,13 @@ export class ModuleInstallerService {
     }
 
     /**
-     * Executa novamente as migrations e seeds do módulo
-     * Remove registros existentes e executa tudo novamente
+     * Executa migrations e seeds PENDENTES do módulo
+     * NÃO remove registros existentes - apenas executa os que ainda não foram executados
+     * Isso evita erros como "trigger já existe" ou "tabela já existe"
      * VERSÃO MELHORADA: Executa uma migration por vez e para no primeiro erro
      */
     async runMigrationsAndSeeds(slug: string) {
-        this.logger.log(`🔄 Executando migrations e seeds novamente para o módulo: ${slug}`);
+        this.logger.log(`🔄 Executando migrations e seeds pendentes para o módulo: ${slug}`);
 
         const module = await this.prisma.module.findUnique({ where: { slug } });
         if (!module) throw new BadRequestException('Módulo não encontrado');
@@ -478,18 +479,15 @@ export class ModuleInstallerService {
         }
 
         try {
-            // Remove registros de migrations e seeds existentes
-            const deletedCount = await this.prisma.moduleMigration.deleteMany({
-                where: { moduleId: module.id }
-            });
+            // NÃO remove registros existentes - apenas executa os pendentes
+            // Isso evita erros de "trigger já existe" ou "tabela já existe"
+            this.logger.log(`📋 Verificando migrations e seeds pendentes para ${slug}...`);
 
-            this.logger.log(`🗑️ ${deletedCount.count} registros de migrations/seeds removidos para ${slug}`);
-
-            // Executa migrations novamente (uma por vez, parando no primeiro erro)
+            // Executa migrations pendentes (uma por vez, parando no primeiro erro)
             const migrationsExecuted = await this.executeMigrationsOneByOne(slug, modulePath, 'migration');
             this.logger.log(`📊 ${migrationsExecuted} migrations executadas para ${slug}`);
 
-            // Executa seeds novamente (uma por vez, parando no primeiro erro)
+            // Executa seeds pendentes (uma por vez, parando no primeiro erro)
             const seedsExecuted = await this.executeMigrationsOneByOne(slug, modulePath, 'seed');
             this.logger.log(`🌱 ${seedsExecuted} seeds executados para ${slug}`);
 
@@ -505,11 +503,11 @@ export class ModuleInstallerService {
             // Criar notificação
             await this.notificationService.create({
                 title: 'Migrations e Seeds Executados',
-                description: `Módulo ${module.name}: ${migrationsExecuted} migrations e ${seedsExecuted} seeds executados novamente.`,
+                description: `Módulo ${module.name}: ${migrationsExecuted} migrations e ${seedsExecuted} seeds pendentes foram executados.`,
                 type: 'success',
                 metadata: {
                     module: slug,
-                    action: 'migrations-seeds-rerun',
+                    action: 'migrations-seeds-run',
                     migrationsExecuted,
                     seedsExecuted
                 }
@@ -583,6 +581,35 @@ export class ModuleInstallerService {
                 this.logger.log(`✅ ${type} ${file} executada com sucesso`);
 
             } catch (error) {
+                // Verificar se o erro é de objeto que já existe (tabela, trigger, índice, etc.)
+                const alreadyExistsPatterns = [
+                    'já existe',
+                    'already exists',
+                    'duplicate key',
+                    'relation .* already exists',
+                    'trigger .* already exists',
+                    'index .* already exists',
+                    'constraint .* already exists'
+                ];
+                
+                const errorMessage = error.message?.toLowerCase() || '';
+                const isAlreadyExistsError = alreadyExistsPatterns.some(pattern => 
+                    new RegExp(pattern, 'i').test(errorMessage)
+                );
+
+                if (isAlreadyExistsError) {
+                    // Objeto já existe no banco - registrar migration como executada
+                    this.logger.warn(`⚠️ ${type} ${file} - Objetos já existem no banco. Registrando como executada...`);
+                    
+                    await this.prisma.moduleMigration.create({
+                        data: { moduleId, filename: file, type: type as any, executedAt: new Date() }
+                    });
+                    
+                    executed++;
+                    this.logger.log(`✅ ${type} ${file} registrada (objetos pré-existentes)`);
+                    continue; // Continuar com próxima migration
+                }
+
                 this.logger.error(`❌ ERRO CRÍTICO ao executar ${type} ${file}:`, {
                     error: error.message,
                     file: file,
@@ -697,6 +724,35 @@ export class ModuleInstallerService {
                 this.logger.log(`✅ ${type} ${file} executada com sucesso`);
 
             } catch (error) {
+                // Verificar se o erro é de objeto que já existe (tabela, trigger, índice, etc.)
+                const alreadyExistsPatterns = [
+                    'já existe',
+                    'already exists',
+                    'duplicate key',
+                    'relation .* already exists',
+                    'trigger .* already exists',
+                    'index .* already exists',
+                    'constraint .* already exists'
+                ];
+                
+                const errorMessage = error.message?.toLowerCase() || '';
+                const isAlreadyExistsError = alreadyExistsPatterns.some(pattern => 
+                    new RegExp(pattern, 'i').test(errorMessage)
+                );
+
+                if (isAlreadyExistsError) {
+                    // Objeto já existe no banco - registrar migration como executada
+                    this.logger.warn(`⚠️ ${type} ${file} - Objetos já existem no banco. Registrando como executada...`);
+                    
+                    await this.prisma.moduleMigration.create({
+                        data: { moduleId, filename: file, type: type as any, executedAt: new Date() }
+                    });
+                    
+                    executed++;
+                    this.logger.log(`✅ ${type} ${file} registrada (objetos pré-existentes)`);
+                    continue; // Continuar com próxima migration
+                }
+
                 this.logger.error(`❌ Erro ao executar ${type} ${file}:`, error);
                 throw new BadRequestException(`Erro ao executar ${type} ${file}: ${error.message}`);
             }

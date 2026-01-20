@@ -9,6 +9,7 @@ export type ModuleStatus = 'detected' | 'installed' | 'db_ready' | 'active' | 'd
 // Interface de ações permitidas
 export interface AllowedModuleActions {
   updateDatabase: boolean;
+  runMigrationsSeeds: boolean;
   activate: boolean;
   deactivate: boolean;
   uninstall: boolean;
@@ -39,16 +40,17 @@ export interface InstalledModule {
  * 
  * REGRAS:
  * - detected: Nenhuma ação permitida (apenas visualizar)
- * - installed: Atualizar Banco + Desinstalar
- * - db_ready: Ativar + Desinstalar
- * - active: Desativar (apenas)
- * - disabled: Ativar + Desinstalar
+ * - installed: Atualizar Banco + Executar Migrations/Seeds + Desinstalar
+ * - db_ready: Ativar + Executar Migrations/Seeds + Desinstalar
+ * - active: Desativar + Executar Migrations/Seeds (apenas)
+ * - disabled: Ativar + Executar Migrations/Seeds + Desinstalar
  */
 export function getAllowedModuleActions(status: ModuleStatus): AllowedModuleActions {
   switch (status) {
     case 'detected':
       return {
         updateDatabase: false,
+        runMigrationsSeeds: false,
         activate: false,
         deactivate: false,
         uninstall: false,
@@ -58,6 +60,7 @@ export function getAllowedModuleActions(status: ModuleStatus): AllowedModuleActi
     case 'installed':
       return {
         updateDatabase: true,
+        runMigrationsSeeds: true,
         activate: false,
         deactivate: false,
         uninstall: true,
@@ -67,6 +70,7 @@ export function getAllowedModuleActions(status: ModuleStatus): AllowedModuleActi
     case 'db_ready':
       return {
         updateDatabase: false,
+        runMigrationsSeeds: true,
         activate: true,
         deactivate: false,
         uninstall: true,
@@ -76,6 +80,7 @@ export function getAllowedModuleActions(status: ModuleStatus): AllowedModuleActi
     case 'active':
       return {
         updateDatabase: false,
+        runMigrationsSeeds: true,
         activate: false,
         deactivate: true,
         uninstall: false,
@@ -85,6 +90,7 @@ export function getAllowedModuleActions(status: ModuleStatus): AllowedModuleActi
     case 'disabled':
       return {
         updateDatabase: false,
+        runMigrationsSeeds: true,
         activate: true,
         deactivate: false,
         uninstall: true,
@@ -95,6 +101,7 @@ export function getAllowedModuleActions(status: ModuleStatus): AllowedModuleActi
       // Fallback seguro: bloquear tudo
       return {
         updateDatabase: false,
+        runMigrationsSeeds: false,
         activate: false,
         deactivate: false,
         uninstall: false,
@@ -212,6 +219,12 @@ export function getDisabledTooltip(action: keyof AllowedModuleActions, status: M
         return 'Preparação de banco já realizada';
       }
       return 'Status atual não permite atualização de banco';
+    
+    case 'runMigrationsSeeds':
+      if (status === 'detected') {
+        return 'Módulo ainda não foi instalado';
+      }
+      return 'Status atual não permite execução de migrations/seeds';
     
     case 'activate':
       if (status === 'installed') {

@@ -20,15 +20,11 @@ export default function ModulePageClient({ moduleSlug, slug }: ModulePageClientP
     // Rota é o caminho completo após /modules/{moduleSlug}/
     const route = slug?.join('/') || 'index';
 
-    console.log('🔎 [ModulePage] Buscando rota (fallback):', { moduleSlug, route });
+    console.log('[ModulePage] Buscando rota (fallback):', { moduleSlug, route });
 
     const [Component, setComponent] = React.useState<React.ComponentType<unknown> | null>(null);
     const [error, setError] = React.useState<string | null>(null);
     const [loading, setLoading] = React.useState(true);
-
-    React.useEffect(() => {
-        loadModuleComponent();
-    }, [moduleSlug, route, loadModuleComponent]);
 
     const loadModuleComponent = React.useCallback(async () => {
         try {
@@ -49,10 +45,10 @@ export default function ModulePageClient({ moduleSlug, slug }: ModulePageClientP
             }
 
             setComponent(() => ComponentToLoad);
-            console.log('✅ [ModulePage] Componente carregado:', `${moduleSlug}/${route}`);
+            console.log('[ModulePage] Componente carregado:', `${moduleSlug}/${route}`);
 
         } catch (err: unknown) {
-            console.error(`❌ [ModulePage] Falha ao carregar ${moduleSlug}/${route}:`, err);
+            console.error(`[ModulePage] Falha ao carregar ${moduleSlug}/${route}:`, err);
 
             const expectedPath = `apps/frontend/src/app/modules/${moduleSlug}/${route}/page.tsx`;
 
@@ -71,6 +67,10 @@ export default function ModulePageClient({ moduleSlug, slug }: ModulePageClientP
             setLoading(false);
         }
     }, [moduleSlug, route]);
+
+    React.useEffect(() => {
+        loadModuleComponent();
+    }, [loadModuleComponent]);
 
     if (loading) {
         return (
@@ -96,7 +96,7 @@ export default function ModulePageClient({ moduleSlug, slug }: ModulePageClientP
                 </div>
                 <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded">
                     <p className="text-blue-900 text-sm">
-                        <strong>📘 Estrutura Esperada:</strong>
+                        <strong>Estrutura Esperada:</strong>
                         <code className="block mt-2 bg-blue-100 px-3 py-2 rounded">
                             apps/frontend/src/app/modules/&#123;module&#125;/&#123;route&#125;/page.tsx
                         </code>

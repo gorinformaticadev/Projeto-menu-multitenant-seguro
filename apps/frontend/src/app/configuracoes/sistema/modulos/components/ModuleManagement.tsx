@@ -666,7 +666,7 @@ export function ModuleManagement() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => handleMigrationsSeedsClick(module)}
-                                    disabled={runningMigrationsSeeds === module.slug}
+                                    disabled={!allowedActions.runMigrationsSeeds || runningMigrationsSeeds === module.slug}
                                   >
                                     {runningMigrationsSeeds === module.slug ? (
                                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
@@ -676,7 +676,9 @@ export function ModuleManagement() {
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                  Executar migrations e seeds novamente
+                                  {allowedActions.runMigrationsSeeds
+                                    ? 'Executar migrations e seeds pendentes'
+                                    : getDisabledTooltip('runMigrationsSeeds', module.status)}
                                 </TooltipContent>
                               </Tooltip>
 
@@ -897,23 +899,23 @@ export function ModuleManagement() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Database className="h-5 w-5 text-green-600" />
-              Executar Migrations e Seeds
+              Executar Migrations e Seeds Pendentes
             </DialogTitle>
             <DialogDescription asChild>
               <div>
                 <p className="mb-4">
-                  Deseja executar as migrations e seeds do módulo <strong>{selectedModuleForMigrations?.name}</strong> novamente?
+                  Deseja executar as migrations e seeds pendentes do módulo <strong>{selectedModuleForMigrations?.name}</strong>?
                 </p>
-                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 text-sm text-yellow-800">
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm text-blue-800">
                   <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="h-4 w-4" />
-                    <strong>Atenção:</strong>
+                    <Info className="h-4 w-4" />
+                    <strong>Informação:</strong>
                   </div>
                   <p className="mb-2">Esta ação irá:</p>
                   <ul className="list-disc list-inside space-y-1">
-                    <li>Remover todos os registros de migrations/seeds anteriores</li>
-                    <li>Executar novamente todas as migrations do módulo</li>
-                    <li>Executar novamente todos os seeds do módulo</li>
+                    <li>Verificar quais migrations e seeds ainda não foram executados</li>
+                    <li>Executar apenas os arquivos pendentes</li>
+                    <li>Manter os registros das execuções anteriores</li>
                   </ul>
                 </div>
               </div>
