@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Save, AlertTriangle } from "lucide-react";
+import { Shield, Save, AlertTriangle, HelpCircle } from "lucide-react";
 import EmailConfigSection from "@/components/EmailConfigSection";
 
 
@@ -31,6 +32,9 @@ interface SecurityConfig {
   twoFactorEnabled: boolean;
   twoFactorRequired: boolean;
   sessionTimeoutMinutes: number;
+  backupRateLimitPerHour: number;
+  restoreRateLimitPerHour: number;
+  updateRateLimitPerHour: number;
   updatedAt: string;
   updatedBy: string | null;
 }
@@ -107,7 +111,10 @@ export default function SecurityConfigPage() {
       'globalMaxRequests',
       'globalWindowMinutes',
       'passwordMinLength',
-      'sessionTimeoutMinutes'
+      'sessionTimeoutMinutes',
+      'backupRateLimitPerHour',
+      'restoreRateLimitPerHour',
+      'updateRateLimitPerHour'
     ];
 
     for (const field of numericFields) {
@@ -142,6 +149,9 @@ export default function SecurityConfigPage() {
         twoFactorEnabled: config.twoFactorEnabled,
         twoFactorRequired: config.twoFactorRequired,
         sessionTimeoutMinutes: Number(config.sessionTimeoutMinutes),
+        backupRateLimitPerHour: Number(config.backupRateLimitPerHour),
+        restoreRateLimitPerHour: Number(config.restoreRateLimitPerHour),
+        updateRateLimitPerHour: Number(config.updateRateLimitPerHour),
       };
 
       const response = await api.put("/security-config", updateData);
@@ -296,9 +306,36 @@ export default function SecurityConfigPage() {
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <Label htmlFor="globalMaxRequests">
-                Requisições Globais (por período)
-              </Label>
+              <div className="flex items-center gap-2 mb-2">
+                <Label htmlFor="globalMaxRequests">
+                  Requisições Globais (por período)
+                </Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-semibold mb-1">⚡ Como funciona o Rate Limiting Global:</p>
+                      <p className="text-xs mb-2">
+                        Limita o número total de requisições HTTP que qualquer usuário/IP pode fazer ao sistema durante a janela de tempo configurada.
+                      </p>
+                      <p className="text-xs mb-1">
+                        <strong>• Propósito:</strong> Proteção contra ataques DDoS e uso abusivo da API.
+                      </p>
+                      <p className="text-xs mb-1">
+                        <strong>• Recomendado:</strong> 60-100 para produção, 500-1000 para desenvolvimento.
+                      </p>
+                      <p className="text-xs mb-1">
+                        <strong>• Exemplo:</strong> Com 100 requisições em 1 minuto, um usuário pode fazer até 100 chamadas de API por minuto.
+                      </p>
+                      <p className="text-xs">
+                        <strong>• Impacto:</strong> Após atingir o limite, requisições serão bloqueadas até o fim da janela.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
               <Input
                 id="globalMaxRequests"
                 type="number"
@@ -315,9 +352,36 @@ export default function SecurityConfigPage() {
             </div>
 
             <div>
-              <Label htmlFor="globalWindowMinutes">
-                Janela Global (minutos)
-              </Label>
+              <div className="flex items-center gap-2 mb-2">
+                <Label htmlFor="globalWindowMinutes">
+                  Janela Global (minutos)
+                </Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-semibold mb-1">⚡ Como funciona a Janela de Tempo:</p>
+                      <p className="text-xs mb-2">
+                        Define o período de tempo (em minutos) usado para contar as requisições globais.
+                      </p>
+                      <p className="text-xs mb-1">
+                        <strong>• Propósito:</strong> Controlar a taxa de requisições ao longo do tempo.
+                      </p>
+                      <p className="text-xs mb-1">
+                        <strong>• Recomendado:</strong> 1 minuto para controle rápido, 5-15 minutos para controle mais flexível.
+                      </p>
+                      <p className="text-xs mb-1">
+                        <strong>• Exemplo:</strong> Com janela de 1 minuto, o contador é resetado a cada minuto.
+                      </p>
+                      <p className="text-xs">
+                        <strong>• Impacto:</strong> Janelas menores = controle mais rígido, janelas maiores = mais flexível.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
               <Input
                 id="globalWindowMinutes"
                 type="number"
@@ -330,6 +394,163 @@ export default function SecurityConfigPage() {
               />
               <p className="text-xs text-muted-foreground mt-1">
                 Período para contagem de requisições globais (1-60 minutos)
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Rate Limiting de Endpoints Críticos */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Rate Limiting de Endpoints Críticos</CardTitle>
+          <CardDescription>
+            Configure limites específicos para operações sensíveis do sistema
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-amber-50 dark:bg-amber-950 p-4 rounded-lg border border-amber-200 dark:border-amber-800 mb-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                  Atenção: Configurações Sensíveis
+                </p>
+                <p className="text-xs text-amber-800 dark:text-amber-200 mt-1">
+                  Estas configurações controlam operações críticas como backup, restore e atualizações do sistema. 
+                  Valores muito altos podem permitir abuse, valores muito baixos podem impedir operações legítimas.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Label htmlFor="backupRateLimitPerHour">
+                  Backup (por hora)
+                </Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-semibold mb-1">⚡ Como funciona o Rate Limiting de Backup:</p>
+                      <p className="text-xs mb-2">
+                        Limita o número de backups completos do banco de dados que podem ser criados por hora.
+                      </p>
+                      <p className="text-xs mb-1">
+                        <strong>• Propósito:</strong> Evitar sobrecarga do servidor e uso excessivo de disco.
+                      </p>
+                      <p className="text-xs mb-1">
+                        <strong>• Recomendado:</strong> 5-10 para produção, 15-20 para desenvolvimento.
+                      </p>
+                      <p className="text-xs">
+                        <strong>• Impacto:</strong> Após atingir o limite, novos backups serão bloqueados por 1 hora.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <Input
+                id="backupRateLimitPerHour"
+                type="number"
+                min="1"
+                max="20"
+                value={config.backupRateLimitPerHour}
+                onChange={(e) =>
+                  updateConfig("backupRateLimitPerHour", e.target.value === "" ? "" : parseInt(e.target.value))
+                }
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Número máximo de backups por hora (1-20)
+              </p>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Label htmlFor="restoreRateLimitPerHour">
+                  Restore (por hora)
+                </Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-semibold mb-1">⚡ Como funciona o Rate Limiting de Restore:</p>
+                      <p className="text-xs mb-2">
+                        Limita o número de restaurações completas do banco de dados que podem ser executadas por hora.
+                      </p>
+                      <p className="text-xs mb-1">
+                        <strong>• Propósito:</strong> Operação crítica que substitui TODOS os dados do sistema.
+                      </p>
+                      <p className="text-xs mb-1">
+                        <strong>• Recomendado:</strong> 2-3 para produção, 5-10 para desenvolvimento.
+                      </p>
+                      <p className="text-xs">
+                        <strong>• Impacto:</strong> Após atingir o limite, novos restores serão bloqueados por 1 hora.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <Input
+                id="restoreRateLimitPerHour"
+                type="number"
+                min="1"
+                max="10"
+                value={config.restoreRateLimitPerHour}
+                onChange={(e) =>
+                  updateConfig("restoreRateLimitPerHour", e.target.value === "" ? "" : parseInt(e.target.value))
+                }
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Número máximo de restores por hora (1-10)
+              </p>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Label htmlFor="updateRateLimitPerHour">
+                  Atualizações (por hora)
+                </Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-semibold mb-1">⚡ Como funciona o Rate Limiting de Atualizações:</p>
+                      <p className="text-xs mb-2">
+                        Limita o número de atualizações automáticas do sistema (via Git) que podem ser executadas por hora.
+                      </p>
+                      <p className="text-xs mb-1">
+                        <strong>• Propósito:</strong> Operação sensível que atualiza código, dependencias e banco de dados.
+                      </p>
+                      <p className="text-xs mb-1">
+                        <strong>• Recomendado:</strong> 1-2 para produção, 3-5 para desenvolvimento.
+                      </p>
+                      <p className="text-xs">
+                        <strong>• Impacto:</strong> Após atingir o limite, novas atualizações serão bloqueadas por 1 hora.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <Input
+                id="updateRateLimitPerHour"
+                type="number"
+                min="1"
+                max="5"
+                value={config.updateRateLimitPerHour}
+                onChange={(e) =>
+                  updateConfig("updateRateLimitPerHour", e.target.value === "" ? "" : parseInt(e.target.value))
+                }
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Número máximo de atualizações por hora (1-5)
               </p>
             </div>
           </div>

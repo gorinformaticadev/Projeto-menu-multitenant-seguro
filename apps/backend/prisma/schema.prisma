@@ -179,6 +179,9 @@ model SecurityConfig {
   tokenCleanupIntervalHours  Int      @default(24)
   maxActiveSessionsPerUser   Int      @default(5)
   refreshTokenRotation       Boolean  @default(true)
+  backupRateLimitPerHour     Int      @default(5)
+  restoreRateLimitPerHour    Int      @default(3)
+  updateRateLimitPerHour     Int      @default(2)
   updatedAt                  DateTime @updatedAt
   updatedBy                  String?
 

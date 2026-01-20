@@ -207,5 +207,18 @@ export class SecurityConfigService {
       }
     };
   }
+
+  /**
+   * Obtém configuração de rate limiting para endpoints críticos
+   */
+  async getCriticalEndpointsRateLimit() {
+    const config: any = await this.getConfig();
+    
+    return {
+      backupRateLimitPerHour: config.backupRateLimitPerHour || 5,
+      restoreRateLimitPerHour: config.restoreRateLimitPerHour || 3,
+      updateRateLimitPerHour: config.updateRateLimitPerHour || 2,
+    };
+  }
 }
 

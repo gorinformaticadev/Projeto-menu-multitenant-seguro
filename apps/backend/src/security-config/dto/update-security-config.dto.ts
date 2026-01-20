@@ -65,6 +65,25 @@ export class UpdateSecurityConfigDto {
   @Max(60)
   rateLimitProdWindow?: number;
 
+  // Rate Limiting de Endpoints Críticos
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  backupRateLimitPerHour?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  restoreRateLimitPerHour?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  updateRateLimitPerHour?: number;
+
   // Configurações de tokens e sessão
   @IsOptional()
   @IsBoolean()
