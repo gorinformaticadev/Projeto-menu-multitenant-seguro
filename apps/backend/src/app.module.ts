@@ -24,6 +24,7 @@ import { DynamicModulesLoader } from './core/dynamic-modules.loader';
 import { PrismaService } from './core/prisma/prisma.service';
 import { WhatsAppModule } from './core/whatsapp/whatsapp.module';
 import { CronModule } from './core/cron/cron.module';
+import { BackupModule } from './backup/backup.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { CronModule } from './core/cron/cron.module';
     EmailConfigModule,
     AuditModule,
     UpdateModule,
+    BackupModule,
     NotificationsModule, // Novo sistema Socket.IO apenas
     WhatsAppModule,
     SecureFilesModule, // Módulo de uploads sensíveis

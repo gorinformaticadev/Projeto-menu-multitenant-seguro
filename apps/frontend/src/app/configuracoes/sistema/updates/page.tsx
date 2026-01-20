@@ -14,10 +14,13 @@ import {
   XCircle,
   Clock,
   AlertTriangle,
-  Info
+  Info,
+  Database,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import { BackupSection } from './components/BackupSection';
+import { RestoreSection } from './components/RestoreSection';
 
 /**
  * Página de Gerenciamento do Sistema de Atualizações
@@ -86,6 +89,7 @@ export default function UpdatesPage() {
 
   const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState('status');
+  const [backupLogs, setBackupLogs] = useState<any[]>([]);
 
 
 
@@ -220,11 +224,24 @@ export default function UpdatesPage() {
     }
   }, [toast]);
 
+  /**
+   * Carrega histórico de backups
+   */
+  const loadBackupLogs = useCallback(async () => {
+    try {
+      const response = await api.get('/api/backup/logs?limit=20');
+      setBackupLogs(response.data.data || []);
+    } catch (error: unknown) {
+      console.error('Erro ao carregar logs de backup:', error);
+    }
+  }, []);
+
   // Carregar dados iniciais
   useEffect(() => {
     loadStatus();
     loadLogs();
-  }, [loadStatus, loadLogs]);
+    loadBackupLogs();
+  }, [loadStatus, loadLogs, loadBackupLogs]);
 
   /**
    * Testa conectividade com repositório
@@ -318,6 +335,13 @@ export default function UpdatesPage() {
             onClick={() => setActiveTab('config')}
           >
             Configurações
+          </Button>
+          <Button
+            variant={activeTab === 'backup' ? 'default' : 'outline'}
+            onClick={() => setActiveTab('backup')}
+          >
+            <Database className="w-4 h-4 mr-2" />
+            Backup & Restore
           </Button>
           <Button
             variant={activeTab === 'history' ? 'default' : 'outline'}
@@ -595,6 +619,197 @@ export default function UpdatesPage() {
             </Card>
           </div>
         )}
+
+        {/* Aba Backup & Restore */}
+        {activeTab === 'backup' && (
+          <div className="space-y-6">
+            {/* Seção de Backup */}
+            <BackupSection onBackupComplete={loadBackupLogs} />
+
+            {/* Seção de Restore */}
+            <RestoreSection onRestoreComplete={loadBackupLogs} />
+
+            {/* Histórico de Backups */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <History className="w-5 h-5" />
+                  Histórico de Backups e Restores
+                </CardTitle>
+                <CardDescription>
+                  Registro de operações de backup e restore executadas
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {backupLogs.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Nenhuma operação registrada
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {backupLogs.map((log) => (
+                      <div key={log.id} className="border rounded-lg p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <span className="font-medium">
+                              {log.operationType === 'BACKUP' ? '💾 Backup' : '⬆️ Restore'}
+                            </span>
+                            <span className={`px-2 py-1 text-xs rounded-full ${
+                              log.status === 'SUCCESS' ? 'bg-green-100 text-green-800' :
+                              log.status === 'FAILED' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {log.status}
+                            </span>
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {new Date(log.startedAt).toLocaleString('pt-BR')}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <span className="font-medium">Arquivo:</span> {log.fileName}
+                          </div>
+                          <div>
+                            <span className="font-medium">Tamanho:</span>{' '}
+                            {log.fileSize ? (log.fileSize / 1024 / 1024).toFixed(2) + ' MB' : 'N/A'}
+                          </div>
+                          <div>
+                            <span className="font-medium">Duração:</span>{' '}
+                            {log.durationSeconds ? `${log.durationSeconds}s` : 'N/A'}
+                          </div>
+                          <div>
+                            <span className="font-medium">Executado por:</span> {log.executedBy}
+                          </div>
+                        </div>
+
+                        {log.errorMessage && (
+                          <div className="flex items-start gap-2 mt-2 p-3 border border-red-200 bg-red-50 rounded-lg">
+                            <XCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                            <div className="text-sm text-red-800">
+                              <strong>Erro:</strong> {log.errorMessage}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="w-5 h-5" />
+                  Configurações do Sistema
+                </CardTitle>
+                <CardDescription>
+                  Configure o repositório Git e parâmetros de atualização
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="gitUsername">Usuário GitHub</Label>
+                    <Input
+                      id="gitUsername"
+                      value={config.gitUsername}
+                      onChange={(e) => setConfig(prev => ({ ...prev, gitUsername: e.target.value }))}
+                      placeholder="ex: meuusuario"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="gitRepository">Repositório</Label>
+                    <Input
+                      id="gitRepository"
+                      value={config.gitRepository}
+                      onChange={(e) => setConfig(prev => ({ ...prev, gitRepository: e.target.value }))}
+                      placeholder="ex: meu-projeto"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="gitToken">Token de Acesso</Label>
+                    <Input
+                      id="gitToken"
+                      type="password"
+                      value={config.gitToken}
+                      onChange={(e) => setConfig(prev => ({ ...prev, gitToken: e.target.value }))}
+                      placeholder="Token GitHub (opcional para repos públicos)"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="gitReleaseBranch">Branch de Release</Label>
+                    <Input
+                      id="gitReleaseBranch"
+                      value={config.gitReleaseBranch}
+                      onChange={(e) => setConfig(prev => ({ ...prev, gitReleaseBranch: e.target.value }))}
+                      placeholder="main"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="packageManager">Gerenciador de Pacotes</Label>
+                    <select
+                      id="packageManager"
+                      value={config.packageManager}
+                      onChange={(e) => setConfig(prev => ({ ...prev, packageManager: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="npm">npm</option>
+                      <option value="pnpm">pnpm</option>
+                      <option value="yarn">yarn</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={config.updateCheckEnabled}
+                        onChange={(e) => setConfig(prev => ({ ...prev, updateCheckEnabled: e.target.checked }))}
+                        className="rounded"
+                      />
+                      Verificação Automática
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Verificar atualizações automaticamente (diariamente)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <Button
+                    onClick={saveConfig}
+                    disabled={loading.config}
+                  >
+                    {loading.config ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Salvando...
+                      </>
+                    ) : (
+                      'Salvar Configurações'
+                    )}
+                  </Button>
+
+                  <Button
+                    onClick={testConnection}
+                    variant="outline"
+                    disabled={!config.gitUsername || !config.gitRepository}
+                  >
+                    Testar Conexão
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
         {/* Aba Histórico */}
         {activeTab === 'history' && (

@@ -55,6 +55,7 @@ model User {
   blacklistedTokens        BlacklistedToken[]
   tenant                   Tenant?              @relation(fields: [tenantId], references: [id])
   preferences              UserPreferences?
+  backupLogs               BackupLog[]
 
   @@index([tenantId])
   @@index([email])
@@ -408,4 +409,38 @@ enum ModuleStatus {
 enum MigrationType {
   migration
   seed
+}
+
+enum BackupOperation {
+  BACKUP
+  RESTORE
+}
+
+enum BackupStatus {
+  STARTED
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+model BackupLog {
+  id                String          @id @default(uuid())
+  operationType     BackupOperation
+  status            BackupStatus
+  fileName          String
+  fileSize          BigInt?
+  startedAt         DateTime        @default(now())
+  completedAt       DateTime?
+  durationSeconds   Int?
+  executedBy        String
+  ipAddress         String?
+  errorMessage      String?
+  metadata          Json?
+  user              User            @relation(fields: [executedBy], references: [id])
+
+  @@index([operationType])
+  @@index([status])
+  @@index([executedBy])
+  @@index([startedAt])
+  @@map("backup_logs")
 }
