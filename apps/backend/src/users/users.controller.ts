@@ -60,6 +60,7 @@ export class UsersController {
    * MOVED UP to avoid conflict with :id
    */
   @Patch('preferences')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER, Role.CLIENT)
   updatePreferences(
     @Body() updateUserPreferencesDto: UpdateUserPreferencesDto,
     @CurrentUser() user: any,

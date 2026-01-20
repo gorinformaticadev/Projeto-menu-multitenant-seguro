@@ -593,3 +593,15 @@ Require stack:
 [2026-01-20T19:31:30.797Z] [Loader] ⚠️ Classe Ordem_servicoModule não encontrada em D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module
 [2026-01-20T19:31:30.798Z] [Loader] 🔄 Usando classe alternativa encontrada: OrdemServicoModule
 [2026-01-20T19:31:30.798Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 1
+[2026-01-20T19:49:54.221Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-20T19:49:58.687Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-20T19:49:58.689Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-20T19:50:00.888Z] [Loader] ⚠️ Classe Ordem_servicoModule não encontrada em D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-20T19:50:00.889Z] [Loader] 🔄 Usando classe alternativa encontrada: OrdemServicoModule
+[2026-01-20T19:50:00.890Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 1
+[2026-01-20T19:50:48.132Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-20T19:50:48.234Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-20T19:50:48.235Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-20T19:50:49.193Z] [Loader] ⚠️ Classe Ordem_servicoModule não encontrada em D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-20T19:50:49.193Z] [Loader] 🔄 Usando classe alternativa encontrada: OrdemServicoModule
+[2026-01-20T19:50:49.194Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 1
