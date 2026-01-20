@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, RefreshCw, CheckCircle, AlertCircle, FileDown } from 'lucide-react';
+import { Download, RefreshCw, CheckCircle, AlertCircle, FileDown, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 
@@ -115,6 +115,39 @@ export function BackupSection({ onBackupComplete }: BackupSectionProps) {
       toast({
         title: 'Erro no download',
         description: 'Não foi possível baixar o arquivo. Tente novamente.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  /**
+   * Apaga um arquivo de backup
+   */
+  const handleDeleteBackup = async (fileName: string) => {
+    // Confirmação antes de deletar
+    if (!confirm(`Tem certeza que deseja apagar o backup "${fileName}"?\n\nEsta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    try {
+      const response = await api.delete(`/api/backup/delete/${encodeURIComponent(fileName)}`);
+      
+      if (response.data.success) {
+        toast({
+          title: 'Backup apagado',
+          description: `Arquivo "${fileName}" foi removido com sucesso.`,
+          variant: 'default',
+        });
+        
+        // Recarregar lista de backups
+        await loadAvailableBackups();
+        onBackupComplete?.();
+      }
+    } catch (error: unknown) {
+      console.error('Erro ao apagar backup:', error);
+      toast({
+        title: 'Erro ao apagar backup',
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Não foi possível apagar o arquivo.',
         variant: 'destructive',
       });
     }
@@ -369,62 +402,83 @@ export function BackupSection({ onBackupComplete }: BackupSectionProps) {
               <p className="text-xs text-gray-400 mt-1">Crie um backup para começar</p>
             </div>
           ) : (
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Nome do Arquivo
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Tamanho
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Data de Criação
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Ações
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {availableBackups.map((backup, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <FileDown className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                            <span className="text-sm font-medium text-gray-900 truncate">
-                              {backup.fileName}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-sm text-gray-600">
-                            {(backup.fileSize / 1024 / 1024).toFixed(2)} MB
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-sm text-gray-600">
-                            {new Date(backup.createdAt).toLocaleString('pt-BR')}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <Button
-                            onClick={() => handleDownloadBackup(backup.fileName)}
-                            size="sm"
-                            variant="outline"
-                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          >
-                            <Download className="w-3 h-3 mr-1" />
-                            Baixar
-                          </Button>
-                        </td>
+            <div className="space-y-2">
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                {/* Área com rolagem limitada para ~5 registros */}
+                <div className="max-h-[360px] overflow-y-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 sticky top-0 z-10">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Nome do Arquivo
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Tamanho
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Data de Criação
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Ações
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {availableBackups.map((backup, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <FileDown className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                              <span className="text-sm font-medium text-gray-900 truncate">
+                                {backup.fileName}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-sm text-gray-600">
+                              {(backup.fileSize / 1024 / 1024).toFixed(2)} MB
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-sm text-gray-600">
+                              {new Date(backup.createdAt).toLocaleString('pt-BR')}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                onClick={() => handleDownloadBackup(backup.fileName)}
+                                size="sm"
+                                variant="outline"
+                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              >
+                                <Download className="w-3 h-3 mr-1" />
+                                Baixar
+                              </Button>
+                              <Button
+                                onClick={() => handleDeleteBackup(backup.fileName)}
+                                size="sm"
+                                variant="outline"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="w-3 h-3 mr-1" />
+                                Apagar
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
+              
+              {/* Indicador de total de registros */}
+              {availableBackups.length > 5 && (
+                <div className="text-center py-2 text-sm text-muted-foreground border border-gray-200 rounded-lg bg-gray-50">
+                  Total de {availableBackups.length} backups disponíveis (role para ver todos)
+                </div>
+              )}
             </div>
           )}
         </div>

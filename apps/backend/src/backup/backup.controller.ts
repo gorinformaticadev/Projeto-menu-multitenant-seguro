@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Delete,
   Body,
   Param,
   Query,
@@ -346,6 +347,45 @@ export class BackupController {
       this.logger.error(`Erro no download: ${error.message}`);
       throw new HttpException(
         error.message || 'Erro ao fazer download',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * DELETE /api/backup/delete/:fileName
+   * Apaga um arquivo de backup
+   * Requer autenticação JWT e role SUPER_ADMIN
+   */
+  @Delete('delete/:fileName')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  @Throttle({ default: { limit: 20, ttl: 3600000 } }) // 20 por hora
+  async deleteBackup(
+    @Param('fileName') fileName: string,
+    @Request() req,
+  ) {
+    try {
+      const userId = req.user?.id || req.user?.sub;
+      
+      if (!userId) {
+        throw new HttpException(
+          'Usuário não autenticado',
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+
+      const result = await this.backupService.deleteBackup(fileName, userId);
+
+      return {
+        success: true,
+        message: 'Backup apagado com sucesso',
+        data: result,
+      };
+    } catch (error) {
+      this.logger.error(`Erro ao apagar backup: ${error.message}`);
+      throw new HttpException(
+        error.message || 'Erro ao apagar backup',
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

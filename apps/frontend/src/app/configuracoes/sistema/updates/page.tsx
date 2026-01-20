@@ -510,16 +510,7 @@ export default function UpdatesPage() {
         {activeTab === 'config' && (
           <div className="space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="w-5 h-5" />
-                  Configurações do Sistema
-                </CardTitle>
-                <CardDescription>
-                  Configure o repositório Git e parâmetros de atualização
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 pt-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="gitUsername">Usuário GitHub</Label>
@@ -646,60 +637,73 @@ export default function UpdatesPage() {
                     Nenhuma operação registrada
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {backupLogs.map((log) => (
-                      <div key={log.id} className="border rounded-lg p-4 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <span className="font-medium">
-                              {log.operationType === 'BACKUP' ? '💾 Backup' : '⬆️ Restore'}
-                            </span>
-                            <span className={`px-2 py-1 text-xs rounded-full ${
-                              log.status === 'SUCCESS' ? 'bg-green-100 text-green-800' :
-                              log.status === 'FAILED' ? 'bg-red-100 text-red-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {log.status}
-                            </span>
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {new Date(log.startedAt).toLocaleString('pt-BR')}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                          <div>
-                            <span className="font-medium">Arquivo:</span> {log.fileName}
-                          </div>
-                          <div>
-                            <span className="font-medium">Tamanho:</span>{' '}
-                            {log.fileSize ? (log.fileSize / 1024 / 1024).toFixed(2) + ' MB' : 'N/A'}
-                          </div>
-                          <div>
-                            <span className="font-medium">Duração:</span>{' '}
-                            {log.durationSeconds ? `${log.durationSeconds}s` : 'N/A'}
-                          </div>
-                          <div>
-                            <span className="font-medium">Executado por:</span> {log.executedBy}
-                          </div>
-                        </div>
-
-                        {log.errorMessage && (
-                          <div className="flex items-start gap-2 mt-2 p-3 border border-red-200 bg-red-50 rounded-lg">
-                            <XCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
-                            <div className="text-sm text-red-800">
-                              <strong>Erro:</strong> {log.errorMessage}
+                  <div className="space-y-2">
+                    {/* Área de rolagem com altura máxima para 5 itens */}
+                    <div className="max-h-[640px] overflow-y-auto pr-2 space-y-4">
+                      {backupLogs.map((log) => (
+                        <div key={log.id} className="border rounded-lg p-4 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <span className="font-medium">
+                                {log.operationType === 'BACKUP' ? '💾 Backup' : '⬆️ Restore'}
+                              </span>
+                              <span className={`px-2 py-1 text-xs rounded-full ${
+                                log.status === 'SUCCESS' ? 'bg-green-100 text-green-800' :
+                                log.status === 'FAILED' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {log.status}
+                              </span>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {new Date(log.startedAt).toLocaleString('pt-BR')}
                             </div>
                           </div>
-                        )}
+
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div>
+                              <span className="font-medium">Arquivo:</span> {log.fileName}
+                            </div>
+                            <div>
+                              <span className="font-medium">Tamanho:</span>{' '}
+                              {log.fileSize ? (log.fileSize / 1024 / 1024).toFixed(2) + ' MB' : 'N/A'}
+                            </div>
+                            <div>
+                              <span className="font-medium">Duração:</span>{' '}
+                              {log.durationSeconds ? `${log.durationSeconds}s` : 'N/A'}
+                            </div>
+                            <div>
+                              <span className="font-medium">Executado por:</span> {log.executedBy}
+                            </div>
+                          </div>
+
+                          {log.errorMessage && (
+                            <div className="flex items-start gap-2 mt-2 p-3 border border-red-200 bg-red-50 rounded-lg">
+                              <XCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                              <div className="text-sm text-red-800">
+                                <strong>Erro:</strong> {log.errorMessage}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* Indicador de total de registros */}
+                    {backupLogs.length > 5 && (
+                      <div className="text-center pt-2 text-sm text-muted-foreground border-t">
+                        Total de {backupLogs.length} registros (role para ver todos)
                       </div>
-                    ))}
+                    )}
                   </div>
                 )}
               </CardContent>
             </Card>
           </div>
         )}
+
+        {/* Aba Configurações */}
+        {activeTab === 'config' && (
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -810,6 +814,7 @@ export default function UpdatesPage() {
               </CardContent>
             </Card>
           </div>
+        )}
 
         {/* Aba Histórico */}
         {activeTab === 'history' && (

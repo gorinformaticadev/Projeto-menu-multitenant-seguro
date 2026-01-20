@@ -803,6 +803,62 @@ export class BackupService {
   }
 
   /**
+   * Apaga um arquivo de backup
+   */
+  async deleteBackup(
+    fileName: string,
+    userId: string,
+  ): Promise<{ fileName: string; deleted: boolean }> {
+    try {
+      // Validar nome do arquivo (segurança)
+      if (!fileName || fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
+        throw new HttpException(
+          'Nome de arquivo inválido',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const filePath = path.join(this.tempDir, fileName);
+
+      // Verificar se arquivo existe
+      if (!fs.existsSync(filePath)) {
+        throw new HttpException(
+          'Arquivo de backup não encontrado',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      // Apagar arquivo do sistema de arquivos
+      fs.unlinkSync(filePath);
+
+      this.logger.log(`Backup apagado: ${fileName} por usuário ${userId}`);
+
+      // Registrar auditoria
+      await this.auditService.log({
+        action: 'BACKUP_DELETED',
+        userId,
+        details: { fileName },
+      });
+
+      return {
+        fileName,
+        deleted: true,
+      };
+    } catch (error) {
+      this.logger.error(`Erro ao apagar backup: ${error.message}`);
+      
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        `Erro ao apagar backup: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
    * Limpa arquivos temporários antigos
    */
   async cleanupOldBackups(retentionHours: number = 1): Promise<void> {
