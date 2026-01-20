@@ -8,19 +8,96 @@ interface ModulePageClientProps {
 }
 
 /**
- * Loader dinâmico de páginas de módulos (FALLBACK)
+ * Cache de módulos carregados dinamicamente
+ * Webpack require.context inclui TODOS os arquivos que correspondem ao pattern no build
+ * Isso permite carregar módulos sem hardcode - qualquer módulo na pasta modules será incluído
+ */
+
+// Função para criar o contexto de módulos dinamicamente
+function getModuleContext() {
+    // require.context inclui automaticamente TODOS os arquivos no build
+    // Pattern: qualquer pasta dentro de modules, qualquer profundidade, arquivos page.tsx
+    // Isso NÃO é hardcode - qualquer módulo adicionado à pasta será incluído automaticamente
+    const context = require.context(
+        '../../',  // Pasta base: modules/
+        true,      // Recursivo: busca em subpastas
+        /^\.\/[^/]+\/.*page\.tsx$/  // Pattern: ./nome_modulo/**/page.tsx
+    );
+    
+    return context;
+}
+
+// Cache do contexto de módulos
+let moduleContext: ReturnType<typeof getModuleContext> | null = null;
+
+function loadModuleContext() {
+    if (!moduleContext) {
+        try {
+            moduleContext = getModuleContext();
+        } catch (error) {
+            console.error('[ModulePage] Erro ao carregar contexto de módulos:', error);
+        }
+    }
+    return moduleContext;
+}
+
+/**
+ * Busca um componente de página no contexto de módulos
+ */
+function findPageComponent(moduleSlug: string, route: string): React.ComponentType | null {
+    const context = loadModuleContext();
+    if (!context) return null;
+
+    // Caminhos possíveis para buscar
+    const possiblePaths = [
+        `./${moduleSlug}/${route}/page.tsx`,
+        `./${moduleSlug}/pages/${route}/page.tsx`,
+    ];
+
+    // Se a rota já começa com 'pages/', adiciona variantes sem o prefixo
+    if (route.startsWith('pages/')) {
+        const routeWithoutPages = route.replace('pages/', '');
+        possiblePaths.push(
+            `./${moduleSlug}/${routeWithoutPages}/page.tsx`,
+        );
+    }
+
+    const keys = context.keys();
+    console.log('[ModulePage] Arquivos disponíveis para módulo:', keys.filter(k => k.includes(moduleSlug)));
+
+    for (const path of possiblePaths) {
+        if (keys.includes(path)) {
+            console.log('[ModulePage] Encontrado:', path);
+            const module = context(path);
+            return module.default || module;
+        }
+    }
+
+    // Busca alternativa: procurar por match parcial
+    const routePattern = route.replace('pages/', '');
+    
+    for (const key of keys) {
+        if (key.startsWith(`./${moduleSlug}/`) && key.includes(routePattern) && key.endsWith('/page.tsx')) {
+            console.log('[ModulePage] Match parcial encontrado:', key);
+            const module = context(key);
+            return module.default || module;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Loader dinâmico de páginas de módulos
  *
- * ATENÇÃO: O Next.js deve priorizar pastas estáticas (ex: modules/sistema).
- * Este loader serve apenas como fallback para rotas não mapeadas fisicamente.
- *
- * CAMINHO DE BUSCA:
- * - apps/frontend/src/app/modules/{moduleSlug}/{route}/page.tsx
+ * TOTALMENTE DINÂMICO: Não há hardcode de módulos.
+ * O webpack inclui automaticamente TODOS os arquivos page.tsx dentro de modules/
+ * Quando um novo módulo é instalado, basta fazer rebuild do frontend.
  */
 export default function ModulePageClient({ moduleSlug, slug }: ModulePageClientProps) {
-    // Rota é o caminho completo após /modules/{moduleSlug}/
     const route = slug?.join('/') || 'index';
 
-    console.log('[ModulePage] Buscando rota (fallback):', { moduleSlug, route });
+    console.log('[ModulePage] Buscando rota:', { moduleSlug, route });
 
     const [Component, setComponent] = React.useState<React.ComponentType<unknown> | null>(null);
     const [error, setError] = React.useState<string | null>(null);
@@ -31,36 +108,26 @@ export default function ModulePageClient({ moduleSlug, slug }: ModulePageClientP
             setLoading(true);
             setError(null);
 
-            // Tenta carregar do diretório FRONTEND
-            // Caminho relativo: ../../{moduleSlug}/{route}/page
-            const importedModule = await import(
-                /* @vite-ignore */
-                `../../${moduleSlug}/${route}/page`
-            );
-
-            const ComponentToLoad = importedModule.default;
-
-            if (!ComponentToLoad) {
-                throw new Error('O arquivo page.tsx não exporta um componente default');
+            // Busca no contexto dinâmico do webpack
+            const PageComponent = findPageComponent(moduleSlug, route);
+            
+            if (PageComponent) {
+                setComponent(() => PageComponent);
+                console.log('[ModulePage] Componente carregado:', `${moduleSlug}/${route}`);
+                return;
             }
 
-            setComponent(() => ComponentToLoad);
-            console.log('[ModulePage] Componente carregado:', `${moduleSlug}/${route}`);
+            throw new Error(`Página não encontrada: ${moduleSlug}/${route}`);
 
         } catch (err: unknown) {
             console.error(`[ModulePage] Falha ao carregar ${moduleSlug}/${route}:`, err);
 
             const expectedPath = `apps/frontend/src/app/modules/${moduleSlug}/${route}/page.tsx`;
 
-            let errorMessage = `Página não encontrada.\n\n` +
-                `Caminho buscado:\n${expectedPath}\n\n` +
-                `Verifique se o arquivo existe e se a URL contém o caminho completo (ex: /pages/dashboard).`;
-
-            if (err instanceof Error && (err.message.includes('Cannot find module'))) {
-                errorMessage = `Módulo ou página não encontrada (${moduleSlug}/${route}).\n` +
-                    `O arquivo não foi encontrado no build do Frontend.\n\n` +
-                    `Caminho esperado: ${expectedPath}`;
-            }
+            const errorMessage = `Módulo ou página não encontrada (${moduleSlug}/${route}).\n` +
+                `O arquivo não foi encontrado no build do Frontend.\n\n` +
+                `Caminho esperado: ${expectedPath}\n\n` +
+                `Se o módulo foi recém-instalado, faça rebuild do frontend.`;
 
             setError(errorMessage);
         } finally {
