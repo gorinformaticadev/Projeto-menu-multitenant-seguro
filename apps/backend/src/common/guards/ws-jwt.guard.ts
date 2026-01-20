@@ -14,12 +14,15 @@ export class WsJwtGuard implements CanActivate {
   ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    this.logger.log(`🔐 WsJwtGuard: INÍCIO - Verificando cliente`);
     try {
       const client = context.switchToWs().getClient();
       const token = this.extractToken(client);
 
+      this.logger.log(`🔐 WsJwtGuard: Cliente ${client.id} - Token extraído:`, token ? 'Presente' : 'Ausente');
+
       if (!token) {
-        this.logger.warn('Conexão WebSocket rejeitada: Nenhum token fornecido');
+        this.logger.warn('❌ Conexão WebSocket rejeitada: Nenhum token fornecido');
         return false;
       }
 
@@ -51,11 +54,13 @@ export class WsJwtGuard implements CanActivate {
         name: user.name
       };
 
-      this.logger.log(`Autenticação WebSocket bem-sucedida: Usuário ${user.id} (${user.email})`);
+      this.logger.log(`✅ Autenticação WebSocket bem-sucedida: Usuário ${user.id} (${user.email})`);
+      this.logger.log(`✅ User anexado ao cliente:`, (client as any).user);
       return true;
 
     } catch (error) {
-      this.logger.error('Falha na autenticação WebSocket:', error.message);
+      this.logger.error('❌ EXCEPTION na autenticação WebSocket:', error);
+      this.logger.error('❌ Stack trace:', error.stack);
       return false;
     }
   }

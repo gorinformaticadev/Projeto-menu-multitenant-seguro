@@ -39,7 +39,6 @@ interface AuthenticatedSocket extends Socket {
   };
 }
 
-@UseGuards(WsJwtGuard)
 @WebSocketGateway({
   namespace: '/notifications',
   cors: {
@@ -188,16 +187,33 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
       this.connectionMetrics.totalConnections++;
       this.connectionMetrics.connectionAttempts++;
       this.connectionStartTimes.set(client.id, Date.now());
-      
-      // O cliente.user já está populado pelo WsJwtGuard
-      const user = client.user;
-      
-      if (!user) {
-        this.logger.warn(`Cliente rejeitado - usuário não autenticado: ${client.id}`);
+
+      // DEBUG: Verificar se o token está sendo enviado
+      this.logger.log(`🔍 Cliente conectando: ${client.id}`);
+      this.logger.log(`🔍 Handshake auth:`, client.handshake?.auth);
+      this.logger.log(`🔍 Handshake headers:`, client.handshake?.headers?.authorization);
+
+      // AUTENTICAÇÃO DIRETA: Extrair e validar token
+      const token = this.extractTokenFromHandshake(client);
+      if (!token) {
+        this.logger.warn(`❌ Cliente rejeitado - nenhum token fornecido: ${client.id}`);
         this.connectionMetrics.failedConnections++;
         client.disconnect(true);
         return;
       }
+
+      // Validar token JWT
+      const user = await this.validateTokenForConnection(token);
+      if (!user) {
+        this.logger.warn(`❌ Cliente rejeitado - token inválido: ${client.id}`);
+        this.connectionMetrics.failedConnections++;
+        client.disconnect(true);
+        return;
+      }
+
+      // Anexar usuário ao cliente
+      (client as any).user = user;
+      this.logger.log(`✅ Cliente autenticado: ${client.id} (user: ${user.id}, tenant: ${user.tenantId})`);
 
       this.connectedClients.set(client.id, client);
 
@@ -467,7 +483,13 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     return [];
   }
 
-  private async validateToken(token: string): Promise<unknown> {
+  private extractTokenFromHandshake(client: AuthenticatedSocket): string | null {
+    return client.handshake?.auth?.token ||
+           client.handshake?.headers?.authorization?.replace('Bearer ', '') ||
+           null;
+  }
+
+  private async validateTokenForConnection(token: string): Promise<any> {
     try {
       // Validar JWT token usando o JwtService
       const payload = this.jwtService.verify(token, {
@@ -498,8 +520,13 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
         name: user.name
       };
     } catch (error) {
-      this.logger.error('Erro ao validar token JWT:', error.message);
+      this.logger.error('Erro ao validar token JWT para conexão:', error.message);
       return null;
     }
+  }
+
+  private async validateToken(token: string): Promise<unknown> {
+    // Método legado - manter para compatibilidade
+    return this.validateTokenForConnection(token);
   }
 }

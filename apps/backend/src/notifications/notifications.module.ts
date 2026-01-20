@@ -26,8 +26,8 @@ import { PrismaModule } from '@core/prisma/prisma.module';
     }),
   ],
   controllers: [NotificationsController],
-  providers: [NotificationService], // NotificationGateway TEMPORARIAMENTE DESABILITADO NOVAMENTE
-  exports: [NotificationService], // NotificationGateway TEMPORARIAMENTE DESABILITADO NOVAMENTE
+  providers: [NotificationService, NotificationGateway],
+  exports: [NotificationService, NotificationGateway],
 })
 export class NotificationsModule {
       // Empty implementation

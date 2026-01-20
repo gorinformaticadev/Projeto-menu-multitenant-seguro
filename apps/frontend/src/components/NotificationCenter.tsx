@@ -90,19 +90,19 @@ export function NotificationCenter() {
 
     const getIconColor = (type: string) => {
         switch (type) {
-            case 'warning': return 'text-yellow-600';
-            case 'error': return 'text-red-600';
-            case 'success': return 'text-green-600';
-            default: return 'text-blue-600';
+            case 'warning': return 'text-amber-600';
+            case 'error': return 'text-rose-600';
+            case 'success': return 'text-emerald-600';
+            default: return 'text-indigo-600';
         }
     };
 
     const getSeverityBadgeColor = (type: string) => {
         switch (type) {
-            case 'warning': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-            case 'error': return 'bg-red-100 text-red-800 border-red-200';
-            case 'success': return 'bg-green-100 text-green-800 border-green-200';
-            default: return 'bg-blue-100 text-blue-800 border-blue-200';
+            case 'warning': return 'bg-amber-50 text-amber-800 border-amber-200';
+            case 'error': return 'bg-rose-50 text-rose-800 border-rose-200';
+            case 'success': return 'bg-emerald-50 text-emerald-800 border-emerald-200';
+            default: return 'bg-indigo-50 text-indigo-800 border-indigo-200';
         }
     };
 
@@ -126,11 +126,11 @@ export function NotificationCenter() {
         <div className="max-w-4xl mx-auto p-6">
             <div className="flex items-center justify-between mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        <Bell className="h-6 w-6 text-primary" />
+                    <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                        <Bell className="h-6 w-6 text-indigo-600" />
                         Central de Notificações
                     </h1>
-                    <p className="text-gray-500 mt-1">Gerencie seus alertas e mensagens do sistema</p>
+                    <p className="text-slate-600 mt-1">Gerencie seus alertas e mensagens do sistema</p>
                 </div>
 
                 <div className="flex gap-3">
@@ -149,48 +149,48 @@ export function NotificationCenter() {
 
             {/* Cards de Estatísticas */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-                    <div className="p-3 bg-blue-50 rounded-lg">
-                        <Bell className="h-6 w-6 text-blue-600" />
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+                    <div className="p-3 bg-indigo-50 rounded-lg">
+                        <Bell className="h-6 w-6 text-indigo-600" />
                     </div>
                     <div>
-                        <p className="text-sm font-medium text-gray-500">Total recebidas</p>
-                        <p className="text-2xl font-bold text-gray-900">{notifications.length}</p>
+                        <p className="text-sm font-medium text-slate-600">Total recebidas</p>
+                        <p className="text-2xl font-bold text-slate-900">{notifications.length}</p>
                     </div>
                 </div>
 
-                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-                    <div className="p-3 bg-yellow-50 rounded-lg">
-                        <AlertCircle className="h-6 w-6 text-yellow-600" />
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+                    <div className="p-3 bg-amber-50 rounded-lg">
+                        <AlertCircle className="h-6 w-6 text-amber-600" />
                     </div>
                     <div>
-                        <p className="text-sm font-medium text-gray-500">Não lidas</p>
-                        <p className="text-2xl font-bold text-gray-900">{unreadCount}</p>
+                        <p className="text-sm font-medium text-slate-600">Não lidas</p>
+                        <p className="text-2xl font-bold text-slate-900">{unreadCount}</p>
                     </div>
                 </div>
 
-                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-                    <div className="p-3 bg-green-50 rounded-lg">
-                        <CheckCircle className="h-6 w-6 text-green-600" />
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+                    <div className="p-3 bg-emerald-50 rounded-lg">
+                        <CheckCircle className="h-6 w-6 text-emerald-600" />
                     </div>
                     <div>
-                        <p className="text-sm font-medium text-gray-500">Lidas</p>
-                        <p className="text-2xl font-bold text-gray-900">{notifications.length - unreadCount}</p>
+                        <p className="text-sm font-medium text-slate-600">Lidas</p>
+                        <p className="text-2xl font-bold text-slate-900">{notifications.length - unreadCount}</p>
                     </div>
                 </div>
             </div>
 
             {/* Status da Conexão */}
             {!isConnected && (
-                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-r-lg">
+                <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-6 rounded-r-lg">
                     <div className="flex">
                         <div className="flex-shrink-0">
-                            <AlertTriangle className="h-5 w-5 text-yellow-400" />
+                            <AlertTriangle className="h-5 w-5 text-amber-400" />
                         </div>
                         <div className="ml-3">
-                            <p className="text-sm text-yellow-700">
+                            <p className="text-sm text-amber-800">
                                 Você está desconectado do servidor de notificações em tempo real.
-                                {connectionError && <span className="block mt-1 text-xs">{connectionError}</span>}
+                                {connectionError && <span className="block mt-1 text-xs text-amber-700">{connectionError}</span>}
                             </p>
                         </div>
                     </div>
@@ -198,17 +198,17 @@ export function NotificationCenter() {
             )}
 
             {/* Filtros e Busca */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6">
                 <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
                     <div className="flex items-center gap-4 w-full">
                         {/* Checkbox Selecionar Tudo */}
-                        <div className="flex items-center gap-2 border-r pr-4 border-gray-200">
+                        <div className="flex items-center gap-2 border-r pr-4 border-slate-200">
                             <Checkbox
                                 id="select-all"
                                 checked={isAllSelected}
                                 onCheckedChange={(checked: boolean) => handleSelectAll(checked as boolean)}
                             />
-                            <label htmlFor="select-all" className="text-sm font-medium text-gray-700 cursor-pointer">
+                            <label htmlFor="select-all" className="text-sm font-medium text-slate-700 cursor-pointer">
                                 Todos
                             </label>
                         </div>
@@ -238,22 +238,22 @@ export function NotificationCenter() {
                         )}
 
                         <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                             <input
                                 type="text"
                                 placeholder="Buscar notificações..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+                                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
                             />
                         </div>
 
-                        <div className="flex bg-gray-100 p-1 rounded-lg shrink-0">
+                        <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
                             <button
                                 onClick={() => setFilter('all')}
                                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${filter === 'all'
-                                    ? 'bg-white text-gray-900 shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700'
+                                    ? 'bg-white text-slate-900 shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-700'
                                     }`}
                             >
                                 Todas
@@ -261,13 +261,13 @@ export function NotificationCenter() {
                             <button
                                 onClick={() => setFilter('unread')}
                                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${filter === 'unread'
-                                    ? 'bg-white text-gray-900 shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700'
+                                    ? 'bg-white text-slate-900 shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-700'
                                     }`}
                             >
                                 Não Lidas
                                 {unreadCount > 0 && (
-                                    <span className="bg-primary text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                                    <span className="bg-indigo-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">
                                         {unreadCount}
                                     </span>
                                 )}
@@ -280,12 +280,12 @@ export function NotificationCenter() {
             {/* Lista de Notificações */}
             <div className="space-y-4">
                 {filteredNotifications.length === 0 ? (
-                    <div className="text-center py-20 bg-gray-50 rounded-xl border-dashed border-2 border-gray-200">
+                    <div className="text-center py-20 bg-slate-50 rounded-xl border-dashed border-2 border-slate-200">
                         <div className="bg-white p-4 rounded-full inline-block mb-4 shadow-sm">
-                            <Bell className="h-8 w-8 text-gray-300" />
+                            <Bell className="h-8 w-8 text-slate-300" />
                         </div>
-                        <h3 className="text-lg font-medium text-gray-900">Nenhuma notificação encontrada</h3>
-                        <p className="text-gray-500 mt-1 max-w-sm mx-auto">
+                        <h3 className="text-lg font-medium text-slate-900">Nenhuma notificação encontrada</h3>
+                        <p className="text-slate-600 mt-1 max-w-sm mx-auto">
                             {searchTerm
                                 ? `Não encontramos resultados para "${searchTerm}"`
                                 : filter === 'unread'
@@ -312,12 +312,12 @@ export function NotificationCenter() {
                             <div
                                 key={notification.id}
                                 className={`group relative bg-white rounded-xl border transition-all duration-200 overflow-hidden ${isUnread
-                                    ? 'border-blue-200 shadow-sm ring-1 ring-blue-50'
-                                    : 'border-gray-200 hover:border-gray-300'
-                                    } ${isSelected ? 'bg-blue-50/50 border-blue-300' : ''}`}
+                                    ? 'border-indigo-200 shadow-sm ring-1 ring-indigo-50'
+                                    : 'border-slate-200 hover:border-slate-300'
+                                    } ${isSelected ? 'bg-indigo-50/50 border-indigo-300' : ''}`}
                             >
                                 {isUnread && (
-                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>
+                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500"></div>
                                 )}
 
                                 <div className="p-5 flex items-start gap-4">
@@ -328,7 +328,7 @@ export function NotificationCenter() {
                                         />
                                     </div>
 
-                                    <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${isUnread ? 'bg-blue-50' : 'bg-gray-50 group-hover:bg-gray-100'
+                                    <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${isUnread ? 'bg-indigo-50' : 'bg-slate-50 group-hover:bg-slate-100'
                                         }`}>
                                         <Icon className={`h-5 w-5 ${getIconColor(notification.type)}`} />
                                     </div>
@@ -336,13 +336,13 @@ export function NotificationCenter() {
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-start justify-between gap-4 mb-1">
                                             <div>
-                                                <h3 className={`text-base ${isUnread ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
+                                                <h3 className={`text-base ${isUnread ? 'font-semibold text-slate-900' : 'font-medium text-slate-700'}`}>
                                                     {notification.title}
                                                 </h3>
                                             </div>
                                         </div>
 
-                                        <p className="text-gray-600 text-sm leading-relaxed mb-3">
+                                        <p className="text-slate-600 text-sm leading-relaxed mb-3">
                                             {notification.description}
                                         </p>
 
@@ -354,7 +354,7 @@ export function NotificationCenter() {
                                                             notification.type === 'success' ? 'Sucesso' : 'Informativo'}
                                                 </span>
 
-                                                <span className="text-xs text-gray-400 flex items-center gap-1 border-l pl-3 ml-1 border-gray-200">
+                                                <span className="text-xs text-slate-400 flex items-center gap-1 border-l pl-3 ml-1 border-slate-200">
                                                     {formatNotificationTime(notification.createdAt)}
                                                 </span>
                                             </div>
@@ -362,7 +362,7 @@ export function NotificationCenter() {
                                             {isUnread && (
                                                 <button
                                                     onClick={() => markAsRead(notification.id)}
-                                                    className="text-xs font-medium text-primary hover:text-primary/80 flex items-center gap-1 transition-colors opacity-0 group-hover:opacity-100"
+                                                    className="text-xs font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1 transition-colors opacity-0 group-hover:opacity-100"
                                                 >
                                                     <Check className="h-3 w-3" />
                                                     Marcar como lida

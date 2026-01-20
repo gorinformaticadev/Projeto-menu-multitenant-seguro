@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { NotificationService } from './notification.service';
-// import { NotificationGateway } from './notification.gateway'; // TEMPORARIAMENTE DESABILITADO
+import { NotificationGateway } from './notification.gateway';
 import { CreateNotificationDto, NotificationFiltersDto, BroadcastNotificationDto } from './notification.dto';
 
 @Controller('notifications')
@@ -24,10 +24,8 @@ import { CreateNotificationDto, NotificationFiltersDto, BroadcastNotificationDto
 export class NotificationsController {
   constructor(
     private notificationService: NotificationService,
-    // private notificationGateway: NotificationGateway // TEMPORARIAMENTE DESABILITADO
-  ) {
-      // Empty implementation
-    }
+    private notificationGateway: NotificationGateway
+  ) {}
 
   /**
    * Cria uma nova notificação
@@ -37,7 +35,7 @@ export class NotificationsController {
     const notification = await this.notificationService.create(createDto);
 
     // Emite via Socket.IO
-    // await this.notificationGateway.emitNewNotification(notification); // TEMPORARIAMENTE DESABILITADO
+    await this.notificationGateway.emitNewNotification(notification);
 
     return { success: true, notification };
   }
@@ -95,7 +93,7 @@ export class NotificationsController {
 
     if (notification) {
       // Emite evento via Socket.IO
-      // await this.notificationGateway.emitNotificationRead(notification); // TEMPORARIAMENTE DESABILITADO
+      await this.notificationGateway.emitNotificationRead(notification);
     }
 
     return { success: !!notification };
@@ -157,7 +155,7 @@ export class NotificationsController {
 
     if (notification) {
       // Emite evento via Socket.IO
-      // await this.notificationGateway.emitNotificationDeleted(id, notification); // TEMPORARIAMENTE DESABILITADO
+      await this.notificationGateway.emitNotificationDeleted(id, notification);
     }
 
     return { success: !!notification };

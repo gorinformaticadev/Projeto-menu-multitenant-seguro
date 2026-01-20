@@ -21,7 +21,7 @@ interface UseNotificationsReturn {
 }
 
 // Flag para controlar se o Socket.IO está habilitado
-const SOCKET_ENABLED = false; // TEMPORARIAMENTE DESABILITADO
+const SOCKET_ENABLED = true;
 
 export function useNotifications(): UseNotificationsReturn {
   const { user, token } = useAuth();
