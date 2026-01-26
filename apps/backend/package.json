@@ -17,9 +17,9 @@
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "security:audit": "npm audit --audit-level=moderate",
     "security:check": "npm run lint && npm run security:audit && npm run security:validate",
-    "security:validate": "ts-node scripts/simple-security-check.ts",
-    "security:full-scan": "ts-node scripts/security-check.ts",
-    "security:snyk": "powershell -ExecutionPolicy Bypass -File ./scripts/snyk-test.ps1",
+    "security:validate": "ts-node ../../scripts/backend/simple-security-check.ts",
+    "security:full-scan": "ts-node ../../scripts/backend/security-check.ts",
+    "security:snyk": "powershell -ExecutionPolicy Bypass -File ../../scripts/backend/snyk-test.ps1",
     "pre-deploy": "npm run security:check && npm run build"
   },
   "dependencies": {

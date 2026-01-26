@@ -125,3 +125,4 @@ apps/frontend/src/app/modules/ordem_servico/services/permissionService.ts
 apps/frontend/src/app/modules/ordem_servico/services/templateService.ts
 apps/frontend/src/app/modules/ordem_servico/types/ordem-servico.types.ts
 apps/frontend/src/app/modules/ordem_servico/types/permission.types.ts
+/scripts
