@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
+import { StringValue } from 'ms';
 import { AuthService } from './auth.service';
 import { TwoFactorService } from './two-factor.service';
 import { EmailVerificationService } from './email-verification.service';
@@ -16,12 +17,17 @@ import { EmailModule } from '../email/email.module';
     PassportModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.get('JWT_SECRET'),
-        signOptions: {
-          expiresIn: config.get('JWT_EXPIRES_IN', '7d'),
-        },
-      }),
+      useFactory: (config: ConfigService) => {
+        const expiresIn = config.get<string>('JWT_EXPIRES_IN', '7d');
+
+        return {
+          secret: config.get<string>('JWT_SECRET'),
+          signOptions: {
+            // Garantir que o expiresIn seja compatível com a tipagem do NestJS 11 (number | StringValue)
+            expiresIn: /^\d+$/.test(expiresIn) ? Number(expiresIn) : (expiresIn as StringValue),
+          },
+        };
+      },
     }),
     forwardRef(() => AuditModule),
     EmailModule,
@@ -30,6 +36,4 @@ import { EmailModule } from '../email/email.module';
   providers: [AuthService, TwoFactorService, EmailVerificationService, PasswordResetService, JwtStrategy],
   exports: [AuthService, TwoFactorService, EmailVerificationService, PasswordResetService],
 })
-export class AuthModule {
-      // Empty implementation
-    }
+export class AuthModule { }

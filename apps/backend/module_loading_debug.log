@@ -641,3 +641,18 @@ Require stack:
 [2026-01-20T21:03:31.990Z] [Loader] ⚠️ Classe Ordem_servicoModule não encontrada em D:\github\2026\apps\backend\src\modules\ordem_servico\ordem_servico.module
 [2026-01-20T21:03:31.991Z] [Loader] 🔄 Usando classe alternativa encontrada: OrdemServicoModule
 [2026-01-20T21:03:31.991Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 1
+[2026-01-26T15:42:31.601Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-26T15:42:35.359Z] [Loader] 🔎 Encontrados 1 módulos ativos. Iniciando carregamento...
+[2026-01-26T15:42:35.361Z] [Loader] ⏳ Carregando: ordem_servico de D:\github\Projeto-menu-multitenant-seguro\apps\backend\src\modules\ordem_servico\ordem_servico.module
+[2026-01-26T15:42:35.362Z] [Loader] ❌ Falha ao carregar módulo ordem_servico: Cannot find module 'D:\github\Projeto-menu-multitenant-seguro\apps\backend\src\modules\ordem_servico\ordem_servico.module'
+Require stack:
+- D:\github\Projeto-menu-multitenant-seguro\apps\backend\src\core\dynamic-modules.loader.ts
+- D:\github\Projeto-menu-multitenant-seguro\apps\backend\src\app.module.ts
+- D:\github\Projeto-menu-multitenant-seguro\apps\backend\src\main.ts
+[2026-01-26T15:42:35.363Z] [Loader]    ➜ Verifique se a pasta/arquivo existe em: src/modules/ordem_servico/
+[2026-01-26T15:42:35.364Z] [Loader] ⚠️ ALERTA: Módulo ordem_servico possui arquivos ausentes.
+[2026-01-26T15:42:35.364Z] [Loader] ⚠️ AÇÃO AUTOMÁTICA: Desabilitando módulo no banco de dados...
+[2026-01-26T15:42:35.378Z] [Loader] ✅ SUCESSO: Módulo ordem_servico foi marcado como 'disabled'.
+[2026-01-26T15:42:35.379Z] [Loader] ✅ Carregamento finalizado. Módulos carregados: 0
+[2026-01-26T17:03:21.452Z] [Loader] 🔄 Buscando módulos ativos no banco de dados...
+[2026-01-26T17:03:21.671Z] [Loader] ℹ️ Nenhum módulo ativo encontrado.
