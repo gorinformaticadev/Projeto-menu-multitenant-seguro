@@ -1,36 +1,47 @@
-# 🚀 Guia de Instalação Rápida
+# 🚀 Guia de Instalação Rápida (pnpm Workspace)
+
+Este projeto utiliza **pnpm workspace**. Todas as dependências são gerenciadas na raiz.
 
 ## Pré-requisitos
 
-- Node.js 18 ou superior
+- Node.js 20 ou superior
 - PostgreSQL instalado e rodando
-- npm ou yarn
+- **pnpm** instalado globalmente (`npm install -g pnpm`)
 
-## Passo 1: Clonar e Configurar Backend
+## Passo 1: Instalação e Configuração
 
-```bash
-# Entrar na pasta do backend
-cd backend
+1.  **Instalar dependências (na raiz)**
+    ```bash
+    pnpm install
+    ```
+    *Isso instala dependências do backend e frontend automaticamente.*
 
-# Instalar dependências
-npm install
+2.  **Configurar Variáveis de Ambiente**
 
-# Criar arquivo .env
-cp .env.example .env
-```
+    *Backend:*
+    ```bash
+    cp apps/backend/.env.example apps/backend/.env
+    ```
+    Edite `apps/backend/.env` com suas configurações do PostgreSQL.
 
-Edite o arquivo `.env` com suas configurações do PostgreSQL:
+    *Frontend:*
+    ```bash
+    cp apps/frontend/.env.local.example apps/frontend/.env.local
+    ```
 
-```env
-DATABASE_URL="postgresql://usuario:senha@localhost:5432/nome_do_banco?schema=public"
-JWT_SECRET="sua-chave-secreta-super-segura-aqui"
-JWT_EXPIRES_IN="7d"
-FRONTEND_URL="http://localhost:5000"
-PORT=3001
-```
+3.  **Configurar Banco de Dados**
+    ```bash
+    # Gerar Client Prisma
+    pnpm --filter backend exec prisma generate
 
-```bash
-# Gerar Prisma Client 
+    # Executar Migrations
+    pnpm --filter backend exec prisma migrate deploy
+
+    # Popular banco com dados iniciais
+    pnpm --filter backend exec ts-node prisma/seed.ts
+    ```
+
+    # Gerar Prisma Client 
 npm run prisma:generate
 
 # Criar banco de dados e executar migrations
@@ -94,37 +105,18 @@ TEMPLATE template0;
 
 ```bash
 \q
-```
 
-✅ Backend rodando em `http://localhost:4000`
+## Passo 2: Rodar o Projeto
 
-## Passo 2: Configurar Frontend
-
-Abra um novo terminal:
+Você pode rodar os projetos diretamente da raiz:
 
 ```bash
-# Entrar na pasta do frontend
-cd frontend
+# Iniciar Backend (Porta 4000)
+pnpm run dev:backend
 
-# Instalar dependências
-npm install
-
-# Criar arquivo .env.local
-cp .env.local.example .env.local
+# Iniciar Frontend (Porta 5000)
+pnpm run dev:frontend
 ```
-
-O arquivo `.env.local` já está configurado corretamente:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:4000
-```
-
-```bash
-# Iniciar aplicação frontend
-npm run dev
-```
-
-✅ Frontend rodando em `http://localhost:5000`
 
 ## Passo 3: Acessar o Sistema
 
@@ -135,139 +127,51 @@ Abra seu navegador em `http://localhost:5000`
 #### SUPER_ADMIN (Acesso Total)
 - **Email**: `admin@system.com`
 - **Senha**: `eRR&KnFyuo&UI6d*`
-- **Pode acessar**: Dashboard, Empresas, Configurações
 
 #### ADMIN (Tenant)
 - **Email**: `admin@empresa1.com`
 - **Senha**: `eRR&KnFyuo&UI6d*`
-- **Pode acessar**: Dashboard, Configurações (apenas do seu tenant)
 
 #### USER (Usuário Comum)
 - **Email**: `user@empresa1.com`
 - **Senha**: `eRR&KnFyuo&UI6d*`
-- **Pode acessar**: Dashboard (apenas dados do seu tenant)
 
-## 🎯 Testando o Sistema
+## 🔧 Comandos Úteis (pnpm)
 
-### 1. Testar Login
-- Acesse `http://localhost:5000/login`
-- Faça login com qualquer uma das credenciais acima
-- Você será redirecionado para o dashboard
-
-### 2. Testar Isolamento Multitenant
-- Faça login como `user@empresa1.com`
-- Observe que o menu "Empresas" não aparece (apenas SUPER_ADMIN)
-- Faça logout e login como `admin@system.com`
-- Agora o menu "Empresas" está visível
-
-### 3. Testar Cadastro de Empresas
-- Faça login como `admin@system.com` (SUPER_ADMIN)
-- Clique em "Empresas" no menu lateral
-- Clique em "Nova Empresa"
-- Preencha o formulário e cadastre uma nova empresa
-- A empresa aparecerá na lista
-
-### 4. Testar Segurança
-- Tente acessar `http://localhost:5000/empresas` sem estar logado
-  - Você será redirecionado para o login
-- Faça login como `user@empresa1.com` (USER)
-- Tente acessar `http://localhost:5000/empresas`
-  - Você será redirecionado para o dashboard (sem permissão)
-
-## 🔧 Comandos Úteis
-
-### Backend
+Todos os comandos podem ser rodados da raiz:
 
 ```bash
-# Ver logs do Prisma
-npx prisma studio
+# Instalar todas as dependências
+pnpm install
 
-# Resetar banco de dados
-npx prisma migrate reset
+# Limpar tudo (node_modules, builds)
+pnpm run clean
 
-# Criar nova migration
-npx prisma migrate dev --name nome_da_migration
+# Buildar tudo
+pnpm run build:all
+
+# Rodar testes em tudo
+pnpm run test:all
 ```
 
-### Frontend
+### Comandos de Banco de Dados (Prisma)
 
 ```bash
-# Limpar cache do Next.js
-rm -rf .next
+# Studio (Interface visual do banco)
+pnpm --filter backend exec prisma studio
 
-# Build para produção
-npm run build
-
-# Executar build de produção
-npm start
+# Resetar banco
+pnpm --filter backend exec prisma migrate reset
 ```
 
 ## ❌ Solução de Problemas
 
-### Erro de conexão com PostgreSQL
-
-```
-Error: Can't reach database server at `localhost:5432`
-```
-
-**Solução**: Verifique se o PostgreSQL está rodando:
-
-```bash
-# Windows
-# Abra o "Serviços" e verifique se PostgreSQL está ativo
-
-# Linux/Mac
-sudo service postgresql status
-```
-
-### Erro "Port 3001 already in use"
-
-**Solução**: Mate o processo que está usando a porta:
-
-```bash
-# Windows
-netstat -ano | findstr :3001
-taskkill /PID <PID> /F
-
-Ou todos os processos
-taskkill /F /IM node.exe
-
-# Linux/Mac
-lsof -ti:3001 | xargs kill -9
-```
-
 ### Erro "Module not found"
+**Solução**: Rode `pnpm install` na raiz novamente. Certifique-se de não ter pastas `node_modules` antigas criadas por `npm`.
+Se necessário, rode `pnpm run clean` e instale de novo.
 
-**Solução**: Reinstale as dependências:
+### Erro de Conexão com Banco
+Verifique se a `DATABASE_URL` no arquivo `apps/backend/.env` está correta e se o serviço do PostgreSQL está rodando.
 
-```bash
-rm -rf node_modules package-lock.json
-npm install
-```
-
-### Erro no Prisma Client
-
-**Solução**: Regenere o Prisma Client:
-
-```bash
-cd backend
-npm run prisma:generate
-```
-
-
-## 📚 Próximos Passos
-
-Após a instalação, você pode:
-
-1. Explorar o código-fonte para entender a arquitetura
-2. Ler a documentação completa no `README.md`
-3. Testar os diferentes níveis de acesso
-4. Modificar e adicionar novas funcionalidades
-5. Implementar novos módulos seguindo os padrões de segurança
-
-## 🆘 Precisa de Ajuda?
-
-- Verifique o `README.md` principal para documentação completa
-- Verifique o `backend/README.md` para detalhes do backend
-- Verifique o `frontend/README.md` para detalhes do frontend
-
+---
+Para mais detalhes sobre como trabalhar com o workspace, leia o arquivo [WORKSPACE_GUIDE.md](./WORKSPACE_GUIDE.md).
