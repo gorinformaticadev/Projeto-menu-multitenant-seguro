@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [3.0.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v2.0.0...v3.0.0) (2026-01-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **backup:** none
+
+### Features
+
+* Add CI/CD workflow for automated testing and Docker image builds, and document service order status improvements for service orders. ([800c1d9](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/800c1d9827cc7106269a2fdaab7c9f11e446301f))
+* add table UI component with its sub-components for structured data display. ([240471d](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/240471dad7db2695682c140d46b80de0c1a8c5a1))
+* **backup:** add backup and restore functionality ([d3b3d71](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/d3b3d710e71e403e13659475d6ecb63b01695c97))
+* **backup:** add delete backup functionality ([b8fe083](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/b8fe08398d77baf1d81f656321bcd5b5612832aa))
+* Implement the WhatsApp module, including new UI components, pages, and data models. ([19b2993](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/19b29930f8a163dc6bffc76c235ebeb1c0a563df))
+* Initialize monorepo structure with pnpm, and introduce backend notification and authentication features. ([cd4a074](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/cd4a074324513443624b5d1972dccc4f130252b3))
+* **modules:** improve migrations and seeds execution to run pendents only ([1367398](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/13673985689cf908490bddc3b0597b2da3b62b85))
+* **modules:** integrate ordem_servico module ([658c84b](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/658c84b5c3fe8bf3ab021122cc8b6f7bf09da878))
+* **security:** add rate limiting for critical endpoints ([e80580c](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/e80580ceaeb905401c4bd6b8c64a4a1805594312))
+* **users:** add role restrictions to update preferences ([c43c6ad](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/c43c6ada0efa41b6633841e1f61562b01ce279d3))
+
+
+### Bug Fixes
+
+* **notifications:** re-enable real-time notifications with direct WebSocket authentication ([3d05808](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/3d05808ce913c99922b28e324064a1d5dd47f82c))
+
 ## [2.0.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.5.2...v2.0.0) (2026-01-19)
 
 
