@@ -7,11 +7,11 @@ import { JwtService } from '@nestjs/jwt';
  */
 @Injectable()
 export class SseJwtGuard implements CanActivate {
-  constructor(private jwtService: JwtService) {}
+  constructor(private jwtService: JwtService) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    
+
     // Extrair token da query string
     const token = request.query?.token;
 
@@ -31,7 +31,7 @@ export class SseJwtGuard implements CanActivate {
 
       // Anexar usuário ao request
       request.user = payload;
-      
+
       return true;
     } catch (error) {
       console.error('❌ [SseJwtGuard] Erro na validação do token:', error.message);
