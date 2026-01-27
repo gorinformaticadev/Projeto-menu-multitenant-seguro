@@ -37,115 +37,98 @@ jobs:
           - 5432:5432
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
+      # -------------------------
+      # Setup pnpm + Node
+      # -------------------------
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
 
-    - name: Ensure DATABASE_URL (fallback to service)
-      run: |
-        if [ -z "${{ env.DATABASE_URL }}" ]; then
-          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db" >> $GITHUB_ENV
-          echo "Using local Postgres service for tests"
-        else
-          echo "Using DATABASE_URL from secrets"
-        fi
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
 
-    - name: Wait for Postgres to be ready
-      run: |
-        for i in $(seq 1 30); do
-          pg_isready -h localhost -p 5432 -U postgres && break
-          echo "Waiting for Postgres..."
-          sleep 2
-        done
-
-    - name: Install backend dependencies (safe)
-      run: |
-        cd apps/backend
-        if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
-          npm ci
-        else
-          npm install
-        fi
-
-    - name: Install frontend dependencies (safe)
-      run: |
-        cd apps/frontend
-        if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
-          npm ci
-        else
-          npm install
-        fi
-
-    - name: Ensure Prisma available & Generate Prisma Client
-      run: |
-        cd apps/backend
-
-        echo "Checking local prisma version..."
-        if [ -f node_modules/prisma/package.json ]; then
-          node -e "console.log('local prisma:', require('./node_modules/prisma/package.json').version)"
-        else
-          echo "Local prisma not found in node_modules"
-        fi
-
-        # If prisma binary not present, ensure dependencies are installed.
-        if [ -x ./node_modules/.bin/prisma ]; then
-          echo "prisma binary present, proceeding to generate"
-        else
-          echo "prisma binary missing; installing backend dependencies now (ensuring prisma is installed)"
-          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
-            npm ci
+      # -------------------------
+      # Database setup
+      # -------------------------
+      - name: Ensure DATABASE_URL (fallback to service)
+        run: |
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db" >> $GITHUB_ENV
+            echo "Using local Postgres service for tests"
           else
-            npm install
+            echo "Using DATABASE_URL from secrets"
           fi
 
-          # Re-check if prisma exists after install
-          if [ -x ./node_modules/.bin/prisma ]; then
-            echo "prisma binary installed by npm, proceeding"
-          else
-            echo "prisma still missing after install — installing prisma@6 and @prisma/client@6 as temporary fallback"
-            # NOTE: fallback installs specific versions to avoid prisma@7 incompatibility with schema v6
-            npm install prisma@^6 @prisma/client@^6 --no-audit --no-fund
-          fi
-        fi
+      - name: Wait for Postgres to be ready
+        run: |
+          for i in $(seq 1 30); do
+            pg_isready -h localhost -p 5432 -U postgres && break
+            echo "Waiting for Postgres..."
+            sleep 2
+          done
 
-        # Use the local prisma to generate the client (via npm script to ensure correct binary)
-        if [ -f package.json ] && grep -q "\"prisma:generate\"" package.json >/dev/null 2>&1; then
-          npm run prisma:generate || (echo "npm run prisma:generate failed" && exit 1)
-        else
-          # direct call if no npm script exists
-          ./node_modules/.bin/prisma generate || (echo "prisma generate failed" && exit 1)
-        fi
+      # -------------------------
+      # Install dependencies
+      # -------------------------
+      - name: Install backend dependencies
+        run: |
+          cd apps/backend
+          pnpm install --frozen-lockfile
 
-    - name: Run backend lint
-      run: |
-        cd apps/backend
-        npm run lint --if-present
+      - name: Install frontend dependencies
+        run: |
+          cd apps/frontend
+          pnpm install --frozen-lockfile
 
-    - name: Run frontend lint
-      run: |
-        cd apps/frontend
-        npm run lint --if-present
+      # -------------------------
+      # Prisma
+      # -------------------------
+      - name: Generate Prisma Client
+        run: |
+          cd apps/backend
+          pnpm prisma:generate
 
-    - name: Run security audit (non-blocking)
-      run: |
-        cd apps/backend || exit 0
-        npm audit --audit-level=moderate || true
-        cd ../frontend || exit 0
-        npm audit --audit-level=moderate || true
+      # -------------------------
+      # Lint
+      # -------------------------
+      - name: Run backend lint
+        run: |
+          cd apps/backend
+          pnpm run lint --if-present
 
-    - name: Run backend tests (if present)
-      run: |
-        cd apps/backend
-        npm run test --if-present
+      - name: Run frontend lint
+        run: |
+          cd apps/frontend
+          pnpm run lint --if-present
 
-    - name: Run frontend tests (if present)
-      run: |
-        cd apps/frontend
-        npm run test --if-present
+      # -------------------------
+      # Security audit (non-blocking)
+      # -------------------------
+      - name: Run security audit (non-blocking)
+        run: |
+          cd apps/backend || exit 0
+          pnpm audit || true
+          cd ../frontend || exit 0
+          pnpm audit || true
+
+      # -------------------------
+      # Tests
+      # -------------------------
+      - name: Run backend tests (if present)
+        run: |
+          cd apps/backend
+          pnpm run test --if-present
+
+      - name: Run frontend tests (if present)
+        run: |
+          cd apps/frontend
+          pnpm run test --if-present
 
   build:
     runs-on: ubuntu-latest
@@ -153,71 +136,72 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.event_name == 'release'
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Extract metadata
-      id: meta
-      run: |
-        if [ "${{ github.event_name }}" = "release" ]; then
-          VERSION="${{ github.ref_name }}"
-          SHA=${GITHUB_SHA::8}
-          BACKEND_TAGS="${BACKEND_IMAGE}:${VERSION},${BACKEND_IMAGE}:sha-${SHA}"
-          FRONTEND_TAGS="${FRONTEND_IMAGE}:${VERSION},${FRONTEND_IMAGE}:sha-${SHA}"
-        else
-          VERSION="latest"
-          BACKEND_TAGS="${BACKEND_IMAGE}:${VERSION}"
-          FRONTEND_TAGS="${FRONTEND_IMAGE}:${VERSION}"
-        fi
-        echo "version=${VERSION}" >> $GITHUB_OUTPUT
-        echo "backend_tags=${BACKEND_TAGS}" >> $GITHUB_OUTPUT
-        echo "frontend_tags=${FRONTEND_TAGS}" >> $GITHUB_OUTPUT
+      - name: Extract metadata
+        id: meta
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION="${{ github.ref_name }}"
+            SHA=${GITHUB_SHA::8}
+            BACKEND_TAGS="${BACKEND_IMAGE}:${VERSION},${BACKEND_IMAGE}:sha-${SHA}"
+            FRONTEND_TAGS="${FRONTEND_IMAGE}:${VERSION},${FRONTEND_IMAGE}:sha-${SHA}"
+          else
+            VERSION="latest"
+            BACKEND_TAGS="${BACKEND_IMAGE}:${VERSION}"
+            FRONTEND_TAGS="${FRONTEND_IMAGE}:${VERSION}"
+          fi
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "backend_tags=${BACKEND_TAGS}" >> $GITHUB_OUTPUT
+          echo "frontend_tags=${FRONTEND_TAGS}" >> $GITHUB_OUTPUT
 
-    - name: Validate Docker Hub secrets
-      run: |
-        echo "🔍 Validating Docker Hub secrets..."
-        if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
-          echo "❌ ERROR: DOCKERHUB_USERNAME secret is missing or empty"
-          exit 1
-        fi
-        if [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
-          echo "❌ ERROR: DOCKERHUB_TOKEN secret is missing or empty"
-          exit 1
-        fi
-        echo "✅ Docker Hub secrets found"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Validate Docker Hub secrets
+        run: |
+          echo "🔍 Validating Docker Hub secrets..."
+          if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
+            echo "❌ ERROR: DOCKERHUB_USERNAME secret is missing or empty"
+            exit 1
+          fi
+          if [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
+            echo "❌ ERROR: DOCKERHUB_TOKEN secret is missing or empty"
+            exit 1
+          fi
+          echo "✅ Docker Hub secrets found"
 
-    - name: Build and push backend image
-      uses: docker/build-push-action@v5
-      with:
-        context: ./apps/backend
-        push: true
-        tags: ${{ steps.meta.outputs.backend_tags }}
-        labels: |
-          org.opencontainers.image.title=Multitenant Backend
-          org.opencontainers.image.description=NestJS backend for multitenant system
-          org.opencontainers.image.version=${{ steps.meta.outputs.version }}
-          org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
-          org.opencontainers.image.revision=${{ github.sha }}
-          org.opencontainers.image.source=https://github.com/${{ github.repository }}
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Build and push frontend image
-      uses: docker/build-push-action@v5
-      with:
-        context: ./apps/frontend
-        push: true
-        tags: ${{ steps.meta.outputs.frontend_tags }}
-        labels: |
-          org.opencontainers.image.title=Multitenant Frontend
-          org.opencontainers.image.description=Next.js frontend for multitenant system
-          org.opencontainers.image.version=${{ steps.meta.outputs.version }}
-          org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
-          org.opencontainers.image.revision=${{ github.sha }}
-          org.opencontainers.image.source=https://github.com/${{ github.repository }}
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/backend
+          push: true
+          tags: ${{ steps.meta.outputs.backend_tags }}
+          labels: |
+            org.opencontainers.image.title=Multitenant Backend
+            org.opencontainers.image.description=NestJS backend for multitenant system
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/frontend
+          push: true
+          tags: ${{ steps.meta.outputs.frontend_tags }}
+          labels: |
+            org.opencontainers.image.title=Multitenant Frontend
+            org.opencontainers.image.description=Next.js frontend for multitenant system
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
