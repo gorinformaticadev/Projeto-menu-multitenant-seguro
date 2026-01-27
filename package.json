@@ -12,7 +12,13 @@
   },
   "scripts": {
     "release": "standard-version",
-    "versao": "npm run release && git push --follow-tags"
+    "versao": "pnpm run release && git push --follow-tags",
+    "install:all": "pnpm install",
+    "dev:backend": "pnpm --filter backend start:dev",
+    "dev:frontend": "pnpm --filter frontend dev",
+    "build:all": "pnpm -r run build",
+    "test:all": "pnpm -r run test",
+    "clean": "pnpm -r exec rm -rf node_modules dist .next"
   },
   "overrides": {
     "diff": "^8.0.3"
