@@ -78,3 +78,37 @@ pnpm prisma migrate deploy
 1.  **Sempre use pnpm**: Não misture `npm` ou `yarn`. Se ver um `package-lock.json` ou `yarn.lock`, apague-o.
 2.  **Lockfile Único**: O arquivo `pnpm-lock.yaml` na raiz é a única fonte da verdade. Mantenha-o sempre commitado.
 3.  **CI/CD**: No pipeline, basta rodar `pnpm install` na raiz. O cache do pnpm deve ser configurado baseado no lockfile da raiz.
+
+## 🤖 CI/CD (Github Actions)
+
+Para otimizar seu pipeline `.github/workflows/ci-cd.yml`, sugerimos as seguintes mudanças:
+
+1.  **Instalação Única**: Não instale dependências dentro de cada pasta. Instale apenas na raiz.
+2.  **Scripts via Workspace**: Use `pnpm --filter` para rodar scripts.
+
+### Exemplo de Workflow Otimizado
+
+```yaml
+      # ... setup node & pnpm ...
+
+      - name: Install dependencies (Root)
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm --filter backend exec prisma generate
+
+      - name: Run Lint (Parallel)
+        run: pnpm -r run lint --if-present
+
+      - name: Run Tests (Parallel)
+        run: pnpm -r run test --if-present
+        env:
+           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Build Backend
+        run: pnpm --filter backend run build
+
+      - name: Build Frontend
+        run: pnpm --filter frontend run build
+```
+Isso reduz o tempo de build pois evita múltiplas instalações de `node_modules`.

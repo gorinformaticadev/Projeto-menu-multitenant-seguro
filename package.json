@@ -12,7 +12,7 @@
   },
   "scripts": {
     "release": "standard-version",
-    "versao": "npm run release && git push --follow-tags",
+    "versao": "pnpm run release && git push --follow-tags",
     "install:all": "pnpm install",
     "dev:backend": "pnpm --filter backend start:dev",
     "dev:frontend": "pnpm --filter frontend dev",
