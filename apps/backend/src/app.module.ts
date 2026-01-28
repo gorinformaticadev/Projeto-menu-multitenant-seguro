@@ -4,6 +4,7 @@ import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { CsrfGuard } from "./common/guards/csrf.guard";
 import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { PrismaModule } from './core/prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { TenantsModule } from './tenants/tenants.module';
@@ -33,6 +34,7 @@ import { BackupModule } from './backup/backup.module';
     }),
     // Módulo de agendamento para tarefas cron
     ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
     SentryModule,
     CommonModule,
     // ============================================
