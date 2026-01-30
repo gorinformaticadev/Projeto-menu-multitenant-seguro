@@ -136,20 +136,47 @@ export class ModuleInstallerService {
                 where: { slug: validatedModule.name }
             });
 
+            let module;
+
+            // Lógica de Atualização vs Instalação Limpa
             if (existingModule) {
-                this.logger.log(`⚠️ Módulo ${validatedModule.name} já existe - realizando limpeza total para reinstalação.`);
+                this.logger.log(`⚠️ Módulo ${validatedModule.name} já existe - preparando ATUALIZAÇÃO...`);
+
+                // 1. Limpeza física prévia (importante para remover arquivos órfãos)
                 await this.uninstallPhysicalFiles(validatedModule.name);
-                await this.prisma.module.delete({ where: { slug: validatedModule.name } });
+
+                // 2. Distribuir novos arquivos
+                this.logger.log('6. Distribuindo arquivos (Atualização)...');
+                await this.distributeModuleFiles(bufferToWrite, structure, validatedModule.name);
+                filesDistributed = true;
+
+                // 3. Atualizar Banco (Mantendo ID e Relacionamentos)
+                this.logger.log('7. Atualizando registro no banco...');
+                module = await this.prisma.module.update({
+                    where: { id: existingModule.id },
+                    data: {
+                        name: validatedModule.displayName,
+                        version: validatedModule.version,
+                        description: validatedModule.description || '',
+                        status: 'installed',
+                        hasBackend: structure.hasBackend,
+                        hasFrontend: structure.hasFrontend,
+                        updatedAt: new Date()
+                    }
+                });
+
+                // Limpa menus antigos
+                await this.prisma.moduleMenu.deleteMany({ where: { moduleId: existingModule.id } });
+
+            } else {
+                // Instalação Nova
+                this.logger.log('6. Distribuindo arquivos (Nova Instalação)...');
+                await this.distributeModuleFiles(bufferToWrite, structure, validatedModule.name);
+                filesDistributed = true;
+
+                this.logger.log('7. Criando registro no banco...');
+                module = await this.registerModuleInDatabase(validatedModule, structure, validatedModule.name);
             }
-
-            // 6. Distribuir Arquivos
-            this.logger.log('6. Distribuindo arquivos...');
-            await this.distributeModuleFiles(bufferToWrite, structure, validatedModule.name);
-            filesDistributed = true;
-
-            // 7. Registrar no Banco
-            this.logger.log('7. Registrando no banco...');
-            const module = await this.registerModuleInDatabase(validatedModule, structure, validatedModule.name);
 
             // 8. Menus
             if (validatedModule.menus?.length) {
@@ -591,20 +618,20 @@ export class ModuleInstallerService {
                     'index .* already exists',
                     'constraint .* already exists'
                 ];
-                
+
                 const errorMessage = error.message?.toLowerCase() || '';
-                const isAlreadyExistsError = alreadyExistsPatterns.some(pattern => 
+                const isAlreadyExistsError = alreadyExistsPatterns.some(pattern =>
                     new RegExp(pattern, 'i').test(errorMessage)
                 );
 
                 if (isAlreadyExistsError) {
                     // Objeto já existe no banco - registrar migration como executada
                     this.logger.warn(`⚠️ ${type} ${file} - Objetos já existem no banco. Registrando como executada...`);
-                    
+
                     await this.prisma.moduleMigration.create({
                         data: { moduleId, filename: file, type: type as any, executedAt: new Date() }
                     });
-                    
+
                     executed++;
                     this.logger.log(`✅ ${type} ${file} registrada (objetos pré-existentes)`);
                     continue; // Continuar com próxima migration
@@ -734,20 +761,20 @@ export class ModuleInstallerService {
                     'index .* already exists',
                     'constraint .* already exists'
                 ];
-                
+
                 const errorMessage = error.message?.toLowerCase() || '';
-                const isAlreadyExistsError = alreadyExistsPatterns.some(pattern => 
+                const isAlreadyExistsError = alreadyExistsPatterns.some(pattern =>
                     new RegExp(pattern, 'i').test(errorMessage)
                 );
 
                 if (isAlreadyExistsError) {
                     // Objeto já existe no banco - registrar migration como executada
                     this.logger.warn(`⚠️ ${type} ${file} - Objetos já existem no banco. Registrando como executada...`);
-                    
+
                     await this.prisma.moduleMigration.create({
                         data: { moduleId, filename: file, type: type as any, executedAt: new Date() }
                     });
-                    
+
                     executed++;
                     this.logger.log(`✅ ${type} ${file} registrada (objetos pré-existentes)`);
                     continue; // Continuar com próxima migration

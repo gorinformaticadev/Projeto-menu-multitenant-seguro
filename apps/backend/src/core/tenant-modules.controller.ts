@@ -4,7 +4,9 @@ import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { SkipThrottle } from '@nestjs/throttler';
 
+@SkipThrottle()
 @Controller('tenants/:tenantId/modules')
 @UseGuards(RolesGuard)
 export class TenantModulesController {

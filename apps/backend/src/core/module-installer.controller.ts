@@ -19,10 +19,13 @@ import { Role } from '@prisma/client';
 import { ModuleInstallerService } from './module-installer.service';
 import { memoryStorage } from 'multer';
 
+import { SkipThrottle } from '@nestjs/throttler';
+
 /**
  * Controller para instalação e gerenciamento de módulos
  * Interface: /configuracoes/sistema/modulos
  */
+@SkipThrottle()
 @Controller('configuracoes/sistema/modulos')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.SUPER_ADMIN)
