@@ -21,6 +21,8 @@ export interface ModuleMenu {
   route: string;
   order?: number;
   children?: ModuleMenu[];
+  permission?: string;
+  roles?: string[];
 }
 
 export interface ModuleData {
@@ -186,7 +188,18 @@ class ModuleRegistry {
     // Adiciona grupos baseados na API (menus dinâmicos)
     for (const mod of this.apiModules) {
       if (mod.menus && mod.menus.length > 0) {
-        const items = mod.menus.map(m => ({
+        const items = mod.menus.filter(m => {
+          // 🛡️ Filtro de Segurança Simplificado
+          // Se o menu requer permissão 'admin' e o usuário é USER, oculta
+          if (m.permission && m.permission.includes('admin') && userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN') {
+            return false;
+          }
+          // Se o menu tem roles definidas (compatibilidade futura)
+          if (m.roles && Array.isArray(m.roles) && userRole && !m.roles.includes(userRole)) {
+            return false;
+          }
+          return true;
+        }).map(m => ({
           id: m.id || m.route,
           label: m.label,
           route: m.route,
@@ -194,8 +207,14 @@ class ModuleRegistry {
           order: m.order,
           children: m.children
         }));
-        groups[mod.slug] = items;
-        groupOrder.push(mod.slug);
+
+        if (items.length > 0) {
+          groups[mod.slug] = items;
+          groupOrder.push(mod.slug);
+        } else {
+          // DEBUG: Se todos os itens foram filtrados (ex: por permissão), 
+          // NÃO adiciona o grupo nem a ordem, efetivamente ocultando o módulo do menu.
+        }
       }
     }
 
@@ -267,7 +286,17 @@ class ModuleRegistry {
       }
     }
 
-    return userMenuItems.sort((a, b) => (a.order || 99) - (b.order || 99));
+    return userMenuItems.filter(item => {
+      // Fallback de segurança para user menu
+      const apiModule = this.apiModules.find(m => m.slug === item.id.split('-')[1]);
+      const menus = apiModule?.menus || [];
+      const menuConfig = menus.find(m => m.route === item.href);
+
+      if (menuConfig?.permission?.includes('admin') && _userRole !== 'ADMIN' && _userRole !== 'SUPER_ADMIN') {
+        return false;
+      }
+      return true;
+    }).sort((a, b) => (a.order || 99) - (b.order || 99));
   }
 
   hasModule(slug: string): boolean {

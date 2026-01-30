@@ -41,7 +41,19 @@ export function ModuleRegistryTaskbar() {
         return;
       }
 
-      const items = moduleRegistry.getTaskbarItems(user?.role);
+      const items = moduleRegistry.getTaskbarItems(user?.role).filter(item => {
+        // Fallback de segurança para não exibir módulos proibidos
+        // O getTaskbarItems teoricamente já traz da API filtrado, 
+        // mas vamos garantir que se houver referência de permissão, respeitamos
+        const apiModule = moduleRegistry.getModule(item.id.replace('taskbar-', ''));
+        const menus = apiModule?.menus || [];
+        const taskbarMenu = menus.find(m => m.route === item.href);
+
+        if (taskbarMenu?.permission?.includes('admin') && user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN') {
+          return false;
+        }
+        return true;
+      });
 
       // Validação defensiva: items é um array?
       if (!Array.isArray(items)) {

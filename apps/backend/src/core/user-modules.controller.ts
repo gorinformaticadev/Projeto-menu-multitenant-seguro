@@ -26,7 +26,8 @@ export class UserModulesController {
             return { modules: [] };
         }
 
-        const modules = await this.moduleSecurity.getAvailableModules(tenantId);
+        // Passando role do usuário para filtragem de segurança no backend
+        const modules = await this.moduleSecurity.getAvailableModules(tenantId, user.role);
 
         return { modules };
     }

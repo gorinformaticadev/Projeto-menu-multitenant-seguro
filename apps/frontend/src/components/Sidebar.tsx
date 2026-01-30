@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu, Shield, FileText, HelpCircle, Package, Home, BookOpen, Rocket, BarChart3, FolderKanban, Tags } from "lucide-react";
+import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu, Shield, FileText, HelpCircle, Package, Home, BookOpen, Rocket, BarChart3, FolderKanban, Tags, Blocks } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { Button } from "./ui/button";
 
@@ -37,6 +37,7 @@ const iconMap: Record<string, React.ElementType> = {
   BarChart3,
   FolderKanban,
   Tags,
+  Blocks,
 };
 
 export function Sidebar() {
@@ -127,8 +128,19 @@ export function Sidebar() {
 
   // Carrega itens do menu do Module Registry
   useEffect(() => {
-    loadMenuItems();
-  }, [user, loadMenuItems]);
+    // Forçar recarregamento do estado sempre que o usuário ou role mudar
+    if (user) {
+      setTimeout(() => {
+        const groups = moduleRegistry.getGroupedSidebarItems(user?.role);
+
+        setGroupedItems(groups as unknown as {
+          ungrouped: ModuleMenuItem[];
+          groups: Record<string, ModuleMenuItem[]>;
+          groupOrder: string[];
+        });
+      }, 50);
+    }
+  }, [user, user?.role]);
 
   // Escuta mudanças no status dos módulos
   useEffect(() => {

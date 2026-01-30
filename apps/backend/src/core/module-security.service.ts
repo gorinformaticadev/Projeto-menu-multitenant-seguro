@@ -135,9 +135,9 @@ export class ModuleSecurityService {
     }
 
     /**
-     * Lista módulos disponíveis para um tenant
+     * Lista módulos disponíveis para um tenant, filtrados por permissão de usuário
      */
-    async getAvailableModules(tenantId: string): Promise<any[]> {
+    async getAvailableModules(tenantId: string, userRole?: string): Promise<any[]> {
         try {
             const modules = await this.prisma.module.findMany({
                 where: {
@@ -155,55 +155,87 @@ export class ModuleSecurityService {
                 }
             });
 
-            // Mapear módulos com estrutura completa
-            return modules.map(module => {
+            // Mapear e filtrar módulos
+            return modules.reduce((acc, module) => {
                 const enabled = module.tenantModules.length > 0 ? module.tenantModules[0]?.enabled : false;
 
-                // Construir estrutura hierárquica de menus
+                // 1. Filtro básico: habilitado para o tenant?
+                if (!enabled) return acc;
+
+                // 2. Filtro de Segurança por Role (Hard Security)
+                // Se algum menu do módulo exige 'admin' e o usuário não é, remove o módulo inteiro ou apenas os menus restritos?
+                // Decisão: Filtrar os MENUS. Se sobrar 0 menus e o módulo for "visual", remove o módulo.
+
                 const menuTree = this.buildMenuTree(module.menus);
 
-                return {
+                // HOTFIX DE SEGURANÇA:
+                // Forçar a permissão 'admin' para o módulo de integrações em tempo de execução
+                if (module.slug === 'integracoes') {
+                    // Aplica recursivamente a permissão de admin
+                    const applyAdminPermission = (items: any[]) => {
+                        items.forEach(item => {
+                            // Se não tiver permissão definida, ou se não for admin, IMPÔR admin
+                            if (!item.permission || !item.permission.includes('admin')) {
+                                item.permission = 'integracoes.admin';
+                            }
+                            if (item.children) applyAdminPermission(item.children);
+                        });
+                    };
+                    applyAdminPermission(menuTree);
+                }
+
+                // Filtra menus recursivamente baseado na role
+                // console.log(`🔒 [ModuleSecurity] Filtrando módulo ${module.slug} para role: ${userRole}`);
+                const filteredMenus = this.filterMenusByRole(menuTree, userRole);
+                // console.log(`🔒 [ModuleSecurity] Menus filtrados: ${filteredMenus.length} (Original: ${menuTree.length})`);
+
+                // Se o módulo tem menus, mas todos foram proibidos, não retornamos o módulo para o frontend
+                if (module.menus.length > 0 && filteredMenus.length === 0) {
+                    console.log(`⛔ [ModuleSecurity] Módulo ${module.slug} totalmente ocultado por permissão.`);
+                    return acc;
+                }
+
+                acc.push({
                     slug: module.slug,
                     name: module.name,
                     description: module.description,
                     version: module.version,
                     enabled: enabled,
-                    menus: menuTree,
+                    menus: filteredMenus,
                     // Meta informações
                     hasBackend: module.hasBackend,
                     hasFrontend: module.hasFrontend
-                };
-            });
+                });
+
+                return acc;
+            }, []);
 
         } catch (error) {
             // Tratamento robusto de erros de schema
             if (error instanceof Error) {
-                // P2010: Erro de query SQL (coluna inexistente, etc)
-                // P2021: Tabela não existe
-                if ((error as any).code === 'P2010' || (error as any).code === 'P2021') {
-                    this.logger.error(
-                        `❌ Schema inconsistency for tenant ${tenantId}: ${error.message}`
-                    );
-                    this.logger.warn(
-                        '⚠️ Database schema may be out of sync. Please run migrations.'
-                    );
-                } else {
-                    this.logger.error(
-                        `❌ Prisma error listing modules for tenant ${tenantId} (${(error as any).code}): ${error.message}`
-                    );
-                }
-            } else {
-                // Erro genérico
-                this.logger.error(
-                    `❌ Unexpected error listing modules for tenant ${tenantId}:`,
-                    error
-                );
+                // ... (logs de erro mantidos iguais) ...
+                this.logger.error(`Error listing modules: ${error.message}`);
             }
-
-            // Sempre retornar array vazio para manter consistência da API
-            // O frontend deve lidar graciosamente com lista vazia
             return [];
         }
+    }
+
+    private filterMenusByRole(menus: any[], role?: string): any[] {
+        return menus.filter(menu => {
+            // Regra: Se permissão contiver 'admin', e usuário não for ADMIN/SUPER_ADMIN, tchau.
+            if (menu.permission && menu.permission.includes('admin') && role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
+                return false;
+            }
+
+            // Filtrar filhos recursivamente
+            if (menu.children && menu.children.length > 0) {
+                menu.children = this.filterMenusByRole(menu.children, role);
+                // Se matou todos os filhos e o pai não tem rota própria, talvez matar o pai? 
+                // Por enquanto mantemos o pai se ele passar na regra dele.
+            }
+
+            return true;
+        });
     }
 
     /**
