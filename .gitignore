@@ -127,3 +127,4 @@ apps/frontend/src/app/modules/ordem_servico/types/ordem-servico.types.ts
 apps/frontend/src/app/modules/ordem_servico/types/permission.types.ts
 /scripts
 /apps/frontend/src/app/modules/integracoes
+/apps/frontend/src/app/modules/agenda

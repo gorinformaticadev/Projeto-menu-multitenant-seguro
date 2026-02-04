@@ -112,3 +112,5 @@ export class AppModule implements NestModule {
     consumer.apply(HttpsRedirectMiddleware).forRoutes('*');
   }
 }
+
+// Forced restart trigger
