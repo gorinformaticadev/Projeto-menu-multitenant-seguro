@@ -1,14 +1,11 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../core/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { CreateBackupDto } from './dto/create-backup.dto';
-
-const execAsync = promisify(exec);
 
 /**
  * Serviço responsável por operações de backup e restore do banco de dados
@@ -108,14 +105,14 @@ export class BackupService {
       });
 
       // Executar pg_dump com logging de progresso
-      const command = this.buildPgDumpCommand(dbConfig, filePath);
+      const args = this.getPgDumpArgs(dbConfig, filePath);
       
       this.logger.log('Executando pg_dump...');
       if (onProgress) {
         onProgress('Executando pg_dump - iniciando exportação...');
       }
 
-      await this.executeCommand(command, this.timeout, (progress) => {
+      await this.executeCommand('pg_dump', args, this.timeout, (progress) => {
         // Log do progresso para debug e envio para frontend
         if (progress.trim()) {
           this.logger.debug(`pg_dump: ${progress.trim()}`);
@@ -254,71 +251,96 @@ export class BackupService {
   }
 
   /**
-   * Constrói comando pg_dump
+   * Obtém argumentos para pg_dump
    */
-  private buildPgDumpCommand(
+  private getPgDumpArgs(
     dbConfig: ReturnType<typeof this.parseDatabaseUrl>,
     filePath: string,
-  ): string {
-    // Usar formato custom para melhor compressão e performance
-    // --verbose para mostrar progresso
-    return `pg_dump --host=${dbConfig.host} --port=${dbConfig.port} --username=${dbConfig.user} --dbname=${dbConfig.database} --format=custom --verbose --file="${filePath}"`;
+  ): string[] {
+    return [
+      `--host=${dbConfig.host}`,
+      `--port=${dbConfig.port}`,
+      `--username=${dbConfig.user}`,
+      `--dbname=${dbConfig.database}`,
+      '--format=custom',
+      '--verbose',
+      `--file=${filePath}`,
+    ];
   }
 
   /**
-   * Executa comando shell com timeout e callback de progresso
+   * Obtém argumentos para pg_restore
+   */
+  private getPgRestoreArgs(
+    dbConfig: ReturnType<typeof this.parseDatabaseUrl>,
+    filePath: string,
+  ): string[] {
+    return [
+      `--host=${dbConfig.host}`,
+      `--port=${dbConfig.port}`,
+      `--username=${dbConfig.user}`,
+      `--dbname=${dbConfig.database}`,
+      '--clean',
+      '--if-exists',
+      '--no-owner',
+      '--no-acl',
+      '--verbose',
+      filePath,
+    ];
+  }
+
+  /**
+   * Executa comando shell com timeout e callback de progresso de forma segura
    */
   private async executeCommand(
     command: string,
+    args: string[],
     timeoutMs: number,
     onProgress?: (data: string) => void,
     password?: string,
   ): Promise<{ stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
-      // Preparar variáveis de ambiente incluindo PGPASSWORD para evitar prompt interativo
       const env = { ...process.env };
       if (password) {
         env.PGPASSWORD = password;
       }
 
-      const childProcess = exec(command, { 
-        timeout: timeoutMs, 
-        maxBuffer: 1024 * 1024 * 10,
-        env, // Passar variáveis de ambiente com PGPASSWORD
-      });
+      const childProcess = spawn(command, args, { env });
 
       let stdout = '';
       let stderr = '';
 
+      const timeout = setTimeout(() => {
+        childProcess.kill();
+        reject(new Error(`Comando ${command} excedeu o tempo limite de ${timeoutMs}ms`));
+      }, timeoutMs);
+
       if (childProcess.stdout) {
         childProcess.stdout.on('data', (data) => {
-          stdout += data;
-          if (onProgress) {
-            onProgress(data.toString());
-          }
+          stdout += data.toString();
+          if (onProgress) onProgress(data.toString());
         });
       }
 
       if (childProcess.stderr) {
         childProcess.stderr.on('data', (data) => {
-          stderr += data;
-          if (onProgress) {
-            onProgress(data.toString());
-          }
-          // Log de progresso do pg_dump
-          this.logger.debug(`Progresso: ${data.toString().trim()}`);
+          stderr += data.toString();
+          if (onProgress) onProgress(data.toString());
+          this.logger.debug(`[${command}]: ${data.toString().trim()}`);
         });
       }
 
       childProcess.on('close', (code) => {
+        clearTimeout(timeout);
         if (code === 0) {
           resolve({ stdout, stderr });
         } else {
-          reject(new Error(`Comando falhou com código ${code}: ${stderr}`));
+          reject(new Error(`Comando ${command} falhou com código ${code}: ${stderr}`));
         }
       });
 
       childProcess.on('error', (error) => {
+        clearTimeout(timeout);
         reject(error);
       });
     });
@@ -652,14 +674,14 @@ export class BackupService {
       const safetyBackupName = `safety_backup_${Date.now()}.dump`;
       backupSafetyFile = path.join(this.tempDir, safetyBackupName);
       
-      const backupCommand = this.buildPgDumpCommand(dbConfig, backupSafetyFile);
-      await this.executeCommand(backupCommand, this.timeout, null, dbConfig.password);
+      const safetyArgs = this.getPgDumpArgs(dbConfig, backupSafetyFile);
+      await this.executeCommand('pg_dump', safetyArgs, this.timeout, null, dbConfig.password);
       this.logger.log('Backup de segurança criado');
 
       // Executar pg_restore
       this.logger.log('Executando restore...');
-      const restoreCommand = this.buildPgRestoreCommand(dbConfig, tempFilePath);
-      await this.executeCommand(restoreCommand, this.timeout, (progress) => {
+      const restoreArgs = this.getPgRestoreArgs(dbConfig, tempFilePath);
+      await this.executeCommand('pg_restore', restoreArgs, this.timeout, (progress) => {
         // Log do progresso para debug
         if (progress.trim()) {
           this.logger.debug(`pg_restore: ${progress.trim()}`);

@@ -30,8 +30,8 @@ services:
       - "4000:4000"
     environment:
       - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-multitenant}?schema=public
-      - JWT_SECRET=${JWT_SECRET:-super_secret_jwt_key_that_is_long_enough_32_chars}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-super_secret_encryption_key_32_characters_long}
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5000}
       - NODE_ENV=production
       - PORT=4000

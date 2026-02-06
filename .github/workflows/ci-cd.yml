@@ -76,59 +76,38 @@ jobs:
       # -------------------------
       # Install dependencies
       # -------------------------
-      - name: Install backend dependencies
-        run: |
-          cd apps/backend
-          pnpm install --frozen-lockfile
-
-      - name: Install frontend dependencies
-        run: |
-          cd apps/frontend
-          pnpm install --frozen-lockfile
+      - name: Install all dependencies
+        run: pnpm install --frozen-lockfile
 
       # -------------------------
       # Prisma
       # -------------------------
       - name: Generate Prisma Client
-        run: |
-          cd apps/backend
-          pnpm prisma:generate
+        run: pnpm --filter backend prisma:generate
 
       # -------------------------
       # Lint
       # -------------------------
       - name: Run backend lint
-        run: |
-          cd apps/backend
-          pnpm run lint --if-present
+        run: pnpm --filter backend run --if-present lint
 
       - name: Run frontend lint
-        run: |
-          cd apps/frontend
-          pnpm run lint --if-present
+        run: pnpm --filter frontend run --if-present lint
 
       # -------------------------
       # Security audit (non-blocking)
       # -------------------------
       - name: Run security audit (non-blocking)
-        run: |
-          cd apps/backend || exit 0
-          pnpm audit || true
-          cd ../frontend || exit 0
-          pnpm audit || true
+        run: pnpm audit || true
 
       # -------------------------
       # Tests
       # -------------------------
       - name: Run backend tests (if present)
-        run: |
-          cd apps/backend
-          pnpm run test --if-present
+        run: pnpm --filter backend run --if-present test
 
       - name: Run frontend tests (if present)
-        run: |
-          cd apps/frontend
-          pnpm run test --if-present
+        run: pnpm --filter frontend run --if-present test
 
   build:
     runs-on: ubuntu-latest

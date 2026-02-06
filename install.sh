@@ -1,117 +1,109 @@
 #!/bin/bash
 
-# SCRIPT DE INSTALAÇÃO - FORÇA TOTAL
-# Ignora completamente arquivos locais e faz instalação limpa
+# Cores para saída
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # Sem cor
 
-set -e  # Para em qualquer erro
+clear
+echo -e "${BLUE}====================================================${NC}"
+echo -e "${BLUE}      INSTALADOR AUTOMATIZADO - MULTITENANT         ${NC}"
+echo -e "${BLUE}====================================================${NC}"
 
-DOMINIO="$1"
+# 1. Perguntar o domínio
+echo -e "\n${YELLOW}1. Configuração de Domínio${NC}"
+echo -e "Exemplo: meusistema.com"
+read -p "Digite o domínio que será utilizado: " DOMAIN
 
-# Verificações básicas
-if [ "$EUID" -ne 0 ]; then 
-    echo "ERRO: Execute como root"
+if [ -z "$DOMAIN" ]; then
+    echo -e "${RED}Erro: O domínio não pode ser vazio.${NC}"
     exit 1
 fi
 
-if [ -z "$DOMINIO" ]; then
-    echo "USO: curl -sSL URL | sudo bash -s dominio.com.br"
-    exit 1
-fi
+# Definir URLs baseadas no domínio
+FRONTEND_URL="https://$DOMAIN"
+BACKEND_URL="https://api.$DOMAIN"
 
-echo "🚀 INSTALAÇÃO FORÇADA - 1 SEGUNDO"
+# 2. Gerar credenciais automáticas
+echo -e "\n${YELLOW}2. Gerando credenciais seguras...${NC}"
 
-sleep 1
+generate_password() {
+    openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 20
+}
 
-# Diretório de trabalho
-DIR="/root/sistema-multitenant"
+generate_secret() {
+    openssl rand -hex 32
+}
 
-# REMOVER TUDO e recomeçar do zero
-echo "💥 Limpando instalação anterior..."
-rm -rf "$DIR"
-mkdir -p "$DIR"
-cd "$DIR"
+DB_USER="user_$(generate_password | head -c 8)"
+DB_PASSWORD=$(generate_password)
+DB_NAME="db_multitenant"
+JWT_SECRET=$(generate_secret)
+ENCRYPTION_KEY=$(generate_secret)
 
-# Clonar repositório fresco
-echo "📥 Baixando código..."
-git clone https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git .
-git checkout main
+# 3. Criar arquivo .env
+echo -e "${YELLOW}3. Criando arquivo .env...${NC}"
 
-# Instalar Docker se necessário
-if ! command -v docker &> /dev/null; then
-    echo "🐳 Instalando Docker..."
-    curl -sSL https://get.docker.com | sh
-    systemctl start docker
-    systemctl enable docker
-fi
+cat <<EOF > .env
+# Configurações de Domínio
+DOMAIN=$DOMAIN
+FRONTEND_URL=$FRONTEND_URL
+BACKEND_URL=$BACKEND_URL
+NEXT_PUBLIC_API_URL=$BACKEND_URL
 
-# Gerar senhas SEM caracteres problemáticos
-echo "🔐 Gerando configurações..."
-DB_PASS=$(openssl rand -hex 16)  # 32 caracteres hexa
-JWT_SEC=$(openssl rand -hex 32)  # 64 caracteres hexa  
-ADMIN_PASS=$(openssl rand -hex 8)   # 16 caracteres hexa
+# Banco de Dados
+DB_USER=$DB_USER
+DB_PASSWORD=$DB_PASSWORD
+DB_NAME=$DB_NAME
 
-# Criar .env simples e seguro
-cat > .env << EOF
-DB_USER=multitenant_user
-DB_PASSWORD=$DB_PASS
-DB_NAME=multitenant_db
-DB_HOST=db
-DB_PORT=5432
-JWT_SECRET=$JWT_SEC
-JWT_EXPIRES_IN=7d
+# Segredos
+JWT_SECRET=$JWT_SECRET
+ENCRYPTION_KEY=$ENCRYPTION_KEY
+
+# Ambiente
 NODE_ENV=production
-FRONTEND_URL=https://$DOMINIO
-API_URL=https://$DOMINIO/api
-BACKEND_PORT=4000
-FRONTEND_PORT=5000
+PORT=4000
 EOF
 
-# Verificar .env
-if [ ! -f ".env" ]; then
-    echo "ERRO: .env não criado"
-    exit 1
+echo -e "${GREEN}Arquivo .env criado com sucesso!${NC}"
+
+# 4. Iniciar Docker
+echo -e "\n${YELLOW}4. Iniciando containers Docker...${NC}"
+echo -e "${BLUE}Isso pode levar alguns minutos na primeira execução...${NC}"
+
+# Verificar se docker-compose ou docker compose está disponível
+if command -v docker-compose &> /dev/null; then
+    DOCKER_CMD="docker-compose"
+else
+    DOCKER_CMD="docker compose"
 fi
 
-# Parar containers antigos
-echo "⏹ Parando containers..."
-docker-compose -f docker-compose.prod.yml down 2>/dev/null || true
+$DOCKER_CMD up -d --build
 
-# Construir sistema
-echo "🏗 Construindo containers..."
-docker-compose -f docker-compose.prod.yml up --build -d
-
-# Aguardar
-echo "⏱ Aguardando 10 segundos..."
-sleep 10
-
-# Verificar containers
-echo "🔍 Verificando containers..."
-if ! docker-compose -f docker-compose.prod.yml ps | grep -q "Up"; then
-    echo "ERRO: Containers não estão rodando"
-    docker-compose -f docker-compose.prod.yml ps
-    docker-compose -f docker-compose.prod.yml logs
+if [ $? -eq 0 ]; then
+    echo -e "\n${GREEN}====================================================${NC}"
+    echo -e "${GREEN}      INSTALAÇÃO CONCLUÍDA COM SUCESSO!             ${NC}"
+    echo -e "${GREEN}====================================================${NC}"
+    
+    echo -e "\n${BLUE}Acesse seu sistema em:${NC}"
+    echo -e "Frontend: ${YELLOW}$FRONTEND_URL${NC} (Porta: 5000)"
+    echo -e "Backend:  ${YELLOW}$BACKEND_URL${NC} (Porta: 4000)"
+    
+    echo -e "\n${RED}!!! GUARDE ESTAS CREDENCIAIS EM LOCAL SEGURO !!!${NC}"
+    echo -e "${BLUE}----------------------------------------------------${NC}"
+    echo -e "Usuário DB:     ${YELLOW}$DB_USER${NC}"
+    echo -e "Senha DB:       ${YELLOW}$DB_PASSWORD${NC}"
+    echo -e "Nome DB:        ${YELLOW}$DB_NAME${NC}"
+    echo -e "JWT Secret:     ${YELLOW}$JWT_SECRET${NC}"
+    echo -e "Encryption Key: ${YELLOW}$ENCRYPTION_KEY${NC}"
+    echo -e "${BLUE}----------------------------------------------------${NC}"
+    
+    echo -e "\n${YELLOW}Nota:${NC} Certifique-se de configurar seu Proxy Reverso (Nginx/Traefik)"
+    echo -e "para apontar o domínio para as portas 5000 e 4000."
+    echo -e "Os logs podem ser vistos com: ${BLUE}$DOCKER_CMD logs -f${NC}"
+else
+    echo -e "\n${RED}Erro ao iniciar os containers. Verifique os logs do Docker.${NC}"
     exit 1
 fi
-
-# Inicializar banco
-echo "🗄 Inicializando banco..."
-docker-compose -f docker-compose.prod.yml exec -T backend npx prisma migrate deploy
-docker-compose -f docker-compose.prod.yml exec -T backend npx ts-node prisma/seed.ts
-
-# Sucesso!
-echo "✅ INSTALAÇÃO CONCLUÍDA!"
-
-cat << EOF
-
-🎉 SISTEMA PRONTO!
-
-Acesso: https://$DOMINIO
-API: https://$DOMINIO/api
-
-Credenciais:
-admin@system.com / $ADMIN_PASS
-admin@empresa1.com / $ADMIN_PASS  
-user@empresa1.com / $ADMIN_PASS
-
-Banco: multitenant_user / $DB_PASS
-EOF

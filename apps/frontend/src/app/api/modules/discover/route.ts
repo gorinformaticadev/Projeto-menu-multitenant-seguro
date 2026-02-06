@@ -366,17 +366,47 @@ async function loadModulePagesFromTS(pagesPath: string): Promise<ModulePage[] | 
       throw new Error('Array modulePages não encontrado');
     }
 
-    // Fazer parsing seguro do array
-    let pages;
+    // Fazer parsing seguro do array sem usar eval()
+    let pages: ModulePage[] = [];
     try {
-      // Remover comentários antes do eval
-      const cleanedArray = pagesMatch[1]
-        .replace(/\/\/.*$/gm, '')  // Remover comentários de linha
-        .replace(/\/\*[\s\S]*?\*\//g, '');  // Remover comentários de bloco
+      const arrayContent = pagesMatch[1];
+      
+      // Extrair cada objeto do array usando regex
+      const objectRegex = /\{[\s\S]*?\}/g;
+      const objects = arrayContent.match(objectRegex) || [];
+      
+      for (const objText of objects) {
+        const extractValue = (key: string) => {
+          const regex = new RegExp(`${key}\\s*:\\s*(['"]?)([^'"\\n,}]*?)\\1`, 'i');
+          const match = objText.match(regex);
+          return match ? match[2].trim() : null;
+        };
 
-      pages = eval(`(${cleanedArray})`);
-    } catch (evalError) {
-      console.error('❌️ Erro ao fazer parse do array de páginas:', evalError);
+        const extractArray = (key: string) => {
+          const regex = new RegExp(`${key}\\s*:\\s*\\[([\\s\\S]*?)\\]`, 'i');
+          const match = objText.match(regex);
+          if (!match) return [];
+          return match[1].split(',').map(s => s.replace(/['"\s]/g, '')).filter(Boolean);
+        };
+
+        const id = extractValue('id');
+        const path = extractValue('path');
+        const component = extractValue('component');
+        
+        if (id && path && component) {
+          pages.push({
+            id,
+            path,
+            component,
+            protected: extractValue('protected') !== 'false', // default true
+            permissions: extractArray('permissions'),
+            title: extractValue('title') || undefined,
+            description: extractValue('description') || undefined
+          });
+        }
+      }
+    } catch (parseError) {
+      console.error('❌ Erro ao fazer parse do array de páginas:', parseError);
       throw new Error('Erro ao fazer parse do array modulePages');
     }
 

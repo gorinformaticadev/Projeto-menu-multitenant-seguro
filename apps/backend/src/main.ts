@@ -81,7 +81,7 @@ async function bootstrap() {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'"], // Mantido unsafe-inline por compatibilidade (frameworks CSS)
+          styleSrc: ["'self'", "'unsafe-inline'"], // Em produção, considere usar hashes ou nonces para remover unsafe-inline
           scriptSrc: ["'self'"], // Removido unsafe-eval
           imgSrc: [
             "'self'",
@@ -230,13 +230,21 @@ async function bootstrap() {
   // ============================================
   // 🌐 CORS - Configurado para aceitar apenas o frontend
   // ============================================
-  app.enableCors({
-    origin: [
-      process.env.FRONTEND_URL || 'http://localhost:5000',
+  const allowedOrigins = isProduction
+    ? [process.env.FRONTEND_URL].filter(Boolean)
+    : [
+      process.env.FRONTEND_URL,
       'http://127.0.0.1:5000',
       'http://localhost:5000',
-      'http://localhost:3000', // Next.js dev server
-    ],
+      'http://localhost:3000',
+    ].filter(Boolean);
+
+  if (isProduction && allowedOrigins.length === 0) {
+    console.warn('⚠️  AVISO: FRONTEND_URL não definida em produção. CORS pode bloquear requisições legítimas.');
+  }
+
+  app.enableCors({
+    origin: allowedOrigins.length > 0 ? allowedOrigins : '*',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     exposedHeaders: ['Content-Type', 'Content-Length', 'X-Total-Count'],
