@@ -99,6 +99,9 @@ importers:
       form-data:
         specifier: ^4.0.5
         version: 4.0.5
+      googleapis:
+        specifier: ^171.2.0
+        version: 171.3.0
       helmet:
         specifier: ^8.1.0
         version: 8.1.0
@@ -4371,6 +4374,7 @@ packages:
 
   glob@10.5.0:
     resolution: {integrity: sha512-DfXN8DfhJ7NH3Oe7cFmu3NCu1wKbkReJ8TorzSAFbSKrlNaQSKfIzqYqVY8zlbs2NLBbWpRiU52GX2PbaBVNkg==}
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
     hasBin: true
 
   glob@13.0.0:
@@ -4383,7 +4387,7 @@ packages:
 
   glob@7.2.3:
     resolution: {integrity: sha512-nFR0zLpU2YCaRxwoCJvL6UvCH2JFyFVIvwTLsIf21AuHlMskA1hhTdk+LlYJtOlYt9v6dvszD2BGRqBL+iQK9Q==}
-    deprecated: Glob versions prior to v9 are no longer supported
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   globals@13.24.0:
     resolution: {integrity: sha512-AhO5QUcj8llrbG09iWhPU2B204J1xnPeL8kQmVorSsy+Sjj1sk8gIyh6cUocGmH4L0UuhAJy+hJMRA4mgA4mFQ==}
@@ -4411,6 +4415,10 @@ packages:
 
   googleapis@171.0.0:
     resolution: {integrity: sha512-z+wpYZ9wfO/v58b/7fM0JqwDR6dx6yE3UdQZ9vWrzmzNVHFd85Uud8QewFfm8ht/3Hx2ISLbCs8RfnbrqR8X4A==}
+    engines: {node: '>=18'}
+
+  googleapis@171.3.0:
+    resolution: {integrity: sha512-koedQak0LZjogRvb1fD0eWXtZ0K0swJ1BkWGVvpvOA0JKH5q1EUpzHhb/kyCXTBiLMKsara6tueao3kK9jJpBQ==}
     engines: {node: '>=18'}
 
   gopd@1.2.0:
@@ -11283,6 +11291,13 @@ snapshots:
       - supports-color
 
   googleapis@171.0.0:
+    dependencies:
+      google-auth-library: 10.5.0
+      googleapis-common: 8.0.1
+    transitivePeerDependencies:
+      - supports-color
+
+  googleapis@171.3.0:
     dependencies:
       google-auth-library: 10.5.0
       googleapis-common: 8.0.1
