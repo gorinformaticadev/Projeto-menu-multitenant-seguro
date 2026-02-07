@@ -55,10 +55,10 @@ export default function PlatformConfigSection() {
         description: "As configurações da plataforma foram atualizadas com sucesso",
       });
     } catch (error: unknown) {
-      const err = error instanceof Error ? error : new Error(String(error));
+      const description = (error as any).response?.data?.message || (error instanceof Error ? error.message : "Erro desconhecido");
       toast({
         title: "Erro ao salvar configurações",
-        description: error.response?.data?.message || "Erro desconhecido",
+        description,
         variant: "destructive",
       });
     } finally {
