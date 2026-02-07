@@ -1,38 +1,49 @@
-# Backend multi-stage build - safer npm usage and entrypoint for migrations
+# Backend multi-stage build - optimized for pnpm monorepo
 FROM node:20-alpine AS base
-WORKDIR /app
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
 
-# Builder
+# Builder stage
 FROM base AS builder
+WORKDIR /app
+# Copy monorepo configuration files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# copy only package files first for caching
-COPY package*.json ./
-# ensure lockfile usage if present
-RUN if [ -f package-lock.json ]; then npm ci --legacy-peer-deps --no-audit --no-fund; else npm install --legacy-peer-deps --no-audit --no-fund; fi
-
+# Copy source code (needed for workspace links)
 COPY . .
 
-RUN npm run build
+# Install dependencies using lockfile
+RUN pnpm install --frozen-lockfile
 
-# Production deps
-FROM base AS prod-deps
-COPY package*.json ./
-RUN if [ -f package-lock.json ]; then npm ci --omit=dev --legacy-peer-deps --no-audit --no-fund; else npm install --omit=dev --legacy-peer-deps --no-audit --no-fund; fi
+# Generate Prisma Client
+RUN pnpm --filter backend prisma:generate
 
-# Runtime
+# Build backend
+RUN pnpm --filter backend build
+RUN pnpm prune --prod
+
+# Runner stage
 FROM base AS runner
+WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=4000
 
-# copy node_modules and build artifacts
-COPY --from=prod-deps /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nestjs
 
-# copy entrypoint
-COPY apps/backend/docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh
+# Copy dependencies and build artifacts from builder
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/backend/dist ./dist
+COPY --from=builder /app/apps/backend/package.json ./package.json
+COPY --from=builder /app/apps/backend/prisma ./prisma
+
+# Copy entrypoint script
+COPY --from=builder /app/apps/backend/docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
+
+USER nestjs
 
 EXPOSE 4000
-
-ENTRYPOINT ["sh", "/app/docker-entrypoint.sh"]
+CMD ["/app/docker-entrypoint.sh"]

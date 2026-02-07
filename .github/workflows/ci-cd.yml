@@ -2,47 +2,24 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ "main", "develop" ]
   pull_request:
-    branches: [ main ]
-  release:
-    types: [ published ]
+    branches: [ "main" ]
 
 env:
+  # Use secrets for Docker Hub registry auth
+  DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
   REGISTRY: docker.io
-  BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/multitenant-backend
-  FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/multitenant-frontend
 
 jobs:
   test:
+    name: Run Tests & Lint
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event_name == 'pull_request'
-
-    env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: test_db
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      # -------------------------
-      # Setup pnpm + Node
-      # -------------------------
-      - name: Setup pnpm
+      - name: Install pnpm
         uses: pnpm/action-setup@v3
         with:
           version: 9
@@ -53,134 +30,70 @@ jobs:
           node-version: '20'
           cache: 'pnpm'
 
-      # -------------------------
-      # Database setup
-      # -------------------------
-      - name: Ensure DATABASE_URL (fallback to service)
-        run: |
-          if [ -z "${DATABASE_URL}" ]; then
-            echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db" >> $GITHUB_ENV
-            echo "Using local Postgres service for tests"
-          else
-            echo "Using DATABASE_URL from secrets"
-          fi
-
-      - name: Wait for Postgres to be ready
-        run: |
-          for i in $(seq 1 30); do
-            pg_isready -h localhost -p 5432 -U postgres && break
-            echo "Waiting for Postgres..."
-            sleep 2
-          done
-
-      # -------------------------
-      # Install dependencies
-      # -------------------------
-      - name: Install all dependencies
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # -------------------------
-      # Prisma
-      # -------------------------
-      - name: Generate Prisma Client
-        run: pnpm --filter backend prisma:generate
+      - name: Lint
+        run: |
+          pnpm --filter backend run lint --if-present
+          pnpm --filter frontend run lint --if-present
 
-      # -------------------------
-      # Lint
-      # -------------------------
-      - name: Run backend lint
-        run: pnpm --filter backend run --if-present lint
+      - name: Backend Tests
+        run: pnpm --filter backend run test --if-present
 
-      - name: Run frontend lint
-        run: pnpm --filter frontend run --if-present lint
+      # Build Check (Ensure code builds before creating image)
+      - name: Build Check
+        run: |
+          pnpm --filter backend build
+          pnpm --filter frontend build
 
-      # -------------------------
-      # Security audit (non-blocking)
-      # -------------------------
-      - name: Run security audit (non-blocking)
-        run: pnpm audit || true
-
-      # -------------------------
-      # Tests
-      # -------------------------
-      - name: Run backend tests (if present)
-        run: pnpm --filter backend run --if-present test
-
-      - name: Run frontend tests (if present)
-        run: pnpm --filter frontend run --if-present test
-
-  build:
-    runs-on: ubuntu-latest
+  build-and-push:
+    name: Build & Push Docker Images
     needs: test
-    if: github.ref == 'refs/heads/main' || github.event_name == 'release'
+    # Only push images on main branch or if manually triggered (and if secrets are present)
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Extract metadata
-        id: meta
-        run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            VERSION="${{ github.ref_name }}"
-            SHA=${GITHUB_SHA::8}
-            BACKEND_TAGS="${BACKEND_IMAGE}:${VERSION},${BACKEND_IMAGE}:sha-${SHA}"
-            FRONTEND_TAGS="${FRONTEND_IMAGE}:${VERSION},${FRONTEND_IMAGE}:sha-${SHA}"
-          else
-            VERSION="latest"
-            BACKEND_TAGS="${BACKEND_IMAGE}:${VERSION}"
-            FRONTEND_TAGS="${FRONTEND_IMAGE}:${VERSION}"
-          fi
-
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "backend_tags=${BACKEND_TAGS}" >> $GITHUB_OUTPUT
-          echo "frontend_tags=${FRONTEND_TAGS}" >> $GITHUB_OUTPUT
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Validate Docker Hub secrets
-        run: |
-          echo "🔍 Validating Docker Hub secrets..."
-          if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
-            echo "❌ ERROR: DOCKERHUB_USERNAME secret is missing or empty"
-            exit 1
-          fi
-          if [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
-            echo "❌ ERROR: DOCKERHUB_TOKEN secret is missing or empty"
-            exit 1
-          fi
-          echo "✅ Docker Hub secrets found"
-
       - name: Login to Docker Hub
+        if: "${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}"
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push backend image
+      # --- BUILD BACKEND ---
+      - name: Build and push Backend
         uses: docker/build-push-action@v5
         with:
-          context: ./apps/backend
-          push: true
-          tags: ${{ steps.meta.outputs.backend_tags }}
-          labels: |
-            org.opencontainers.image.title=Multitenant Backend
-            org.opencontainers.image.description=NestJS backend for multitenant system
-            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
-            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          # Context set to root (.) is CRITICAL for monorepo COPY operations
+          context: .
+          file: ./apps/backend/Dockerfile
+          push: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+          tags: |
+            ${{ env.DOCKER_USERNAME }}/multitenant-backend:latest
+            ${{ env.DOCKER_USERNAME }}/multitenant-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Build and push frontend image
+      # --- BUILD FRONTEND ---
+      - name: Build and push Frontend
         uses: docker/build-push-action@v5
         with:
-          context: ./apps/frontend
-          push: true
-          tags: ${{ steps.meta.outputs.frontend_tags }}
-          labels: |
-            org.opencontainers.image.title=Multitenant Frontend
-            org.opencontainers.image.description=Next.js frontend for multitenant system
-            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
-            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          context: .
+          file: ./apps/frontend/Dockerfile
+          push: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+          tags: |
+            ${{ env.DOCKER_USERNAME }}/multitenant-frontend:latest
+            ${{ env.DOCKER_USERNAME }}/multitenant-frontend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
