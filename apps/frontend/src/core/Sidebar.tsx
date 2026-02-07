@@ -61,7 +61,14 @@ export function Sidebar() {
   const loadMenuItems = () => {
     try {
       // Core agrega itens de todos os módulos registrados
-      const items = moduleRegistry.getSidebarItems(user?.role);
+      const rawItems = moduleRegistry.getSidebarItems(user?.role);
+      const items: SidebarItem[] = rawItems.map(item => ({
+        id: item.id || item.route || 'unknown',
+        name: item.label,
+        href: item.route,
+        icon: item.icon || 'Menu',
+        order: item.order || 99
+      }));
       setMenuItems(items);
     } catch (error) {
       console.error('Erro ao carregar itens do menu:', error);
@@ -79,7 +86,7 @@ export function Sidebar() {
   };
 
   return (
-    <div 
+    <div
       ref={sidebarRef}
       className={cn(
         "flex flex-col h-full bg-card border-r transition-all duration-300",
@@ -107,7 +114,7 @@ export function Sidebar() {
         <nav className="space-y-1">
           {menuItems.map((item) => {
             const isActive = pathname === item.href;
-            const Icon = iconMap[item.icon] || Menu; // Fallback para ícone padrão
+            const Icon = (iconMap[item.icon] || Menu) as any; // Fallback para ícone padrão
 
             return (
               <Link

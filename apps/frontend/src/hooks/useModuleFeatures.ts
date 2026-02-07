@@ -65,7 +65,7 @@ export function useModuleFeatures() {
                     userMenuItems.push(...mod.config.userMenu);
                 }
                 if (mod.config.notifications) {
-                    notificationConfigs.push(mod.config.notifications);
+                    notificationConfigs.push(mod.config.notifications as unknown as ModuleNotificationConfig);
                 }
                 if (mod.config.dashboardWidgets && Array.isArray(mod.config.dashboardWidgets)) {
                     dashboardWidgets.push(...mod.config.dashboardWidgets);

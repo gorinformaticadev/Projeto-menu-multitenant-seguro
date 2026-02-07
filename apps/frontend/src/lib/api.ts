@@ -1,5 +1,9 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 
+interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean;
+}
+
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 const api = axios.create({
@@ -144,17 +148,24 @@ const doLogout = () => {
 // Interceptor para renovação automática de tokens
 api.interceptors.response.use(
   (response) => response,
-  async (error: AxiosError | unknown) => {
-    const originalRequest = error.config;
+  async (error: unknown) => {
+    if (!axios.isAxiosError(error)) {
+      return Promise.reject(error);
+    }
+
+    const originalRequest = error.config as CustomAxiosRequestConfig;
+    const axiosError = error;
 
     // Erros que devem causar logout imediato
     const shouldLogout =
-      error.response?.status === 401 || // Não autorizado
-      error.response?.status === 403 || // Proibido (token inválido)
-      error.response?.data?.message?.includes("token") || // Mensagens relacionadas a token
-      error.response?.data?.message?.includes("expirado") ||
-      error.response?.data?.message?.includes("expired") ||
-      error.response?.data?.message?.includes("invalid");
+      axiosError.response?.status === 401 || // Não autorizado
+      axiosError.response?.status === 403 || // Proibido (token inválido)
+      (axiosError.response?.data?.message && (
+        axiosError.response.data.message.includes("token") || // Mensagens relacionadas a token
+        axiosError.response.data.message.includes("expirado") ||
+        axiosError.response.data.message.includes("expired") ||
+        axiosError.response.data.message.includes("invalid")
+      ));
 
     // Se for erro de autenticação em endpoints de login/refresh, não tentar renovar
     if (
@@ -169,7 +180,7 @@ api.interceptors.response.use(
 
     // Se o erro for 401 e não for uma tentativa de refresh
     if (
-      error.response?.status === 401 &&
+      axiosError.response?.status === 401 &&
       originalRequest &&
       !originalRequest._retry &&
       originalRequest.url !== "/auth/refresh" &&
