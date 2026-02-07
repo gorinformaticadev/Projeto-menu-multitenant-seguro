@@ -21,6 +21,7 @@ RUN pnpm --filter backend prisma:generate
 
 # Build backend
 RUN pnpm --filter backend build
+ENV CI=true
 RUN pnpm prune --prod
 
 # Runner stage

@@ -220,7 +220,9 @@ services:
       retries: 5
 
   backend:
-    build: ./apps/backend
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
     container_name: multitenant-backend-install
     ports:
       - "${BACKEND_PORT}:4000"
@@ -243,8 +245,26 @@ services:
       timeout: 10s
       retries: 3
 
+  migrator:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+      target: builder
+    container_name: multitenant-migrator-install
+    command: [] 
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public
+    working_dir: /app/apps/backend
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+
   frontend:
-    build: ./apps/frontend
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
     container_name: multitenant-frontend-install
     ports:
       - "${FRONTEND_PORT}:5000"
@@ -298,13 +318,14 @@ seed_database() {
     print_header "🌱 POPULANDO BANCO DE DADOS"
     
     print_info "Executando migrations..."
-    if ! docker-compose -f docker-compose.install.yml exec backend npx prisma migrate deploy; then
+    # Usamos o serviço migrator que tem as dependências de desenvolvimento (prisma cli)
+    if ! docker-compose -f docker-compose.install.yml run --rm migrator npx prisma migrate deploy; then
         print_error "Erro ao executar migrations"
         exit 1
     fi
     
     print_info "Executando seed..."
-    if ! docker-compose -f docker-compose.install.yml exec backend npx ts-node prisma/seed.ts; then
+    if ! docker-compose -f docker-compose.install.yml run --rm migrator npx ts-node prisma/seed.ts; then
         print_error "Erro ao executar seed"
         exit 1
     fi
@@ -665,6 +686,23 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  migrator:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+      target: builder
+    container_name: multitenant-migrator-install
+    # O comando é passado na execução manual via 'run'
+    command: []
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public
+    working_dir: /app/apps/backend
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
 
   frontend:
     build: ./apps/frontend

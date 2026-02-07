@@ -22,12 +22,12 @@ export function PlatformConfigProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Cache simples para evitar múltiplas chamadas
       const cacheKey = 'platform-config-cache';
       const cacheTTL = 5 * 60 * 1000; // 5 minutos
       const cached = localStorage.getItem(cacheKey);
-      
+
       if (cached) {
         const { data, timestamp } = JSON.parse(cached);
         if (Date.now() - timestamp < cacheTTL) {
@@ -36,20 +36,20 @@ export function PlatformConfigProvider({ children }: { children: ReactNode }) {
           return;
         }
       }
-      
+
       const response = await api.get('/platform-config');
       setConfig(response.data);
-      
+
       // Salvar no cache
       localStorage.setItem(cacheKey, JSON.stringify({
         data: response.data,
         timestamp: Date.now()
       }));
-      
+
     } catch (err: unknown) {
-      const error = err instanceof Error ? err : new Error(String(err));
+      const errorObj = err instanceof Error ? err : new Error(String(err));
       console.warn('Failed to fetch platform config:', err);
-      setError(err.message || 'Failed to load platform configuration');
+      setError(errorObj.message || 'Failed to load platform configuration');
       setConfig(DEFAULT_PLATFORM_CONFIG);
     } finally {
       setLoading(false);
@@ -61,7 +61,7 @@ export function PlatformConfigProvider({ children }: { children: ReactNode }) {
     const timeoutId = setTimeout(() => {
       fetchConfig();
     }, 100);
-    
+
     return () => clearTimeout(timeoutId);
   }, []);
 
@@ -79,11 +79,11 @@ export function PlatformConfigProvider({ children }: { children: ReactNode }) {
   }, [config.platformName, loading]);
 
   return (
-    <PlatformConfigContext.Provider value={{ 
-      config, 
-      loading, 
-      error, 
-      refreshConfig 
+    <PlatformConfigContext.Provider value={{
+      config,
+      loading,
+      error,
+      refreshConfig
     }}>
       {children}
     </PlatformConfigContext.Provider>

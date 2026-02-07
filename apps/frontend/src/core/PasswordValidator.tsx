@@ -114,9 +114,10 @@ export function PasswordValidator({ password, showRequirements = true }: Passwor
 }
 
 // Função utilitária para validar senha
-export function validatePassword(password: string, policy: Record<string, unknown>): ValidationResult {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function validatePassword(password: string, policy: any): ValidationResult {
   return {
-    minLength: password.length >= policy.minLength,
+    minLength: password.length >= (policy.minLength || 8),
     hasUppercase: policy.requireUppercase ? /[A-Z]/.test(password) : true,
     hasLowercase: policy.requireLowercase ? /[a-z]/.test(password) : true,
     hasNumbers: policy.requireNumbers ? /\d/.test(password) : true,

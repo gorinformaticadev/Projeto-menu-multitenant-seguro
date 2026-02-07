@@ -15,8 +15,9 @@ import { Package, CheckCircle } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
 // Helper para ícones dinâmicos
-const getIconComponent = (iconName: string): React.ComponentType | undefined => {
-  const Icon = (LucideIcons as Record<string, React.ComponentType | undefined>)[iconName];
+// Helper para ícones dinâmicos
+const getIconComponent = (iconName: string): any => {
+  const Icon = (LucideIcons as any)[iconName];
   return Icon || Package;
 };
 

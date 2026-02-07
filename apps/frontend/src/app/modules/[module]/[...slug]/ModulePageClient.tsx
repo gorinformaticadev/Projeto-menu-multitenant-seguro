@@ -13,22 +13,32 @@ interface ModulePageClientProps {
  * Isso permite carregar módulos sem hardcode - qualquer módulo na pasta modules será incluído
  */
 
+// Interface para o contexto do webpack
+interface WebpackContext {
+    keys(): string[];
+    (id: string): any;
+}
+
 // Função para criar o contexto de módulos dinamicamente
 function getModuleContext() {
-    // require.context inclui automaticamente TODOS os arquivos no build
-    // Pattern: qualquer pasta dentro de modules, qualquer profundidade, arquivos page.tsx
-    // Isso NÃO é hardcode - qualquer módulo adicionado à pasta será incluído automaticamente
-    const context = require.context(
-        '../../',  // Pasta base: modules/
-        true,      // Recursivo: busca em subpastas
-        /^\.\/[^/]+\/.*page\.tsx$/  // Pattern: ./nome_modulo/**/page.tsx
-    );
-    
-    return context;
+    // Hack para TypeScript aceitar require.context
+    // O require.context é funcionalidade do Webpack/Turbopack usada no build time
+    try {
+        if (typeof require !== 'undefined' && (require as any).context) {
+            return (require as any).context(
+                '../../',  // Pasta base: modules/
+                true,      // Recursivo: busca em subpastas
+                /^\.\/[^/]+\/.*page\.tsx$/  // Pattern: ./nome_modulo/**/page.tsx
+            ) as WebpackContext;
+        }
+    } catch (e) {
+        console.warn('require.context não disponível', e);
+    }
+    return null;
 }
 
 // Cache do contexto de módulos
-let moduleContext: ReturnType<typeof getModuleContext> | null = null;
+let moduleContext: WebpackContext | null = null;
 
 function loadModuleContext() {
     if (!moduleContext) {
@@ -48,6 +58,11 @@ function findPageComponent(moduleSlug: string, route: string): React.ComponentTy
     const context = loadModuleContext();
     if (!context) return null;
 
+    // Caminhos possíveis para buscar relativo à raiz de modules (onde o context foi criado)
+    // O context está em ../../ (apps/frontend/src/app/modules)
+    // Mas o require.context foi definido em apps/frontend/src/app/modules/[module]/[...slug]/
+    // Espera... o require.context('../..') vai pegar a pasta apps/frontend/src/app/modules
+    
     // Caminhos possíveis para buscar
     const possiblePaths = [
         `./${moduleSlug}/${route}/page.tsx`,
@@ -97,47 +112,58 @@ function findPageComponent(moduleSlug: string, route: string): React.ComponentTy
 export default function ModulePageClient({ moduleSlug, slug }: ModulePageClientProps) {
     const route = slug?.join('/') || 'index';
 
-    console.log('[ModulePage] Buscando rota:', { moduleSlug, route });
-
-    const [Component, setComponent] = React.useState<React.ComponentType<unknown> | null>(null);
+    // Para evitar problemas de hidratação, usamos useEffect para carregar o componente
+    const [Component, setComponent] = React.useState<React.ComponentType<any> | null>(null);
     const [error, setError] = React.useState<string | null>(null);
     const [loading, setLoading] = React.useState(true);
 
-    const loadModuleComponent = React.useCallback(async () => {
-        try {
-            setLoading(true);
-            setError(null);
-
-            // Busca no contexto dinâmico do webpack
-            const PageComponent = findPageComponent(moduleSlug, route);
-            
-            if (PageComponent) {
-                setComponent(() => PageComponent);
-                console.log('[ModulePage] Componente carregado:', `${moduleSlug}/${route}`);
-                return;
-            }
-
-            throw new Error(`Página não encontrada: ${moduleSlug}/${route}`);
-
-        } catch (err: unknown) {
-            console.error(`[ModulePage] Falha ao carregar ${moduleSlug}/${route}:`, err);
-
-            const expectedPath = `apps/frontend/src/app/modules/${moduleSlug}/${route}/page.tsx`;
-
-            const errorMessage = `Módulo ou página não encontrada (${moduleSlug}/${route}).\n` +
-                `O arquivo não foi encontrado no build do Frontend.\n\n` +
-                `Caminho esperado: ${expectedPath}\n\n` +
-                `Se o módulo foi recém-instalado, faça rebuild do frontend.`;
-
-            setError(errorMessage);
-        } finally {
-            setLoading(false);
-        }
-    }, [moduleSlug, route]);
-
     React.useEffect(() => {
-        loadModuleComponent();
-    }, [loadModuleComponent]);
+        let mounted = true;
+
+        const load = async () => {
+            try {
+                if (!mounted) return;
+                setLoading(true);
+                setError(null);
+
+                // Busca no contexto dinâmico do webpack
+                const PageComponent = findPageComponent(moduleSlug, route);
+                
+                if (mounted) {
+                    if (PageComponent) {
+                        setComponent(() => PageComponent);
+                        console.log('[ModulePage] Componente carregado:', `${moduleSlug}/${route}`);
+                    } else {
+                        throw new Error(`Página não encontrada: ${moduleSlug}/${route}`);
+                    }
+                }
+
+            } catch (err: any) {
+                if (mounted) {
+                    console.error(`[ModulePage] Falha ao carregar ${moduleSlug}/${route}:`, err);
+
+                    const expectedPath = `apps/frontend/src/app/modules/${moduleSlug}/${route}/page.tsx`;
+
+                    const errorMessage = `Módulo ou página não encontrada (${moduleSlug}/${route}).\n` +
+                        `O arquivo não foi encontrado no build do Frontend.\n\n` +
+                        `Caminho esperado: ${expectedPath}\n\n` +
+                        `Se o módulo foi recém-instalado, faça rebuild do frontend.`;
+
+                    setError(errorMessage);
+                }
+            } finally {
+                if (mounted) {
+                    setLoading(false);
+                }
+            }
+        };
+
+        load();
+
+        return () => {
+            mounted = false;
+        };
+    }, [moduleSlug, route]);
 
     if (loading) {
         return (

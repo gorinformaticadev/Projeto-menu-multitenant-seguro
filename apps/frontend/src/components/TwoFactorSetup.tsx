@@ -37,7 +37,8 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
     } catch (error: unknown) {
       let message = "Erro desconhecido";
       if (error && typeof error === "object" && "response" in error && error.response && typeof error.response === "object" && "data" in error.response && error.response.data && typeof error.response.data === "object" && "message" in error.response.data) {
-        message = (error.response.data as { message?: string }).message;
+        const errorData = error.response.data as { message?: string };
+        message = errorData.message || "Erro desconhecido";
       }
       toast({
         title: "Erro ao gerar QR Code",
@@ -74,7 +75,8 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
     } catch (error: unknown) {
       let message = "Código inválido";
       if (error && typeof error === "object" && "response" in error && error.response && typeof error.response === "object" && "data" in error.response && error.response.data && typeof error.response.data === "object" && "message" in error.response.data) {
-        message = (error.response.data as { message?: string }).message;
+        const errorData = error.response.data as { message?: string };
+        message = errorData.message || "Código inválido";
       }
       toast({
         title: "Erro ao ativar 2FA",
@@ -112,7 +114,8 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
     } catch (error: unknown) {
       let message = "Código inválido";
       if (error && typeof error === "object" && "response" in error && error.response && typeof error.response === "object" && "data" in error.response && error.response.data && typeof error.response.data === "object" && "message" in error.response.data) {
-        message = (error.response.data as { message?: string }).message;
+        const errorData = error.response.data as { message?: string };
+        message = errorData.message || "Código inválido";
       }
       toast({
         title: "Erro ao desativar 2FA",
@@ -167,19 +170,18 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
                 {isEnabled
                   ? "Sua conta está protegida com 2FA"
                   : twoFactorGloballyEnabled
-                  ? "Ative o 2FA para maior segurança"
-                  : "2FA desabilitado pelo administrador"}
+                    ? "Ative o 2FA para maior segurança"
+                    : "2FA desabilitado pelo administrador"}
               </p>
             </div>
           </div>
           <div
-            className={`px-3 py-1 rounded-full text-sm font-medium ${
-              isEnabled
-                ? "bg-green-100 text-green-800"
-                : twoFactorGloballyEnabled
+            className={`px-3 py-1 rounded-full text-sm font-medium ${isEnabled
+              ? "bg-green-100 text-green-800"
+              : twoFactorGloballyEnabled
                 ? "bg-gray-100 text-gray-800"
                 : "bg-yellow-100 text-yellow-800"
-            }`}
+              }`}
           >
             {isEnabled ? "Ativo" : twoFactorGloballyEnabled ? "Inativo" : "Bloqueado"}
           </div>

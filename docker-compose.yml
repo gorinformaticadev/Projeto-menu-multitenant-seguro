@@ -66,10 +66,15 @@ services:
       dockerfile: apps/backend/Dockerfile
       target: builder
     container_name: multitenant-migrator
-    command: sh -c "npx prisma migrate deploy && npx prisma db seed"
+    working_dir: /app/apps/backend
+    entrypoint: [ "sh", "-c", "npx prisma migrate deploy && npx prisma db seed" ]
+    # We don't need the command here if we use entrypoint, but command overrides CMD.
+    # Let's clean up the migrator definition to be safer for pnpm.
+    # We use the 'builder' stage which has pnpm and dependencies.
+    # We need to ensure we run commands using pnpm or npx correctly.
+    command: []
     environment:
       - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-multitenant}?schema=public
-    working_dir: /app/apps/backend
     depends_on:
       db:
         condition: service_healthy

@@ -21,6 +21,7 @@ RUN pnpm install --frozen-lockfile
 
 # Build frontend
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV CI=true
 RUN pnpm --filter frontend build
 
 # Runner stage
