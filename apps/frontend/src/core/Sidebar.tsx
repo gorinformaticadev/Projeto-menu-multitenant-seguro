@@ -61,7 +61,14 @@ export function Sidebar() {
   const loadMenuItems = () => {
     try {
       // Core agrega itens de todos os módulos registrados
-      const items = moduleRegistry.getSidebarItems(user?.role);
+      const rawItems = moduleRegistry.getSidebarItems(user?.role);
+      const items: SidebarItem[] = rawItems.map(item => ({
+        id: item.id || item.route || 'unknown',
+        name: item.label,
+        href: item.route,
+        icon: item.icon || 'Menu',
+        order: item.order || 99
+      }));
       setMenuItems(items);
     } catch (error) {
       console.error('Erro ao carregar itens do menu:', error);
