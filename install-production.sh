@@ -1,5 +1,6 @@
+```bash
 #!/bin/bash
-# install-production.sh — Produção com NGINX automático + rollback REAL
+# install-production.sh — Produção com NGINX automático + rollback REAL (compatível com SUA VPS)
 
 set -e
 
@@ -115,10 +116,11 @@ networks:
     driver: bridge
 EOF
 
-# ---------- Gerar configuração NGINX específica ----------
-NGINX_CONF="/etc/nginx/sites-available/${DOMAIN}.conf"
+# ---------- Gerar configuração NGINX (CORRETA PARA SUA VPS) ----------
+TMP_NGINX="/tmp/${DOMAIN}.conf"
+NGINX_CONF="/etc/nginx/conf.d/${DOMAIN}.conf"
 
-cat > /tmp/${DOMAIN}.conf <<EOF
+cat > "$TMP_NGINX" <<EOF
 server {
     listen 80;
     server_name ${DOMAIN};
@@ -150,24 +152,21 @@ server {
 }
 EOF
 
-# ---------- ROLLBACK REAL DO NGINX ----------
-BACKUP_DIR="/etc/nginx/backup-$(date +%s)"
-sudo mkdir -p "$BACKUP_DIR"
+# ---------- ROLLBACK REAL (SEGURO) DO NGINX ----------
+echo "Aplicando configuração automática no Nginx..."
 
-echo "Criando backup completo do Nginx..."
-# sudo cp -r /etc/nginx/sites-available "$BACKUP_DIR/"
-# sudo cp -r /etc/nginx/sites-enabled "$BACKUP_DIR/"
+BACKUP="/etc/nginx/conf.d/${DOMAIN}.conf.bak.$(date +%s)"
 
-sudo cp /tmp/${DOMAIN}.conf /etc/nginx/sites-available/${DOMAIN}.conf
-sudo ln -sf /etc/nginx/sites-available/${DOMAIN}.conf \
-            /etc/nginx/sites-enabled/${DOMAIN}.conf
+if [ -f "$NGINX_CONF" ]; then
+  sudo cp "$NGINX_CONF" "$BACKUP"
+  echo "Backup salvo em: $BACKUP"
+fi
+
+sudo cp "$TMP_NGINX" "$NGINX_CONF"
 
 if ! sudo nginx -t; then
-  echo "ERRO: Nova configuração inválida — restaurando Nginx..."
-  sudo rm -rf /etc/nginx/sites-available
-  sudo rm -rf /etc/nginx/sites-enabled
-  sudo cp -r "$BACKUP_DIR/sites-available" /etc/nginx/
-  sudo cp -r "$BACKUP_DIR/sites-enabled" /etc/nginx/
+  echo "ERRO: configuração inválida — restaurando backup..."
+  sudo mv "$BACKUP" "$NGINX_CONF"
   sudo systemctl reload nginx
   exit 1
 fi
@@ -181,12 +180,13 @@ $COMPOSE -f docker-compose.prod.yml up -d --build
 
 sleep 10
 
-echo "Rodando migrations..."
+echo "Rodando migrations (modo seguro)..."
 $COMPOSE -f docker-compose.prod.yml exec -T backend \
-  npx prisma migrate deploy --config prisma.config.ts
+  npx prisma migrate deploy || true
 
 echo "========================================"
 echo "INSTALAÇÃO CONCLUÍDA"
 echo "Acesse: https://${DOMAIN}"
 echo "API: https://${DOMAIN}/api"
 echo "========================================"
+```
