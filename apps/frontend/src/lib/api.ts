@@ -1,5 +1,9 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 
+interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean;
+}
+
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 const api = axios.create({
@@ -144,9 +148,13 @@ const doLogout = () => {
 // Interceptor para renovação automática de tokens
 api.interceptors.response.use(
   (response) => response,
-  async (error: AxiosError | unknown) => {
-    const originalRequest = (error as any).config;
-    const axiosError = error as any;
+  async (error: unknown) => {
+    if (!axios.isAxiosError(error)) {
+      return Promise.reject(error);
+    }
+
+    const originalRequest = error.config as CustomAxiosRequestConfig;
+    const axiosError = error;
 
     // Erros que devem causar logout imediato
     const shouldLogout =

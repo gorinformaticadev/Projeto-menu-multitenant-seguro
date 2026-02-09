@@ -182,7 +182,8 @@ $COMPOSE -f docker-compose.prod.yml up -d --build
 sleep 10
 
 echo "Rodando migrations..."
-$COMPOSE -f docker-compose.prod.yml exec -T backend npx prisma migrate deploy || true
+$COMPOSE -f docker-compose.prod.yml exec -T backend \
+  npx prisma migrate deploy --config prisma.config.ts
 
 echo "========================================"
 echo "INSTALAÇÃO CONCLUÍDA"
