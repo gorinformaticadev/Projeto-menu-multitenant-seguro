@@ -70,8 +70,10 @@ generate_env() {
     
     if [ -f .env ]; then
         print_info "Arquivo .env existente encontrado. Mantendo configurações atuais."
-        # Carregar variáveis existentes para uso no script se necessário
-        export $(grep -v '^#' .env | xargs)
+        # Carregar variáveis existentes de forma segura
+        set -a
+        source .env
+        set +a
     else
         if [ "$MODE" == "update" ]; then
             print_error "Modo UPDATE selecionado mas .env não encontrado. Execute a instalação primeiro."
@@ -80,10 +82,10 @@ generate_env() {
         
         print_info "Gerando novo arquivo .env..."
         
-        # Gerar senhas
-        DB_PASSWORD=$(openssl rand -base64 32)
-        JWT_SECRET=$(openssl rand -base64 64)
-        ADMIN_PASSWORD=$(openssl rand -base64 24 | tr '+/' '_-')
+        # Gerar senhas (URL-safe para evitar problemas)
+        DB_PASSWORD=$(openssl rand -base64 32 | tr '+/' '_-' | tr -d '=')
+        JWT_SECRET=$(openssl rand -base64 64 | tr '+/' '_-' | tr -d '=')
+        ADMIN_PASSWORD=$(openssl rand -base64 24 | tr '+/' '_-' | tr -d '=')
         
         cat > .env << EOF
 # ============================================
