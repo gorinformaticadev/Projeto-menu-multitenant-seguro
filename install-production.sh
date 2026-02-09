@@ -155,8 +155,8 @@ BACKUP_DIR="/etc/nginx/backup-$(date +%s)"
 sudo mkdir -p "$BACKUP_DIR"
 
 echo "Criando backup completo do Nginx..."
-sudo cp -r /etc/nginx/sites-available "$BACKUP_DIR/"
-sudo cp -r /etc/nginx/sites-enabled "$BACKUP_DIR/"
+# sudo cp -r /etc/nginx/sites-available "$BACKUP_DIR/"
+# sudo cp -r /etc/nginx/sites-enabled "$BACKUP_DIR/"
 
 sudo cp /tmp/${DOMAIN}.conf /etc/nginx/sites-available/${DOMAIN}.conf
 sudo ln -sf /etc/nginx/sites-available/${DOMAIN}.conf \

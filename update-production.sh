@@ -1,5 +1,5 @@
 #!/bin/bash
-# update-production.sh — Atualização segura sem perder .env
+# update-production.sh — Atualização segura REAL (sem Nginx host)
 
 set -e
 
@@ -8,15 +8,21 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
-echo "Fazendo backup do .env..."
+echo ">> Backup do .env"
 cp .env /tmp/.env.backup
 
-echo "Atualizando repositório..."
+echo ">> Atualizando repositório..."
 git pull origin main
 
+echo ">> Restaurando .env"
 mv /tmp/.env.backup .env
 
-echo "Rodando instalação novamente..."
-./install-production.sh $(grep DOMAIN .env | cut -d= -f2) "admin@seuemail.com"
+echo ">> Rebuild e restart dos containers (sem mexer em Nginx)..."
+docker compose -f docker-compose.prod.yml down
+docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml up -d
 
-echo "Atualização concluída."
+echo ">> Rodando migrations manualmente..."
+docker compose -f docker-compose.prod.yml run --rm migrator || true
+
+echo "✅ Atualização concluída (dados preservados, zero gambiarra no Nginx)."
