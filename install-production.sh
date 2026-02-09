@@ -1,100 +1,89 @@
 #!/bin/bash
-# install-production.sh - Instalação e Atualização para Produção
+# install-production.sh - Produção com NGINX (dois modos: interno ou externo)
 # Autor: Sistema Multitenant Seguro
-# Descrição: Script de instalação/atualização automatizada via Docker com HTTPS automático (Caddy)
 
-set -e  # Abortar em caso de erro
+set -e
 
-# Cores
+# ---------- Cores ----------
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Variáveis Padrão
+# ---------- Padrões ----------
 DOMAIN="crm.whapichat.com.br"
-EMAIL="admin@whapichat.com.br" # Necessário para o Let's Encrypt
+EMAIL="admin@whapichat.com.br"
 NODE_ENV="production"
-MODE="install" # install ou update
+MODE="install"          # install | update
+PROXY_MODE="internal"   # internal (nginx no docker) | external (nginx do host)
 
-# Funções de Log
+# ---------- Logs ----------
 print_header() { echo -e "${CYAN}========================================${NC}\n${CYAN}$1${NC}\n${CYAN}========================================${NC}"; }
-print_success() { echo -e "${GREEN}✅ $1${NC}"; }
-print_error() { echo -e "${RED}❌ $1${NC}"; }
-print_info() { echo -e "${YELLOW}ℹ️  $1${NC}"; }
+print_success() { echo -e "${GREEN}✔ $1${NC}"; }
+print_error() { echo -e "${RED}✖ $1${NC}"; }
+print_info() { echo -e "${YELLOW}ℹ $1${NC}"; }
 
-# Argumentos
+# ---------- Args ----------
 while [[ $# -gt 0 ]]; do
-    case $1 in
-        --update)
-            MODE="update"
-            shift
-            ;;
-        --domain)
-            DOMAIN="$2"
-            shift 2
-            ;;
-        --email)
-            EMAIL="$2"
-            shift 2
-            ;;
-        *)
-            echo "Opção desconhecida: $1"
-            echo "Uso: ./install-production.sh [--update] [--domain crm.whapichat.com.br] [--email admin@...]"
-            exit 1
-            ;;
-    esac
+  case $1 in
+    --update)
+      MODE="update"; shift ;;
+    --domain)
+      DOMAIN="$2"; shift 2 ;;
+    --email)
+      EMAIL="$2"; shift 2 ;;
+    --with-nginx)       # modo padrão (proxy interno)
+      PROXY_MODE="internal"; shift ;;
+    --external-nginx)   # modo para servidor já ocupado
+      PROXY_MODE="external"; shift ;;
+    *)
+      echo "Uso: ./install-production.sh [--update] [--domain DOMINIO] [--email EMAIL] [--with-nginx | --external-nginx]"
+      exit 1 ;;
+  esac
 done
 
+# ---------- Pré-requisitos ----------
 check_prerequisites() {
-    print_header "🔍 VERIFICANDO PRÉ-REQUISITOS"
-    if ! command -v docker &> /dev/null; then
-        print_error "Docker não encontrado. Instale o Docker primeiro."
-        exit 1
-    fi
-    # Tenta docker compose v2 ou v1
-    if docker compose version >/dev/null 2>&1; then
-        DOCKER_COMPOSE_CMD="docker compose"
-    elif command -v docker-compose &> /dev/null; then
-        DOCKER_COMPOSE_CMD="docker-compose"
-    else
-        print_error "Docker Compose não encontrado."
-        exit 1
-    fi
-    print_success "Docker e Compose encontrados."
+  print_header "🔍 PRÉ-REQUISITOS"
+
+  if ! command -v docker &>/dev/null; then
+    print_error "Docker não encontrado."; exit 1
+  fi
+
+  if docker compose version &>/dev/null; then
+    DOCKER_COMPOSE_CMD="docker compose"
+  elif command -v docker-compose &>/dev/null; then
+    DOCKER_COMPOSE_CMD="docker-compose"
+  else
+    print_error "Docker Compose não encontrado."; exit 1
+  fi
+
+  print_success "Docker/Compose OK"
 }
 
+# ---------- .env ----------
 generate_env() {
-    print_header "🔐 CONFIGURAÇÃO DO AMBIENTE (.env)"
-    
-    if [ -f .env ]; then
-        print_info "Arquivo .env existente encontrado. Mantendo configurações atuais."
-        # Carregar variáveis existentes de forma segura
-        set -a
-        source .env
-        set +a
-    else
-        if [ "$MODE" == "update" ]; then
-            print_error "Modo UPDATE selecionado mas .env não encontrado. Execute a instalação primeiro."
-            exit 1
-        fi
-        
-        print_info "Gerando novo arquivo .env..."
-        
-        # Gerar senhas (URL-safe para evitar problemas)
-        DB_PASSWORD=$(openssl rand -base64 32 | tr '+/' '_-' | tr -d '=')
-        JWT_SECRET=$(openssl rand -base64 64 | tr '+/' '_-' | tr -d '=')
-        ADMIN_PASSWORD=$(openssl rand -base64 24 | tr '+/' '_-' | tr -d '=')
-        
-        cat > .env << EOF
-# ============================================
-# CONFIGURAÇÕES DE PRODUÇÃO ($DOMAIN)
-# ============================================
+  print_header "🔐 .env"
+
+  if [ -f .env ]; then
+    print_info "Usando .env existente"
+    set -a; source .env; set +a
+    return
+  fi
+
+  if [ "$MODE" = "update" ]; then
+    print_error "UPDATE sem .env existente"; exit 1
+  fi
+
+  DB_PASSWORD=$(openssl rand -base64 32 | tr '+/' '_-' | tr -d '=')
+  JWT_SECRET=$(openssl rand -base64 64 | tr '+/' '_-' | tr -d '=')
+  ADMIN_PASSWORD=$(openssl rand -base64 24 | tr '+/' '_-' | tr -d '=')
+
+  cat > .env <<EOF
 NODE_ENV=production
 DOMAIN=$DOMAIN
 
-# Banco de Dados
 POSTGRES_USER=multitenant_user
 POSTGRES_PASSWORD=$DB_PASSWORD
 POSTGRES_DB=multitenant_db
@@ -102,237 +91,149 @@ POSTGRES_HOST=db
 POSTGRES_PORT=5432
 DATABASE_URL=postgresql://multitenant_user:$DB_PASSWORD@db:5432/multitenant_db?schema=public
 
-# Segurança
 JWT_SECRET=$JWT_SECRET
 JWT_EXPIRES_IN=7d
 
-# URLs (Internas e Externas)
+# URLs internas
 FRONTEND_URL=https://$DOMAIN
 NEXT_PUBLIC_API_URL=https://$DOMAIN/api
 API_URL=http://backend:4000
 
-# Redis
 REDIS_HOST=redis
 REDIS_PORT=6379
 EOF
-        print_success "Arquivo .env gerado com sucesso!"
-        echo "Senha Admin Gerada: $ADMIN_PASSWORD" > admin_credentials.txt
-        print_info "Credenciais de admin salvas em admin_credentials.txt (guarde com segurança!)"
-    fi
+
+  echo "Admin inicial: $ADMIN_PASSWORD" > admin_credentials.txt
+  print_success ".env gerado"
 }
 
-create_caddyfile() {
-    print_header "🌐 CONFIGURANDO PROXY REVERSO (Caddy)"
-    
-    cat > Caddyfile <<EOF
-${DOMAIN} {
-    # Compressão Gzip/Zstd
-    encode gzip zstd
+# ---------- Arquivos de NGINX (modo interno) ----------
+create_internal_nginx_files() {
+  mkdir -p nginx/conf.d nginx/certs
 
-    # Security Headers básicos
-    header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains"
-        X-XSS-Protection "1; mode=block"
-        X-Frame-Options "DENY"
-        X-Content-Type-Options "nosniff"
-    }
+  cat > nginx/conf.d/app.conf <<EOF
+server {
+  listen 80;
+  server_name $DOMAIN;
+  return 301 https://\$host\$request_uri;
+}
 
-    # Rota API -> Backend
-    handle_path /api/* {
-        reverse_proxy backend:4000 {
-            header_up Host {host}
-            header_up X-Real-IP {remote}
-            header_up X-Forwarded-Proto {scheme}
-        }
-    }
+server {
+  listen 443 ssl;
+  server_name $DOMAIN;
 
-    # Rota Health -> Backend Health
-    handle /health {
-        reverse_proxy backend:4000
-    }
+  ssl_certificate /etc/nginx/certs/fullchain.pem;
+  ssl_certificate_key /etc/nginx/certs/privkey.pem;
 
-    # Default -> Frontend
-    handle {
-        reverse_proxy frontend:5000 {
-            header_up Host {host}
-            header_up X-Real-IP {remote}
-            header_up X-Forwarded-Proto {scheme}
-        }
-    }
+  location / {
+    proxy_pass http://frontend:3000;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+  }
 
-    # Logs
-    log {
-        output file /data/access.log
-    }
+  location /api {
+    proxy_pass http://backend:3000;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+  }
 }
 EOF
-    print_success "Caddyfile gerado para $DOMAIN"
+
+  print_success "Config Nginx interno criada em nginx/conf.d/app.conf"
 }
 
-create_docker_compose() {
-    print_header "🐳 GERANDO DOCKER COMPOSE (PRODUÇÃO)"
-    
-    cat > docker-compose.prod.yml <<EOF
-version: '3.8'
+# ---------- Template para NGINX externo ----------
+create_external_nginx_example() {
+  cat > nginx-${DOMAIN}-example.conf <<EOF
+upstream minha_front {
+  server 127.0.0.1:5000;
+}
 
-services:
-  # Caddy (Reverse Proxy & SSL Automático)
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - frontend
-      - backend
-    networks:
-      - app-network
+upstream minha_api {
+  server 127.0.0.1:4000;
+}
 
-  # Frontend (Next.js)
-  frontend:
-    build: 
-      context: .
-      dockerfile: ./apps/frontend/Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: https://${DOMAIN}/api
-    container_name: multitenant-frontend-prod
-    restart: unless-stopped
-    expose:
-      - "5000"
-    environment:
-      - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=https://${DOMAIN}/api
-      - PORT=5000
-    depends_on:
-      - backend
-    networks:
-      - app-network
+server {
+  server_name $DOMAIN;
 
-  # Backend (Node.js/NestJS)
-  backend:
-    build: 
-      context: .
-      dockerfile: ./apps/backend/Dockerfile
-    container_name: multitenant-backend-prod
-    restart: unless-stopped
-    expose:
-      - "4000"
-    environment:
-      - DATABASE_URL=\${DATABASE_URL}
-      - JWT_SECRET=\${JWT_SECRET}
-      - FRONTEND_URL=https://${DOMAIN}
-      - NODE_ENV=production
-      - PORT=4000
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    depends_on:
-      - db
-      - redis
-    volumes:
-      - ./uploads:/app/uploads
-    networks:
-      - app-network
+  location / {
+    proxy_pass http://minha_front;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+  }
 
-  # Database (PostgreSQL)
-  db:
-    image: postgres:15-alpine
-    container_name: multitenant-db-prod
-    restart: unless-stopped
-    environment:
-      - POSTGRES_USER=\${POSTGRES_USER}
-      - POSTGRES_PASSWORD=\${POSTGRES_PASSWORD}
-      - POSTGRES_DB=\${POSTGRES_DB}
-    volumes:
-      - postgres_data_prod:/var/lib/postgresql/data
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \${POSTGRES_USER}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # Cache (Redis)
-  redis:
-    image: redis:7-alpine
-    container_name: multitenant-redis-prod
-    restart: unless-stopped
-    volumes:
-      - redis_data_prod:/data
-    networks:
-      - app-network
-
-volumes:
-  caddy_data:
-  caddy_config:
-  postgres_data_prod:
-  redis_data_prod:
-
-networks:
-  app-network:
-    driver: bridge
+  location /api {
+    proxy_pass http://minha_api;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+  }
+}
 EOF
-    print_success "docker-compose.prod.yml gerado."
+
+  print_info "Arquivo exemplo para Nginx do host: nginx-${DOMAIN}-example.conf"
 }
 
+# ---------- Compose selection ----------
+select_compose() {
+  if [ "$PROXY_MODE" = "internal" ]; then
+    COMPOSE_FILE="docker-compose.prod.with-nginx.yml"
+  else
+    COMPOSE_FILE="docker-compose.prod.external.yml"
+  fi
+}
+
+# ---------- Deploy ----------
 deploy() {
-    print_header "🚀 INICIANDO DEPLOY ($MODE)"
-    
-    if [ "$MODE" == "update" ]; then
-        print_info "Atualizando imagens e recriando containers..."
-        $DOCKER_COMPOSE_CMD -f docker-compose.prod.yml up --build -d --remove-orphans
-    else
-        print_info "Iniciando containers pela primeira vez..."
-        $DOCKER_COMPOSE_CMD -f docker-compose.prod.yml up --build -d
-    fi
-    
-    if [ $? -eq 0 ]; then
-        print_success "Containers iniciados!"
-    else
-        print_error "Falha ao iniciar containers."
-        exit 1
-    fi
+  print_header "🚀 DEPLOY ($MODE | proxy=$PROXY_MODE)"
+
+  if [ "$MODE" = "update" ]; then
+    $DOCKER_COMPOSE_CMD -f "$COMPOSE_FILE" up --build -d --remove-orphans
+  else
+    $DOCKER_COMPOSE_CMD -f "$COMPOSE_FILE" up --build -d
+  fi
 }
 
+# ---------- Migrations ----------
 run_migrations() {
-    print_header "🌱 BANCO DE DADOS"
-    
-    print_info "Aguardando banco de dados..."
-    sleep 10
-    
-    print_info "Rodando migrations..."
-    $DOCKER_COMPOSE_CMD -f docker-compose.prod.yml exec -T backend npx prisma migrate deploy
-    
-    if [ "$MODE" == "install" ]; then
-        print_info "Rodando seed inicial..."
-        $DOCKER_COMPOSE_CMD -f docker-compose.prod.yml exec -T backend npx ts-node prisma/seed.ts || echo "Seed pode já ter sido rodado ou falhou sem gravidade."
-    fi
-    
-    print_success "Banco de dados atualizado!"
+  print_header "🌱 MIGRATIONS"
+  sleep 10
+  $DOCKER_COMPOSE_CMD -f "$COMPOSE_FILE" exec -T backend npx prisma migrate deploy
+  if [ "$MODE" = "install" ]; then
+    $DOCKER_COMPOSE_CMD -f "$COMPOSE_FILE" exec -T backend npx ts-node prisma/seed.ts || true
+  fi
 }
 
+# ---------- Main ----------
 main() {
-    print_header "INSTALL-PRODUCTION: $DOMAIN"
-    
-    check_prerequisites
-    generate_env
-    create_caddyfile
-    create_docker_compose
-    deploy
-    run_migrations
-    
-    print_header "🎉 DEPLOY CONCLUÍDO!"
-    echo "Acesse: https://$DOMAIN"
-    echo "API: https://$DOMAIN/api"
-    echo "Modo: $MODE"
-    if [ -f admin_credentials.txt ]; then
-        echo "Credenciais iniciais (se instalacao nova) em: admin_credentials.txt"
-    fi
+  print_header "INSTALL-PRODUCTION: $DOMAIN"
+
+  check_prerequisites
+  generate_env
+  select_compose
+
+  if [ "$PROXY_MODE" = "internal" ]; then
+    create_internal_nginx_files
+  else
+    create_external_nginx_example
+  fi
+
+  deploy
+  run_migrations
+
+  print_header "🎉 CONCLUÍDO"
+  echo "URL: https://$DOMAIN"
+  echo "Modo: $PROXY_MODE"
+  if [ -f admin_credentials.txt ]; then
+    echo "Credenciais em admin_credentials.txt"
+  fi
 }
 
 main
