@@ -1,8 +1,9 @@
 ```bash
 #!/bin/bash
-# install-production.sh — Produção com NGINX automático + rollback REAL (compatível com SUA VPS)
+# install-production.sh — Versão FUNCIONAL para sua VPS
 
 set -e
+set -x   # <-- IMPORTANTE: mostra tudo o que está acontecendo
 
 DOMAIN="$1"
 EMAIL="$2"
@@ -13,12 +14,16 @@ if [ -z "$DOMAIN" ] || [ -z "$EMAIL" ]; then
 fi
 
 echo "========================================"
-echo "INSTALAÇÃO MULTITENANT — NGINX AUTOMÁTICO"
+echo "INSTALAÇÃO MULTITENANT — NGINX"
 echo "Domínio: $DOMAIN"
 echo "Email: $EMAIL"
 echo "========================================"
 
-# ---------- Detectar Docker Compose ----------
+# ======= GARANTIR QUE NGINX TENHA ONDE ESCREVER =======
+sudo mkdir -p /etc/nginx/conf.d
+sudo mkdir -p /etc/nginx/certs/$DOMAIN
+
+# ======= DETECTAR DOCKER COMPOSE =======
 if docker compose version >/dev/null 2>&1; then
   COMPOSE="docker compose"
 elif command -v docker-compose >/dev/null 2>&1; then
@@ -28,7 +33,7 @@ else
   exit 1
 fi
 
-# ---------- Garantir .env (NÃO APAGAR EM UPDATE) ----------
+# ======= GARANTIR .ENV =======
 if [ ! -f .env ]; then
 cat > .env <<EOF
 DOMAIN=$DOMAIN
@@ -44,10 +49,10 @@ JWT_SECRET=$(openssl rand -base64 64 | tr '+/' '_-' | tr -d '=')
 FRONTEND_URL=https://$DOMAIN
 EOF
 else
-  echo ".env já existe — preservando configuração."
+  echo ".env já existe — mantendo configuração."
 fi
 
-# ---------- Gerar docker-compose.prod.yml ----------
+# ======= GERAR DOCKER COMPOSE =======
 cat > docker-compose.prod.yml <<EOF
 services:
   frontend:
@@ -116,11 +121,10 @@ networks:
     driver: bridge
 EOF
 
-# ---------- Gerar configuração NGINX (CORRETA PARA SUA VPS) ----------
-TMP_NGINX="/tmp/${DOMAIN}.conf"
+# ======= GERAR CONFIGURAÇÃO DO NGINX (CORRETA) =======
 NGINX_CONF="/etc/nginx/conf.d/${DOMAIN}.conf"
 
-cat > "$TMP_NGINX" <<EOF
+cat > "/tmp/${DOMAIN}.conf" <<EOF
 server {
     listen 80;
     server_name ${DOMAIN};
@@ -136,57 +140,35 @@ server {
 
     location /api {
         proxy_pass http://multitenant-backend-prod:4000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
     location / {
         proxy_pass http://multitenant-frontend-prod:5000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 }
 EOF
 
-# ---------- ROLLBACK REAL (SEGURO) DO NGINX ----------
-echo "Aplicando configuração automática no Nginx..."
-
-BACKUP="/etc/nginx/conf.d/${DOMAIN}.conf.bak.$(date +%s)"
-
-if [ -f "$NGINX_CONF" ]; then
-  sudo cp "$NGINX_CONF" "$BACKUP"
-  echo "Backup salvo em: $BACKUP"
-fi
-
-sudo cp "$TMP_NGINX" "$NGINX_CONF"
+# ======= APLICAR NGINX =======
+sudo cp "/tmp/${DOMAIN}.conf" "$NGINX_CONF"
 
 if ! sudo nginx -t; then
-  echo "ERRO: configuração inválida — restaurando backup..."
-  sudo mv "$BACKUP" "$NGINX_CONF"
-  sudo systemctl reload nginx
+  echo "ERRO: Nginx inválido. Abortando."
   exit 1
 fi
 
 sudo systemctl reload nginx
-echo "Nginx atualizado com sucesso."
+echo "NGINX CONFIGURADO!"
 
-# ---------- Subir containers ----------
+# ======= SUBIR DOCKER =======
 echo "Subindo containers..."
 $COMPOSE -f docker-compose.prod.yml up -d --build
 
 sleep 10
 
-echo "Rodando migrations (modo seguro)..."
+echo "Rodando migrations..."
 $COMPOSE -f docker-compose.prod.yml exec -T backend \
   npx prisma migrate deploy || true
 
-echo "========================================"
-echo "INSTALAÇÃO CONCLUÍDA"
+echo "INSTALAÇÃO FINALIZADA!"
 echo "Acesse: https://${DOMAIN}"
-echo "API: https://${DOMAIN}/api"
-echo "========================================"
 ```
