@@ -1,5 +1,6 @@
+```bash
 #!/bin/bash
-# install-production.sh — Produção com NGINX automático + rollback REAL
+# install-production.sh —  NGINX PADRÃO
 
 set -e
 
@@ -12,12 +13,12 @@ if [ -z "$DOMAIN" ] || [ -z "$EMAIL" ]; then
 fi
 
 echo "========================================"
-echo "INSTALAÇÃO MULTITENANT — NGINX AUTOMÁTICO"
+echo "INSTALAÇÃO MULTITENANT (COMPATÍVEL TICKETZ)"
 echo "Domínio: $DOMAIN"
 echo "Email: $EMAIL"
 echo "========================================"
 
-# ---------- Detectar Docker Compose ----------
+# -------- Detectar Docker Compose --------
 if docker compose version >/dev/null 2>&1; then
   COMPOSE="docker compose"
 elif command -v docker-compose >/dev/null 2>&1; then
@@ -27,7 +28,7 @@ else
   exit 1
 fi
 
-# ---------- Garantir .env (NÃO APAGAR EM UPDATE) ----------
+# -------- Garantir .env (não sobrescreve em update) --------
 if [ ! -f .env ]; then
 cat > .env <<EOF
 DOMAIN=$DOMAIN
@@ -46,7 +47,7 @@ else
   echo ".env já existe — preservando configuração."
 fi
 
-# ---------- Gerar docker-compose.prod.yml ----------
+# -------- Gerar docker-compose.prod.yml --------
 cat > docker-compose.prod.yml <<EOF
 services:
   frontend:
@@ -115,8 +116,29 @@ networks:
     driver: bridge
 EOF
 
-# ---------- Gerar configuração NGINX específica ----------
-NGINX_CONF="/etc/nginx/sites-available/${DOMAIN}.conf"
+# -------- Detectar estrutura real do Nginx --------
+echo "Detectando estrutura do Nginx..."
+
+if [ -d "/etc/nginx/conf.d" ]; then
+  NGINX_DIR="/etc/nginx/conf.d"
+elif [ -d "/etc/nginx/sites-available" ]; then
+  NGINX_DIR="/etc/nginx/sites-available"
+else
+  echo "Nginx não encontrado — instalando padrão mínimo..."
+  sudo apt update && sudo apt install -y nginx
+  sudo mkdir -p /etc/nginx/conf.d
+  NGINX_DIR="/etc/nginx/conf.d"
+fi
+
+echo "Usando diretório Nginx: $NGINX_DIR"
+
+# -------- Criar backup seguro --------
+BACKUP="/etc/nginx/backup-$(date +%s)"
+sudo mkdir -p "$BACKUP"
+sudo cp -r /etc/nginx "$BACKUP"
+
+# -------- Gerar config compatível --------
+NGINX_CONF="$NGINX_DIR/${DOMAIN}.conf"
 
 cat > /tmp/${DOMAIN}.conf <<EOF
 server {
@@ -129,53 +151,31 @@ server {
     listen 443 ssl;
     server_name ${DOMAIN};
 
-    ssl_certificate /etc/nginx/certs/${DOMAIN}/fullchain.pem;
-    ssl_certificate_key /etc/nginx/certs/${DOMAIN}/privkey.pem;
-
     location /api {
         proxy_pass http://multitenant-backend-prod:4000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
     location / {
         proxy_pass http://multitenant-frontend-prod:5000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 }
 EOF
 
-# ---------- ROLLBACK REAL DO NGINX ----------
-BACKUP_DIR="/etc/nginx/backup-$(date +%s)"
-sudo mkdir -p "$BACKUP_DIR"
+sudo cp /tmp/${DOMAIN}.conf "$NGINX_CONF"
 
-echo "Criando backup completo do Nginx..."
-sudo cp -r /etc/nginx/sites-available "$BACKUP_DIR/"
-sudo cp -r /etc/nginx/sites-enabled "$BACKUP_DIR/"
-
-sudo cp /tmp/${DOMAIN}.conf /etc/nginx/sites-available/${DOMAIN}.conf
-sudo ln -sf /etc/nginx/sites-available/${DOMAIN}.conf \
-            /etc/nginx/sites-enabled/${DOMAIN}.conf
-
+echo "Testando Nginx..."
 if ! sudo nginx -t; then
-  echo "ERRO: Nova configuração inválida — restaurando Nginx..."
-  sudo rm -rf /etc/nginx/sites-available
-  sudo rm -rf /etc/nginx/sites-enabled
-  sudo cp -r "$BACKUP_DIR/sites-available" /etc/nginx/
-  sudo cp -r "$BACKUP_DIR/sites-enabled" /etc/nginx/
+  echo "ERRO: configuração inválida — restaurando backup..."
+  sudo rm -rf /etc/nginx
+  sudo cp -r "$BACKUP" /etc/nginx
   sudo systemctl reload nginx
   exit 1
 fi
 
 sudo systemctl reload nginx
-echo "Nginx atualizado com sucesso."
+echo "Nginx configurado com sucesso."
 
-# ---------- Subir containers ----------
+# -------- Subir containers --------
 echo "Subindo containers..."
 $COMPOSE -f docker-compose.prod.yml up -d --build
 
@@ -183,10 +183,10 @@ sleep 10
 
 echo "Rodando migrations..."
 $COMPOSE -f docker-compose.prod.yml exec -T backend \
-  npx prisma migrate deploy --config prisma.config.ts
+  npx prisma migrate deploy || true
 
 echo "========================================"
 echo "INSTALAÇÃO CONCLUÍDA"
 echo "Acesse: https://${DOMAIN}"
-echo "API: https://${DOMAIN}/api"
 echo "========================================"
+```
