@@ -1,41 +1,55 @@
 ```bash
 #!/bin/bash
-# install-production.sh — Versão FUNCIONAL para sua VPS
+# install-production.sh — versão ROBUSTA (visível + logada)
+
+LOG="/root/install-multitenant.log"
+
+# Força log e saída na tela ao mesmo tempo
+exec > >(tee -a "$LOG") 2>&1
+
+echo "==============================="
+echo "INÍCIO DA INSTALAÇÃO"
+echo "Data: $(date)"
+echo "Usuário: $(whoami)"
+echo "PWD: $(pwd)"
+echo "==============================="
 
 set -e
-set -x   # <-- IMPORTANTE: mostra tudo o que está acontecendo
 
 DOMAIN="$1"
 EMAIL="$2"
 
 if [ -z "$DOMAIN" ] || [ -z "$EMAIL" ]; then
+  echo "ERRO: parâmetros ausentes."
   echo "Uso: ./install-production.sh <dominio> <email>"
   exit 1
 fi
 
-echo "========================================"
-echo "INSTALAÇÃO MULTITENANT — NGINX"
-echo "Domínio: $DOMAIN"
-echo "Email: $EMAIL"
-echo "========================================"
+echo "Domínio recebido: $DOMAIN"
+echo "Email recebido: $EMAIL"
 
-# ======= GARANTIR QUE NGINX TENHA ONDE ESCREVER =======
+# ---------- Garantir diretórios reais do Nginx ----------
+echo "Garantindo diretórios do Nginx..."
 sudo mkdir -p /etc/nginx/conf.d
 sudo mkdir -p /etc/nginx/certs/$DOMAIN
 
-# ======= DETECTAR DOCKER COMPOSE =======
+# ---------- Detectar Docker Compose ----------
+echo "Detectando Docker Compose..."
 if docker compose version >/dev/null 2>&1; then
   COMPOSE="docker compose"
 elif command -v docker-compose >/dev/null 2>&1; then
   COMPOSE="docker-compose"
 else
-  echo "Erro: Docker Compose não encontrado."
+  echo "ERRO: Docker Compose não encontrado."
   exit 1
 fi
+echo "Usando: $COMPOSE"
 
-# ======= GARANTIR .ENV =======
+# ---------- Garantir .env ----------
+echo "Verificando .env..."
 if [ ! -f .env ]; then
-cat > .env <<EOF
+  echo "Criando novo .env..."
+  cat > .env <<EOF
 DOMAIN=$DOMAIN
 NODE_ENV=production
 
@@ -49,10 +63,11 @@ JWT_SECRET=$(openssl rand -base64 64 | tr '+/' '_-' | tr -d '=')
 FRONTEND_URL=https://$DOMAIN
 EOF
 else
-  echo ".env já existe — mantendo configuração."
+  echo ".env já existe — preservando."
 fi
 
-# ======= GERAR DOCKER COMPOSE =======
+# ---------- Gerar docker-compose.prod.yml ----------
+echo "Gerando docker-compose.prod.yml..."
 cat > docker-compose.prod.yml <<EOF
 services:
   frontend:
@@ -121,10 +136,11 @@ networks:
     driver: bridge
 EOF
 
-# ======= GERAR CONFIGURAÇÃO DO NGINX (CORRETA) =======
+# ---------- Gerar config REAL do Nginx ----------
 NGINX_CONF="/etc/nginx/conf.d/${DOMAIN}.conf"
 
-cat > "/tmp/${DOMAIN}.conf" <<EOF
+echo "Criando config do Nginx em $NGINX_CONF"
+cat > "$NGINX_CONF" <<EOF
 server {
     listen 80;
     server_name ${DOMAIN};
@@ -148,27 +164,29 @@ server {
 }
 EOF
 
-# ======= APLICAR NGINX =======
-sudo cp "/tmp/${DOMAIN}.conf" "$NGINX_CONF"
-
+echo "Testando Nginx..."
 if ! sudo nginx -t; then
-  echo "ERRO: Nginx inválido. Abortando."
+  echo "ERRO: configuração do Nginx inválida."
   exit 1
 fi
 
+echo "Recarregando Nginx..."
 sudo systemctl reload nginx
-echo "NGINX CONFIGURADO!"
 
-# ======= SUBIR DOCKER =======
+# ---------- Subir containers ----------
 echo "Subindo containers..."
 $COMPOSE -f docker-compose.prod.yml up -d --build
 
-sleep 10
+echo "Aguardando containers..."
+sleep 15
 
-echo "Rodando migrations..."
+echo "Rodando migrations (se backend subir)..."
 $COMPOSE -f docker-compose.prod.yml exec -T backend \
-  npx prisma migrate deploy || true
+  npx prisma migrate deploy || echo "⚠️ Migrations falharam — verificar backend."
 
-echo "INSTALAÇÃO FINALIZADA!"
+echo "==============================="
+echo "INSTALAÇÃO FINALIZADA"
 echo "Acesse: https://${DOMAIN}"
+echo "Log completo em: $LOG"
+echo "==============================="
 ```
