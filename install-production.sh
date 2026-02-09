@@ -116,7 +116,7 @@ networks:
 EOF
 
 # ---------- Gerar configuração NGINX específica ----------
-NGINX_CONF="/etc/nginx/${DOMAIN}.conf"
+NGINX_CONF="/etc/nginx/sites-available/${DOMAIN}.conf"
 
 cat > /tmp/${DOMAIN}.conf <<EOF
 server {
@@ -155,19 +155,19 @@ BACKUP_DIR="/etc/nginx/backup-$(date +%s)"
 sudo mkdir -p "$BACKUP_DIR"
 
 echo "Criando backup completo do Nginx..."
-sudo cp -r /etc/nginx "$BACKUP_DIR/"
-sudo cp -r /etc/nginx "$BACKUP_DIR/"
+sudo cp -r /etc/nginx/sites-available "$BACKUP_DIR/"
+sudo cp -r /etc/nginx/sites-enabled "$BACKUP_DIR/"
 
-sudo cp /tmp/${DOMAIN}.conf /etc/nginx/${DOMAIN}.conf
-sudo ln -sf /etc/nginx/${DOMAIN}.conf \
-            /etc/nginx/${DOMAIN}.conf
+sudo cp /tmp/${DOMAIN}.conf /etc/nginx/sites-available/${DOMAIN}.conf
+sudo ln -sf /etc/nginx/sites-available/${DOMAIN}.conf \
+            /etc/nginx/sites-enabled/${DOMAIN}.conf
 
 if ! sudo nginx -t; then
   echo "ERRO: Nova configuração inválida — restaurando Nginx..."
-  sudo rm -rf /etc/nginx/
-  sudo rm -rf /etc/nginx/
-  sudo cp -r "$BACKUP_DIR/" /etc/nginx/
-  sudo cp -r "$BACKUP_DIR/" /etc/nginx/
+  sudo rm -rf /etc/nginx/sites-available
+  sudo rm -rf /etc/nginx/sites-enabled
+  sudo cp -r "$BACKUP_DIR/sites-available" /etc/nginx/
+  sudo cp -r "$BACKUP_DIR/sites-enabled" /etc/nginx/
   sudo systemctl reload nginx
   exit 1
 fi
