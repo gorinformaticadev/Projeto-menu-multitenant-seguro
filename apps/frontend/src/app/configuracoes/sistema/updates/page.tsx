@@ -105,7 +105,7 @@ export default function UpdatesPage() {
     } catch (error: unknown) {
       toast({
         title: 'Erro ao carregar status',
-        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Erro interno do servidor',
+        description: (error as any).response?.data?.message || (error instanceof Error ? error.message : 'Erro interno do servidor'),
         variant: 'destructive',
       });
     } finally {
@@ -131,7 +131,7 @@ export default function UpdatesPage() {
     } catch (error: unknown) {
       toast({
         title: 'Erro na verificação',
-        description: (error as unknown as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Erro interno do servidor',
+        description: (error as any).response?.data?.message || (error instanceof Error ? error.message : 'Erro interno do servidor'),
         variant: 'destructive',
       });
     } finally {
@@ -647,11 +647,10 @@ export default function UpdatesPage() {
                               <span className="font-medium">
                                 {log.operationType === 'BACKUP' ? '💾 Backup' : '⬆️ Restore'}
                               </span>
-                              <span className={`px-2 py-1 text-xs rounded-full ${
-                                log.status === 'SUCCESS' ? 'bg-green-100 text-green-800' :
-                                log.status === 'FAILED' ? 'bg-red-100 text-red-800' :
-                                'bg-gray-100 text-gray-800'
-                              }`}>
+                              <span className={`px-2 py-1 text-xs rounded-full ${log.status === 'SUCCESS' ? 'bg-green-100 text-green-800' :
+                                  log.status === 'FAILED' ? 'bg-red-100 text-red-800' :
+                                    'bg-gray-100 text-gray-800'
+                                }`}>
                                 {log.status}
                               </span>
                             </div>
@@ -688,7 +687,7 @@ export default function UpdatesPage() {
                         </div>
                       ))}
                     </div>
-                    
+
                     {/* Indicador de total de registros */}
                     {backupLogs.length > 5 && (
                       <div className="text-center pt-2 text-sm text-muted-foreground border-t">

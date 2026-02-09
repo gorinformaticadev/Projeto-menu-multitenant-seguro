@@ -86,7 +86,7 @@ export function Sidebar() {
   };
 
   return (
-    <div 
+    <div
       ref={sidebarRef}
       className={cn(
         "flex flex-col h-full bg-card border-r transition-all duration-300",
@@ -114,7 +114,7 @@ export function Sidebar() {
         <nav className="space-y-1">
           {menuItems.map((item) => {
             const isActive = pathname === item.href;
-            const Icon = iconMap[item.icon] || Menu; // Fallback para ícone padrão
+            const Icon = (iconMap[item.icon] || Menu) as any; // Fallback para ícone padrão
 
             return (
               <Link
