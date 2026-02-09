@@ -1,5 +1,5 @@
 #!/bin/bash
-# install-production.sh — Produção com NGINX automático + rollback seguro
+# install-production.sh — Produção com NGINX automático + rollback REAL
 
 set -e
 
@@ -17,7 +17,7 @@ echo "Domínio: $DOMAIN"
 echo "Email: $EMAIL"
 echo "========================================"
 
-# ----------- Detectar Docker Compose -----------
+# ---------- Detectar Docker Compose ----------
 if docker compose version >/dev/null 2>&1; then
   COMPOSE="docker compose"
 elif command -v docker-compose >/dev/null 2>&1; then
@@ -27,7 +27,7 @@ else
   exit 1
 fi
 
-# ----------- Garantir .env -----------
+# ---------- Garantir .env (NÃO APAGAR EM UPDATE) ----------
 if [ ! -f .env ]; then
 cat > .env <<EOF
 DOMAIN=$DOMAIN
@@ -46,10 +46,8 @@ else
   echo ".env já existe — preservando configuração."
 fi
 
-# ----------- Gerar docker-compose (SEM Caddy) -----------
+# ---------- Gerar docker-compose.prod.yml ----------
 cat > docker-compose.prod.yml <<EOF
-version: '3.8'
-
 services:
   frontend:
     build:
@@ -117,10 +115,10 @@ networks:
     driver: bridge
 EOF
 
-# ----------- Gerar configuração NGINX -----------
-NGINX_CONF="nginx-${DOMAIN}.conf"
+# ---------- Gerar configuração NGINX específica ----------
+NGINX_CONF="/etc/nginx/sites-available/${DOMAIN}.conf"
 
-cat > $NGINX_CONF <<EOF
+cat > /tmp/${DOMAIN}.conf <<EOF
 server {
     listen 80;
     server_name ${DOMAIN};
@@ -152,37 +150,32 @@ server {
 }
 EOF
 
-# ----------- Rollback seguro de Nginx -----------
-if command -v nginx >/dev/null 2>&1; then
+# ---------- ROLLBACK REAL DO NGINX ----------
+BACKUP_DIR="/etc/nginx/backup-$(date +%s)"
+sudo mkdir -p "$BACKUP_DIR"
 
-  echo "Aplicando configuração automática no Nginx..."
+echo "Criando backup completo do Nginx..."
+sudo cp -r /etc/nginx/sites-available "$BACKUP_DIR/"
+sudo cp -r /etc/nginx/sites-enabled "$BACKUP_DIR/"
 
-  BACKUP="/etc/nginx/sites-available/${DOMAIN}.bak.$(date +%s)"
+sudo cp /tmp/${DOMAIN}.conf /etc/nginx/sites-available/${DOMAIN}.conf
+sudo ln -sf /etc/nginx/sites-available/${DOMAIN}.conf \
+            /etc/nginx/sites-enabled/${DOMAIN}.conf
 
-  if [ -f "/etc/nginx/sites-available/${DOMAIN}.conf" ]; then
-    sudo cp "/etc/nginx/sites-available/${DOMAIN}.conf" "$BACKUP"
-    echo "Backup salvo em: $BACKUP"
-  fi
-
-  sudo cp "$NGINX_CONF" "/etc/nginx/sites-available/${DOMAIN}.conf"
-  sudo ln -sf "/etc/nginx/sites-available/${DOMAIN}.conf" \
-               "/etc/nginx/sites-enabled/${DOMAIN}.conf"
-
-  if sudo nginx -t; then
-    sudo systemctl reload nginx
-    echo "Nginx atualizado com sucesso."
-  else
-    echo "ERRO: nova configuração inválida — restaurando backup..."
-    sudo cp "$BACKUP" "/etc/nginx/sites-available/${DOMAIN}.conf"
-    sudo systemctl reload nginx
-    exit 1
-  fi
-
-else
-  echo "Nginx não encontrado no host — pulei configuração automática."
+if ! sudo nginx -t; then
+  echo "ERRO: Nova configuração inválida — restaurando Nginx..."
+  sudo rm -rf /etc/nginx/sites-available
+  sudo rm -rf /etc/nginx/sites-enabled
+  sudo cp -r "$BACKUP_DIR/sites-available" /etc/nginx/
+  sudo cp -r "$BACKUP_DIR/sites-enabled" /etc/nginx/
+  sudo systemctl reload nginx
+  exit 1
 fi
 
-# ----------- Subir containers -----------
+sudo systemctl reload nginx
+echo "Nginx atualizado com sucesso."
+
+# ---------- Subir containers ----------
 echo "Subindo containers..."
 $COMPOSE -f docker-compose.prod.yml up -d --build
 
