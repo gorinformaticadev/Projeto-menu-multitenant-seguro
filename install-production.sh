@@ -1,18 +1,5 @@
-```bash
 #!/bin/bash
-# install-production.sh — versão ROBUSTA (visível + logada)
-
-LOG="/root/install-multitenant.log"
-
-# Força log e saída na tela ao mesmo tempo
-exec > >(tee -a "$LOG") 2>&1
-
-echo "==============================="
-echo "INÍCIO DA INSTALAÇÃO"
-echo "Data: $(date)"
-echo "Usuário: $(whoami)"
-echo "PWD: $(pwd)"
-echo "==============================="
+# install-production.sh — Produção com NGINX automático + rollback REAL
 
 set -e
 
@@ -20,36 +7,29 @@ DOMAIN="$1"
 EMAIL="$2"
 
 if [ -z "$DOMAIN" ] || [ -z "$EMAIL" ]; then
-  echo "ERRO: parâmetros ausentes."
   echo "Uso: ./install-production.sh <dominio> <email>"
   exit 1
 fi
 
-echo "Domínio recebido: $DOMAIN"
-echo "Email recebido: $EMAIL"
-
-# ---------- Garantir diretórios reais do Nginx ----------
-echo "Garantindo diretórios do Nginx..."
-sudo mkdir -p /etc/nginx/conf.d
-sudo mkdir -p /etc/nginx/certs/$DOMAIN
+echo "========================================"
+echo "INSTALAÇÃO MULTITENANT — NGINX AUTOMÁTICO"
+echo "Domínio: $DOMAIN"
+echo "Email: $EMAIL"
+echo "========================================"
 
 # ---------- Detectar Docker Compose ----------
-echo "Detectando Docker Compose..."
 if docker compose version >/dev/null 2>&1; then
   COMPOSE="docker compose"
 elif command -v docker-compose >/dev/null 2>&1; then
   COMPOSE="docker-compose"
 else
-  echo "ERRO: Docker Compose não encontrado."
+  echo "Erro: Docker Compose não encontrado."
   exit 1
 fi
-echo "Usando: $COMPOSE"
 
-# ---------- Garantir .env ----------
-echo "Verificando .env..."
+# ---------- Garantir .env (NÃO APAGAR EM UPDATE) ----------
 if [ ! -f .env ]; then
-  echo "Criando novo .env..."
-  cat > .env <<EOF
+cat > .env <<EOF
 DOMAIN=$DOMAIN
 NODE_ENV=production
 
@@ -63,11 +43,10 @@ JWT_SECRET=$(openssl rand -base64 64 | tr '+/' '_-' | tr -d '=')
 FRONTEND_URL=https://$DOMAIN
 EOF
 else
-  echo ".env já existe — preservando."
+  echo ".env já existe — preservando configuração."
 fi
 
 # ---------- Gerar docker-compose.prod.yml ----------
-echo "Gerando docker-compose.prod.yml..."
 cat > docker-compose.prod.yml <<EOF
 services:
   frontend:
@@ -136,11 +115,10 @@ networks:
     driver: bridge
 EOF
 
-# ---------- Gerar config REAL do Nginx ----------
-NGINX_CONF="/etc/nginx/conf.d/${DOMAIN}.conf"
+# ---------- Gerar configuração NGINX específica ----------
+NGINX_CONF="/etc/nginx/sites-available/${DOMAIN}.conf"
 
-echo "Criando config do Nginx em $NGINX_CONF"
-cat > "$NGINX_CONF" <<EOF
+cat > /tmp/${DOMAIN}.conf <<EOF
 server {
     listen 80;
     server_name ${DOMAIN};
@@ -156,37 +134,59 @@ server {
 
     location /api {
         proxy_pass http://multitenant-backend-prod:4000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
     location / {
         proxy_pass http://multitenant-frontend-prod:5000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 }
 EOF
 
-echo "Testando Nginx..."
+# ---------- ROLLBACK REAL DO NGINX ----------
+BACKUP_DIR="/etc/nginx/backup-$(date +%s)"
+sudo mkdir -p "$BACKUP_DIR"
+
+echo "Criando backup completo do Nginx..."
+sudo cp -r /etc/nginx/sites-available "$BACKUP_DIR/"
+sudo cp -r /etc/nginx/sites-enabled "$BACKUP_DIR/"
+
+sudo cp /tmp/${DOMAIN}.conf /etc/nginx/sites-available/${DOMAIN}.conf
+sudo ln -sf /etc/nginx/sites-available/${DOMAIN}.conf \
+            /etc/nginx/sites-enabled/${DOMAIN}.conf
+
 if ! sudo nginx -t; then
-  echo "ERRO: configuração do Nginx inválida."
+  echo "ERRO: Nova configuração inválida — restaurando Nginx..."
+  sudo rm -rf /etc/nginx/sites-available
+  sudo rm -rf /etc/nginx/sites-enabled
+  sudo cp -r "$BACKUP_DIR/sites-available" /etc/nginx/
+  sudo cp -r "$BACKUP_DIR/sites-enabled" /etc/nginx/
+  sudo systemctl reload nginx
   exit 1
 fi
 
-echo "Recarregando Nginx..."
 sudo systemctl reload nginx
+echo "Nginx atualizado com sucesso."
 
 # ---------- Subir containers ----------
 echo "Subindo containers..."
 $COMPOSE -f docker-compose.prod.yml up -d --build
 
-echo "Aguardando containers..."
-sleep 15
+sleep 10
 
-echo "Rodando migrations (se backend subir)..."
+echo "Rodando migrations..."
 $COMPOSE -f docker-compose.prod.yml exec -T backend \
-  npx prisma migrate deploy || echo "⚠️ Migrations falharam — verificar backend."
+  npx prisma migrate deploy --config prisma.config.ts
 
-echo "==============================="
-echo "INSTALAÇÃO FINALIZADA"
+echo "========================================"
+echo "INSTALAÇÃO CONCLUÍDA"
 echo "Acesse: https://${DOMAIN}"
-echo "Log completo em: $LOG"
-echo "==============================="
-```
+echo "API: https://${DOMAIN}/api"
+echo "========================================"
