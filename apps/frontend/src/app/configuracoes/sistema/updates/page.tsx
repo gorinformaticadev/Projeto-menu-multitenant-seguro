@@ -170,7 +170,7 @@ export default function UpdatesPage() {
     } catch (error: unknown) {
       toast({
         title: 'Erro na atualização',
-        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Erro interno do servidor',
+        description: (error as any).response?.data?.message || (error instanceof Error ? error.message : 'Erro interno do servidor'),
         variant: 'destructive',
       });
     } finally {
@@ -197,7 +197,7 @@ export default function UpdatesPage() {
     } catch (error: unknown) {
       toast({
         title: 'Erro ao salvar configurações',
-        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Erro interno do servidor',
+        description: (error as any).response?.data?.message || (error instanceof Error ? error.message : 'Erro interno do servidor'),
         variant: 'destructive',
       });
     } finally {
@@ -216,7 +216,7 @@ export default function UpdatesPage() {
     } catch (error: unknown) {
       toast({
         title: 'Erro ao carregar histórico',
-        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Erro interno do servidor',
+        description: (error as any).response?.data?.message || (error instanceof Error ? error.message : 'Erro interno do servidor'),
         variant: 'destructive',
       });
     } finally {
@@ -258,7 +258,7 @@ export default function UpdatesPage() {
     } catch (error: unknown) {
       toast({
         title: 'Erro no teste de conexão',
-        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Erro interno do servidor',
+        description: (error as any).response?.data?.message || (error instanceof Error ? error.message : 'Erro interno do servidor'),
         variant: 'destructive',
       });
     }
@@ -648,8 +648,8 @@ export default function UpdatesPage() {
                                 {log.operationType === 'BACKUP' ? '💾 Backup' : '⬆️ Restore'}
                               </span>
                               <span className={`px-2 py-1 text-xs rounded-full ${log.status === 'SUCCESS' ? 'bg-green-100 text-green-800' :
-                                  log.status === 'FAILED' ? 'bg-red-100 text-red-800' :
-                                    'bg-gray-100 text-gray-800'
+                                log.status === 'FAILED' ? 'bg-red-100 text-red-800' :
+                                  'bg-gray-100 text-gray-800'
                                 }`}>
                                 {log.status}
                               </span>
