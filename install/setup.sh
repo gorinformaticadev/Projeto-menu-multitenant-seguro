@@ -82,11 +82,8 @@ fi
 # ===============================
 # Clona ou atualiza repositório
 # ===============================
-TARGET_DIR="$HOME/Projeto-menu-multitenant-seguro"
-
-rm -rf "$TARGET_DIR"
-git clone https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git "$TARGET_DIR"
-cd "$TARGET_DIR" || exit 1
+[ -d multitenant-docker ] || git clone https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git
+cd multitenant-docker
 
 if ! git diff-index --quiet HEAD --; then
     git stash push &> /dev/null
