@@ -77,7 +77,7 @@ which docker > /dev/null || curl -sSL https://get.docker.com | sh
 # ===============================
 # Clona ou atualiza repositório
 # ===============================
-[ -d multitenant-docker ] || git clone https://github.com/seuusuario/multitenant-docker.git
+[ -d multitenant-docker ] || git clone https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git
 cd multitenant-docker
 
 if ! git diff-index --quiet HEAD --; then
