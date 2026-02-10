@@ -70,14 +70,40 @@ sleep 2
 CURFOLDER=${PWD}
 
 # ===============================
-# Instala Docker se necessário
+# Instala Docker (detecção de arquitetura)
 # ===============================
 if ! command -v docker &> /dev/null; then
-    # Detecta versão Ubuntu e ajusta repositório
+
     UBUNTU_VER=$(lsb_release -cs)
-    echo "Instalando Docker no Ubuntu $UBUNTU_VER..."
-    curl -fsSL https://get.docker.com | sh
+    ARCH=$(dpkg --print-architecture)
+
+    echo "Instalando Docker..."
+    echo "Ubuntu: $UBUNTU_VER"
+    echo "Arquitetura: $ARCH"
+
+    apt-get update -qq
+    apt-get install -y ca-certificates curl gnupg lsb-release
+
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+      gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+    echo \
+      "deb [arch=$ARCH signed-by=/etc/apt/keyrings/docker.gpg] \
+      https://download.docker.com/linux/ubuntu $UBUNTU_VER stable" \
+      | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    apt-get update -qq
+
+    # 🔹 INSTALA SOMENTE PACOTES QUE EXISTEM EM TODAS AS ARCHS
+    apt-get install -y \
+      docker-ce \
+      docker-ce-cli \
+      containerd.io \
+      docker-compose-plugin \
+      docker-buildx-plugin
 fi
+
 
 # ===============================
 # Clona ou atualiza repositório
