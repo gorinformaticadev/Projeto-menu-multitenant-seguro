@@ -22,7 +22,6 @@ RUN pnpm --filter backend prisma:generate
 # Build backend
 RUN pnpm --filter backend build
 ENV CI=true
-RUN pnpm prune --prod
 
 # Runner stage
 FROM base AS runner
@@ -36,6 +35,7 @@ RUN adduser --system --uid 1001 nestjs
 
 # Copy dependencies and build artifacts from builder
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/backend/node_modules ./apps/backend/node_modules
 COPY --from=builder /app/apps/backend/dist ./dist
 COPY --from=builder /app/apps/backend/package.json ./package.json
 COPY --from=builder /app/apps/backend/prisma ./prisma

@@ -89,46 +89,6 @@ echo "# Generated Database URL" >> .env
 echo "DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public" >> .env
 
 # ===============================
-# Ajusta o docker-compose.yml (Contexto e Env)
-# ===============================
-echoblue "Ajustando Docker Compose..."
-sed -i 's/context: .\/apps\/backend/context: ./g' docker-compose.yml
-sed -i 's/dockerfile: Dockerfile/dockerfile: apps\/backend\/Dockerfile/g' docker-compose.yml
-sed -i 's/context: .\/apps\/frontend/context: ./g' docker-compose.yml
-sed -i 's/dockerfile: Dockerfile/dockerfile: apps\/frontend\/Dockerfile/g' docker-compose.yml
-
-if ! grep -q "env_file:" docker-compose.yml; then
-    sed -i '/container_name: app-backend/a \    env_file:\n      - .env' docker-compose.yml
-fi
-
-# ===============================
-# Ajusta o prisma.config.js (Versão Protegida)
-# ===============================
-echoblue "Configurando Prisma Config..."
-
-# Usar 'EOF' entre aspas simples impede que o bash tente injetar variáveis
-# e garante que o arquivo final seja puro JavaScript
-cat > apps/backend/prisma.config.js << 'EOF'
-module.exports = {
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL,
-    },
-  },
-};
-EOF
-
-# ===============================
-# Corrige o schema.prisma
-# ===============================
-SCHEMA_FILE="apps/backend/prisma/schema.prisma"
-if [ -f "$SCHEMA_FILE" ]; then
-    echoblue "Ajustando schema.prisma..."
-    sed -i '/url *=/d' "$SCHEMA_FILE"
-    sed -i '/provider = "postgresql"/a \  url = env("DATABASE_URL")' "$SCHEMA_FILE"
-fi
-
-# ===============================
 # Substitui SUPER_ADMIN no seed.ts
 # ===============================
 SEED_FILE="apps/backend/prisma/seed.ts"
@@ -176,8 +136,11 @@ sleep 15
 echoblue "Executando migrações..."
 DB_URL_VAL="postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public"
 
-docker compose run --rm -e DATABASE_URL="$DB_URL_VAL" backend npx prisma migrate deploy --config prisma.config.js
-docker compose run --rm -e DATABASE_URL="$DB_URL_VAL" backend npx prisma db seed --config prisma.config.js
+# Migrações e seed usando o binário Prisma já presente na imagem
+PRISMA_BIN="/app/apps/backend/node_modules/.bin/prisma"
+docker compose run --rm -e DATABASE_URL="$DB_URL_VAL" -w /app backend "$PRISMA_BIN" generate --schema /app/prisma/schema.prisma
+docker compose run --rm -e DATABASE_URL="$DB_URL_VAL" -w /app backend "$PRISMA_BIN" migrate deploy --schema /app/prisma/schema.prisma
+docker compose run --rm -e DATABASE_URL="$DB_URL_VAL" -w /app backend "$PRISMA_BIN" db seed --schema /app/prisma/schema.prisma
 
 # Sobe tudo finalizado
 echoblue "Finalizando inicialização..."
@@ -198,4 +161,4 @@ echo "ENCRYPTION_KEY: $ENCRYPTION_KEY"
 echo "-------------------------------------------------"
 echo ""
 echo "A aplicação estará disponível em: https://${DOMAIN}"
-echo "Login padrão: ${EMAIL} / senha: 123456 (alterável após primeiro acesso)"
+echo "Login padrão: ${EMAIL} / senha: admin123 (alterável após primeiro acesso)"

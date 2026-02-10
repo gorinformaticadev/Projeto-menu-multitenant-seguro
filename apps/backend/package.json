@@ -9,7 +9,7 @@
     "dev": "nest start --watch --exec \"ts-node -r tsconfig-paths/register src/main.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch --exec \"ts-node -r tsconfig-paths/register src/main.ts\"",
-    "start:prod": "node dist/backend/src/main",
+    "start:prod": "node dist/main.js",
     "build": "nest build",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
@@ -35,7 +35,8 @@
     "@nestjs/schedule": "^6.1.0",
     "@nestjs/throttler": "^6.4.0",
     "@nestjs/websockets": "^11.1.11",
-    "@prisma/client": "^7.0.0",
+    "@prisma/client": "^6.4.1",
+    "prisma": "^6.4.1",
     "@sentry/node": "^8.0.0",
     "@socket.io/redis-adapter": "^8.3.0",
     "@types/adm-zip": "^0.5.7",
@@ -90,7 +91,6 @@
     "eslint": "^8.50.0",
     "eslint-plugin-security": "^1.7.1",
     "husky": "^8.0.3",
-    "prisma": "^7.0.0",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.3.3",
@@ -98,5 +98,8 @@
   },
   "overrides": {
     "diff": "^8.0.3"
+  },
+  "prisma": {
+    "seed": "NODE_PATH=./node_modules npx ts-node prisma/seed.ts"
   }
 }

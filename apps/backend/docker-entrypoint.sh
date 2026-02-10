@@ -18,14 +18,17 @@ for i in $(seq 1 30); do
   sleep 2
 done
 
+PRISMA_BIN="/app/apps/backend/node_modules/.bin/prisma"
+PRISMA_SCHEMA="/app/prisma/schema.prisma"
+
 # Generate Prisma client (safe, uses installed prisma)
 echo "Generating Prisma client..."
-pnpm exec prisma generate --config prisma.config.js || npx prisma generate
+"${PRISMA_BIN}" generate --schema "${PRISMA_SCHEMA}" || npx --yes prisma generate --schema "${PRISMA_SCHEMA}"
 
 # Optionally run migrations (disabled by default)
 if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
   echo "Running prisma migrate deploy..."
-  pnpm exec prisma migrate deploy || echo "prisma migrate failed (continuing)"
+  "${PRISMA_BIN}" migrate deploy --schema "${PRISMA_SCHEMA}" || echo "prisma migrate failed (continuing)"
 fi
 
 # Start the app using package.json start:prod script (keeps runtime consistent)
