@@ -73,6 +73,9 @@ CURFOLDER=${PWD}
 # Instala Docker se necessário
 # ===============================
 if ! command -v docker &> /dev/null; then
+    # Detecta versão Ubuntu e ajusta repositório
+    UBUNTU_VER=$(lsb_release -cs)
+    echo "Instalando Docker no Ubuntu $UBUNTU_VER..."
     curl -fsSL https://get.docker.com | sh
 fi
 
