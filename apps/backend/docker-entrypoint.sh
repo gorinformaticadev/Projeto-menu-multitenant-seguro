@@ -20,12 +20,12 @@ done
 
 # Generate Prisma client (safe, uses installed prisma)
 echo "Generating Prisma client..."
-npx prisma generate --config prisma.config.ts
+pnpm exec prisma generate --config prisma.config.js || npx prisma generate
 
 # Optionally run migrations (disabled by default)
 if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
   echo "Running prisma migrate deploy..."
-  npx prisma migrate deploy --config prisma.config.ts || echo "prisma migrate failed (continuing)"
+  pnpm exec prisma migrate deploy || echo "prisma migrate failed (continuing)"
 fi
 
 # Start the app using package.json start:prod script (keeps runtime consistent)

@@ -25,9 +25,12 @@ services:
       dockerfile: Dockerfile
     container_name: app-backend
     ports:
-      - "4000:4000" # Nginx host vai usar essa porta
+      - "4000:4000"
+    # O env_file fica no mesmo nível de indentação que 'ports' e 'environment'
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-db_multitenant}?schema=public
+      DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       FRONTEND_URL: ${FRONTEND_URL}
@@ -38,7 +41,7 @@ services:
       LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL}
     depends_on:
       db:
-        condition: service_healthy
+        condition: service_healthy # Garante que o DB esteja PRONTO, não apenas iniciado
     networks:
       - app-network
     restart: always
