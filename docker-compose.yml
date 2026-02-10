@@ -1,40 +1,41 @@
-version: '3.8'
+# version: '3.8'
 
 services:
   db:
     image: postgres:15-alpine
-    container_name: multitenant-db
+    container_name: app-db
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_NAME:-multitenant}
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${DB_NAME:-db_multitenant}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}" ]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - app-network
     restart: always
 
   backend:
     build:
-      context: .
-      dockerfile: apps/backend/Dockerfile
-    container_name: multitenant-backend
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    container_name: app-backend
     ports:
-      - "4000:4000"
+      - "4000:4000" # Nginx host vai usar essa porta
     environment:
-      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-multitenant}?schema=public
-      - JWT_SECRET=${JWT_SECRET}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5000}
-      - NODE_ENV=production
-      - PORT=4000
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-db_multitenant}?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      FRONTEND_URL: ${FRONTEND_URL}
+      NODE_ENV: ${NODE_ENV}
+      PORT: ${PORT:-4000}
+      VIRTUAL_HOST: ${VIRTUAL_HOST}
+      LETSENCRYPT_HOST: ${LETSENCRYPT_HOST}
+      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL}
     depends_on:
       db:
         condition: service_healthy
@@ -44,43 +45,24 @@ services:
 
   frontend:
     build:
-      context: .
-      dockerfile: apps/frontend/Dockerfile
+      context: ./apps/frontend
+      dockerfile: Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:4000}
-    container_name: multitenant-frontend
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    container_name: app-frontend
     ports:
-      - "5000:5000"
+      - "5000:5000" # Nginx host vai usar essa porta
     environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:4000}
-      - NODE_ENV=production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NODE_ENV: ${NODE_ENV}
+      VIRTUAL_HOST: ${VIRTUAL_HOST}
+      LETSENCRYPT_HOST: ${LETSENCRYPT_HOST}
+      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL}
     depends_on:
       - backend
     networks:
       - app-network
     restart: always
-
-  migrator:
-    build:
-      context: .
-      dockerfile: apps/backend/Dockerfile
-      target: builder
-    container_name: multitenant-migrator
-    working_dir: /app/apps/backend
-    entrypoint: [ "sh", "-c", "npx prisma migrate deploy && npx prisma db seed" ]
-    # We don't need the command here if we use entrypoint, but command overrides CMD.
-    # Let's clean up the migrator definition to be safer for pnpm.
-    # We use the 'builder' stage which has pnpm and dependencies.
-    # We need to ensure we run commands using pnpm or npx correctly.
-    command: []
-    environment:
-      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-multitenant}?schema=public
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - app-network
-    restart: on-failure:3
 
 networks:
   app-network:
