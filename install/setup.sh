@@ -5,8 +5,8 @@
 # ===============================
 
 show_usage() {
-    echo -e "Uso:\n\n  curl -sSL https://get.example.com | sudo bash -s [-b <branch>] <domain> <email>\n"
-    echo -e "Exemplo:\n\n  curl -sSL https://get.example.com | sudo bash -s -b main crm.gorinformatica.com.br usuario@exemplo.com\n"
+    echo -e "Uso:\n\n  sudo bash setup.sh [-b <branch>] <domain> <email>\n"
+    echo -e "Exemplo:\n\n  sudo bash setup.sh -b main crm.gorinformatica.com.br usuario@exemplo.com\n"
 }
 
 echored() {
@@ -72,19 +72,24 @@ CURFOLDER=${PWD}
 # ===============================
 # Instala Docker se necessário
 # ===============================
-which docker > /dev/null || curl -sSL https://get.docker.com | sh
+if ! command -v docker &> /dev/null; then
+    curl -fsSL https://get.docker.com | sh
+fi
 
 # ===============================
 # Clona ou atualiza repositório
 # ===============================
-[ -d multitenant-docker ] || git clone https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git
-cd multitenant-docker
+TARGET_DIR="$HOME/Projeto-menu-multitenant-seguro"
+
+rm -rf "$TARGET_DIR"
+git clone https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git "$TARGET_DIR"
+cd "$TARGET_DIR" || exit 1
 
 if ! git diff-index --quiet HEAD --; then
     git stash push &> /dev/null
 fi
 
-git fetch
+git fetch --all
 if [ -n "${BRANCH}" ]; then
     git checkout ${BRANCH} 2>/dev/null || git checkout -t origin/${BRANCH}
 fi
@@ -103,7 +108,6 @@ ENCRYPTION_KEY="$(openssl rand -hex 32)"
 # Gera .env a partir do .env.example
 # ===============================
 cp .env.example .env
-
 sed -i \
     -e "s/__DOMAIN__/${DOMAIN}/g" \
     -e "s/__EMAIL__/${EMAIL}/g" \
@@ -173,7 +177,6 @@ server {
 }
 EOF
 
-# Cria link simbólico e recarrega nginx
 ln -sf "$NGINX_FILE" /etc/nginx/sites-enabled/multitenant.conf
 nginx -t && systemctl reload nginx
 
