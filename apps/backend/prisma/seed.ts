@@ -8,33 +8,33 @@ const prisma = new PrismaClient();
 function generateSecurePassword(length: number = 16): string {
   const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
   let password = '';
-  
+
   // Garantir pelo menos um de cada tipo
   password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; // lowercase
   password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)]; // uppercase
   password += '0123456789'[Math.floor(Math.random() * 10)]; // number
   password += '!@#$%^&*'[Math.floor(Math.random() * 8)]; // special
-  
+
   // Preencher o resto
   for (let i = password.length; i < length; i++) {
     password += charset[Math.floor(Math.random() * charset.length)];
   }
-  
+
   // Embaralhar a senha
   return password.split('').sort(() => Math.random() - 0.5).join('');
 }
 
 async function main() {
   console.log('🌱 Iniciando seed do banco de dados...');
-  
+
   // Senha padrão fixa para desenvolvimento
   const defaultPassword = 'admin123';
   const adminPassword = process.env.ADMIN_DEFAULT_PASSWORD || defaultPassword;
   const userPassword = process.env.USER_DEFAULT_PASSWORD || defaultPassword;
-  
-  console.log('🔐 Usando senha padrão para desenvolvimento:');
-  console.log(`   Senha: ${defaultPassword}`);
-  console.log('⚠️  IMPORTANTE: Esta é uma senha padrão para desenvolvimento!');
+
+  // console.log('🔐 Usando senha padrão para desenvolvimento:');
+  // console.log(`   Senha: ${defaultPassword}`);
+  // console.log('⚠️  IMPORTANTE: Esta é uma senha padrão para desenvolvimento!');
 
   // Cria a tenant principal (empresa padrão do sistema)
   const tenant1 = await prisma.tenant.upsert({
