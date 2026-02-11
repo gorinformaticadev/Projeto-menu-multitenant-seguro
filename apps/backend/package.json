@@ -98,8 +98,5 @@
   },
   "overrides": {
     "diff": "^8.0.3"
-  },
-  "prisma": {
-    "seed": "NODE_PATH=./node_modules npx ts-node prisma/seed.ts"
   }
 }
