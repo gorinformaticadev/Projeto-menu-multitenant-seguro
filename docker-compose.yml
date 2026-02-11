@@ -25,8 +25,7 @@ services:
       dockerfile: apps/backend/Dockerfile
     container_name: app-backend
     ports:
-      - "4000:4000"
-    # O env_file fica no mesmo nível de indentação que 'ports' e 'environment'
+      - "127.0.0.1:4000:4000"
     env_file:
       - .env
     environment:
@@ -36,12 +35,9 @@ services:
       FRONTEND_URL: ${FRONTEND_URL}
       NODE_ENV: ${NODE_ENV}
       PORT: ${PORT:-4000}
-      VIRTUAL_HOST: ${VIRTUAL_HOST}
-      LETSENCRYPT_HOST: ${LETSENCRYPT_HOST}
-      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL}
     depends_on:
       db:
-        condition: service_healthy # Garante que o DB esteja PRONTO, não apenas iniciado
+        condition: service_healthy
     networks:
       - app-network
     restart: always
@@ -54,13 +50,12 @@ services:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     container_name: app-frontend
     ports:
-      - "5000:5000" # Nginx host vai usar essa porta
+      - "127.0.0.1:5000:5000"
+    env_file:
+      - .env
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       NODE_ENV: ${NODE_ENV}
-      VIRTUAL_HOST: ${VIRTUAL_HOST}
-      LETSENCRYPT_HOST: ${LETSENCRYPT_HOST}
-      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL}
     depends_on:
       - backend
     networks:

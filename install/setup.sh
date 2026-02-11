@@ -50,13 +50,13 @@ cd "$BASE_DIR"
 # Instala Docker se necessário
 if ! command -v docker &> /dev/null; then
     echoblue "Instalando Docker..."
-    apt-get update -qq
-    apt-get install -y ca-certificates curl gnupg lsb-release
-    mkdir -p /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-    apt-get update -qq
-    apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-buildx-plugin
+    curl -sSL https://get.docker.com | sh
+fi
+
+# Instala Nginx e Certbot se necessário
+if ! command -v nginx &> /dev/null; then
+    echoblue "Instalando Nginx..."
+    apt-get update -qq && apt-get install -y nginx certbot python3-certbot-nginx
 fi
 
 # Gera segredos dinâmicos
@@ -97,31 +97,51 @@ if [ -f "$SEED_FILE" ]; then
 fi
 
 # ===============================
-# Configura Nginx (Somente se instalado)
+# Configura Nginx (Proxy Reverso Externo)
 # ===============================
-if command -v nginx &> /dev/null; then
-    echoblue "Configurando Nginx local..."
-    NGINX_FILE="/etc/nginx/sites-available/multitenant.conf"
-    cat > "$NGINX_FILE" << EOF
+echoblue "Configurando Nginx para $DOMAIN..."
+NGINX_CONF="/etc/nginx/sites-available/${DOMAIN}"
+cat > "$NGINX_CONF" << EOF
 server {
     listen 80;
     server_name ${DOMAIN};
+
     location / {
         proxy_pass http://127.0.0.1:5000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
+
     location /api {
         proxy_pass http://127.0.0.1:4000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        
+        # Websockets support
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
     }
 }
 EOF
-    ln -sf "$NGINX_FILE" /etc/nginx/sites-enabled/multitenant.conf
-    nginx -t && systemctl reload nginx || echo "Falha ao recarregar Nginx."
+
+ln -sf "$NGINX_CONF" "/etc/nginx/sites-enabled/${DOMAIN}"
+rm -f /etc/nginx/sites-enabled/default
+
+# Testa e recarrega Nginx
+nginx -t && systemctl reload nginx
+
+# Tenta obter SSL se o domínio estiver apontado corretamente
+echoblue "Tentando configurar SSL com Certbot..."
+if certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos -m "${EMAIL}" --redirect; then
+    echoblue "SSL configurado com sucesso!"
+else
+    echored "Aviso: Não foi possível obter o certificado SSL automaticamente."
+    echored "Verifique se o domínio $DOMAIN está apontado para este IP e execute: certbot --nginx -d $DOMAIN"
 fi
 
 # Sobe os serviços
