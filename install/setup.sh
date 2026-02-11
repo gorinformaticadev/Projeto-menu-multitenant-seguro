@@ -138,8 +138,9 @@ DB_URL_VAL="postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=pub
 
 # Migrações e seed usando o binário Prisma já presente na imagem
 PRISMA_BIN="/app/apps/backend/node_modules/.bin/prisma"
+TSX_BIN="/app/apps/backend/node_modules/.bin/tsx"
 docker compose run --rm -e DATABASE_URL="$DB_URL_VAL" -w /app backend "$PRISMA_BIN" migrate deploy --schema /app/prisma/schema.prisma
-docker compose run --rm -e DATABASE_URL="$DB_URL_VAL" -w /app/apps/backend backend sh -lc "node -r ts-node/register/transpile-only -e \"require('./prisma/seed.ts')\""
+docker compose run --rm -e DATABASE_URL="$DB_URL_VAL" -w /app/apps/backend backend "$TSX_BIN" prisma/seed.ts
 
 # Sobe tudo finalizado
 echoblue "Finalizando inicialização..."
