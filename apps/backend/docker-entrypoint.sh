@@ -21,9 +21,12 @@ done
 PRISMA_BIN="/app/apps/backend/node_modules/.bin/prisma"
 PRISMA_SCHEMA="/app/prisma/schema.prisma"
 
-# Generate Prisma client (safe, uses installed prisma)
-echo "Generating Prisma client..."
-"${PRISMA_BIN}" generate --schema "${PRISMA_SCHEMA}" || npx --yes prisma generate --schema "${PRISMA_SCHEMA}"
+# Optionally generate Prisma client in runtime (disabled by default).
+# Client is already generated during image build.
+if [ "${RUN_PRISMA_GENERATE:-false}" = "true" ]; then
+  echo "Generating Prisma client..."
+  "${PRISMA_BIN}" generate --schema "${PRISMA_SCHEMA}" || npx --yes prisma generate --schema "${PRISMA_SCHEMA}"
+fi
 
 # Optionally run migrations (disabled by default)
 if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
