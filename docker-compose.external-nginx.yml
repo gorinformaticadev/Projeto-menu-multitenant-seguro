@@ -1,0 +1,49 @@
+version: '3.8'
+
+# ============================================================================
+# Docker Compose para uso com Nginx EXTERNO (fora do Docker)
+# ============================================================================
+# Este arquivo é usado quando você tem Nginx instalado no host
+# e quer que os containers exponham portas apenas no localhost
+# ============================================================================
+
+services:
+  frontend:
+    ports:
+      # Expõe apenas no localhost para o Nginx do host acessar
+      - "127.0.0.1:5000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+    networks:
+      - multitenant-network
+
+  backend:
+    ports:
+      # Expõe apenas no localhost para o Nginx do host acessar
+      - "127.0.0.1:4000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5000}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    networks:
+      - multitenant-network
+
+  db:
+    environment:
+      - POSTGRES_DB=multitenant
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    networks:
+      - multitenant-network
+
+  redis:
+    networks:
+      - multitenant-network
+
+networks:
+  multitenant-network:
+    driver: bridge

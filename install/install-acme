@@ -1,0 +1,627 @@
+#!/usr/bin/env bash
+
+# ============================================================================
+# install-acme - Instalador compatível com ticketz-docker-acme
+# ============================================================================
+# Este script permite instalar o Projeto-menu-multitenant-seguro usando
+# Nginx externo (fora do Docker) e é compatível com instalações existentes
+# do ticketz-docker-acme.
+#
+# Uso:
+#   sudo bash install/install-acme <domain> <email> [--external-nginx]
+#
+# Exemplos:
+#   sudo bash install/install-acme menu.exemplo.com.br admin@exemplo.com.br
+#   sudo bash install/install-acme menu.exemplo.com.br admin@exemplo.com.br --external-nginx
+# ============================================================================
+
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Variáveis padrão
+DOMAIN="${1:-}"
+EMAIL="${2:-}"
+USE_EXTERNAL_NGINX="false"
+FRONTEND_PORT="5000"
+BACKEND_PORT="4000"
+APP_NAME="multitenant"
+INSTALL_DIR="/opt/multitenant"
+NGINX_CONF_DIR="/etc/nginx/sites-available"
+NGINX_ENABLED_DIR="/etc/nginx/sites-enabled"
+CERTBOT_DIR="/etc/letsencrypt"
+
+# Cores para output
+echoblue() {
+    echo -ne "\033[44m\033[37m\033[1m  $1  \033[0m\n"
+}
+
+echored() {
+    echo -ne "\033[41m\033[37m\033[1m  $1  \033[0m\n"
+}
+
+echogreen() {
+    echo -ne "\033[42m\033[37m\033[1m  $1  \033[0m\n"
+}
+
+log_info() {
+    echo -e "\033[1;34m[INFO]\033[0m $*"
+}
+
+log_warn() {
+    echo -e "\033[1;33m[WARN]\033[0m $*"
+}
+
+log_error() {
+    echo -e "\033[1;31m[ERROR]\033[0m $*" >&2
+}
+
+show_usage() {
+    cat <<'EOF'
+Uso:
+  sudo bash install/install-acme <domain> <email> [--external-nginx]
+
+Exemplos:
+  # Instalação com nginx-proxy Docker (padrão, compatível com ticketz)
+  sudo bash install/install-acme menu.exemplo.com.br admin@exemplo.com.br
+
+  # Instalação com Nginx externo (fora do Docker)
+  sudo bash install/install-acme menu.exemplo.com.br admin@exemplo.com.br --external-nginx
+
+Parâmetros:
+  domain          Domínio para acesso à aplicação
+  email           Email para certificados Let's Encrypt
+  --external-nginx Usar Nginx instalado no host (fora do Docker)
+
+EOF
+}
+
+# Verifica se está rodando como root
+require_root() {
+    if [[ $EUID -ne 0 ]]; then
+        echored "Este script deve ser executado como root"
+        exit 1
+    fi
+}
+
+# Valida parâmetros
+validate_params() {
+    if [[ -z "$DOMAIN" || -z "$EMAIL" ]]; then
+        echored "Parâmetros obrigatórios faltando!"
+        show_usage
+        exit 1
+    fi
+
+    # Valida formato do email
+    local emailregex="^[a-z0-9!#\$%&'*+/=?^_\`{|}~-]+(\.[a-z0-9!#$%&'*+/=?^_\`{|}~-]+)*@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?\$"
+    if ! [[ $EMAIL =~ $emailregex ]]; then
+        echored "Email inválido: $EMAIL"
+        exit 1
+    fi
+
+    # Verifica flag --external-nginx
+    if [[ "${3:-}" == "--external-nginx" ]]; then
+        USE_EXTERNAL_NGINX="true"
+        log_info "Modo: Nginx externo (fora do Docker)"
+    else
+        log_info "Modo: nginx-proxy Docker (compatível com ticketz)"
+    fi
+}
+
+# Banner de apresentação
+show_banner() {
+    echo ""
+    echoblue "=============================================="
+    echoblue "  Projeto Menu Multitenant - Instalador ACME "
+    echoblue "=============================================="
+    echoblue "                                              "
+    echoblue "  Compatível com ticketz-docker-acme         "
+    echoblue "  Suporte a Nginx externo e interno          "
+    echoblue "                                              "
+    echoblue "=============================================="
+    echo ""
+    log_info "Domínio: $DOMAIN"
+    log_info "Email: $EMAIL"
+    log_info "Nginx externo: $USE_EXTERNAL_NGINX"
+    echo ""
+}
+
+# Instala Docker se necessário
+ensure_docker() {
+    if ! command -v docker >/dev/null 2>&1; then
+        log_info "Docker não encontrado. Instalando..."
+        curl -fsSL https://get.docker.com | sh
+        log_info "Docker instalado com sucesso!"
+    else
+        log_info "Docker já instalado: $(docker --version)"
+    fi
+
+    if ! docker compose version >/dev/null 2>&1; then
+        log_error "Docker Compose plugin não encontrado."
+        log_error "Instale com: apt-get install docker-compose-plugin"
+        exit 1
+    fi
+}
+
+# Instala Nginx externo se necessário
+ensure_nginx_external() {
+    if [[ "$USE_EXTERNAL_NGINX" != "true" ]]; then
+        return 0
+    fi
+
+    if ! command -v nginx >/dev/null 2>&1; then
+        log_info "Nginx não encontrado. Instalando..."
+        apt-get update -y
+        apt-get install -y nginx
+        systemctl enable nginx
+        log_info "Nginx instalado com sucesso!"
+    else
+        log_info "Nginx já instalado: $(nginx -v 2>&1)"
+    fi
+}
+
+# Instala Certbot se usar Nginx externo
+ensure_certbot() {
+    if [[ "$USE_EXTERNAL_NGINX" != "true" ]]; then
+        return 0
+    fi
+
+    if ! command -v certbot >/dev/null 2>&1; then
+        log_info "Certbot não encontrado. Instalando..."
+        apt-get update -y
+        apt-get install -y certbot python3-certbot-nginx
+        log_info "Certbot instalado com sucesso!"
+    else
+        log_info "Certbot já instalado: $(certbot --version 2>&1 | head -n1)"
+    fi
+}
+
+# Valida DNS
+validate_dns() {
+    log_info "Validando DNS para $DOMAIN..."
+    
+    if ! command -v dig >/dev/null 2>&1; then
+        log_info "Instalando dnsutils..."
+        apt-get update -y
+        apt-get install -y dnsutils
+    fi
+
+    local public_ip
+    public_ip="$(curl -4 -fsSL ifconfig.me || true)"
+    
+    if [[ -z "$public_ip" ]]; then
+        log_error "Não foi possível obter o IP público."
+        exit 1
+    fi
+
+    log_info "IP público detectado: $public_ip"
+
+    local domain_ips
+    mapfile -t domain_ips < <(dig +short A "$DOMAIN" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' || true)
+    
+    if [[ "${#domain_ips[@]}" -eq 0 ]]; then
+        log_warn "O domínio $DOMAIN não possui registro A."
+        log_warn "Aponte o DNS para $public_ip antes de prosseguir."
+        read -p "Deseja continuar mesmo assim? (s/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Ss]$ ]]; then
+            exit 1
+        fi
+        return 0
+    fi
+
+    local matches="false"
+    for ip in "${domain_ips[@]}"; do
+        if [[ "$ip" == "$public_ip" ]]; then
+            matches="true"
+            break
+        fi
+    done
+
+    if [[ "$matches" != "true" ]]; then
+        log_warn "DNS inconsistente: $DOMAIN resolve para [${domain_ips[*]}]"
+        log_warn "mas o IP público desta VPS é $public_ip."
+        read -p "Deseja continuar mesmo assim? (s/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Ss]$ ]]; then
+            exit 1
+        fi
+    else
+        echogreen "DNS validado com sucesso!"
+    fi
+}
+
+# Detecta stack nginx-proxy/acme existente
+detect_existing_proxy() {
+    log_info "Detectando stack nginx-proxy/acme-companion existente..."
+
+    local proxy_containers
+    proxy_containers="$(docker ps --format '{{.Names}} {{.Image}}' | grep -E 'nginx-proxy|acme-companion|ticketz-nginx-proxy|ticketz-acme-companion' || true)"
+
+    if [[ -n "$proxy_containers" ]]; then
+        log_info "Stack existente encontrado:"
+        echo "$proxy_containers"
+        
+        # Verifica se é do ticketz
+        if echo "$proxy_containers" | grep -q "ticketz"; then
+            log_info "Detectado stack do ticketz-docker-acme!"
+            export EXISTING_TICKETZ="true"
+            export PROXY_NETWORK="nginx-proxy"
+        else
+            export EXISTING_PROXY="true"
+            export PROXY_NETWORK="nginx-proxy"
+        fi
+        return 0
+    fi
+
+    log_info "Nenhum stack nginx-proxy existente encontrado."
+    export EXISTING_PROXY="false"
+}
+
+# Cria diretório de instalação
+prepare_install_dir() {
+    log_info "Preparando diretório de instalação: $INSTALL_DIR"
+    
+    mkdir -p "$INSTALL_DIR"
+    
+    # Copia arquivos do projeto
+    log_info "Copiando arquivos do projeto..."
+    rsync -av --exclude='.git' --exclude='node_modules' --exclude='.next' \
+        "$PROJECT_ROOT/" "$INSTALL_DIR/"
+    
+    cd "$INSTALL_DIR"
+}
+
+# Configura variáveis de ambiente
+setup_env_file() {
+    log_info "Configurando arquivo .env..."
+
+    if [[ ! -f "$INSTALL_DIR/.env.example" ]]; then
+        log_error "Arquivo .env.example não encontrado!"
+        exit 1
+    fi
+
+    cp "$INSTALL_DIR/.env.example" "$INSTALL_DIR/.env"
+
+    # Gera secrets
+    local jwt_secret
+    local encryption_key
+    jwt_secret="$(openssl rand -hex 32)"
+    encryption_key="$(openssl rand -hex 32)"
+    local db_password
+    db_password="$(openssl rand -hex 16)"
+
+    # Atualiza .env
+    cat >> "$INSTALL_DIR/.env" <<EOF
+
+# Configurações geradas pelo install-acme
+DOMAIN=$DOMAIN
+LETSENCRYPT_EMAIL=$EMAIL
+FRONTEND_PORT=$FRONTEND_PORT
+BACKEND_PORT=$BACKEND_PORT
+JWT_SECRET=$jwt_secret
+ENCRYPTION_KEY=$encryption_key
+DB_PASSWORD=$db_password
+DATABASE_URL=postgresql://postgres:${db_password}@db:5432/multitenant
+
+# Modo de instalação
+USE_EXTERNAL_NGINX=$USE_EXTERNAL_NGINX
+EOF
+
+    log_info "Arquivo .env configurado!"
+}
+
+# Instala com nginx-proxy Docker (modo compatível com ticketz)
+install_with_docker_proxy() {
+    log_info "Instalando com nginx-proxy Docker..."
+
+    # Se já existe stack do ticketz, apenas integra
+    if [[ "${EXISTING_TICKETZ:-false}" == "true" ]]; then
+        log_info "Integrando com stack ticketz existente..."
+        
+        # Usa o setup.sh existente para integração
+        bash "$INSTALL_DIR/install/setup.sh" \
+            --domain "$DOMAIN" \
+            --email "$EMAIL" \
+            --app-name "$APP_NAME" \
+            --app-port "$FRONTEND_PORT" \
+            --app-service "frontend" \
+            --app-compose "$INSTALL_DIR/docker-compose.yml" \
+            --app-compose "$INSTALL_DIR/docker-compose.prod.external.yml" \
+            --proxy-network "nginx-proxy"
+        
+        return 0
+    fi
+
+    # Se não existe proxy, cria um novo
+    if [[ "${EXISTING_PROXY:-false}" != "true" ]]; then
+        log_info "Criando novo stack nginx-proxy + acme-companion..."
+        
+        # Cria usando o template do projeto
+        bash "$INSTALL_DIR/install/setup.sh" \
+            --domain "$DOMAIN" \
+            --email "$EMAIL" \
+            --app-name "$APP_NAME" \
+            --app-port "$FRONTEND_PORT" \
+            --app-service "frontend" \
+            --app-compose "$INSTALL_DIR/docker-compose.yml" \
+            --app-compose "$INSTALL_DIR/docker-compose.prod.external.yml"
+    else
+        # Integra com proxy existente
+        log_info "Integrando com nginx-proxy existente..."
+        
+        bash "$INSTALL_DIR/install/setup.sh" \
+            --domain "$DOMAIN" \
+            --email "$EMAIL" \
+            --app-name "$APP_NAME" \
+            --app-port "$FRONTEND_PORT" \
+            --app-service "frontend" \
+            --app-compose "$INSTALL_DIR/docker-compose.yml" \
+            --app-compose "$INSTALL_DIR/docker-compose.prod.external.yml" \
+            --proxy-network "${PROXY_NETWORK:-nginx-proxy}"
+    fi
+}
+
+# Instala com Nginx externo
+install_with_external_nginx() {
+    log_info "Instalando com Nginx externo..."
+
+    # Sobe apenas os containers da aplicação (sem nginx)
+    cd "$INSTALL_DIR"
+    
+    log_info "Subindo containers da aplicação..."
+    docker compose -f docker-compose.yml -f docker-compose.prod.external.yml up -d --build
+
+    # Aguarda containers iniciarem
+    log_info "Aguardando containers iniciarem..."
+    sleep 10
+
+    # Configura Nginx
+    setup_external_nginx_config
+
+    # Obtém certificado SSL
+    obtain_ssl_certificate
+
+    # Recarrega Nginx
+    log_info "Recarregando Nginx..."
+    systemctl reload nginx
+
+    echogreen "Instalação com Nginx externo concluída!"
+}
+
+# Configura Nginx externo
+setup_external_nginx_config() {
+    log_info "Configurando Nginx externo..."
+
+    local nginx_conf="$NGINX_CONF_DIR/$APP_NAME.conf"
+
+    # Cria configuração inicial (HTTP apenas, para certbot)
+    cat > "$nginx_conf" <<EOF
+# Configuração Multitenant - HTTP (temporário para certbot)
+server {
+    listen 80;
+    server_name $DOMAIN;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    location / {
+        return 301 https://\$host\$request_uri;
+    }
+}
+EOF
+
+    # Ativa configuração
+    ln -sf "$nginx_conf" "$NGINX_ENABLED_DIR/$APP_NAME.conf"
+
+    # Testa configuração
+    if ! nginx -t; then
+        log_error "Erro na configuração do Nginx!"
+        exit 1
+    fi
+
+    systemctl reload nginx
+    log_info "Configuração Nginx HTTP criada!"
+}
+
+# Obtém certificado SSL com certbot
+obtain_ssl_certificate() {
+    log_info "Obtendo certificado SSL com Let's Encrypt..."
+
+    # Certbot em modo não-interativo
+    if certbot certonly --nginx -d "$DOMAIN" --email "$EMAIL" --agree-tos --non-interactive; then
+        log_info "Certificado SSL obtido com sucesso!"
+        
+        # Atualiza configuração do Nginx com HTTPS
+        update_nginx_config_with_ssl
+    else
+        log_error "Falha ao obter certificado SSL!"
+        log_warn "Verifique se o domínio está apontando corretamente para este servidor."
+        exit 1
+    fi
+}
+
+# Atualiza configuração do Nginx com SSL
+update_nginx_config_with_ssl() {
+    log_info "Atualizando configuração Nginx com SSL..."
+
+    local nginx_conf="$NGINX_CONF_DIR/$APP_NAME.conf"
+
+    cat > "$nginx_conf" <<EOF
+# ============================================================================
+# Configuração Multitenant - HTTPS
+# ============================================================================
+
+upstream frontend_app {
+    server 127.0.0.1:$FRONTEND_PORT;
+}
+
+upstream backend_api {
+    server 127.0.0.1:$BACKEND_PORT;
+}
+
+# Redireciona HTTP para HTTPS
+server {
+    listen 80;
+    server_name $DOMAIN;
+    
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+    
+    location / {
+        return 301 https://\$host\$request_uri;
+    }
+}
+
+# Servidor HTTPS principal
+server {
+    listen 443 ssl http2;
+    server_name $DOMAIN;
+
+    # Certificados SSL
+    ssl_certificate $CERTBOT_DIR/live/$DOMAIN/fullchain.pem;
+    ssl_certificate_key $CERTBOT_DIR/live/$DOMAIN/privkey.pem;
+
+    # Configurações SSL recomendadas
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    # Tamanho máximo de upload
+    client_max_body_size 64m;
+
+    # Frontend
+    location / {
+        proxy_pass http://frontend_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+    }
+
+    # API Backend
+    location /api {
+        proxy_pass http://backend_api;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+    }
+
+    # Logs
+    access_log /var/log/nginx/$APP_NAME.access.log;
+    error_log /var/log/nginx/$APP_NAME.error.log;
+}
+EOF
+
+    # Testa configuração
+    if ! nginx -t; then
+        log_error "Erro na configuração do Nginx com SSL!"
+        exit 1
+    fi
+
+    log_info "Configuração Nginx com SSL atualizada!"
+}
+
+# Expõe portas dos containers no host (para Nginx externo)
+expose_container_ports() {
+    if [[ "$USE_EXTERNAL_NGINX" != "true" ]]; then
+        return 0
+    fi
+
+    log_info "Expondo portas dos containers no host..."
+
+    # Cria docker-compose.override.yml para expor portas
+    cat > "$INSTALL_DIR/docker-compose.override.yml" <<EOF
+version: '3.8'
+
+services:
+  frontend:
+    ports:
+      - "127.0.0.1:$FRONTEND_PORT:3000"
+  
+  backend:
+    ports:
+      - "127.0.0.1:$BACKEND_PORT:3000"
+EOF
+
+    log_info "Portas configuradas para exposição no host!"
+}
+
+# Mostra relatório final
+show_final_report() {
+    echo ""
+    echogreen "=============================================="
+    echogreen "  INSTALAÇÃO CONCLUÍDA COM SUCESSO!          "
+    echogreen "=============================================="
+    echo ""
+    log_info "Domínio: https://$DOMAIN"
+    log_info "Email: $EMAIL"
+    log_info "Diretório: $INSTALL_DIR"
+    
+    if [[ "$USE_EXTERNAL_NGINX" == "true" ]]; then
+        log_info "Modo: Nginx externo"
+        log_info "Configuração Nginx: $NGINX_CONF_DIR/$APP_NAME.conf"
+        log_info "Certificados: $CERTBOT_DIR/live/$DOMAIN/"
+    else
+        log_info "Modo: nginx-proxy Docker"
+        log_info "Network: ${PROXY_NETWORK:-nginx-proxy}"
+    fi
+    
+    echo ""
+    log_info "Containers em execução:"
+    docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' | grep -E "NAMES|multitenant|nginx-proxy|acme" || true
+    echo ""
+    log_info "Acesse: https://$DOMAIN"
+    echo ""
+    echogreen "=============================================="
+}
+
+# Função principal
+main() {
+    require_root
+    validate_params "$@"
+    show_banner
+    
+    ensure_docker
+    
+    if [[ "$USE_EXTERNAL_NGINX" == "true" ]]; then
+        ensure_nginx_external
+        ensure_certbot
+    fi
+    
+    validate_dns
+    
+    if [[ "$USE_EXTERNAL_NGINX" != "true" ]]; then
+        detect_existing_proxy
+    fi
+    
+    prepare_install_dir
+    setup_env_file
+    
+    if [[ "$USE_EXTERNAL_NGINX" == "true" ]]; then
+        expose_container_ports
+        install_with_external_nginx
+    else
+        install_with_docker_proxy
+    fi
+    
+    show_final_report
+}
+
+# Executa
+main "$@"
