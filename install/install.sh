@@ -1,80 +1,438 @@
 #!/usr/bin/env bash
+# =============================================================================
+# Instalador automatizado - Projeto Menu Multitenant (Monorepo)
+# =============================================================================
+# Baseado na estrutura multitenant-docker-acme. Compatível com CI/CD e cenário
+# multitenant. Suporta instalação inicial e rotina de atualização.
+#
+# Uso:
+#   Instalação:  sudo bash install/install.sh install [opções]
+#   Atualização: sudo bash install/install.sh update [branch]
+#
+# Variáveis de instalação (podem ser passadas por ambiente ou interativamente):
+#   INSTALL_DOMAIN, LETSENCRYPT_EMAIL, DOCKERHUB_USERNAME, INSTALL_ADMIN_EMAIL,
+#   INSTALL_ADMIN_PASSWORD, DB_USER, DB_PASSWORD, JWT_SECRET, ENCRYPTION_KEY
+# =============================================================================
 
-echoblue() {
-    echo -ne "\033[44m\033[37m\033[1m  $1  \033[0m\n"
-}
+set -Eeuo pipefail
+IFS=$'\n\t'
 
-echored() {
-    echo -ne "\033[41m\033[37m\033[1m  $1  \033[0m\n"
-}
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+COMPOSE_PROD="$PROJECT_ROOT/docker-compose.prod.yml"
+COMPOSE_EXTERNAL="$PROJECT_ROOT/docker-compose.external-nginx.yml"
+ENV_EXAMPLE="$PROJECT_ROOT/.env.example"
+ENV_INSTALLER_EXAMPLE="$SCRIPT_DIR/.env.installer.example"
+# Arquivo de env da stack de produção (monorepo: não usar .env na raiz)
+ENV_PRODUCTION="$SCRIPT_DIR/.env.production"
+NGINX_TEMPLATE_DOCKER="$SCRIPT_DIR/nginx-docker.conf.template"
+NGINX_TEMPLATE_ACME="$PROJECT_ROOT/multitenant-docker-acme/confs/nginx-multitenant.conf"
+NGINX_CONF_DIR="$PROJECT_ROOT/nginx/conf.d"
+NGINX_CERTS_DIR="$PROJECT_ROOT/nginx/certs"
+NGINX_WEBROOT="$PROJECT_ROOT/nginx/webroot"
 
-if [[ $EUID -ne 0 ]]; then
-    echored "Este script precisa ser executado como root."
+# --- Cores e helpers ---
+echored()   { echo -ne "\033[41m\033[37m\033[1m  $1  \033[0m\n"; }
+echoblue()  { echo -ne "\033[44m\033[37m\033[1m  $1  \033[0m\n"; }
+echogreen() { echo -ne "\033[42m\033[37m\033[1m  $1  \033[0m\n"; }
+log_info()  { echo -e "\033[1;34m[INFO]\033[0m $*"; }
+log_warn()  { echo -e "\033[1;33m[WARN]\033[0m $*"; }
+log_error() { echo -e "\033[1;31m[ERROR]\033[0m $*" >&2; }
+
+cleanup_on_error() {
+    log_error "Instalador interrompido. Verifique as mensagens acima."
     exit 1
-fi
+}
+trap cleanup_on_error ERR
 
-while true; do
-    echo ""
-    echoblue "=============================="
-    echoblue "     MULTITENANT MANAGER      "
-    echoblue "=============================="
-    echo "Escolha uma opcao:"
-    echo "1) Instalar/Integrar com nginx-proxy + acme"
-    echo "2) Atualizar"
-    echo "3) Desinstalar"
-    echo "4) Sair"
-    echo -n "Opcao: "
-    read -r OP
+# --- Uso ---
+show_usage() {
+    cat <<'EOF'
+Uso:
+  sudo bash install/install.sh install [OPÇÕES]
+  sudo bash install/install.sh update [branch]
 
-    case $OP in
-        1)
-            read -r -p "DOMAIN: " DOMAIN
-            read -r -p "LETSENCRYPT_EMAIL: " LETSENCRYPT_EMAIL
-            read -r -p "APP_NAME (slug): " APP_NAME
-            read -r -p "APP_SERVICE (servico compose): " APP_SERVICE
-            read -r -p "APP_INTERNAL_PORT: " APP_INTERNAL_PORT
-            read -r -p "Arquivo compose principal (ex: /srv/app/docker-compose.yml): " APP_COMPOSE
-            read -r -p "Arquivo compose extra opcional (ou Enter): " APP_COMPOSE_EXTRA
+Comandos:
+  install   Instalação inicial (cria .env, prepara nginx, sobe containers).
+  update    Atualização (pull imagens, reinicia containers).
+  cert      Obtém ou renova certificado Let's Encrypt (usa install/.env.production).
 
-            if [[ -z "$DOMAIN" || -z "$LETSENCRYPT_EMAIL" || -z "$APP_NAME" || -z "$APP_SERVICE" || -z "$APP_INTERNAL_PORT" || -z "$APP_COMPOSE" ]]; then
-                echored "Campos obrigatorios nao preenchidos."
-                continue
-            fi
+Opções para install:
+  -d, --domain DOMAIN       Domínio principal (ex: app.exemplo.com.br).
+  -e, --email EMAIL         Email para Let's Encrypt e admin.
+  -u, --docker-user USER    Usuário Docker Hub para imagens (ex: gorinformaticadev).
+  -a, --admin-email EMAIL   Email do administrador (default: mesmo de -e).
+  -p, --admin-pass SENHA    Senha inicial do admin (default: 123456).
+  -n, --no-prompt           Não perguntar; usa apenas variáveis de ambiente.
 
-            echoblue "Iniciando instalacao..."
-            if [[ -n "$APP_COMPOSE_EXTRA" ]]; then
-                ./setup.sh \
-                    --domain "$DOMAIN" \
-                    --email "$LETSENCRYPT_EMAIL" \
-                    --app-name "$APP_NAME" \
-                    --app-service "$APP_SERVICE" \
-                    --app-port "$APP_INTERNAL_PORT" \
-                    --app-compose "$APP_COMPOSE" \
-                    --app-compose "$APP_COMPOSE_EXTRA"
+Variáveis de ambiente (alternativa às opções):
+  INSTALL_DOMAIN, LETSENCRYPT_EMAIL, DOCKERHUB_USERNAME,
+  INSTALL_ADMIN_EMAIL, INSTALL_ADMIN_PASSWORD,
+  DB_USER, DB_PASSWORD, DB_NAME, JWT_SECRET, ENCRYPTION_KEY
+
+Exemplos:
+  sudo bash install/install.sh install -d menu.empresa.com -e admin@empresa.com -u gorinformaticadev
+  sudo INSTALL_DOMAIN=app.empresa.com LETSENCRYPT_EMAIL=admin@empresa.com bash install/install.sh install --no-prompt
+  sudo bash install/install.sh update
+  sudo bash install/install.sh update develop
+EOF
+}
+
+# --- Verificações de dependências ---
+require_bash() {
+    if [[ -z "${BASH_VERSION:-}" ]]; then
+        echored "Este script deve ser executado com Bash."
+        exit 1
+    fi
+}
+
+require_root() {
+    if [[ $EUID -ne 0 ]]; then
+        echored "Este script deve ser executado como root (sudo)."
+        exit 1
+    fi
+}
+
+check_docker() {
+    if ! command -v docker &>/dev/null; then
+        log_info "Docker não encontrado. Instalando..."
+        curl -fsSL https://get.docker.com | sh
+        log_info "Docker instalado."
+    else
+        log_info "Docker: $(docker --version)"
+    fi
+}
+
+check_docker_compose() {
+    if ! docker compose version &>/dev/null; then
+        log_error "Docker Compose (plugin) não encontrado."
+        log_error "Instale com: apt-get update && apt-get install -y docker-compose-plugin"
+        exit 1
+    fi
+    log_info "Docker Compose: $(docker compose version --short)"
+}
+
+# --- Validações ---
+validate_email() {
+    local email="$1"
+    local re="^[a-z0-9!#\$%&'*+/=?^_\`{|}~-]+(\.[a-z0-9!#$%&'*+/=?^_\`{|}~-]+)*@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?\$"
+    if ! [[ "$email" =~ $re ]]; then
+        log_error "Email inválido: $email"
+        exit 1
+    fi
+}
+
+ensure_env_file() {
+    if [[ ! -f "$ENV_PRODUCTION" ]]; then
+        if [[ -f "$ENV_INSTALLER_EXAMPLE" ]]; then
+            cp "$ENV_INSTALLER_EXAMPLE" "$ENV_PRODUCTION"
+            log_info "Arquivo de produção criado: install/.env.production"
+        elif [[ -f "$ENV_EXAMPLE" ]]; then
+            cp "$ENV_EXAMPLE" "$ENV_PRODUCTION"
+            log_info "Arquivo de produção criado: install/.env.production"
+        else
+            log_error "Nenhum .env.example ou .env.installer.example encontrado."
+            exit 1
+        fi
+    fi
+}
+
+upsert_env() {
+    local key="$1"
+    local value="$2"
+    local file="${3:-$ENV_PRODUCTION}"
+    if grep -q "^${key}=" "$file" 2>/dev/null; then
+        local tmpfile
+        tmpfile="$(mktemp)"
+        while IFS= read -r line; do
+            if [[ "$line" == "${key}="* ]]; then
+                echo "${key}=${value}"
             else
-                ./setup.sh \
-                    --domain "$DOMAIN" \
-                    --email "$LETSENCRYPT_EMAIL" \
-                    --app-name "$APP_NAME" \
-                    --app-service "$APP_SERVICE" \
-                    --app-port "$APP_INTERNAL_PORT" \
-                    --app-compose "$APP_COMPOSE"
+                echo "$line"
             fi
-            ;;
-        2)
-            echoblue "Iniciando atualizacao..."
-            ./update.sh
-            ;;
-        3)
-            echoblue "Iniciando desinstalacao..."
-            ./uninstall.sh
-            ;;
-        4)
-            echoblue "Saindo..."
-            exit 0
-            ;;
-        *)
-            echored "Opcao invalida. Tente novamente."
-            ;;
+        done < "$file" > "$tmpfile"
+        mv "$tmpfile" "$file"
+    else
+        echo "${key}=${value}" >> "$file"
+    fi
+}
+
+# --- Certificado Let's Encrypt ---
+obtain_letsencrypt_cert() {
+    local domain="$1"
+    local email="$2"
+    mkdir -p "$NGINX_WEBROOT"
+    log_info "Obtendo certificado Let's Encrypt para $domain ..."
+    if docker run --rm \
+        -v "${NGINX_WEBROOT}:/var/www/certbot:rw" \
+        -v "${NGINX_CERTS_DIR}:/etc/letsencrypt:rw" \
+        certbot/certbot certonly --webroot \
+        -w /var/www/certbot \
+        -d "$domain" \
+        --email "$email" \
+        --agree-tos \
+        --non-interactive 2>/dev/null; then
+        local live_cert="$NGINX_CERTS_DIR/live/$domain/fullchain.pem"
+        local live_key="$NGINX_CERTS_DIR/live/$domain/privkey.pem"
+        if [[ -f "$live_cert" ]] && [[ -f "$live_key" ]]; then
+            cp "$live_cert" "$NGINX_CERTS_DIR/cert.pem"
+            cp "$live_key" "$NGINX_CERTS_DIR/key.pem"
+            log_info "Certificado Let's Encrypt instalado em nginx/certs/"
+            cd "$PROJECT_ROOT"
+            docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml restart nginx 2>/dev/null || true
+            return 0
+        fi
+    fi
+    log_warn "Não foi possível obter certificado Let's Encrypt (verifique DNS e porta 80). Mantido certificado autoassinado."
+    return 1
+}
+
+# --- Instalação inicial ---
+run_install() {
+    local domain="${INSTALL_DOMAIN:-}"
+    local email="${LETSENCRYPT_EMAIL:-}"
+    local docker_user="${DOCKERHUB_USERNAME:-}"
+    local admin_email="${INSTALL_ADMIN_EMAIL:-$email}"
+    local admin_pass="${INSTALL_ADMIN_PASSWORD:-123456}"
+    local no_prompt="${INSTALL_NO_PROMPT:-false}"
+
+    # Parse opções
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -d|--domain)   domain="$2"; shift 2 ;;
+            -e|--email)    email="$2"; shift 2 ;;
+            -u|--docker-user) docker_user="$2"; shift 2 ;;
+            -a|--admin-email)  admin_email="$2"; shift 2 ;;
+            -p|--admin-pass)   admin_pass="$2"; shift 2 ;;
+            -n|--no-prompt)   no_prompt="true"; shift ;;
+            *) shift ;;
+        esac
+    done
+
+    if [[ "$no_prompt" != "true" ]]; then
+        [[ -z "$domain" ]] && read -p "Domínio (ex: app.empresa.com): " domain
+        [[ -z "$email" ]]  && read -p "Email (Let's Encrypt / admin): " email
+        [[ -z "$docker_user" ]] && read -p "Docker Hub username (imagens): " docker_user
+        [[ -z "$admin_email" ]] && admin_email="$email"
+        read -sp "Senha inicial do admin [123456]: " admin_pass
+        echo
+        admin_pass="${admin_pass:-123456}"
+    fi
+
+    if [[ -z "$domain" || -z "$email" ]]; then
+        log_error "Domínio e email são obrigatórios."
+        show_usage
+        exit 1
+    fi
+    validate_email "$email"
+    [[ -n "$admin_email" ]] && validate_email "$admin_email"
+
+    docker_user="${docker_user:-local}"
+    ensure_env_file
+
+    # Secrets gerados se não fornecidos
+    local db_user="${DB_USER:-multitenant}"
+    local db_pass="${DB_PASSWORD:-$(openssl rand -hex 16)}"
+    local db_name="${DB_NAME:-multitenant}"
+    local jwt_secret="${JWT_SECRET:-$(openssl rand -hex 32)}"
+    local enc_key="${ENCRYPTION_KEY:-$(openssl rand -hex 32)}"
+
+    log_info "Configurando .env..."
+    upsert_env "DOMAIN" "$domain"
+    upsert_env "LETSENCRYPT_EMAIL" "$email"
+    upsert_env "LETSENCRYPT_HOST" "$domain"
+    upsert_env "VIRTUAL_HOST" "$domain"
+    upsert_env "DOCKERHUB_USERNAME" "$docker_user"
+    upsert_env "FRONTEND_URL" "https://$domain"
+    upsert_env "NEXT_PUBLIC_API_URL" "https://$domain/api"
+    upsert_env "DB_USER" "$db_user"
+    upsert_env "DB_PASSWORD" "$db_pass"
+    upsert_env "DB_NAME" "$db_name"
+    upsert_env "DATABASE_URL" "postgresql://$db_user:$db_pass@db:5432/$db_name?schema=public"
+    upsert_env "JWT_SECRET" "$jwt_secret"
+    upsert_env "ENCRYPTION_KEY" "$enc_key"
+    upsert_env "NODE_ENV" "production"
+    upsert_env "PORT" "4000"
+    # Variáveis de instalação (documentação / uso futuro pelo backend)
+    upsert_env "INSTALL_DOMAIN" "$domain"
+    upsert_env "INSTALL_ADMIN_EMAIL" "${admin_email:-$email}"
+    upsert_env "INSTALL_ADMIN_PASSWORD" "$admin_pass"
+
+    # Criar .env em apps/backend e .env.local em apps/frontend (a partir dos exemplos do projeto)
+    BACKEND_ENV="$PROJECT_ROOT/apps/backend/.env"
+    FRONTEND_ENV="$PROJECT_ROOT/apps/frontend/.env.local"
+    BACKEND_EXAMPLE="$PROJECT_ROOT/apps/backend/.env.example"
+    FRONTEND_EXAMPLE="$PROJECT_ROOT/apps/frontend/.env.local.example"
+    if [[ -f "$BACKEND_EXAMPLE" ]]; then
+        if [[ ! -f "$BACKEND_ENV" ]]; then
+            cp "$BACKEND_EXAMPLE" "$BACKEND_ENV"
+            log_info "Criado apps/backend/.env a partir de .env.example"
+        fi
+        upsert_env "DATABASE_URL" "postgresql://$db_user:$db_pass@db:5432/$db_name?schema=public" "$BACKEND_ENV"
+        upsert_env "JWT_SECRET" "$jwt_secret" "$BACKEND_ENV"
+        upsert_env "ENCRYPTION_KEY" "$enc_key" "$BACKEND_ENV"
+        upsert_env "FRONTEND_URL" "https://$domain" "$BACKEND_ENV"
+        upsert_env "PORT" "4000" "$BACKEND_ENV"
+        upsert_env "NODE_ENV" "production" "$BACKEND_ENV"
+    fi
+    if [[ -f "$FRONTEND_EXAMPLE" ]]; then
+        if [[ ! -f "$FRONTEND_ENV" ]]; then
+            cp "$FRONTEND_EXAMPLE" "$FRONTEND_ENV"
+            log_info "Criado apps/frontend/.env.local a partir de .env.local.example"
+        fi
+        upsert_env "NEXT_PUBLIC_API_URL" "https://$domain/api" "$FRONTEND_ENV"
+    fi
+
+    # Nginx embutido (docker-compose.prod.yml): criar dirs, cert e config
+    if [[ -f "$COMPOSE_PROD" ]]; then
+        mkdir -p "$NGINX_CONF_DIR" "$NGINX_CERTS_DIR" "$NGINX_WEBROOT"
+        # Certificado autoassinado para HTTPS (antes de escolher o template)
+        if [[ ! -f "$NGINX_CERTS_DIR/cert.pem" ]] || [[ ! -f "$NGINX_CERTS_DIR/key.pem" ]]; then
+            log_info "Gerando certificado autoassinado para HTTPS em $NGINX_CERTS_DIR"
+            if openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                -keyout "$NGINX_CERTS_DIR/key.pem" \
+                -out "$NGINX_CERTS_DIR/cert.pem" \
+                -subj "/CN=$domain" 2>/dev/null; then
+                log_info "Certificado autoassinado criado. Para produção, substitua por Let's Encrypt."
+            fi
+        fi
+        # Template Docker: upstream frontend:5000, backend:4000 (evita 502 Bad Gateway)
+        if [[ -f "$NGINX_TEMPLATE_DOCKER" ]] && [[ -f "$NGINX_CERTS_DIR/cert.pem" ]]; then
+            sed "s/__DOMAIN__/$domain/g" "$NGINX_TEMPLATE_DOCKER" > "$NGINX_CONF_DIR/default.conf"
+            log_info "Config Nginx gerado (HTTP + HTTPS) em $NGINX_CONF_DIR/default.conf"
+        elif [[ -f "$NGINX_TEMPLATE_DOCKER" ]]; then
+            NGINX_HTTP_ONLY="$SCRIPT_DIR/nginx-docker-http-only.conf.template"
+            if [[ -f "$NGINX_HTTP_ONLY" ]]; then
+                sed "s/__DOMAIN__/$domain/g" "$NGINX_HTTP_ONLY" > "$NGINX_CONF_DIR/default.conf"
+                log_info "Config Nginx gerado (apenas HTTP) em $NGINX_CONF_DIR/default.conf"
+            else
+                sed "s/__DOMAIN__/$domain/g" "$NGINX_TEMPLATE_DOCKER" > "$NGINX_CONF_DIR/default.conf"
+            fi
+        elif [[ -f "$NGINX_TEMPLATE_ACME" ]]; then
+            sed "s/__DOMAIN__/$domain/g" "$NGINX_TEMPLATE_ACME" > "$NGINX_CONF_DIR/default.conf"
+            log_warn "Usando template ACME; no Docker use nginx-docker.conf.template para evitar 502."
+        else
+            log_warn "Nenhum template nginx encontrado. Configure manualmente $NGINX_CONF_DIR/default.conf"
+        fi
+    fi
+
+    log_info "Subindo stack (docker-compose.prod.yml) com install/.env.production..."
+    cd "$PROJECT_ROOT"
+    if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml pull 2>/dev/null; then
+        log_warn "Pull de imagens falhou (repositório inexistente ou sem login)."
+    fi
+    docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml down 2>/dev/null || true
+    if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml up -d; then
+        log_info "Imagens do projeto não encontradas. Executando build local..."
+        docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml build
+        if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml up -d; then
+            log_error "Falha ao subir containers."
+            exit 1
+        fi
+    fi
+
+    # Tentar obter certificado Let's Encrypt (domínio deve apontar para este host e porta 80 acessível)
+    sleep 5
+    if obtain_letsencrypt_cert "$domain" "$email"; then
+        echogreen "Certificado SSL válido (Let's Encrypt) instalado."
+    fi
+
+    echogreen "Instalação concluída."
+    echo ""
+    log_info "URL: https://$domain"
+    log_info "Admin: $admin_email / $admin_pass"
+    log_info "Altere a senha após o primeiro login."
+    echo ""
+}
+
+# --- Atualização ---
+run_update() {
+    local branch="${1:-}"
+    cd "$PROJECT_ROOT"
+
+    ensure_env_file
+    if [[ -f "$ENV_PRODUCTION" ]]; then
+        set -a
+        # shellcheck source=/dev/null
+        source "$ENV_PRODUCTION" 2>/dev/null || true
+        set +a
+    fi
+
+    if [[ -d "$PROJECT_ROOT/.git" ]] && [[ -n "$branch" ]]; then
+        log_info "Atualizando repositório (branch: ${branch})..."
+        git fetch --all
+        if git rev-parse --verify "$branch" &>/dev/null; then
+            git checkout "$branch"
+        else
+            git checkout --track "origin/$branch" 2>/dev/null || git checkout "$branch"
+        fi
+        git pull origin "$branch" || true
+    fi
+
+    log_info "Baixando imagens..."
+    if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml pull 2>/dev/null; then
+        log_warn "Pull falhou; usando imagens existentes ou build local."
+    fi
+    log_info "Reiniciando containers..."
+    docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml down
+    if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml up -d; then
+        log_info "Imagens do projeto não encontradas. Executando build local..."
+        docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml build
+        if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml up -d; then
+            log_error "Falha ao subir containers."
+            exit 1
+        fi
+    fi
+
+    echogreen "Atualização concluída."
+}
+
+# --- Main ---
+main() {
+    require_bash
+    require_root
+
+    echoblue "=============================================="
+    echoblue "  Projeto Menu Multitenant - Instalador      "
+    echoblue "=============================================="
+    echo ""
+
+    check_docker
+    check_docker_compose
+
+    local cmd="${1:-}"
+    shift || true
+    case "$cmd" in
+        install) run_install "$@" ;;
+        update)  run_update "$@" ;;
+        cert)    run_cert ;;
+        *)       show_usage; exit 1 ;;
     esac
-done
+}
+
+# --- Obter/renovar certificado (comando standalone) ---
+run_cert() {
+    cd "$PROJECT_ROOT"
+    ensure_env_file
+    if [[ ! -f "$ENV_PRODUCTION" ]]; then
+        log_error "Crie install/.env.production antes (rode install primeiro)."
+        exit 1
+    fi
+    set -a
+    # shellcheck source=/dev/null
+    source "$ENV_PRODUCTION" 2>/dev/null || true
+    set +a
+    domain="${DOMAIN:-}"
+    email="${LETSENCRYPT_EMAIL:-}"
+    if [[ -z "$domain" || -z "$email" ]]; then
+        log_error "Defina DOMAIN e LETSENCRYPT_EMAIL em install/.env.production"
+        exit 1
+    fi
+    if obtain_letsencrypt_cert "$domain" "$email"; then
+        echogreen "Certificado Let's Encrypt obtido/atualizado."
+    else
+        exit 1
+    fi
+}
+
+main "$@"

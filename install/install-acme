@@ -279,48 +279,59 @@ setup_env_file() {
     log_info "Configurando arquivo .env..."
 
     if [[ ! -f "$INSTALL_DIR/.env.example" ]]; then
-        log_error "Arquivo .env.example não encontrado!"
+        log_error "Arquivo .env.example nao encontrado!"
         exit 1
     fi
 
     cp "$INSTALL_DIR/.env.example" "$INSTALL_DIR/.env"
 
     # Gera secrets
-    local jwt_secret=$(openssl rand -hex 32)
-    local encryption_key=$(openssl rand -hex 32)
+    local jwt_secret
+    local encryption_key
     local db_user="multitenant"
     local db_name="multitenant"
-    local db_pass=$(openssl rand -hex 16)
+    local db_pass
+    jwt_secret="$(openssl rand -hex 32)"
+    encryption_key="$(openssl rand -hex 32)"
+    db_pass="$(openssl rand -hex 16)"
+    local dockerhub_username="${DOCKERHUB_USERNAME:-local}"
 
-    # Atualiza .env
-    cat >> "$INSTALL_DIR/.env" <<EOF
+    upsert_env_var() {
+        local key="$1"
+        local value="$2"
+        if grep -q "^${key}=" "$INSTALL_DIR/.env"; then
+            sed -i "s|^${key}=.*|${key}=${value}|" "$INSTALL_DIR/.env"
+        else
+            echo "${key}=${value}" >> "$INSTALL_DIR/.env"
+        fi
+    }
 
-# Configurações geradas pelo install-acme
-DOMAIN=$DOMAIN
-LETSENCRYPT_EMAIL=$EMAIL
-FRONTEND_PORT=$FRONTEND_PORT
-BACKEND_PORT=$BACKEND_PORT
-JWT_SECRET=$jwt_secret
-ENCRYPTION_KEY=$encryption_key
+    upsert_env_var "DOMAIN" "$DOMAIN"
+    upsert_env_var "LETSENCRYPT_EMAIL" "$EMAIL"
+    upsert_env_var "FRONTEND_PORT" "$FRONTEND_PORT"
+    upsert_env_var "BACKEND_PORT" "$BACKEND_PORT"
+    upsert_env_var "JWT_SECRET" "$jwt_secret"
+    upsert_env_var "ENCRYPTION_KEY" "$encryption_key"
+    upsert_env_var "NEXT_PUBLIC_API_URL" "https://$DOMAIN/api"
+    upsert_env_var "FRONTEND_URL" "https://$DOMAIN"
+    upsert_env_var "PORT" "4000"
+    upsert_env_var "NODE_ENV" "production"
 
-# URLs e Portas
-NEXT_PUBLIC_API_URL=https://$DOMAIN/api
-FRONTEND_URL=https://$DOMAIN
-PORT=4000
+    # Compatibilidade: alguns arquivos usam DB_* e outros usam POSTGRES_*.
+    upsert_env_var "DB_USER" "$db_user"
+    upsert_env_var "DB_PASSWORD" "$db_pass"
+    upsert_env_var "DB_NAME" "$db_name"
+    upsert_env_var "POSTGRES_USER" "$db_user"
+    upsert_env_var "POSTGRES_PASSWORD" "$db_pass"
+    upsert_env_var "POSTGRES_DB" "$db_name"
+    upsert_env_var "DATABASE_URL" "postgresql://$db_user:$db_pass@db:5432/$db_name"
+    upsert_env_var "DOCKERHUB_USERNAME" "$dockerhub_username"
 
-# Banco de Dados
-POSTGRES_USER=$db_user
-POSTGRES_PASSWORD=$db_pass
-POSTGRES_DB=$db_name
-DATABASE_URL=postgresql://$db_user:$db_pass@db:5432/$db_name
-
-# Modo de instalação
-USE_EXTERNAL_NGINX=$USE_EXTERNAL_NGINX
-EOF
+    # Modo de instalacao
+    upsert_env_var "USE_EXTERNAL_NGINX" "$USE_EXTERNAL_NGINX"
 
     log_info "Arquivo .env configurado!"
 }
-
 # Instala com nginx-proxy Docker (modo compatível com ticketz)
 install_with_docker_proxy() {
     log_info "Instalando com nginx-proxy Docker..."

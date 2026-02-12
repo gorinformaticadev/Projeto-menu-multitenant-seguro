@@ -40,7 +40,7 @@ async function bootstrap() {
       process.exit(1);
     }
 
-    } catch (error) {
+  } catch (error) {
     console.error('❌ Falha ao inicializar Secret Manager:', error.message);
     if (process.env.NODE_ENV === 'production') {
       process.exit(1);
@@ -52,6 +52,7 @@ async function bootstrap() {
   // Carregamento dinâmico de módulos via register()
   const dynamicModule = await AppModule.register();
   const app = await NestFactory.create<NestExpressApplication>(dynamicModule);
+  app.setGlobalPrefix('api');
 
   // ============================================
   // 🔧 REDIS ADAPTER PARA ESCALABILIDADE HORIZONTAL
@@ -174,8 +175,8 @@ async function bootstrap() {
   // 🔒 HTTPS ENFORCEMENT - Apenas em produção
   // ============================================
   if (isProduction) {
-      // Empty implementation
-    }
+    // Empty implementation
+  }
 
   // Servir arquivos estáticos (logos)
   // Usa process.cwd() que sempre aponta para a raiz do projeto
@@ -201,8 +202,8 @@ async function bootstrap() {
         res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache por 24 horas
 
         if (!isProduction) {
-      // Empty implementation
-    }
+          // Empty implementation
+        }
       } else {
         // CORS restritivo para outros arquivos estáticos
         const allowedOrigins = [

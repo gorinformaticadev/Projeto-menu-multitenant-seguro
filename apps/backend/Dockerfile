@@ -1,52 +1,60 @@
-# Backend multi-stage build - optimized for pnpm monorepo
 FROM node:20-alpine AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 
-# Builder stage
+# -------------------------
+# Builder (build completo)
+# -------------------------
 FROM base AS builder
 WORKDIR /app
-# Copy monorepo configuration files
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-
-# Copy source code (needed for workspace links)
 COPY . .
-
-# Install dependencies using lockfile
-RUN pnpm install --frozen-lockfile
-
-# Generate Prisma Client
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm --filter backend prisma:generate
-
-# Build backend
 RUN pnpm --filter backend build
-ENV CI=true
 
-# Runner stage
-FROM base AS runner
+# -------------------------
+# prod-deps (somente backend)
+# -------------------------
+FROM base AS prod-deps
+WORKDIR /app
+
+# Copia arquivos do backend como projeto standalone
+COPY apps/backend/package.json ./package.json
+COPY apps/backend/prisma ./prisma
+COPY .npmrc* ./
+
+# Instala deps de produção (sem workspace)
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --no-frozen-lockfile
+
+# Gera prisma client (garante que entra em node_modules)
+RUN pnpm prisma generate
+
+# -------------------------
+# Runner
+# -------------------------
+FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=4000
 
-# Create non-root user
+RUN apk add --no-cache curl postgresql-client
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nestjs
 
-# Copy dependencies and build artifacts from builder
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/backend/node_modules ./apps/backend/node_modules
-COPY --from=builder /app/apps/backend/dist ./dist
-COPY --from=builder /app/apps/backend/package.json ./package.json
-COPY --from=builder /app/apps/backend/prisma.config.ts ./prisma.config.ts
-COPY --from=builder /app/apps/backend/prisma ./apps/backend/prisma
-COPY --from=builder /app/apps/backend/prisma ./prisma
+COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/package.json ./package.json
+COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/docker-entrypoint.sh ./docker-entrypoint.sh
+COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/prisma ./prisma
 
-# Copy entrypoint script
-COPY --from=builder /app/apps/backend/docker-entrypoint.sh ./docker-entrypoint.sh
+# Aqui é /app/node_modules (não apps/backend/node_modules)
+COPY --from=prod-deps --chown=nestjs:nodejs /app/node_modules ./node_modules
+
 RUN chmod +x ./docker-entrypoint.sh
+RUN mkdir -p /app/uploads/logos && chown -R nestjs:nodejs /app/uploads
 
 USER nestjs
 
 EXPOSE 4000
-CMD ["/app/docker-entrypoint.sh"]
+CMD ["./docker-entrypoint.sh"]

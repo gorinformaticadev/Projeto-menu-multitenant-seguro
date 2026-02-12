@@ -42,24 +42,58 @@ const nextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: `default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: ${apiUrl} ${apiUrl.replace('http', 'https')}; connect-src 'self' ${apiUrl} ${apiUrl.replace('http', 'ws')} ${apiUrl.replace('http', 'https')} ${apiUrl.replace('http', 'wss')} http://localhost:5000 ws://localhost:5000 https://localhost:5000 wss://localhost:5000; font-src 'self' data: https:;`,
+          value: (() => {
+              const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+              const apiUrl = rawApiUrl.replace(/\/+$/, '');
+              const isAbsolute = /^https?:\/\//i.test(apiUrl);
+
+              const apiCsp = isAbsolute
+                ? `${apiUrl} ${apiUrl.replace(/^http:/, 'https:')}`
+                : '';
+
+              const wsCsp = isAbsolute
+                ? `${apiUrl.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:')}`
+                : '';
+
+              return `default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: ${apiCsp}; connect-src 'self' ${apiCsp} ${wsCsp} http://localhost:5000 ws://localhost:5000 https://localhost:5000 wss://localhost:5000; font-src 'self' data: https:;`;
+            })(),
           },
         ],
       },
     ];
   },
   async rewrites() {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-    return [
-      {
+    const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    const apiUrl = rawApiUrl.replace(/\/+$/, '');
+    const isAbsoluteApiUrl = /^https?:\/\//i.test(apiUrl);
+    const rewrites = [];
+
+    // Evita loop quando NEXT_PUBLIC_API_URL = "/api".
+    // Nesse cenário, o proxy da borda (nginx) já resolve /api para o backend.
+    if (isAbsoluteApiUrl) {
+      const apiBase = apiUrl.endsWith('/api') ? apiUrl : `${apiUrl}/api`;
+      rewrites.push({
         source: '/api/:path*',
-        destination: `${apiUrl}/api/:path*`, // Proxy API requests to backend
-      },
-      {
+        destination: `${apiBase}/:path*`,
+      });
+
+      rewrites.push({
         source: '/uploads/:path*',
-        destination: `${apiUrl}/uploads/:path*`, // Proxy static uploads to backend
-      },
-    ];
+        destination: `${apiUrl}/uploads/:path*`,
+      });
+    } else if (apiUrl && apiUrl !== '/api') {
+      rewrites.push({
+        source: '/api/:path*',
+        destination: `${apiUrl}/:path*`,
+      });
+
+      rewrites.push({
+        source: '/uploads/:path*',
+        destination: `${apiUrl}/uploads/:path*`,
+      });
+    }
+
+    return rewrites;
   },
   // Enable experimental features for better security
   experimental: {

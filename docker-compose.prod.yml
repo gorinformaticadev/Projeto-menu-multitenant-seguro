@@ -1,5 +1,5 @@
-version: '3.8'
-
+# Variáveis da stack: use install/.env.production (monorepo: env não fica na raiz).
+# Subir: cd /caminho/Projeto-menu-multitenant-seguro && docker compose --env-file install/.env.production -f docker-compose.prod.yml up -d
 services:
   nginx:
     image: nginx:1.25-alpine
@@ -11,6 +11,7 @@ services:
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/certs:/etc/nginx/certs:ro
+      - ./nginx/webroot:/var/www/certbot:ro
     depends_on:
       - frontend
       - backend
@@ -18,35 +19,43 @@ services:
       - multitenant-network
 
   frontend:
-    image: ${DOCKERHUB_USERNAME}/multitenant-frontend:latest
+    image: ${DOCKERHUB_USERNAME:-local}/multitenant-frontend:latest
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+      args:
+        # No browser a API é acessada pela mesma origem (nginx faz proxy /api)
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     container_name: multitenant-frontend
     restart: unless-stopped
-    # NÃO expor portas públicas; o acesso será apenas via nginx
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=http://backend:3000
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     depends_on:
       - backend
     networks:
       - multitenant-network
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:3000/api/health" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:5000/" ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
 
   backend:
-    image: ${DOCKERHUB_USERNAME}/multitenant-backend:latest
+    image: ${DOCKERHUB_USERNAME:-local}/multitenant-backend:latest
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
     container_name: multitenant-backend
     restart: unless-stopped
-    # NÃO expor portas públicas; o acesso será apenas via nginx
+    # FRONTEND_URL deve ser a URL pública (https://DOMAIN) para CORS aceitar o browser; vem de install/.env.production
     environment:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - FRONTEND_URL=http://frontend:3000
+      - FRONTEND_URL=${FRONTEND_URL}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     depends_on:
@@ -57,7 +66,7 @@ services:
     networks:
       - multitenant-network
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:3000/health" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:4000/api/health" ]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -26,6 +26,7 @@ import { PrismaService } from './core/prisma/prisma.service';
 import { WhatsAppModule } from './core/whatsapp/whatsapp.module';
 import { CronModule } from './core/cron/cron.module';
 import { BackupModule } from './backup/backup.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { BackupModule } from './backup/backup.module';
     WhatsAppModule,
     SecureFilesModule, // Módulo de uploads sensíveis
     CronModule,
+    HealthModule,
   ],
   providers: [
     {

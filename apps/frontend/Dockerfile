@@ -33,6 +33,9 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=5000
 
+# Install curl for healthcheck
+RUN apk add --no-cache curl
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 

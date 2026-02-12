@@ -75,15 +75,50 @@ update_app() {
         export $(grep -v '^#' .env | xargs)
     fi
 
-    # Garante que variáveis essenciais existam no .env para evitar 502
-    if ! grep -q "NEXT_PUBLIC_API_URL" .env; then
-        log_info "Adicionando variáveis de URL ausentes no .env..."
-        local domain=$(grep "DOMAIN=" .env | cut -d'=' -f2)
-        echo "NEXT_PUBLIC_API_URL=https://$domain/api" >> .env
-        echo "FRONTEND_URL=https://$domain" >> .env
-        echo "PORT=4000" >> .env
+    # Garante que variaveis essenciais existam no .env para evitar falhas no compose.
+    ensure_env_var() {
+        local key="$1"
+        local value="$2"
+        if ! grep -q "^${key}=" .env; then
+            echo "${key}=${value}" >> .env
+        fi
+    }
+
+    local domain
+    domain="$(grep '^DOMAIN=' .env | head -n1 | cut -d'=' -f2-)"
+    ensure_env_var "NEXT_PUBLIC_API_URL" "https://$domain/api"
+    ensure_env_var "FRONTEND_URL" "https://$domain"
+    ensure_env_var "PORT" "4000"
+    ensure_env_var "NODE_ENV" "production"
+
+    # Compatibilidade com diferentes compose do projeto.
+    local db_user db_pass db_name
+    db_user="$(grep '^DB_USER=' .env | head -n1 | cut -d'=' -f2-)"
+    db_pass="$(grep '^DB_PASSWORD=' .env | head -n1 | cut -d'=' -f2-)"
+    db_name="$(grep '^DB_NAME=' .env | head -n1 | cut -d'=' -f2-)"
+
+    if [ -z "$db_user" ]; then
+        db_user="$(grep '^POSTGRES_USER=' .env | head -n1 | cut -d'=' -f2-)"
+    fi
+    if [ -z "$db_pass" ]; then
+        db_pass="$(grep '^POSTGRES_PASSWORD=' .env | head -n1 | cut -d'=' -f2-)"
+    fi
+    if [ -z "$db_name" ]; then
+        db_name="$(grep '^POSTGRES_DB=' .env | head -n1 | cut -d'=' -f2-)"
     fi
 
+    db_user="${db_user:-multitenant}"
+    db_name="${db_name:-multitenant}"
+    db_pass="${db_pass:-$(openssl rand -hex 16)}"
+
+    ensure_env_var "DB_USER" "$db_user"
+    ensure_env_var "DB_PASSWORD" "$db_pass"
+    ensure_env_var "DB_NAME" "$db_name"
+    ensure_env_var "POSTGRES_USER" "$db_user"
+    ensure_env_var "POSTGRES_PASSWORD" "$db_pass"
+    ensure_env_var "POSTGRES_DB" "$db_name"
+    ensure_env_var "DATABASE_URL" "postgresql://$db_user:$db_pass@db:5432/$db_name"
+    ensure_env_var "DOCKERHUB_USERNAME" "local"
     # Detecta o modo de instalação (Externo ou Interno)
     if grep -q "USE_EXTERNAL_NGINX=true" .env 2>/dev/null; then
         log_info "Detectado modo: Nginx Externo"
@@ -102,6 +137,8 @@ update_app() {
         # Usa o novo arquivo de proxy se disponível
         if [ -f "docker-compose.proxy.yml" ]; then
             log_info "Aplicando configurações de rede e proxy..."
+            # Garante que PROXY_NETWORK está exportada para o compose
+            export PROXY_NETWORK="${PROXY_NETWORK:-nginx-proxy}"
             # Removemos o 'pull' para evitar erro com imagens locais
             docker compose -f docker-compose.yml -f docker-compose.prod.external.yml -f docker-compose.proxy.yml up -d --build --remove-orphans
         else
