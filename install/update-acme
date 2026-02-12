@@ -87,7 +87,7 @@ update_app() {
     # Detecta o modo de instalação (Externo ou Interno)
     if grep -q "USE_EXTERNAL_NGINX=true" .env 2>/dev/null; then
         log_info "Detectado modo: Nginx Externo"
-        docker compose -f docker-compose.yml -f docker-compose.external-nginx.yml pull
+        # Removemos o 'pull' para evitar erro com imagens locais
         docker compose -f docker-compose.yml -f docker-compose.external-nginx.yml up -d --build --remove-orphans
     else
         log_info "Detectado modo: Nginx Interno (Docker Proxy)"
@@ -102,10 +102,9 @@ update_app() {
         # Usa o novo arquivo de proxy se disponível
         if [ -f "docker-compose.proxy.yml" ]; then
             log_info "Aplicando configurações de rede e proxy..."
-            docker compose -f docker-compose.yml -f docker-compose.prod.external.yml -f docker-compose.proxy.yml pull
+            # Removemos o 'pull' para evitar erro com imagens locais
             docker compose -f docker-compose.yml -f docker-compose.prod.external.yml -f docker-compose.proxy.yml up -d --build --remove-orphans
         else
-            docker compose pull
             docker compose up -d --build --remove-orphans
         fi
     fi
