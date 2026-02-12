@@ -121,11 +121,16 @@ EOF
 install_internal_proxy() {
     log_info "Iniciando instalação com Nginx Interno (Docker)..."
     
-    # Garante que a rede do proxy existe
+    # Garante que as redes necessárias existem
     local network_name="${PROXY_NETWORK:-nginx-proxy}"
     if ! docker network inspect "$network_name" >/dev/null 2>&1; then
-        log_info "Criando rede Docker: $network_name"
+        log_info "Criando rede Docker do Proxy: $network_name"
         docker network create "$network_name"
+    fi
+    
+    if ! docker network inspect "app-network" >/dev/null 2>&1; then
+        log_info "Criando rede Docker da Aplicação: app-network"
+        docker network create "app-network"
     fi
 
     # Sobe o proxy se não existir
