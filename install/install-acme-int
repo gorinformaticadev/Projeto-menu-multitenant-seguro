@@ -121,15 +121,79 @@ EOF
 install_internal_proxy() {
     log_info "Iniciando instalação com Nginx Interno (Docker)..."
     
-    # Usa o setup.sh do projeto que já lida com a lógica de nginx-proxy
-    bash "$INSTALL_DIR/install/setup.sh" \
-        --domain "$DOMAIN" \
-        --email "$EMAIL" \
-        --app-name "$APP_NAME" \
-        --app-port "$FRONTEND_PORT" \
-        --app-service "frontend" \
-        --app-compose "$INSTALL_DIR/docker-compose.yml" \
-        --app-compose "$INSTALL_DIR/docker-compose.prod.external.yml"
+    # Garante que a rede do proxy existe
+    local network_name="${PROXY_NETWORK:-nginx-proxy}"
+    if ! docker network inspect "$network_name" >/dev/null 2>&1; then
+        log_info "Criando rede Docker: $network_name"
+        docker network create "$network_name"
+    fi
+
+    # Sobe o proxy se não existir
+    if [[ "$EXISTING_PROXY" == "false" ]]; then
+        log_info "Subindo stack nginx-proxy..."
+        # Tenta localizar ou criar um diretório para o proxy
+        local proxy_dir="/opt/nginx-proxy"
+        mkdir -p "$proxy_dir"
+        
+        # Cria um docker-compose simples para o proxy se não houver
+        cat > "$proxy_dir/docker-compose.yml" <<EOF
+version: '3.8'
+services:
+  nginx-proxy:
+    image: nginxproxy/nginx-proxy:alpine
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./certs:/etc/nginx/certs:ro
+      - ./vhost:/etc/nginx/vhost.d
+      - ./html:/usr/share/nginx/html
+    networks:
+      - proxy-nw
+    restart: always
+
+  acme-companion:
+    image: nginxproxy/acme-companion
+    container_name: acme-companion
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./certs:/etc/nginx/certs
+      - ./vhost:/etc/nginx/vhost.d
+      - ./html:/usr/share/nginx/html
+      - ./acme:/etc/acme.sh
+    environment:
+      - DEFAULT_EMAIL=$EMAIL
+    networks:
+      - proxy-nw
+    depends_on:
+      - nginx-proxy
+    restart: always
+
+networks:
+  proxy-nw:
+    name: $network_name
+    external: true
+EOF
+        docker compose -f "$proxy_dir/docker-compose.yml" up -d
+    fi
+
+    log_info "Subindo aplicação com integração ao proxy..."
+    cd "$INSTALL_DIR"
+    
+    # Carrega variáveis para o shell
+    export DOMAIN="$DOMAIN"
+    export LETSENCRYPT_EMAIL="$EMAIL"
+    export PROXY_NETWORK="$network_name"
+    export DOCKERHUB_USERNAME="multitenant"
+    
+    # Usa os arquivos de compose necessários
+    docker compose \
+        -f docker-compose.yml \
+        -f docker-compose.prod.external.yml \
+        -f docker-compose.proxy.yml \
+        up -d --build --remove-orphans
 }
 
 main() {
