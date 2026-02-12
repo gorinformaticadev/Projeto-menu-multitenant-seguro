@@ -47,17 +47,27 @@ find_install_dir() {
 update_app() {
     cd "$INSTALL_DIR"
     
+    log_info "Verificando integridade do repositório Git..."
+    if [ ! -d ".git" ]; then
+        log_info "Diretório não é um repositório Git. Inicializando..."
+        git init
+        git remote add origin https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git
+        git fetch origin
+        git checkout -f main || git checkout -f master
+    fi
+
     log_info "Buscando atualizações no Git..."
     git fetch --all
     
     # Salva alterações locais se houver
-    if ! git diff-index --quiet HEAD --; then
+    if git rev-parse --git-dir > /dev/null 2>&1 && ! git diff-index --quiet HEAD --; then
         log_info "Salvando alterações locais temporariamente..."
         git stash push -m "Update ACME $(date +%Y%m%d_%H%M%S)"
     fi
 
     log_info "Atualizando código fonte..."
-    git pull origin $(git rev-parse --abbrev-ref HEAD)
+    local current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
+    git pull origin "$current_branch" || git reset --hard "origin/$current_branch"
 
     # Carrega variáveis do .env para o shell atual para garantir que o docker compose as veja
     if [ -f ".env" ]; then
