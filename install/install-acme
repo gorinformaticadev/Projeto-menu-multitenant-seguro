@@ -303,6 +303,11 @@ BACKEND_PORT=$BACKEND_PORT
 JWT_SECRET=$jwt_secret
 ENCRYPTION_KEY=$encryption_key
 
+# URLs e Portas
+NEXT_PUBLIC_API_URL=https://$DOMAIN/api
+FRONTEND_URL=https://$DOMAIN
+PORT=4000
+
 # Banco de Dados
 POSTGRES_USER=$db_user
 POSTGRES_PASSWORD=$db_pass

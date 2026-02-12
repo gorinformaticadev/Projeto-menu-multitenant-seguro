@@ -20,7 +20,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 # Variáveis padrão
 DOMAIN="${1:-}"
 EMAIL="${2:-}"
-FRONTEND_PORT="3000" # Porta interna do container
+FRONTEND_PORT="5000" # Porta interna do container frontend no Dockerfile
 APP_NAME="multitenant"
 INSTALL_DIR="/opt/multitenant"
 
@@ -101,6 +101,11 @@ DOMAIN=$DOMAIN
 LETSENCRYPT_EMAIL=$EMAIL
 JWT_SECRET=$(openssl rand -hex 32)
 ENCRYPTION_KEY=$(openssl rand -hex 32)
+
+# URLs e Portas
+NEXT_PUBLIC_API_URL=https://$DOMAIN/api
+FRONTEND_URL=https://$DOMAIN
+PORT=4000
 
 # Banco de Dados
 POSTGRES_USER=$db_user
