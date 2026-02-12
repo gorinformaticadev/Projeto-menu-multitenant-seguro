@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+
+# ============================================================================
+# update-acme - Atualizador para instalações ACME (Interno ou Externo)
+# ============================================================================
+# Este script atualiza o Projeto-menu-multitenant-seguro mantendo a
+# compatibilidade com as configurações de Nginx (Docker ou Host).
+#
+# Uso:
+#   sudo bash install/update-acme
+# ============================================================================
+
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+# Cores para output
+echoblue() { echo -ne "\033[44m\033[37m\033[1m  $1  \033[0m\n"; }
+echored() { echo -ne "\033[41m\033[37m\033[1m  $1  \033[0m\n"; }
+echogreen() { echo -ne "\033[42m\033[37m\033[1m  $1  \033[0m\n"; }
+log_info() { echo -e "\033[1;34m[INFO]\033[0m $*"; }
+
+require_root() {
+    if [[ $EUID -ne 0 ]]; then
+        echored "Este script deve ser executado como root"
+        exit 1
+    fi
+}
+
+# Localiza a instalação
+find_install_dir() {
+    log_info "Localizando diretório de instalação..."
+    # Tenta o diretório padrão primeiro
+    if [ -d "/opt/multitenant" ]; then
+        INSTALL_DIR="/opt/multitenant"
+    else
+        # Busca por .env que contenha multitenant
+        INSTALL_DIR=$(find / -maxdepth 4 -type f -name ".env" 2>/dev/null | xargs grep -l "DOMAIN=" 2>/dev/null | head -n 1 | xargs dirname 2>/dev/null || echo "")
+    fi
+
+    if [ -z "$INSTALL_DIR" ] || [ ! -d "$INSTALL_DIR" ]; then
+        echored "Não foi possível localizar a instalação do Multitenant."
+        exit 1
+    fi
+    log_info "Instalação encontrada em: $INSTALL_DIR"
+}
+
+update_app() {
+    cd "$INSTALL_DIR"
+    
+    log_info "Buscando atualizações no Git..."
+    git fetch --all
+    
+    # Salva alterações locais se houver
+    if ! git diff-index --quiet HEAD --; then
+        log_info "Salvando alterações locais temporariamente..."
+        git stash push -m "Update ACME $(date +%Y%m%d_%H%M%S)"
+    fi
+
+    log_info "Atualizando código fonte..."
+    git pull origin $(git rev-parse --abbrev-ref HEAD)
+
+    # Detecta o modo de instalação (Externo ou Interno)
+    if grep -q "USE_EXTERNAL_NGINX=true" .env 2>/dev/null; then
+        log_info "Detectado modo: Nginx Externo"
+        docker compose -f docker-compose.yml -f docker-compose.external-nginx.yml pull
+        docker compose -f docker-compose.yml -f docker-compose.external-nginx.yml up -d --build --remove-orphans
+    else
+        log_info "Detectado modo: Nginx Interno (Docker Proxy)"
+        # Verifica se existe override de proxy
+        if [ -f "docker-compose.proxy.override.yml" ]; then
+            docker compose -f docker-compose.yml -f docker-compose.prod.external.yml -f docker-compose.proxy.override.yml pull
+            docker compose -f docker-compose.yml -f docker-compose.prod.external.yml -f docker-compose.proxy.override.yml up -d --build --remove-orphans
+        else
+            docker compose pull
+            docker compose up -d --build --remove-orphans
+        fi
+    fi
+}
+
+main() {
+    require_root
+    find_install_dir
+    update_app
+    
+    echogreen "=============================================="
+    echogreen "  ATUALIZAÇÃO CONCLUÍDA COM SUCESSO!         "
+    echogreen "=============================================="
+}
+
+main "$@"
