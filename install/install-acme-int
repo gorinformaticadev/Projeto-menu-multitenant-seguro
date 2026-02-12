@@ -113,8 +113,6 @@ POSTGRES_PASSWORD=$db_pass
 POSTGRES_DB=$db_name
 DATABASE_URL=postgresql://$db_user:$db_pass@db:5432/$db_name
 
-# Docker Hub (para evitar erro de tag vazia)
-DOCKERHUB_USERNAME=multitenant
 EOF
 }
 
@@ -193,7 +191,6 @@ EOF
     export DOMAIN="$DOMAIN"
     export LETSENCRYPT_EMAIL="$EMAIL"
     export PROXY_NETWORK="$network_name"
-    export DOCKERHUB_USERNAME="multitenant"
     
     # Usa os arquivos de compose necessários
     docker compose \

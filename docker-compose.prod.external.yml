@@ -3,7 +3,7 @@
 services:
   # Frontend (Next.js) - Exposto apenas para localhost
   frontend:
-    image: ${DOCKERHUB_USERNAME}/multitenant-frontend:latest
+    image: multitenant-frontend:latest
     container_name: multitenant-frontend-external
     restart: unless-stopped
     ports:
@@ -19,7 +19,7 @@ services:
 
   # Backend (Node.js/NestJS) - Exposto apenas para localhost
   backend:
-    image: ${DOCKERHUB_USERNAME}/multitenant-backend:latest
+    image: multitenant-backend:latest
     container_name: multitenant-backend-external
     restart: unless-stopped
     ports:

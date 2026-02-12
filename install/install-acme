@@ -314,9 +314,6 @@ POSTGRES_PASSWORD=$db_pass
 POSTGRES_DB=$db_name
 DATABASE_URL=postgresql://$db_user:$db_pass@db:5432/$db_name
 
-# Docker Hub (para evitar erro de tag vazia)
-DOCKERHUB_USERNAME=multitenant
-
 # Modo de instalação
 USE_EXTERNAL_NGINX=$USE_EXTERNAL_NGINX
 EOF
