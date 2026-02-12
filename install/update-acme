@@ -65,6 +65,15 @@ update_app() {
         export $(grep -v '^#' .env | xargs)
     fi
 
+    # Garante que variáveis essenciais existam no .env para evitar 502
+    if ! grep -q "NEXT_PUBLIC_API_URL" .env; then
+        log_info "Adicionando variáveis de URL ausentes no .env..."
+        local domain=$(grep "DOMAIN=" .env | cut -d'=' -f2)
+        echo "NEXT_PUBLIC_API_URL=https://$domain/api" >> .env
+        echo "FRONTEND_URL=https://$domain" >> .env
+        echo "PORT=4000" >> .env
+    fi
+
     # Detecta o modo de instalação (Externo ou Interno)
     if grep -q "USE_EXTERNAL_NGINX=true" .env 2>/dev/null; then
         log_info "Detectado modo: Nginx Externo"
@@ -72,10 +81,19 @@ update_app() {
         docker compose -f docker-compose.yml -f docker-compose.external-nginx.yml up -d --build --remove-orphans
     else
         log_info "Detectado modo: Nginx Interno (Docker Proxy)"
-        # Verifica se existe override de proxy
-        if [ -f "docker-compose.proxy.override.yml" ]; then
-            docker compose -f docker-compose.yml -f docker-compose.prod.external.yml -f docker-compose.proxy.override.yml pull
-            docker compose -f docker-compose.yml -f docker-compose.prod.external.yml -f docker-compose.proxy.override.yml up -d --build --remove-orphans
+        
+        # Garante que a rede do proxy existe
+        local network_name=$(grep "PROXY_NETWORK=" .env | cut -d'=' -f2 || echo "nginx-proxy")
+        if ! docker network inspect "$network_name" >/dev/null 2>&1; then
+            log_info "Criando rede Docker ausente: $network_name"
+            docker network create "$network_name"
+        fi
+
+        # Usa o novo arquivo de proxy se disponível
+        if [ -f "docker-compose.proxy.yml" ]; then
+            log_info "Aplicando configurações de rede e proxy..."
+            docker compose -f docker-compose.yml -f docker-compose.prod.external.yml -f docker-compose.proxy.yml pull
+            docker compose -f docker-compose.yml -f docker-compose.prod.external.yml -f docker-compose.proxy.yml up -d --build --remove-orphans
         else
             docker compose pull
             docker compose up -d --build --remove-orphans
