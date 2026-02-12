@@ -1,70 +1,7 @@
-# version: '3.8'
-
-services:
-  db:
-    image: postgres:15-alpine
-    container_name: app-db
-    environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_NAME:-db_multitenant}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - app-network
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: always
-
-  backend:
-    build:
-      context: .
-      dockerfile: apps/backend/Dockerfile
-    container_name: app-backend
-    ports:
-      - "127.0.0.1:4000:4000"
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: ${DATABASE_URL}
-      JWT_SECRET: ${JWT_SECRET}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
-      FRONTEND_URL: ${FRONTEND_URL}
-      NODE_ENV: ${NODE_ENV}
-      PORT: ${PORT:-4000}
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - app-network
-    restart: always
-
-  frontend:
-    build:
-      context: .
-      dockerfile: apps/frontend/Dockerfile
-      args:
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-    container_name: app-frontend
-    ports:
-      - "127.0.0.1:5000:5000"
-    env_file:
-      - .env
-    environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-      NODE_ENV: ${NODE_ENV}
-    depends_on:
-      - backend
-    networks:
-      - app-network
-    restart: always
+services: {}
 
 networks:
   app-network:
+    external: true
+    name: app-network
     driver: bridge
-
-volumes:
-  postgres_data:

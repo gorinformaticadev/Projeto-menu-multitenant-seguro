@@ -1,13 +1,12 @@
-# version: '3.8'
-
 services:
-  # Frontend (Next.js) - Exposto apenas para localhost
   frontend:
     image: multitenant-frontend:latest
-    container_name: multitenant-frontend-external
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=https://${DOMAIN}/api
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:5000:5000"
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_API_URL=https://${DOMAIN}/api
@@ -17,16 +16,16 @@ services:
     depends_on:
       - backend
 
-  # Backend (Node.js/NestJS) - Exposto apenas para localhost
   backend:
     image: multitenant-backend:latest
-    container_name: multitenant-backend-external
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:4000:4000"
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - FRONTEND_URL=https://${DOMAIN}
       - NODE_ENV=production
       - PORT=4000
@@ -40,10 +39,8 @@ services:
       - db
       - redis
 
-  # Database (PostgreSQL)
   db:
     image: postgres:15-alpine
-    container_name: multitenant-db-prod
     restart: unless-stopped
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
@@ -59,10 +56,8 @@ services:
       timeout: 5s
       retries: 5
 
-  # Cache (Redis)
   redis:
     image: redis:7-alpine
-    container_name: multitenant-redis-prod
     restart: unless-stopped
     volumes:
       - redis_data_prod:/data
@@ -76,4 +71,5 @@ volumes:
 
 networks:
   app-network:
-    driver: bridge
+    external: true
+    name: app-network

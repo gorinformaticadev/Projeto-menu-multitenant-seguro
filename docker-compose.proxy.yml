@@ -1,5 +1,3 @@
-# version: '3.8'
-
 services:
   frontend:
     environment:
@@ -8,22 +6,13 @@ services:
       - LETSENCRYPT_HOST=${DOMAIN}
       - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
     networks:
-      - app-network
       - proxy-nw
 
   backend:
-    environment:
-      - VIRTUAL_HOST=${DOMAIN}
-      - VIRTUAL_PATH=/api
-      - VIRTUAL_PORT=4000
-      - LETSENCRYPT_HOST=${DOMAIN}
     networks:
-      - app-network
       - proxy-nw
 
 networks:
-  app-network:
-    external: true
   proxy-nw:
-    name: ${PROXY_NETWORK:-nginx-proxy}
     external: true
+    name: ${PROXY_NETWORK}
