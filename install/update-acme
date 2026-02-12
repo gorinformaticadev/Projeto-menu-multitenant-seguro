@@ -59,6 +59,12 @@ update_app() {
     log_info "Atualizando código fonte..."
     git pull origin $(git rev-parse --abbrev-ref HEAD)
 
+    # Carrega variáveis do .env para o shell atual para garantir que o docker compose as veja
+    if [ -f ".env" ]; then
+        log_info "Carregando variáveis do arquivo .env..."
+        export $(grep -v '^#' .env | xargs)
+    fi
+
     # Detecta o modo de instalação (Externo ou Interno)
     if grep -q "USE_EXTERNAL_NGINX=true" .env 2>/dev/null; then
         log_info "Detectado modo: Nginx Externo"

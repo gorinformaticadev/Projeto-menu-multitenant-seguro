@@ -286,12 +286,11 @@ setup_env_file() {
     cp "$INSTALL_DIR/.env.example" "$INSTALL_DIR/.env"
 
     # Gera secrets
-    local jwt_secret
-    local encryption_key
-    jwt_secret="$(openssl rand -hex 32)"
-    encryption_key="$(openssl rand -hex 32)"
-    local db_password
-    db_password="$(openssl rand -hex 16)"
+    local jwt_secret=$(openssl rand -hex 32)
+    local encryption_key=$(openssl rand -hex 32)
+    local db_user="multitenant"
+    local db_name="multitenant"
+    local db_pass=$(openssl rand -hex 16)
 
     # Atualiza .env
     cat >> "$INSTALL_DIR/.env" <<EOF
@@ -303,8 +302,15 @@ FRONTEND_PORT=$FRONTEND_PORT
 BACKEND_PORT=$BACKEND_PORT
 JWT_SECRET=$jwt_secret
 ENCRYPTION_KEY=$encryption_key
-DB_PASSWORD=$db_password
-DATABASE_URL=postgresql://postgres:${db_password}@db:5432/multitenant
+
+# Banco de Dados
+POSTGRES_USER=$db_user
+POSTGRES_PASSWORD=$db_pass
+POSTGRES_DB=$db_name
+DATABASE_URL=postgresql://$db_user:$db_pass@db:5432/$db_name
+
+# Docker Hub (para evitar erro de tag vazia)
+DOCKERHUB_USERNAME=multitenant
 
 # Modo de instalação
 USE_EXTERNAL_NGINX=$USE_EXTERNAL_NGINX

@@ -88,12 +88,28 @@ prepare_install_dir() {
 setup_env_file() {
     log_info "Configurando .env..."
     cp "$INSTALL_DIR/.env.example" "$INSTALL_DIR/.env"
+    
+    # Define variáveis de ambiente necessárias para o docker-compose
+    local db_user="multitenant"
+    local db_name="multitenant"
+    local db_pass=$(openssl rand -hex 16)
+    
     cat >> "$INSTALL_DIR/.env" <<EOF
+
+# Configurações geradas pelo install-acme-int
 DOMAIN=$DOMAIN
 LETSENCRYPT_EMAIL=$EMAIL
 JWT_SECRET=$(openssl rand -hex 32)
 ENCRYPTION_KEY=$(openssl rand -hex 32)
-DB_PASSWORD=$(openssl rand -hex 16)
+
+# Banco de Dados
+POSTGRES_USER=$db_user
+POSTGRES_PASSWORD=$db_pass
+POSTGRES_DB=$db_name
+DATABASE_URL=postgresql://$db_user:$db_pass@db:5432/$db_name
+
+# Docker Hub (para evitar erro de tag vazia)
+DOCKERHUB_USERNAME=multitenant
 EOF
 }
 
