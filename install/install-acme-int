@@ -137,7 +137,7 @@ install_internal_proxy() {
         
         # Cria um docker-compose simples para o proxy se não houver
         cat > "$proxy_dir/docker-compose.yml" <<EOF
-version: '3.8'
+# version: '3.8'
 services:
   nginx-proxy:
     image: nginxproxy/nginx-proxy:alpine
@@ -147,9 +147,9 @@ services:
       - "443:443"
     volumes:
       - /var/run/docker.sock:/tmp/docker.sock:ro
-      - ./certs:/etc/nginx/certs:ro
-      - ./vhost:/etc/nginx/vhost.d
-      - ./html:/usr/share/nginx/html
+      - certs:/etc/nginx/certs:ro
+      - vhost:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
     networks:
       - proxy-nw
     restart: always
@@ -159,17 +159,24 @@ services:
     container_name: acme-companion
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./certs:/etc/nginx/certs
-      - ./vhost:/etc/nginx/vhost.d
-      - ./html:/usr/share/nginx/html
-      - ./acme:/etc/acme.sh
+      - certs:/etc/nginx/certs
+      - vhost:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - acme:/etc/acme.sh
     environment:
       - DEFAULT_EMAIL=$EMAIL
+      - NGINX_PROXY_CONTAINER=nginx-proxy
     networks:
       - proxy-nw
     depends_on:
       - nginx-proxy
     restart: always
+
+volumes:
+  certs:
+  vhost:
+  html:
+  acme:
 
 networks:
   proxy-nw:
