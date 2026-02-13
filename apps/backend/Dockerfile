@@ -1,46 +1,36 @@
-# Backend multi-stage build - optimized for pnpm monorepo
+# Backend multi-stage build - optimized for production
 FROM node:20-alpine AS base
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
 
 # Builder stage
 FROM base AS builder
 WORKDIR /app
-# Copy monorepo configuration files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-
-# Copy source code (needed for workspace links)
 COPY . .
-
-# Install dependencies using lockfile
+RUN npm install -g pnpm
 RUN pnpm install --frozen-lockfile
-
-# Generate Prisma Client
 RUN pnpm --filter backend prisma:generate
-
-# Build backend
 RUN pnpm --filter backend build
-ENV CI=true
 
-# Runner stage
+# Runner stage - production only
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=4000
 
+# Install curl for healthcheck
+RUN apk add --no-cache curl
+
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nestjs
 
-# Copy dependencies and build artifacts from builder
+# Copy node_modules from builder (the entire monorepo node_modules)
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/backend/node_modules ./apps/backend/node_modules
+
+# Copy build artifacts
 COPY --from=builder /app/apps/backend/dist ./dist
-COPY --from=builder /app/apps/backend/package.json ./package.json
-COPY --from=builder /app/apps/backend/prisma.config.ts ./prisma.config.ts
-COPY --from=builder /app/apps/backend/prisma ./apps/backend/prisma
 COPY --from=builder /app/apps/backend/prisma ./prisma
+COPY --from=builder /app/apps/backend/package.json ./
 
 # Copy entrypoint script
 COPY --from=builder /app/apps/backend/docker-entrypoint.sh ./docker-entrypoint.sh
@@ -49,4 +39,5 @@ RUN chmod +x ./docker-entrypoint.sh
 USER nestjs
 
 EXPOSE 4000
+
 CMD ["/app/docker-entrypoint.sh"]

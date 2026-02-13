@@ -6,16 +6,29 @@ services:
       - LETSENCRYPT_HOST=${DOMAIN}
       - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
     networks:
+      - app-network
       - proxy-nw
+    depends_on:
+      backend:
+        condition: service_healthy
 
   backend:
     environment:
       - VIRTUAL_HOST=${DOMAIN}
       - VIRTUAL_PORT=4000
     networks:
+      - app-network
       - proxy-nw
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 networks:
+  app-network:
+    external: true
+    name: app-network
   proxy-nw:
     external: true
     name: ${PROXY_NETWORK}

@@ -1,14 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
 # install-acme-int - Instalador (1 domínio) com nginx-proxy + acme-companion
-# Opção B: domínio único, /api roteado para backend via vhost.d custom
-#
-# Compatível com ticketz-docker-acme:
-# - Se achar ticketz-nginx-proxy, escreve o vhost no volume do Ticketz e reload
-# - Senão, cria proxy próprio em /opt/nginx-proxy
-#
-# Uso:
-#   sudo bash install/install-acme-int <domain> <email>
 # ============================================================================
 
 set -Eeuo pipefail
@@ -24,7 +16,6 @@ INSTALL_DIR="/opt/multitenant"
 APP_NETWORK="app-network"
 PROXY_DIR="/opt/nginx-proxy"
 
-# ------------------------------- UI helpers ---------------------------------
 echored()   { echo -e "\033[41m\033[37m\033[1m  $*  \033[0m"; }
 echogreen() { echo -e "\033[42m\033[37m\033[1m  $*  \033[0m"; }
 log_info()  { echo -e "\033[1;34m[INFO]\033[0m $*"; }
@@ -35,7 +26,6 @@ show_usage() {
   cat <<'EOF'
 Uso:
   sudo bash install/install-acme-int <domain> <email>
-
 Exemplo:
   sudo bash install/install-acme-int menu.exemplo.com.br admin@exemplo.com.br
 EOF
@@ -65,19 +55,15 @@ ensure_docker() {
     log_info "Docker não encontrado. Instalando..."
     curl -fsSL https://get.docker.com | sh
   fi
-
   if command -v systemctl >/dev/null 2>&1; then
     systemctl enable --now docker >/dev/null 2>&1 || true
   fi
-
   docker info >/dev/null 2>&1 || {
     log_error "Docker instalado, mas daemon não está acessível."
-    log_error "Verifique: systemctl status docker"
     exit 1
   }
-
   docker compose version >/dev/null 2>&1 || {
-    log_error "docker compose não disponível. (plugin docker-compose-plugin)."
+    log_error "docker compose não disponível."
     exit 1
   }
 }
@@ -98,14 +84,8 @@ prepare_install_dir() {
 }
 
 upsert_env_var() {
-  local key="$1"
-  local value="$2"
-  local file="$INSTALL_DIR/.env"
-
-  if [[ ! -f "$file" ]]; then
-    touch "$file"
-  fi
-
+  local key="$1" value="$2" file="$INSTALL_DIR/.env"
+  if [[ ! -f "$file" ]]; then touch "$file"; fi
   if grep -q "^${key}=" "$file" 2>/dev/null; then
     sed -i "s|^${key}=.*|${key}=${value}|" "$file"
   else
@@ -115,63 +95,39 @@ upsert_env_var() {
 
 setup_env_file() {
   log_info "Configurando .env..."
-
-  [[ -f "$INSTALL_DIR/.env.example" ]] || {
-    log_error ".env.example não encontrado em $INSTALL_DIR"
-    exit 1
-  }
-
-  if [[ -f "$INSTALL_DIR/.env" ]]; then
-    cp -f "$INSTALL_DIR/.env" "$INSTALL_DIR/.env.bak.$(date +%Y%m%d%H%M%S)" || true
-  fi
-
+  [[ -f "$INSTALL_DIR/.env.example" ]] || { log_error ".env.example não encontrado"; exit 1; }
   cp "$INSTALL_DIR/.env.example" "$INSTALL_DIR/.env"
-
-  local db_user="multitenant"
-  local db_name="multitenant"
-  local db_pass jwt_secret encryption_key
-
-  db_pass="$(openssl rand -hex 16)"
-  jwt_secret="$(openssl rand -hex 32)"
-  encryption_key="$(openssl rand -hex 32)"
-
+  
+  local db_user="multitenant" db_name="multitenant"
+  local db_pass="$(openssl rand -hex 16)"
+  local jwt_secret="$(openssl rand -hex 32)"
+  local encryption_key="$(openssl rand -hex 32)"
+  
   upsert_env_var "DOMAIN" "$DOMAIN"
   upsert_env_var "LETSENCRYPT_EMAIL" "$EMAIL"
-
-  # compatibilidade: .env pode ter DB_* ou POSTGRES_*
   upsert_env_var "DB_USER" "$db_user"
   upsert_env_var "DB_PASSWORD" "$db_pass"
   upsert_env_var "DB_NAME" "$db_name"
-
   upsert_env_var "POSTGRES_USER" "$db_user"
   upsert_env_var "POSTGRES_PASSWORD" "$db_pass"
   upsert_env_var "POSTGRES_DB" "$db_name"
-
   upsert_env_var "PORT" "4000"
   upsert_env_var "NODE_ENV" "production"
   upsert_env_var "JWT_SECRET" "$jwt_secret"
   upsert_env_var "ENCRYPTION_KEY" "$encryption_key"
-
   upsert_env_var "FRONTEND_URL" "https://${DOMAIN}"
-  # Opção B: API no mesmo domínio via /api
   upsert_env_var "NEXT_PUBLIC_API_URL" "https://${DOMAIN}/api"
-
-  # Service name do banco no compose é "db"
   upsert_env_var "DATABASE_URL" "postgresql://${db_user}:${db_pass}@db:5432/${db_name}"
 }
 
 detect_proxy() {
   log_info "Detectando proxy existente..."
-
-  PROXY_CONTAINER=""
-  PROXY_NETWORK=""
-
+  PROXY_CONTAINER="" PROXY_NETWORK=""
   if docker ps --format '{{.Names}}' | grep -qx 'ticketz-nginx-proxy'; then
     PROXY_CONTAINER="ticketz-nginx-proxy"
   elif docker ps --format '{{.Names}}' | grep -qx 'nginx-proxy'; then
     PROXY_CONTAINER="nginx-proxy"
   fi
-
   if [[ -n "$PROXY_CONTAINER" ]]; then
     PROXY_NETWORK="$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{println $k}}{{end}}' "$PROXY_CONTAINER" | head -n 1)"
     log_info "Proxy encontrado: $PROXY_CONTAINER | Rede: $PROXY_NETWORK"
@@ -182,50 +138,33 @@ detect_proxy() {
 
 create_proxy_if_needed() {
   if [[ -n "$PROXY_CONTAINER" ]]; then
-    [[ -n "$PROXY_NETWORK" ]] || {
-      log_error "Proxy detectado, mas rede não foi encontrada."
-      exit 1
-    }
-    docker network inspect "$PROXY_NETWORK" >/dev/null 2>&1 || {
-      log_error "Rede do proxy ($PROXY_NETWORK) não existe."
-      exit 1
-    }
+    [[ -n "$PROXY_NETWORK" ]] || { log_error "Rede não encontrada"; exit 1; }
+    docker network inspect "$PROXY_NETWORK" >/dev/null 2>&1 || { log_error "Rede não existe"; exit 1; }
     upsert_env_var "PROXY_NETWORK" "$PROXY_NETWORK"
     return 0
   fi
-
   local new_net="nginx-proxy"
-
-  # Não pode ocupar 80/443
   if ss -tulpn | grep -Eq ':(80|443)\s'; then
-    log_error "Porta 80/443 já em uso. Não vou criar novo proxy."
-    log_error "Instale o Ticketz (proxy existente) ou libere 80/443."
-    exit 1
+    log_error "Porta 80/443 já em uso."; exit 1
   fi
-
   ensure_network "$new_net"
   upsert_env_var "PROXY_NETWORK" "$new_net"
-
-  log_info "Criando proxy próprio em $PROXY_DIR..."
+  log_info "Criando proxy em $PROXY_DIR..."
   mkdir -p "$PROXY_DIR" "$PROXY_DIR/certs" "$PROXY_DIR/vhost" "$PROXY_DIR/html" "$PROXY_DIR/acme"
-
-  cat > "$PROXY_DIR/docker-compose.yml" <<EOF
+  
+  cat > "$PROXY_DIR/docker-compose.yml" <<EOFPROXY
 services:
   nginx-proxy:
     image: nginxproxy/nginx-proxy:alpine
     container_name: nginx-proxy
-    ports:
-      - "80:80"
-      - "443:443"
+    ports: ["80:80", "443:443"]
     volumes:
       - /var/run/docker.sock:/tmp/docker.sock:ro
       - ./certs:/etc/nginx/certs
       - ./vhost:/etc/nginx/vhost.d
       - ./html:/usr/share/nginx/html
-    networks:
-      - proxy-nw
+    networks: [proxy-nw]
     restart: always
-
   acme-companion:
     image: nginxproxy/acme-companion
     container_name: acme-companion
@@ -238,154 +177,149 @@ services:
     environment:
       - DEFAULT_EMAIL=${EMAIL}
       - NGINX_PROXY_CONTAINER=nginx-proxy
-    networks:
-      - proxy-nw
-    depends_on:
-      - nginx-proxy
+    networks: [proxy-nw]
+    depends_on: [nginx-proxy]
     restart: always
-
 networks:
   proxy-nw:
     name: ${new_net}
     external: true
-EOF
+EOFPROXY
 
+  # Criar rede explicitamente
+  log_info "Criando rede Docker: $new_net"
+  docker network create "$new_net" 2>/dev/null || true
+  
   docker compose -f "$PROXY_DIR/docker-compose.yml" up -d
-
   PROXY_CONTAINER="nginx-proxy"
   PROXY_NETWORK="$new_net"
-  log_info "Proxy criado: $PROXY_CONTAINER | Rede: $PROXY_NETWORK"
 }
 
 write_vhost_rule_and_reload() {
-  log_info "Aplicando regra /api no proxy para o domínio: $DOMAIN"
-
-  # IMPORTANTE:
-  # - Como você disse que o backend PRECISA de /api, aqui mantemos /api no path.
-  # - Upstream deve ser o NOME DO SERVICE no compose: "backend" (não app-backend).
-  local vhost_content
-  vhost_content="$(cat <<'NGINX'
-# --- Custom /api routing (generated by installer) ---
-location = /api {
-  return 301 /api/;
-}
-
+  log_info "Aplicando regra /api no proxy para: $DOMAIN"
+  local vhost_content='
+# --- Custom /api routing ---
+location = /api { return 301 /api/; }
 location ^~ /api/ {
   proxy_http_version 1.1;
   proxy_set_header Host $host;
   proxy_set_header X-Real-IP $remote_addr;
   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
   proxy_set_header X-Forwarded-Proto $scheme;
-
   proxy_set_header Upgrade $http_upgrade;
   proxy_set_header Connection $connection_upgrade;
-
   proxy_read_timeout 300;
   proxy_send_timeout 300;
-
-  # Mantém /api no path:
   proxy_pass http://backend:4000;
   proxy_redirect off;
-}
-NGINX
-)"
-
+}'
   local mount_type mount_name_or_src
-
   mount_type="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/etc/nginx/vhost.d"}}{{.Type}}{{end}}{{end}}' "$PROXY_CONTAINER")"
   mount_name_or_src="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/etc/nginx/vhost.d"}}{{if eq .Type "volume"}}{{.Name}}{{else}}{{.Source}}{{end}}{{end}}{{end}}' "$PROXY_CONTAINER")"
-
   if [[ -z "$mount_type" || -z "$mount_name_or_src" ]]; then
-    log_error "Não consegui identificar o mount de /etc/nginx/vhost.d no proxy ($PROXY_CONTAINER)."
-    exit 1
-  fi
-
+    log_error "Não consegui identificar mount de vhost.d"; exit 1; fi
   if [[ "$mount_type" == "volume" ]]; then
-    log_info "Escrevendo vhost em VOLUME: $mount_name_or_src"
     docker run --rm -i -v "${mount_name_or_src}:/vhost" alpine:3.20 sh -c "cat > /vhost/${DOMAIN} <<'EOF'
 ${vhost_content}
-EOF
-"
+EOF"
   else
-    log_info "Escrevendo vhost em PATH: $mount_name_or_src"
     mkdir -p "$mount_name_or_src"
     cat > "${mount_name_or_src}/${DOMAIN}" <<EOF
 ${vhost_content}
 EOF
   fi
-
-  log_info "Recarregando nginx no proxy: $PROXY_CONTAINER"
-  if ! docker exec "$PROXY_CONTAINER" nginx -s reload >/dev/null 2>&1; then
-    docker kill -s HUP "$PROXY_CONTAINER" >/dev/null 2>&1 || true
-  fi
+  docker exec "$PROXY_CONTAINER" nginx -s reload 2>/dev/null || docker kill -s HUP "$PROXY_CONTAINER" 2>/dev/null || true
 }
 
 start_application() {
   log_info "Subindo aplicação..."
   cd "$INSTALL_DIR"
-
-  # Redes já garantidas no main
-
-  if [[ -f "$INSTALL_DIR/.env" ]]; then
-    set -a
-    # shellcheck disable=SC1091
-    source "$INSTALL_DIR/.env"
-    set +a
-  fi
-
-  # Sanity: proxy resolve o service backend? (requer backend estar na rede do proxy via overlay)
-  if [[ -n "${PROXY_CONTAINER:-}" ]]; then
-    if ! docker exec "$PROXY_CONTAINER" getent hosts backend >/dev/null 2>&1; then
-      log_warn "Proxy ainda não resolve 'backend'. Isso é esperado antes de subir a app,"
-      log_warn "mas após o up deve resolver se docker-compose.proxy.yml colocar backend na proxy-nw."
+  ensure_network "$APP_NETWORK"
+  if [[ -f "$INSTALL_DIR/.env" ]]; then set -a; source "$INSTALL_DIR/.env"; set +a; fi
+  
+  log_info "Subindo containers..."
+  docker compose -f docker-compose.yml -f docker-compose.prod.external.yml -f docker-compose.proxy.yml up -d --build --remove-orphans
+  
+  # ===============================================================
+  # VALIDACAO: Verificar se backend iniciou corretamente
+  # ===============================================================
+  log_info "Validando container do backend..."
+  local backend_container="multitenant-backend-1"
+  local max_wait=120 waited=0 backend_ok=false
+  
+  while [[ $waited -lt $max_wait ]]; do
+    if docker ps --format '{{.Names}}' | grep -q "$backend_container"; then
+      local status=$(docker inspect -f '{{.State.Status}}' "$backend_container" 2>/dev/null || echo "unknown")
+      if [[ "$status" == "running" ]]; then
+        local logs=$(docker logs "$backend_container" 2>&1 | tail -50 || true)
+        if echo "$logs" | grep -qi "Cannot find module\|ModuleNotFoundError"; then
+          log_error "ERRO CRÍTICO: Dependência faltando!"
+          log_error "Logs: $logs"
+          exit 1
+        fi
+        if echo "$logs" | grep -qi "Nest application successfully started\|Server running\|Application is running"; then
+          backend_ok=true
+          break
+        fi
+      fi
     fi
-  fi
-
-  docker compose \
-    -f docker-compose.yml \
-    -f docker-compose.prod.external.yml \
-    -f docker-compose.proxy.yml \
-    up -d --build --remove-orphans
-
-  # Após subir, valida de novo: proxy precisa resolver backend
-  if ! docker exec "$PROXY_CONTAINER" getent hosts backend >/dev/null 2>&1; then
-    log_error "Proxy NÃO resolve 'backend' após subir. O backend não está na rede do proxy."
-    log_error "Corrija docker-compose.proxy.yml para colocar o service backend em proxy-nw."
+    waited=$((waited + 2))
+    sleep 2
+  done
+  
+  if [[ "$backend_ok" == "true" ]]; then
+    log_info "Backend iniciou corretamente!"
+  else
+    log_error "Backend não iniciou após ${max_wait}s"
+    docker logs "$backend_container" --tail 100
     exit 1
   fi
+  
+  # Validar frontend
+  log_info "Validando frontend..."
+  local frontend_container="multitenant-frontend-1" frontend_ok=false waited=0
+  while [[ $waited -lt $max_wait ]]; do
+    if docker ps --format '{{.Names}}' | grep -q "$frontend_container"; then
+      local status=$(docker inspect -f '{{.State.Status}}' "$frontend_container" 2>/dev/null || echo "unknown")
+      if [[ "$status" == "running" ]]; then
+        local logs=$(docker logs "$frontend_container" 2>&1 | tail -30 || true)
+        if echo "$logs" | grep -qi "Ready in production\|compiled successfully"; then
+          frontend_ok=true
+          break
+        fi
+      fi
+    fi
+    waited=$((waited + 2))
+    sleep 2
+  done
+  [[ "$frontend_ok" == "true" ]] && log_info "Frontend iniciou!" || log_warn "Frontend pode não ter iniciado."
+  
+  # Aguardar rede
+  log_info "Aguardando rede (30s)..."
+  local max_attempts=30 attempt=0 backend_resolved=false
+  while [[ $attempt -lt $max_attempts ]]; do
+    if docker exec "$PROXY_CONTAINER" getent hosts backend >/dev/null 2>&1; then
+      backend_resolved=true; break
+    fi
+    attempt=$((attempt + 1))
+    sleep 1
+  done
+  [[ "$backend_resolved" == "true" ]] && log_info "Proxy resolve backend!" || log_warn "Proxy não resolve backend."
 }
 
 main() {
-  require_root
-  validate_params
-
-  log_info "Domain: $DOMAIN"
-  log_info "Email:  $EMAIL"
-
-  ensure_docker
-  prepare_install_dir
-  setup_env_file
-
-  detect_proxy
-  create_proxy_if_needed
-
+  require_root; validate_params
+  log_info "Domain: $DOMAIN | Email: $EMAIL"
+  ensure_docker; prepare_install_dir; setup_env_file
+  detect_proxy; create_proxy_if_needed
   upsert_env_var "PROXY_NETWORK" "$PROXY_NETWORK"
   export PROXY_NETWORK="$PROXY_NETWORK"
-
   ensure_network "$APP_NETWORK"
   start_application
   write_vhost_rule_and_reload
-
   echogreen "=============================================="
-  echogreen "  INSTALAÇÃO CONCLUÍDA                        "
-  echogreen "  Acesse: https://${DOMAIN}                   "
+  echogreen "  INSTALAÇÃO CONCLUÍDA: https://${DOMAIN}      "
   echogreen "=============================================="
-
-  log_info "Diagnóstico:"
-  echo "  docker ps"
-  echo "  docker logs -f frontend"
-  echo "  docker logs -f backend"
-  echo "  docker logs -f $PROXY_CONTAINER"
 }
 
 main "$@"
