@@ -1,6 +1,8 @@
-import { Controller, Get, Head } from '@nestjs/common';
+import { Controller, Get, Head, SetMetadata } from '@nestjs/common';
 
 @Controller('health')
+@SetMetadata('skipCsrf', true)
+@SetMetadata('isPublic', true)
 export class HealthController {
   @Get()
   check() {
