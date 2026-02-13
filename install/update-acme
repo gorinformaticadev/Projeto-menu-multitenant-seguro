@@ -137,6 +137,8 @@ update_app() {
         # Usa o novo arquivo de proxy se disponível
         if [ -f "docker-compose.proxy.yml" ]; then
             log_info "Aplicando configurações de rede e proxy..."
+            # Garante que PROXY_NETWORK está exportada para o compose
+            export PROXY_NETWORK="${PROXY_NETWORK:-nginx-proxy}"
             # Removemos o 'pull' para evitar erro com imagens locais
             docker compose -f docker-compose.yml -f docker-compose.prod.external.yml -f docker-compose.proxy.yml up -d --build --remove-orphans
         else

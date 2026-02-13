@@ -9,6 +9,9 @@ services:
       - proxy-nw
 
   backend:
+    environment:
+      - VIRTUAL_HOST=${DOMAIN}
+      - VIRTUAL_PORT=4000
     networks:
       - proxy-nw
 

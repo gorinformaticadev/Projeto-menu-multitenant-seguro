@@ -285,6 +285,7 @@ location ^~ /api/ {
 
   # Mantém /api no path:
   proxy_pass http://backend:4000;
+  proxy_redirect off;
 }
 NGINX
 )"
@@ -323,8 +324,7 @@ start_application() {
   log_info "Subindo aplicação..."
   cd "$INSTALL_DIR"
 
-  ensure_network "$APP_NETWORK"
-  ensure_network "$PROXY_NETWORK"
+  # Redes já garantidas no main
 
   if [[ -f "$INSTALL_DIR/.env" ]]; then
     set -a
@@ -372,6 +372,7 @@ main() {
   upsert_env_var "PROXY_NETWORK" "$PROXY_NETWORK"
   export PROXY_NETWORK="$PROXY_NETWORK"
 
+  ensure_network "$APP_NETWORK"
   start_application
   write_vhost_rule_and_reload
 
