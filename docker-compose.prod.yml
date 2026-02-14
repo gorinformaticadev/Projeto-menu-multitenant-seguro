@@ -22,12 +22,14 @@ services:
     build:
       context: .
       dockerfile: apps/frontend/Dockerfile
+      args:
+        # No browser a API é acessada pela mesma origem (nginx faz proxy /api)
+        - NEXT_PUBLIC_API_URL=/api
     container_name: multitenant-frontend
     restart: unless-stopped
-    # NÃO expor portas públicas; o acesso será apenas via nginx
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=http://backend:4000
+      - NEXT_PUBLIC_API_URL=/api
     depends_on:
       - backend
     networks:
@@ -46,13 +48,13 @@ services:
       dockerfile: apps/backend/Dockerfile
     container_name: multitenant-backend
     restart: unless-stopped
-    # NÃO expor portas públicas; o acesso será apenas via nginx
+    # FRONTEND_URL deve ser a URL pública (https://DOMAIN) para CORS aceitar o browser; vem de install/.env.production
     environment:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - FRONTEND_URL=http://frontend:5000
+      - FRONTEND_URL=${FRONTEND_URL}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     depends_on:

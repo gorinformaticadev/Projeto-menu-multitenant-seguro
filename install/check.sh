@@ -81,7 +81,7 @@ for name in "${CONTAINERS[@]}"; do
         if [[ "$state" == "running" ]]; then
             if [[ "$health" == "healthy" ]]; then
                 report ok "Container $name: running, healthy" "container_$name"
-            elif [[ "$health" == "no-healthcheck" ]]; then
+            elif [[ "$health" == "no-healthcheck" || -z "$health" ]]; then
                 report ok "Container $name: running (sem healthcheck)" "container_$name"
             else
                 report fail "Container $name: running mas health=$health" "container_$name"
