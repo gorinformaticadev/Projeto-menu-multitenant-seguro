@@ -25,12 +25,12 @@ services:
       dockerfile: apps/frontend/Dockerfile
       args:
         # No browser a API é acessada pela mesma origem (nginx faz proxy /api)
-        - NEXT_PUBLIC_API_URL=/api
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     container_name: multitenant-frontend
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=/api
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     depends_on:
       - backend
     networks:
