@@ -60,6 +60,33 @@ sudo bash install/install.sh update
 sudo bash install/install.sh update main
 ```
 
+### Verificação do ambiente
+
+Para conferir se Docker, containers, Nginx, portas e certificados estão corretos, use o script de checagem (a partir da **raiz do projeto**):
+
+```bash
+bash install/check.sh
+```
+
+O script verifica:
+
+| Verificação | Descrição |
+|-------------|-----------|
+| **Docker** | Instalado e daemon em execução |
+| **Docker Compose** | Plugin disponível |
+| **docker-compose.prod.yml** | Arquivo presente na raiz |
+| **Containers** | Existência e status de: `multitenant-nginx`, `multitenant-frontend`, `multitenant-backend`, `multitenant-postgres`, `multitenant-redis` (running e healthy quando houver healthcheck) |
+| **Nginx** | Arquivo de config em `nginx/conf.d/default.conf` |
+| **Portas** | 80 e 443 em escuta no host (`ss` ou `netstat`) |
+| **Certificado** | Existência e validade de `nginx/certs/cert.pem` e `nginx/certs/key.pem` |
+| **Teste HTTP/HTTPS** | `curl` em `http://127.0.0.1:80/` e `https://127.0.0.1:443/` |
+
+No final o script mostra um resumo de `docker compose ps` e o resultado dos curls. Para saída em uma linha (ex.: logs), use:
+
+```bash
+bash install/check.sh --json
+```
+
 ## Variáveis de ambiente
 
 O instalador gera/atualiza o `.env` na **raiz do projeto**. Além das variáveis já usadas pelo `docker-compose` e pelas apps, foram adicionadas as seguintes, pensadas para o momento da instalação e multitenancy:
@@ -136,6 +163,7 @@ O instalador não altera o pipeline em `.github/workflows/ci-cd.yml`:
 | Arquivo | Função |
 |---------|--------|
 | `install/install.sh` | Script principal (install / update). |
+| `install/check.sh` | Script de verificação (Docker, containers, Nginx, portas, certificados). |
 | `install/nginx-docker.conf.template` | Template Nginx para Docker (HTTP + HTTPS). |
 | `install/nginx-docker-http-only.conf.template` | Template só HTTP (quando não há cert). |
 | `install/.env.installer.example` | Template de variáveis. |
