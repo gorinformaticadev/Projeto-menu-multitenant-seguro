@@ -11,7 +11,7 @@ services:
   frontend:
     ports:
       # Expõe apenas no localhost para o Nginx do host acessar
-      - "127.0.0.1:5000:3000"
+      - "127.0.0.1:5000:5000"
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:4000}
     networks:
@@ -20,7 +20,7 @@ services:
   backend:
     ports:
       # Expõe apenas no localhost para o Nginx do host acessar
-      - "127.0.0.1:4000:3000"
+      - "127.0.0.1:4000:4000"
     environment:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}

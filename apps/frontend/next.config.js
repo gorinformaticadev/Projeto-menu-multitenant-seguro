@@ -42,7 +42,21 @@ const nextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: `default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: ${apiUrl} ${apiUrl.replace('http', 'https')}; connect-src 'self' ${apiUrl} ${apiUrl.replace('http', 'ws')} ${apiUrl.replace('http', 'https')} ${apiUrl.replace('http', 'wss')} http://localhost:5000 ws://localhost:5000 https://localhost:5000 wss://localhost:5000; font-src 'self' data: https:;`,
+          value: (() => {
+              const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+              const apiUrl = rawApiUrl.replace(/\/+$/, '');
+              const isAbsolute = /^https?:\/\//i.test(apiUrl);
+
+              const apiCsp = isAbsolute
+                ? `${apiUrl} ${apiUrl.replace(/^http:/, 'https:')}`
+                : '';
+
+              const wsCsp = isAbsolute
+                ? `${apiUrl.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:')}`
+                : '';
+
+              return `default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: ${apiCsp}; connect-src 'self' ${apiCsp} ${wsCsp} http://localhost:5000 ws://localhost:5000 https://localhost:5000 wss://localhost:5000; font-src 'self' data: https:;`;
+            })(),
           },
         ],
       },
