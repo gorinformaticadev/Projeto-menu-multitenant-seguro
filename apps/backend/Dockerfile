@@ -17,8 +17,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=4000
 
-# Install curl for healthcheck
-RUN apk add --no-cache curl
+# Install curl for healthcheck and postgresql-client for entrypoint (pg_isready)
+RUN apk add --no-cache curl postgresql-client
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
