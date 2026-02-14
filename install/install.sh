@@ -23,6 +23,8 @@ COMPOSE_PROD="$PROJECT_ROOT/docker-compose.prod.yml"
 COMPOSE_EXTERNAL="$PROJECT_ROOT/docker-compose.external-nginx.yml"
 ENV_EXAMPLE="$PROJECT_ROOT/.env.example"
 ENV_INSTALLER_EXAMPLE="$SCRIPT_DIR/.env.installer.example"
+# Arquivo de env da stack de produção (monorepo: não usar .env na raiz)
+ENV_PRODUCTION="$SCRIPT_DIR/.env.production"
 NGINX_TEMPLATE_DOCKER="$SCRIPT_DIR/nginx-docker.conf.template"
 NGINX_TEMPLATE_ACME="$PROJECT_ROOT/multitenant-docker-acme/confs/nginx-multitenant.conf"
 NGINX_CONF_DIR="$PROJECT_ROOT/nginx/conf.d"
@@ -119,13 +121,13 @@ validate_email() {
 }
 
 ensure_env_file() {
-    if [[ ! -f "$PROJECT_ROOT/.env" ]]; then
+    if [[ ! -f "$ENV_PRODUCTION" ]]; then
         if [[ -f "$ENV_INSTALLER_EXAMPLE" ]]; then
-            cp "$ENV_INSTALLER_EXAMPLE" "$PROJECT_ROOT/.env"
-            log_info "Arquivo .env criado a partir de .env.installer.example"
+            cp "$ENV_INSTALLER_EXAMPLE" "$ENV_PRODUCTION"
+            log_info "Arquivo de produção criado: install/.env.production"
         elif [[ -f "$ENV_EXAMPLE" ]]; then
-            cp "$ENV_EXAMPLE" "$PROJECT_ROOT/.env"
-            log_info "Arquivo .env criado a partir de .env.example"
+            cp "$ENV_EXAMPLE" "$ENV_PRODUCTION"
+            log_info "Arquivo de produção criado: install/.env.production"
         else
             log_error "Nenhum .env.example ou .env.installer.example encontrado."
             exit 1
@@ -136,7 +138,7 @@ ensure_env_file() {
 upsert_env() {
     local key="$1"
     local value="$2"
-    local file="${3:-$PROJECT_ROOT/.env}"
+    local file="${3:-$ENV_PRODUCTION}"
     if grep -q "^${key}=" "$file" 2>/dev/null; then
         local tmpfile
         tmpfile="$(mktemp)"
@@ -224,6 +226,31 @@ run_install() {
     upsert_env "INSTALL_ADMIN_EMAIL" "${admin_email:-$email}"
     upsert_env "INSTALL_ADMIN_PASSWORD" "$admin_pass"
 
+    # Criar .env em apps/backend e .env.local em apps/frontend (a partir dos exemplos do projeto)
+    BACKEND_ENV="$PROJECT_ROOT/apps/backend/.env"
+    FRONTEND_ENV="$PROJECT_ROOT/apps/frontend/.env.local"
+    BACKEND_EXAMPLE="$PROJECT_ROOT/apps/backend/.env.example"
+    FRONTEND_EXAMPLE="$PROJECT_ROOT/apps/frontend/.env.local.example"
+    if [[ -f "$BACKEND_EXAMPLE" ]]; then
+        if [[ ! -f "$BACKEND_ENV" ]]; then
+            cp "$BACKEND_EXAMPLE" "$BACKEND_ENV"
+            log_info "Criado apps/backend/.env a partir de .env.example"
+        fi
+        upsert_env "DATABASE_URL" "postgresql://$db_user:$db_pass@db:5432/$db_name?schema=public" "$BACKEND_ENV"
+        upsert_env "JWT_SECRET" "$jwt_secret" "$BACKEND_ENV"
+        upsert_env "ENCRYPTION_KEY" "$enc_key" "$BACKEND_ENV"
+        upsert_env "FRONTEND_URL" "https://$domain" "$BACKEND_ENV"
+        upsert_env "PORT" "4000" "$BACKEND_ENV"
+        upsert_env "NODE_ENV" "production" "$BACKEND_ENV"
+    fi
+    if [[ -f "$FRONTEND_EXAMPLE" ]]; then
+        if [[ ! -f "$FRONTEND_ENV" ]]; then
+            cp "$FRONTEND_EXAMPLE" "$FRONTEND_ENV"
+            log_info "Criado apps/frontend/.env.local a partir de .env.local.example"
+        fi
+        upsert_env "NEXT_PUBLIC_API_URL" "https://$domain/api" "$FRONTEND_ENV"
+    fi
+
     # Nginx embutido (docker-compose.prod.yml): criar dirs, cert e config
     if [[ -f "$COMPOSE_PROD" ]]; then
         mkdir -p "$NGINX_CONF_DIR" "$NGINX_CERTS_DIR"
@@ -257,16 +284,16 @@ run_install() {
         fi
     fi
 
-    log_info "Subindo stack (docker-compose.prod.yml)..."
+    log_info "Subindo stack (docker-compose.prod.yml) com install/.env.production..."
     cd "$PROJECT_ROOT"
-    if ! docker compose -f docker-compose.prod.yml pull 2>/dev/null; then
+    if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml pull 2>/dev/null; then
         log_warn "Pull de imagens falhou (repositório inexistente ou sem login)."
     fi
-    docker compose -f docker-compose.prod.yml down 2>/dev/null || true
-    if ! docker compose -f docker-compose.prod.yml up -d; then
+    docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml down 2>/dev/null || true
+    if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml up -d; then
         log_info "Imagens do projeto não encontradas. Executando build local..."
-        docker compose -f docker-compose.prod.yml build
-        if ! docker compose -f docker-compose.prod.yml up -d; then
+        docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml build
+        if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml up -d; then
             log_error "Falha ao subir containers."
             exit 1
         fi
@@ -286,10 +313,10 @@ run_update() {
     cd "$PROJECT_ROOT"
 
     ensure_env_file
-    if [[ -f "$PROJECT_ROOT/.env" ]]; then
+    if [[ -f "$ENV_PRODUCTION" ]]; then
         set -a
         # shellcheck source=/dev/null
-        source "$PROJECT_ROOT/.env" 2>/dev/null || true
+        source "$ENV_PRODUCTION" 2>/dev/null || true
         set +a
     fi
 
@@ -305,15 +332,15 @@ run_update() {
     fi
 
     log_info "Baixando imagens..."
-    if ! docker compose -f docker-compose.prod.yml pull 2>/dev/null; then
+    if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml pull 2>/dev/null; then
         log_warn "Pull falhou; usando imagens existentes ou build local."
     fi
     log_info "Reiniciando containers..."
-    docker compose -f docker-compose.prod.yml down
-    if ! docker compose -f docker-compose.prod.yml up -d; then
+    docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml down
+    if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml up -d; then
         log_info "Imagens do projeto não encontradas. Executando build local..."
-        docker compose -f docker-compose.prod.yml build
-        if ! docker compose -f docker-compose.prod.yml up -d; then
+        docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml build
+        if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml up -d; then
             log_error "Falha ao subir containers."
             exit 1
         fi

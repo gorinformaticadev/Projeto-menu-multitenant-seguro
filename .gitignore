@@ -24,6 +24,8 @@ yarn-error.log*
 # Local env files
 .env
 .env*.local
+# Env da stack de produção (monorepo: fica em install/)
+install/.env.production
 
 # Vercel
 .vercel

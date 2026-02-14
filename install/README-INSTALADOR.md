@@ -87,9 +87,32 @@ No final o script mostra um resumo de `docker compose ps` e o resultado dos curl
 bash install/check.sh --json
 ```
 
+### Comandos manuais (stack de produção)
+
+Sempre a partir da **raiz do monorepo**, usando o env em `install/`:
+
+```bash
+cd /caminho/Projeto-menu-multitenant-seguro
+
+# Subir
+docker compose --env-file install/.env.production -f docker-compose.prod.yml up -d
+
+# Parar
+docker compose --env-file install/.env.production -f docker-compose.prod.yml down
+
+# Build (ex.: após alterar backend/frontend)
+docker compose --env-file install/.env.production -f docker-compose.prod.yml build
+docker compose --env-file install/.env.production -f docker-compose.prod.yml up -d
+```
+
 ## Variáveis de ambiente
 
-O instalador gera/atualiza o `.env` na **raiz do projeto**. Além das variáveis já usadas pelo `docker-compose` e pelas apps, foram adicionadas as seguintes, pensadas para o momento da instalação e multitenancy:
+O instalador grava as variáveis em dois lugares:
+
+- **`install/.env.production`** – usado pela stack Docker (Compose com `--env-file install/.env.production`). Não fica `.env` na raiz do monorepo.
+- **`apps/backend/.env`** e **`apps/frontend/.env.local`** – criados a partir de `.env.example` e `.env.local.example`, com os mesmos valores da instalação. Servem para desenvolvimento local e para manter a mesma estrutura do projeto original; os containers em produção recebem as variáveis pelo Compose, não por esses arquivos.
+
+Além das variáveis já usadas pelo `docker-compose` e pelas apps, foram adicionadas as seguintes:
 
 ### Novas variáveis (instalação)
 
@@ -116,7 +139,8 @@ O template completo está em `install/.env.installer.example`. O instalador usa 
 
 1. **Checagens:** Bash, root, Docker e Docker Compose.
 2. **Instalação:**
-   - Cria/atualiza `.env` (a partir de `.env.installer.example` ou `.env.example`).
+   - Cria/atualiza `install/.env.production` (a partir de `.env.installer.example` ou `.env.example`).
+   - Cria `apps/backend/.env` e `apps/frontend/.env.local` a partir dos `.env.example` e `.env.local.example` do projeto, preenchendo com os mesmos valores (uso em desenvolvimento local ou referência; a stack Docker usa apenas `install/.env.production`).
    - Gera `JWT_SECRET` e `ENCRYPTION_KEY` se não definidos.
    - Gera senha do banco se não definida.
    - Preenche/atualiza variáveis de domínio, admin e Docker Hub.
@@ -148,7 +172,7 @@ O instalador gera configuração Nginx para a rede Docker (`frontend:5000`, `bac
 O instalador não altera o pipeline em `.github/workflows/ci-cd.yml`:
 
 - As imagens continuam sendo construídas a partir da raiz do monorepo (`context: .`, `apps/backend/Dockerfile`, `apps/frontend/Dockerfile`) e tagadas como `DOCKER_USERNAME/multitenant-backend:latest` e `.../multitenant-frontend:latest`.
-- O instalador apenas consome essas imagens via `DOCKERHUB_USERNAME` no `.env` e usa o mesmo `docker-compose.prod.yml` (nginx + frontend + backend + db + redis), garantindo que a lógica de deploy seja respeitada.
+- O instalador apenas consome essas imagens via `DOCKERHUB_USERNAME` em `install/.env.production` e usa o mesmo `docker-compose.prod.yml` (nginx + frontend + backend + db + redis), garantindo que a lógica de deploy seja respeitada.
 
 ## Solução de problemas
 
@@ -167,16 +191,17 @@ O instalador não altera o pipeline em `.github/workflows/ci-cd.yml`:
 | `install/nginx-docker.conf.template` | Template Nginx para Docker (HTTP + HTTPS). |
 | `install/nginx-docker-http-only.conf.template` | Template só HTTP (quando não há cert). |
 | `install/.env.installer.example` | Template de variáveis. |
+| `install/.env.production` | Arquivo de env da stack (gerado pelo instalador; não commitar). |
 | `install/README-INSTALADOR.md` | Este guia. |
 | `docker-compose.prod.yml` | Stack (nginx, frontend, backend, db, redis). |
 
-## Resumo das variáveis novas no `.env`
+## Resumo das variáveis novas em `install/.env.production`
 
-As variáveis **novas** que o instalador adiciona ou documenta no `.env` são:
+As variáveis **novas** que o instalador adiciona ou documenta em `install/.env.production` são:
 
 - `INSTALL_DOMAIN` – domínio da instalação.
 - `INSTALL_ADMIN_EMAIL` – email do administrador.
 - `INSTALL_ADMIN_PASSWORD` – senha inicial do admin.
-- `DOCKERHUB_USERNAME` – usuário Docker Hub das imagens (já usado pelo compose; o instalador garante que exista no `.env`).
+- `DOCKERHUB_USERNAME` – usuário Docker Hub das imagens (o instalador garante que exista em `install/.env.production`).
 
 As demais (`DOMAIN`, `LETSENCRYPT_EMAIL`, `DB_*`, `JWT_SECRET`, `ENCRYPTION_KEY`, etc.) já existiam; o instalador apenas as preenche ou gera quando necessário.

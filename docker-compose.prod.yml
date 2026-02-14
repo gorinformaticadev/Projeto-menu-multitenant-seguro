@@ -1,5 +1,5 @@
-# Requer arquivo .env na mesma pasta (DOCKERHUB_USERNAME, DATABASE_URL, JWT_SECRET, ENCRYPTION_KEY, DB_USER, DB_PASSWORD).
-# Execute sempre a partir da raiz do projeto: cd /caminho/Projeto-menu-multitenant-seguro && docker compose -f docker-compose.prod.yml up -d
+# Variáveis da stack: use install/.env.production (monorepo: env não fica na raiz).
+# Subir: cd /caminho/Projeto-menu-multitenant-seguro && docker compose --env-file install/.env.production -f docker-compose.prod.yml up -d
 services:
   nginx:
     image: nginx:1.25-alpine

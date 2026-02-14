@@ -140,7 +140,12 @@ if [[ -z "$JSON" ]]; then
     echo ""
     info "--- Resumo dos containers (docker compose ps) ---"
     if [[ -f "$COMPOSE_PROD" ]]; then
-        (cd "$PROJECT_ROOT" && docker compose -f docker-compose.prod.yml ps 2>/dev/null) || true
+        ENV_FILE="$SCRIPT_DIR/.env.production"
+        if [[ -f "$ENV_FILE" ]]; then
+            (cd "$PROJECT_ROOT" && docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml ps 2>/dev/null) || true
+        else
+            (cd "$PROJECT_ROOT" && docker compose -f docker-compose.prod.yml ps 2>/dev/null) || true
+        fi
     fi
     echo ""
     info "--- Portas em escuta (80, 443) ---"
