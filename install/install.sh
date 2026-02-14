@@ -405,8 +405,34 @@ main() {
     case "$cmd" in
         install) run_install "$@" ;;
         update)  run_update "$@" ;;
+        cert)    run_cert ;;
         *)       show_usage; exit 1 ;;
     esac
+}
+
+# --- Obter/renovar certificado (comando standalone) ---
+run_cert() {
+    cd "$PROJECT_ROOT"
+    ensure_env_file
+    if [[ ! -f "$ENV_PRODUCTION" ]]; then
+        log_error "Crie install/.env.production antes (rode install primeiro)."
+        exit 1
+    fi
+    set -a
+    # shellcheck source=/dev/null
+    source "$ENV_PRODUCTION" 2>/dev/null || true
+    set +a
+    domain="${DOMAIN:-}"
+    email="${LETSENCRYPT_EMAIL:-}"
+    if [[ -z "$domain" || -z "$email" ]]; then
+        log_error "Defina DOMAIN e LETSENCRYPT_EMAIL em install/.env.production"
+        exit 1
+    fi
+    if obtain_letsencrypt_cert "$domain" "$email"; then
+        echogreen "Certificado Let's Encrypt obtido/atualizado."
+    else
+        exit 1
+    fi
 }
 
 main "$@"

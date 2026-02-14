@@ -60,6 +60,16 @@ sudo bash install/install.sh update
 sudo bash install/install.sh update main
 ```
 
+### Obter ou renovar certificado Let's Encrypt
+
+Se na instalação o certificado não foi obtido (ex.: DNS ainda não apontava), ou para renovar manualmente:
+
+```bash
+sudo bash install/install.sh cert
+```
+
+Usa `DOMAIN` e `LETSENCRYPT_EMAIL` de `install/.env.production`. Para renovação automática (cron), use `install/renew-cert.sh`.
+
 ### Verificação do ambiente
 
 Para conferir se Docker, containers, Nginx, portas e certificados estão corretos, use o script de checagem (a partir da **raiz do projeto**):
@@ -157,7 +167,7 @@ O instalador está preparado para cenário multitenant:
 - Um único domínio é configurado por execução (`INSTALL_DOMAIN` / `-d`).
 - Para vários tenants, pode-se rodar o instalador em diretórios ou ambientes diferentes (um `.env` por tenant) ou usar depois o proxy/ACME existente (por exemplo `install-acme` / `update-acme`) para integrar múltiplos domínios.
 
-O instalador gera configuração Nginx para a rede Docker (`frontend:5000`, `backend:4000`) e um certificado autoassinado para HTTPS. Para produção, substitua os certs em `nginx/certs/` por Let's Encrypt (ex.: certbot).
+O instalador gera a config Nginx e **tenta obter certificado Let's Encrypt** automaticamente (após subir a stack). Se o domínio já estiver apontando para o servidor e a porta 80 acessível, o certificado válido é instalado em `nginx/certs/`. Caso contrário, é usado um certificado autoassinado (aviso no navegador até obter Let's Encrypt).
 
 ## Resiliência e erros
 
@@ -176,7 +186,8 @@ O instalador não altera o pipeline em `.github/workflows/ci-cd.yml`:
 
 ## Solução de problemas
 
-- **Aviso de certificado no navegador:** O instalador gera um certificado autoassinado em `nginx/certs/`. O aviso é esperado. Para produção, substitua por Let's Encrypt (ex.: `certbot certonly --webroot -w /var/www/html -d SEU_DOMINIO`) e coloque `fullchain.pem` e `privkey.pem` em `nginx/certs/` como `cert.pem` e `key.pem`; depois `docker compose --env-file install/.env.production -f docker-compose.prod.yml restart nginx`.
+- **Certificado válido (Let's Encrypt):** O instalador tenta obter o cert automaticamente. Se falhar (DNS não apontando, porta 80 bloqueada), rode depois: `sudo bash install/install.sh cert` (usa DOMAIN e LETSENCRYPT_EMAIL de `install/.env.production`). Para renovação automática, agende: `0 3 * * * root /caminho/Projeto-menu-multitenant-seguro/install/renew-cert.sh`.
+- **Aviso de certificado:** Se ainda aparecer aviso, o Let's Encrypt não foi obtido; use o comando `cert` acima após garantir que o domínio aponta para o servidor e a porta 80 está aberta.
 
 - **Não consigo fazer login:** O backend precisa de `FRONTEND_URL` com a URL pública (ex.: `https://seu-dominio.com`) para CORS aceitar o browser; e o frontend precisa chamar a API pela mesma origem (`/api`). Confira em `install/.env.production`: `FRONTEND_URL=https://SEU_DOMINIO`. Reconstrua a imagem do frontend para que a URL da API seja relativa: `docker compose --env-file install/.env.production -f docker-compose.prod.yml build --no-cache frontend` e depois `up -d`.
 
@@ -192,6 +203,7 @@ O instalador não altera o pipeline em `.github/workflows/ci-cd.yml`:
 |---------|--------|
 | `install/install.sh` | Script principal (install / update). |
 | `install/check.sh` | Script de verificação (Docker, containers, Nginx, portas, certificados). |
+| `install/renew-cert.sh` | Renovação Let's Encrypt (para cron). |
 | `install/nginx-docker.conf.template` | Template Nginx para Docker (HTTP + HTTPS). |
 | `install/nginx-docker-http-only.conf.template` | Template só HTTP (quando não há cert). |
 | `install/.env.installer.example` | Template de variáveis. |

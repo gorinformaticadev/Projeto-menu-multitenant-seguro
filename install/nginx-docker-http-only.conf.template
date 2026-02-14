@@ -10,6 +10,11 @@ server {
 
     client_max_body_size 64m;
 
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        try_files $uri =404;
+    }
+
     set $frontend_upstream "http://frontend:5000";
     set $backend_upstream "http://backend:4000";
 
