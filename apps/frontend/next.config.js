@@ -49,17 +49,37 @@ const nextConfig = {
     ];
   },
   async rewrites() {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-    return [
-      {
+    const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    const apiUrl = rawApiUrl.replace(/\/+$/, '');
+    const isAbsoluteApiUrl = /^https?:\/\//i.test(apiUrl);
+    const rewrites = [];
+
+    // Evita loop quando NEXT_PUBLIC_API_URL = "/api".
+    // Nesse cenário, o proxy da borda (nginx) já resolve /api para o backend.
+    if (isAbsoluteApiUrl) {
+      const apiBase = apiUrl.endsWith('/api') ? apiUrl : `${apiUrl}/api`;
+      rewrites.push({
         source: '/api/:path*',
-        destination: `${apiUrl}/api/:path*`, // Proxy API requests to backend
-      },
-      {
+        destination: `${apiBase}/:path*`,
+      });
+
+      rewrites.push({
         source: '/uploads/:path*',
-        destination: `${apiUrl}/uploads/:path*`, // Proxy static uploads to backend
-      },
-    ];
+        destination: `${apiUrl}/uploads/:path*`,
+      });
+    } else if (apiUrl && apiUrl !== '/api') {
+      rewrites.push({
+        source: '/api/:path*',
+        destination: `${apiUrl}/:path*`,
+      });
+
+      rewrites.push({
+        source: '/uploads/:path*',
+        destination: `${apiUrl}/uploads/:path*`,
+      });
+    }
+
+    return rewrites;
   },
   // Enable experimental features for better security
   experimental: {
