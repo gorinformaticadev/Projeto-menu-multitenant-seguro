@@ -1,10 +1,10 @@
 services:
   frontend:
     environment:
-      - VIRTUAL_HOST=${DOMAIN}
+      - VIRTUAL_HOST=${DOMAIN:-localhost}
       - VIRTUAL_PORT=5000
-      - LETSENCRYPT_HOST=${DOMAIN}
-      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
+      - LETSENCRYPT_HOST=${DOMAIN:-localhost}
+      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL:-admin@localhost}
     networks:
       - app-network
       - proxy-nw
@@ -14,7 +14,7 @@ services:
 
   backend:
     environment:
-      - VIRTUAL_HOST=${DOMAIN}
+      - VIRTUAL_HOST=${DOMAIN:-localhost}
       - VIRTUAL_PORT=4000
     networks:
       - app-network

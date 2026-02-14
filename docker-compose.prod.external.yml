@@ -5,11 +5,11 @@ services:
       context: .
       dockerfile: apps/frontend/Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL=https://${DOMAIN}/api
+        - NEXT_PUBLIC_API_URL=https://${DOMAIN:-localhost}/api
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=https://${DOMAIN}/api
+      - NEXT_PUBLIC_API_URL=https://${DOMAIN:-localhost}/api
       - PORT=5000
     networks:
       - app-network
@@ -30,10 +30,10 @@ services:
       dockerfile: apps/backend/Dockerfile
     restart: unless-stopped
     environment:
-      - DATABASE_URL=${DATABASE_URL:-postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}}
-      - JWT_SECRET=${JWT_SECRET}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - FRONTEND_URL=https://${DOMAIN}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-multitenant}}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET not set}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY not set}
+      - FRONTEND_URL=https://${DOMAIN:-localhost}
       - NODE_ENV=production
       - PORT=4000
       - REDIS_HOST=redis
@@ -58,15 +58,15 @@ services:
     image: postgres:15-alpine
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-${DB_USER}}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-${DB_PASSWORD}}
-      - POSTGRES_DB=${POSTGRES_DB:-${DB_NAME}}
+      - POSTGRES_USER=${POSTGRES_USER:-${DB_USER:-postgres}}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-${DB_PASSWORD:-postgres}}
+      - POSTGRES_DB=${POSTGRES_DB:-${DB_NAME:-multitenant}}
     volumes:
       - postgres_data_prod:/var/lib/postgresql/data
     networks:
       - app-network
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-${DB_USER}}" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-${DB_USER:-postgres}}" ]
       interval: 10s
       timeout: 5s
       retries: 5
