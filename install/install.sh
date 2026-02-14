@@ -23,7 +23,8 @@ COMPOSE_PROD="$PROJECT_ROOT/docker-compose.prod.yml"
 COMPOSE_EXTERNAL="$PROJECT_ROOT/docker-compose.external-nginx.yml"
 ENV_EXAMPLE="$PROJECT_ROOT/.env.example"
 ENV_INSTALLER_EXAMPLE="$SCRIPT_DIR/.env.installer.example"
-NGINX_TEMPLATE="$PROJECT_ROOT/multitenant-docker-acme/confs/nginx-multitenant.conf"
+NGINX_TEMPLATE_DOCKER="$SCRIPT_DIR/nginx-docker.conf.template"
+NGINX_TEMPLATE_ACME="$PROJECT_ROOT/multitenant-docker-acme/confs/nginx-multitenant.conf"
 NGINX_CONF_DIR="$PROJECT_ROOT/nginx/conf.d"
 NGINX_CERTS_DIR="$PROJECT_ROOT/nginx/certs"
 
@@ -223,14 +224,36 @@ run_install() {
     upsert_env "INSTALL_ADMIN_EMAIL" "${admin_email:-$email}"
     upsert_env "INSTALL_ADMIN_PASSWORD" "$admin_pass"
 
-    # Nginx embutido (docker-compose.prod.yml): criar dirs e config
+    # Nginx embutido (docker-compose.prod.yml): criar dirs, cert e config
     if [[ -f "$COMPOSE_PROD" ]]; then
         mkdir -p "$NGINX_CONF_DIR" "$NGINX_CERTS_DIR"
-        if [[ -f "$NGINX_TEMPLATE" ]]; then
-            sed "s/__DOMAIN__/$domain/g" "$NGINX_TEMPLATE" > "$NGINX_CONF_DIR/default.conf"
-            log_info "Config Nginx gerado em $NGINX_CONF_DIR/default.conf"
+        # Certificado autoassinado para HTTPS (antes de escolher o template)
+        if [[ ! -f "$NGINX_CERTS_DIR/cert.pem" ]] || [[ ! -f "$NGINX_CERTS_DIR/key.pem" ]]; then
+            log_info "Gerando certificado autoassinado para HTTPS em $NGINX_CERTS_DIR"
+            if openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                -keyout "$NGINX_CERTS_DIR/key.pem" \
+                -out "$NGINX_CERTS_DIR/cert.pem" \
+                -subj "/CN=$domain" 2>/dev/null; then
+                log_info "Certificado autoassinado criado. Para produção, substitua por Let's Encrypt."
+            fi
+        fi
+        # Template Docker: upstream frontend:5000, backend:4000 (evita 502 Bad Gateway)
+        if [[ -f "$NGINX_TEMPLATE_DOCKER" ]] && [[ -f "$NGINX_CERTS_DIR/cert.pem" ]]; then
+            sed "s/__DOMAIN__/$domain/g" "$NGINX_TEMPLATE_DOCKER" > "$NGINX_CONF_DIR/default.conf"
+            log_info "Config Nginx gerado (HTTP + HTTPS) em $NGINX_CONF_DIR/default.conf"
+        elif [[ -f "$NGINX_TEMPLATE_DOCKER" ]]; then
+            NGINX_HTTP_ONLY="$SCRIPT_DIR/nginx-docker-http-only.conf.template"
+            if [[ -f "$NGINX_HTTP_ONLY" ]]; then
+                sed "s/__DOMAIN__/$domain/g" "$NGINX_HTTP_ONLY" > "$NGINX_CONF_DIR/default.conf"
+                log_info "Config Nginx gerado (apenas HTTP) em $NGINX_CONF_DIR/default.conf"
+            else
+                sed "s/__DOMAIN__/$domain/g" "$NGINX_TEMPLATE_DOCKER" > "$NGINX_CONF_DIR/default.conf"
+            fi
+        elif [[ -f "$NGINX_TEMPLATE_ACME" ]]; then
+            sed "s/__DOMAIN__/$domain/g" "$NGINX_TEMPLATE_ACME" > "$NGINX_CONF_DIR/default.conf"
+            log_warn "Usando template ACME; no Docker use nginx-docker.conf.template para evitar 502."
         else
-            log_warn "Template nginx não encontrado em $NGINX_TEMPLATE. Certificados e conf devem ser configurados manualmente."
+            log_warn "Nenhum template nginx encontrado. Configure manualmente $NGINX_CONF_DIR/default.conf"
         fi
     fi
 

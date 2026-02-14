@@ -93,8 +93,8 @@ O template completo está em `install/.env.installer.example`. O instalador usa 
    - Gera `JWT_SECRET` e `ENCRYPTION_KEY` se não definidos.
    - Gera senha do banco se não definida.
    - Preenche/atualiza variáveis de domínio, admin e Docker Hub.
-   - Cria `nginx/conf.d` e `nginx/certs` e gera `nginx/conf.d/default.conf` a partir do template em `multitenant-docker-acme/confs/nginx-multitenant.conf` (quando existir).
-   - Executa `docker compose -f docker-compose.prod.yml pull`, `down` e `up -d`.
+   - Cria `nginx/conf.d` e `nginx/certs`; gera `default.conf` a partir de `install/nginx-docker.conf.template` (upstream por nome de serviço: `frontend:5000`, `backend:4000`) e gera certificado autoassinado para HTTPS.
+   - Executa `docker compose -f docker-compose.prod.yml pull` (ou build local se falhar), `down` e `up -d`.
 3. **Atualização:** (opcional) checkout da branch; `docker compose -f docker-compose.prod.yml pull`, `down`, `up -d`.
 
 Isso segue a mesma ideia de criação de containers, instalação inicial e rotina de atualização da pasta `multitenant-docker-acme`.
@@ -106,7 +106,7 @@ O instalador está preparado para cenário multitenant:
 - Um único domínio é configurado por execução (`INSTALL_DOMAIN` / `-d`).
 - Para vários tenants, pode-se rodar o instalador em diretórios ou ambientes diferentes (um `.env` por tenant) ou usar depois o proxy/ACME existente (por exemplo `install-acme` / `update-acme`) para integrar múltiplos domínios.
 
-A configuração de Nginx gerada usa o template em `multitenant-docker-acme/confs/nginx-multitenant.conf`; os certificados SSL devem ser obtidos manualmente ou por outro mecanismo (ex.: certbot) até que o nginx do `docker-compose.prod.yml` esteja integrado a um ACME automático.
+O instalador gera configuração Nginx para a rede Docker (`frontend:5000`, `backend:4000`) e um certificado autoassinado para HTTPS. Para produção, substitua os certs em `nginx/certs/` por Let's Encrypt (ex.: certbot).
 
 ## Resiliência e erros
 
@@ -123,15 +123,24 @@ O instalador não altera o pipeline em `.github/workflows/ci-cd.yml`:
 - As imagens continuam sendo construídas a partir da raiz do monorepo (`context: .`, `apps/backend/Dockerfile`, `apps/frontend/Dockerfile`) e tagadas como `DOCKER_USERNAME/multitenant-backend:latest` e `.../multitenant-frontend:latest`.
 - O instalador apenas consome essas imagens via `DOCKERHUB_USERNAME` no `.env` e usa o mesmo `docker-compose.prod.yml` (nginx + frontend + backend + db + redis), garantindo que a lógica de deploy seja respeitada.
 
+## Solução de problemas
+
+- **502 Bad Gateway em HTTP** ou **"Não foi possível acessar este site" em HTTPS**: o Nginx precisa usar os nomes dos serviços Docker (`frontend:5000`, `backend:4000`), não `127.0.0.1`. O instalador usa `install/nginx-docker.conf.template`. Se a instalação foi feita antes dessa alteração, reexecute o instalador (com o mesmo domínio) ou copie manualmente:
+  - `install/nginx-docker.conf.template` → `nginx/conf.d/default.conf` (substitua `__DOMAIN__` pelo seu domínio).
+  - Gere certificado em `nginx/certs/`: `openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout nginx/certs/key.pem -out nginx/certs/cert.pem -subj "/CN=SEU_DOMINIO"`.
+  - Reinicie: `docker compose -f docker-compose.prod.yml restart nginx`.
+- **HTTPS com certificado inválido**: o certificado autoassinado gera aviso no navegador; é esperado. Para produção, use Let's Encrypt e coloque os arquivos em `nginx/certs/` (ex.: `cert.pem` e `key.pem`).
+
 ## Arquivos envolvidos
 
 | Arquivo | Função |
 |---------|--------|
 | `install/install.sh` | Script principal (install / update). |
-| `install/.env.installer.example` | Template de variáveis com as novas opções de instalação. |
+| `install/nginx-docker.conf.template` | Template Nginx para Docker (HTTP + HTTPS). |
+| `install/nginx-docker-http-only.conf.template` | Template só HTTP (quando não há cert). |
+| `install/.env.installer.example` | Template de variáveis. |
 | `install/README-INSTALADOR.md` | Este guia. |
-| `docker-compose.prod.yml` | Stack usada pelo instalador (nginx, frontend, backend, db, redis). |
-| `multitenant-docker-acme/confs/nginx-multitenant.conf` | Template de Nginx (domínio substituído pelo instalador). |
+| `docker-compose.prod.yml` | Stack (nginx, frontend, backend, db, redis). |
 
 ## Resumo das variáveis novas no `.env`
 
