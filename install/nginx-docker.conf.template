@@ -1,15 +1,9 @@
 # ==============================
 # Nginx - Docker Compose (prod)
-# Upstreams pelos nomes dos serviços na rede Docker
+# Resolver DNS do Docker (127.0.0.11) para resolver frontend/backend
 # ==============================
 
-upstream frontend_app {
-    server frontend:5000;
-}
-
-upstream backend_api {
-    server backend:4000;
-}
+resolver 127.0.0.11 valid=10s ipv6=off;
 
 # HTTP - responde direto (sem redirect) para funcionar sem certificado
 server {
@@ -18,8 +12,11 @@ server {
 
     client_max_body_size 64m;
 
+    set $frontend_upstream "http://frontend:5000";
+    set $backend_upstream "http://backend:4000";
+
     location / {
-        proxy_pass http://frontend_app;
+        proxy_pass $frontend_upstream;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -31,7 +28,7 @@ server {
     }
 
     location /api {
-        proxy_pass http://backend_api;
+        proxy_pass $backend_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -55,8 +52,11 @@ server {
 
     client_max_body_size 64m;
 
+    set $frontend_upstream "http://frontend:5000";
+    set $backend_upstream "http://backend:4000";
+
     location / {
-        proxy_pass http://frontend_app;
+        proxy_pass $frontend_upstream;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -68,7 +68,7 @@ server {
     }
 
     location /api {
-        proxy_pass http://backend_api;
+        proxy_pass $backend_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
