@@ -1,3 +1,5 @@
+# Requer arquivo .env na mesma pasta (DOCKERHUB_USERNAME, DATABASE_URL, JWT_SECRET, ENCRYPTION_KEY, DB_USER, DB_PASSWORD).
+# Execute sempre a partir da raiz do projeto: cd /caminho/Projeto-menu-multitenant-seguro && docker compose -f docker-compose.prod.yml up -d
 services:
   nginx:
     image: nginx:1.25-alpine
@@ -16,7 +18,7 @@ services:
       - multitenant-network
 
   frontend:
-    image: ${DOCKERHUB_USERNAME}/multitenant-frontend:latest
+    image: ${DOCKERHUB_USERNAME:-local}/multitenant-frontend:latest
     build:
       context: .
       dockerfile: apps/frontend/Dockerfile
@@ -38,7 +40,7 @@ services:
       start_period: 40s
 
   backend:
-    image: ${DOCKERHUB_USERNAME}/multitenant-backend:latest
+    image: ${DOCKERHUB_USERNAME:-local}/multitenant-backend:latest
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
