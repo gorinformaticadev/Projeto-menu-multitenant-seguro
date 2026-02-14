@@ -236,13 +236,17 @@ run_install() {
 
     log_info "Subindo stack (docker-compose.prod.yml)..."
     cd "$PROJECT_ROOT"
-    if ! docker compose -f docker-compose.prod.yml pull; then
-        log_warn "Pull de imagens falhou (talvez imagens locais). Continuando..."
+    if ! docker compose -f docker-compose.prod.yml pull 2>/dev/null; then
+        log_warn "Pull de imagens falhou (repositório inexistente ou sem login)."
     fi
     docker compose -f docker-compose.prod.yml down 2>/dev/null || true
     if ! docker compose -f docker-compose.prod.yml up -d; then
-        log_error "Falha ao subir containers."
-        exit 1
+        log_info "Imagens do projeto não encontradas. Executando build local..."
+        docker compose -f docker-compose.prod.yml build
+        if ! docker compose -f docker-compose.prod.yml up -d; then
+            log_error "Falha ao subir containers."
+            exit 1
+        fi
     fi
 
     echogreen "Instalação concluída."
@@ -278,12 +282,19 @@ run_update() {
     fi
 
     log_info "Baixando imagens..."
-    if ! docker compose -f docker-compose.prod.yml pull; then
-        log_warn "Pull falhou; usando imagens existentes."
+    if ! docker compose -f docker-compose.prod.yml pull 2>/dev/null; then
+        log_warn "Pull falhou; usando imagens existentes ou build local."
     fi
     log_info "Reiniciando containers..."
     docker compose -f docker-compose.prod.yml down
-    docker compose -f docker-compose.prod.yml up -d
+    if ! docker compose -f docker-compose.prod.yml up -d; then
+        log_info "Imagens do projeto não encontradas. Executando build local..."
+        docker compose -f docker-compose.prod.yml build
+        if ! docker compose -f docker-compose.prod.yml up -d; then
+            log_error "Falha ao subir containers."
+            exit 1
+        fi
+    fi
 
     echogreen "Atualização concluída."
 }
