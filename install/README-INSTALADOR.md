@@ -176,6 +176,10 @@ O instalador não altera o pipeline em `.github/workflows/ci-cd.yml`:
 
 ## Solução de problemas
 
+- **Aviso de certificado no navegador:** O instalador gera um certificado autoassinado em `nginx/certs/`. O aviso é esperado. Para produção, substitua por Let's Encrypt (ex.: `certbot certonly --webroot -w /var/www/html -d SEU_DOMINIO`) e coloque `fullchain.pem` e `privkey.pem` em `nginx/certs/` como `cert.pem` e `key.pem`; depois `docker compose --env-file install/.env.production -f docker-compose.prod.yml restart nginx`.
+
+- **Não consigo fazer login:** O backend precisa de `FRONTEND_URL` com a URL pública (ex.: `https://seu-dominio.com`) para CORS aceitar o browser; e o frontend precisa chamar a API pela mesma origem (`/api`). Confira em `install/.env.production`: `FRONTEND_URL=https://SEU_DOMINIO`. Reconstrua a imagem do frontend para que a URL da API seja relativa: `docker compose --env-file install/.env.production -f docker-compose.prod.yml build --no-cache frontend` e depois `up -d`.
+
 - **502 Bad Gateway em HTTP** ou **"Não foi possível acessar este site" em HTTPS**: o Nginx precisa usar os nomes dos serviços Docker (`frontend:5000`, `backend:4000`), não `127.0.0.1`. O instalador usa `install/nginx-docker.conf.template`. Se a instalação foi feita antes dessa alteração, reexecute o instalador (com o mesmo domínio) ou copie manualmente:
   - `install/nginx-docker.conf.template` → `nginx/conf.d/default.conf` (substitua `__DOMAIN__` pelo seu domínio).
   - Gere certificado em `nginx/certs/`: `openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout nginx/certs/key.pem -out nginx/certs/cert.pem -subj "/CN=SEU_DOMINIO"`.

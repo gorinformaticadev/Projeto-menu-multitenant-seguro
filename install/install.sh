@@ -29,6 +29,7 @@ NGINX_TEMPLATE_DOCKER="$SCRIPT_DIR/nginx-docker.conf.template"
 NGINX_TEMPLATE_ACME="$PROJECT_ROOT/multitenant-docker-acme/confs/nginx-multitenant.conf"
 NGINX_CONF_DIR="$PROJECT_ROOT/nginx/conf.d"
 NGINX_CERTS_DIR="$PROJECT_ROOT/nginx/certs"
+NGINX_WEBROOT="$PROJECT_ROOT/nginx/webroot"
 
 # --- Cores e helpers ---
 echored()   { echo -ne "\033[41m\033[37m\033[1m  $1  \033[0m\n"; }
@@ -54,6 +55,7 @@ Uso:
 Comandos:
   install   Instalação inicial (cria .env, prepara nginx, sobe containers).
   update    Atualização (pull imagens, reinicia containers).
+  cert      Obtém ou renova certificado Let's Encrypt (usa install/.env.production).
 
 Opções para install:
   -d, --domain DOMAIN       Domínio principal (ex: app.exemplo.com.br).
@@ -155,6 +157,36 @@ upsert_env() {
     fi
 }
 
+# --- Certificado Let's Encrypt ---
+obtain_letsencrypt_cert() {
+    local domain="$1"
+    local email="$2"
+    mkdir -p "$NGINX_WEBROOT"
+    log_info "Obtendo certificado Let's Encrypt para $domain ..."
+    if docker run --rm \
+        -v "${NGINX_WEBROOT}:/var/www/certbot:rw" \
+        -v "${NGINX_CERTS_DIR}:/etc/letsencrypt:rw" \
+        certbot/certbot certonly --webroot \
+        -w /var/www/certbot \
+        -d "$domain" \
+        --email "$email" \
+        --agree-tos \
+        --non-interactive 2>/dev/null; then
+        local live_cert="$NGINX_CERTS_DIR/live/$domain/fullchain.pem"
+        local live_key="$NGINX_CERTS_DIR/live/$domain/privkey.pem"
+        if [[ -f "$live_cert" ]] && [[ -f "$live_key" ]]; then
+            cp "$live_cert" "$NGINX_CERTS_DIR/cert.pem"
+            cp "$live_key" "$NGINX_CERTS_DIR/key.pem"
+            log_info "Certificado Let's Encrypt instalado em nginx/certs/"
+            cd "$PROJECT_ROOT"
+            docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml restart nginx 2>/dev/null || true
+            return 0
+        fi
+    fi
+    log_warn "Não foi possível obter certificado Let's Encrypt (verifique DNS e porta 80). Mantido certificado autoassinado."
+    return 1
+}
+
 # --- Instalação inicial ---
 run_install() {
     local domain="${INSTALL_DOMAIN:-}"
@@ -253,7 +285,7 @@ run_install() {
 
     # Nginx embutido (docker-compose.prod.yml): criar dirs, cert e config
     if [[ -f "$COMPOSE_PROD" ]]; then
-        mkdir -p "$NGINX_CONF_DIR" "$NGINX_CERTS_DIR"
+        mkdir -p "$NGINX_CONF_DIR" "$NGINX_CERTS_DIR" "$NGINX_WEBROOT"
         # Certificado autoassinado para HTTPS (antes de escolher o template)
         if [[ ! -f "$NGINX_CERTS_DIR/cert.pem" ]] || [[ ! -f "$NGINX_CERTS_DIR/key.pem" ]]; then
             log_info "Gerando certificado autoassinado para HTTPS em $NGINX_CERTS_DIR"
@@ -297,6 +329,12 @@ run_install() {
             log_error "Falha ao subir containers."
             exit 1
         fi
+    fi
+
+    # Tentar obter certificado Let's Encrypt (domínio deve apontar para este host e porta 80 acessível)
+    sleep 5
+    if obtain_letsencrypt_cert "$domain" "$email"; then
+        echogreen "Certificado SSL válido (Let's Encrypt) instalado."
     fi
 
     echogreen "Instalação concluída."
