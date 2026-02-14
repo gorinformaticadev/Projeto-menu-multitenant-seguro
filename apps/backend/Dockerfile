@@ -12,7 +12,8 @@ RUN pnpm --filter backend prisma:generate
 RUN pnpm --filter backend build
 
 # Deploy stage - creates standalone package
-RUN pnpm --filter=backend --prod deploy /app/pruned
+# Fix for pnpm v10+ workspace deploy error
+RUN echo "inject-workspace-packages=true" >> .npmrc && pnpm --filter=backend --prod deploy /app/pruned
 
 # Runner stage - production only
 FROM base AS runner
