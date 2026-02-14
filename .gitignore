@@ -130,3 +130,4 @@ apps/frontend/src/app/modules/ordem_servico/types/permission.types.ts
 /apps/frontend/src/app/modules/agenda
 module-agenda
 ANALISE_DOCKER_PROBLEMAS_502.md
+multitenant-docker-acme/
