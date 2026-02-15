@@ -1,8 +1,7 @@
 #!/bin/sh
 set -e
 
-# Simple entrypoint: wait for DB, generate prisma client, run optional migrations, start app.
-# Configure RUN_MIGRATIONS=false to skip migrations in runtime (recommended to run them in CI/CD).
+# Simple entrypoint: wait for DB, generate prisma client, run migrations, start app.
 
 # Extrair hostname do DATABASE_URL
 DB_HOST=$(echo "${DATABASE_URL}" | sed -n 's|.*@\([^:]*\):.*|\1|p')
