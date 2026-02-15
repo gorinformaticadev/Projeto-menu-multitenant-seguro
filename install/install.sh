@@ -344,10 +344,17 @@ run_install() {
     fi
     docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml down 2>/dev/null || true
     if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml up -d; then
-        log_info "Imagens do projeto não encontradas. Executando build local..."
-        docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml build
+        echo -e "\n\033[1;34m[INFO]\033[0m Imagens prontas não encontradas ou acesso negado ao Docker Hub."
+        echo -e "\033[1;32m[INFO]\033[0m Iniciando \033[1mBUILD LOCAL\033[0m das imagens no seu VPS. Isso pode levar alguns minutos...\n"
+        
+        if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml build; then
+            log_error "Falha ao construir imagens localmente."
+            exit 1
+        fi
+        
+        log_info "Build concluído. Iniciando containers..."
         if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml up -d; then
-            log_error "Falha ao subir containers."
+            log_error "Falha ao subir containers após o build."
             exit 1
         fi
     fi
@@ -436,10 +443,17 @@ run_update() {
     log_info "Reiniciando containers..."
     docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml down
     if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml up -d; then
-        log_info "Imagens do projeto não encontradas. Executando build local..."
-        docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml build
+        echo -e "\n\033[1;34m[INFO]\033[0m Imagens prontas não encontradas ou acesso negado ao Docker Hub."
+        echo -e "\033[1;32m[INFO]\033[0m Iniciando \033[1mBUILD LOCAL\033[0m das imagens no seu VPS. Isso pode levar alguns minutos...\n"
+        
+        if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml build; then
+            log_error "Falha ao construir imagens localmente."
+            exit 1
+        fi
+        
+        log_info "Build concluído. Iniciando containers..."
         if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml up -d; then
-            log_error "Falha ao subir containers."
+            log_error "Falha ao subir containers após o build."
             exit 1
         fi
     fi
