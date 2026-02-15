@@ -294,6 +294,7 @@ setup_env_file() {
     jwt_secret="$(openssl rand -hex 32)"
     encryption_key="$(openssl rand -hex 32)"
     db_pass="$(openssl rand -hex 16)"
+    admin_pass="$(openssl rand -hex 12)"
     local dockerhub_username="${DOCKERHUB_USERNAME:-local}"
 
     upsert_env_var() {
@@ -307,6 +308,8 @@ setup_env_file() {
     }
 
     upsert_env_var "DOMAIN" "$DOMAIN"
+    upsert_env_var "INSTALL_ADMIN_EMAIL" "$EMAIL"
+    upsert_env_var "INSTALL_ADMIN_PASSWORD" "$admin_pass"
     upsert_env_var "LETSENCRYPT_EMAIL" "$EMAIL"
     upsert_env_var "FRONTEND_PORT" "$FRONTEND_PORT"
     upsert_env_var "BACKEND_PORT" "$BACKEND_PORT"
@@ -582,6 +585,39 @@ EOF
 }
 
 # Mostra relatório final
+# Executa seed do banco para garantir
+run_final_seed_check() {
+    log_info "Verificando e executando seed do banco de dados..."
+    
+    # Aguarda container backend estar acessível
+    log_info "Aguardando container backend..."
+    local attempts=0
+    local max_attempts=30
+    
+    while [[ $attempts -lt $max_attempts ]]; do
+        if docker exec multitenant-backend echo "ready" >/dev/null 2>&1; then
+            break
+        fi
+        sleep 2
+        attempts=$((attempts+1))
+    done
+    
+    if [[ $attempts -eq $max_attempts ]]; then
+        log_warn "Não foi possível conectar ao container multitenant-backend para rodar o seed."
+        return
+    fi
+
+    # Executa o seed explicitamente
+    log_info "Executando: npx prisma db seed..."
+    if docker exec multitenant-backend npx prisma db seed; then
+        echogreen "Seed do banco de dados executado com sucesso!"
+    else
+        log_error "Erro ao executar seed do banco de dados."
+        log_info "Verificando logs do backend:"
+        docker logs multitenant-backend --tail 20
+    fi
+}
+
 show_final_report() {
     echo ""
     echogreen "=============================================="
@@ -590,6 +626,7 @@ show_final_report() {
     echo ""
     log_info "Domínio: https://$DOMAIN"
     log_info "Email: $EMAIL"
+    log_info "Senha Admin (Gerada): $(grep INSTALL_ADMIN_PASSWORD "$INSTALL_DIR/.env" | cut -d= -f2)"
     log_info "Diretório: $INSTALL_DIR"
     
     if [[ "$USE_EXTERNAL_NGINX" == "true" ]]; then
@@ -610,7 +647,6 @@ show_final_report() {
     echogreen "=============================================="
 }
 
-# Função principal
 main() {
     require_root
     validate_params "$@"
@@ -639,6 +675,7 @@ main() {
         install_with_docker_proxy
     fi
     
+    run_final_seed_check
     show_final_report
 }
 

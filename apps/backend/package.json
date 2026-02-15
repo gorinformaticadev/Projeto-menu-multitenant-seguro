@@ -99,5 +99,8 @@
   },
   "overrides": {
     "diff": "^8.0.3"
+  },
+  "prisma": {
+    "seed": "node dist/prisma/seed.js"
   }
 }

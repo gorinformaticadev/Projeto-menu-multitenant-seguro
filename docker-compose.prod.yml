@@ -79,7 +79,7 @@ services:
     container_name: multitenant-postgres
     restart: unless-stopped
     environment:
-      - POSTGRES_DB=multitenant
+      - POSTGRES_DB=${DB_NAME:-multitenant}
       - POSTGRES_USER=${DB_USER:-postgres}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
