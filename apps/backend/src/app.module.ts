@@ -82,11 +82,11 @@ import { HealthModule } from './health/health.module';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
-    // CSRF Protection Global
-    {
-      provide: APP_GUARD,
-      useClass: CsrfGuard,
-    },
+    // CSRF Protection Global (TEMPORARIAMENTE DESABILITADO PARA RESOLVER 403 EM PRODUÇÃO)
+    // {
+    //   provide: APP_GUARD,
+    //   useClass: CsrfGuard,
+    // },
     // Serviço de limpeza de tokens
     TokenCleanupService,
   ],

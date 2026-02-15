@@ -4,10 +4,11 @@ set -e
 # Simple entrypoint: wait for DB, generate prisma client, run optional migrations, start app.
 # Configure RUN_MIGRATIONS=false to skip migrations in runtime (recommended to run them in CI/CD).
 
-# Extrair hostname do DATABASE_URL
-DB_HOST=$(echo "${DATABASE_URL}" | sed -n 's|.*@\([^:]*\):.*|\1|p')
+# Extrair hostname do DATABASE_URL de forma robusta
+# Suporta formatos: postgresql://user:pass@host:port/db e postgresql://user:pass@host/db
+DB_HOST=$(echo "${DATABASE_URL}" | sed -e 's|.*@||' -e 's|/.*||' -e 's|:.*||')
 if [ -z "$DB_HOST" ]; then
-  DB_HOST="localhost"
+  DB_HOST="db"
 fi
 
 DB_PORT=${DB_PORT:-5432}
