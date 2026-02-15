@@ -295,6 +295,8 @@ run_install() {
         upsert_env "FRONTEND_URL" "https://$domain" "$BACKEND_ENV"
         upsert_env "PORT" "4000" "$BACKEND_ENV"
         upsert_env "NODE_ENV" "production" "$BACKEND_ENV"
+        upsert_env "INSTALL_ADMIN_EMAIL" "${admin_email:-$email}" "$BACKEND_ENV"
+        upsert_env "INSTALL_ADMIN_PASSWORD" "$admin_pass" "$BACKEND_ENV"
     fi
     if [[ -f "$FRONTEND_EXAMPLE" ]]; then
         if [[ ! -f "$FRONTEND_ENV" ]]; then
@@ -365,9 +367,9 @@ run_install() {
         echogreen "Certificado SSL válido (Let's Encrypt) instalado."
     fi
 
-    # Aguardar backend inicializar e rodar seeds
-    log_info "Aguardando inicialização final do sistema..."
-    sleep 15
+    # Garantir que os seeds rodem explicitamente
+    log_info "Finalizando configuração do banco de dados e usuários..."
+    docker exec multitenant-backend npx prisma db seed || log_warn "Seed automático falhou, mas o sistema continuará subindo."
 
     # Exibir Relatório Final de Credenciais
     echo -e "\n\n"

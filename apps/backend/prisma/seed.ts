@@ -26,10 +26,12 @@ function generateSecurePassword(length: number = 16): string {
 
 async function main() {
   console.log('🌱 Iniciando seed do banco de dados...');
+  console.log('🔍 Ambiente:', process.env.NODE_ENV);
+  console.log('🔍 INSTALL_ADMIN_EMAIL:', process.env.INSTALL_ADMIN_EMAIL);
 
   // Senha padrão fixa para desenvolvimento
   const defaultPassword = 'admin123';
-  const adminPassword = process.env.ADMIN_DEFAULT_PASSWORD || defaultPassword;
+  const adminPassword = process.env.INSTALL_ADMIN_PASSWORD || process.env.ADMIN_DEFAULT_PASSWORD || defaultPassword;
   const userPassword = process.env.USER_DEFAULT_PASSWORD || defaultPassword;
 
   // console.log('🔐 Usando senha padrão para desenvolvimento:');
@@ -61,6 +63,9 @@ async function main() {
       password: hashedPasswordAdmin,
       role: Role.SUPER_ADMIN,
       tenantId: tenant1.id,
+      isLocked: false,
+      loginAttempts: 0,
+      lockedUntil: null
     },
     create: {
       email: adminEmail,
