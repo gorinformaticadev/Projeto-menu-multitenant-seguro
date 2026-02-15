@@ -53,12 +53,17 @@ async function main() {
   console.log('✅ Tenant criado:', tenant1.nomeFantasia);
 
   // Cria um SUPER_ADMIN (vinculado à tenant principal)
+  const adminEmail = process.env.INSTALL_ADMIN_EMAIL || 'admin@system.com';
   const hashedPasswordAdmin = await bcrypt.hash(adminPassword, 12);
   const superAdmin = await prisma.user.upsert({
-    where: { email: 'admin@system.com' },
-    update: {},
+    where: { email: adminEmail },
+    update: {
+      password: hashedPasswordAdmin,
+      role: Role.SUPER_ADMIN,
+      tenantId: tenant1.id,
+    },
     create: {
-      email: 'admin@system.com',
+      email: adminEmail,
       password: hashedPasswordAdmin,
       name: 'Super Admin',
       role: Role.SUPER_ADMIN,

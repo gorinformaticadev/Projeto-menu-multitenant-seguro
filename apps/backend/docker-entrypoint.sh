@@ -52,8 +52,14 @@ if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     echo "⚠️  Prisma migrate failed. Attempting to push schema..."
     $PRISMA_CMD db push --schema "${PRISMA_SCHEMA}" --skip-generate || echo "❌ Database sync failed (continuing anyway)"
   }
+  
+  # Executar seeds para garantir que o usuário admin exista
+  echo "Running prisma db seed..."
+  export INSTALL_ADMIN_EMAIL="${INSTALL_ADMIN_EMAIL}"
+  export ADMIN_DEFAULT_PASSWORD="${INSTALL_ADMIN_PASSWORD}"
+  $PRISMA_CMD db seed || echo "❌ Database seed failed (continuing anyway)"
 else
-  echo "Skipping migrations (RUN_MIGRATIONS=false)"
+  echo "Skipping migrations/seeds (RUN_MIGRATIONS=false)"
 fi
 
 # Start the app using package.json start:prod script (keeps runtime consistent)
