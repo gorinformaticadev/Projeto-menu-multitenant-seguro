@@ -358,12 +358,51 @@ run_install() {
         echogreen "Certificado SSL válido (Let's Encrypt) instalado."
     fi
 
-    echogreen "Instalação concluída."
-    echo ""
-    log_info "URL: https://$domain"
-    log_info "Admin: $admin_email / $admin_pass"
-    log_info "Altere a senha após o primeiro login."
-    echo ""
+    # Aguardar backend inicializar e rodar seeds
+    log_info "Aguardando inicialização final do sistema..."
+    sleep 15
+
+    # Exibir Relatório Final de Credenciais
+    echo -e "\n\n"
+    echoblue "=========================================================="
+    echoblue "      RELATÓRIO FINAL DE INSTALAÇÃO - MULTITENANT         "
+    echoblue "=========================================================="
+    echo -e "\n"
+    
+    echo -e "\033[1;32m🌐 ACESSO AO SISTEMA:\033[0m"
+    echo -e "   URL Principal:  https://$domain"
+    echo -e "   API Endpoint:   https://$domain/api"
+    echo -e "\n"
+
+    echo -e "\033[1;32m👤 CREDENCIAIS DO ADMINISTRADOR:\033[0m"
+    echo -e "   Email:          $admin_email"
+    echo -e "   Senha:          $admin_pass"
+    echo -e "   Nível:          SUPER_ADMIN"
+    echo -e "\n"
+
+    echo -e "\033[1;32m🐘 BANCO DE DADOS (PostgreSQL):\033[0m"
+    echo -e "   Host:           db (interno) / localhost (se exposto)"
+    echo -e "   Porta:          5432"
+    echo -e "   Banco:          $db_name"
+    echo -e "   Usuário:        $db_user"
+    echo -e "   Senha:          $db_pass"
+    echo -e "\n"
+
+    echo -e "\033[1;32m🔴 CACHE (Redis):\033[0m"
+    echo -e "   Host:           redis"
+    echo -e "   Porta:          6379"
+    echo -e "\n"
+
+    echo -e "\033[1;32m🔑 SEGREDOS DO SISTEMA:\033[0m"
+    echo -e "   JWT_SECRET:     $jwt_secret"
+    echo -e "   ENCRYPTION_KEY: $enc_key"
+    echo -e "\n"
+
+    echoblue "=========================================================="
+    log_info "Guarde estas informações em local seguro!"
+    log_info "Arquivo de configuração: install/.env.production"
+    echogreen "Instalação concluída com sucesso!"
+    echo -e "\n"
 }
 
 # --- Atualização ---
