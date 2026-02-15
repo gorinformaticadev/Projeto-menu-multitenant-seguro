@@ -50,11 +50,8 @@ case $opt in
         fi
         
         log_info "Removendo imagens locais do projeto..."
-        docker images | grep "multitenant" | awk '{print $3}' | xargs -r docker rmi -f
-        
-        log_info "Limpando diretório do projeto..."
-        # Removemos tudo exceto o próprio script que está rodando? 
-        # Melhor remover tudo após o término.
+        # Pega apenas os IDs das imagens (coluna 3) que contenham 'multitenant' no nome
+        docker images --format "{{.Repository}} {{.ID}}" | grep "multitenant" | awk '{print $2}' | xargs -r docker rmi -f
         ;;
         
     2)
@@ -96,7 +93,9 @@ esac
 
 # Limpeza final do diretório do projeto (para ambas as opções)
 log_info "Removendo arquivos do repositório..."
-rm -rf "$PROJECT_ROOT"
+
+# Agenda a remoção do diretório para 1 segundo após o script terminar para evitar erro de "file in use"
+(sleep 1 && rm -rf "$PROJECT_ROOT") &
 
 log_success "Desinstalação concluída com sucesso!"
 echo -e "\nO VPS está limpo para uma nova instalação.\n"
