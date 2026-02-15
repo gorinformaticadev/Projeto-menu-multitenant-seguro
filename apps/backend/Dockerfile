@@ -12,7 +12,7 @@ COPY . .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm --filter backend prisma:generate
 RUN pnpm --filter backend build
-RUN pnpm exec tsc apps/backend/prisma/seed.ts --outDir apps/backend/dist/prisma --skipLibCheck --module commonjs --target ES2021 --esModuleInterop
+RUN pnpm --filter backend exec tsc prisma/seed.ts --outDir dist/prisma --skipLibCheck --module commonjs --target ES2021 --esModuleInterop
 
 # -------------------------
 # prod-deps (somente backend)
