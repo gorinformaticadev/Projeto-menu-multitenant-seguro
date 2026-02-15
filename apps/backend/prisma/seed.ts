@@ -26,13 +26,16 @@ function generateSecurePassword(length: number = 16): string {
 
 async function main() {
   console.log('🌱 Iniciando seed do banco de dados...');
-  console.log('🔍 Ambiente:', process.env.NODE_ENV);
-  console.log('🔍 INSTALL_ADMIN_EMAIL:', process.env.INSTALL_ADMIN_EMAIL);
+  console.log('🔍 NODE_ENV:', process.env.NODE_ENV);
+  console.log('🔍 INSTALL_ADMIN_EMAIL:', process.env.INSTALL_ADMIN_EMAIL || 'NÃO DEFINIDO');
+  console.log('🔍 INSTALL_ADMIN_PASSWORD:', process.env.INSTALL_ADMIN_PASSWORD ? 'DEFINIDO (***)' : 'NÃO DEFINIDO');
 
   // Senha padrão fixa para desenvolvimento
   const defaultPassword = 'admin123';
   const adminPassword = process.env.INSTALL_ADMIN_PASSWORD || process.env.ADMIN_DEFAULT_PASSWORD || defaultPassword;
   const userPassword = process.env.USER_DEFAULT_PASSWORD || defaultPassword;
+  
+  console.log('🔐 Usando senha de admin:', adminPassword === defaultPassword ? 'PADRÃO (admin123)' : 'PERSONALIZADA');
 
   // console.log('🔐 Usando senha padrão para desenvolvimento:');
   // console.log(`   Senha: ${defaultPassword}`);
