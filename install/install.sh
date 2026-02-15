@@ -251,10 +251,21 @@ run_install() {
     docker_user="${docker_user:-local}"
     ensure_env_file
 
+    # Gerar prefixo baseado no domínio (remove pontos e pega a parte principal)
+    # Ex: novo.whapichat.com.br -> novowhapichat
+    local domain_prefix=$(echo "$domain" | sed 's/\..*//')
+    if [[ "$domain" == *"."* ]]; then
+        # Se tiver subdomínio, tenta pegar o nome principal também
+        # Ex: novo.whapichat.com.br -> novowhapichat
+        domain_prefix=$(echo "$domain" | cut -d'.' -f1,2 | tr -d '.')
+    fi
+    # Sanitizar para garantir apenas letras e números, max 16 caracteres
+    domain_prefix=$(echo "$domain_prefix" | tr -cd '[:alnum:]' | cut -c1-16 | tr '[:upper:]' '[:lower:]')
+    
     # Secrets gerados se não fornecidos
-    local db_user="${DB_USER:-multitenant}"
+    local db_name="${DB_NAME:-db_${domain_prefix}}"
+    local db_user="${DB_USER:-us_${domain_prefix}}"
     local db_pass="${DB_PASSWORD:-$(openssl rand -hex 16)}"
-    local db_name="${DB_NAME:-multitenant}"
     local jwt_secret="${JWT_SECRET:-$(openssl rand -hex 32)}"
     local enc_key="${ENCRYPTION_KEY:-$(openssl rand -hex 32)}"
 
