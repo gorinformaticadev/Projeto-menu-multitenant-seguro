@@ -2,6 +2,43 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [3.2.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v3.1.0...v3.2.0) (2026-02-15)
+
+
+### Features
+
+* Add Dockerfile and package.json for backend containerization, introduce an ACME-compatible installation script, and enhance production database configuration. ([b28be7b](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/b28be7b6aa511dd85e81ae0c6b27d0bd11c6ffd2))
+* adiciona instalador install-acme compatível com ticketz-docker-acme ([03a7e6d](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/03a7e6d3ce6705aac6ed0fb55b1f9d0c1289f8f4))
+* adiciona instalador install-acme-int para Nginx interno (Docker) ([7750748](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/7750748add07025c4d8e16cd900467fbdd45f5c2))
+* Adiciona relatório detalhado de credenciais ao final da instalação ([c3153d5](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/c3153d54602d28bd60b24ca632372d0063250bf4))
+* adiciona script update-acme para atualizações inteligentes ([b48f6bb](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/b48f6bb3a2c91c701ba5fb41d1fe9cb21510fac3))
+* Melhora feedback de build no instalador e reconstrói desinstalador robusto ([005d446](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/005d446ccc574282829ddc9f06e987713f2ab1a8))
+* Melhora robustez do instalador e SSL ([92291f0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/92291f026e96a968543a56fc87fd9742d570d0a5))
+* melhora update-acme para resolver erros de rede e 502 ([1b10132](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/1b10132ddabe6c70f5221120fe10b110aa77d81d))
+* Nomes de banco e usuário dinâmicos baseados no domínio ([593fe21](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/593fe2112a10b4040c868435655da6a479088f13))
+
+
+### Bug Fixes
+
+* correções de rede, vhost e roteamento para instalação Docker ([67115b7](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/67115b7b7d197a5a00c20f9e32ff7b3a144ea289))
+* Corrige erro 502 - permissões de diretórios e migrações do Prisma ([fdd6c3d](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/fdd6c3dfbbabf5eb082024d640ebe75733f5b3e9))
+* corrige erro 502 Bad Gateway e mapeamento de portas ([aab72c1](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/aab72c1606ceda8fc47905417979a33c7529d64d))
+* Corrige erro de formato no docker rmi e melhora limpeza de diretório ([873f8ce](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/873f8ce9ba03be299cc50cbeac12021c0f89b2c2))
+* corrige erro de tag inválida no Docker e variáveis de ambiente ausentes ([0764306](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/07643066520e83c55a7bc6ae2bcd5652b5725d66))
+* elimina definitivamente erro de tag inválida no Docker ([55e5d61](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/55e5d618842450efac7199ca1ebc282456ca73a9))
+* Garante injeção de variáveis de admin no comando de seed ([f99c8ab](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/f99c8ab5bd3365e1fc33c47893f92fc5fc4fb417))
+* Habilita seeds automáticos e configura usuário admin personalizado ([3d101cc](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/3d101cc10ec2a7fa18347e6b69138ec464fc1dd6))
+* **install:** Refatoração do script de configuração para suportar nginx-proxy e acme-companion ([7e6a461](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/7e6a461fe247176df1b7da1714dc2d84544aa2f0))
+* permite que update-acme funcione em diretórios sem .git ([e666030](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/e6660304fd70b6535502601d801f4e015ed2fecf))
+* resolve ERR_SSL_UNRECOGNIZED_NAME_ALERT ([c708434](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/c7084340ffb214f51f566b04a30dc88c8354f6f0))
+* Resolve erro 403 e melhora extração de host no banco de dados ([aedb40b](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/aedb40b3b8977e912204e203356f512860f3ef16))
+* resolve erro 502 Bad Gateway garantindo conectividade multi-rede ([2b1a289](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/2b1a289449240d395e1c960d171d18e620e1d561))
+* resolve erro 502 Bad Gateway no modo Nginx Interno ([6a489fb](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/6a489fba90781e3dbaaffb131f12411d4650529e))
+* resolve erro de pull access denied e limpa avisos do docker compose ([e290312](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/e2903123f754b50eeb1c3ca43df4ed454bd78eb4))
+* resolve falha na emissão de certificados SSL ([07e4a2f](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/07e4a2ff3e5b875410da502424e597941a8e634c))
+* Resolve falha no seed e melhora performance de inicialização ([a7a2638](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/a7a2638396e30728b69620bd34055834b7633ec2))
+* Torna prompt do Docker Hub opcional no instalador ([3fd4b77](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/3fd4b77dba8283ae60f91a19a3fe0a0e438ee590))
+
 ## [3.1.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v2.0.0...v3.1.0) (2026-02-11)
 
 
