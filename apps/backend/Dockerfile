@@ -25,7 +25,7 @@ COPY apps/backend/prisma ./prisma
 COPY .npmrc* ./
 
 # Instala deps de produção (sem workspace)
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --no-frozen-lockfile
 
 # Gera prisma client (garante que entra em node_modules)
 RUN pnpm prisma generate
