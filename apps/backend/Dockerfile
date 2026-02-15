@@ -52,6 +52,8 @@ COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/prisma ./prisma
 COPY --from=prod-deps --chown=nestjs:nodejs /app/node_modules ./node_modules
 
 RUN chmod +x ./docker-entrypoint.sh
+RUN mkdir -p /app/uploads/logos && chown -R nestjs:nodejs /app/uploads
+
 USER nestjs
 
 EXPOSE 4000
