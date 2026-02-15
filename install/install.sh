@@ -230,7 +230,10 @@ run_install() {
     if [[ "$no_prompt" != "true" ]]; then
         [[ -z "$domain" ]] && read -p "Domínio (ex: app.empresa.com): " domain
         [[ -z "$email" ]]  && read -p "Email (Let's Encrypt / admin): " email
-        [[ -z "$docker_user" ]] && read -p "Docker Hub username (imagens): " docker_user
+        if [[ -z "$docker_user" ]]; then
+            read -p "Docker Hub username (deixe vazio para build local): " docker_user
+            docker_user="${docker_user:-local}"
+        fi
         [[ -z "$admin_email" ]] && admin_email="$email"
         read -sp "Senha inicial do admin [123456]: " admin_pass
         echo
