@@ -16,17 +16,18 @@ DB_PORT=${DB_PORT:-5432}
 # Wait for DB readiness (pg_isready from postgresql-client package)
 echo "Waiting for database at ${DB_HOST}:${DB_PORT} ..."
 if command -v pg_isready >/dev/null 2>&1; then
-  for i in $(seq 1 30); do
+  # Reduzido para 1s de intervalo para inicialização mais rápida
+  for i in $(seq 1 45); do
     if pg_isready -h "${DB_HOST}" -p "${DB_PORT}" >/dev/null 2>&1; then
       echo "Database is ready."
       break
     fi
-    echo "Waiting for Postgres... (${i}/30)"
-    sleep 2
+    echo "Waiting for Postgres... (${i}/45)"
+    sleep 1
   done
 else
-  echo "pg_isready not found; waiting 10s for DB to be up."
-  sleep 10
+  echo "pg_isready not found; waiting 5s for DB to be up."
+  sleep 5
 fi
 
 # Verificar se npx está disponível, senão usar o prisma do node_modules
