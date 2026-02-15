@@ -163,6 +163,8 @@ obtain_letsencrypt_cert() {
     local email="$2"
     mkdir -p "$NGINX_WEBROOT"
     log_info "Obtendo certificado Let's Encrypt para $domain ..."
+    # Tentar primeiro com --test-cert para não queimar limite se houver erro de DNS/Porta
+    log_info "Testando conexão para Let's Encrypt (staging)..."
     if docker run --rm \
         -v "${NGINX_WEBROOT}:/var/www/certbot:rw" \
         -v "${NGINX_CERTS_DIR}:/etc/letsencrypt:rw" \
@@ -171,7 +173,23 @@ obtain_letsencrypt_cert() {
         -d "$domain" \
         --email "$email" \
         --agree-tos \
-        --non-interactive 2>/dev/null; then
+        --test-cert \
+        --non-interactive; then
+        
+        log_info "Teste de staging OK. Solicitando certificado real..."
+        if docker run --rm \
+            -v "${NGINX_WEBROOT}:/var/www/certbot:rw" \
+            -v "${NGINX_CERTS_DIR}:/etc/letsencrypt:rw" \
+            certbot/certbot certonly --webroot \
+            -w /var/www/certbot \
+            -d "$domain" \
+            --email "$email" \
+            --agree-tos \
+            --force-renewal \
+            --non-interactive; then
+            log_info "Certificado real obtido com sucesso."
+        fi
+        
         local live_cert="$NGINX_CERTS_DIR/live/$domain/fullchain.pem"
         local live_key="$NGINX_CERTS_DIR/live/$domain/privkey.pem"
         if [[ -f "$live_cert" ]] && [[ -f "$live_key" ]]; then
