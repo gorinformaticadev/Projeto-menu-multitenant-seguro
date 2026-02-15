@@ -378,9 +378,9 @@ run_install() {
         echogreen "Certificado SSL válido (Let's Encrypt) instalado."
     fi
 
-    # Garantir que os seeds rodem explicitamente
+    # Garantir que os seeds rodem explicitamente com as variáveis passadas
     log_info "Finalizando configuração do banco de dados e usuários..."
-    docker exec multitenant-backend npx prisma db seed || log_warn "Seed automático falhou, mas o sistema continuará subindo."
+    docker exec -e INSTALL_ADMIN_EMAIL="$admin_email" -e INSTALL_ADMIN_PASSWORD="$admin_pass" multitenant-backend npx prisma db seed || log_warn "Seed automático falhou, mas o sistema continuará subindo."
 
     # Exibir Relatório Final de Credenciais
     echo -e "\n\n"
