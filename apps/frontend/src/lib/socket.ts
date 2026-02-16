@@ -18,7 +18,13 @@ class SocketClient {
 
     this.token = token;
     
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    let backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    
+    // Remove /api sufixo para garantir que conectamos ao host raiz
+    // O Socket.IO adiciona o namespace à URL base, então queremos:
+    // https://dominio.com/notifications (Namespace: /notifications)
+    // E NÃO: https://dominio.com/api/notifications (Namespace: /api/notifications)
+    backendUrl = backendUrl.replace(/\/api\/?$/, '');
     
     this.socket = io(`${backendUrl}/notifications`, {
       auth: {
@@ -26,7 +32,8 @@ class SocketClient {
       },
       transports: ['websocket', 'polling'],
       timeout: 20000,
-      forceNew: true
+      forceNew: true,
+      path: '/socket.io/' // Garante o path correto no Nginx
     });
 
     this.setupEventListeners();
