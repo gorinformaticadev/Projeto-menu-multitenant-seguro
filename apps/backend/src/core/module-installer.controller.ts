@@ -51,12 +51,6 @@ export class ModuleInstallerController {
         storage: memoryStorage(),
         limits: {
             fileSize: 50 * 1024 * 1024 // 50MB
-        },
-        fileFilter: (req, file, cb) => {
-            if (!file.originalname.endsWith('.zip')) {
-                return cb(new Error('Apenas arquivos .zip são permitidos'), false);
-            }
-            cb(null, true);
         }
     }))
     async uploadModule(@UploadedFile() file: Express.Multer.File) {
