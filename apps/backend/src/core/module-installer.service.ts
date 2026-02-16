@@ -220,11 +220,15 @@ export class ModuleInstallerService {
     }
 
     private prepareFileBuffer(file: Express.Multer.File): Buffer {
-        if (Buffer.isBuffer(file.buffer)) return file.buffer;
-        if (file.buffer && typeof file.buffer === 'object') {
-            return Buffer.from(Object.values(file.buffer) as number[]);
+        try {
+            if (Buffer.isBuffer(file.buffer)) return file.buffer;
+            if (file.buffer && typeof file.buffer === 'object') {
+                return Buffer.from(Object.values(file.buffer) as number[]);
+            }
+        } catch (error) {
+            this.logger.error('Erro ao converter buffer:', error);
         }
-        throw new BadRequestException('Buffer inválido');
+        throw new BadRequestException('Buffer do arquivo inválido ou corrompido');
     }
 
     private async distributeModuleFiles(
@@ -232,56 +236,81 @@ export class ModuleInstallerService {
         structure: ModuleStructureResult,
         moduleSlug: string
     ): Promise<void> {
-        const zip = new AdmZip(zipBuffer);
-        const entries = zip.getEntries();
+        try {
+            const zip = new AdmZip(zipBuffer);
+            const entries = zip.getEntries();
 
-        const frontendDest = path.join(this.frontendBase, moduleSlug);
-        const backendDest = path.join(this.backendModulesPath, moduleSlug);
+            const frontendDest = path.join(this.frontendBase, moduleSlug);
+            const backendDest = path.join(this.backendModulesPath, moduleSlug);
 
-        if (!fs.existsSync(this.frontendBase)) fs.mkdirSync(this.frontendBase, { recursive: true });
-        if (!fs.existsSync(this.backendModulesPath)) fs.mkdirSync(this.backendModulesPath, { recursive: true });
+            // Tenta criar diretórios, loga se falhar (especialmente frontend em prod)
+            try {
+                if (!fs.existsSync(this.frontendBase)) fs.mkdirSync(this.frontendBase, { recursive: true });
+            } catch (e) {
+                this.logger.warn(`Não foi possível criar diretório frontend: ${this.frontendBase}. Ignorando arquivos de frontend.`);
+            }
 
-        for (const entry of entries) {
-            if (entry.isDirectory) continue;
+            try {
+                if (!fs.existsSync(this.backendModulesPath)) fs.mkdirSync(this.backendModulesPath, { recursive: true });
+            } catch (e) {
+                throw new Error(`CRÍTICO: Não foi possível criar diretório de módulos backend: ${this.backendModulesPath}`);
+            }
 
-            let relativePath = entry.entryName;
-            if (structure.basePath) {
-                const basePathWithSlash = structure.basePath + '/';
-                if (relativePath.startsWith(basePathWithSlash)) {
-                    relativePath = relativePath.substring(basePathWithSlash.length);
-                } else {
-                    continue;
+            for (const entry of entries) {
+                if (entry.isDirectory) continue;
+
+                let relativePath = entry.entryName;
+                if (structure.basePath) {
+                    const basePathWithSlash = structure.basePath + '/';
+                    if (relativePath.startsWith(basePathWithSlash)) {
+                        relativePath = relativePath.substring(basePathWithSlash.length);
+                    } else {
+                        continue;
+                    }
+                }
+
+                if (!relativePath || relativePath.trim() === '') continue;
+                if (relativePath.includes('..')) continue;
+
+                let targetPath = '';
+                const _data = entry.getData();
+
+                // Lógica de Distribuição Atualizada - PRESERVANDO ESTRUTURA
+                if (relativePath.startsWith('frontend/')) {
+                    // Remove o prefixo 'frontend/' e mantém a hierarquia completa
+                    // Ex: frontend/pages/dashboard/page.tsx -> modules/{slug}/pages/dashboard/page.tsx
+                    const inner = relativePath.substring('frontend/'.length);
+                    if (inner.trim() !== '') {
+                        targetPath = path.join(frontendDest, inner);
+                    }
+                } else if (relativePath.startsWith('backend/')) {
+                    // Backend
+                    const inner = relativePath.substring('backend/'.length);
+                    targetPath = path.join(backendDest, inner);
+                } else if (!relativePath.includes('/')) {
+                    // Raiz (module.json)
+                    targetPath = path.join(backendDest, relativePath);
+                }
+
+                if (targetPath) {
+                    try {
+                        const tDir = path.dirname(targetPath);
+                        if (!fs.existsSync(tDir)) fs.mkdirSync(tDir, { recursive: true });
+                        fs.writeFileSync(targetPath, _data);
+                    } catch (writeError) {
+                        this.logger.error(`Erro ao escrever arquivo ${targetPath}: ${writeError.message}`);
+                        // Se for erro no frontend, apenas loga e continua (comum em Docker prod)
+                        if (targetPath.includes(frontendDest)) {
+                            this.logger.warn(`Skipping frontend file write due to error: ${relativePath}`);
+                        } else {
+                            throw writeError; // Erro no backend deve falhar a instalação
+                        }
+                    }
                 }
             }
-
-            if (!relativePath || relativePath.trim() === '') continue;
-            if (relativePath.includes('..')) continue;
-
-            let targetPath = '';
-            const _data = entry.getData();
-
-            // Lógica de Distribuição Atualizada - PRESERVANDO ESTRUTURA
-            if (relativePath.startsWith('frontend/')) {
-                // Remove o prefixo 'frontend/' e mantém a hierarquia completa
-                // Ex: frontend/pages/dashboard/page.tsx -> modules/{slug}/pages/dashboard/page.tsx
-                const inner = relativePath.substring('frontend/'.length);
-                if (inner.trim() !== '') {
-                    targetPath = path.join(frontendDest, inner);
-                }
-            } else if (relativePath.startsWith('backend/')) {
-                // Backend
-                const inner = relativePath.substring('backend/'.length);
-                targetPath = path.join(backendDest, inner);
-            } else if (!relativePath.includes('/')) {
-                // Raiz (module.json)
-                targetPath = path.join(backendDest, relativePath);
-            }
-
-            if (targetPath) {
-                const tDir = path.dirname(targetPath);
-                if (!fs.existsSync(tDir)) fs.mkdirSync(tDir, { recursive: true });
-                fs.writeFileSync(targetPath, _data);
-            }
+        } catch (error) {
+            this.logger.error('Erro fatal na distribuição de arquivos:', error);
+            throw new BadRequestException(`Falha ao extrair/escrever arquivos do módulo: ${error.message}`);
         }
     }
 
