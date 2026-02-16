@@ -10,11 +10,11 @@ export class ExecuteUpdateDto {
   })
   version: string;
 
+  // Campo mantido apenas por compatibilidade de payload da UI.
+  // O backend ignora este valor e sempre executa update com fluxo Docker controlado.
   @IsOptional()
-  @IsEnum(['npm', 'pnpm', 'yarn'], {
-    message: 'Package manager deve ser npm, pnpm ou yarn',
-  })
-  packageManager?: string = 'npm';
+  @IsString()
+  packageManager?: string;
 }
 
 /**
@@ -38,8 +38,8 @@ export class UpdateConfigDto {
   gitReleaseBranch?: string = 'main';
 
   @IsOptional()
-  @IsEnum(['npm', 'pnpm', 'yarn'])
-  packageManager?: string = 'npm';
+  @IsEnum(['docker', 'npm', 'pnpm', 'yarn'])
+  packageManager?: string = 'docker';
 
   @IsOptional()
   updateCheckEnabled?: boolean = true;

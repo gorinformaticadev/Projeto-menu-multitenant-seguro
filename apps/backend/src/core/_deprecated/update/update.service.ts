@@ -1,3 +1,5 @@
+// DEPRECATED: nao utilizado pelo AppModule.
+// Servico ativo de updates: apps/backend/src/update/update.service.ts
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';

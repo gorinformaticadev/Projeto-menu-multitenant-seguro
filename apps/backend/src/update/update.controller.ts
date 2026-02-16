@@ -1,229 +1,148 @@
- import {
+import {
+  Body,
   Controller,
   Get,
-  Post,
-  Put,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-  Request,
   HttpException,
   HttpStatus,
+  Param,
+  Post,
+  Put,
+  Query,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import { Role } from '@prisma/client';
+import { Roles } from '@core/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
-import { Roles } from '@core/common/decorators/roles.decorator';
-import { Role } from '@prisma/client';
-import { UpdateService } from './update.service';
 import { ExecuteUpdateDto, UpdateConfigDto } from './dto/update.dto';
-import { Throttle } from '@nestjs/throttler';
+import { UpdateService } from './update.service';
 
-/**
- * Controller do Sistema de AtualizaÃ§Ãµes
- * 
- * Endpoints protegidos para gerenciar atualizaÃ§Ãµes do sistema:
- * - VerificaÃ§Ã£o de status e versÃµes disponÃ­veis
- * - ExecuÃ§Ã£o de atualizaÃ§Ãµes (apenas SUPER_ADMIN)
- * - ConfiguraÃ§Ã£o do sistema de updates
- * - Consulta de logs e auditoria
- */
 @Controller('update')
 @UseGuards(JwtAuthGuard)
 export class UpdateController {
   constructor(private updateService: UpdateService) {
-      // Empty implementation
-    }
+    // Empty implementation
+  }
 
-  /**
-   * GET /api/update/status
-   * Retorna status atual do sistema de atualizaÃ§Ãµes
-   * AcessÃ­vel para usuÃ¡rios autenticados
-   */
+  private rethrowPreservingHttp(error: unknown, fallbackMessage: string): never {
+    if (error instanceof HttpException) {
+      throw error;
+    }
+    throw new HttpException(fallbackMessage, HttpStatus.INTERNAL_SERVER_ERROR);
+  }
+
   @Get('status')
   async getStatus() {
     try {
       return await this.updateService.getUpdateStatus();
     } catch (error) {
-      throw new HttpException(
-        'Erro ao buscar status de atualizaÃ§Ãµes',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      this.rethrowPreservingHttp(error, 'Erro ao buscar status de atualizacoes');
     }
   }
 
-  /**
-   * GET /api/update/check
-   * ForÃ§a verificaÃ§Ã£o de novas versÃµes no repositÃ³rio
-   * Apenas SUPER_ADMIN pode executar
-   */
   @Get('check')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
-  @Throttle({ default: { limit: 10, ttl: 60000 } }) // MÃ¡ximo 10 verificaÃ§Ãµes por minuto
-  async checkForUpdates(@Request() req) {
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  async checkForUpdates(@Request() _req) {
     try {
       const result = await this.updateService.checkForUpdates();
-      
       return {
         success: true,
-        message: result.updateAvailable 
-          ? `Nova versÃ£o disponÃ­vel: ${result.availableVersion}`
-          : 'Sistema estÃ¡ atualizado',
+        message: result.updateAvailable
+          ? `Nova versao disponivel: ${result.availableVersion}`
+          : 'Sistema esta atualizado',
         ...result,
       };
     } catch (error) {
-      throw new HttpException(
-        'Erro ao verificar atualizaÃ§Ãµes',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      this.rethrowPreservingHttp(error, 'Erro ao verificar atualizacoes');
     }
   }
 
-  /**
-   * POST /api/update/execute
-   * Executa atualizaÃ§Ã£o para versÃ£o especificada
-   * Apenas SUPER_ADMIN pode executar
-   */
   @Post('execute')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
-  @Throttle({ default: { limit: 3, ttl: 3600000 } }) // MÃ¡ximo 3 atualizaÃ§Ãµes por hora
-  async executeUpdate(
-    @Body() updateData: ExecuteUpdateDto,
-    @Request() req,
-  ) {
+  @Throttle({ default: { limit: 3, ttl: 3600000 } })
+  async executeUpdate(@Body() updateData: ExecuteUpdateDto, @Request() req) {
     try {
       const userId = req.user.sub;
       const ipAddress = req.ip;
       const userAgent = req.headers['user-agent'];
 
-      const result = await this.updateService.executeUpdate(
-        updateData,
-        userId,
-        ipAddress,
-        userAgent,
-      );
-
-      return result;
+      return await this.updateService.executeUpdate(updateData, userId, ipAddress, userAgent);
     } catch (error) {
-      throw new HttpException(
-        error.message || 'Erro ao executar atualizaÃ§Ã£o',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      this.rethrowPreservingHttp(error, 'Erro ao executar atualizacao');
     }
   }
 
-  /**
-   * PUT /api/update/config
-   * Atualiza configuraÃ§Ãµes do sistema de updates
-   * Apenas SUPER_ADMIN pode executar
-   */
   @Put('config')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
-  async updateConfig(
-    @Body() config: UpdateConfigDto,
-    @Request() req,
-  ) {
+  async updateConfig(@Body() config: UpdateConfigDto, @Request() req) {
     try {
       const userId = req.user.sub;
-      
-      const result = await this.updateService.updateConfig(config, userId);
-      
-      return result;
+      return await this.updateService.updateConfig(config, userId);
     } catch (error) {
-      throw new HttpException(
-        'Erro ao atualizar configuraÃ§Ãµes',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      this.rethrowPreservingHttp(error, 'Erro ao atualizar configuracoes');
     }
   }
 
-  /**
-   * GET /api/update/logs
-   * Retorna histÃ³rico de atualizaÃ§Ãµes
-   * Apenas SUPER_ADMIN pode acessar
-   */
   @Get('logs')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   async getLogs(@Query('limit') limit?: string) {
     try {
       const limitNum = limit ? parseInt(limit, 10) : 50;
-      
       if (limitNum > 200) {
-        throw new HttpException(
-          'Limite mÃ¡ximo de 200 registros',
-          HttpStatus.BAD_REQUEST,
-        );
+        throw new HttpException('Limite maximo de 200 registros', HttpStatus.BAD_REQUEST);
       }
 
       const logs = await this.updateService.getUpdateLogs(limitNum);
-      
       return {
         success: true,
         data: logs,
         total: logs.length,
       };
     } catch (error) {
-      throw new HttpException(
-        'Erro ao buscar logs de atualizaÃ§Ã£o',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      this.rethrowPreservingHttp(error, 'Erro ao buscar logs de atualizacao');
     }
   }
 
-  /**
-   * GET /api/update/logs/:id
-   * Retorna detalhes de uma atualizaÃ§Ã£o especÃ­fica
-   * Apenas SUPER_ADMIN pode acessar
-   */
   @Get('logs/:id')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   async getLogDetails(@Param('id') logId: string) {
     try {
       const log = await this.updateService.getUpdateLogDetails(logId);
-      
       return {
         success: true,
         data: log,
       };
     } catch (error) {
-      throw new HttpException(
-        error.message || 'Erro ao buscar detalhes do log',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      this.rethrowPreservingHttp(error, 'Erro ao buscar detalhes do log');
     }
   }
 
-  /**
-   * GET /api/update/test-connection
-   * Testa conectividade com o repositÃ³rio Git
-   * Apenas SUPER_ADMIN pode executar
-   */
   @Get('test-connection')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
-  @Throttle({ default: { limit: 5, ttl: 60000 } }) // MÃ¡ximo 5 testes por minuto
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async testConnection() {
     try {
-      // Tenta verificar atualizaÃ§Ãµes para testar conectividade
       const result = await this.updateService.checkForUpdates();
-      
       return {
         success: true,
-        message: 'ConexÃ£o com repositÃ³rio estabelecida com sucesso',
+        message: 'Conexao com repositorio estabelecida com sucesso',
         connected: true,
         ...result,
       };
-    } catch (error) {
+    } catch (_error) {
       return {
         success: false,
-        message: 'Falha na conexÃ£o com o repositÃ³rio',
+        message: 'Falha na conexao com o repositorio',
         connected: false,
-        error: error.message,
       };
     }
   }

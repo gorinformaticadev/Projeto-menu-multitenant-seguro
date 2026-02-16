@@ -64,6 +64,12 @@ interface UpdateConfig {
   updateCheckEnabled: boolean;
 }
 
+function normalizeVersionTag(version: string): string {
+  const value = (version || '').trim();
+  if (!value) return value;
+  return value.startsWith('v') ? value : `v${value}`;
+}
+
 export default function UpdatesPage() {
   const { toast } = useToast();
 
@@ -100,7 +106,7 @@ export default function UpdatesPage() {
   const loadStatus = useCallback(async () => {
     try {
       setLoading(prev => ({ ...prev, status: true }));
-      const response = await api.get('/update/status');
+      const response = await api.get('/api/update/status');
       setStatus(response.data);
     } catch (error: unknown) {
       toast({
@@ -119,7 +125,7 @@ export default function UpdatesPage() {
   const checkForUpdates = async () => {
     try {
       setLoading(prev => ({ ...prev, check: true }));
-      const response = await api.get('/update/check');
+      const response = await api.get('/api/update/check');
 
       toast({
         title: 'Verificação concluída',
@@ -148,8 +154,8 @@ export default function UpdatesPage() {
     try {
       setLoading(prev => ({ ...prev, update: true }));
 
-      const response = await api.post('/update/execute', {
-        version: status.availableVersion,
+      const response = await api.post('/api/update/execute', {
+        version: normalizeVersionTag(status.availableVersion),
         packageManager: config.packageManager,
       });
 
@@ -185,7 +191,7 @@ export default function UpdatesPage() {
     try {
       setLoading(prev => ({ ...prev, config: true }));
 
-      const response = await api.put('/update/config', config);
+      const response = await api.put('/api/update/config', config);
 
       toast({
         title: 'Configurações salvas',
@@ -211,7 +217,7 @@ export default function UpdatesPage() {
   const loadLogs = useCallback(async () => {
     try {
       setLoading(prev => ({ ...prev, logs: true }));
-      const response = await api.get('/update/logs?limit=20');
+      const response = await api.get('/api/update/logs?limit=20');
       setLogs(response.data.data || []);
     } catch (error: unknown) {
       toast({
@@ -248,7 +254,7 @@ export default function UpdatesPage() {
    */
   const testConnection = async () => {
     try {
-      const response = await api.get('/update/test-connection');
+      const response = await api.get('/api/update/test-connection');
 
       toast({
         title: response.data.connected ? 'Conexão bem-sucedida' : 'Falha na conexão',
@@ -896,3 +902,4 @@ export default function UpdatesPage() {
     </div>
   );
 }
+

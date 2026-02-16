@@ -1,4 +1,6 @@
- import { Module } from '@nestjs/common';
+// DEPRECATED: nao utilizado pelo AppModule.
+// Modulo ativo de updates: apps/backend/src/update/update.module.ts
+import { Module } from '@nestjs/common';
 import { UpdateController } from './update.controller';
 import { UpdateService } from './update.service';
 import { UpdateCronService } from './update-cron.service';

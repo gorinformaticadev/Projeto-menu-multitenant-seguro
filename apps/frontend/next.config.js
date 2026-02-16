@@ -98,6 +98,7 @@ const nextConfig = {
   // Enable experimental features for better security
   experimental: {
     optimizeCss: true, // Optimize CSS
+    workerThreads: true,
   },
   // Configure build output
   output: 'standalone', // Always use standalone for SSR support

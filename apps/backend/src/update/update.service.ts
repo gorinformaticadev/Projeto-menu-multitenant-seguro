@@ -34,28 +34,28 @@ export class UpdateService {
         return { updateAvailable: false };
       }
 
-      const repoUrl = `https://github.com/${settings.gitUsername}/${settings.gitRepository}.git`;
-      const { stdout } = await execFileAsync('git', ['ls-remote', '--tags', repoUrl], {
-        timeout: 60_000,
-        cwd: process.cwd(),
-      });
+      const repoUrl = this.buildPublicGitRepoUrl(settings);
+      const stdout = await this.getRemoteTagsOutput(repoUrl, settings.gitToken);
 
-      const tags = stdout
+      const cleanTags = stdout
         .split('\n')
         .map(line => line.split('\t')[1])
         .filter(ref => ref && ref.includes('refs/tags/'))
         .map(ref => ref.replace('refs/tags/', '').replace('^{}', ''))
-        .filter(tag => semver.valid(semver.clean(tag)))
-        .sort((a, b) => semver.rcompare(semver.clean(a)!, semver.clean(b)!));
+        .map(tag => semver.clean(tag))
+        .filter((tag): tag is string => !!tag && !!semver.valid(tag));
 
-      if (tags.length === 0) {
+      const uniqueCleanTags = Array.from(new Set(cleanTags)).sort((a, b) => semver.rcompare(a, b));
+
+      if (uniqueCleanTags.length === 0) {
         this.logger.warn('Nenhuma tag valida encontrada no repositorio');
         return { updateAvailable: false };
       }
 
-      const latestVersion = semver.clean(tags[0])!;
-      const currentVersion = semver.clean(settings.appVersion || '1.0.0')!;
-      const updateAvailable = semver.gt(latestVersion, currentVersion);
+      const latestClean = uniqueCleanTags[0];
+      const latestVersion = this.formatVersion(latestClean);
+      const currentClean = semver.clean(settings.appVersion || 'v1.0.0') || '1.0.0';
+      const updateAvailable = semver.gt(latestClean, currentClean);
 
       await this.updateSystemSettings({
         availableVersion: latestVersion,
@@ -64,8 +64,9 @@ export class UpdateService {
       });
 
       return { updateAvailable, availableVersion: latestVersion };
-    } catch (error) {
-      this.logger.error('Erro ao verificar atualizacoes:', error);
+    } catch (_error) {
+      // Nao expor detalhes do comando git para evitar vazamento de credenciais.
+      this.logger.error('Erro ao verificar atualizacoes');
       throw new HttpException('Erro ao verificar atualizacoes', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
@@ -77,16 +78,9 @@ export class UpdateService {
     userAgent?: string,
   ): Promise<{ success: boolean; logId: string; message: string }> {
     let updateLog: any;
+    let requestedVersion = updateData.version;
 
     try {
-      const normalizedVersion = semver.clean(updateData.version);
-      if (!normalizedVersion) {
-        throw new HttpException('Versao invalida', HttpStatus.BAD_REQUEST);
-      }
-
-      const settings: any = await this.getSystemSettings();
-      const currentVersion = semver.clean(settings.appVersion || '1.0.0') || '1.0.0';
-
       const runningUpdate = await (this.prisma as any).updateLog.findFirst({
         where: { status: 'STARTED' },
         orderBy: { startedAt: 'asc' },
@@ -110,7 +104,17 @@ export class UpdateService {
         }
       }
 
-      if (!semver.gt(normalizedVersion, currentVersion)) {
+      const normalizedCleanVersion = semver.clean(updateData.version);
+      if (!normalizedCleanVersion) {
+        throw new HttpException('Versao invalida', HttpStatus.BAD_REQUEST);
+      }
+      const normalizedVersion = this.formatVersion(normalizedCleanVersion);
+      requestedVersion = normalizedVersion;
+
+      const settings: any = await this.getSystemSettings();
+      const currentVersion = semver.clean(settings.appVersion || 'v1.0.0') || '1.0.0';
+
+      if (!semver.gt(normalizedCleanVersion, currentVersion)) {
         updateLog = await (this.prisma as any).updateLog.create({
           data: {
             version: normalizedVersion,
@@ -168,10 +172,12 @@ export class UpdateService {
       const deployResult = await this.runSafeImageDeploy(normalizedVersion, settings);
       const combinedOutput = `${deployResult.stdout || ''}\n${deployResult.stderr || ''}`;
       if (combinedOutput.includes('ROLLBACK_COMPLETED')) {
-        throw new HttpException(
-          'Deploy reportou rollback automatico; versao anterior foi mantida',
-          HttpStatus.INTERNAL_SERVER_ERROR,
-        );
+        const rollbackError: any = new Error('Deploy reportou rollback automatico; versao anterior foi mantida');
+        rollbackError.stdout = deployResult.stdout || '';
+        rollbackError.stderr = deployResult.stderr || '';
+        rollbackError.exitCode = 2;
+        rollbackError.status = HttpStatus.INTERNAL_SERVER_ERROR;
+        throw rollbackError;
       }
       const duration = Math.floor((Date.now() - startTime) / 1000);
 
@@ -210,7 +216,9 @@ export class UpdateService {
       const stdout = typeof error?.stdout === 'string' ? error.stdout : '';
       const stderr = typeof error?.stderr === 'string' ? error.stderr : '';
       const combinedErrorOutput = `${stdout}\n${stderr}\n${error?.message || ''}`;
-      const rollbackDetected = combinedErrorOutput.includes('ROLLBACK_COMPLETED');
+      const exitCode = Number(error?.code ?? error?.exitCode ?? -1);
+      const rollbackDetected =
+        combinedErrorOutput.includes('ROLLBACK_COMPLETED') || exitCode === 2;
 
       if (updateLog) {
         await (this.prisma as any).updateLog.update({
@@ -235,7 +243,7 @@ export class UpdateService {
           tenantId: null,
           ipAddress,
           userAgent,
-          details: { version: updateData.version, error: error.message, rollbackDetected, logId: updateLog.id },
+          details: { version: requestedVersion, error: error.message, rollbackDetected, logId: updateLog.id },
         });
       }
 
@@ -251,8 +259,8 @@ export class UpdateService {
   async getUpdateStatus(): Promise<UpdateStatusDto> {
     const settings: any = await this.getSystemSettings();
     return {
-      currentVersion: settings.appVersion || '1.0.0',
-      availableVersion: settings.availableVersion || undefined,
+      currentVersion: this.formatVersion(settings.appVersion || 'v1.0.0'),
+      availableVersion: settings.availableVersion ? this.formatVersion(settings.availableVersion) : undefined,
       updateAvailable: settings.updateAvailable || false,
       lastCheck: settings.lastUpdateCheck || undefined,
       isConfigured: !!(settings.gitUsername && settings.gitRepository),
@@ -273,7 +281,7 @@ export class UpdateService {
         if (!normalized) {
           throw new HttpException('releaseTag invalida', HttpStatus.BAD_REQUEST);
         }
-        updateData.releaseTag = normalized;
+        updateData.releaseTag = this.formatVersion(normalized);
       }
 
       if (config.composeFile) {
@@ -296,6 +304,9 @@ export class UpdateService {
       return { success: true, message: 'Configuracoes atualizadas com sucesso' };
     } catch (error) {
       this.logger.error('Erro ao atualizar configuracoes:', error);
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new HttpException('Erro ao atualizar configuracoes', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
@@ -333,7 +344,7 @@ export class UpdateService {
     if (!settings) {
       settings = await (this.prisma as any).systemSettings.create({
         data: {
-          appVersion: '1.0.0',
+          appVersion: 'v1.0.0',
           packageManager: 'docker',
           updateCheckEnabled: true,
           gitReleaseBranch: 'main',
@@ -444,5 +455,45 @@ export class UpdateService {
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return decrypted;
+  }
+
+  private formatVersion(version: string): string {
+    const clean = semver.clean(version);
+    return clean ? `v${clean}` : version;
+  }
+
+  private buildPublicGitRepoUrl(settings: any): string {
+    const repository = String(settings.gitRepository || '').replace(/\.git$/i, '');
+    return `https://github.com/${settings.gitUsername}/${repository}.git`;
+  }
+
+  private async getRemoteTagsOutput(repoUrl: string, encryptedGitToken?: string): Promise<string> {
+    const options = { timeout: 60_000, cwd: process.cwd() };
+    if (!encryptedGitToken) {
+      const { stdout } = await execFileAsync('git', ['ls-remote', '--tags', repoUrl], options);
+      return stdout;
+    }
+
+    try {
+      const decrypted = this.decryptToken(encryptedGitToken);
+      if (!decrypted) {
+        const { stdout } = await execFileAsync('git', ['ls-remote', '--tags', repoUrl], options);
+        return stdout;
+      }
+
+      const basicAuth = Buffer.from(`x-access-token:${decrypted}`, 'utf8').toString('base64');
+      const headerArg = `http.extraHeader=AUTHORIZATION: basic ${basicAuth}`;
+      const { stdout } = await execFileAsync(
+        'git',
+        ['-c', headerArg, 'ls-remote', '--tags', repoUrl],
+        options,
+      );
+      return stdout;
+    } catch {
+      // Fallback para repositórios públicos caso token legado esteja inválido.
+      this.logger.warn('Falha ao usar gitToken; tentando repositorio sem autenticacao');
+      const { stdout } = await execFileAsync('git', ['ls-remote', '--tags', repoUrl], options);
+      return stdout;
+    }
   }
 }

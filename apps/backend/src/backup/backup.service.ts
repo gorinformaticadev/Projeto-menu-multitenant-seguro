@@ -2,10 +2,16 @@ import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../core/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { spawn } from 'child_process';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { CreateBackupDto } from './dto/create-backup.dto';
+import { RestoreRequestDto } from './dto/restore-request.dto';
+import * as semver from 'semver';
+
+const execFileAsync = promisify(execFile);
 
 /**
  * Serviço responsável por operações de backup e restore do banco de dados
@@ -36,6 +42,223 @@ export class BackupService {
    */
   getBackupsDir(): string {
     return this.tempDir;
+  }
+
+  async restoreFromBackup(
+    dto: RestoreRequestDto,
+    userId: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<{ restoreLogId: string; fileName: string; message: string }> {
+    let restoreLog: any;
+
+    try {
+      const normalizedName = this.validateBackupFileName(dto.backupFile);
+      const filePath = path.resolve(path.join(this.tempDir, normalizedName));
+      if (!fs.existsSync(filePath)) {
+        throw new HttpException('Arquivo de backup nao encontrado', HttpStatus.NOT_FOUND);
+      }
+
+      await this.ensureRestoreNotLocked();
+
+      restoreLog = await (this.prisma as any).backupRestoreLog.create({
+        data: {
+          fileName: normalizedName,
+          status: 'STARTED',
+          executedBy: userId,
+          metadata: {
+            runMigrations: !!dto.runMigrations,
+            targetReleaseTag: dto.targetReleaseTag || null,
+            mode: dto.mode || 'restore-only',
+          },
+        },
+      });
+
+      await this.auditService.log({
+        action: 'BACKUP_RESTORE_STARTED',
+        userId,
+        ipAddress,
+        userAgent,
+        details: {
+          fileName: normalizedName,
+          restoreLogId: restoreLog.id,
+          runMigrations: !!dto.runMigrations,
+          targetReleaseTag: dto.targetReleaseTag || null,
+          mode: dto.mode || 'restore-only',
+        },
+      });
+
+      const settings: any = await (this.prisma as any).systemSettings.findFirst();
+      const composeFile = settings?.composeFile || 'docker-compose.prod.yml';
+      const envFile = settings?.envFile || 'install/.env.production';
+      this.validateRunnerAllowlist(composeFile, envFile);
+
+      const releaseTag = dto.targetReleaseTag ? semver.clean(dto.targetReleaseTag) : undefined;
+      if (dto.targetReleaseTag && !releaseTag) {
+        throw new HttpException('targetReleaseTag invalida', HttpStatus.BAD_REQUEST);
+      }
+
+      const scriptPath = path.join(process.cwd(), 'install', 'restore-db.sh');
+      if (!fs.existsSync(scriptPath)) {
+        throw new HttpException('Runner de restore nao encontrado (install/restore-db.sh)', HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+
+      const { stdout, stderr } = await execFileAsync('bash', [scriptPath], {
+        cwd: process.cwd(),
+        timeout: 45 * 60 * 1000,
+        maxBuffer: 20 * 1024 * 1024,
+        env: {
+          ...process.env,
+          PROJECT_ROOT: process.cwd(),
+          COMPOSE_FILE: composeFile,
+          ENV_FILE: envFile,
+          BACKUPS_DIR: this.tempDir,
+          BACKUP_FILE: normalizedName,
+          RUN_MIGRATIONS: dto.runMigrations ? 'true' : 'false',
+          RESTORE_MODE: dto.mode || 'restore-only',
+          TARGET_RELEASE_TAG: releaseTag || '',
+          HEALTH_TIMEOUT: process.env.RESTORE_HEALTH_TIMEOUT || '180',
+        },
+      });
+
+      await (this.prisma as any).backupRestoreLog.update({
+        where: { id: restoreLog.id },
+        data: {
+          status: 'SUCCESS',
+          completedAt: new Date(),
+          stdout,
+          stderr,
+        },
+      });
+
+      await this.auditService.log({
+        action: 'BACKUP_RESTORE_SUCCESS',
+        userId,
+        ipAddress,
+        userAgent,
+        details: { fileName: normalizedName, restoreLogId: restoreLog.id },
+      });
+
+      return {
+        restoreLogId: restoreLog.id,
+        fileName: normalizedName,
+        message: 'Restore executado com sucesso',
+      };
+    } catch (error: any) {
+      const stdout = typeof error?.stdout === 'string' ? error.stdout : '';
+      const stderr = typeof error?.stderr === 'string' ? error.stderr : '';
+
+      if (restoreLog) {
+        await (this.prisma as any).backupRestoreLog.update({
+          where: { id: restoreLog.id },
+          data: {
+            status: 'FAILED',
+            completedAt: new Date(),
+            stdout,
+            stderr,
+            errorMessage: error.message || 'Erro no restore',
+          },
+        });
+
+        await this.auditService.log({
+          action: 'BACKUP_RESTORE_FAILED',
+          userId,
+          ipAddress,
+          userAgent,
+          details: {
+            fileName: dto.backupFile,
+            restoreLogId: restoreLog.id,
+            error: error.message || 'Erro no restore',
+          },
+        });
+      }
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        `Erro ao executar restore: ${error.message || 'erro desconhecido'}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async listRestoreLogs(limit: number = 50): Promise<any[]> {
+    const logs = await (this.prisma as any).backupRestoreLog.findMany({
+      orderBy: { startedAt: 'desc' },
+      take: Math.min(limit, 200),
+      include: {
+        user: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+    });
+
+    return logs.map((log: any) => ({
+      id: log.id,
+      fileName: log.fileName,
+      status: log.status,
+      startedAt: log.startedAt,
+      completedAt: log.completedAt,
+      executedBy: log.user?.name || log.executedBy,
+      rollbackReason: log.rollbackReason,
+      errorMessage: log.errorMessage,
+    }));
+  }
+
+  async getRestoreLog(logId: string): Promise<any> {
+    const log = await (this.prisma as any).backupRestoreLog.findUnique({
+      where: { id: logId },
+      include: { user: { select: { id: true, name: true, email: true } } },
+    });
+    if (!log) {
+      throw new HttpException('Log de restore nao encontrado', HttpStatus.NOT_FOUND);
+    }
+    return log;
+  }
+
+  private validateBackupFileName(fileName: string): string {
+    if (!/^[a-zA-Z0-9._-]+$/.test(fileName)) {
+      throw new HttpException('Nome de arquivo invalido', HttpStatus.BAD_REQUEST);
+    }
+    const normalizedName = path.basename(fileName);
+    if (normalizedName !== fileName) {
+      throw new HttpException('Nome de arquivo invalido', HttpStatus.BAD_REQUEST);
+    }
+    const backupsDir = path.resolve(this.tempDir);
+    const candidatePath = path.resolve(path.join(backupsDir, normalizedName));
+    if (!candidatePath.startsWith(backupsDir + path.sep)) {
+      throw new HttpException('Acesso a caminho invalido', HttpStatus.BAD_REQUEST);
+    }
+    return normalizedName;
+  }
+
+  private validateRunnerAllowlist(composeFile: string, envFile: string): void {
+    const allowedCompose = new Set(['docker-compose.prod.yml', 'docker-compose.prod.external.yml']);
+    const allowedEnv = new Set(['install/.env.production', '.env.production', '.env']);
+
+    if (!allowedCompose.has(composeFile)) {
+      throw new HttpException('composeFile nao permitido para restore', HttpStatus.BAD_REQUEST);
+    }
+    if (!allowedEnv.has(envFile)) {
+      throw new HttpException('envFile nao permitido para restore', HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  private async ensureRestoreNotLocked(): Promise<void> {
+    const runningUpdate = await (this.prisma as any).updateLog.findFirst({
+      where: { status: 'STARTED' },
+    });
+    if (runningUpdate) {
+      throw new HttpException('Existe update em andamento. Restore bloqueado.', HttpStatus.CONFLICT);
+    }
+
+    const runningRestore = await (this.prisma as any).backupRestoreLog.findFirst({
+      where: { status: 'STARTED' },
+    });
+    if (runningRestore) {
+      throw new HttpException('Existe restore em andamento.', HttpStatus.CONFLICT);
+    }
   }
 
   /**

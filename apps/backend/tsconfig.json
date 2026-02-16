@@ -50,6 +50,7 @@
     "test",
     "**/*spec.ts",
     "**/*.js",
+    "src/core/_deprecated/**/*",
     "../../packages/modules/**/frontend/**/*",
     "src/**/frontend/**/*"
   ]

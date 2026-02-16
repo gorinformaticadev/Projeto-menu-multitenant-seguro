@@ -20,7 +20,7 @@ export function useSystemVersion() {
       
       try {
         // Primeiro tenta buscar da API de updates
-        const response = await api.get('/update/status');
+        const response = await api.get('/api/update/status');
         if (response.data?.currentVersion) {
           setVersion(response.data.currentVersion);
           setSource('api');
@@ -63,7 +63,7 @@ export function useSystemVersion() {
     setLoading(true);
     
     try {
-      const response = await api.get('/update/status');
+      const response = await api.get('/api/update/status');
       if (response.data?.currentVersion) {
         setVersion(response.data.currentVersion);
         setSource('api');
@@ -82,3 +82,4 @@ export function useSystemVersion() {
     refreshVersion,
   };
 }
+

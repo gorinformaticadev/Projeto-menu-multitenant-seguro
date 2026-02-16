@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SecurityConfigProvider } from "@/contexts/SecurityConfigContext";
@@ -9,8 +8,6 @@ import { AppLayout } from "@/components/AppLayout";
 import { NotificationProvider } from "@/providers/NotificationProvider";
 import { InactivityLogout } from "@/components/InactivityLogout";
 import { ThemeProvider } from "@/providers/ThemeProvider";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Sistema Multitenant", // Será atualizado dinamicamente pelo DynamicTitle
@@ -41,7 +38,11 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.json" />
       </head>
-      <body className={inter.className} suppressHydrationWarning>
+      <body
+        className="font-sans"
+        style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" }}
+        suppressHydrationWarning
+      >
         <PlatformConfigProvider>
           <AuthProvider>
             <SecurityConfigProvider>

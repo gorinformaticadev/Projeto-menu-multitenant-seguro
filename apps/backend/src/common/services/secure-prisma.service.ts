@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 
+type PrismaModelDelegateKey = {
+  [K in keyof PrismaService]: PrismaService[K] extends { findMany: (...args: never[]) => Promise<unknown> } ? K : never;
+}[keyof PrismaService] & string;
+
 @Injectable()
 export class SecurePrismaService {
   private readonly logger = new Logger(SecurePrismaService.name);
@@ -13,7 +17,7 @@ export class SecurePrismaService {
    * Wrapper seguro para findMany com validação automática de tenant isolation
    */
   async findManySecure<T>(
-    model: keyof PrismaClient,
+    model: PrismaModelDelegateKey,
     where: any,
     tenantId: string,
     userRole: string,
@@ -40,7 +44,7 @@ export class SecurePrismaService {
         hasTenantFilter: userRole !== 'SUPER_ADMIN'
       });
 
-      const result = await this.prisma[model].findMany({
+      const result = await (this.prisma as Record<string, any>)[model].findMany({
         where: tenantWhere,
         select: options.select,
         include: options.include,
@@ -60,7 +64,7 @@ export class SecurePrismaService {
    * Wrapper seguro para findUnique com validação de ownership
    */
   async findUniqueSecure<T>(
-    model: keyof PrismaClient,
+    model: PrismaModelDelegateKey,
     where: any,
     tenantId: string,
     userRole: string,
@@ -72,7 +76,7 @@ export class SecurePrismaService {
       }
   ): Promise<T | null> {
     try {
-      const result = await this.prisma[model].findUnique({
+      const result = await (this.prisma as Record<string, any>)[model].findUnique({
         where,
         select: options.select,
         include: options.include
@@ -115,7 +119,7 @@ export class SecurePrismaService {
    * Wrapper seguro para create com validação de tenant
    */
   async createSecure<T>(
-    model: keyof PrismaClient,
+    model: PrismaModelDelegateKey,
     data: any,
     tenantId: string,
     userId: string,
@@ -136,7 +140,7 @@ export class SecurePrismaService {
         hasExplicitTenant: !!data.tenantId
       });
 
-      const result = await this.prisma[model].create({
+      const result = await (this.prisma as Record<string, any>)[model].create({
         data: secureData
       });
 
@@ -159,7 +163,7 @@ export class SecurePrismaService {
    * Wrapper seguro para update com validação de ownership
    */
   async updateSecure<T>(
-    model: keyof PrismaClient,
+    model: PrismaModelDelegateKey,
     where: any,
     data: any,
     tenantId: string,
@@ -185,7 +189,7 @@ export class SecurePrismaService {
         userId
       });
 
-      const result = await this.prisma[model].update({
+      const result = await (this.prisma as Record<string, any>)[model].update({
         where,
         data: {
           ...data,
@@ -213,7 +217,7 @@ export class SecurePrismaService {
    * Wrapper seguro para delete com validação de ownership
    */
   async deleteSecure<T>(
-    model: keyof PrismaClient,
+    model: PrismaModelDelegateKey,
     where: any,
     tenantId: string,
     userId: string,
@@ -239,7 +243,7 @@ export class SecurePrismaService {
         userRole
       });
 
-      const result = await this.prisma[model].delete({
+      const result = await (this.prisma as Record<string, any>)[model].delete({
         where
       });
 
@@ -319,7 +323,3 @@ export class SecurePrismaService {
   }
 }
 
-// Tipo auxiliar para o PrismaClient
-type PrismaClient = {
-  [K in keyof typeof import('@prisma/client').PrismaClient]: unknown;
-};

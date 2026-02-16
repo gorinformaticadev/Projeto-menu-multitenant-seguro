@@ -3,6 +3,7 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ "main", "develop" ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ "main" ]
 
@@ -50,8 +51,8 @@ jobs:
   build-and-push:
     name: Build & Push Docker Images
     needs: test
-    # Only push images on main branch or if manually triggered (and if secrets are present)
-    if: github.ref == 'refs/heads/main'
+    # Only push images on main branch or release tags (v*)
+    if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -71,6 +72,38 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Resolve image tag
+        id: vars
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "IMAGE_TAG=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+            {
+              echo "BACKEND_TAGS<<EOF"
+              echo "${DOCKER_USERNAME}/multitenant-backend:${GITHUB_REF#refs/tags/}"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            {
+              echo "FRONTEND_TAGS<<EOF"
+              echo "${DOCKER_USERNAME}/multitenant-frontend:${GITHUB_REF#refs/tags/}"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "IMAGE_TAG=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+            {
+              echo "BACKEND_TAGS<<EOF"
+              echo "${DOCKER_USERNAME}/multitenant-backend:latest"
+              echo "${DOCKER_USERNAME}/multitenant-backend:${GITHUB_SHA}"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            {
+              echo "FRONTEND_TAGS<<EOF"
+              echo "${DOCKER_USERNAME}/multitenant-frontend:latest"
+              echo "${DOCKER_USERNAME}/multitenant-frontend:${GITHUB_SHA}"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
       # --- BUILD BACKEND ---
       - name: Build and push Backend
         uses: docker/build-push-action@v5
@@ -79,9 +112,7 @@ jobs:
           context: .
           file: ./apps/backend/Dockerfile
           push: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
-          tags: |
-            ${{ env.DOCKER_USERNAME }}/multitenant-backend:latest
-            ${{ env.DOCKER_USERNAME }}/multitenant-backend:${{ github.sha }}
+          tags: ${{ steps.vars.outputs.BACKEND_TAGS }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -92,8 +123,6 @@ jobs:
           context: .
           file: ./apps/frontend/Dockerfile
           push: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
-          tags: |
-            ${{ env.DOCKER_USERNAME }}/multitenant-frontend:latest
-            ${{ env.DOCKER_USERNAME }}/multitenant-frontend:${{ github.sha }}
+          tags: ${{ steps.vars.outputs.FRONTEND_TAGS }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

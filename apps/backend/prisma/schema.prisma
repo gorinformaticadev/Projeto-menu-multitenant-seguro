@@ -56,6 +56,7 @@ model User {
   tenant                   Tenant?              @relation(fields: [tenantId], references: [id])
   preferences              UserPreferences?
   backupLogs               BackupLog[]
+  backupRestoreLogs        BackupRestoreLog[]
 
   @@index([tenantId])
   @@index([email])
@@ -449,6 +450,32 @@ model BackupLog {
   @@index([executedBy])
   @@index([startedAt])
   @@map("backup_logs")
+}
+
+model BackupRestoreLog {
+  id            String       @id @default(uuid())
+  fileName      String
+  status        RestoreStatus
+  startedAt     DateTime     @default(now())
+  completedAt   DateTime?
+  stdout        String?
+  stderr        String?
+  executedBy    String
+  rollbackReason String?
+  errorMessage  String?
+  metadata      Json?
+  user          User         @relation(fields: [executedBy], references: [id])
+
+  @@index([status])
+  @@index([startedAt])
+  @@index([executedBy])
+  @@map("backup_restore_logs")
+}
+
+enum RestoreStatus {
+  STARTED
+  SUCCESS
+  FAILED
 }
 
 

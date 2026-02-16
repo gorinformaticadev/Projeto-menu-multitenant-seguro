@@ -1,4 +1,6 @@
- import {
+// DEPRECATED: nao utilizado pelo AppModule.
+// Controller ativo de updates: apps/backend/src/update/update.controller.ts
+import {
   Controller,
   Get,
   Post,
