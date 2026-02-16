@@ -2,6 +2,7 @@ import { Module, NestModule, MiddlewareConsumer, DynamicModule } from '@nestjs/c
 import { ConfigModule } from '@nestjs/config';
 import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { ServeStaticModule } from '@nestjs/serve-static';
 import { CsrfGuard } from "./common/guards/csrf.guard";
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
@@ -36,6 +37,11 @@ import { HealthModule } from './health/health.module';
     // Módulo de agendamento para tarefas cron
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
+    ServeStaticModule.forRoot({
+      rootPath: '/app/uploads',
+      serveRoot: '/api/uploads',
+      exclude: ['/api/(?!uploads).*'],
+    }),
     SentryModule,
     CommonModule,
     // ============================================
