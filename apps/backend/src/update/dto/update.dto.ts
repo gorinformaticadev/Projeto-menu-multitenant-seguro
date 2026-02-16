@@ -1,12 +1,12 @@
 import { IsString, IsOptional, IsEnum, Matches } from 'class-validator';
 
 /**
- * DTO para execução de atualização
+ * DTO para execucao de atualizacao
  */
 export class ExecuteUpdateDto {
   @IsString()
   @Matches(/^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.-]+)?$/, {
-    message: 'Versão deve seguir o formato semver (ex: v1.2.3 ou 1.2.3)',
+    message: 'Versao deve seguir o formato semver (ex: v1.2.3 ou 1.2.3)',
   })
   version: string;
 
@@ -18,7 +18,7 @@ export class ExecuteUpdateDto {
 }
 
 /**
- * DTO para configuração do sistema de updates
+ * DTO para configuracao do sistema de updates
  */
 export class UpdateConfigDto {
   @IsOptional()
@@ -43,6 +43,27 @@ export class UpdateConfigDto {
 
   @IsOptional()
   updateCheckEnabled?: boolean = true;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.-]+)?$/, {
+    message: 'releaseTag deve seguir o formato semver (ex: v1.2.3 ou 1.2.3)',
+  })
+  releaseTag?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(docker-compose\.prod\.yml|docker-compose\.prod\.external\.yml)$/, {
+    message: 'composeFile invalido. Use docker-compose.prod.yml ou docker-compose.prod.external.yml',
+  })
+  composeFile?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(install\/\.env\.production|\.env\.production|\.env)$/, {
+    message: 'envFile invalido. Use install/.env.production, .env.production ou .env',
+  })
+  envFile?: string;
 }
 
 /**
@@ -58,7 +79,7 @@ export class UpdateStatusDto {
 }
 
 /**
- * DTO de resposta para logs de atualização
+ * DTO de resposta para logs de atualizacao
  */
 export class UpdateLogDto {
   id: string;

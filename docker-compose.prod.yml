@@ -19,7 +19,7 @@ services:
       - multitenant-network
 
   frontend:
-    image: ${DOCKERHUB_USERNAME:-local}/multitenant-frontend:latest
+    image: ${DOCKERHUB_USERNAME:-local}/multitenant-frontend:${RELEASE_TAG:-latest}
     build:
       context: .
       dockerfile: apps/frontend/Dockerfile
@@ -43,7 +43,7 @@ services:
       start_period: 40s
 
   backend:
-    image: ${DOCKERHUB_USERNAME:-local}/multitenant-backend:latest
+    image: ${DOCKERHUB_USERNAME:-local}/multitenant-backend:${RELEASE_TAG:-latest}
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
@@ -120,3 +120,4 @@ volumes:
 networks:
   multitenant-network:
     driver: bridge
+

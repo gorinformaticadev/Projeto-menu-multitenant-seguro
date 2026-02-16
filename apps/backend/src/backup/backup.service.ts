@@ -32,6 +32,13 @@ export class BackupService {
   }
 
   /**
+   * Retorna o diretório raiz onde os backups ficam armazenados.
+   */
+  getBackupsDir(): string {
+    return this.tempDir;
+  }
+
+  /**
    * Garante que o diretório de backups existe
    */
   private ensureTempDirExists(): void {

@@ -216,6 +216,9 @@ model SystemSettings {
   lastUpdateCheck    DateTime?
   availableVersion   String?
   updateAvailable    Boolean   @default(false)
+  releaseTag         String?   @default("latest")
+  composeFile        String?   @default("docker-compose.prod.yml")
+  envFile            String?   @default("install/.env.production")
   updatedAt          DateTime  @updatedAt
   updatedBy          String?
 
@@ -447,5 +450,6 @@ model BackupLog {
   @@index([startedAt])
   @@map("backup_logs")
 }
+
 
 

@@ -1,3 +1,5 @@
+
+> Seguran�a: NUNCA versione segredos reais em arquivos .env no Git. Use vari�veis no ambiente/secret manager e mantenha apenas exemplos no reposit�rio.
 # Instalador automatizado – Projeto Menu Multitenant
 
 Script de instalação e atualização para o monorepo, alinhado à pasta `multitenant-docker-acme` e ao fluxo de CI/CD (build e deploy via GitHub Actions).
@@ -221,3 +223,4 @@ As variáveis **novas** que o instalador adiciona ou documenta em `install/.env.
 - `DOCKERHUB_USERNAME` – usuário Docker Hub das imagens (o instalador garante que exista em `install/.env.production`).
 
 As demais (`DOMAIN`, `LETSENCRYPT_EMAIL`, `DB_*`, `JWT_SECRET`, `ENCRYPTION_KEY`, etc.) já existiam; o instalador apenas as preenche ou gera quando necessário.
+

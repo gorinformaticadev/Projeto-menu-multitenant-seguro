@@ -2,11 +2,13 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as AdmZip from 'adm-zip';
+import { createHash } from 'crypto';
 import { PrismaService } from './prisma/prisma.service';
 import { NotificationService } from '../notifications/notification.service';
 import { ModuleJsonValidator, ModuleJson } from './validators/module-json.validator';
 import { ModuleStructureValidator, ModuleStructureResult } from './validators/module-structure.validator';
 import { ModuleDatabaseExecutorService } from './services/module-database-executor.service';
+import { AuditService } from '../audit/audit.service';
 
 /**
  * Serviço de Instalação de Módulos - DISTRIBUTED
@@ -24,11 +26,14 @@ export class ModuleInstallerService {
     private readonly backendModulesPath = path.resolve(process.cwd(), 'src', 'modules');
     private readonly frontendBase = path.resolve(process.cwd(), '..', 'frontend', 'src', 'app', 'modules');
     private readonly uploadsPath = path.resolve(process.cwd(), 'uploads', 'modules');
+    private readonly allowedTextExtensions = new Set(['.json', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.css', '.scss', '.md', '.txt', '.sql', '.yml', '.yaml']);
+    private readonly allowedBinaryExtensions = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico']);
 
     constructor(
         private readonly prisma: PrismaService,
         private readonly notificationService: NotificationService,
-        private readonly dbExecutor: ModuleDatabaseExecutorService
+        private readonly dbExecutor: ModuleDatabaseExecutorService,
+        private readonly auditService: AuditService
     ) {
         this.ensureDirectories();
     }
@@ -104,54 +109,44 @@ export class ModuleInstallerService {
             };
         });
     }
-
     /**
-     * Instala módulo a partir de arquivo ZIP
+     * Instala modulo a partir de arquivo ZIP
      */
-    async installModuleFromZip(file: Express.Multer.File) {
-        this.logger.log('🚀 Iniciando instalação de módulo distribuída...');
+    async installModuleFromZip(
+        file: Express.Multer.File,
+        uploadedBy?: string,
+        ipAddress?: string,
+        userAgent?: string,
+    ) {
+        this.logger.log('Iniciando instalacao de modulo distribuida...');
 
-        // Variáveis para rollback
         let moduleNameForRollback: string | null = null;
         let filesDistributed = false;
+        let wasExistingModule = false;
 
         try {
-            // 1. Preparar Buffer
             const bufferToWrite = this.prepareFileBuffer(file);
+            const moduleHash = createHash('sha256').update(bufferToWrite).digest('hex');
 
-            // 2. Analisar
             const structure = ModuleStructureValidator.analyzeZipStructure(bufferToWrite);
-
-            // 3. Validar JSON
             const moduleJsonData = JSON.parse(structure.moduleJsonContent);
             const validatedModule = ModuleJsonValidator.validate(moduleJsonData);
 
             moduleNameForRollback = validatedModule.name;
-
-            // 4. Validar Nome Seguro
             ModuleJsonValidator.validateSafeName(validatedModule.name);
 
-            // 5. Verificar Existência
             const existingModule = await this.prisma.module.findUnique({
                 where: { slug: validatedModule.name }
             });
 
+            wasExistingModule = !!existingModule;
             let module;
 
-            // Lógica de Atualização vs Instalação Limpa
             if (existingModule) {
-                this.logger.log(`⚠️ Módulo ${validatedModule.name} já existe - preparando ATUALIZAÇÃO...`);
-
-                // 1. Limpeza física prévia (importante para remover arquivos órfãos)
-                await this.uninstallPhysicalFiles(validatedModule.name);
-
-                // 2. Distribuir novos arquivos
-                this.logger.log('6. Distribuindo arquivos (Atualização)...');
+                this.logger.log(`Modulo ${validatedModule.name} ja existe - preparando atualizacao...`);
                 await this.distributeModuleFiles(bufferToWrite, structure, validatedModule.name);
                 filesDistributed = true;
 
-                // 3. Atualizar Banco (Mantendo ID e Relacionamentos)
-                this.logger.log('7. Atualizando registro no banco...');
                 module = await this.prisma.module.update({
                     where: { id: existingModule.id },
                     data: {
@@ -165,28 +160,36 @@ export class ModuleInstallerService {
                     }
                 });
 
-                // Limpa menus antigos
                 await this.prisma.moduleMenu.deleteMany({ where: { moduleId: existingModule.id } });
-
             } else {
-                // Instalação Nova
-                this.logger.log('6. Distribuindo arquivos (Nova Instalação)...');
+                this.logger.log('Distribuindo arquivos (nova instalacao)...');
                 await this.distributeModuleFiles(bufferToWrite, structure, validatedModule.name);
                 filesDistributed = true;
 
-                this.logger.log('7. Criando registro no banco...');
                 module = await this.registerModuleInDatabase(validatedModule, structure, validatedModule.name);
             }
 
-            // 8. Menus
             if (validatedModule.menus?.length) {
-                this.logger.log('8. Registrando menus...');
                 await this.registerModuleMenus(module.id, validatedModule.menus);
             }
 
-            // 9. Notificar
+            await this.auditService.log({
+                action: 'MODULE_UPLOAD',
+                userId: uploadedBy,
+                ipAddress,
+                userAgent,
+                details: {
+                    slug: validatedModule.name,
+                    version: validatedModule.version,
+                    size: file.size,
+                    sha256: moduleHash,
+                    hasBackend: structure.hasBackend,
+                    hasFrontend: structure.hasFrontend,
+                    mode: wasExistingModule ? 'update' : 'install',
+                }
+            });
+
             await this.notifyModuleInstalled(validatedModule);
-            this.logger.log('✅ Instalação concluída com sucesso.');
 
             return {
                 success: true,
@@ -196,29 +199,25 @@ export class ModuleInstallerService {
                     version: validatedModule.version,
                     status: 'installed'
                 },
-                message: 'Módulo instalado com sucesso.'
+                message: 'Modulo instalado com sucesso.'
             };
 
         } catch (error) {
-            this.logger.error('❌ Erro ao instalar módulo:', error);
+            this.logger.error('Erro ao instalar modulo:', error);
 
-            // AUTO-ROLLBACK
-            if (moduleNameForRollback && filesDistributed) {
-                this.logger.warn(`🔄 Executando ROLLBACK para módulo ${moduleNameForRollback}...`);
+            if (moduleNameForRollback && filesDistributed && !wasExistingModule) {
+                this.logger.warn(`Executando rollback para modulo ${moduleNameForRollback}...`);
                 try {
                     await this.uninstallPhysicalFiles(moduleNameForRollback);
-                    // Tenta remover registro se foi criado
                     await this.prisma.module.deleteMany({ where: { slug: moduleNameForRollback } });
-                    this.logger.warn('✅ Rollback concluído: Arquivos e registros limpos.');
                 } catch (rollbackError) {
-                    this.logger.error('❌ Falha crítica no Rollback:', rollbackError);
+                    this.logger.error('Falha critica no rollback:', rollbackError);
                 }
             }
 
             throw error;
         }
     }
-
     private prepareFileBuffer(file: Express.Multer.File): Buffer {
         try {
             if (Buffer.isBuffer(file.buffer)) return file.buffer;
@@ -230,34 +229,32 @@ export class ModuleInstallerService {
         }
         throw new BadRequestException('Buffer do arquivo inválido ou corrompido');
     }
-
     private async distributeModuleFiles(
         zipBuffer: Buffer,
         structure: ModuleStructureResult,
         moduleSlug: string
     ): Promise<void> {
+        const zip = new AdmZip(zipBuffer);
+        const entries = zip.getEntries();
+
+        const frontendDest = path.join(this.frontendBase, moduleSlug);
+        const backendDest = path.join(this.backendModulesPath, moduleSlug);
+        const backendStaging = path.join(this.backendModulesPath, `.staging-${moduleSlug}-${Date.now()}`);
+        const frontendStaging = path.join(this.frontendBase, `.staging-${moduleSlug}-${Date.now()}`);
+
         try {
-            const zip = new AdmZip(zipBuffer);
-            const entries = zip.getEntries();
+            if (!fs.existsSync(this.backendModulesPath)) fs.mkdirSync(this.backendModulesPath, { recursive: true });
+            if (!fs.existsSync(this.frontendBase)) fs.mkdirSync(this.frontendBase, { recursive: true });
 
-            const frontendDest = path.join(this.frontendBase, moduleSlug);
-            const backendDest = path.join(this.backendModulesPath, moduleSlug);
-
-            // Tenta criar diretórios, loga se falhar (especialmente frontend em prod)
-            try {
-                if (!fs.existsSync(this.frontendBase)) fs.mkdirSync(this.frontendBase, { recursive: true });
-            } catch (e) {
-                this.logger.warn(`Não foi possível criar diretório frontend: ${this.frontendBase}. Ignorando arquivos de frontend.`);
-            }
-
-            try {
-                if (!fs.existsSync(this.backendModulesPath)) fs.mkdirSync(this.backendModulesPath, { recursive: true });
-            } catch (e) {
-                throw new Error(`CRÍTICO: Não foi possível criar diretório de módulos backend: ${this.backendModulesPath}`);
-            }
+            fs.mkdirSync(backendStaging, { recursive: true });
+            fs.mkdirSync(frontendStaging, { recursive: true });
 
             for (const entry of entries) {
                 if (entry.isDirectory) continue;
+
+                if (this.isSymlinkEntry(entry)) {
+                    throw new BadRequestException(`ZIP contem symlink proibido: ${entry.entryName}`);
+                }
 
                 let relativePath = entry.entryName;
                 if (structure.basePath) {
@@ -270,50 +267,90 @@ export class ModuleInstallerService {
                 }
 
                 if (!relativePath || relativePath.trim() === '') continue;
-                if (relativePath.includes('..')) continue;
+                ModuleStructureValidator.validateSafePath(relativePath);
+
+                const data = entry.getData();
+                this.validateModuleFileEntry(relativePath, data);
 
                 let targetPath = '';
-                const _data = entry.getData();
-
-                // Lógica de Distribuição Atualizada - PRESERVANDO ESTRUTURA
                 if (relativePath.startsWith('frontend/')) {
-                    // Remove o prefixo 'frontend/' e mantém a hierarquia completa
-                    // Ex: frontend/pages/dashboard/page.tsx -> modules/{slug}/pages/dashboard/page.tsx
                     const inner = relativePath.substring('frontend/'.length);
                     if (inner.trim() !== '') {
-                        targetPath = path.join(frontendDest, inner);
+                        targetPath = path.join(frontendStaging, inner);
                     }
                 } else if (relativePath.startsWith('backend/')) {
-                    // Backend
                     const inner = relativePath.substring('backend/'.length);
-                    targetPath = path.join(backendDest, inner);
+                    targetPath = path.join(backendStaging, inner);
                 } else if (!relativePath.includes('/')) {
-                    // Raiz (module.json)
-                    targetPath = path.join(backendDest, relativePath);
+                    targetPath = path.join(backendStaging, relativePath);
                 }
 
-                if (targetPath) {
-                    try {
-                        const tDir = path.dirname(targetPath);
-                        if (!fs.existsSync(tDir)) fs.mkdirSync(tDir, { recursive: true });
-                        fs.writeFileSync(targetPath, _data);
-                    } catch (writeError) {
-                        this.logger.error(`Erro ao escrever arquivo ${targetPath}: ${writeError.message}`);
-                        // Se for erro no frontend, apenas loga e continua (comum em Docker prod)
-                        if (targetPath.includes(frontendDest)) {
-                            this.logger.warn(`Skipping frontend file write due to error: ${relativePath}`);
-                        } else {
-                            throw writeError; // Erro no backend deve falhar a instalação
-                        }
-                    }
-                }
+                if (!targetPath) continue;
+
+                const targetDir = path.dirname(targetPath);
+                if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+                fs.writeFileSync(targetPath, data);
+            }
+
+            await this.atomicReplaceDir(backendStaging, backendDest);
+
+            const hasFrontendPayload = fs.readdirSync(frontendStaging).length > 0;
+            if (hasFrontendPayload) {
+                await this.atomicReplaceDir(frontendStaging, frontendDest);
+            } else {
+                await this.safeRemoveDir(frontendStaging);
             }
         } catch (error) {
-            this.logger.error('Erro fatal na distribuição de arquivos:', error);
-            throw new BadRequestException(`Falha ao extrair/escrever arquivos do módulo: ${error.message}`);
+            await this.safeRemoveDir(backendStaging);
+            await this.safeRemoveDir(frontendStaging);
+            this.logger.error('Erro fatal na distribuicao de arquivos:', error);
+            throw new BadRequestException(`Falha ao extrair/escrever arquivos do modulo: ${error.message}`);
         }
     }
 
+    private isSymlinkEntry(entry: any): boolean {
+        const attr = entry.header?.attr || 0;
+        const mode = (attr >> 16) & 0xF000;
+        return mode === 0xA000;
+    }
+
+    private validateModuleFileEntry(relativePath: string, data: Buffer): void {
+        const ext = path.extname(relativePath).toLowerCase();
+
+        if (!this.allowedTextExtensions.has(ext) && !this.allowedBinaryExtensions.has(ext)) {
+            throw new BadRequestException(`Arquivo nao permitido no modulo: ${relativePath}`);
+        }
+
+        if (this.allowedTextExtensions.has(ext) && data.includes(0x00)) {
+            throw new BadRequestException(`Arquivo binario nao permitido para extensao textual: ${relativePath}`);
+        }
+    }
+
+    private async atomicReplaceDir(stagingDir: string, finalDir: string): Promise<void> {
+        const backupDir = `${finalDir}.backup-${Date.now()}`;
+
+        if (fs.existsSync(finalDir)) {
+            fs.renameSync(finalDir, backupDir);
+        }
+
+        try {
+            fs.renameSync(stagingDir, finalDir);
+            await this.safeRemoveDir(backupDir);
+        } catch (error) {
+            if (fs.existsSync(backupDir)) {
+                if (fs.existsSync(finalDir)) await this.safeRemoveDir(finalDir);
+                fs.renameSync(backupDir, finalDir);
+            }
+            throw error;
+        }
+    }
+
+    private async safeRemoveDir(dirPath: string): Promise<void> {
+        if (!fs.existsSync(dirPath)) return;
+        await new Promise<void>((resolve) => {
+            fs.rm(dirPath, { recursive: true, force: true }, () => resolve());
+        });
+    }
     private async uninstallPhysicalFiles(slug: string): Promise<void> {
         const frontendPath = path.join(this.frontendBase, slug);
         const backendPath = path.join(this.backendModulesPath, slug);
@@ -823,3 +860,6 @@ export class ModuleInstallerService {
         if (!fs.existsSync(this.uploadsPath)) fs.mkdirSync(this.uploadsPath, { recursive: true });
     }
 }
+
+
+

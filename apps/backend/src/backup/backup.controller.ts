@@ -298,13 +298,29 @@ export class BackupController {
    * ENDPOINT PÚBLICO - Sem autenticação JWT
    */
   @Get('download-file/:fileName')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
   async downloadBackupFile(
     @Param('fileName') fileName: string,
     @Res() res: Response,
   ) {
     try {
+      if (!/^[a-zA-Z0-9._-]+$/.test(fileName)) {
+        throw new HttpException('Nome de arquivo invalido', HttpStatus.BAD_REQUEST);
+      }
+
+      const normalizedName = path.basename(fileName);
+      if (normalizedName !== fileName) {
+        throw new HttpException('Nome de arquivo invalido', HttpStatus.BAD_REQUEST);
+      }
+
+      const backupsDir = path.resolve(this.backupService.getBackupsDir());
+      const candidatePath = path.resolve(path.join(backupsDir, normalizedName));
+      if (!candidatePath.startsWith(backupsDir + path.sep)) {
+        throw new HttpException('Acesso a caminho invalido', HttpStatus.BAD_REQUEST);
+      }
       const backups = await this.backupService.listAvailableBackups();
-      const backup = backups.find(b => b.fileName === fileName);
+      const backup = backups.find(b => b.fileName === normalizedName);
 
       if (!backup) {
         throw new HttpException('Backup não encontrado', HttpStatus.NOT_FOUND);
@@ -433,3 +449,4 @@ export class BackupController {
     }
   }
 }
+

@@ -51,6 +51,7 @@ export function ModuleManagement() {
   const [reloadingConfig, setReloadingConfig] = useState<string | null>(null);
   const [runningMigrationsSeeds, setRunningMigrationsSeeds] = useState<string | null>(null);
   const [showMigrationsSeedsDialog, setShowMigrationsSeedsDialog] = useState(false);
+  const moduleUploadEnabled = process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_ENABLE_MODULE_UPLOAD === 'true';
   const [selectedModuleForMigrations, setSelectedModuleForMigrations] = useState<InstalledModule | null>(null);
 
   const loadInstalledModules = useCallback(async () => {
@@ -117,6 +118,11 @@ export function ModuleManagement() {
   };
 
   const uploadModule = async () => {
+    if (!moduleUploadEnabled) {
+      toast({ title: 'Operacao bloqueada', description: 'Upload de modulo habilitado apenas em DEV com ENABLE_MODULE_UPLOAD=true.', variant: 'destructive' });
+      return;
+    }
+
     if (!selectedFile) return;
 
     setUploading(true);
@@ -178,6 +184,11 @@ export function ModuleManagement() {
   const [confirmationInput, setConfirmationInput] = useState("");
 
   const handleRemoveModule = async () => {
+    if (!moduleUploadEnabled) {
+      toast({ title: 'Operacao bloqueada', description: 'Desinstalacao de modulo habilitada apenas em DEV com ENABLE_MODULE_UPLOAD=true.', variant: 'destructive' });
+      return;
+    }
+
     if (!selectedModule) return;
 
     // Validação frontend básica da confirmação
@@ -351,6 +362,11 @@ export function ModuleManagement() {
   };
 
   const reloadModuleConfig = async (moduleName: string) => {
+    if (!moduleUploadEnabled) {
+      toast({ title: 'Operacao bloqueada', description: 'Reload de configuracao habilitado apenas em DEV com ENABLE_MODULE_UPLOAD=true.', variant: 'destructive' });
+      return;
+    }
+
     setReloadingConfig(moduleName);
 
     try {
@@ -451,7 +467,7 @@ export function ModuleManagement() {
                   <p className="text-sm text-muted-foreground mb-4">
                     Arraste e solte ou clique para selecionar um módulo (.zip, máx. 50MB)
                   </p>
-                  <Button onClick={handleFileSelect} disabled={uploading}>
+                  <Button onClick={handleFileSelect} disabled={uploading || !moduleUploadEnabled}>
                     Selecionar Arquivo
                   </Button>
                   <input
@@ -512,7 +528,7 @@ export function ModuleManagement() {
                   <div className="flex gap-3">
                     <Button
                       onClick={uploadModule}
-                      disabled={uploading}
+                      disabled={uploading || !moduleUploadEnabled}
                       className="flex-1"
                     >
                       {uploading ? (
@@ -530,7 +546,7 @@ export function ModuleManagement() {
                     <Button
                       variant="outline"
                       onClick={clearSelectedFile}
-                      disabled={uploading}
+                      disabled={uploading || !moduleUploadEnabled}
                     >
                       Cancelar
                     </Button>
@@ -645,7 +661,7 @@ export function ModuleManagement() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => reloadModuleConfig(module.slug)}
-                                    disabled={reloadingConfig === module.slug}
+                                    disabled={reloadingConfig === module.slug || !moduleUploadEnabled}
                                   >
                                     {reloadingConfig === module.slug ? (
                                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
@@ -774,7 +790,7 @@ export function ModuleManagement() {
                                     variant="destructive"
                                     size="sm"
                                     onClick={() => openRemoveDialog(module)}
-                                    disabled={!allowedActions.uninstall}
+                                    disabled={!allowedActions.uninstall || !moduleUploadEnabled}
                                   >
                                     <Trash2 className="h-4 w-4 mr-1" />
                                     Desinstalar

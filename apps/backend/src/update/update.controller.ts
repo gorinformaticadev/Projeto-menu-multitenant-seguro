@@ -28,7 +28,7 @@ import { Throttle } from '@nestjs/throttler';
  * - ConfiguraÃ§Ã£o do sistema de updates
  * - Consulta de logs e auditoria
  */
-@Controller('api/update')
+@Controller('update')
 @UseGuards(JwtAuthGuard)
 export class UpdateController {
   constructor(private updateService: UpdateService) {

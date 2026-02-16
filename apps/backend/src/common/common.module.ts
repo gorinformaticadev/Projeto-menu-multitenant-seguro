@@ -8,12 +8,13 @@ import { PrismaModule } from '@core/prisma/prisma.module';
 import { UserModulesController } from '@core/user-modules.controller';
 import { ModuleSecurityService } from '@core/module-security.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { AuditModule } from '../audit/audit.module';
 import { eventBus } from '@core/events/EventBus';
 import { ModuleInstallerController } from '@core/module-installer.controller';
 import { ModuleInstallerService } from '@core/module-installer.service';
 
 @Module({
-  imports: [PrismaModule, SecurityConfigModule, NotificationsModule],
+  imports: [PrismaModule, SecurityConfigModule, NotificationsModule, AuditModule],
   controllers: [CspReportController, UserModulesController, ModuleInstallerController],
   providers: [
     PlatformInitService,
@@ -45,3 +46,4 @@ export class CommonModule implements NestModule {
     }
   }
 }
+

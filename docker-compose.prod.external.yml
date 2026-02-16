@@ -1,6 +1,6 @@
 services:
   frontend:
-    image: multitenant-frontend:latest
+    image: ${DOCKERHUB_USERNAME:-local}/multitenant-frontend:${RELEASE_TAG:-latest}
     build:
       context: .
       dockerfile: apps/frontend/Dockerfile
@@ -24,7 +24,7 @@ services:
       start_period: 30s
 
   backend:
-    image: multitenant-backend:latest
+    image: ${DOCKERHUB_USERNAME:-local}/multitenant-backend:${RELEASE_TAG:-latest}
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
@@ -48,7 +48,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:4000/api/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -93,3 +93,4 @@ networks:
   app-network:
     name: app-network
     driver: bridge
+
