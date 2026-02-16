@@ -85,7 +85,7 @@ export class ModuleInstallerService {
                 name: module.name,
                 version: module.version,
                 description: module.description,
-                status: integrityStatus === 'corrupted' ? 'corrupted' : module.status, // Sobrescreve status visualmente se corrompido
+                status: (integrityStatus === 'corrupted' && missingFolders.includes('backend')) ? 'corrupted' : module.status, // Só marca corrompido se falat backend
                 originalStatus: module.status,
                 hasBackend: module.hasBackend,
                 hasFrontend: module.hasFrontend,
