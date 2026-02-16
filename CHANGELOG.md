@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [3.3.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v3.2.0...v3.3.0) (2026-02-16)
+
+
+### Features
+
+* create initial AppModule with core modules, guards, and middleware. ([c1943c6](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/c1943c64692e30d85bf08c43839746ff222a9fbc))
+* Implement a distributed module installer service for managing module installation, updates, and file distribution. ([ba84543](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/ba84543f054c7513932d30d1ac75d87a0fefd6b7))
+* Implement a Socket.IO client for real-time notifications, including connection management and event handling. ([4868230](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/4868230e421d16ffec3ddb0f79341ff9baeae45f))
+* Implement secure Prisma service for tenant isolation, add backup and restore functionality, and introduce system update features with CI/CD. ([acef8f1](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/acef8f14ad986c18bfc83a030a069805badde040))
+* Implement system update, module management, and backup features, including new deployment scripts, database schema, and frontend pages. ([99f8c57](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/99f8c57e5e0da49634a455761052f58e8e66a4c3))
+* Introduce `ModuleInstallerService` to manage module installation, updates, and file distribution from ZIP archives, including rollback. ([375fd79](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/375fd79bd72c993ab016f3a213fce9ac2a3bbcce))
+
+
+### Bug Fixes
+
+* add module installer controller with endpoints for module upload, installation, activation, deactivation, database updates, status, uninstallation, and configuration reloading. ([de04fd1](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/de04fd16e5e60e13b35303132064bdc9bc949b5f))
+* **install:** corrigir detecção de diretório no script update.sh ([46c6214](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/46c6214aea5e3abd724909c08f05edc52efdcc11))
+* **socket:** Correção de erro de socket ([478842f](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/478842f41577791061a40dca4d0d0bc934d52782))
+* **socket:** habilitar suporte a WebSocket/Socket.IO nos templates do Nginx e gateway ([33178ba](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/33178bae743630f263f77a66e82c320e6797dcee))
+
 ## [3.2.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v3.1.0...v3.2.0) (2026-02-15)
 
 
