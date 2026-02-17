@@ -14,7 +14,7 @@ interface CspReportBody {
   };
 }
 
-@Controller('api')
+@Controller()
 export class CspReportController {
   private readonly logger = new Logger(CspReportController.name);
 

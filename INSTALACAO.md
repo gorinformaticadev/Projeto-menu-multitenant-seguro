@@ -35,7 +35,7 @@ Este projeto utiliza **pnpm workspace**. Todas as dependências são gerenciadas
     pnpm --filter backend exec prisma generate
 
     # Executar Migrations
-    pnpm --filter backend exec prisma migrate deploy
+    pnpm --filter backend exec prisma generate
 
     # Popular banco com dados iniciais
     pnpm --filter backend exec ts-node prisma/seed.ts
