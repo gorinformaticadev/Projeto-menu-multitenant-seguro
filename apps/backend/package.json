@@ -12,7 +12,7 @@
     "start:prod": "node dist/main.js",
     "build": "nest build",
     "test": "jest --runInBand --passWithNoTests",
-    "prisma:generate": "node scripts/run-prisma-generate.js",
+    "prisma:generate": "pnpm exec prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
