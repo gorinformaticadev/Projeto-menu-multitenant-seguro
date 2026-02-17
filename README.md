@@ -159,3 +159,10 @@ Consulte o arquivo `LICENSE`.
 Contribuicoes ajudam na evolucao continua da plataforma.
 
 ![QR Code Pix](DOCS/assets/qr-code-pix.png)
+
+## Telas
+![Telas](DOCS/assets/1.png) 
+![Telas](DOCS/assets/2.png) 
+![Telas](DOCS/assets/3.png) 
+![Telas](DOCS/assets/4.png) 
+![Telas](DOCS/assets/5.png)
