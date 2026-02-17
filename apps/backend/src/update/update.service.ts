@@ -468,20 +468,21 @@ export class UpdateService {
   }
 
   private async getRemoteTagsOutput(repoUrl: string, encryptedGitToken?: string): Promise<string> {
-    const options = { timeout: 60_000, cwd: process.cwd() };
+    const options = { timeout: 60_000, cwd: process.cwd(), maxBuffer: 10 * 1024 * 1024 };
     if (!encryptedGitToken) {
       const { stdout } = await execFileAsync('git', ['ls-remote', '--tags', repoUrl], options);
       return stdout;
     }
 
+    let decryptedToken = '';
     try {
-      const decrypted = this.decryptToken(encryptedGitToken);
-      if (!decrypted) {
+      decryptedToken = this.decryptToken(encryptedGitToken);
+      if (!decryptedToken) {
         const { stdout } = await execFileAsync('git', ['ls-remote', '--tags', repoUrl], options);
         return stdout;
       }
 
-      const basicAuth = Buffer.from(`x-access-token:${decrypted}`, 'utf8').toString('base64');
+      const basicAuth = Buffer.from(`x-access-token:${decryptedToken}`, 'utf8').toString('base64');
       const headerArg = `http.extraHeader=AUTHORIZATION: basic ${basicAuth}`;
       const { stdout } = await execFileAsync(
         'git',
@@ -489,11 +490,28 @@ export class UpdateService {
         options,
       );
       return stdout;
-    } catch {
-      // Fallback para repositórios públicos caso token legado esteja inválido.
-      this.logger.warn('Falha ao usar gitToken; tentando repositorio sem autenticacao');
+    } catch (error: any) {
+      const sanitizedStderr = this.sanitizeSensitiveOutput(String(error?.stderr || error?.message || ''), decryptedToken);
+      this.logger.warn(`Falha ao usar gitToken; tentando repositorio sem autenticacao. detalhe=${sanitizedStderr}`);
       const { stdout } = await execFileAsync('git', ['ls-remote', '--tags', repoUrl], options);
       return stdout;
     }
   }
+
+  private sanitizeSensitiveOutput(output: string, token?: string): string {
+    if (!output) return '';
+    if (!token) return output;
+
+    const basicAuth = Buffer.from(`x-access-token:${token}`, 'utf8').toString('base64');
+    const secrets = [token, basicAuth, `x-access-token:${token}`, `AUTHORIZATION: basic ${basicAuth}`];
+
+    let sanitized = output;
+    for (const secret of secrets) {
+      if (secret) {
+        sanitized = sanitized.split(secret).join('[REDACTED]');
+      }
+    }
+    return sanitized;
+  }
 }
+

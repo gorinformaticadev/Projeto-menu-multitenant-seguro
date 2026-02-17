@@ -19,35 +19,24 @@ interface WebpackContext {
     (id: string): any;
 }
 
-// Função para criar o contexto de módulos dinamicamente
-function getModuleContext() {
-    // Hack para TypeScript aceitar require.context
-    // O require.context é funcionalidade do Webpack/Turbopack usada no build time
-    try {
-        if (typeof require !== 'undefined' && (require as any).context) {
-            return (require as any).context(
-                '../../',  // Pasta base: modules/
-                true,      // Recursivo: busca em subpastas
-                /^\.\/[^/]+\/.*page\.tsx$/  // Pattern: ./nome_modulo/**/page.tsx
-            ) as WebpackContext;
-        }
-    } catch (e) {
-        console.warn('require.context não disponível', e);
-    }
-    return null;
-}
+declare const require: {
+    context?: (path: string, deep?: boolean, filter?: RegExp) => WebpackContext;
+};
 
-// Cache do contexto de módulos
+// Cache do contexto de modulos
 let moduleContext: WebpackContext | null = null;
 
+try {
+    moduleContext = require.context!(
+        '../../',
+        true,
+        /^\.\/[^/]+\/.*page\.tsx$/
+    );
+} catch (error) {
+    console.warn('[ModulePage] require.context nao disponivel:', error);
+}
+
 function loadModuleContext() {
-    if (!moduleContext) {
-        try {
-            moduleContext = getModuleContext();
-        } catch (error) {
-            console.error('[ModulePage] Erro ao carregar contexto de módulos:', error);
-        }
-    }
     return moduleContext;
 }
 
@@ -201,3 +190,4 @@ export default function ModulePageClient({ moduleSlug, slug }: ModulePageClientP
 
     return <Component />;
 }
+
