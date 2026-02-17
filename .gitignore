@@ -63,7 +63,8 @@ modules/demo-completo.zip
 
 apps/backend/src/modules/*
 # apps/frontend/src/app/modules/* (Removido para permitir build no CI)
-module-os
+# Repos externos/espelhos locais
+externos/
 /apps/backend/scripts
 /.qoder
 GOR.png
@@ -131,4 +132,3 @@ apps/frontend/src/app/modules/ordem_servico/types/permission.types.ts
 /apps/frontend/src/app/modules/agenda
 module-agenda
 ANALISE_DOCKER_PROBLEMAS_502.md
-multitenant-docker-acme/

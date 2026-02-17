@@ -8,7 +8,7 @@ Se este projeto foi útil para você ou sua empresa, considere fazer uma doaçã
 
 ## 📱 QR Code PIX
 
-![QR Code PIX](./qr-code-pix.png)
+![QR Code PIX](../assets/qr-code-pix.png)
 
 ## 🏢 Sobre a GOR Informática
 
