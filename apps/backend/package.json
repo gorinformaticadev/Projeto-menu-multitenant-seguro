@@ -11,7 +11,7 @@
     "start:dev": "nest start --watch --exec \"ts-node -r tsconfig-paths/register src/main.ts\"",
     "start:prod": "node dist/main.js",
     "build": "pnpm run prisma:generate && nest build",
-    "test": "jest --runInBand --passWithNoTests",
+    "test": "pnpm run prisma:generate && jest --runInBand --passWithNoTests",
     "prisma:generate": "pnpm exec prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "lint": "eslint \"src/**/*.ts\"",
