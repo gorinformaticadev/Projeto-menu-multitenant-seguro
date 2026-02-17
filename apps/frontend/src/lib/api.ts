@@ -4,7 +4,23 @@ interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
 }
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
+const normalizeApiUrl = (value?: string): string => {
+  const raw = (value || "/api").trim();
+  if (!raw) {
+    return "/api";
+  }
+
+  const noTrailingSlash = raw.replace(/\/+$/, "");
+  const isAbsolute = /^https?:\/\//i.test(noTrailingSlash);
+
+  if (!isAbsolute) {
+    return noTrailingSlash || "/api";
+  }
+
+  return noTrailingSlash.endsWith("/api") ? noTrailingSlash : `${noTrailingSlash}/api`;
+};
+
+export const API_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
 
 const api = axios.create({
   baseURL: API_URL === "/api" ? "" : API_URL,
