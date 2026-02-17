@@ -17,9 +17,10 @@ const normalizeApiUrl = (value?: string): string => {
 };
 
 export const API_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
+const AXIOS_BASE_URL = API_URL === "/api" ? "/api" : API_URL;
 
 const api = axios.create({
-  baseURL: API_URL === "/api" ? "" : API_URL,
+  baseURL: AXIOS_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
@@ -126,6 +127,11 @@ const setSecureRefreshToken = async (token: string): Promise<void> => {
 // Interceptor de request para adicionar token
 api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
+    // Normaliza chamadas para evitar /api/api/* quando a URL já vem prefixada.
+    if (config.url && !/^https?:\/\//i.test(config.url) && config.url.startsWith("/api/")) {
+      config.url = config.url.replace(/^\/api/, "");
+    }
+
     const token = await getSecureToken();
 
     if (token) {
