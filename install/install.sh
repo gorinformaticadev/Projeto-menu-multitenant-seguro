@@ -20,6 +20,7 @@ IFS=$'\n\t'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 COMPOSE_PROD="$PROJECT_ROOT/docker-compose.prod.yml"
+COMPOSE_PROD_BUILD="$PROJECT_ROOT/docker-compose.prod.build.yml"
 COMPOSE_EXTERNAL="$PROJECT_ROOT/docker-compose.external-nginx.yml"
 ENV_EXAMPLE="$PROJECT_ROOT/.env.example"
 ENV_INSTALLER_EXAMPLE="$SCRIPT_DIR/.env.installer.example"
@@ -73,7 +74,7 @@ Variáveis de ambiente (alternativa às opções):
   DB_USER, DB_PASSWORD, DB_NAME, JWT_SECRET, ENCRYPTION_KEY
 
 Exemplos:
-  sudo bash install/install.sh install -d menu.empresa.com -e admin@empresa.com -u gorinformatica -r projeto-menu-multitenant-seguro -t latest
+  sudo bash install/install.sh install -d menu.empresa.com -e admin@empresa.com -u gorinformatica -r projeto-menu-multitenant-seguro -t v1.0.0
   sudo INSTALL_DOMAIN=app.empresa.com LETSENCRYPT_EMAIL=admin@empresa.com bash install/install.sh install --no-prompt
   sudo bash install/install.sh update
   sudo bash install/install.sh update develop
@@ -155,6 +156,55 @@ upsert_env() {
     else
         echo "${key}=${value}" >> "$file"
     fi
+}
+
+resolve_image_owner() {
+    local owner="${IMAGE_OWNER:-${GHCR_OWNER:-}}"
+    if [[ -n "$owner" ]]; then
+        echo "$owner" | tr '[:upper:]' '[:lower:]'
+        return 0
+    fi
+
+    if [[ -d "$PROJECT_ROOT/.git" ]]; then
+        local remote_url
+        remote_url="$(git -C "$PROJECT_ROOT" config --get remote.origin.url 2>/dev/null || true)"
+        if [[ -n "$remote_url" ]]; then
+            owner="$(echo "$remote_url" | sed -E 's#(git@github.com:|https://github.com/)##' | cut -d'/' -f1)"
+            if [[ -n "$owner" ]]; then
+                echo "$owner" | tr '[:upper:]' '[:lower:]'
+                return 0
+            fi
+        fi
+    fi
+
+    echo ""
+}
+
+pull_or_build_stack() {
+    local compose_base=(-f docker-compose.prod.yml)
+    local compose_build=(-f docker-compose.prod.yml -f docker-compose.prod.build.yml)
+
+    # Primeira tentativa: pull da tag definida
+    if docker compose --env-file "$ENV_PRODUCTION" "${compose_base[@]}" pull; then
+        docker compose --env-file "$ENV_PRODUCTION" "${compose_base[@]}" up -d
+        return 0
+    fi
+
+    # Segunda tentativa: se tag começar com v, tenta sem o prefixo v
+    if [[ "${IMAGE_TAG:-}" =~ ^v[0-9] ]]; then
+        local fallback_tag="${IMAGE_TAG#v}"
+        log_warn "Pull falhou para tag ${IMAGE_TAG}. Tentando tag ${fallback_tag}..."
+        upsert_env "IMAGE_TAG" "$fallback_tag" "$ENV_PRODUCTION"
+        IMAGE_TAG="$fallback_tag"
+        if docker compose --env-file "$ENV_PRODUCTION" "${compose_base[@]}" pull; then
+            docker compose --env-file "$ENV_PRODUCTION" "${compose_base[@]}" up -d
+            return 0
+        fi
+    fi
+
+    log_warn "Imagem não encontrada no registry. Iniciando build local..."
+    docker compose --env-file "$ENV_PRODUCTION" "${compose_build[@]}" build backend frontend
+    docker compose --env-file "$ENV_PRODUCTION" "${compose_build[@]}" up -d
 }
 
 # --- Certificado Let's Encrypt ---
@@ -246,8 +296,12 @@ run_install() {
         admin_pass="${admin_pass:-123456}"
     fi
 
+    if [[ -z "$image_owner" ]]; then
+        image_owner="$(resolve_image_owner)"
+    fi
+
     if [[ -z "$domain" || -z "$email" || -z "$image_owner" ]]; then
-        log_error "Domínio, email e GHCR owner são obrigatórios."
+        log_error "Domínio, email e IMAGE_OWNER são obrigatórios."
         show_usage
         exit 1
     fi
@@ -361,8 +415,7 @@ run_install() {
 
     log_info "Subindo stack (docker-compose.prod.yml) com install/.env.production..."
     cd "$PROJECT_ROOT"
-    docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml pull
-    docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml up -d
+    pull_or_build_stack
 
     # Tentar obter certificado Let's Encrypt (domínio deve apontar para este host e porta 80 acessível)
     sleep 5
@@ -430,6 +483,17 @@ run_update() {
         set +a
     fi
 
+    IMAGE_OWNER="${IMAGE_OWNER:-$(resolve_image_owner)}"
+    IMAGE_REPO="${IMAGE_REPO:-projeto-menu-multitenant-seguro}"
+    IMAGE_TAG="${IMAGE_TAG:-latest}"
+    if [[ -z "$IMAGE_OWNER" ]]; then
+        log_error "IMAGE_OWNER não definido em install/.env.production e não foi possível inferir do git remote."
+        exit 1
+    fi
+    upsert_env "IMAGE_OWNER" "$IMAGE_OWNER" "$ENV_PRODUCTION"
+    upsert_env "IMAGE_REPO" "$IMAGE_REPO" "$ENV_PRODUCTION"
+    upsert_env "IMAGE_TAG" "$IMAGE_TAG" "$ENV_PRODUCTION"
+
     if [[ -d "$PROJECT_ROOT/.git" ]] && [[ -n "$branch" ]]; then
         log_info "Atualizando repositório (branch: ${branch})..."
         git fetch --all
@@ -451,9 +515,7 @@ run_update() {
     fi
 
     log_info "Baixando imagens..."
-    docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml pull
-    log_info "Atualizando containers..."
-    docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml up -d
+    pull_or_build_stack
 
     echogreen "Atualização concluída."
 }
