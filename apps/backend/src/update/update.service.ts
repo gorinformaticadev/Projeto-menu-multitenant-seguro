@@ -9,13 +9,12 @@ import * as crypto from 'crypto';
 import * as path from 'path';
 import * as fs from 'fs';
 
-const execFileAsync = promisify(execFile);
-
 @Injectable()
 export class UpdateService {
   private readonly logger = new Logger(UpdateService.name);
   private readonly encryptionKeyRaw = process.env.ENCRYPTION_KEY || '';
   private readonly encryptionKey: Buffer;
+  private readonly execFileAsync = promisify(execFile);
 
   constructor(
     private prisma: PrismaService,
@@ -25,6 +24,7 @@ export class UpdateService {
   }
 
   async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: string }> {
+    let decryptedTokenForSanitizer = '';
     try {
       this.logger.log('Iniciando verificacao de atualizacoes...');
       const settings: any = await this.getSystemSettings();
@@ -35,6 +35,7 @@ export class UpdateService {
       }
 
       const repoUrl = this.buildPublicGitRepoUrl(settings);
+      decryptedTokenForSanitizer = this.tryDecryptToken(settings.gitToken);
       const stdout = await this.getRemoteTagsOutput(repoUrl, settings.gitToken);
 
       const cleanTags = stdout
@@ -64,9 +65,9 @@ export class UpdateService {
       });
 
       return { updateAvailable, availableVersion: latestVersion };
-    } catch (_error) {
-      // Nao expor detalhes do comando git para evitar vazamento de credenciais.
-      this.logger.error('Erro ao verificar atualizacoes');
+    } catch (error: any) {
+      const detail = this.sanitizeGitError(String(error?.stderr || error?.message || ''), decryptedTokenForSanitizer);
+      this.logger.error(`Erro ao verificar atualizacoes. detalhe=${detail}`);
       throw new HttpException('Erro ao verificar atualizacoes', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
@@ -212,10 +213,14 @@ export class UpdateService {
         message: `Atualizacao para ${normalizedVersion} concluida com sucesso`,
       };
     } catch (error: any) {
-      this.logger.error('Erro durante atualizacao:', error);
-      const stdout = typeof error?.stdout === 'string' ? error.stdout : '';
-      const stderr = typeof error?.stderr === 'string' ? error.stderr : '';
-      const combinedErrorOutput = `${stdout}\n${stderr}\n${error?.message || ''}`;
+      const stdoutRaw = typeof error?.stdout === 'string' ? error.stdout : '';
+      const stderrRaw = typeof error?.stderr === 'string' ? error.stderr : '';
+      const errorMessageRaw = String(error?.message || 'Erro desconhecido durante atualizacao');
+      const stdout = this.sanitizeGitError(stdoutRaw);
+      const stderr = this.sanitizeGitError(stderrRaw);
+      const errorMessage = this.sanitizeGitError(errorMessageRaw);
+      this.logger.error(`Erro durante atualizacao: ${errorMessage}`);
+      const combinedErrorOutput = `${stdout}\n${stderr}\n${errorMessage}`;
       const exitCode = Number(error?.code ?? error?.exitCode ?? -1);
       const rollbackDetected =
         combinedErrorOutput.includes('ROLLBACK_COMPLETED') || exitCode === 2;
@@ -226,10 +231,10 @@ export class UpdateService {
           data: {
             status: 'FAILED',
             completedAt: new Date(),
-            errorMessage: error.message,
+            errorMessage,
             rollbackReason: rollbackDetected ? 'automatic rollback executed' : undefined,
             executionLogs: JSON.stringify({
-              error: error.message,
+              error: errorMessage,
               stdout,
               stderr,
               rollbackDetected,
@@ -243,14 +248,14 @@ export class UpdateService {
           tenantId: null,
           ipAddress,
           userAgent,
-          details: { version: requestedVersion, error: error.message, rollbackDetected, logId: updateLog.id },
+          details: { version: requestedVersion, error: errorMessage, rollbackDetected, logId: updateLog.id },
         });
       }
 
       throw new HttpException(
         rollbackDetected
-          ? `Erro durante atualizacao: ${error.message}. Rollback automatico executado.`
-          : `Erro durante atualizacao: ${error.message}`,
+          ? `Erro durante atualizacao: ${errorMessage}. Rollback automatico executado.`
+          : `Erro durante atualizacao: ${errorMessage}`,
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -394,7 +399,7 @@ export class UpdateService {
       HEALTH_TIMEOUT: process.env.UPDATE_HEALTH_TIMEOUT || '120',
     };
 
-    return execFileAsync('bash', [scriptPath], {
+    return this.execFileAsync('bash', [scriptPath], {
       cwd: process.cwd(),
       env,
       timeout: 30 * 60 * 1000,
@@ -470,45 +475,64 @@ export class UpdateService {
   private async getRemoteTagsOutput(repoUrl: string, encryptedGitToken?: string): Promise<string> {
     const options = { timeout: 60_000, cwd: process.cwd(), maxBuffer: 10 * 1024 * 1024 };
     if (!encryptedGitToken) {
-      const { stdout } = await execFileAsync('git', ['ls-remote', '--tags', repoUrl], options);
+      const { stdout } = await this.execFileAsync('git', ['ls-remote', '--tags', repoUrl], options);
       return stdout;
     }
 
     let decryptedToken = '';
     try {
-      decryptedToken = this.decryptToken(encryptedGitToken);
+      decryptedToken = this.tryDecryptToken(encryptedGitToken);
       if (!decryptedToken) {
-        const { stdout } = await execFileAsync('git', ['ls-remote', '--tags', repoUrl], options);
+        const { stdout } = await this.execFileAsync('git', ['ls-remote', '--tags', repoUrl], options);
         return stdout;
       }
 
       const basicAuth = Buffer.from(`x-access-token:${decryptedToken}`, 'utf8').toString('base64');
       const headerArg = `http.extraHeader=AUTHORIZATION: basic ${basicAuth}`;
-      const { stdout } = await execFileAsync(
+      const { stdout } = await this.execFileAsync(
         'git',
         ['-c', headerArg, 'ls-remote', '--tags', repoUrl],
         options,
       );
       return stdout;
     } catch (error: any) {
-      const sanitizedStderr = this.sanitizeSensitiveOutput(String(error?.stderr || error?.message || ''), decryptedToken);
+      const sanitizedStderr = this.sanitizeGitError(String(error?.stderr || error?.message || ''), decryptedToken);
       this.logger.warn(`Falha ao usar gitToken; tentando repositorio sem autenticacao. detalhe=${sanitizedStderr}`);
-      const { stdout } = await execFileAsync('git', ['ls-remote', '--tags', repoUrl], options);
+      const { stdout } = await this.execFileAsync('git', ['ls-remote', '--tags', repoUrl], options);
       return stdout;
     }
   }
 
-  private sanitizeSensitiveOutput(output: string, token?: string): string {
+  private tryDecryptToken(encryptedGitToken?: string): string {
+    if (!encryptedGitToken) return '';
+    try {
+      return this.decryptToken(encryptedGitToken);
+    } catch {
+      return '';
+    }
+  }
+
+  private sanitizeGitError(output: string, token?: string): string {
     if (!output) return '';
-    if (!token) return output;
-
-    const basicAuth = Buffer.from(`x-access-token:${token}`, 'utf8').toString('base64');
-    const secrets = [token, basicAuth, `x-access-token:${token}`, `AUTHORIZATION: basic ${basicAuth}`];
-
     let sanitized = output;
-    for (const secret of secrets) {
-      if (secret) {
-        sanitized = sanitized.split(secret).join('[REDACTED]');
+
+    sanitized = sanitized.replace(
+      /AUTHORIZATION:\s*basic\s+[A-Za-z0-9+/=]{20,}/gi,
+      'AUTHORIZATION: basic [REDACTED]',
+    );
+    sanitized = sanitized.replace(
+      /(AUTHORIZATION:\s*basic\s+)[A-Za-z0-9+/=]{8,}/gi,
+      '$1[REDACTED]',
+    );
+
+    if (token) {
+      const basicAuth = Buffer.from(`x-access-token:${token}`, 'utf8').toString('base64');
+      const secrets = [token, basicAuth, `x-access-token:${token}`];
+
+      for (const secret of secrets) {
+        if (secret) {
+          sanitized = sanitized.split(secret).join('[REDACTED]');
+        }
       }
     }
     return sanitized;
