@@ -441,6 +441,15 @@ run_update() {
         git pull origin "$branch" || true
     fi
 
+    # Atualizar configuração nginx para refletir correções de roteamento (/uploads)
+    if [[ -n "${DOMAIN:-}" ]]; then
+        mkdir -p "$NGINX_CONF_DIR"
+        if [[ -f "$NGINX_TEMPLATE_DOCKER" ]]; then
+            sed "s/__DOMAIN__/$DOMAIN/g" "$NGINX_TEMPLATE_DOCKER" > "$NGINX_CONF_DIR/default.conf"
+            log_info "Nginx default.conf atualizado com o domínio ${DOMAIN}."
+        fi
+    fi
+
     log_info "Baixando imagens..."
     docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml pull
     log_info "Atualizando containers..."
