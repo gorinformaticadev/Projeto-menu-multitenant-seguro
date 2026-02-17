@@ -1,50 +1,161 @@
 ﻿# Sistema Menu Multitenant Seguro
 
-Repositorio monorepo com backend NestJS, frontend Next.js e stack Docker para operacao multitenant.
+Plataforma SaaS multitenant orientada a isolamento de dados, seguranca operacional e implantacao simplificada via Docker. Projetado para operacao continua em producao com arquitetura modular pronta para evolucao funcional.
 
-## Estrutura oficial
+------------------------------------------------------------------------
 
-- `README.md` -> resumo principal do repositorio (este arquivo)
-- `DOCS/` -> toda documentacao funcional, tecnica e historica
-- `Scripts/` -> scripts auxiliares, testes manuais e utilitarios
-- `install/` -> scripts oficiais de instalacao, update e desinstalacao
-- `apps/backend` -> API NestJS
-- `apps/frontend` -> aplicacao Next.js
+## Visao Geral
 
-## Fluxo de instalacao oficial
+Este repositorio entrega uma stack completa para aplicacoes SaaS multitenant:
 
-Use sempre os scripts da pasta `install/`:
+- API backend em **NestJS** com autenticacao, autorizacao e isolamento por tenant
+- Frontend administrativo moderno em **Next.js**
+- Scripts oficiais para instalacao, atualizacao e remocao
+- Estrutura documental centralizada para operacao e manutencao
 
-1. Instalacao inicial
-```bash
-bash install/install.sh
+Objetivo principal:
+
+> Garantir isolamento entre clientes, facilidade de deploy e manutencao previsivel.
+
+------------------------------------------------------------------------
+
+## Principais Caracteristicas Tecnicas
+
+### Arquitetura
+
+- Multitenancy com separacao logica por tenant
+- Backend modular preparado para expansao
+- Frontend desacoplado e escalavel
+- Docker Compose pronto para producao
+
+### Operacao
+
+- Scripts oficiais versionados
+- Documentacao tecnica consolidada
+- Fluxo controlado de update
+- Base pronta para CI/CD
+
+### Seguranca
+
+- Controle de acesso centralizado
+- Isolamento entre tenants
+- Estrutura preparada para TLS e proxy reverso
+
+------------------------------------------------------------------------
+
+## Estrutura do Repositorio
+
+```text
+apps/
+  backend/      -> API NestJS
+  frontend/     -> Aplicacao Next.js
+
+install/
+  install.sh
+  update.sh
+  uninstall.sh
+  scripts auxiliares
+
+DOCS/           -> Documentacao tecnica e operacional
+Scripts/        -> Scripts auxiliares e testes manuais
 ```
 
-2. Atualizacao
+------------------------------------------------------------------------
+
+## Instalacao Oficial
+
+Sempre utilize os scripts da pasta `install/`.
+
+### Instalacao inicial
+
 ```bash
-bash install/update.sh
+sudo bash install/install.sh install -d crm.example.com.br -e seuemail@email.com -u gorinformatica
 ```
 
-3. Desinstalacao
+Alternativa interativa:
+
 ```bash
-bash install/uninstall.sh
+sudo bash install/install.sh install
 ```
 
-Scripts relacionados:
-- Validacao: `install/check.sh`
-- Restauracao de banco: `install/restore-db.sh`
-- Renovacao de certificado: `install/renew-cert.sh`
+------------------------------------------------------------------------
 
-## Documentacao recomendada
+## Atualizacao do Sistema
 
-- Guia principal do instalador: `DOCS/install/README-INSTALADOR.md`
-- Troubleshooting de instalacao: `DOCS/install/TROUBLESHOOTING.md`
-- Inicio rapido: `DOCS/INICIO_RAPIDO.md`
-- Indice geral da documentacao: `DOCS/INDICE_DOCUMENTACAO.md`
+### Fluxo recomendado
 
-## Padrao de organizacao aplicado
+```bash
+sudo bash install/install.sh update
+```
 
-- Arquivos `.md` na raiz: somente `README.md`
-- Documentacao fora da raiz: centralizada em `DOCS/`
-- Scripts e testes auxiliares: centralizados em `Scripts/`
-- Scripts operacionais de deploy/install: mantidos em `install/`
+### Atualizacao pela branch desejada
+
+```bash
+sudo bash install/install.sh update main
+```
+
+### Atualizador interativo (legado, mantido no projeto)
+
+```bash
+sudo bash install/update.sh
+```
+
+------------------------------------------------------------------------
+
+## Desinstalacao
+
+```bash
+sudo bash install/uninstall.sh
+```
+
+Scripts auxiliares:
+
+- `install/check.sh` -> valida ambiente
+- `install/restore-db.sh` -> restore banco
+- `install/renew-cert.sh` -> renovar certificado
+
+------------------------------------------------------------------------
+
+## Reset Completo do Ambiente
+
+Por seguranca, este README **nao** inclui sequencia destrutiva automatica de reset (ex.: `git reset --hard`, purge completo de Docker, remocao forcada de diretorios).
+
+Se precisar de reset completo, siga este fluxo:
+
+1. Execute `install/uninstall.sh`
+2. Reclone o repositorio
+3. Rode nova instalacao com `install/install.sh install`
+
+------------------------------------------------------------------------
+
+## Documentacao Tecnica
+
+- `DOCS/INICIO_RAPIDO.md`
+- `DOCS/install/README-INSTALADOR.md`
+- `DOCS/install/TROUBLESHOOTING.md`
+- `DOCS/INDICE_DOCUMENTACAO.md`
+
+------------------------------------------------------------------------
+
+## Licenca
+
+**AGPL-3.0**
+
+Consulte o arquivo `LICENSE`.
+
+------------------------------------------------------------------------
+
+## Creditos
+
+**GOR Informatica - Gilson Oliveira**
+
+- Site: `https://gorinformatica.com.br`
+- WhatsApp: `(61) 3359-7358`
+
+------------------------------------------------------------------------
+
+## Apoio ao Projeto
+
+Contribuicoes ajudam na evolucao continua da plataforma.
+
+![QR Code Pix](DOCS/assets/qr-code-pix.png)
