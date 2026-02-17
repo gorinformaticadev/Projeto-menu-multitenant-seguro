@@ -33,3 +33,5 @@ docker-compose.yml
 docker-compose.*.yml
 install*
 scripts
+!apps/backend/scripts/
+!apps/backend/scripts/run-prisma-generate.js

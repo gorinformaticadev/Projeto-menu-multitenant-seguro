@@ -1,6 +1,122 @@
-services: {}
+# VariÃƒÂ¡veis da stack: use install/.env.production (monorepo: env nÃƒÂ£o fica na raiz).
+# Subir: cd /caminho/Projeto-menu-multitenant-seguro && docker compose --env-file install/.env.production up -d
+services:
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: multitenant-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - ./nginx/webroot:/var/www/certbot:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - multitenant-network
+
+  frontend:
+    image: ${DOCKERHUB_USERNAME:-local}/multitenant-frontend:${RELEASE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+      args:
+        # No browser a API ÃƒÂ© acessada pela mesma origem (nginx faz proxy /api)
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    container_name: multitenant-frontend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    depends_on:
+      - backend
+    networks:
+      - multitenant-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5000/" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  backend:
+    image: ${DOCKERHUB_USERNAME:-local}/multitenant-backend:${RELEASE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: multitenant-backend
+    restart: unless-stopped
+    # FRONTEND_URL deve ser a URL pÃƒÂºblica (https://DOMAIN) para CORS aceitar o browser; vem de install/.env.production
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - INSTALL_ADMIN_EMAIL=${INSTALL_ADMIN_EMAIL}
+      - INSTALL_ADMIN_PASSWORD=${INSTALL_ADMIN_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - uploads:/app/uploads
+    networks:
+      - multitenant-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:4000/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  db:
+    image: postgres:15
+    container_name: multitenant-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${DB_NAME:-multitenant}
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - multitenant-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d multitenant" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: multitenant-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - multitenant-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  uploads:
+    driver: local
 
 networks:
-  app-network:
-    name: app-network
+  multitenant-network:
     driver: bridge
