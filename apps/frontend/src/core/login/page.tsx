@@ -137,7 +137,7 @@ export default function LoginPage() {
             {masterLogo && (
               <div className="w-32 h-20 flex items-center justify-center">
                 <img 
-                  src={`${API_URL}/uploads/logos/${masterLogo}`} 
+                  src={`/uploads/logos/${masterLogo}`} 
                   alt="Logo do Tenant"
                   className="max-w-full max-h-full object-contain"
                   onError={(e) => {

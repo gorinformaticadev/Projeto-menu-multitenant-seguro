@@ -45,7 +45,7 @@ export default function PlatformConfigSection() {
     try {
       setSaving(true);
 
-      await api.put("/platform-config", formData);
+      await api.put("/api/platform-config", formData);
 
       // Forçar atualização do contexto global (Isso atualiza o título no navegador)
       await refreshConfig();

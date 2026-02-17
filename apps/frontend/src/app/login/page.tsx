@@ -153,7 +153,7 @@ export default function LoginPage() {
           {masterLogo ? (
             <div className="inline-flex items-center justify-center relative rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 shadow-[8px_8px_16px_rgba(0,0,0,0.3),-4px_-4px_8px_rgba(255,255,255,0.05)]">
               <Image
-                src={`${API_URL}/uploads/logos/${masterLogo}`}
+                src={`/uploads/logos/${masterLogo}`}
                 alt="Logo do Tenant"
                 width={80}
                 height={80}

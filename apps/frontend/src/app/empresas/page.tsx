@@ -754,13 +754,13 @@ export default function EmpresasPage() {
                       {tenant.logoUrl ? (
                         <>
                           <Image
-                            src={`${API_URL}/uploads/logos/${tenant.logoUrl}?t=${Date.now()}`}
+                                                    src={`/uploads/logos/${tenant.logoUrl}?t=${Date.now()}`}
                             alt={tenant.nomeFantasia}
                             fill
                             className="object-cover rounded-full logo-image"
                             unoptimized
                             onError={(e) => {
-                              console.error(`Erro ao carregar logo: ${tenant.nomeFantasia} - ${API_URL}/uploads/logos/${tenant.logoUrl}`);
+                                                    console.error(`Erro ao carregar logo: ${tenant.nomeFantasia} - /uploads/logos/${tenant.logoUrl}`);
                               const target = e.currentTarget;
                               target.style.display = 'none';
                               const fallback = target.parentElement?.querySelector('.fallback-icon');
@@ -1149,7 +1149,7 @@ export default function EmpresasPage() {
                   <div className="flex items-center justify-center p-4 border rounded-lg bg-muted">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={`${API_URL}/uploads/logos/${selectedTenant.logoUrl}?t=${logoTimestamp}`}
+                                            src={`/uploads/logos/${selectedTenant.logoUrl}?t=${logoTimestamp}`}
                       alt="Logo atual"
                       className="max-h-32 object-contain"
                       onError={(e) => {

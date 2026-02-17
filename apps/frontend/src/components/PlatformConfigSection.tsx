@@ -41,7 +41,7 @@ export default function PlatformConfigSection() {
     try {
       setSaving(true);
       
-      await api.put("/platform-config", config);
+      await api.put("/api/platform-config", config);
       
       // Atualizar contexto para refletir mudanças imediatamente
       await refreshConfig();

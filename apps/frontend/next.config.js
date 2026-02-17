@@ -18,7 +18,7 @@ const nextConfig = {
     formats: ['image/webp', 'image/avif'], // Optimize image formats
   },
   async headers() {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api';
 
     return [
       {
@@ -43,7 +43,7 @@ const nextConfig = {
           {
             key: 'Content-Security-Policy',
           value: (() => {
-              const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+              const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || '/api';
               const apiUrl = rawApiUrl.replace(/\/+$/, '');
               const isAbsolute = /^https?:\/\//i.test(apiUrl);
 
@@ -63,7 +63,7 @@ const nextConfig = {
     ];
   },
   async rewrites() {
-    const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || '/api';
     const apiUrl = rawApiUrl.replace(/\/+$/, '');
     const isAbsoluteApiUrl = /^https?:\/\//i.test(apiUrl);
     const rewrites = [];

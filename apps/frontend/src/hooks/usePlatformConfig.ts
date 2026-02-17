@@ -23,7 +23,7 @@ let configPromise: Promise<PlatformConfig> | null = null;
  */
 async function fetchPlatformConfig(): Promise<PlatformConfig> {
   try {
-    const response = await api.get('/platform-config');
+    const response = await api.get('/api/platform-config');
     globalPlatformConfig = response.data;
     return response.data;
   } catch (error) {

@@ -64,7 +64,7 @@ export function BackupSection({ onBackupComplete }: BackupSectionProps) {
   const loadAvailableBackups = async () => {
     try {
       setLoadingBackups(true);
-      const response = await api.get('/api/backup/available');
+      const response = await api.get('/backup/available');
       setAvailableBackups(response.data.data || []);
     } catch (error) {
       console.error('Erro ao carregar backups:', error);
@@ -78,8 +78,8 @@ export function BackupSection({ onBackupComplete }: BackupSectionProps) {
    */
   const handleDownloadBackup = async (fileName: string) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const downloadUrl = `${apiUrl}/api/backup/download-file/${encodeURIComponent(fileName)}`;
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api';
+      const downloadUrl = `${apiUrl}/backup/download-file/${encodeURIComponent(fileName)}`;
       
       // Usar fetch para baixar o arquivo
       const response = await fetch(downloadUrl);
@@ -130,7 +130,7 @@ export function BackupSection({ onBackupComplete }: BackupSectionProps) {
     }
 
     try {
-      const response = await api.delete(`/api/backup/delete/${encodeURIComponent(fileName)}`);
+      const response = await api.delete(`/backup/delete/${encodeURIComponent(fileName)}`);
       
       if (response.data.success) {
         toast({
@@ -213,9 +213,9 @@ export function BackupSection({ onBackupComplete }: BackupSectionProps) {
       }
 
       // Conectar ao SSE endpoint com token na URL
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api';
       const eventSource = new EventSource(
-        `${apiUrl}/api/backup/progress/${sessionId}?token=${encodeURIComponent(token)}`
+        `${apiUrl}/backup/progress/${sessionId}?token=${encodeURIComponent(token)}`
       );
       eventSourceRef.current = eventSource;
 
@@ -240,7 +240,7 @@ export function BackupSection({ onBackupComplete }: BackupSectionProps) {
       };
 
       // Iniciar backup
-      const response = await api.post('/api/backup/create', {
+      const response = await api.post('/backup/create', {
         includeMetadata: true,
         compressionLevel: 'default',
         sessionId,

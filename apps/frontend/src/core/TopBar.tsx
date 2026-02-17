@@ -55,7 +55,7 @@ export function TopBar() {
     }
 
     console.log('🌐 Buscando master logo da API');
-    api.get("/tenants/public/master-logo")
+    api.get("/api/tenants/public/master-logo")
       .then(response => {
         const logoUrl = response.data?.logoUrl;
         if (logoUrl) {
@@ -148,7 +148,7 @@ export function TopBar() {
             {masterLogo ? (
               <div className="relative h-10 w-32">
                 <Image
-                  src={`${API_URL}/uploads/logos/${masterLogo}`}
+                  src={`/uploads/logos/${masterLogo}`}
                   alt="Logo"
                   fill
                   className="object-contain object-left"
@@ -266,7 +266,7 @@ export function TopBar() {
               {userTenantLogo ? (
                 <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 relative">
                   <Image
-                    src={`${API_URL}/uploads/logos/${userTenantLogo}?t=${Date.now()}`}
+                    src={`/uploads/logos/${userTenantLogo}?t=${Date.now()}`}
                     alt="Logo Tenant"
                     fill
                     className="object-cover"
@@ -308,7 +308,7 @@ export function TopBar() {
                     {userTenantLogo ? (
                       <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 flex-shrink-0 relative">
                         <Image
-                          src={`${API_URL}/uploads/logos/${userTenantLogo}?t=${Date.now()}`}
+                          src={`/uploads/logos/${userTenantLogo}?t=${Date.now()}`}
                           alt="Logo Tenant"
                           fill
                           className="object-cover"

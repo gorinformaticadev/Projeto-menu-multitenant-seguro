@@ -37,7 +37,7 @@ export function SecurityConfigProvider({ children }: { children: ReactNode }) {
       setLoading(true);
 
       // Busca configurações completas de segurança
-      const response = await api.get("/security-config/full");
+      const response = await api.get("/api/security-config/full");
 
       // Mapeia os dados do backend para o formato esperado
       const backendConfig = response.data;

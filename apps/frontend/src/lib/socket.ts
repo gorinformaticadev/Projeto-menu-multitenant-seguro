@@ -18,7 +18,7 @@ class SocketClient {
 
     this.token = token;
     
-    let backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    let backendUrl = process.env.NEXT_PUBLIC_API_URL || '/api';
     
     // Se a URL contém /api, removemos para a conexão do socket
     const baseUrl = backendUrl.replace(/\/api$/, '');

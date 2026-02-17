@@ -37,7 +37,7 @@ export function PlatformConfigProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      const response = await api.get('/platform-config');
+      const response = await api.get('/api/platform-config');
       setConfig(response.data);
 
       // Salvar no cache

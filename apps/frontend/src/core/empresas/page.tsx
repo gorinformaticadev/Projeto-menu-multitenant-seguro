@@ -661,14 +661,14 @@ export default function EmpresasPage() {
                       {tenant.logoUrl ? (
                         <>
                           <img 
-                            src={`${API_URL}/uploads/logos/${tenant.logoUrl}?t=${logoTimestamp}`} 
+                                                    src={`/uploads/logos/${tenant.logoUrl}?t=${logoTimestamp}`}
                             alt={tenant.nomeFantasia}
                             className="w-full h-full object-cover rounded-full logo-image"
                             onLoad={() => {
                               console.log(`Logo carregado: ${tenant.nomeFantasia} - ${tenant.logoUrl}`);
                             }}
                             onError={(e) => {
-                              console.error(`Erro ao carregar logo: ${tenant.nomeFantasia} - ${API_URL}/uploads/logos/${tenant.logoUrl}`);
+                                                    console.error(`Erro ao carregar logo: ${tenant.nomeFantasia} - /uploads/logos/${tenant.logoUrl}`);
                               const target = e.currentTarget;
                               target.style.display = 'none';
                               const fallback = target.parentElement?.querySelector('.fallback-icon');
@@ -1024,7 +1024,7 @@ export default function EmpresasPage() {
                   <Label>Logo Atual</Label>
                   <div className="flex items-center justify-center p-4 border rounded-lg bg-muted">
                     <img 
-                      src={`${API_URL}/uploads/logos/${selectedTenant.logoUrl}?t=${logoTimestamp}`} 
+                                            src={`/uploads/logos/${selectedTenant.logoUrl}?t=${logoTimestamp}`}
                       alt="Logo atual"
                       className="max-h-32 object-contain"
                       onError={(e) => {
