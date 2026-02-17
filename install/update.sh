@@ -23,21 +23,17 @@ fi
 # ===============================
 # Localiza instalação
 # ===============================
-# Tenta primeiro o diretório atual (se estiver dentro do repositório)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 if [ -d "$PROJECT_ROOT/.git" ]; then
     INSTALL_DIR="$PROJECT_ROOT"
 else
-    # Fallback: Busca pelo diretório que contém .git e tem "multitenant" no nome
-    # Limitamos a busca para ser mais performática e evitar erros de permissão
     INSTALL_DIR=$(find /home /root /opt /var/www -maxdepth 3 -type d -name ".git" 2>/dev/null | grep -i "multitenant" | head -n 1 | xargs -r dirname)
 fi
 
 if [ -z "$INSTALL_DIR" ] || [ ! -d "$INSTALL_DIR" ]; then
     echored "Não foi possível localizar a instalação do Multitenant."
-    echo "Dica: Execute este script de dentro da pasta do projeto."
     exit 1
 fi
 
@@ -48,14 +44,14 @@ cd "$INSTALL_DIR"
 # Verifica se é um repositório Git
 # ===============================
 if [ ! -d ".git" ]; then
-    echored "Não é um repositório Git válido em $INSTALL_DIR. Abortando atualização."
+    echored "Não é um repositório Git válido. Abortando."
     exit 1
 fi
 
 # ===============================
 # Lista branches disponíveis
 # ===============================
-echoblue "Buscando atualizações no repositório..."
+echoblue "Buscando atualizações..."
 git fetch --all --prune
 
 echoblue "Branches disponíveis:"
@@ -88,13 +84,11 @@ git pull origin "$SELECTED_BRANCH"
 # ===============================
 echoblue "Atualizando containers Docker..."
 
-# Detecta qual arquivo compose usar
 COMPOSE_FILE="docker-compose.yml"
 if [ -f "docker-compose.prod.yml" ]; then
     COMPOSE_FILE="docker-compose.prod.yml"
 fi
 
-# Tenta localizar o arquivo .env
 ENV_FILE=".env"
 if [ -f "install/.env.production" ]; then
     ENV_FILE="install/.env.production"
@@ -104,11 +98,11 @@ fi
 
 echoblue "Usando $COMPOSE_FILE com $ENV_FILE"
 
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" pull
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --remove-orphans
+# Forçamos o build e ignoramos o pull de imagens que não existem no hub (local/*)
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build --remove-orphans
 
 # ===============================
 # Mensagem final
 # ===============================
 echoblue "Atualização completa!"
-echo "A aplicação foi atualizada mantendo volumes, .env e configurações existentes."
+echo "A aplicação foi atualizada com sucesso."

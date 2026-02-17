@@ -17,7 +17,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY . .
 
 # Install dependencies
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --no-frozen-lockfile
 
 # Build frontend
 ENV NEXT_TELEMETRY_DISABLED=1
