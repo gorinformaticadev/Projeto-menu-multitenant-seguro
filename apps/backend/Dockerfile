@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1.7
+
 FROM node:20-alpine AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
@@ -7,36 +8,67 @@ RUN corepack enable
 
 FROM base AS builder
 RUN apk add --no-cache libc6-compat
+
+# Workspace manifests first for better layer caching.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/backend/package.json apps/backend/package.json
+COPY apps/backend/prisma.config.ts apps/backend/prisma.config.ts
 COPY apps/backend/prisma apps/backend/prisma
+
+# Install backend deps (and transitive workspace deps if any).
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --filter backend... --frozen-lockfile
+
+# Build backend artifacts.
 COPY apps/backend apps/backend
 RUN pnpm --filter backend exec prisma generate
 RUN pnpm --filter backend build
 RUN pnpm --filter backend exec tsc prisma/seed.ts --outDir dist/prisma --skipLibCheck --module commonjs --target ES2021 --esModuleInterop
 
-FROM base AS prod-deps
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/backend/package.json apps/backend/package.json
-COPY apps/backend/prisma apps/backend/prisma
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --filter backend --prod --frozen-lockfile
-RUN pnpm --filter backend exec prisma generate
+# Create a production-ready backend bundle.
+# Primary path: pnpm deploy --prod.
+# Fallback path: production install for backend in an isolated workspace snapshot.
+RUN set -eu; \
+  if pnpm --filter backend deploy --prod /opt/backend-prod; then \
+    echo "pnpm deploy --prod succeeded"; \
+  else \
+    echo "pnpm deploy --prod failed; using fallback production install"; \
+    rm -rf /opt/backend-prod /tmp/backend-fallback; \
+    mkdir -p /tmp/backend-fallback/apps/backend /opt/backend-prod; \
+    cp package.json pnpm-lock.yaml pnpm-workspace.yaml /tmp/backend-fallback/; \
+    cp apps/backend/package.json /tmp/backend-fallback/apps/backend/package.json; \
+    cp apps/backend/prisma.config.ts /tmp/backend-fallback/apps/backend/prisma.config.ts; \
+    cp -R apps/backend/prisma /tmp/backend-fallback/apps/backend/prisma; \
+    cd /tmp/backend-fallback; \
+    pnpm install --filter backend... --prod --frozen-lockfile; \
+    pnpm --filter backend exec prisma generate; \
+    cp apps/backend/package.json /opt/backend-prod/package.json; \
+    cp -R node_modules /opt/backend-prod/node_modules; \
+    rm -rf /tmp/backend-fallback; \
+  fi
 
 FROM node:20-alpine AS runner
-WORKDIR /app
+WORKDIR /app/apps/backend
 ENV NODE_ENV=production
 ENV PORT=4000
+
 RUN apk add --no-cache curl postgresql-client
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nestjs
-COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/dist ./dist
+
 COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/package.json ./package.json
-COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/docker-entrypoint.sh ./docker-entrypoint.sh
+COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/node_modules ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules/.pnpm /app/node_modules/.pnpm
+COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/prisma ./prisma
-COPY --from=prod-deps --chown=nestjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/prisma.config.ts ./prisma.config.ts
+COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/docker-entrypoint.sh ./docker-entrypoint.sh
+
+# Runtime dependency sanity check (required by audit).
+RUN node -e "require('@nestjs/core'); console.log('nestjs ok')"
+
 RUN chmod +x ./docker-entrypoint.sh
 RUN mkdir -p /app/uploads/logos /app/backups /app/modules /app/src/modules && chown -R nestjs:nodejs /app/uploads /app/backups /app/modules /app/src
+
 USER nestjs
 EXPOSE 4000
 CMD ["./docker-entrypoint.sh"]

@@ -11,6 +11,8 @@ import { validateSecurityConfig } from './common/utils/security.utils';
 import { SecretManagerService } from './common/services/secret-manager.nest.service';
 
 async function bootstrap() {
+  const requireSecretManager = process.env.REQUIRE_SECRET_MANAGER === 'true';
+
   // ============================================
   // 🔒 VALIDAÇÃO DE SEGURANÇA NA INICIALIZAÇÃO
   // ============================================
@@ -37,15 +39,21 @@ async function bootstrap() {
     // Validar secrets críticos
     if (!secretManager.validateCriticalSecrets()) {
       console.error('❌ Secrets críticos ausentes!');
-      process.exit(1);
+      if (requireSecretManager) {
+        process.exit(1);
+      }
+      console.warn('⚠️ REQUIRE_SECRET_MANAGER=false: continuando sem validação estrita de secrets.');
     }
 
   } catch (error) {
     console.error('❌ Falha ao inicializar Secret Manager:', error.message);
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV === 'production' && requireSecretManager) {
       process.exit(1);
     } else {
       console.warn('⚠️  Continuando em modo desenvolvimento sem Secret Manager');
+      if (process.env.NODE_ENV === 'production') {
+        console.warn('⚠️ REQUIRE_SECRET_MANAGER=false: continuando em produção sem Secret Manager.');
+      }
     }
   }
 

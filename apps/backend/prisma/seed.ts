@@ -113,27 +113,39 @@ async function main() {
 
   console.log('✅ Admin do tenant criado:', tenantAdmin.email);
 
-  // Cria configurações de segurança globais (padrão)
-  const globalSecurityConfig = await prisma.securityConfig.create({
-    data: {
-      twoFactorEnabled: true,
-      twoFactorRequired: false,
-      twoFactorRequiredForAdmins: false,
-      twoFactorSuggested: true,
-      sessionTimeoutMinutes: 30,
-      passwordMinLength: 8,
-      passwordRequireUppercase: true,
-      passwordRequireLowercase: true,
-      passwordRequireNumbers: true,
-      passwordRequireSpecial: true,
-      loginMaxAttempts: 5,
-      loginLockDurationMinutes: 15,
-      platformName: 'Sistema Multitenant',
-      platformEmail: 'admin@sistema.com',
-    },
+  // Configuracao global idempotente: atualiza a primeira linha, cria se nao existir.
+  const existingSecurityConfig = await prisma.securityConfig.findFirst({
+    orderBy: { updatedAt: 'asc' },
+    select: { id: true },
   });
 
-  console.log('✅ Configurações de segurança globais criadas');
+  const securityConfigData = {
+    twoFactorEnabled: true,
+    twoFactorRequired: false,
+    twoFactorRequiredForAdmins: false,
+    twoFactorSuggested: true,
+    sessionTimeoutMinutes: 30,
+    passwordMinLength: 8,
+    passwordRequireUppercase: true,
+    passwordRequireLowercase: true,
+    passwordRequireNumbers: true,
+    passwordRequireSpecial: true,
+    loginMaxAttempts: 5,
+    loginLockDurationMinutes: 15,
+    platformName: 'Sistema Multitenant',
+    platformEmail: 'admin@sistema.com',
+  };
+
+  if (existingSecurityConfig) {
+    await prisma.securityConfig.update({
+      where: { id: existingSecurityConfig.id },
+      data: securityConfigData,
+    });
+    console.log('Configuracoes de seguranca globais atualizadas');
+  } else {
+    await prisma.securityConfig.create({ data: securityConfigData });
+    console.log('Configuracoes de seguranca globais criadas');
+  }
 
   console.log('\n📋 Credenciais de acesso:');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -162,3 +174,4 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+

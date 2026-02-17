@@ -1,68 +1,101 @@
 #!/bin/sh
-set -e
+set -eu
 
-# Simple entrypoint: wait for DB, generate prisma client, run optional migrations, start app.
-# Configure RUN_MIGRATIONS=false to skip migrations in runtime (recommended to run them in CI/CD).
+PRISMA_SCHEMA="/app/apps/backend/prisma/schema.prisma"
+MIGRATIONS_DIR="/app/apps/backend/prisma/migrations"
 
-# Extrair hostname do DATABASE_URL de forma robusta
-# Suporta formatos: postgresql://user:pass@host:port/db e postgresql://user:pass@host/db
-DB_HOST=$(echo "${DATABASE_URL}" | sed -e 's|.*@||' -e 's|/.*||' -e 's|:.*||')
-if [ -z "$DB_HOST" ]; then
-  DB_HOST="db"
+if [ -z "${DATABASE_URL:-}" ]; then
+  echo "ERROR: DATABASE_URL is not configured."
+  exit 1
 fi
 
-DB_PORT=${DB_PORT:-5432}
+if [ ! -f "$PRISMA_SCHEMA" ]; then
+  echo "ERROR: Prisma schema not found at $PRISMA_SCHEMA."
+  exit 1
+fi
 
-# Wait for DB readiness (pg_isready from postgresql-client package)
+if [ ! -d "$MIGRATIONS_DIR" ] || [ -z "$(find "$MIGRATIONS_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)" ]; then
+  echo "ERROR: No Prisma versioned migrations found in $MIGRATIONS_DIR."
+  echo "migrate deploy requires committed migrations."
+  exit 1
+fi
+
+DB_HOST="${DB_HOST:-db}"
+DB_PORT="${DB_PORT:-5432}"
+DB_WAIT_TIMEOUT="${DB_WAIT_TIMEOUT:-60}"
+
 echo "Waiting for database at ${DB_HOST}:${DB_PORT} ..."
-if command -v pg_isready >/dev/null 2>&1; then
-  # Reduzido para 1s de intervalo para inicialização mais rápida
-  for i in $(seq 1 45); do
-    if pg_isready -h "${DB_HOST}" -p "${DB_PORT}" >/dev/null 2>&1; then
-      echo "Database is ready."
-      break
-    fi
-    echo "Waiting for Postgres... (${i}/45)"
-    sleep 1
-  done
-else
-  echo "pg_isready not found; waiting 5s for DB to be up."
-  sleep 5
-fi
+node <<'NODE'
+const net = require('net');
 
-# Verificar se npx está disponível, senão usar o prisma do node_modules
-if command -v npx >/dev/null 2>&1; then
-  PRISMA_CMD="npx prisma"
-else
+const host = process.env.DB_HOST || 'db';
+const port = Number(process.env.DB_PORT || 5432);
+const timeoutSeconds = Number(process.env.DB_WAIT_TIMEOUT || 60);
+const maxAttempts = Number.isFinite(timeoutSeconds) && timeoutSeconds > 0 ? Math.floor(timeoutSeconds) : 60;
+
+let attempts = 0;
+
+function tryConnect() {
+  attempts += 1;
+
+  const socket = net.createConnection({ host, port });
+  let handled = false;
+
+  const finish = (ok, message) => {
+    if (handled) return;
+    handled = true;
+    socket.destroy();
+
+    if (ok) {
+      console.log('Database is ready.');
+      process.exit(0);
+    }
+
+    if (attempts >= maxAttempts) {
+      console.error(`ERROR: Database did not become ready in time (${maxAttempts}s). Last error: ${message}`);
+      process.exit(1);
+    }
+
+    setTimeout(tryConnect, 1000);
+  };
+
+  socket.setTimeout(1000);
+  socket.on('connect', () => finish(true, 'connected'));
+  socket.on('timeout', () => finish(false, 'timeout'));
+  socket.on('error', (err) => finish(false, err && err.message ? err.message : String(err)));
+}
+
+tryConnect();
+NODE
+
+if [ -x "./node_modules/.bin/prisma" ]; then
   PRISMA_CMD="./node_modules/.bin/prisma"
-fi
-
-PRISMA_SCHEMA="/app/prisma/schema.prisma"
-
-# Optionally generate Prisma client in runtime (disabled by default).
-# Client is already generated during image build.
-if [ "${RUN_PRISMA_GENERATE:-false}" = "true" ]; then
-  echo "Generating Prisma client..."
-  $PRISMA_CMD generate --schema "${PRISMA_SCHEMA}"
-fi
-
-# CORREÇÃO: Executar migrações por padrão em produção
-# Para desabilitar, defina RUN_MIGRATIONS=false
-if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
-  echo "Running prisma migrate deploy..."
-  $PRISMA_CMD migrate deploy --schema "${PRISMA_SCHEMA}" || {
-    echo "⚠️  Prisma migrate failed. Attempting to push schema..."
-    $PRISMA_CMD db push --schema "${PRISMA_SCHEMA}" --skip-generate || echo "❌ Database sync failed (continuing anyway)"
-  }
-  
-  # Executar seeds para garantir que o usuário admin exista
-  echo "Running prisma db seed..."
-  export INSTALL_ADMIN_EMAIL="${INSTALL_ADMIN_EMAIL}"
-  export ADMIN_DEFAULT_PASSWORD="${INSTALL_ADMIN_PASSWORD}"
-  $PRISMA_CMD db seed || echo "❌ Database seed failed (continuing anyway)"
+elif command -v prisma >/dev/null 2>&1; then
+  PRISMA_CMD="prisma"
 else
-  echo "Skipping migrations/seeds (RUN_MIGRATIONS=false)"
+  echo "ERROR: Prisma CLI not found in container."
+  exit 1
 fi
 
-# Start the app using package.json start:prod script (keeps runtime consistent)
-exec npm run start:prod
+echo "Running prisma migrate deploy..."
+if ! MIGRATE_OUTPUT="$($PRISMA_CMD migrate deploy --schema "$PRISMA_SCHEMA" 2>&1)"; then
+  echo "$MIGRATE_OUTPUT"
+  echo "ERROR: prisma migrate deploy failed. Refusing to continue."
+  echo "Prisma migration status:"
+  if ! $PRISMA_CMD migrate status --schema "$PRISMA_SCHEMA"; then
+    echo "Unable to read migration status after failure."
+  fi
+  exit 1
+fi
+echo "$MIGRATE_OUTPUT"
+
+if [ -f "/app/apps/backend/dist/prisma/seed.js" ]; then
+  echo "Running application seed (idempotent)..."
+  export INSTALL_ADMIN_EMAIL="${INSTALL_ADMIN_EMAIL:-}"
+  export INSTALL_ADMIN_PASSWORD="${INSTALL_ADMIN_PASSWORD:-}"
+  node /app/apps/backend/dist/prisma/seed.js
+else
+  echo "Seed disabled: /app/apps/backend/dist/prisma/seed.js not found."
+fi
+
+exec node dist/main.js

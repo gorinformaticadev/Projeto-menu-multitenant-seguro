@@ -183,11 +183,22 @@ resolve_image_owner() {
 pull_or_build_stack() {
     local compose_base=(-f docker-compose.prod.yml)
     local compose_build=(-f docker-compose.prod.yml -f docker-compose.prod.build.yml)
+    local compose_cmd=(docker compose --env-file "$ENV_PRODUCTION")
+
+    print_stack_diagnostics() {
+        log_warn "Falha ao subir stack. Coletando diagnóstico..."
+        "${compose_cmd[@]}" "${compose_base[@]}" ps || true
+        docker logs --tail 200 multitenant-backend 2>/dev/null || true
+        docker logs --tail 120 multitenant-postgres 2>/dev/null || true
+    }
 
     # Primeira tentativa: pull da tag definida
-    if docker compose --env-file "$ENV_PRODUCTION" "${compose_base[@]}" pull; then
-        docker compose --env-file "$ENV_PRODUCTION" "${compose_base[@]}" up -d
-        return 0
+    if "${compose_cmd[@]}" "${compose_base[@]}" pull; then
+        if "${compose_cmd[@]}" "${compose_base[@]}" up -d; then
+            return 0
+        fi
+        print_stack_diagnostics
+        log_warn "Pull funcionou, mas os containers não ficaram saudáveis."
     fi
 
     # Segunda tentativa: se tag começar com v, tenta sem o prefixo v
@@ -196,15 +207,21 @@ pull_or_build_stack() {
         log_warn "Pull falhou para tag ${IMAGE_TAG}. Tentando tag ${fallback_tag}..."
         upsert_env "IMAGE_TAG" "$fallback_tag" "$ENV_PRODUCTION"
         IMAGE_TAG="$fallback_tag"
-        if docker compose --env-file "$ENV_PRODUCTION" "${compose_base[@]}" pull; then
-            docker compose --env-file "$ENV_PRODUCTION" "${compose_base[@]}" up -d
-            return 0
+        if "${compose_cmd[@]}" "${compose_base[@]}" pull; then
+            if "${compose_cmd[@]}" "${compose_base[@]}" up -d; then
+                return 0
+            fi
+            print_stack_diagnostics
+            log_warn "Tag ${fallback_tag} foi baixada, mas os containers não ficaram saudáveis."
         fi
     fi
 
     log_warn "Imagem não encontrada no registry. Iniciando build local..."
-    docker compose --env-file "$ENV_PRODUCTION" "${compose_build[@]}" build backend frontend
-    docker compose --env-file "$ENV_PRODUCTION" "${compose_build[@]}" up -d
+    "${compose_cmd[@]}" "${compose_build[@]}" build backend frontend
+    if ! "${compose_cmd[@]}" "${compose_build[@]}" up -d; then
+        print_stack_diagnostics
+        return 1
+    fi
 }
 
 # --- Certificado Let's Encrypt ---
@@ -346,6 +363,7 @@ run_install() {
     upsert_env "DATABASE_URL" "postgresql://$db_user:$db_pass@db:5432/$db_name?schema=public"
     upsert_env "JWT_SECRET" "$jwt_secret"
     upsert_env "ENCRYPTION_KEY" "$enc_key"
+    upsert_env "REQUIRE_SECRET_MANAGER" "false"
     upsert_env "NODE_ENV" "production"
     upsert_env "PORT" "4000"
     # Variáveis de instalação (documentação / uso futuro pelo backend)
@@ -493,6 +511,7 @@ run_update() {
     upsert_env "IMAGE_OWNER" "$IMAGE_OWNER" "$ENV_PRODUCTION"
     upsert_env "IMAGE_REPO" "$IMAGE_REPO" "$ENV_PRODUCTION"
     upsert_env "IMAGE_TAG" "$IMAGE_TAG" "$ENV_PRODUCTION"
+    upsert_env "REQUIRE_SECRET_MANAGER" "${REQUIRE_SECRET_MANAGER:-false}" "$ENV_PRODUCTION"
 
     if [[ -d "$PROJECT_ROOT/.git" ]] && [[ -n "$branch" ]]; then
         log_info "Atualizando repositório (branch: ${branch})..."
