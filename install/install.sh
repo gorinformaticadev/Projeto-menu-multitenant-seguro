@@ -10,7 +10,7 @@
 #   Atualização: sudo bash install/install.sh update [branch]
 #
 # Variáveis de instalação (podem ser passadas por ambiente ou interativamente):
-#   INSTALL_DOMAIN, LETSENCRYPT_EMAIL, DOCKERHUB_USERNAME, INSTALL_ADMIN_EMAIL,
+#   INSTALL_DOMAIN, LETSENCRYPT_EMAIL, IMAGE_OWNER, IMAGE_REPO, IMAGE_TAG, INSTALL_ADMIN_EMAIL,
 #   INSTALL_ADMIN_PASSWORD, DB_USER, DB_PASSWORD, JWT_SECRET, ENCRYPTION_KEY
 # =============================================================================
 
@@ -60,18 +60,20 @@ Comandos:
 Opções para install:
   -d, --domain DOMAIN       Domínio principal (ex: app.exemplo.com.br).
   -e, --email EMAIL         Email para Let's Encrypt e admin.
-  -u, --docker-user USER    Usuário Docker Hub para imagens (ex: gorinformaticadev).
+  -u, --image-owner OWNER   Owner no GHCR (ex: gorinformatica).
+  -r, --image-repo REPO     Prefixo das imagens no GHCR (default: projeto-menu-multitenant-seguro).
+  -t, --image-tag TAG       Tag da imagem (default: latest).
   -a, --admin-email EMAIL   Email do administrador (default: mesmo de -e).
   -p, --admin-pass SENHA    Senha inicial do admin (default: 123456).
   -n, --no-prompt           Não perguntar; usa apenas variáveis de ambiente.
 
 Variáveis de ambiente (alternativa às opções):
-  INSTALL_DOMAIN, LETSENCRYPT_EMAIL, DOCKERHUB_USERNAME,
+  INSTALL_DOMAIN, LETSENCRYPT_EMAIL, IMAGE_OWNER, IMAGE_REPO, IMAGE_TAG,
   INSTALL_ADMIN_EMAIL, INSTALL_ADMIN_PASSWORD,
   DB_USER, DB_PASSWORD, DB_NAME, JWT_SECRET, ENCRYPTION_KEY
 
 Exemplos:
-  sudo bash install/install.sh install -d menu.empresa.com -e admin@empresa.com -u gorinformaticadev
+  sudo bash install/install.sh install -d menu.empresa.com -e admin@empresa.com -u gorinformatica -r projeto-menu-multitenant-seguro -t latest
   sudo INSTALL_DOMAIN=app.empresa.com LETSENCRYPT_EMAIL=admin@empresa.com bash install/install.sh install --no-prompt
   sudo bash install/install.sh update
   sudo bash install/install.sh update develop
@@ -95,12 +97,10 @@ require_root() {
 
 check_docker() {
     if ! command -v docker &>/dev/null; then
-        log_info "Docker não encontrado. Instalando..."
-        curl -fsSL https://get.docker.com | sh
-        log_info "Docker instalado."
-    else
-        log_info "Docker: $(docker --version)"
+        log_error "Docker não encontrado. Instale Docker antes de continuar."
+        exit 1
     fi
+    log_info "Docker: $(docker --version)"
 }
 
 check_docker_compose() {
@@ -209,7 +209,9 @@ obtain_letsencrypt_cert() {
 run_install() {
     local domain="${INSTALL_DOMAIN:-}"
     local email="${LETSENCRYPT_EMAIL:-}"
-    local docker_user="${DOCKERHUB_USERNAME:-}"
+    local image_owner="${IMAGE_OWNER:-}"
+    local image_repo="${IMAGE_REPO:-projeto-menu-multitenant-seguro}"
+    local image_tag="${IMAGE_TAG:-latest}"
     local admin_email="${INSTALL_ADMIN_EMAIL:-$email}"
     local admin_pass="${INSTALL_ADMIN_PASSWORD:-123456}"
     local no_prompt="${INSTALL_NO_PROMPT:-false}"
@@ -219,7 +221,9 @@ run_install() {
         case "$1" in
             -d|--domain)   domain="$2"; shift 2 ;;
             -e|--email)    email="$2"; shift 2 ;;
-            -u|--docker-user) docker_user="$2"; shift 2 ;;
+            -u|--image-owner) image_owner="$2"; shift 2 ;;
+            -r|--image-repo) image_repo="$2"; shift 2 ;;
+            -t|--image-tag) image_tag="$2"; shift 2 ;;
             -a|--admin-email)  admin_email="$2"; shift 2 ;;
             -p|--admin-pass)   admin_pass="$2"; shift 2 ;;
             -n|--no-prompt)   no_prompt="true"; shift ;;
@@ -230,25 +234,28 @@ run_install() {
     if [[ "$no_prompt" != "true" ]]; then
         [[ -z "$domain" ]] && read -p "Domínio (ex: app.empresa.com): " domain
         [[ -z "$email" ]]  && read -p "Email (Let's Encrypt / admin): " email
-        if [[ -z "$docker_user" ]]; then
-            read -p "Docker Hub username (deixe vazio para build local): " docker_user
-            docker_user="${docker_user:-local}"
+        if [[ -z "$image_owner" ]]; then
+            read -p "GHCR owner (ex: org/user): " image_owner
         fi
+        [[ -z "$image_repo" ]] && read -p "Image repo prefix [projeto-menu-multitenant-seguro]: " image_repo
+        image_repo="${image_repo:-projeto-menu-multitenant-seguro}"
+        [[ -z "$image_tag" ]] && image_tag="latest"
         [[ -z "$admin_email" ]] && admin_email="$email"
         read -sp "Senha inicial do admin [123456]: " admin_pass
         echo
         admin_pass="${admin_pass:-123456}"
     fi
 
-    if [[ -z "$domain" || -z "$email" ]]; then
-        log_error "Domínio e email são obrigatórios."
+    if [[ -z "$domain" || -z "$email" || -z "$image_owner" ]]; then
+        log_error "Domínio, email e GHCR owner são obrigatórios."
         show_usage
         exit 1
     fi
     validate_email "$email"
     [[ -n "$admin_email" ]] && validate_email "$admin_email"
 
-    docker_user="${docker_user:-local}"
+    image_owner="$(echo "$image_owner" | tr '[:upper:]' '[:lower:]')"
+    image_repo="$(echo "$image_repo" | tr '[:upper:]' '[:lower:]')"
     ensure_env_file
 
     # Gerar prefixo baseado no domínio (remove pontos e pega a parte principal)
@@ -274,7 +281,9 @@ run_install() {
     upsert_env "LETSENCRYPT_EMAIL" "$email"
     upsert_env "LETSENCRYPT_HOST" "$domain"
     upsert_env "VIRTUAL_HOST" "$domain"
-    upsert_env "DOCKERHUB_USERNAME" "$docker_user"
+    upsert_env "IMAGE_OWNER" "$image_owner"
+    upsert_env "IMAGE_REPO" "$image_repo"
+    upsert_env "IMAGE_TAG" "$image_tag"
     upsert_env "FRONTEND_URL" "https://$domain"
     upsert_env "NEXT_PUBLIC_API_URL" "https://$domain/api"
     upsert_env "DB_USER" "$db_user"
@@ -352,25 +361,8 @@ run_install() {
 
     log_info "Subindo stack (docker-compose.prod.yml) com install/.env.production..."
     cd "$PROJECT_ROOT"
-    if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml pull 2>/dev/null; then
-        log_warn "Pull de imagens falhou (repositório inexistente ou sem login)."
-    fi
-    docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml down 2>/dev/null || true
-    if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml up -d; then
-        echo -e "\n\033[1;34m[INFO]\033[0m Imagens prontas não encontradas ou acesso negado ao Docker Hub."
-        echo -e "\033[1;32m[INFO]\033[0m Iniciando \033[1mBUILD LOCAL\033[0m das imagens no seu VPS. Isso pode levar alguns minutos...\n"
-        
-        if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml build; then
-            log_error "Falha ao construir imagens localmente."
-            exit 1
-        fi
-        
-        log_info "Build concluído. Iniciando containers..."
-        if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml up -d; then
-            log_error "Falha ao subir containers após o build."
-            exit 1
-        fi
-    fi
+    docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml pull
+    docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml up -d
 
     # Tentar obter certificado Let's Encrypt (domínio deve apontar para este host e porta 80 acessível)
     sleep 5
@@ -380,7 +372,7 @@ run_install() {
 
     # Garantir que os seeds rodem explicitamente com as variáveis passadas
     log_info "Finalizando configuração do banco de dados e usuários..."
-    docker exec -e INSTALL_ADMIN_EMAIL="$admin_email" -e INSTALL_ADMIN_PASSWORD="$admin_pass" multitenant-backend npx prisma db seed || log_warn "Seed automático falhou, mas o sistema continuará subindo."
+    docker exec -e INSTALL_ADMIN_EMAIL="$admin_email" -e INSTALL_ADMIN_PASSWORD="$admin_pass" multitenant-backend npx prisma db seed
 
     # Exibir Relatório Final de Credenciais
     echo -e "\n\n"
@@ -450,26 +442,9 @@ run_update() {
     fi
 
     log_info "Baixando imagens..."
-    if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml pull 2>/dev/null; then
-        log_warn "Pull falhou; usando imagens existentes ou build local."
-    fi
-    log_info "Reiniciando containers..."
-    docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml down
-    if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml up -d; then
-        echo -e "\n\033[1;34m[INFO]\033[0m Imagens prontas não encontradas ou acesso negado ao Docker Hub."
-        echo -e "\033[1;32m[INFO]\033[0m Iniciando \033[1mBUILD LOCAL\033[0m das imagens no seu VPS. Isso pode levar alguns minutos...\n"
-        
-        if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml build; then
-            log_error "Falha ao construir imagens localmente."
-            exit 1
-        fi
-        
-        log_info "Build concluído. Iniciando containers..."
-        if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml up -d; then
-            log_error "Falha ao subir containers após o build."
-            exit 1
-        fi
-    fi
+    docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml pull
+    log_info "Atualizando containers..."
+    docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml up -d
 
     echogreen "Atualização concluída."
 }

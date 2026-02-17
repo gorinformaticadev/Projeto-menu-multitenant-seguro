@@ -1,5 +1,3 @@
-# VariÃ¡veis da stack: use install/.env.production (monorepo: env nÃ£o fica na raiz).
-# Subir: cd /caminho/Projeto-menu-multitenant-seguro && docker compose --env-file install/.env.production -f docker-compose.prod.yml up -d
 services:
   nginx:
     image: nginx:1.25-alpine
@@ -13,43 +11,36 @@ services:
       - ./nginx/certs:/etc/nginx/certs:ro
       - ./nginx/webroot:/var/www/certbot:ro
     depends_on:
-      - frontend
-      - backend
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
     networks:
       - multitenant-network
 
   frontend:
-    image: ${DOCKERHUB_USERNAME:-local}/multitenant-frontend:${RELEASE_TAG:-latest}
-    build:
-      context: .
-      dockerfile: apps/frontend/Dockerfile
-      args:
-        # No browser a API Ã© acessada pela mesma origem (nginx faz proxy /api)
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    image: ghcr.io/${IMAGE_OWNER}/${IMAGE_REPO:-projeto-menu-multitenant-seguro}-frontend:${IMAGE_TAG:-latest}
     container_name: multitenant-frontend
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-/api}
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - multitenant-network
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:5000/" ]
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
 
   backend:
-    image: ${DOCKERHUB_USERNAME:-local}/multitenant-backend:${RELEASE_TAG:-latest}
-    build:
-      context: .
-      dockerfile: apps/backend/Dockerfile
+    image: ghcr.io/${IMAGE_OWNER}/${IMAGE_REPO:-projeto-menu-multitenant-seguro}-backend:${IMAGE_TAG:-latest}
     container_name: multitenant-backend
     restart: unless-stopped
-    # FRONTEND_URL deve ser a URL pÃºblica (https://DOMAIN) para CORS aceitar o browser; vem de install/.env.production
     environment:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}
@@ -61,14 +52,16 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - uploads:/app/uploads
     networks:
       - multitenant-network
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:4000/api/health" ]
+      test: ["CMD", "curl", "-f", "http://localhost:4000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -87,7 +80,7 @@ services:
     networks:
       - multitenant-network
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d multitenant" ]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-multitenant}"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -103,7 +96,7 @@ services:
     networks:
       - multitenant-network
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -120,4 +113,3 @@ volumes:
 networks:
   multitenant-network:
     driver: bridge
-
