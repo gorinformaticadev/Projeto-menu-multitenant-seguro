@@ -80,6 +80,17 @@ sudo bash install/install.sh install
 
 ------------------------------------------------------------------------
 
+## Manuais de Instalação Detalhados
+
+Para procedimentos passo a passo específicos, consulte os manuais abaixo:
+
+- **[Instalação Docker - Desenvolvimento](DOCS/manual-instalacao/INSTALL_DOCKER_DEV.md)**: Guia para rodar o ambiente de desenvolvimento localmente.
+- **[Instalação Docker - Local (Prod)](DOCS/manual-instalacao/INSTALL_DOCKER_LOCAL.md)**: Guia para rodar/testar o build de produção localmente.
+- **[Instalação VPS - Produção](DOCS/manual-instalacao/INSTALL_VPS_PROD.md)**: Procedimento oficial para deploy em servidor VPS de Produção.
+- **[Instalação VPS - Dev/Staging](DOCS/manual-instalacao/INSTALL_VPS_DEV.md)**: Procedimento para deploy em servidor VPS de Desenvolvimento/Homologação.
+
+------------------------------------------------------------------------
+
 ## Atualizacao do Sistema
 
 ### Fluxo recomendado

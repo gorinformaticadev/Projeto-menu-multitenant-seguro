@@ -18,7 +18,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: backend/Dockerfile.dev
+      dockerfile: apps/backend/Dockerfile.dev
     container_name: multitenant-backend
     ports:
       - "4000:4000"
@@ -27,8 +27,9 @@ services:
       - JWT_SECRET=supersecretkey_dev_12345678901234567890123456789012
       - FRONTEND_URL=http://localhost:5000
       - NODE_ENV=development
+      - ENCRYPTION_KEY=1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
     volumes:
-      - ./backend:/app
+      - ./apps/backend:/app
       - /app/node_modules
     depends_on:
       - db
@@ -38,7 +39,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: frontend/Dockerfile.dev
+      dockerfile: apps/frontend/Dockerfile.dev
     container_name: multitenant-frontend
     ports:
       - "5000:5000"
@@ -46,7 +47,7 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:4000
       - NODE_ENV=development
     volumes:
-      - ./frontend:/app
+      - ./apps/frontend:/app
       - /app/node_modules
     depends_on:
       - backend
@@ -55,6 +56,7 @@ services:
 
 volumes:
   postgres_data:
+
 
 networks:
   app-network:

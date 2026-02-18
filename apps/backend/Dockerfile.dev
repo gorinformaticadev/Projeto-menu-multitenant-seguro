@@ -5,17 +5,20 @@ WORKDIR /app
 # Instalar dependências do sistema
 RUN apk add --no-cache bash openssl
 
+# Install pnpm
+RUN npm install -g pnpm
+
 # Copiar package files
-COPY backend/package*.json ./
+COPY apps/backend/package.json ./
 
 # Instalar todas as dependências (incluindo dev)
-RUN npm ci
+RUN pnpm install
 
 # Copiar prisma schema para gerar client
-COPY backend/prisma ./prisma
+COPY apps/backend/prisma ./prisma
 
 # Gerar Prisma Client
-RUN npm run prisma:generate
+RUN pnpm run prisma:generate
 
 # Criar diretórios necessários
 RUN mkdir -p uploads/logos
@@ -24,4 +27,4 @@ RUN mkdir -p uploads/logos
 EXPOSE 4000
 
 # Comando padrão para desenvolvimento
-CMD ["npm", "run", "start:dev"]
+CMD ["pnpm", "run", "start:dev"]

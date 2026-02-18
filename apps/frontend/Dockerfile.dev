@@ -2,14 +2,17 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+# Install pnpm
+RUN npm install -g pnpm
+
 # Copiar package files
-COPY frontend/package*.json ./
+COPY apps/frontend/package.json ./
 
 # Instalar dependências
-RUN npm ci
+RUN pnpm install
 
 # Expôr porta
 EXPOSE 5000
 
 # Comando padrão para desenvolvimento
-CMD ["npm", "run", "dev"]
+CMD ["pnpm", "run", "dev"]
