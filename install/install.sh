@@ -64,19 +64,23 @@ Opções para install:
   -u, --image-owner OWNER   Owner no GHCR (ex: gorinformatica).
   -r, --image-repo REPO     Prefixo das imagens no GHCR (default: projeto-menu-multitenant-seguro).
   -t, --image-tag TAG       Tag da imagem (default: latest).
+  -l, --local-build-only    Ignora pull de imagens e faz build local no servidor.
   -a, --admin-email EMAIL   Email do administrador (default: mesmo de -e).
   -p, --admin-pass SENHA    Senha inicial do admin (default: 123456).
   -n, --no-prompt           Não perguntar; usa apenas variáveis de ambiente.
 
 Variáveis de ambiente (alternativa às opções):
   INSTALL_DOMAIN, LETSENCRYPT_EMAIL, IMAGE_OWNER, IMAGE_REPO, IMAGE_TAG,
+  LOCAL_BUILD_ONLY,
   INSTALL_ADMIN_EMAIL, INSTALL_ADMIN_PASSWORD,
   DB_USER, DB_PASSWORD, DB_NAME, JWT_SECRET, ENCRYPTION_KEY
 
 Exemplos:
   sudo bash install/install.sh install -d menu.empresa.com -e admin@empresa.com -u gorinformatica -r projeto-menu-multitenant-seguro -t v1.0.0
+  sudo bash install/install.sh install -d dev.empresa.com -e admin@empresa.com -l
   sudo INSTALL_DOMAIN=app.empresa.com LETSENCRYPT_EMAIL=admin@empresa.com bash install/install.sh install --no-prompt
   sudo bash install/install.sh update
+  sudo bash install/install.sh update dev
   sudo bash install/install.sh update develop
 EOF
 }
@@ -184,6 +188,7 @@ pull_or_build_stack() {
     local compose_base=(-f docker-compose.prod.yml)
     local compose_build=(-f docker-compose.prod.yml -f docker-compose.prod.build.yml)
     local compose_cmd=(docker compose --env-file "$ENV_PRODUCTION")
+    local local_build_only="${LOCAL_BUILD_ONLY:-false}"
 
     print_stack_diagnostics() {
         log_warn "Falha ao subir stack. Coletando diagnóstico..."
@@ -191,6 +196,16 @@ pull_or_build_stack() {
         docker logs --tail 200 multitenant-backend 2>/dev/null || true
         docker logs --tail 120 multitenant-postgres 2>/dev/null || true
     }
+
+    if [[ "$local_build_only" == "true" ]]; then
+        log_info "Modo LOCAL_BUILD_ONLY=true: executando build local no servidor."
+        "${compose_cmd[@]}" "${compose_build[@]}" build backend frontend
+        if ! "${compose_cmd[@]}" "${compose_build[@]}" up -d; then
+            print_stack_diagnostics
+            return 1
+        fi
+        return 0
+    fi
 
     # Primeira tentativa: pull da tag definida
     if "${compose_cmd[@]}" "${compose_base[@]}" pull; then
@@ -279,6 +294,7 @@ run_install() {
     local image_owner="${IMAGE_OWNER:-}"
     local image_repo="${IMAGE_REPO:-projeto-menu-multitenant-seguro}"
     local image_tag="${IMAGE_TAG:-latest}"
+    local local_build_only="${LOCAL_BUILD_ONLY:-false}"
     local admin_email="${INSTALL_ADMIN_EMAIL:-$email}"
     local admin_pass="${INSTALL_ADMIN_PASSWORD:-123456}"
     local no_prompt="${INSTALL_NO_PROMPT:-false}"
@@ -291,6 +307,7 @@ run_install() {
             -u|--image-owner) image_owner="$2"; shift 2 ;;
             -r|--image-repo) image_repo="$2"; shift 2 ;;
             -t|--image-tag) image_tag="$2"; shift 2 ;;
+            -l|--local-build-only) local_build_only="true"; shift ;;
             -a|--admin-email)  admin_email="$2"; shift 2 ;;
             -p|--admin-pass)   admin_pass="$2"; shift 2 ;;
             -n|--no-prompt)   no_prompt="true"; shift ;;
@@ -301,7 +318,7 @@ run_install() {
     if [[ "$no_prompt" != "true" ]]; then
         [[ -z "$domain" ]] && read -p "Domínio (ex: app.empresa.com): " domain
         [[ -z "$email" ]]  && read -p "Email (Let's Encrypt / admin): " email
-        if [[ -z "$image_owner" ]]; then
+        if [[ -z "$image_owner" && "$local_build_only" != "true" ]]; then
             read -p "GHCR owner (ex: org/user): " image_owner
         fi
         [[ -z "$image_repo" ]] && read -p "Image repo prefix [projeto-menu-multitenant-seguro]: " image_repo
@@ -313,20 +330,28 @@ run_install() {
         admin_pass="${admin_pass:-123456}"
     fi
 
-    if [[ -z "$image_owner" ]]; then
+    if [[ -z "$image_owner" && "$local_build_only" != "true" ]]; then
         image_owner="$(resolve_image_owner)"
     fi
 
-    if [[ -z "$domain" || -z "$email" || -z "$image_owner" ]]; then
-        log_error "Domínio, email e IMAGE_OWNER são obrigatórios."
+    if [[ -z "$domain" || -z "$email" ]]; then
+        log_error "Domínio e email são obrigatórios."
+        show_usage
+        exit 1
+    fi
+    if [[ "$local_build_only" != "true" && -z "$image_owner" ]]; then
+        log_error "IMAGE_OWNER é obrigatório quando LOCAL_BUILD_ONLY=false."
         show_usage
         exit 1
     fi
     validate_email "$email"
     [[ -n "$admin_email" ]] && validate_email "$admin_email"
 
+    image_owner="${image_owner:-local-build}"
     image_owner="$(echo "$image_owner" | tr '[:upper:]' '[:lower:]')"
     image_repo="$(echo "$image_repo" | tr '[:upper:]' '[:lower:]')"
+    local_build_only="$(echo "$local_build_only" | tr '[:upper:]' '[:lower:]')"
+    LOCAL_BUILD_ONLY="$local_build_only"
     ensure_env_file
 
     # Gerar prefixo baseado no domínio (remove pontos e pega a parte principal)
@@ -355,6 +380,7 @@ run_install() {
     upsert_env "IMAGE_OWNER" "$image_owner"
     upsert_env "IMAGE_REPO" "$image_repo"
     upsert_env "IMAGE_TAG" "$image_tag"
+    upsert_env "LOCAL_BUILD_ONLY" "$local_build_only"
     upsert_env "FRONTEND_URL" "https://$domain"
     upsert_env "NEXT_PUBLIC_API_URL" "https://$domain/api"
     upsert_env "DB_USER" "$db_user"
@@ -504,13 +530,17 @@ run_update() {
     IMAGE_OWNER="${IMAGE_OWNER:-$(resolve_image_owner)}"
     IMAGE_REPO="${IMAGE_REPO:-projeto-menu-multitenant-seguro}"
     IMAGE_TAG="${IMAGE_TAG:-latest}"
-    if [[ -z "$IMAGE_OWNER" ]]; then
+    LOCAL_BUILD_ONLY="${LOCAL_BUILD_ONLY:-false}"
+    LOCAL_BUILD_ONLY="$(echo "$LOCAL_BUILD_ONLY" | tr '[:upper:]' '[:lower:]')"
+    if [[ "$LOCAL_BUILD_ONLY" != "true" && -z "$IMAGE_OWNER" ]]; then
         log_error "IMAGE_OWNER não definido em install/.env.production e não foi possível inferir do git remote."
         exit 1
     fi
+    IMAGE_OWNER="${IMAGE_OWNER:-local-build}"
     upsert_env "IMAGE_OWNER" "$IMAGE_OWNER" "$ENV_PRODUCTION"
     upsert_env "IMAGE_REPO" "$IMAGE_REPO" "$ENV_PRODUCTION"
     upsert_env "IMAGE_TAG" "$IMAGE_TAG" "$ENV_PRODUCTION"
+    upsert_env "LOCAL_BUILD_ONLY" "$LOCAL_BUILD_ONLY" "$ENV_PRODUCTION"
     upsert_env "REQUIRE_SECRET_MANAGER" "${REQUIRE_SECRET_MANAGER:-false}" "$ENV_PRODUCTION"
 
     if [[ -d "$PROJECT_ROOT/.git" ]] && [[ -n "$branch" ]]; then

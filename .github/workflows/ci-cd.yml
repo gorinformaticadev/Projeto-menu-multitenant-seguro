@@ -91,6 +91,17 @@ jobs:
             type=ref,event=tag
             type=semver,pattern={{version}}
 
+      - name: Validate backend image has Prisma Client
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --target runner \
+            --file ./apps/backend/Dockerfile \
+            --load \
+            --tag backend-prisma-check:ci \
+            .
+          docker run --rm --entrypoint node backend-prisma-check:ci -e "process.chdir('/app/apps/backend'); require('@prisma/client'); console.log('Prisma Client OK')"
+
       - name: Build and push backend
         uses: docker/build-push-action@v6
         with:
