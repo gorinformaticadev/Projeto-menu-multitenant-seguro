@@ -14,13 +14,47 @@ Este guia detalha o procedimento oficial para instalar a aplicação em um servi
 No servidor VPS, instale Docker e Git:
 
 ```bash
-# Atualizar lista de pacotes
+# Atualizar pacotes
 sudo apt update && sudo apt upgrade -y
+```
 
-# Instalar Docker e Docker Compose Plugin
-sudo apt install -y docker.io docker-compose-plugin git
+```bash
+# Instalar dependências
+sudo apt install -y ca-certificates curl gnupg git
+```
 
-# Iniciar Docker
+```bash
+# Criar diretório de chave
+sudo install -m 0755 -d /etc/apt/keyrings
+```
+
+```bash
+# Baixar chave GPG oficial da Docker
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+```
+
+```bash
+# Adicionar repositório oficial
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+```
+
+```bash
+# Atualizar lista novamente
+sudo apt update
+```
+
+```bash
+# Instalar Docker oficial + Compose Plugin
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+
+```bash
+# Iniciar e habilitar Docker
 sudo systemctl enable --now docker
 ```
 
@@ -40,10 +74,7 @@ cd Projeto-menu-multitenant-seguro
 Execute o comando abaixo, substituindo os valores pelos seus dados reais:
 
 ```bash
-sudo bash install/install.sh install \
-  -d app.suaempresa.com.br \
-  -e admin@suaempresa.com.br \
-  -u gorinformatica
+sudo bash install/install.sh install -d crm.example.com.br -e seuemail@email.com -u gorinformatica
 ```
 
 *   `-d`: Seu domínio completo.

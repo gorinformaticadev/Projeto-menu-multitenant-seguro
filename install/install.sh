@@ -64,19 +64,24 @@ Opções para install:
   -u, --image-owner OWNER   Owner no GHCR (ex: gorinformatica).
   -r, --image-repo REPO     Prefixo das imagens no GHCR (default: projeto-menu-multitenant-seguro).
   -t, --image-tag TAG       Tag da imagem (default: latest).
+  -l, --local-build-only    Ignora pull de imagens e faz build local no servidor.
   -a, --admin-email EMAIL   Email do administrador (default: mesmo de -e).
   -p, --admin-pass SENHA    Senha inicial do admin (default: 123456).
   -n, --no-prompt           Não perguntar; usa apenas variáveis de ambiente.
+  -c, --clean               Remove volumes existentes antes de instalar (instalação limpa).
 
 Variáveis de ambiente (alternativa às opções):
   INSTALL_DOMAIN, LETSENCRYPT_EMAIL, IMAGE_OWNER, IMAGE_REPO, IMAGE_TAG,
+  LOCAL_BUILD_ONLY,
   INSTALL_ADMIN_EMAIL, INSTALL_ADMIN_PASSWORD,
   DB_USER, DB_PASSWORD, DB_NAME, JWT_SECRET, ENCRYPTION_KEY
 
 Exemplos:
   sudo bash install/install.sh install -d menu.empresa.com -e admin@empresa.com -u gorinformatica -r projeto-menu-multitenant-seguro -t v1.0.0
+  sudo bash install/install.sh install -d dev.empresa.com -e admin@empresa.com -l
   sudo INSTALL_DOMAIN=app.empresa.com LETSENCRYPT_EMAIL=admin@empresa.com bash install/install.sh install --no-prompt
   sudo bash install/install.sh update
+  sudo bash install/install.sh update dev
   sudo bash install/install.sh update develop
 EOF
 }
@@ -97,20 +102,118 @@ require_root() {
 }
 
 check_docker() {
-    if ! command -v docker &>/dev/null; then
-        log_error "Docker não encontrado. Instale Docker antes de continuar."
-        exit 1
+    # Verificar se o Docker está instalado mas não no PATH
+    if systemctl is-active --quiet docker 2>/dev/null; then
+        log_info "Docker já está instalado e rodando."
+        log_info "Docker: $(docker --version 2>/dev/null || echo 'instalado')"
+        return 0
     fi
-    log_info "Docker: $(docker --version)"
+    
+    if ! command -v docker &>/dev/null; then
+        # Verificar se o Docker está instalado mas o serviço não está rodando
+        if systemctl list-unit-files | grep -q docker.service; then
+            log_info "Docker instalado. Iniciando serviço..."
+            systemctl start docker
+            systemctl enable docker
+            log_info "Docker: $(docker --version)"
+            return 0
+        fi
+        
+        log_warn "Docker não encontrado. Instalando Docker..."
+        install_docker
+    else
+        log_info "Docker: $(docker --version)"
+    fi
+}
+
+install_docker() {
+    log_info "Instalando Docker..."
+    
+    # Atualizar repositórios
+    apt-get update -qq
+    
+    # Instalar dependências
+    apt-get install -y -qq \
+        ca-certificates \
+        curl \
+        gnupg \
+        lsb-release
+    
+    # Adicionar chave GPG oficial do Docker
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg 2>/dev/null
+    chmod a+r /etc/apt/keyrings/docker.gpg
+    
+    # Adicionar repositório do Docker
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+      $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    
+    # Instalar Docker
+    apt-get update -qq
+    apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    
+    # Iniciar e habilitar Docker
+    systemctl start docker
+    systemctl enable docker
+    
+    log_info "Docker instalado com sucesso: $(docker --version)"
 }
 
 check_docker_compose() {
     if ! docker compose version &>/dev/null; then
         log_error "Docker Compose (plugin) não encontrado."
-        log_error "Instale com: apt-get update && apt-get install -y docker-compose-plugin"
+        log_error "Isso é estranho, pois deveria ter sido instalado com o Docker."
+        log_error "Tente reinstalar o Docker manualmente."
         exit 1
     fi
     log_info "Docker Compose: $(docker compose version --short)"
+}
+
+check_and_open_ports() {
+    log_info "Verificando portas 80 e 443..."
+    
+    # Instalar net-tools se necessário (para netstat)
+    if ! command -v netstat &>/dev/null; then
+        apt-get install -y -qq net-tools >/dev/null 2>&1 || true
+    fi
+    
+    # Verificar se ufw está instalado e ativo
+    if command -v ufw &>/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
+        log_info "UFW detectado. Liberando portas 80 e 443..."
+        ufw allow 80/tcp >/dev/null 2>&1 || true
+        ufw allow 443/tcp >/dev/null 2>&1 || true
+        log_info "Portas liberadas no UFW."
+    fi
+    
+    # Verificar se iptables está bloqueando
+    if command -v iptables &>/dev/null; then
+        # Verificar se há regras que bloqueiam as portas
+        if iptables -L INPUT -n 2>/dev/null | grep -q "DROP\|REJECT"; then
+            log_warn "Detectadas regras de firewall. Certifique-se de que as portas 80 e 443 estão liberadas."
+        fi
+    fi
+    
+    # Verificar se as portas estão em uso
+    if command -v netstat &>/dev/null; then
+        if netstat -tlnp 2>/dev/null | grep -q ":80 "; then
+            local port80_process=$(netstat -tlnp 2>/dev/null | grep ":80 " | awk '{print $7}' | head -1)
+            if [[ "$port80_process" != *"docker"* ]]; then
+                log_warn "Porta 80 já está em uso por: $port80_process"
+                log_warn "Isso pode causar conflitos. Considere parar o serviço antes de continuar."
+            fi
+        fi
+        
+        if netstat -tlnp 2>/dev/null | grep -q ":443 "; then
+            local port443_process=$(netstat -tlnp 2>/dev/null | grep ":443 " | awk '{print $7}' | head -1)
+            if [[ "$port443_process" != *"docker"* ]]; then
+                log_warn "Porta 443 já está em uso por: $port443_process"
+                log_warn "Isso pode causar conflitos. Considere parar o serviço antes de continuar."
+            fi
+        fi
+    fi
+    
+    log_info "Verificação de portas concluída."
 }
 
 # --- Validações ---
@@ -184,6 +287,7 @@ pull_or_build_stack() {
     local compose_base=(-f docker-compose.prod.yml)
     local compose_build=(-f docker-compose.prod.yml -f docker-compose.prod.build.yml)
     local compose_cmd=(docker compose --env-file "$ENV_PRODUCTION")
+    local local_build_only="${LOCAL_BUILD_ONLY:-false}"
 
     print_stack_diagnostics() {
         log_warn "Falha ao subir stack. Coletando diagnóstico..."
@@ -191,6 +295,16 @@ pull_or_build_stack() {
         docker logs --tail 200 multitenant-backend 2>/dev/null || true
         docker logs --tail 120 multitenant-postgres 2>/dev/null || true
     }
+
+    if [[ "$local_build_only" == "true" ]]; then
+        log_info "Modo LOCAL_BUILD_ONLY=true: executando build local no servidor."
+        "${compose_cmd[@]}" "${compose_build[@]}" build backend frontend
+        if ! "${compose_cmd[@]}" "${compose_build[@]}" up -d; then
+            print_stack_diagnostics
+            return 1
+        fi
+        return 0
+    fi
 
     # Primeira tentativa: pull da tag definida
     if "${compose_cmd[@]}" "${compose_base[@]}" pull; then
@@ -279,9 +393,11 @@ run_install() {
     local image_owner="${IMAGE_OWNER:-}"
     local image_repo="${IMAGE_REPO:-projeto-menu-multitenant-seguro}"
     local image_tag="${IMAGE_TAG:-latest}"
+    local local_build_only="${LOCAL_BUILD_ONLY:-false}"
     local admin_email="${INSTALL_ADMIN_EMAIL:-$email}"
     local admin_pass="${INSTALL_ADMIN_PASSWORD:-123456}"
     local no_prompt="${INSTALL_NO_PROMPT:-false}"
+    local clean_install="${CLEAN_INSTALL:-false}"
 
     # Parse opções
     while [[ $# -gt 0 ]]; do
@@ -291,9 +407,11 @@ run_install() {
             -u|--image-owner) image_owner="$2"; shift 2 ;;
             -r|--image-repo) image_repo="$2"; shift 2 ;;
             -t|--image-tag) image_tag="$2"; shift 2 ;;
+            -l|--local-build-only) local_build_only="true"; shift ;;
             -a|--admin-email)  admin_email="$2"; shift 2 ;;
             -p|--admin-pass)   admin_pass="$2"; shift 2 ;;
             -n|--no-prompt)   no_prompt="true"; shift ;;
+            -c|--clean)   clean_install="true"; shift ;;
             *) shift ;;
         esac
     done
@@ -301,7 +419,7 @@ run_install() {
     if [[ "$no_prompt" != "true" ]]; then
         [[ -z "$domain" ]] && read -p "Domínio (ex: app.empresa.com): " domain
         [[ -z "$email" ]]  && read -p "Email (Let's Encrypt / admin): " email
-        if [[ -z "$image_owner" ]]; then
+        if [[ -z "$image_owner" && "$local_build_only" != "true" ]]; then
             read -p "GHCR owner (ex: org/user): " image_owner
         fi
         [[ -z "$image_repo" ]] && read -p "Image repo prefix [projeto-menu-multitenant-seguro]: " image_repo
@@ -313,21 +431,37 @@ run_install() {
         admin_pass="${admin_pass:-123456}"
     fi
 
-    if [[ -z "$image_owner" ]]; then
+    if [[ -z "$image_owner" && "$local_build_only" != "true" ]]; then
         image_owner="$(resolve_image_owner)"
     fi
 
-    if [[ -z "$domain" || -z "$email" || -z "$image_owner" ]]; then
-        log_error "Domínio, email e IMAGE_OWNER são obrigatórios."
+    if [[ -z "$domain" || -z "$email" ]]; then
+        log_error "Domínio e email são obrigatórios."
+        show_usage
+        exit 1
+    fi
+    if [[ "$local_build_only" != "true" && -z "$image_owner" ]]; then
+        log_error "IMAGE_OWNER é obrigatório quando LOCAL_BUILD_ONLY=false."
         show_usage
         exit 1
     fi
     validate_email "$email"
     [[ -n "$admin_email" ]] && validate_email "$admin_email"
 
+    image_owner="${image_owner:-local-build}"
     image_owner="$(echo "$image_owner" | tr '[:upper:]' '[:lower:]')"
     image_repo="$(echo "$image_repo" | tr '[:upper:]' '[:lower:]')"
+    local_build_only="$(echo "$local_build_only" | tr '[:upper:]' '[:lower:]')"
+    LOCAL_BUILD_ONLY="$local_build_only"
     ensure_env_file
+
+    # Limpar volumes se solicitado
+    if [[ "$clean_install" == "true" ]]; then
+        log_warn "Limpeza solicitada: removendo containers e volumes existentes..."
+        cd "$PROJECT_ROOT"
+        docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml down -v 2>/dev/null || true
+        log_info "Volumes removidos. Iniciando instalação limpa..."
+    fi
 
     # Gerar prefixo baseado no domínio (remove pontos e pega a parte principal)
     # Ex: novo.whapichat.com.br -> novowhapichat
@@ -355,6 +489,7 @@ run_install() {
     upsert_env "IMAGE_OWNER" "$image_owner"
     upsert_env "IMAGE_REPO" "$image_repo"
     upsert_env "IMAGE_TAG" "$image_tag"
+    upsert_env "LOCAL_BUILD_ONLY" "$local_build_only"
     upsert_env "FRONTEND_URL" "https://$domain"
     upsert_env "NEXT_PUBLIC_API_URL" "https://$domain/api"
     upsert_env "DB_USER" "$db_user"
@@ -441,9 +576,10 @@ run_install() {
         echogreen "Certificado SSL válido (Let's Encrypt) instalado."
     fi
 
-    # Garantir que os seeds rodem explicitamente com as variáveis passadas
-    log_info "Finalizando configuração do banco de dados e usuários..."
-    docker exec -e INSTALL_ADMIN_EMAIL="$admin_email" -e INSTALL_ADMIN_PASSWORD="$admin_pass" multitenant-backend npx prisma db seed
+    # O seed é executado automaticamente pelo docker-entrypoint.sh do backend
+    # Aguardar alguns segundos para garantir que o seed foi executado
+    log_info "Aguardando inicialização completa do sistema..."
+    sleep 10
 
     # Exibir Relatório Final de Credenciais
     echo -e "\n\n"
@@ -504,13 +640,17 @@ run_update() {
     IMAGE_OWNER="${IMAGE_OWNER:-$(resolve_image_owner)}"
     IMAGE_REPO="${IMAGE_REPO:-projeto-menu-multitenant-seguro}"
     IMAGE_TAG="${IMAGE_TAG:-latest}"
-    if [[ -z "$IMAGE_OWNER" ]]; then
+    LOCAL_BUILD_ONLY="${LOCAL_BUILD_ONLY:-false}"
+    LOCAL_BUILD_ONLY="$(echo "$LOCAL_BUILD_ONLY" | tr '[:upper:]' '[:lower:]')"
+    if [[ "$LOCAL_BUILD_ONLY" != "true" && -z "$IMAGE_OWNER" ]]; then
         log_error "IMAGE_OWNER não definido em install/.env.production e não foi possível inferir do git remote."
         exit 1
     fi
+    IMAGE_OWNER="${IMAGE_OWNER:-local-build}"
     upsert_env "IMAGE_OWNER" "$IMAGE_OWNER" "$ENV_PRODUCTION"
     upsert_env "IMAGE_REPO" "$IMAGE_REPO" "$ENV_PRODUCTION"
     upsert_env "IMAGE_TAG" "$IMAGE_TAG" "$ENV_PRODUCTION"
+    upsert_env "LOCAL_BUILD_ONLY" "$LOCAL_BUILD_ONLY" "$ENV_PRODUCTION"
     upsert_env "REQUIRE_SECRET_MANAGER" "${REQUIRE_SECRET_MANAGER:-false}" "$ENV_PRODUCTION"
 
     if [[ -d "$PROJECT_ROOT/.git" ]] && [[ -n "$branch" ]]; then
@@ -551,6 +691,7 @@ main() {
 
     check_docker
     check_docker_compose
+    check_and_open_ports
 
     local cmd="${1:-}"
     shift || true
