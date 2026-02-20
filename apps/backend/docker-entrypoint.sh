@@ -54,9 +54,10 @@ else
   done
 fi
 
-# Localiza o CLI do Prisma
-if [ -x "../../node_modules/.bin/prisma" ]; then
-  PRISMA_CMD="../../node_modules/.bin/prisma"
+# Localiza o CLI do Prisma de forma robusta
+# O pnpm coloca o prisma em /app/node_modules/.bin/prisma ou ./node_modules/.bin/prisma
+if [ -x "/app/node_modules/.bin/prisma" ]; then
+  PRISMA_CMD="/app/node_modules/.bin/prisma"
 elif [ -x "./node_modules/.bin/prisma" ]; then
   PRISMA_CMD="./node_modules/.bin/prisma"
 else
@@ -84,5 +85,5 @@ else
 fi
 
 echo "Starting NestJS application..."
-# Executa a partir de dist/main.js
+# O NestJS compilado está em ./dist/main.js
 exec node dist/main.js
