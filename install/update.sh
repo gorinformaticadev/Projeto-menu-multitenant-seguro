@@ -11,6 +11,9 @@ echoblue() {
 echored() {
     echo -ne "\033[41m\033[37m\033[1m  $1  \033[0m\n"
 }
+echogreen() {
+    echo -ne "\033[42m\033[30m\033[1m  $1  \033[0m\n"
+}
 
 # ===============================
 # Checagens iniciais
@@ -98,8 +101,48 @@ fi
 
 echoblue "Usando $COMPOSE_FILE com $ENV_FILE"
 
-# Forçamos o build e ignoramos o pull de imagens que não existem no hub (local/*)
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build --remove-orphans
+# ===============================
+# Atualiza containers Docker
+# ===============================
+echoblue "Atualizando containers Docker..."
+
+# Tenta fazer pull das novas imagens do registry (compose.prod.yml usa imagens pré-construídas)
+echoblue "Baixando imagens atualizadas do registry..."
+if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" pull 2>/dev/null; then
+    echogreen "Imagens atualizadas com sucesso."
+else
+    echored "Aviso: Não foi possível fazer pull das imagens. Usando imagens locais existentes."
+fi
+
+# Recria os containers com as imagens atualizadas
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --remove-orphans
+
+# ===============================
+# Verifica saúde do backend
+# ===============================
+echoblue "Aguardando o backend ficar saudável (até 3 minutos)..."
+BACKEND_HEALTHY=0
+for i in $(seq 1 18); do
+    sleep 10
+    HEALTH=$(docker inspect --format='{{.State.Health.Status}}' multitenant-backend 2>/dev/null || echo "not_found")
+    echo "  Backend status: $HEALTH (${i}/18 - $((i * 10))s)"
+    if [ "$HEALTH" = "healthy" ]; then
+        BACKEND_HEALTHY=1
+        break
+    elif [ "$HEALTH" = "unhealthy" ]; then
+        echored "Backend ficou unhealthy. Verificando logs..."
+        docker logs --tail 50 multitenant-backend 2>&1 || true
+        break
+    fi
+done
+
+if [ "$BACKEND_HEALTHY" -eq 1 ]; then
+    echogreen "Backend está saudável!"
+else
+    echored "ATENÇÃO: Backend não ficou saudável no tempo esperado."
+    echored "Execute: docker logs multitenant-backend"
+    echored "para verificar os logs e identificar o problema."
+fi
 
 # ===============================
 # Mensagem final

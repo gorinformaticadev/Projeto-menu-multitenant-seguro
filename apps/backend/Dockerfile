@@ -15,7 +15,7 @@ COPY apps/backend/package.json apps/backend/package.json
 COPY apps/backend/prisma.config.ts apps/backend/prisma.config.ts
 COPY apps/backend/prisma apps/backend/prisma
 
-# Install backend deps (and transitive workspace deps if any).
+# Install all deps (including devDeps needed for build).
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --filter backend... --frozen-lockfile
 
 # Build backend artifacts.
@@ -24,9 +24,8 @@ RUN pnpm --filter backend exec prisma generate
 RUN pnpm --filter backend build
 RUN pnpm --filter backend exec tsc prisma/seed.ts --outDir dist/prisma --skipLibCheck --module commonjs --target ES2021 --esModuleInterop
 
-# Create a production-ready backend bundle.
-# Primary path: pnpm deploy --prod.
-# Fallback path: production install for backend in an isolated workspace snapshot.
+# Create a production-ready backend bundle using pnpm deploy.
+# pnpm deploy --prod copies only production deps (no devDeps) to /opt/backend-prod.
 RUN set -eu; \
   if pnpm --filter backend deploy --prod /opt/backend-prod; then \
     echo "pnpm deploy --prod succeeded"; \
@@ -42,6 +41,7 @@ RUN set -eu; \
     pnpm install --filter backend... --prod --frozen-lockfile; \
     pnpm --filter backend exec prisma generate; \
     cp apps/backend/package.json /opt/backend-prod/package.json; \
+    cp -R apps/backend/node_modules /opt/backend-prod/node_modules 2>/dev/null || \
     cp -R node_modules /opt/backend-prod/node_modules; \
     rm -rf /tmp/backend-fallback; \
   fi
@@ -55,9 +55,10 @@ RUN apk add --no-cache curl postgresql-client
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nestjs
 
+# Copia arquivos de produção
 COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/package.json ./package.json
-COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/node_modules ./node_modules
-COPY --from=builder --chown=nestjs:nodejs /app/node_modules/.pnpm /app/node_modules/.pnpm
+# Usa os node_modules de produção do pnpm deploy (sem devDeps)
+COPY --from=builder --chown=nestjs:nodejs /opt/backend-prod/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/prisma ./prisma
 COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/prisma.config.ts ./prisma.config.ts
