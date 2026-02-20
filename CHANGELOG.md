@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.2.1](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v1.2.0...v1.2.1) (2026-02-20)
+
+
+### Bug Fixes
+
+* **backend:** corrige estrutura de diretórios e caminhos de dependências no Docker ([f96d377](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/f96d377f4822f6f2b017d4575a3aa2f38a043c06))
+
 ## [1.2.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v1.1.0...v1.2.0) (2026-02-20)
 
 
