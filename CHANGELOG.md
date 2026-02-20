@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.2.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v1.1.0...v1.2.0) (2026-02-20)
+
+
+### Features
+
+* **docs:** Documentação de instalação ([845892f](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/845892fd370d0c935a49a85cb55933c7799563c5))
+
+
+### Bug Fixes
+
+* **backend:** corrige caminhos de dependências e execução do Prisma no Docker ([4e0d4ac](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/4e0d4acbe61d66a7c226fb10df47aad3fd0d176e))
+* **backend:** corrige healthcheck, entrypoint e Dockerfile do backend ([e6f52e5](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/e6f52e51937adb74506bce4c648710bef0d2f30b))
+* **backend:** simplifica Dockerfile para evitar erros de build no CI/CD ([97d0e91](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/97d0e91101022d87e42f8ed21fc5d7d53fc62fc8))
+* **install:** correção de instalador ([8733cff](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/8733cff91a54d61f0bf39af3b9bacb0baaf8c109))
+
 ## [1.1.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v3.3.0...v1.1.0) (2026-02-17)
 
 
