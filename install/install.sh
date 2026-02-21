@@ -103,19 +103,101 @@ require_root() {
 
 check_docker() {
     if ! command -v docker &>/dev/null; then
-        log_error "Docker não encontrado. Instale Docker antes de continuar."
-        exit 1
+        log_warn "Docker não encontrado. Instalando Docker..."
+        install_docker
+    else
+        log_info "Docker: $(docker --version)"
     fi
-    log_info "Docker: $(docker --version)"
+}
+
+install_docker() {
+    log_info "Instalando Docker..."
+    
+    # Atualizar repositórios
+    apt-get update -qq
+    
+    # Instalar dependências
+    apt-get install -y -qq \
+        ca-certificates \
+        curl \
+        gnupg \
+        lsb-release
+    
+    # Adicionar chave GPG oficial do Docker
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+    
+    # Adicionar repositório do Docker
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+      $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    
+    # Instalar Docker
+    apt-get update -qq
+    apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    
+    # Iniciar e habilitar Docker
+    systemctl start docker
+    systemctl enable docker
+    
+    log_info "Docker instalado com sucesso: $(docker --version)"
 }
 
 check_docker_compose() {
     if ! docker compose version &>/dev/null; then
         log_error "Docker Compose (plugin) não encontrado."
-        log_error "Instale com: apt-get update && apt-get install -y docker-compose-plugin"
+        log_error "Isso é estranho, pois deveria ter sido instalado com o Docker."
+        log_error "Tente reinstalar o Docker manualmente."
         exit 1
     fi
     log_info "Docker Compose: $(docker compose version --short)"
+}
+
+check_and_open_ports() {
+    log_info "Verificando portas 80 e 443..."
+    
+    # Instalar net-tools se necessário (para netstat)
+    if ! command -v netstat &>/dev/null; then
+        apt-get install -y -qq net-tools >/dev/null 2>&1 || true
+    fi
+    
+    # Verificar se ufw está instalado e ativo
+    if command -v ufw &>/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
+        log_info "UFW detectado. Liberando portas 80 e 443..."
+        ufw allow 80/tcp >/dev/null 2>&1 || true
+        ufw allow 443/tcp >/dev/null 2>&1 || true
+        log_info "Portas liberadas no UFW."
+    fi
+    
+    # Verificar se iptables está bloqueando
+    if command -v iptables &>/dev/null; then
+        # Verificar se há regras que bloqueiam as portas
+        if iptables -L INPUT -n 2>/dev/null | grep -q "DROP\|REJECT"; then
+            log_warn "Detectadas regras de firewall. Certifique-se de que as portas 80 e 443 estão liberadas."
+        fi
+    fi
+    
+    # Verificar se as portas estão em uso
+    if command -v netstat &>/dev/null; then
+        if netstat -tlnp 2>/dev/null | grep -q ":80 "; then
+            local port80_process=$(netstat -tlnp 2>/dev/null | grep ":80 " | awk '{print $7}' | head -1)
+            if [[ "$port80_process" != *"docker"* ]]; then
+                log_warn "Porta 80 já está em uso por: $port80_process"
+                log_warn "Isso pode causar conflitos. Considere parar o serviço antes de continuar."
+            fi
+        fi
+        
+        if netstat -tlnp 2>/dev/null | grep -q ":443 "; then
+            local port443_process=$(netstat -tlnp 2>/dev/null | grep ":443 " | awk '{print $7}' | head -1)
+            if [[ "$port443_process" != *"docker"* ]]; then
+                log_warn "Porta 443 já está em uso por: $port443_process"
+                log_warn "Isso pode causar conflitos. Considere parar o serviço antes de continuar."
+            fi
+        fi
+    fi
+    
+    log_info "Verificação de portas concluída."
 }
 
 # --- Validações ---
@@ -592,6 +674,7 @@ main() {
 
     check_docker
     check_docker_compose
+    check_and_open_ports
 
     local cmd="${1:-}"
     shift || true
