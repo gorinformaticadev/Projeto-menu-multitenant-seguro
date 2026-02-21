@@ -102,7 +102,23 @@ require_root() {
 }
 
 check_docker() {
+    # Verificar se o Docker está instalado mas não no PATH
+    if systemctl is-active --quiet docker 2>/dev/null; then
+        log_info "Docker já está instalado e rodando."
+        log_info "Docker: $(docker --version 2>/dev/null || echo 'instalado')"
+        return 0
+    fi
+    
     if ! command -v docker &>/dev/null; then
+        # Verificar se o Docker está instalado mas o serviço não está rodando
+        if systemctl list-unit-files | grep -q docker.service; then
+            log_info "Docker instalado. Iniciando serviço..."
+            systemctl start docker
+            systemctl enable docker
+            log_info "Docker: $(docker --version)"
+            return 0
+        fi
+        
         log_warn "Docker não encontrado. Instalando Docker..."
         install_docker
     else
@@ -125,7 +141,7 @@ install_docker() {
     
     # Adicionar chave GPG oficial do Docker
     install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg 2>/dev/null
     chmod a+r /etc/apt/keyrings/docker.gpg
     
     # Adicionar repositório do Docker
