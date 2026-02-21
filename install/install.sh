@@ -576,9 +576,10 @@ run_install() {
         echogreen "Certificado SSL válido (Let's Encrypt) instalado."
     fi
 
-    # Garantir que os seeds rodem explicitamente com as variáveis passadas
-    log_info "Finalizando configuração do banco de dados e usuários..."
-    docker exec -e INSTALL_ADMIN_EMAIL="$admin_email" -e INSTALL_ADMIN_PASSWORD="$admin_pass" multitenant-backend npx prisma db seed
+    # O seed é executado automaticamente pelo docker-entrypoint.sh do backend
+    # Aguardar alguns segundos para garantir que o seed foi executado
+    log_info "Aguardando inicialização completa do sistema..."
+    sleep 10
 
     # Exibir Relatório Final de Credenciais
     echo -e "\n\n"

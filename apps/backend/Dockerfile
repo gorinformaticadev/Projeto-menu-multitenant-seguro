@@ -21,7 +21,10 @@ COPY apps/backend/package.json apps/backend/package.json
 COPY apps/backend apps/backend
 RUN pnpm --filter backend exec prisma generate --schema prisma/schema.prisma
 RUN pnpm --filter backend build
-RUN pnpm --filter backend exec tsc prisma/seed.ts --outDir apps/backend/dist/prisma --skipLibCheck --module commonjs --target ES2021 --esModuleInterop
+# Compilar o seed para o diretório correto
+WORKDIR /app/apps/backend
+RUN pnpm exec tsc prisma/seed.ts --outDir dist/prisma --skipLibCheck --module commonjs --target ES2021 --esModuleInterop --resolveJsonModule
+WORKDIR /app
 
 FROM base AS prod-deps
 RUN apk add --no-cache libc6-compat
