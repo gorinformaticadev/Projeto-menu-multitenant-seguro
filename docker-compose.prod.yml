@@ -32,11 +32,11 @@ services:
     networks:
       - multitenant-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/"]
-      interval: 15s
-      timeout: 10s
-      retries: 10
-      start_period: 90s
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   backend:
     image: ghcr.io/${IMAGE_OWNER}/${IMAGE_REPO:-projeto-menu-multitenant-seguro}-backend:${IMAGE_TAG:-latest}
