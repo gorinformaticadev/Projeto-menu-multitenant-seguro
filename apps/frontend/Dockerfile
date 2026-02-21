@@ -22,6 +22,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=5000
+ENV HOSTNAME=0.0.0.0
 RUN apk add --no-cache curl
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -37,4 +38,5 @@ USER nextjs
 EXPOSE 5000
 
 # O server.js está em apps/frontend/server.js dentro do standalone
-CMD ["node", "apps/frontend/server.js"]
+# Passar PORT e HOSTNAME explicitamente
+CMD ["sh", "-c", "PORT=5000 HOSTNAME=0.0.0.0 node apps/frontend/server.js"]
