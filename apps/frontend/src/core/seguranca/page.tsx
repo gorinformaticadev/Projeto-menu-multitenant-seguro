@@ -21,6 +21,12 @@ interface SecurityConfig {
   loginWindowMinutes: number;
   globalMaxRequests: number;
   globalWindowMinutes: number;
+  rateLimitDevEnabled: boolean;
+  rateLimitProdEnabled: boolean;
+  rateLimitDevRequests: number;
+  rateLimitProdRequests: number;
+  rateLimitDevWindow: number;
+  rateLimitProdWindow: number;
   passwordMinLength: number;
   passwordRequireUppercase: boolean;
   passwordRequireLowercase: boolean;
@@ -110,6 +116,12 @@ export default function SecurityConfigPage() {
         loginWindowMinutes: config.loginWindowMinutes,
         globalMaxRequests: config.globalMaxRequests,
         globalWindowMinutes: config.globalWindowMinutes,
+        rateLimitDevEnabled: config.rateLimitDevEnabled,
+        rateLimitProdEnabled: config.rateLimitProdEnabled,
+        rateLimitDevRequests: config.rateLimitDevRequests,
+        rateLimitProdRequests: config.rateLimitProdRequests,
+        rateLimitDevWindow: config.rateLimitDevWindow,
+        rateLimitProdWindow: config.rateLimitProdWindow,
         passwordMinLength: config.passwordMinLength,
         passwordRequireUppercase: config.passwordRequireUppercase,
         passwordRequireLowercase: config.passwordRequireLowercase,
@@ -310,6 +322,137 @@ export default function SecurityConfigPage() {
                 <p className="text-xs text-muted-foreground mt-1">
                   Período para contagem de requisições globais (1-60 minutos)
                 </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Rate Limiting por Ambiente */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Rate Limiting por Ambiente</CardTitle>
+            <CardDescription>
+              Configure limites diferentes para desenvolvimento e produção
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Desenvolvimento */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b">
+                <div>
+                  <h4 className="font-medium">Ambiente de Desenvolvimento</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Limites mais permissivos para testes
+                  </p>
+                </div>
+                <Switch
+                  checked={config.rateLimitDevEnabled}
+                  onCheckedChange={(checked) =>
+                    updateConfig("rateLimitDevEnabled", checked)
+                  }
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="rateLimitDevRequests">
+                    Requisições (Dev)
+                  </Label>
+                  <Input
+                    id="rateLimitDevRequests"
+                    type="number"
+                    min="10"
+                    max="10000"
+                    value={config.rateLimitDevRequests}
+                    disabled={!config.rateLimitDevEnabled}
+                    onChange={(e) =>
+                      updateConfig("rateLimitDevRequests", parseInt(e.target.value))
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Requisições permitidas em desenvolvimento (10-10000)
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="rateLimitDevWindow">
+                    Janela (Dev) - minutos
+                  </Label>
+                  <Input
+                    id="rateLimitDevWindow"
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={config.rateLimitDevWindow}
+                    disabled={!config.rateLimitDevEnabled}
+                    onChange={(e) =>
+                      updateConfig("rateLimitDevWindow", parseInt(e.target.value))
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Período de contagem em desenvolvimento (1-60 minutos)
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Produção */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b">
+                <div>
+                  <h4 className="font-medium">Ambiente de Produção</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Limites mais restritivos para segurança
+                  </p>
+                </div>
+                <Switch
+                  checked={config.rateLimitProdEnabled}
+                  onCheckedChange={(checked) =>
+                    updateConfig("rateLimitProdEnabled", checked)
+                  }
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="rateLimitProdRequests">
+                    Requisições (Prod)
+                  </Label>
+                  <Input
+                    id="rateLimitProdRequests"
+                    type="number"
+                    min="10"
+                    max="10000"
+                    value={config.rateLimitProdRequests}
+                    disabled={!config.rateLimitProdEnabled}
+                    onChange={(e) =>
+                      updateConfig("rateLimitProdRequests", parseInt(e.target.value))
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Requisições permitidas em produção (10-10000)
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="rateLimitProdWindow">
+                    Janela (Prod) - minutos
+                  </Label>
+                  <Input
+                    id="rateLimitProdWindow"
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={config.rateLimitProdWindow}
+                    disabled={!config.rateLimitProdEnabled}
+                    onChange={(e) =>
+                      updateConfig("rateLimitProdWindow", parseInt(e.target.value))
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Período de contagem em produção (1-60 minutos)
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>

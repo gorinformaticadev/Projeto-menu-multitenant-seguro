@@ -5,7 +5,7 @@
 
 resolver 127.0.0.11 valid=10s ipv6=off;
 
-# HTTP - serve app e desafio ACME (Let's Encrypt)
+# HTTP - redireciona para HTTPS (exceto ACME challenge)
 server {
     listen 80;
     server_name __DOMAIN__;
@@ -18,53 +18,9 @@ server {
         try_files $uri =404;
     }
 
-    set $frontend_upstream "http://frontend:5000";
-    set $backend_upstream "http://backend:4000";
-
+    # Redirecionar todo o resto para HTTPS
     location / {
-        proxy_pass $frontend_upstream;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-
-    location /api {
-        proxy_pass $backend_upstream;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-
-    location /uploads {
-        proxy_pass $backend_upstream;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-
-    location /socket.io {
-        proxy_pass $backend_upstream;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 86400;
+        return 301 https://$server_name$request_uri;
     }
 
     access_log /var/log/nginx/multitenant.access.log;
