@@ -30,7 +30,6 @@ COPY apps/backend/package.json apps/backend/package.json
 COPY apps/backend/prisma apps/backend/prisma
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --filter backend... --prod --frozen-lockfile
 RUN pnpm --filter backend exec prisma generate --schema prisma/schema.prisma
-RUN node -e "process.chdir('/app/apps/backend'); require('@prisma/client'); console.log('Prisma Client OK')"
 
 FROM node:20-alpine AS runner
 WORKDIR /app/apps/backend
@@ -47,7 +46,6 @@ COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/package.json ./packa
 COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/prisma ./prisma
 COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/docker-entrypoint.sh ./docker-entrypoint.sh
-RUN node -e "process.chdir('/app/apps/backend'); require('@prisma/client'); console.log('Prisma Client OK')"
 
 RUN chmod +x ./docker-entrypoint.sh
 RUN mkdir -p /app/apps/backend/uploads /app/apps/backend/backups && chown -R nestjs:nodejs /app/apps/backend
