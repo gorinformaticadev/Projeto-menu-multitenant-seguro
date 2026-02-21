@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.2.2](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v1.2.1...v1.2.2) (2026-02-21)
+
+
+### Bug Fixes
+
+* **DB:** correção de falhas se migrate ja existe ([5566a56](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/5566a566a5a3e056401d127a0c00b25d35a5a4f2))
+* **front:** correções ([359b42b](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/359b42bc0526f6aa0468752caca410182d22d762))
+* **install:** correções ([c191388](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/c19138831d6267aaee8b91756637fb10c6f09b13))
+
 ### [1.2.1](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v1.2.0...v1.2.1) (2026-02-20)
 
 
