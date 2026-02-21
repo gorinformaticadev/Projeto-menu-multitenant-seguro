@@ -55,6 +55,7 @@ export default function UsuariosPage() {
     name: "",
     role: "USER",
     password: "",
+    confirmPassword: "",
   });
 
   const loadTenants = useCallback(async () => {
@@ -151,25 +152,54 @@ export default function UsuariosPage() {
       return;
     }
 
+    // Validar confirmação de senha
+    if (formData.password && formData.password !== formData.confirmPassword) {
+      toast({
+        title: "Erro",
+        description: "As senhas não coincidem",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Impedir mudança de role do SUPER_ADMIN
+    if (editingUser?.role === "SUPER_ADMIN" && formData.role !== "SUPER_ADMIN") {
+      toast({
+        title: "Erro",
+        description: "Não é possível alterar a função de um SUPER_ADMIN",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSubmitting(true);
 
     try {
-      const dataToSend = {
-        ...formData,
-        tenantId: selectedTenantId,
+      const dataToSend: any = {
+        email: formData.email,
+        name: formData.name,
+        role: formData.role,
       };
 
+      // Adicionar senha apenas se foi preenchida
+      if (formData.password) {
+        dataToSend.password = formData.password;
+      }
+
       if (editingUser) {
-        await api.patch(`/users/${editingUser.id}`, formData);
+        // Não enviar tenantId na atualização
+        await api.patch(`/users/${editingUser.id}`, dataToSend);
         toast({ title: "Usuário atualizado com sucesso!" });
       } else {
+        // Adicionar tenantId apenas na criação
+        dataToSend.tenantId = selectedTenantId;
         await api.post("/users", dataToSend);
         toast({ title: "Usuário criado com sucesso!" });
       }
 
       setShowDialog(false);
       setEditingUser(null);
-      setFormData({ email: "", name: "", role: "USER", password: "" });
+      setFormData({ email: "", name: "", role: "USER", password: "", confirmPassword: "" });
       loadUsers();
     } catch (error: unknown) {
       toast({
@@ -182,7 +212,16 @@ export default function UsuariosPage() {
     }
   }
 
-  async function handleDelete(id: string) {
+  async function handleDelete(id: string, userRole: string) {
+    if (userRole === "SUPER_ADMIN") {
+      toast({
+        title: "Ação não permitida",
+        description: "Não é possível excluir um usuário SUPER_ADMIN",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!confirm("Tem certeza que deseja deletar este usuário?")) return;
 
     try {
@@ -221,6 +260,7 @@ export default function UsuariosPage() {
       name: user.name,
       role: user.role,
       password: "",
+      confirmPassword: "",
     });
     setShowDialog(true);
   }
@@ -235,9 +275,17 @@ export default function UsuariosPage() {
       return;
     }
     setEditingUser(null);
-    setFormData({ email: "", name: "", role: "USER", password: "" });
+    setFormData({ email: "", name: "", role: "USER", password: "", confirmPassword: "" });
     setShowDialog(true);
   }
+
+  // Verificar se o usuário sendo editado é SUPER_ADMIN
+  const isEditingSuperAdmin = editingUser?.role === "SUPER_ADMIN";
+  
+  // Verificar se pode deletar (não pode deletar SUPER_ADMIN)
+  const canDelete = (userToCheck: UserData) => {
+    return userToCheck.role !== "SUPER_ADMIN";
+  };
 
   const selectedTenant = tenants.find(t => t.id === selectedTenantId);
 
@@ -405,10 +453,17 @@ export default function UsuariosPage() {
                           <Edit className="h-4 w-4 mr-1" />
                           Editar
                         </Button>
-                        <Button variant="destructive" size="sm" onClick={() => handleDelete(user.id)}>
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Deletar
-                        </Button>
+                        {canDelete(user) ? (
+                          <Button variant="destructive" size="sm" onClick={() => handleDelete(user.id, user.role)}>
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Deletar
+                          </Button>
+                        ) : (
+                          <Button variant="outline" size="sm" disabled title="Não é possível excluir SUPER_ADMIN">
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Deletar
+                          </Button>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -453,13 +508,20 @@ export default function UsuariosPage() {
                   id="role"
                   value={formData.role}
                   onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   required
+                  disabled={isEditingSuperAdmin}
+                  title={isEditingSuperAdmin ? "Não é possível alterar a função de um SUPER_ADMIN" : ""}
                 >
                   <option value="USER">USER</option>
                   <option value="ADMIN">ADMIN</option>
                   <option value="CLIENT">CLIENT</option>
                 </select>
+                {isEditingSuperAdmin && (
+                  <p className="text-xs text-muted-foreground">
+                    A função SUPER_ADMIN não pode ser alterada
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <PasswordInput
@@ -473,6 +535,25 @@ export default function UsuariosPage() {
                   required={!editingUser}
                 />
               </div>
+              {(formData.password || !editingUser) && (
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">
+                    {editingUser ? "Confirmar Nova Senha" : "Confirmar Senha"}
+                  </Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={formData.confirmPassword}
+                    onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                    placeholder="Digite a senha novamente"
+                    required={!editingUser || formData.password.length > 0}
+                    className={formData.password && formData.confirmPassword && formData.password !== formData.confirmPassword ? "border-destructive" : ""}
+                  />
+                  {formData.confirmPassword && formData.password !== formData.confirmPassword && (
+                    <p className="text-sm text-destructive">As senhas não coincidem</p>
+                  )}
+                </div>
+              )}
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setShowDialog(false)} disabled={submitting}>
                   Cancelar

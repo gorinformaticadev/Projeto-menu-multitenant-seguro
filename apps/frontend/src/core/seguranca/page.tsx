@@ -200,10 +200,29 @@ export default function SecurityConfigPage() {
             Gerencie as políticas de segurança do sistema
           </p>
         </div>
-        <Button onClick={handleSave} disabled={saving}>
-          <Save className="h-4 w-4 mr-2" />
-          {saving ? "Salvando..." : "Salvar Alterações"}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant={config.rateLimitProdEnabled ? "destructive" : "default"}
+            onClick={() => {
+              const newValue = !config.rateLimitProdEnabled;
+              updateConfig("rateLimitProdEnabled", newValue);
+              updateConfig("rateLimitDevEnabled", newValue);
+              toast({
+                title: newValue ? "Rate Limiting Ativado" : "Rate Limiting Desativado",
+                description: newValue 
+                  ? "O sistema agora está protegido contra requisições excessivas"
+                  : "Rate limiting desabilitado. Salve as alterações para aplicar.",
+              });
+            }}
+          >
+            <Shield className="h-4 w-4 mr-2" />
+            {config.rateLimitProdEnabled ? "Desativar Rate Limiting" : "Ativar Rate Limiting"}
+          </Button>
+          <Button onClick={handleSave} disabled={saving}>
+            <Save className="h-4 w-4 mr-2" />
+            {saving ? "Salvando..." : "Salvar Alterações"}
+          </Button>
+        </div>
       </div>
 
       {/* Aviso */}
@@ -294,14 +313,14 @@ export default function SecurityConfigPage() {
                   id="globalMaxRequests"
                   type="number"
                   min="10"
-                  max="1000"
+                  max="100000"
                   value={config.globalMaxRequests}
                   onChange={(e) =>
                     updateConfig("globalMaxRequests", parseInt(e.target.value))
                   }
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Número máximo de requisições globais (10-1000)
+                  Número máximo de requisições globais (10-100000)
                 </p>
               </div>
 
@@ -362,7 +381,7 @@ export default function SecurityConfigPage() {
                     id="rateLimitDevRequests"
                     type="number"
                     min="10"
-                    max="10000"
+                    max="100000"
                     value={config.rateLimitDevRequests}
                     disabled={!config.rateLimitDevEnabled}
                     onChange={(e) =>
@@ -370,7 +389,7 @@ export default function SecurityConfigPage() {
                     }
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Requisições permitidas em desenvolvimento (10-10000)
+                    Requisições permitidas em desenvolvimento (10-100000)
                   </p>
                 </div>
 
@@ -422,7 +441,7 @@ export default function SecurityConfigPage() {
                     id="rateLimitProdRequests"
                     type="number"
                     min="10"
-                    max="10000"
+                    max="100000"
                     value={config.rateLimitProdRequests}
                     disabled={!config.rateLimitProdEnabled}
                     onChange={(e) =>
@@ -430,7 +449,7 @@ export default function SecurityConfigPage() {
                     }
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Requisições permitidas em produção (10-10000)
+                    Requisições permitidas em produção (10-100000)
                   </p>
                 </div>
 

@@ -13,13 +13,13 @@ export class UpdateSecurityConfigDto {
   @IsOptional()
   @IsInt()
   @Min(10)
-  @Max(10000)
+  @Max(100000)
   rateLimitDevRequests?: number;
 
   @IsOptional()
   @IsInt()
   @Min(10)
-  @Max(10000)
+  @Max(100000)
   rateLimitProdRequests?: number;
 
   @IsOptional()
@@ -56,7 +56,7 @@ export class UpdateSecurityConfigDto {
   @IsOptional()
   @IsInt()
   @Min(10)
-  @Max(1000)
+  @Max(100000)
   globalMaxRequests?: number;
 
   @IsOptional()
