@@ -68,6 +68,7 @@ Opções para install:
   -a, --admin-email EMAIL   Email do administrador (default: mesmo de -e).
   -p, --admin-pass SENHA    Senha inicial do admin (default: 123456).
   -n, --no-prompt           Não perguntar; usa apenas variáveis de ambiente.
+  -c, --clean               Remove volumes existentes antes de instalar (instalação limpa).
 
 Variáveis de ambiente (alternativa às opções):
   INSTALL_DOMAIN, LETSENCRYPT_EMAIL, IMAGE_OWNER, IMAGE_REPO, IMAGE_TAG,
@@ -298,6 +299,7 @@ run_install() {
     local admin_email="${INSTALL_ADMIN_EMAIL:-$email}"
     local admin_pass="${INSTALL_ADMIN_PASSWORD:-123456}"
     local no_prompt="${INSTALL_NO_PROMPT:-false}"
+    local clean_install="${CLEAN_INSTALL:-false}"
 
     # Parse opções
     while [[ $# -gt 0 ]]; do
@@ -311,6 +313,7 @@ run_install() {
             -a|--admin-email)  admin_email="$2"; shift 2 ;;
             -p|--admin-pass)   admin_pass="$2"; shift 2 ;;
             -n|--no-prompt)   no_prompt="true"; shift ;;
+            -c|--clean)   clean_install="true"; shift ;;
             *) shift ;;
         esac
     done
@@ -353,6 +356,14 @@ run_install() {
     local_build_only="$(echo "$local_build_only" | tr '[:upper:]' '[:lower:]')"
     LOCAL_BUILD_ONLY="$local_build_only"
     ensure_env_file
+
+    # Limpar volumes se solicitado
+    if [[ "$clean_install" == "true" ]]; then
+        log_warn "Limpeza solicitada: removendo containers e volumes existentes..."
+        cd "$PROJECT_ROOT"
+        docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml down -v 2>/dev/null || true
+        log_info "Volumes removidos. Iniciando instalação limpa..."
+    fi
 
     # Gerar prefixo baseado no domínio (remove pontos e pega a parte principal)
     # Ex: novo.whapichat.com.br -> novowhapichat
