@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+# =============================================================================
+# Instalador Multitenant - Versão 2.0 com Menu Interativo
+# =============================================================================
+
+set -Eeo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Carregar utilitarios
+source "$SCRIPT_DIR/utils/common.sh"
+source "$SCRIPT_DIR/utils/docker-utils.sh"
+source "$SCRIPT_DIR/utils/menu.sh"
+
+# Trap de erro
+trap cleanup_on_error ERR
+
+# --- Uso ---
+show_usage() {
+    cat <<'EOF'
+Uso:
+  sudo bash install-2/install.sh install [OPÇÕES]
+
+Comandos:
+  install   Instalação inicial com menu interativo
+
+Opções:
+  -d, --domain DOMAIN       Domínio (ex: app.exemplo.com.br)
+  -e, --email EMAIL         Email para Let's Encrypt e admin
+  -n, --no-prompt           Modo não-interativo (requer variáveis de ambiente)
+
+Variáveis de ambiente:
+  INSTALL_DOMAIN, LETSENCRYPT_EMAIL
+
+Exemplos:
+  sudo bash install-2/install.sh install -d dev.empresa.com -e admin@empresa.com
+  sudo INSTALL_DOMAIN=app.empresa.com LETSENCRYPT_EMAIL=admin@empresa.com bash install-2/install.sh install --no-prompt
+EOF
+}
+
+# --- Instalação ---
+run_install() {
+    local domain="${INSTALL_DOMAIN:-}"
+    local email="${LETSENCRYPT_EMAIL:-}"
+    local no_prompt="${INSTALL_NO_PROMPT:-false}"
+
+    # Parse opções
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -d|--domain)   domain="$2"; shift 2 ;;
+            -e|--email)    email="$2"; shift 2 ;;
+            -n|--no-prompt) no_prompt="true"; shift ;;
+            -h|--help)     show_usage; exit 0 ;;
+            *) shift ;;
+        esac
+    done
+
+    # Solicitar informações se não fornecidas
+    if [[ "$no_prompt" != "true" ]]; then
+        [[ -z "$domain" ]] && read -p "Domínio (ex: app.empresa.com): " domain
+        [[ -z "$email" ]]  && read -p "Email (Let's Encrypt / admin): " email
+    fi
+
+    # Validar
+    if [[ -z "$domain" || -z "$email" ]]; then
+        log_error "Domínio e email são obrigatórios."
+        show_usage
+        exit 1
+    fi
+
+    validate_domain "$domain" || exit 1
+    validate_email "$email" || exit 1
+
+    # Mostrar menu e obter modo selecionado
+    show_installation_menu "$domain" "$email"
+    local installation_mode="$INSTALLATION_MODE"
+
+    log_info "Modo selecionado: $installation_mode"
+
+    # Executar instalação baseado no modo
+    case "$installation_mode" in
+        local-dev-docker*)
+            source "$SCRIPT_DIR/modes/docker-local-dev.sh"
+            run_docker_local_dev "$domain" "$email"
+            ;;
+        local-prod-docker*)
+            source "$SCRIPT_DIR/modes/docker-local-prod.sh"
+            run_docker_local_prod "$domain" "$email"
+            ;;
+        vps-dev-docker*local-build)
+            source "$SCRIPT_DIR/modes/docker-vps-dev.sh"
+            run_docker_vps_dev "$domain" "$email" "local"
+            ;;
+        vps-dev-docker*)
+            source "$SCRIPT_DIR/modes/docker-vps-dev.sh"
+            run_docker_vps_dev "$domain" "$email" "registry"
+            ;;
+        vps-prod-docker*local-build)
+            source "$SCRIPT_DIR/modes/docker-vps-prod.sh"
+            run_docker_vps_prod "$domain" "$email" "local"
+            ;;
+        vps-prod-docker*)
+            source "$SCRIPT_DIR/modes/docker-vps-prod.sh"
+            run_docker_vps_prod "$domain" "$email" "registry"
+            ;;
+        vps-dev-native)
+            source "$SCRIPT_DIR/utils/native-utils.sh"
+            source "$SCRIPT_DIR/modes/native-vps-dev.sh"
+            run_native_vps_dev "$domain" "$email"
+            ;;
+        vps-prod-native)
+            source "$SCRIPT_DIR/utils/native-utils.sh"
+            source "$SCRIPT_DIR/modes/native-vps-prod.sh"
+            run_native_vps_prod "$domain" "$email"
+            ;;
+        *)
+            log_error "Modo de instalação desconhecido: $installation_mode"
+            exit 1
+            ;;
+    esac
+}
+
+# --- Main ---
+main() {
+    require_bash
+    require_root
+
+    print_header "INSTALADOR MULTITENANT v2.0"
+    
+    check_os
+
+    local cmd="${1:-}"
+    shift || true
+    
+    case "$cmd" in
+        install) run_install "$@" ;;
+        *)       show_usage; exit 1 ;;
+    esac
+}
+
+main "$@"
