@@ -2,7 +2,7 @@
 -- Isso evita bloqueios acidentais em aplicações modernas com SPAs
 
 -- Atualizar configurações existentes
-UPDATE "SecurityConfig" 
+UPDATE "security_config" 
 SET 
   "globalMaxRequests" = 10000,
   "rateLimitDevEnabled" = false,
