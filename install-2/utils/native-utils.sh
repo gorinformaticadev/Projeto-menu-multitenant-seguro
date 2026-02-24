@@ -526,7 +526,7 @@ build_application() {
     # Gerar Prisma Client
     log_info "Gerando Prisma Client..."
     cd "$PROJECT_ROOT/apps/backend"
-    sudo -u multitenant npx prisma generate
+    sudo -u multitenant pnpm exec prisma generate
 
     # Build do backend
     log_info "Construindo backend (NestJS)..."
@@ -626,15 +626,15 @@ run_migrations() {
     
     # Antes de executar as migrations, gerar novamente o Prisma Client
     log_info "Garantindo que o Prisma Client esteja atualizado..."
-    sudo -u multitenant npx prisma generate 2>/dev/null || true
+    sudo -u multitenant pnpm exec prisma generate 2>/dev/null || true
     
     # Primeira tentativa de executar as migrations
-    if ! sudo -u multitenant npx prisma migrate deploy 2>&1; then
+    if ! sudo -u multitenant pnpm exec prisma migrate deploy 2>&1; then
         log_warn "Falha na aplicação das migrations. Verificando situação..."
         
         # Verificar o status das migrations
         log_info "Verificando status das migrations..."
-        sudo -u multitenant npx prisma migrate status 2>&1 || true
+        sudo -u multitenant pnpm exec prisma migrate status 2>&1 || true
         
         # Verificar se há migrações com falha e tentar resolver
         log_info "Verificando migrações com falha..."
@@ -644,26 +644,26 @@ run_migrations() {
         
         # Primeiro, tenta verificar se o banco está em estado inconsistente
         log_info "Resetando banco de dados para limpar estado inconsistente..."
-        if sudo -u multitenant npx prisma migrate reset --force 2>/dev/null; then
+        if sudo -u multitenant pnpm exec prisma migrate reset --force 2>/dev/null; then
             log_info "Banco de dados resetado com sucesso. Aplicando migrations novamente..."
         else
             log_warn "Não foi possível resetar as migrations. Verificando se o banco está vazio..."
             
             # Se o reset falhar, verificar se o banco está completamente vazio
             # Nesse caso, podemos tentar aplicar as migrations do zero
-            if sudo -u multitenant npx prisma migrate resolve --applied 2>/dev/null; then
+            if sudo -u multitenant pnpm exec prisma migrate resolve --applied 2>/dev/null; then
                 log_info "Estado de migrações resolvido. Tentando aplicar novamente..."
             else
                 log_warn "Não foi possível resolver o estado das migrations automaticamente."
                 
                 # Como último recurso, tentar um reset completo
                 log_info "Forçando reset completo do banco de dados..."
-                sudo -u multitenant npx prisma migrate reset --force <<< "y" 2>/dev/null || true
+                sudo -u multitenant pnpm exec prisma migrate reset --force <<< "y" 2>/dev/null || true
             fi
         fi
         
         # Tentar aplicar novamente
-        if ! sudo -u multitenant npx prisma migrate deploy 2>&1; then
+        if ! sudo -u multitenant pnpm exec prisma migrate deploy 2>&1; then
             log_error "Falha crítica ao aplicar migrations. O banco de dados pode estar em estado inconsistente."
             log_error "Tentando uma abordagem alternativa..."
                 
@@ -680,15 +680,15 @@ run_migrations() {
             if sudo -u multitenant psql -d "$db_name" -tAc "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public');" 2>/dev/null | grep -q "f"; then
                 # Banco está vazio, tentar aplicar migrations do zero
                 log_info "Banco está vazio, tentando aplicar migrations do zero..."
-                if ! sudo -u multitenant npx prisma migrate deploy 2>&1; then
+                if ! sudo -u multitenant pnpm exec prisma migrate deploy 2>&1; then
                     log_warn "Erro persiste. Verificando se é o problema conhecido de nome de tabela..."
                             
                     # Se o erro for o problema conhecido com a tabela SecurityConfig, tentar criar a tabela manualmente
                     log_info "Tentando criar estrutura inicial do security_config se necessário..."
-                    sudo -u multitenant npx prisma migrate resolve --applied 20260222000000_update_rate_limit_defaults 2>/dev/null || true
+                    sudo -u multitenant pnpm exec prisma migrate resolve --applied 20260222000000_update_rate_limit_defaults 2>/dev/null || true
                             
                     # Tentar aplicar novamente
-                    if ! sudo -u multitenant npx prisma migrate deploy 2>&1; then
+                    if ! sudo -u multitenant pnpm exec prisma migrate deploy 2>&1; then
                         log_error "Falha ao aplicar migrations mesmo com banco vazio."
                         return 1
                     fi
@@ -706,14 +706,14 @@ run_migrations() {
                     # A tabela existe, então a migração inicial já foi aplicada
                     # Marcar a migração problemática como resolvida
                     log_info "Tabela security_config existe, marcando migração problemática como resolvida..."
-                    sudo -u multitenant npx prisma migrate resolve --applied 20260222000000_update_rate_limit_defaults 2>/dev/null || true
+                    sudo -u multitenant pnpm exec prisma migrate resolve --applied 20260222000000_update_rate_limit_defaults 2>/dev/null || true
                 else
                     # A tabela não existe, talvez seja necessário aplicar as migrações iniciais primeiro
                     log_info "Tabela security_config não existe, aplicando migrations iniciais..."
                 fi
                         
                 # Tentar aplicar novamente
-                if ! sudo -u multitenant npx prisma migrate deploy 2>&1; then
+                if ! sudo -u multitenant pnpm exec prisma migrate deploy 2>&1; then
                     log_error "Falha ao aplicar migrations mesmo após tentativas de resolução."
                     return 1
                 fi
@@ -729,10 +729,10 @@ run_seeds() {
     cd "$PROJECT_ROOT/apps/backend"
     
     # Tentar executar o seed com tratamento de erros
-    if ! sudo -u multitenant npx prisma db seed 2>/dev/null; then
+    if ! sudo -u multitenant pnpm exec prisma db seed 2>/dev/null; then
         log_warn "Falha ao executar prisma db seed, tentando alternativa..."
         if ! sudo -u multitenant node dist/prisma/seed.js 2>/dev/null; then
-            log_warn "Seed nao executou. Execute manualmente: cd apps/backend && npx prisma db seed"
+            log_warn "Seed nao executou. Execute manualmente: cd apps/backend && pnpm exec prisma db seed"
             log_warn "OBS: Isso pode ser normal se não houver seed definido ou se as tabelas não estiverem prontas ainda"
         fi
     fi
