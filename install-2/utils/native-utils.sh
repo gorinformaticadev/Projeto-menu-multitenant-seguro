@@ -38,11 +38,15 @@ setup_directories() {
     mkdir -p "$MULTITENANT_LOG_DIR"
     mkdir -p "$MULTITENANT_DATA_DIR"
     mkdir -p "$CERTBOT_WEBROOT"
+    # Garantir que os diretórios de aplicação existam
+    mkdir -p "$PROJECT_ROOT/apps/backend"
+    mkdir -p "$PROJECT_ROOT/apps/frontend"
     # Garantir que o diretório home do usuário multitenant tenha permissões corretas
     mkdir -p /home/multitenant
     chown -R multitenant:multitenant "$MULTITENANT_LOG_DIR"
     chown -R multitenant:multitenant "$MULTITENANT_DATA_DIR"
     chown -R multitenant:multitenant /home/multitenant
+    chown -R multitenant:multitenant "$PROJECT_ROOT/apps"
     log_success "Diretorios criados."
 }
 
@@ -556,6 +560,10 @@ configure_backend_env() {
     local env_file="$PROJECT_ROOT/apps/backend/.env"
     local env_example="$PROJECT_ROOT/apps/backend/.env.example"
 
+    # Garantir que o diretório exista
+    mkdir -p "$PROJECT_ROOT/apps/backend"
+    chown multitenant:multitenant "$PROJECT_ROOT/apps/backend"
+
     if [[ ! -f "$env_file" ]] && [[ -f "$env_example" ]]; then
         cp "$env_example" "$env_file"
         log_info "Criado apps/backend/.env a partir de .env.example"
@@ -588,6 +596,10 @@ configure_frontend_env() {
 
     local env_file="$PROJECT_ROOT/apps/frontend/.env.local"
     local env_example="$PROJECT_ROOT/apps/frontend/.env.local.example"
+
+    # Garantir que o diretório exista
+    mkdir -p "$PROJECT_ROOT/apps/frontend"
+    chown multitenant:multitenant "$PROJECT_ROOT/apps/frontend"
 
     if [[ ! -f "$env_file" ]] && [[ -f "$env_example" ]]; then
         cp "$env_example" "$env_file"
