@@ -760,24 +760,89 @@ setup_systemd_services() {
     log_success "Servicos systemd instalados e habilitados."
 }
 
+# =============================================================================
+# Verificação de ambiente do usuário multitenant
+# =============================================================================
+
+check_multitenant_environment() {
+    log_info "Verificando ambiente do usuário multitenant..."
+    
+    # Verificar se o Node.js está disponível para o usuário multitenant
+    if ! sudo -u multitenant command -v node >/dev/null 2>&1; then
+        log_error "Node.js não está disponível para o usuário multitenant"
+        # Tentar configurar o PATH
+        sudo -u multitenant sh -c 'export PATH="$PATH:/usr/local/bin:/opt/nodejs/bin:$HOME/.nvm/versions/node/*/bin" >> ~/.bashrc'
+        # Atualizar o PATH
+        sudo -u multitenant sh -c 'hash -r'
+    fi
+    
+    # Verificar se o Node.js pode ser executado
+    local node_version=$(sudo -u multitenant node --version 2>/dev/null)
+    if [[ -n "$node_version" ]]; then
+        log_success "Node.js encontrado: $node_version"
+    else
+        log_warn "Node.js não pôde ser executado como usuário multitenant"
+    fi
+    
+    # Verificar se os arquivos necessários existem
+    if [[ ! -f "$PROJECT_ROOT/apps/backend/dist/main.js" ]]; then
+        log_error "Arquivo backend dist/main.js não encontrado"
+        log_info "Certifique-se de que o build foi concluído com sucesso"
+    else
+        log_success "Arquivo backend encontrado"
+    fi
+    
+    if [[ ! -f "$PROJECT_ROOT/apps/frontend/server.js" ]]; then
+        log_error "Arquivo frontend server.js não encontrado"
+        log_info "Certifique-se de que o build foi concluído com sucesso"
+    else
+        log_success "Arquivo frontend encontrado"
+    fi
+}
+
 start_systemd_services() {
     log_info "Iniciando servicos..."
+    
+    # Verificar ambiente do usuário multitenant antes de iniciar
+    check_multitenant_environment
+    
+    # Iniciar backend primeiro e aguardar um pouco
     systemctl start multitenant-backend
-    sleep 5
+    sleep 8  # Aumentar o tempo para garantir que o backend suba
+    
+    # Verificar se o backend está realmente ativo antes de iniciar o frontend
+    local backend_attempts=0
+    local backend_max_attempts=10
+    while [[ $backend_attempts -lt $backend_max_attempts ]]; do
+        if systemctl is-active --quiet multitenant-backend; then
+            log_info "Backend iniciado com sucesso."
+            break
+        else
+            log_info "Aguardando backend iniciar... (${backend_attempts}/${backend_max_attempts})"
+            sleep 3
+            ((backend_attempts++))
+        fi
+    done
+    
+    # Iniciar frontend
     systemctl start multitenant-frontend
-    sleep 3
-
+    sleep 5  # Tempo para o frontend subir
+    
     # Verificar status
     if systemctl is-active --quiet multitenant-backend; then
         log_success "Backend rodando (systemd)."
     else
         log_error "Backend nao iniciou. Verifique: journalctl -u multitenant-backend"
+        log_info "Verificando logs do backend:"
+        journalctl -u multitenant-backend --no-pager -n 20 2>/dev/null || true
     fi
 
     if systemctl is-active --quiet multitenant-frontend; then
         log_success "Frontend rodando (systemd)."
     else
         log_error "Frontend nao iniciou. Verifique: journalctl -u multitenant-frontend"
+        log_info "Verificando logs do frontend:"
+        journalctl -u multitenant-frontend --no-pager -n 20 2>/dev/null || true
     fi
 }
 
