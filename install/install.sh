@@ -68,6 +68,7 @@ Opções para install:
   -a, --admin-email EMAIL   Email do administrador (default: mesmo de -e).
   -p, --admin-pass SENHA    Senha inicial do admin (default: 123456).
   -n, --no-prompt           Não perguntar; usa apenas variáveis de ambiente.
+  -c, --clean               Remove volumes existentes antes de instalar (instalação limpa).
 
 Variáveis de ambiente (alternativa às opções):
   INSTALL_DOMAIN, LETSENCRYPT_EMAIL, IMAGE_OWNER, IMAGE_REPO, IMAGE_TAG,
@@ -101,20 +102,118 @@ require_root() {
 }
 
 check_docker() {
-    if ! command -v docker &>/dev/null; then
-        log_error "Docker não encontrado. Instale Docker antes de continuar."
-        exit 1
+    # Verificar se o Docker está instalado mas não no PATH
+    if systemctl is-active --quiet docker 2>/dev/null; then
+        log_info "Docker já está instalado e rodando."
+        log_info "Docker: $(docker --version 2>/dev/null || echo 'instalado')"
+        return 0
     fi
-    log_info "Docker: $(docker --version)"
+    
+    if ! command -v docker &>/dev/null; then
+        # Verificar se o Docker está instalado mas o serviço não está rodando
+        if systemctl list-unit-files | grep -q docker.service; then
+            log_info "Docker instalado. Iniciando serviço..."
+            systemctl start docker
+            systemctl enable docker
+            log_info "Docker: $(docker --version)"
+            return 0
+        fi
+        
+        log_warn "Docker não encontrado. Instalando Docker..."
+        install_docker
+    else
+        log_info "Docker: $(docker --version)"
+    fi
+}
+
+install_docker() {
+    log_info "Instalando Docker..."
+    
+    # Atualizar repositórios
+    apt-get update -qq
+    
+    # Instalar dependências
+    apt-get install -y -qq \
+        ca-certificates \
+        curl \
+        gnupg \
+        lsb-release
+    
+    # Adicionar chave GPG oficial do Docker
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg 2>/dev/null
+    chmod a+r /etc/apt/keyrings/docker.gpg
+    
+    # Adicionar repositório do Docker
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+      $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    
+    # Instalar Docker
+    apt-get update -qq
+    apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    
+    # Iniciar e habilitar Docker
+    systemctl start docker
+    systemctl enable docker
+    
+    log_info "Docker instalado com sucesso: $(docker --version)"
 }
 
 check_docker_compose() {
     if ! docker compose version &>/dev/null; then
         log_error "Docker Compose (plugin) não encontrado."
-        log_error "Instale com: apt-get update && apt-get install -y docker-compose-plugin"
+        log_error "Isso é estranho, pois deveria ter sido instalado com o Docker."
+        log_error "Tente reinstalar o Docker manualmente."
         exit 1
     fi
     log_info "Docker Compose: $(docker compose version --short)"
+}
+
+check_and_open_ports() {
+    log_info "Verificando portas 80 e 443..."
+    
+    # Instalar net-tools se necessário (para netstat)
+    if ! command -v netstat &>/dev/null; then
+        apt-get install -y -qq net-tools >/dev/null 2>&1 || true
+    fi
+    
+    # Verificar se ufw está instalado e ativo
+    if command -v ufw &>/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
+        log_info "UFW detectado. Liberando portas 80 e 443..."
+        ufw allow 80/tcp >/dev/null 2>&1 || true
+        ufw allow 443/tcp >/dev/null 2>&1 || true
+        log_info "Portas liberadas no UFW."
+    fi
+    
+    # Verificar se iptables está bloqueando
+    if command -v iptables &>/dev/null; then
+        # Verificar se há regras que bloqueiam as portas
+        if iptables -L INPUT -n 2>/dev/null | grep -q "DROP\|REJECT"; then
+            log_warn "Detectadas regras de firewall. Certifique-se de que as portas 80 e 443 estão liberadas."
+        fi
+    fi
+    
+    # Verificar se as portas estão em uso
+    if command -v netstat &>/dev/null; then
+        if netstat -tlnp 2>/dev/null | grep -q ":80 "; then
+            local port80_process=$(netstat -tlnp 2>/dev/null | grep ":80 " | awk '{print $7}' | head -1)
+            if [[ "$port80_process" != *"docker"* ]]; then
+                log_warn "Porta 80 já está em uso por: $port80_process"
+                log_warn "Isso pode causar conflitos. Considere parar o serviço antes de continuar."
+            fi
+        fi
+        
+        if netstat -tlnp 2>/dev/null | grep -q ":443 "; then
+            local port443_process=$(netstat -tlnp 2>/dev/null | grep ":443 " | awk '{print $7}' | head -1)
+            if [[ "$port443_process" != *"docker"* ]]; then
+                log_warn "Porta 443 já está em uso por: $port443_process"
+                log_warn "Isso pode causar conflitos. Considere parar o serviço antes de continuar."
+            fi
+        fi
+    fi
+    
+    log_info "Verificação de portas concluída."
 }
 
 # --- Validações ---
@@ -298,6 +397,7 @@ run_install() {
     local admin_email="${INSTALL_ADMIN_EMAIL:-$email}"
     local admin_pass="${INSTALL_ADMIN_PASSWORD:-123456}"
     local no_prompt="${INSTALL_NO_PROMPT:-false}"
+    local clean_install="${CLEAN_INSTALL:-false}"
 
     # Parse opções
     while [[ $# -gt 0 ]]; do
@@ -311,6 +411,7 @@ run_install() {
             -a|--admin-email)  admin_email="$2"; shift 2 ;;
             -p|--admin-pass)   admin_pass="$2"; shift 2 ;;
             -n|--no-prompt)   no_prompt="true"; shift ;;
+            -c|--clean)   clean_install="true"; shift ;;
             *) shift ;;
         esac
     done
@@ -353,6 +454,14 @@ run_install() {
     local_build_only="$(echo "$local_build_only" | tr '[:upper:]' '[:lower:]')"
     LOCAL_BUILD_ONLY="$local_build_only"
     ensure_env_file
+
+    # Limpar volumes se solicitado
+    if [[ "$clean_install" == "true" ]]; then
+        log_warn "Limpeza solicitada: removendo containers e volumes existentes..."
+        cd "$PROJECT_ROOT"
+        docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml down -v 2>/dev/null || true
+        log_info "Volumes removidos. Iniciando instalação limpa..."
+    fi
 
     # Gerar prefixo baseado no domínio (remove pontos e pega a parte principal)
     # Ex: novo.whapichat.com.br -> novowhapichat
@@ -467,9 +576,10 @@ run_install() {
         echogreen "Certificado SSL válido (Let's Encrypt) instalado."
     fi
 
-    # Garantir que os seeds rodem explicitamente com as variáveis passadas
-    log_info "Finalizando configuração do banco de dados e usuários..."
-    docker exec -e INSTALL_ADMIN_EMAIL="$admin_email" -e INSTALL_ADMIN_PASSWORD="$admin_pass" multitenant-backend npx prisma db seed
+    # O seed é executado automaticamente pelo docker-entrypoint.sh do backend
+    # Aguardar alguns segundos para garantir que o seed foi executado
+    log_info "Aguardando inicialização completa do sistema..."
+    sleep 10
 
     # Exibir Relatório Final de Credenciais
     echo -e "\n\n"
@@ -581,6 +691,7 @@ main() {
 
     check_docker
     check_docker_compose
+    check_and_open_ports
 
     local cmd="${1:-}"
     shift || true

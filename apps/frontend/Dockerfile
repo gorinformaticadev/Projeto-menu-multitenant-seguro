@@ -22,12 +22,21 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=5000
+ENV HOSTNAME=0.0.0.0
 RUN apk add --no-cache curl
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
+
+# Copiar o standalone completo
 COPY --from=builder --chown=nextjs:nodejs /app/apps/frontend/.next/standalone ./
+
+# Copiar os arquivos estáticos e públicos para o local correto
 COPY --from=builder --chown=nextjs:nodejs /app/apps/frontend/.next/static ./apps/frontend/.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/apps/frontend/public ./apps/frontend/public
+
 USER nextjs
 EXPOSE 5000
-CMD ["node", "apps/frontend/server.js"]
+
+# O server.js está em apps/frontend/server.js dentro do standalone
+# Passar PORT e HOSTNAME explicitamente
+CMD ["sh", "-c", "PORT=5000 HOSTNAME=0.0.0.0 node apps/frontend/server.js"]

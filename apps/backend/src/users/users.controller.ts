@@ -81,14 +81,36 @@ export class UsersController {
   @Patch(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @SkipTenantIsolation()
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto, @CurrentUser() currentUser: any) {
+    // Verificar se está tentando editar um SUPER_ADMIN
+    const targetUser = await this.usersService.findOne(id);
+    
+    if (targetUser.role === Role.SUPER_ADMIN) {
+      // Impedir mudança de role de SUPER_ADMIN
+      if (updateUserDto.role && updateUserDto.role !== Role.SUPER_ADMIN) {
+        throw new Error('Não é possível alterar a função de um SUPER_ADMIN');
+      }
+      
+      // Apenas SUPER_ADMIN pode editar outro SUPER_ADMIN
+      if (currentUser.role !== Role.SUPER_ADMIN) {
+        throw new Error('Apenas SUPER_ADMIN pode editar outro SUPER_ADMIN');
+      }
+    }
+    
     return this.usersService.update(id, updateUserDto);
   }
 
   @Delete(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @SkipTenantIsolation()
-  remove(@Param('id') id: string) {
+  async remove(@Param('id') id: string, @CurrentUser() currentUser: any) {
+    // Verificar se está tentando deletar um SUPER_ADMIN
+    const targetUser = await this.usersService.findOne(id);
+    
+    if (targetUser.role === Role.SUPER_ADMIN) {
+      throw new Error('Não é possível excluir um usuário SUPER_ADMIN');
+    }
+    
     return this.usersService.remove(id);
   }
 

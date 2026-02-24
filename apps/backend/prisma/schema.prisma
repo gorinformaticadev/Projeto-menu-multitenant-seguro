@@ -148,7 +148,7 @@ model SecurityConfig {
   loginMaxAttempts           Int      @default(5)
   loginLockDurationMinutes   Int      @default(30)
   loginWindowMinutes         Int      @default(1)
-  globalMaxRequests          Int      @default(100)
+  globalMaxRequests          Int      @default(10000)
   globalWindowMinutes        Int      @default(1)
   passwordMinLength          Int      @default(8)
   passwordRequireUppercase   Boolean  @default(true)
@@ -170,10 +170,10 @@ model SecurityConfig {
   platformName               String?  @default("Sistema Multitenant")
   platformEmail              String?
   platformPhone              String?
-  rateLimitDevEnabled        Boolean  @default(true)
-  rateLimitProdEnabled       Boolean  @default(true)
-  rateLimitDevRequests       Int      @default(1000)
-  rateLimitProdRequests      Int      @default(100)
+  rateLimitDevEnabled        Boolean  @default(false)
+  rateLimitProdEnabled       Boolean  @default(false)
+  rateLimitDevRequests       Int      @default(10000)
+  rateLimitProdRequests      Int      @default(10000)
   rateLimitDevWindow         Int      @default(1)
   rateLimitProdWindow        Int      @default(1)
   tokenCleanupEnabled        Boolean  @default(true)

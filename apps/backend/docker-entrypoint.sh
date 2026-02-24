@@ -66,12 +66,24 @@ fi
 
 # Executa as migrations
 echo "Running prisma migrate deploy..."
-if ! $PRISMA_CMD migrate deploy --schema "$PRISMA_SCHEMA"; then
-  echo "WARNING: prisma migrate deploy failed. Attempting db push as fallback..."
-  if ! $PRISMA_CMD db push --schema "$PRISMA_SCHEMA" --skip-generate; then
-    echo "ERROR: Both migrate deploy and db push failed."
-    exit 1
+MIGRATE_OUTPUT=$($PRISMA_CMD migrate deploy --schema "$PRISMA_SCHEMA" 2>&1) || MIGRATE_EXIT_CODE=$?
+
+if [ "${MIGRATE_EXIT_CODE:-0}" -ne 0 ]; then
+  echo "$MIGRATE_OUTPUT"
+  
+  # Verifica se o erro é porque as migrações já foram aplicadas
+  if echo "$MIGRATE_OUTPUT" | grep -qi "already applied\|no pending migrations\|database is already in sync"; then
+    echo "INFO: Database schema is already up to date."
+  else
+    echo "WARNING: prisma migrate deploy failed. Attempting db push as fallback..."
+    if ! $PRISMA_CMD db push --schema "$PRISMA_SCHEMA" --skip-generate --accept-data-loss 2>&1; then
+      echo "WARNING: Migration issues detected. Application will attempt to start anyway."
+      echo "You may need to manually fix the database schema."
+    fi
   fi
+else
+  echo "$MIGRATE_OUTPUT"
+  echo "Migrations applied successfully."
 fi
 
 # Executa o seed (idempotente)

@@ -1,6 +1,39 @@
 import { IsInt, IsBoolean, IsString, IsOptional, Min, Max } from 'class-validator';
 
 export class UpdateSecurityConfigDto {
+  // Rate Limiting (Desenvolvimento e Produção)
+  @IsOptional()
+  @IsBoolean()
+  rateLimitDevEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  rateLimitProdEnabled?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(10)
+  @Max(100000)
+  rateLimitDevRequests?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(10)
+  @Max(100000)
+  rateLimitProdRequests?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(60)
+  rateLimitDevWindow?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(60)
+  rateLimitProdWindow?: number;
+
   // Rate Limiting
   @IsOptional()
   @IsInt()
@@ -23,7 +56,7 @@ export class UpdateSecurityConfigDto {
   @IsOptional()
   @IsInt()
   @Min(10)
-  @Max(1000)
+  @Max(100000)
   globalMaxRequests?: number;
 
   @IsOptional()
