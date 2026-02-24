@@ -804,11 +804,12 @@ check_multitenant_environment() {
         log_success "Arquivo backend encontrado"
     fi
     
-    if [[ ! -f "$PROJECT_ROOT/apps/frontend/server.js" ]]; then
-        log_error "Arquivo frontend server.js não encontrado"
+    # Para o frontend Next.js, verificar a existência do diretório .next após o build
+    if [[ ! -d "$PROJECT_ROOT/apps/frontend/.next" ]]; then
+        log_error "Diretório .next do frontend não encontrado (build não realizado ou falhou)"
         log_info "Certifique-se de que o build foi concluído com sucesso"
     else
-        log_success "Arquivo frontend encontrado"
+        log_success "Build do frontend encontrado (.next)"
     fi
 }
 
