@@ -9,8 +9,8 @@
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INSTALL_DIR="$(dirname "$SCRIPT_DIR")"
-PROJECT_ROOT="$(dirname "$INSTALL_DIR")"
+INSTALL_DIR="${INSTALLER_ROOT:-$(dirname "$SCRIPT_DIR")}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(dirname "$INSTALL_DIR")/Projeto-menu-multitenant-seguro}"
 
 # common.sh, docker-utils.sh e native-utils.sh ja foram carregados pelo install.sh
 
@@ -66,6 +66,7 @@ run_native_vps_prod() {
     # --- 1. Preparacao ---
     apt-get update -qq
     create_system_user
+    setup_timezone
     setup_directories
 
     # --- 2. Instalar dependencias ---
@@ -94,13 +95,13 @@ run_native_vps_prod() {
     # --- 5. Configurar Redis ---
     harden_redis
 
-    # --- 6. Configurar .env dos apps ---
+    # --- 6. Ajustar permissoes ---
+    fix_project_permissions
+
+    # --- 7. Configurar .env dos apps ---
     configure_backend_env "$domain" "$db_user" "$db_pass" "$db_name" \
         "$jwt_secret" "$enc_key" "$admin_email" "$admin_pass" "production"
     configure_frontend_env "$domain"
-
-    # --- 7. Ajustar permissoes ---
-    fix_project_permissions
 
     # --- 8. Build da aplicacao ---
     build_application "production"
