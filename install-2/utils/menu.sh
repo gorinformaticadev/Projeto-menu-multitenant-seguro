@@ -187,6 +187,79 @@ show_confirmation() {
     fi
 }
 
+# --- Menu de Atualização ---
+show_update_menu() {
+    print_header "MENU DE ATUALIZAÇÃO"
+    
+    local method=""
+    if command -v docker &>/dev/null && docker ps -a | grep -i "multitenant" > /dev/null; then
+        method="docker"
+        log_info "Detectado: Instalação Docker"
+    elif [[ -f "/etc/systemd/system/multitenant-backend.service" ]]; then
+        method="native"
+        log_info "Detectado: Instalação Nativa"
+    else
+        echo "Como o sistema está instalado?"
+        echo "  1) Docker"
+        echo "  2) Nativo (sem Docker)"
+        read -p "Escolha [1-2]: " method_choice
+        [[ "$method_choice" == "1" ]] && method="docker" || method="native"
+    fi
+    
+    local branch=""
+    echo ""
+    read -p "Digite a branch para atualizar (Enter para atual): " branch
+    
+    if [[ "$method" == "docker" ]]; then
+        echo ""
+        echo "Como deseja atualizar o Docker?"
+        echo "  1) [REGISTRY] Usar imagens prontas (Download)"
+        echo "  2) [LOCAL] Reconstruir imagens localmente (Build)"
+        read -p "Escolha [1-2]: " build_choice
+        
+        if [[ "$build_choice" == "1" ]]; then
+            run_update_docker "registry" "$branch"
+        else
+            run_update_docker "local" "$branch"
+        fi
+    else
+        run_update_native "$branch"
+    fi
+}
+
+# --- Menu de Desinstalação ---
+show_uninstall_menu() {
+    print_header "MENU DE DESINSTALAÇÃO"
+    
+    echo -e "\033[1;31m⚠️  AVISO: Esta ação é irreversível!\033[0m"
+    echo ""
+    echo "Escolha o tipo de desinstalação:"
+    echo "  1) Apenas a Aplicação (Remove containers/serviços e arquivos)"
+    echo "  2) Limpeza Total (Remove Aplicação + Docker/Nginx/Certificados)"
+    echo "  q) Sair"
+    read -p "Escolha [1, 2 ou q]: " choice
+    
+    case "$choice" in
+        1)
+            if command -v docker &>/dev/null && docker ps -a | grep -i "multitenant" > /dev/null; then
+                run_uninstall_docker "false"
+            else
+                run_uninstall_native "false"
+            fi
+            ;;
+        2)
+            if command -v docker &>/dev/null && docker ps -a | grep -i "multitenant" > /dev/null; then
+                run_uninstall_docker "true"
+            else
+                run_uninstall_native "true"
+            fi
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+}
+
 # --- Função principal do menu ---
 show_installation_menu() {
     local domain="$1"

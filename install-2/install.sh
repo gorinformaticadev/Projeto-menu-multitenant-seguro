@@ -12,6 +12,8 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 source "$SCRIPT_DIR/utils/common.sh"
 source "$SCRIPT_DIR/utils/docker-utils.sh"
 source "$SCRIPT_DIR/utils/menu.sh"
+source "$SCRIPT_DIR/utils/update-utils.sh"
+source "$SCRIPT_DIR/utils/uninstall-utils.sh"
 
 # Trap de erro
 trap cleanup_on_error ERR
@@ -24,6 +26,8 @@ Uso:
 
 Comandos:
   install   Instalação inicial com menu interativo
+  update    Atualiza a aplicação existente
+  uninstall Desinstala a aplicação do sistema
 
 Opções:
   -d, --domain DOMAIN       Domínio (ex: app.exemplo.com.br)
@@ -121,6 +125,36 @@ run_install() {
     esac
 }
 
+# --- Atualização ---
+run_update() {
+    show_update_menu
+}
+
+# --- Desinstalação ---
+run_uninstall() {
+    show_uninstall_menu
+}
+
+# --- Menu Principal ---
+show_main_menu() {
+    print_header "INSTALADOR MULTITENANT v2.0"
+    
+    echo "Escolha o que deseja fazer:"
+    echo "  1) Instalação Inicial"
+    echo "  2) Atualizar Aplicação"
+    echo "  3) Desinstalar Sistema"
+    echo "  q) Sair"
+    echo ""
+    read -p "Opção: " main_opt
+    
+    case "$main_opt" in
+        1) run_install ;;
+        2) run_update  ;;
+        3) run_uninstall ;;
+        *) exit 0      ;;
+    esac
+}
+
 # --- Main ---
 main() {
     require_bash
@@ -134,8 +168,11 @@ main() {
     shift || true
     
     case "$cmd" in
-        install) run_install "$@" ;;
-        *)       show_usage; exit 1 ;;
+        install)   run_install "$@" ;;
+        update)    run_update "$@" ;;
+        uninstall) run_uninstall "$@" ;;
+        "")        show_main_menu ;;
+        *)         show_usage; exit 1 ;;
     esac
 }
 
