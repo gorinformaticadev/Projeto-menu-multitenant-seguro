@@ -30,8 +30,10 @@ run_docker_vps_prod() {
     
     # Verificar branch
     if [[ -d "$PROJECT_ROOT/.git" ]]; then
-        local current_branch=$(git -C "$PROJECT_ROOT" branch --show-current)
-        if [[ "$current_branch" != "main" && "$current_branch" != "master" ]]; then
+        # Lidar com o problema de segurança do Git sobre propriedade duvidosa
+        git config --global --add safe.directory "$PROJECT_ROOT" 2>/dev/null || true
+        local current_branch=$(git -C "$PROJECT_ROOT" branch --show-current 2>/dev/null)
+        if [[ -n "$current_branch" ]] && [[ "$current_branch" != "main" && "$current_branch" != "master" ]]; then
             log_warn "Branch atual: $current_branch"
             log_warn "Recomendado: main ou master"
             if ! confirm_action "Deseja continuar mesmo assim?" "n"; then

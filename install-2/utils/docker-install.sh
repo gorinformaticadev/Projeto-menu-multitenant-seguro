@@ -76,6 +76,8 @@ resolve_image_owner() {
     fi
 
     if [[ -d "$PROJECT_ROOT/.git" ]]; then
+        # Lidar com o problema de segurança do Git sobre propriedade duvidosa
+        git config --global --add safe.directory "$PROJECT_ROOT" 2>/dev/null || true
         local remote_url
         remote_url="$(git -C "$PROJECT_ROOT" config --get remote.origin.url 2>/dev/null || true)"
         if [[ -n "$remote_url" ]]; then
