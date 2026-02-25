@@ -989,6 +989,9 @@ start_pm2_services() {
 fix_project_permissions() {
     log_info "Ajustando permissoes do projeto..."
     
+    # Primeiro, garantir permissões básicas para travessia de diretórios
+    chmod 755 "$PROJECT_ROOT"
+    
     # Preservar o diretório .git com as permissões originais para permitir operações de git
     if [[ -d "$PROJECT_ROOT/.git" ]]; then
         # Salvar as permissões atuais do .git antes de alterar o resto
@@ -999,6 +1002,11 @@ fix_project_permissions() {
     else
         chown -R multitenant:multitenant "$PROJECT_ROOT"
     fi
+    
+    # Garantir que os diretórios importantes tenham permissões adequadas para o multitenant
+    chmod -R 755 "$PROJECT_ROOT/apps"
+    chmod -R 755 "$PROJECT_ROOT/data" 2>/dev/null || true
+    chmod -R 755 "$PROJECT_ROOT/logs" 2>/dev/null || true
     
     # Manter install-2 acessivel ao root para futuras reinstalacoes
     chmod -R 755 "$INSTALL2_DIR"
