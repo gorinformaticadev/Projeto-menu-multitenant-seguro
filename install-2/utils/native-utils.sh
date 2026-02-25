@@ -822,9 +822,27 @@ setup_systemd_services() {
 check_multitenant_environment() {
     log_info "Verificando ambiente do usuário multitenant..."
     
-    # Verificar se o Node.js está disponível para o usuário multitenant
-    if ! sudo -u multitenant command -v node >/dev/null 2>&1; then
-        log_error "Node.js não está disponível para o usuário multitenant"
+    # Verificar se o Node.js pode ser executado (tentar múltiplas vezes)
+    local node_version=""
+    local attempts=0
+    local max_attempts=5  # Aumentar o número de tentativas
+    
+    while [[ $attempts -lt $max_attempts ]]; do
+        node_version=$(sudo -u multitenant bash -l -c 'node --version' 2>/dev/null)
+        if [[ -n "$node_version" ]]; then
+            break
+        fi
+        log_info "Aguardando Node.js estar disponível para o usuário multitenant... (${attempts}/${max_attempts})"
+        sleep 3
+        ((attempts++))
+    done
+    
+    if [[ -n "$node_version" ]]; then
+        log_success "Node.js encontrado: $node_version"
+    else
+        # Somente se realmente não encontrar o Node.js, tentar configurar o ambiente
+        log_warn "Node.js não está disponível para o usuário multitenant, tentando configurar..."
+        
         # Tentar configurar o PATH de forma mais robusta
         sudo -u multitenant sh -c 'echo "export PATH=\"$PATH:/usr/local/bin:/opt/nodejs/bin:$HOME/.nvm/versions/node/*/bin\"" >> ~/.bashrc'
         sudo -u multitenant sh -c 'echo "export NODE_PATH=\"/usr/local/lib/node_modules:/opt/nodejs/lib/node_modules\"" >> ~/.bashrc'
@@ -834,33 +852,31 @@ check_multitenant_environment() {
         
         # Tornar as alterações permanentes no ambiente
         sudo -u multitenant sh -c 'source ~/.bashrc 2>/dev/null || true'
-    fi
-    
-    # Verificar se o Node.js pode ser executado (tentar múltiplas vezes)
-    local node_version=""
-    local attempts=0
-    local max_attempts=3
-    
-    while [[ $attempts -lt $max_attempts ]]; do
-        node_version=$(sudo -u multitenant bash -l -c 'node --version' 2>/dev/null)
+        
+        # Tentar novamente
+        attempts=0
+        max_attempts=3
+        while [[ $attempts -lt $max_attempts ]]; do
+            node_version=$(sudo -u multitenant bash -l -c 'node --version' 2>/dev/null)
+            if [[ -n "$node_version" ]]; then
+                break
+            fi
+            sleep 2
+            ((attempts++))
+        done
+        
         if [[ -n "$node_version" ]]; then
-            break
-        fi
-        sleep 2
-        ((attempts++))
-    done
-    
-    if [[ -n "$node_version" ]]; then
-        log_success "Node.js encontrado: $node_version"
-    else
-        log_warn "Node.js não pôde ser executado como usuário multitenant"
-        # Último recurso: tentar encontrar o binário de Node.js
-        local node_path=$(find /usr -name node -type f -executable 2>/dev/null | head -n 1)
-        if [[ -n "$node_path" ]]; then
-            log_info "Node.js encontrado em: $node_path"
-            # Criar um link simbólico ou atualizar o PATH
-            sudo -u multitenant sh -c "ln -sf \"$node_path\" /home/multitenant/.local/bin/node 2>/dev/null || mkdir -p /home/multitenant/.local/bin 2>/dev/null && ln -sf \"$node_path\" /home/multitenant/.local/bin/node 2>/dev/null"
-            sudo -u multitenant sh -c 'export PATH="$HOME/.local/bin:$PATH" >> ~/.bashrc'
+            log_success "Node.js encontrado após configuração: $node_version"
+        else
+            log_warn "Node.js não pôde ser executado como usuário multitenant"
+            # Último recurso: tentar encontrar o binário de Node.js
+            local node_path=$(find /usr -name node -type f -executable 2>/dev/null | head -n 1)
+            if [[ -n "$node_path" ]]; then
+                log_info "Node.js encontrado em: $node_path"
+                # Criar um link simbólico ou atualizar o PATH
+                sudo -u multitenant sh -c "ln -sf \"$node_path\" /home/multitenant/.local/bin/node 2>/dev/null || mkdir -p /home/multitenant/.local/bin 2>/dev/null && ln -sf \"$node_path\" /home/multitenant/.local/bin/node 2>/dev/null"
+                sudo -u multitenant sh -c 'export PATH="$HOME/.local/bin:$PATH" >> ~/.bashrc'
+            fi
         fi
     fi
     
