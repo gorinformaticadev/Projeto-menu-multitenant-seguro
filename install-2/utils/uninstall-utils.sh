@@ -93,8 +93,8 @@ run_uninstall_native() {
              apt-get purge -y postgresql*
              rm -rf /var/lib/postgresql
         fi
+        npm uninstall -g pnpm 2>/dev/null || true
         apt-get purge -y nodejs
-        npm uninstall -g pnpm
     fi
     
     # 4. Remover arquivos do projeto
