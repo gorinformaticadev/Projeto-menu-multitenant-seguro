@@ -989,8 +989,15 @@ start_pm2_services() {
 fix_project_permissions() {
     log_info "Ajustando permissoes do projeto..."
     
-    # Primeiro, garantir permissões básicas para travessia de diretórios
-    chmod 755 "$PROJECT_ROOT"
+    # Garantir que todos os diretórios no caminho para o projeto tenham permissões de travessia
+    local current_path="/"
+    IFS='/' read -ra path_parts <<< "${PROJECT_ROOT#/}"
+    for part in "${path_parts[@]}"; do
+        if [[ -n "$part" ]]; then
+            current_path="$current_path$part/"
+            chmod 755 "$current_path" 2>/dev/null || true
+        fi
+    done
     
     # Preservar o diretório .git com as permissões originais para permitir operações de git
     if [[ -d "$PROJECT_ROOT/.git" ]]; then
