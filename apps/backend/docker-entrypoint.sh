@@ -61,7 +61,7 @@ if [ -x "/app/node_modules/.bin/prisma" ]; then
 elif [ -x "./node_modules/.bin/prisma" ]; then
   PRISMA_CMD="./node_modules/.bin/prisma"
 else
-  PRISMA_CMD="npx prisma"
+  PRISMA_CMD="pnpm exec prisma"
 fi
 
 # Executa as migrations

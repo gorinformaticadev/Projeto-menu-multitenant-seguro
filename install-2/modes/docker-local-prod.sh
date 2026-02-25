@@ -51,11 +51,11 @@ run_docker_local_prod() {
     
     # Executar migrations
     log_info "Executando migrations..."
-    docker compose -f docker-compose.prod.yml --env-file "$env_prod" exec backend npx prisma migrate deploy || true
+    docker compose -f docker-compose.prod.yml --env-file "$env_prod" exec backend pnpm exec prisma migrate deploy || true
     
     # Executar seeds
     log_info "Populando banco de dados..."
-    docker compose -f docker-compose.prod.yml --env-file "$env_prod" exec backend npx prisma db seed || true
+    docker compose -f docker-compose.prod.yml --env-file "$env_prod" exec backend pnpm exec prisma db seed || true
     
     print_separator
     echogreen "✓ Instalação concluída!"

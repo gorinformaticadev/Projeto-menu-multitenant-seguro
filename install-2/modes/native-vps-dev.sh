@@ -65,6 +65,7 @@ run_native_vps_dev() {
     # --- 1. Preparacao ---
     apt-get update -qq
     create_system_user
+    setup_timezone
     setup_directories
 
     # --- 2. Instalar dependencias ---
@@ -83,13 +84,13 @@ run_native_vps_dev() {
     # --- 3. Configurar PostgreSQL ---
     configure_postgresql "$db_name" "$db_user" "$db_pass"
 
-    # --- 4. Configurar .env dos apps ---
+    # --- 4. Ajustar permissoes ---
+    fix_project_permissions
+
+    # --- 5. Configurar .env dos apps ---
     configure_backend_env "$domain" "$db_user" "$db_pass" "$db_name" \
         "$jwt_secret" "$enc_key" "$admin_email" "$admin_pass" "development"
     configure_frontend_env "$domain"
-
-    # --- 5. Ajustar permissoes ---
-    fix_project_permissions
 
     # --- 6. Build da aplicacao ---
     build_application "development"

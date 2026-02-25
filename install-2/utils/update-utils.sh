@@ -67,8 +67,8 @@ run_update_native() {
     log_info "Atualizando dependências do backend..."
     cd "$PROJECT_ROOT/apps/backend"
     $exec_user pnpm install --frozen-lockfile || $exec_user pnpm install
-    $exec_user npx prisma generate
-    $exec_user npx prisma migrate deploy
+    $exec_user pnpm exec prisma generate
+    $exec_user pnpm exec prisma migrate deploy
     
     log_info "Atualizando dependências do frontend..."
     cd "$PROJECT_ROOT/apps/frontend"

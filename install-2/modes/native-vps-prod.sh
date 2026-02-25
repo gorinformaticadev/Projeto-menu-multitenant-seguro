@@ -66,6 +66,7 @@ run_native_vps_prod() {
     # --- 1. Preparacao ---
     apt-get update -qq
     create_system_user
+    setup_timezone
     setup_directories
 
     # --- 2. Instalar dependencias ---
@@ -94,13 +95,13 @@ run_native_vps_prod() {
     # --- 5. Configurar Redis ---
     harden_redis
 
-    # --- 6. Configurar .env dos apps ---
+    # --- 6. Ajustar permissoes ---
+    fix_project_permissions
+
+    # --- 7. Configurar .env dos apps ---
     configure_backend_env "$domain" "$db_user" "$db_pass" "$db_name" \
         "$jwt_secret" "$enc_key" "$admin_email" "$admin_pass" "production"
     configure_frontend_env "$domain"
-
-    # --- 7. Ajustar permissoes ---
-    fix_project_permissions
 
     # --- 8. Build da aplicacao ---
     build_application "production"

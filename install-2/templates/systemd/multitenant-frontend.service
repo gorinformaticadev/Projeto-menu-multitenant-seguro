@@ -28,7 +28,7 @@ MemoryMax=512M
 # Seguranca (hardening basico)
 NoNewPrivileges=true
 ProtectSystem=strict
-ProtectHome=true
+ProtectHome=false
 ReadWritePaths=__PROJECT_ROOT__/apps/frontend
 PrivateTmp=true
 
