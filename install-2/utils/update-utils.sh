@@ -6,6 +6,7 @@
 run_update_docker() {
     local build_mode="$1" # "local" or "registry"
     local branch="${2:-}"
+    local installer_root="${INSTALLER_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
     
     log_info "Iniciando atualização Docker (Modo: $build_mode)..."
     
@@ -14,16 +15,16 @@ run_update_docker() {
     
     # 2. Determinar arquivos de composição
     local compose_file="docker-compose.prod.yml"
-    local env_file=".env"
+    local env_file="$installer_root/.env.production"
     
     if [[ ! -f "$PROJECT_ROOT/$compose_file" ]]; then
         compose_file="docker-compose.yml"
     fi
     
-    if [[ -f "$PROJECT_ROOT/install/.env.production" ]]; then
-        env_file="install/.env.production"
-    elif [[ -f "$PROJECT_ROOT/.env.production" ]]; then
-        env_file=".env.production"
+    if [[ ! -f "$env_file" ]] && [[ -f "$PROJECT_ROOT/.env.production" ]]; then
+        env_file="$PROJECT_ROOT/.env.production"
+    elif [[ ! -f "$env_file" ]] && [[ -f "$PROJECT_ROOT/.env" ]]; then
+        env_file="$PROJECT_ROOT/.env"
     fi
     
     log_info "Usando arquivo de composição: $compose_file"
@@ -31,13 +32,13 @@ run_update_docker() {
     # 3. Executar atualização baseada no modo
     if [[ "$build_mode" == "registry" ]]; then
         log_info "Fazendo pull de imagens atualizadas..."
-        docker compose -f "$PROJECT_ROOT/$compose_file" --env-file "$PROJECT_ROOT/$env_file" pull || log_warn "Falha ao baixar imagens. Tentando com as locais."
+        docker compose -f "$PROJECT_ROOT/$compose_file" --env-file "$env_file" pull || log_warn "Falha ao baixar imagens. Tentando com as locais."
         
         log_info "Reiniciando containers..."
-        docker compose -f "$PROJECT_ROOT/$compose_file" --env-file "$PROJECT_ROOT/$env_file" up -d --remove-orphans
+        docker compose -f "$PROJECT_ROOT/$compose_file" --env-file "$env_file" up -d --remove-orphans
     else
         log_info "Reconstruindo imagens localmente..."
-        docker compose -f "$PROJECT_ROOT/$compose_file" --env-file "$PROJECT_ROOT/$env_file" up -d --build --remove-orphans
+        docker compose -f "$PROJECT_ROOT/$compose_file" --env-file "$env_file" up -d --build --remove-orphans
     fi
     
     # 4. Verificar saúde

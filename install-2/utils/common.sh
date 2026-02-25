@@ -65,6 +65,41 @@ check_os() {
     fi
 }
 
+# --- Repositorio da aplicacao ---
+ensure_project_repository() {
+    local repo_url="${APP_REPO_URL:-https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git}"
+    local target_dir="${PROJECT_ROOT:-}"
+
+    if [[ -z "$target_dir" ]]; then
+        log_error "PROJECT_ROOT nao definido para clonar/atualizar a aplicacao."
+        return 1
+    fi
+
+    if ! command -v git &>/dev/null; then
+        log_info "Git nao encontrado. Instalando..."
+        apt-get update -qq
+        apt-get install -y -qq git
+    fi
+
+    if [[ -d "$target_dir/.git" ]]; then
+        log_info "Repositorio da aplicacao ja existe em: $target_dir"
+        git config --global --add safe.directory "$target_dir" 2>/dev/null || true
+        return 0
+    fi
+
+    if [[ -d "$target_dir" ]] && [[ -n "$(ls -A "$target_dir" 2>/dev/null)" ]]; then
+        log_error "Diretorio de destino ja existe e nao eh repositorio Git: $target_dir"
+        log_error "Defina INSTALL_PROJECT_DIR para outro caminho ou limpe o diretorio."
+        return 1
+    fi
+
+    mkdir -p "$(dirname "$target_dir")"
+    log_info "Clonando aplicacao em: $target_dir"
+    git clone "$repo_url" "$target_dir"
+    git config --global --add safe.directory "$target_dir" 2>/dev/null || true
+    log_success "Repositorio clonado com sucesso."
+}
+
 # --- Gerenciamento de arquivos .env ---
 ensure_env_file() {
     local env_file="$1"
@@ -205,4 +240,3 @@ cleanup_on_error() {
     log_error "Verifique as mensagens acima para mais detalhes."
     exit 1
 }
-

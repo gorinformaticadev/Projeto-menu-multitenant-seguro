@@ -9,8 +9,8 @@
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INSTALL_DIR="$(dirname "$SCRIPT_DIR")"
-PROJECT_ROOT="$(dirname "$INSTALL_DIR")"
+INSTALL_DIR="${INSTALLER_ROOT:-$(dirname "$SCRIPT_DIR")}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(dirname "$INSTALL_DIR")/Projeto-menu-multitenant-seguro}"
 
 # common.sh, docker-utils.sh e native-utils.sh ja foram carregados pelo install.sh
 

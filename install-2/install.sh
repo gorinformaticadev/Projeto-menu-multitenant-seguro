@@ -6,7 +6,10 @@
 set -Eeo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+INSTALLER_ROOT="${INSTALLER_ROOT:-$SCRIPT_DIR}"
+PROJECT_ROOT="${PROJECT_ROOT:-${INSTALL_PROJECT_DIR:-$(dirname "$INSTALLER_ROOT")/Projeto-menu-multitenant-seguro}}"
+APP_REPO_URL="${APP_REPO_URL:-https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git}"
+export INSTALLER_ROOT PROJECT_ROOT APP_REPO_URL
 
 # Carregar utilitarios
 source "$SCRIPT_DIR/utils/common.sh"
@@ -22,7 +25,7 @@ trap cleanup_on_error ERR
 show_usage() {
     cat <<'EOF'
 Uso:
-  sudo bash install-2/install.sh install [OPÇÕES]
+  sudo bash install/install.sh install [OPÇÕES]
 
 Comandos:
   install   Instalação inicial com menu interativo
@@ -32,14 +35,15 @@ Comandos:
 Opções:
   -d, --domain DOMAIN       Domínio (ex: app.exemplo.com.br)
   -e, --email EMAIL         Email para Let's Encrypt e admin
+  -u, --user USER           Usuário/owner para imagens (GHCR)
   -n, --no-prompt           Modo não-interativo (requer variáveis de ambiente)
 
 Variáveis de ambiente:
-  INSTALL_DOMAIN, LETSENCRYPT_EMAIL
+  INSTALL_DOMAIN, LETSENCRYPT_EMAIL, IMAGE_OWNER, INSTALL_PROJECT_DIR, APP_REPO_URL
 
 Exemplos:
-  sudo bash install-2/install.sh install -d dev.empresa.com -e admin@empresa.com
-  sudo INSTALL_DOMAIN=app.empresa.com LETSENCRYPT_EMAIL=admin@empresa.com bash install-2/install.sh install --no-prompt
+  sudo bash install/install.sh install -d dev.empresa.com -e admin@empresa.com -u gorinformatica
+  sudo INSTALL_DOMAIN=app.empresa.com LETSENCRYPT_EMAIL=admin@empresa.com bash install/install.sh install --no-prompt
 EOF
 }
 
@@ -47,6 +51,7 @@ EOF
 run_install() {
     local domain="${INSTALL_DOMAIN:-}"
     local email="${LETSENCRYPT_EMAIL:-}"
+    local image_owner="${IMAGE_OWNER:-${GHCR_OWNER:-}}"
     local no_prompt="${INSTALL_NO_PROMPT:-false}"
 
     # Parse opções
@@ -54,6 +59,7 @@ run_install() {
         case "$1" in
             -d|--domain)   domain="$2"; shift 2 ;;
             -e|--email)    email="$2"; shift 2 ;;
+            -u|--user)     image_owner="$2"; shift 2 ;;
             -n|--no-prompt) no_prompt="true"; shift ;;
             -h|--help)     show_usage; exit 0 ;;
             *) shift ;;
@@ -75,6 +81,14 @@ run_install() {
 
     validate_domain "$domain" || exit 1
     validate_email "$email" || exit 1
+
+    if [[ -n "$image_owner" ]]; then
+        IMAGE_OWNER="$image_owner"
+        GHCR_OWNER="$image_owner"
+        export IMAGE_OWNER GHCR_OWNER
+    fi
+
+    ensure_project_repository
 
     # Mostrar menu e obter modo selecionado
     show_installation_menu "$domain" "$email"
@@ -127,6 +141,7 @@ run_install() {
 
 # --- Atualização ---
 run_update() {
+    ensure_project_repository
     show_update_menu
 }
 

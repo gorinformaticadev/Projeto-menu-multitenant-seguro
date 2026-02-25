@@ -11,7 +11,8 @@
 # Nao carregar common.sh aqui - ja foi carregado pelo install.sh
 
 INSTALL2_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PROJECT_ROOT="$(dirname "$INSTALL2_DIR")"
+INSTALLER_ROOT="${INSTALLER_ROOT:-$INSTALL2_DIR}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(dirname "$INSTALLER_ROOT")/Projeto-menu-multitenant-seguro}"
 TEMPLATES_DIR="$INSTALL2_DIR/templates"
 
 # Diretorios de log e dados
@@ -955,7 +956,7 @@ start_pm2_services() {
 fix_project_permissions() {
     log_info "Ajustando permissoes do projeto..."
     chown -R multitenant:multitenant "$PROJECT_ROOT"
-    # Manter install-2 acessivel ao root para futuras reinstalacoes
+    # Manter diretorio do instalador acessivel ao root para futuras reinstalacoes
     chmod -R 755 "$INSTALL2_DIR"
     log_success "Permissoes ajustadas."
 }
