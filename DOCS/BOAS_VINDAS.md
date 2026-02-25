@@ -1,33 +1,43 @@
-﻿# Boas vindas
+# Boas vindas
 
-Este repositorio usa uma estrutura padrao para documentacao e automacao.
+Este repositorio contem a aplicacao. O instalador oficial agora fica em repositorio separado.
 
-## Estrutura que voce deve seguir
+## Estrutura
 
-- `README.md` (raiz): resumo oficial do repositorio
+- `README.md` (raiz): resumo oficial
 - `DOCS/`: documentacao tecnica e funcional
-- `Scripts/`: scripts auxiliares e testes manuais
-- `install/`: scripts oficiais de ciclo de vida do sistema
+- `Scripts/`: scripts auxiliares
 
 ## Fluxo oficial de operacao
 
-1. Instalar
+1. Clonar instalador:
+
 ```bash
-bash install/install.sh
+git clone https://github.com/gorinformaticadev/install-multitenant.git install
+cd install
 ```
 
-2. Atualizar
+2. Instalar:
+
 ```bash
-bash install/update.sh
+sudo bash install.sh install -d app.empresa.com -e admin@empresa.com -u gorinformatica
 ```
 
-3. Desinstalar
+3. Atualizar:
+
 ```bash
-bash install/uninstall.sh
+sudo bash install.sh update
 ```
 
-## Proximas leituras
+4. Desinstalar:
 
-- `INDICE_DOCUMENTACAO.md`
-- `install/README-INSTALADOR.md`
-- `INICIO_RAPIDO.md`
+```bash
+sudo bash install.sh uninstall
+```
+
+## Leitura recomendada
+
+- `DOCS/INICIO_RAPIDO.md`
+- `DOCS/install/README-INSTALADOR.md`
+- `DOCS/INDICE_DOCUMENTACAO.md`
+
