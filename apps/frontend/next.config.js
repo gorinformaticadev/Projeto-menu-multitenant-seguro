@@ -99,7 +99,6 @@ const nextConfig = {
   experimental: {
     optimizeCss: true, // Optimize CSS
     workerThreads: true,
-    webpackBuildWorker: false,
   },
   // Configure build output
   output: 'standalone', // Always use standalone for SSR support

@@ -70,18 +70,46 @@ prepare_multitenant_environment() {
     # Garantir que os diretórios de configuração do npm/pnpm existam
     sudo -u multitenant sh -c 'mkdir -p ~/.npm ~/.pnpm-store ~/.config'
     
-    # Garantir que os comandos node e npm estejam disponíveis
-    if ! sudo -u multitenant sh -c 'which node >/dev/null'; then
-        log_error "Node.js não está disponível para o usuário multitenant"
+    # Aguardar até que o Node.js esteja disponível para o usuário multitenant (até 30 segundos)
+    local attempts=0
+    local max_attempts=15
+    local node_available=false
+    
+    while [[ $attempts -lt $max_attempts ]]; do
+        if sudo -u multitenant sh -c 'command -v node >/dev/null 2>&1'; then
+            node_available=true
+            break
+        fi
+        log_info "Aguardando Node.js estar disponível para o usuário multitenant... (${attempts}/${max_attempts})"
+        sleep 2
+        ((attempts++))
+    done
+    
+    if [[ "$node_available" != true ]]; then
+        log_error "Node.js não está disponível para o usuário multitenant após ${max_attempts} tentativas"
         return 1
     fi
     
-    if ! sudo -u multitenant sh -c 'which npm >/dev/null'; then
-        log_error "npm não está disponível para o usuário multitenant"
+    # Aguardar até que o npm esteja disponível
+    attempts=0
+    local npm_available=false
+    
+    while [[ $attempts -lt $max_attempts ]]; do
+        if sudo -u multitenant sh -c 'command -v npm >/dev/null 2>&1'; then
+            npm_available=true
+            break
+        fi
+        log_info "Aguardando npm estar disponível para o usuário multitenant... (${attempts}/${max_attempts})"
+        sleep 2
+        ((attempts++))
+    done
+    
+    if [[ "$npm_available" != true ]]; then
+        log_error "npm não está disponível para o usuário multitenant após ${max_attempts} tentativas"
         return 1
     fi
     
-    if ! sudo -u multitenant sh -c 'which pnpm >/dev/null'; then
+    if ! sudo -u multitenant sh -c 'command -v pnpm >/dev/null 2>&1'; then
         log_error "pnpm não está disponível para o usuário multitenant"
         # Tentar instalar pnpm para o usuário multitenant
         log_info "Tentando instalar pnpm para o usuário multitenant..."
@@ -131,6 +159,11 @@ install_nodejs() {
     apt-get install -y -qq nodejs
 
     log_success "Node.js instalado: $(node --version)"
+
+    # Garantir que o usuário multitenant tenha acesso ao Node.js
+    # Configurar o PATH do usuário multitenant para incluir o diretório do Node.js
+    sudo -u multitenant sh -c 'echo "export PATH=/usr/bin:/usr/local/bin:/opt/nodejs/bin:\$PATH" >> ~/.bashrc'
+    sudo -u multitenant sh -c 'hash -r 2>/dev/null || true'
 
     # Instalar pnpm globalmente
     if ! command -v pnpm &>/dev/null; then
