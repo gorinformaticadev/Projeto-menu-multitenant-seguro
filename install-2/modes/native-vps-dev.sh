@@ -65,6 +65,7 @@ run_native_vps_dev() {
     # --- 1. Preparacao ---
     apt-get update -qq
     create_system_user
+    setup_timezone
     setup_directories
 
     # --- 2. Instalar dependencias ---

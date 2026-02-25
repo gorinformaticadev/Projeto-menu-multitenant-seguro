@@ -33,6 +33,16 @@ create_system_user() {
     log_success "Usuario 'multitenant' criado."
 }
 
+setup_timezone() {
+    log_info "Configurando timezone para America/Sao_Paulo..."
+    timedatectl set-timezone America/Sao_Paulo 2>/dev/null || {
+        # Fallback para sistemas que não têm systemd
+        echo "America/Sao_Paulo" > /etc/timezone
+        dpkg-reconfigure -f noninteractive tzdata 2>/dev/null || true
+    }
+    log_success "Timezone configurado."
+}
+
 setup_directories() {
     log_info "Criando diretorios necessarios..."
     mkdir -p "$MULTITENANT_LOG_DIR"
