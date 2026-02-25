@@ -1015,6 +1015,10 @@ fix_project_permissions() {
     chmod -R 755 "$PROJECT_ROOT/data" 2>/dev/null || true
     chmod -R 755 "$PROJECT_ROOT/logs" 2>/dev/null || true
     
+    # Garantir que o diretório pai do projeto tenha permissão de execução para o usuário multitenant
+    local parent_dir=$(dirname "$PROJECT_ROOT")
+    chmod 755 "$parent_dir" 2>/dev/null || true
+
     # Manter install-2 acessivel ao root para futuras reinstalacoes
     chmod -R 755 "$INSTALL2_DIR"
     log_success "Permissoes ajustadas."

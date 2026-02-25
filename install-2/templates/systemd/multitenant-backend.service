@@ -27,7 +27,7 @@ MemoryMax=1G
 # Seguranca (hardening basico)
 NoNewPrivileges=true
 ProtectSystem=strict
-ProtectHome=true
+ProtectHome=false
 ReadWritePaths=__PROJECT_ROOT__/apps/backend
 PrivateTmp=true
 
