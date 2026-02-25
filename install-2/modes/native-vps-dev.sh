@@ -104,17 +104,18 @@ run_native_vps_dev() {
 
     generate_self_signed_cert "$domain"
 
+    # Configurar nginx com autoassinado antes do Certbot para servir ACME challenge.
+    configure_nginx_native "$domain" "$ssl_cert" "$ssl_key"
+
     # Tentar Let's Encrypt (pode falhar em dev)
     if obtain_native_ssl_cert "$domain" "$email" 2>/dev/null; then
         ssl_cert="/etc/letsencrypt/live/$domain/fullchain.pem"
         ssl_key="/etc/letsencrypt/live/$domain/privkey.pem"
+        configure_nginx_native "$domain" "$ssl_cert" "$ssl_key"
         setup_certbot_renewal
     else
         log_info "Usando certificado autoassinado (OK para desenvolvimento)."
     fi
-
-    # --- 9. Configurar Nginx ---
-    configure_nginx_native "$domain" "$ssl_cert" "$ssl_key"
 
     # --- 10. Iniciar com PM2 ---
     setup_pm2_services "development" 1

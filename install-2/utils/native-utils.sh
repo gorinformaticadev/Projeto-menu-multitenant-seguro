@@ -291,6 +291,48 @@ install_nginx() {
     log_success "Nginx instalado: $(nginx -v 2>&1 | grep -oP 'nginx/\K.*')"
 }
 
+check_and_open_ports_native() {
+    log_info "Verificando portas 80 e 443 para validacao do Let's Encrypt..."
+
+    if ! command -v netstat &>/dev/null; then
+        apt-get install -y -qq net-tools >/dev/null 2>&1 || true
+    fi
+
+    if command -v ufw &>/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
+        log_info "UFW detectado. Liberando portas 80 e 443..."
+        ufw allow 80/tcp >/dev/null 2>&1 || true
+        ufw allow 443/tcp >/dev/null 2>&1 || true
+        log_info "Portas 80/443 liberadas no UFW."
+    fi
+
+    if command -v iptables &>/dev/null; then
+        if iptables -L INPUT -n 2>/dev/null | grep -q "DROP\|REJECT"; then
+            log_warn "Detectadas regras de firewall (iptables). Garanta que 80/443 estejam liberadas."
+        fi
+    fi
+
+    if command -v netstat &>/dev/null; then
+        if netstat -tlnp 2>/dev/null | grep -q ":80 "; then
+            local port80_process
+            port80_process=$(netstat -tlnp 2>/dev/null | grep ":80 " | awk '{print $7}' | head -1)
+            log_info "Porta 80 em uso por: $port80_process"
+        else
+            log_warn "Nenhum processo local ouvindo na porta 80."
+            log_warn "Sem HTTP ativo, o desafio ACME via webroot vai falhar."
+        fi
+
+        if netstat -tlnp 2>/dev/null | grep -q ":443 "; then
+            local port443_process
+            port443_process=$(netstat -tlnp 2>/dev/null | grep ":443 " | awk '{print $7}' | head -1)
+            log_info "Porta 443 em uso por: $port443_process"
+        else
+            log_warn "Nenhum processo local ouvindo na porta 443."
+        fi
+    fi
+
+    log_info "Verificacao de portas finalizada."
+}
+
 configure_nginx_native() {
     local domain="$1"
     local ssl_cert="$2"
@@ -357,6 +399,7 @@ obtain_native_ssl_cert() {
     local email="$2"
 
     log_info "Obtendo certificado SSL para $domain via Certbot..."
+    check_and_open_ports_native
 
     # Testar com staging primeiro
     log_info "Testando com Let's Encrypt staging..."
@@ -388,7 +431,7 @@ obtain_native_ssl_cert() {
     fi
 
     log_warn "Nao foi possivel obter certificado Let's Encrypt."
-    log_warn "Verifique se o DNS de $domain aponta para este servidor e porta 80 esta aberta."
+    log_warn "Verifique DNS (A/AAAA), abertura de porta 80 no firewall e regra de entrada no provedor cloud."
     return 1
 }
 
@@ -715,16 +758,36 @@ run_migrations() {
 run_seeds() {
     log_info "Populando banco de dados (seed)..."
     cd "$PROJECT_ROOT/apps/backend"
-    
-    # Tentar executar o seed com tratamento de erros
-    if ! sudo -u multitenant npx prisma db seed 2>/dev/null; then
-        log_warn "Falha ao executar prisma db seed, tentando alternativa..."
-        if ! sudo -u multitenant node dist/prisma/seed.js 2>/dev/null; then
-            log_warn "Seed nao executou. Execute manualmente: cd apps/backend && npx prisma db seed"
-            log_warn "OBS: Isso pode ser normal se não houver seed definido ou se as tabelas não estiverem prontas ainda"
+
+    # O projeto usa seed compilado em dist/prisma/seed.js.
+    # No fluxo nativo, garantir artefato antes de executar.
+    if [[ ! -f dist/prisma/seed.js ]]; then
+        log_warn "Arquivo dist/prisma/seed.js nao encontrado. Compilando seed..."
+        if ! sudo -u multitenant npx tsc prisma/seed.ts \
+            --outDir dist/prisma \
+            --skipLibCheck \
+            --module commonjs \
+            --target ES2021 \
+            --esModuleInterop \
+            --resolveJsonModule; then
+            log_error "Falha ao compilar seed.ts para dist/prisma/seed.js"
+            return 1
         fi
     fi
-    log_success "Seed executado (ou ignorado se não aplicável)."
+
+    if sudo -u multitenant npx prisma db seed; then
+        log_success "Seed executado com sucesso."
+        return 0
+    fi
+
+    log_warn "Falha no prisma db seed. Tentando executar seed compilado diretamente..."
+    if sudo -u multitenant node dist/prisma/seed.js; then
+        log_success "Seed executado com sucesso (modo direto)."
+        return 0
+    fi
+
+    log_error "Seed falhou. Corrija o erro acima e execute: cd apps/backend && npx prisma db seed"
+    return 1
 }
 
 # =============================================================================
