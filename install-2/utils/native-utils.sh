@@ -988,7 +988,18 @@ start_pm2_services() {
 
 fix_project_permissions() {
     log_info "Ajustando permissoes do projeto..."
-    chown -R multitenant:multitenant "$PROJECT_ROOT"
+    
+    # Preservar o diretório .git com as permissões originais para permitir operações de git
+    if [[ -d "$PROJECT_ROOT/.git" ]]; then
+        # Salvar as permissões atuais do .git antes de alterar o resto
+        local git_owner=$(stat -c "%U:%G" "$PROJECT_ROOT/.git" 2>/dev/null || echo "$(whoami):$(whoami)")
+        chown -R multitenant:multitenant "$PROJECT_ROOT"
+        # Restaurar as permissões do .git para o proprietário original
+        chown -R "$git_owner" "$PROJECT_ROOT/.git"
+    else
+        chown -R multitenant:multitenant "$PROJECT_ROOT"
+    fi
+    
     # Manter install-2 acessivel ao root para futuras reinstalacoes
     chmod -R 755 "$INSTALL2_DIR"
     log_success "Permissoes ajustadas."
