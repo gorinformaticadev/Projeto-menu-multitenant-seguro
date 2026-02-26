@@ -21,6 +21,31 @@ MULTITENANT_DATA_DIR="/var/lib/multitenant"
 CERTBOT_WEBROOT="/var/www/certbot"
 
 # =============================================================================
+# Timezone
+# =============================================================================
+
+setup_timezone() {
+    local tz="${INSTALL_TIMEZONE:-Etc/UTC}"
+
+    if command -v timedatectl &>/dev/null; then
+        if timedatectl set-timezone "$tz" 2>/dev/null; then
+            log_info "Timezone configurado para: $tz"
+            return 0
+        fi
+    fi
+
+    if [[ -f "/usr/share/zoneinfo/$tz" ]]; then
+        ln -sf "/usr/share/zoneinfo/$tz" /etc/localtime
+        echo "$tz" > /etc/timezone
+        log_info "Timezone configurado para: $tz"
+        return 0
+    fi
+
+    log_warn "Timezone '$tz' invalido. Mantendo timezone atual."
+    return 0
+}
+
+# =============================================================================
 # Usuario do sistema
 # =============================================================================
 
@@ -377,7 +402,9 @@ configure_nginx_native() {
 
 check_certbot() {
     if command -v certbot &>/dev/null; then
-        log_info "Certbot ja instalado."
+        local certbot_version
+        certbot_version="$(certbot --version 2>/dev/null | head -1 || true)"
+        log_info "Certbot ja instalado: ${certbot_version:-versao desconhecida}"
         return 0
     fi
     return 1
@@ -385,22 +412,65 @@ check_certbot() {
 
 install_certbot() {
     if check_certbot; then
-        return 0
+        if certbot --help all 2>/dev/null | grep -q "tls-alpn-01"; then
+            return 0
+        fi
+        log_warn "Certbot atual sem suporte TLS-ALPN-01. Tentando atualizar para versao mais nova..."
     fi
 
     log_info "Instalando Certbot..."
 
-    apt-get install -y -qq certbot python3-certbot-nginx
+    # Preferir instalacao via snap para obter versao mais atual e melhor suporte de desafios.
+    if command -v snap &>/dev/null || apt-get install -y -qq snapd; then
+        systemctl enable --now snapd.socket 2>/dev/null || true
+        systemctl enable --now snapd.service 2>/dev/null || true
+        ln -sf /var/lib/snapd/snap /snap 2>/dev/null || true
 
-    log_success "Certbot instalado."
+        snap install core >/dev/null 2>&1 || true
+        snap refresh core >/dev/null 2>&1 || true
+        snap install --classic certbot >/dev/null 2>&1 || true
+        ln -sf /snap/bin/certbot /usr/bin/certbot 2>/dev/null || true
+    fi
+
+    # Fallback apt para ambientes sem snap.
+    if ! command -v certbot &>/dev/null; then
+        apt-get install -y -qq certbot python3-certbot-nginx
+    fi
+
+    if command -v certbot &>/dev/null; then
+        local certbot_version
+        certbot_version="$(certbot --version 2>/dev/null | head -1 || true)"
+        log_success "Certbot instalado: ${certbot_version:-versao desconhecida}"
+        return 0
+    fi
+
+    log_error "Falha ao instalar Certbot."
+    return 1
 }
 
 obtain_native_ssl_cert() {
     local domain="$1"
     local email="$2"
+    local acme_dir="$CERTBOT_WEBROOT/.well-known/acme-challenge"
+    local acme_probe="multitenant-acme-probe-$(date +%s)"
+    local acme_file="$acme_dir/$acme_probe"
 
     log_info "Obtendo certificado SSL para $domain via Certbot..."
     check_and_open_ports_native
+
+    mkdir -p "$acme_dir"
+    echo "ok-$acme_probe" > "$acme_file"
+    chmod 644 "$acme_file" 2>/dev/null || true
+
+    # Preflight local: garante que o Nginx serve o webroot ACME corretamente.
+    if command -v curl &>/dev/null; then
+        if curl -fsS -H "Host: $domain" "http://127.0.0.1/.well-known/acme-challenge/$acme_probe" >/dev/null 2>&1; then
+            log_info "Preflight ACME local OK (Nginx webroot acessivel)."
+        else
+            log_warn "Preflight ACME local falhou."
+            log_warn "Revise o location /.well-known/acme-challenge/ no Nginx e recarregue o servico."
+        fi
+    fi
 
     # Testar com staging primeiro
     log_info "Testando com Let's Encrypt staging..."
@@ -410,7 +480,7 @@ obtain_native_ssl_cert() {
         --email "$email" \
         --agree-tos \
         --test-cert \
-        --non-interactive 2>/dev/null; then
+        --non-interactive; then
 
         log_info "Staging OK. Obtendo certificado real..."
         certbot certonly --webroot \
@@ -426,13 +496,56 @@ obtain_native_ssl_cert() {
 
         if [[ -f "$cert_path" ]] && [[ -f "$key_path" ]]; then
             log_success "Certificado Let's Encrypt obtido para $domain"
+            rm -f "$acme_file" 2>/dev/null || true
             echo "$cert_path"
             return 0
         fi
     fi
 
+    rm -f "$acme_file" 2>/dev/null || true
+
+    # Fallback quando a porta 80 esta bloqueada externamente:
+    # usar standalone + tls-alpn-01 (porta 443), se suportado pela versao do certbot.
+    if certbot --help all 2>/dev/null | grep -q "tls-alpn-01"; then
+        log_warn "Falha no desafio HTTP-01 (webroot). Tentando fallback TLS-ALPN-01 na porta 443..."
+        if certbot certonly --standalone \
+            --preferred-challenges tls-alpn-01 \
+            -d "$domain" \
+            --email "$email" \
+            --agree-tos \
+            --test-cert \
+            --non-interactive \
+            --pre-hook "systemctl stop nginx" \
+            --post-hook "systemctl start nginx"; then
+
+            log_info "Fallback TLS-ALPN staging OK. Obtendo certificado real..."
+            certbot certonly --standalone \
+                --preferred-challenges tls-alpn-01 \
+                -d "$domain" \
+                --email "$email" \
+                --agree-tos \
+                --force-renewal \
+                --non-interactive \
+                --pre-hook "systemctl stop nginx" \
+                --post-hook "systemctl start nginx"
+
+            local cert_path_fallback="/etc/letsencrypt/live/$domain/fullchain.pem"
+            local key_path_fallback="/etc/letsencrypt/live/$domain/privkey.pem"
+            if [[ -f "$cert_path_fallback" ]] && [[ -f "$key_path_fallback" ]]; then
+                log_success "Certificado Let's Encrypt obtido via TLS-ALPN-01 para $domain"
+                rm -f "$acme_file" 2>/dev/null || true
+                echo "$cert_path_fallback"
+                return 0
+            fi
+        fi
+    else
+        log_warn "Este certbot nao suporta TLS-ALPN-01 nesta instalacao."
+    fi
+
     log_warn "Nao foi possivel obter certificado Let's Encrypt."
-    log_warn "Verifique DNS (A/AAAA), abertura de porta 80 no firewall e regra de entrada no provedor cloud."
+    log_warn "HTTP-01 falhou e o fallback automatico nao foi possivel."
+    log_warn "Opcao imediata: emitir por DNS-01 manual:"
+    log_warn "certbot certonly --manual --preferred-challenges dns -d $domain -m $email --agree-tos"
     return 1
 }
 
@@ -566,7 +679,7 @@ build_application() {
     # Gerar Prisma Client
     log_info "Gerando Prisma Client..."
     cd "$PROJECT_ROOT/apps/backend"
-    sudo -u multitenant npx prisma generate
+    sudo -u multitenant pnpm exec prisma generate
 
     # Build do backend
     log_info "Construindo backend (NestJS)..."
@@ -658,15 +771,15 @@ run_migrations() {
     
     # Antes de executar as migrations, gerar novamente o Prisma Client
     log_info "Garantindo que o Prisma Client esteja atualizado..."
-    sudo -u multitenant npx prisma generate 2>/dev/null || true
+    sudo -u multitenant pnpm exec prisma generate 2>/dev/null || true
     
     # Primeira tentativa de executar as migrations
-    if ! sudo -u multitenant npx prisma migrate deploy 2>&1; then
+    if ! sudo -u multitenant pnpm exec prisma migrate deploy 2>&1; then
         log_warn "Falha na aplicação das migrations. Verificando situação..."
         
         # Verificar o status das migrations
         log_info "Verificando status das migrations..."
-        sudo -u multitenant npx prisma migrate status 2>&1 || true
+        sudo -u multitenant pnpm exec prisma migrate status 2>&1 || true
         
         # Verificar se há migrações com falha e tentar resolver
         log_info "Verificando migrações com falha..."
@@ -676,26 +789,26 @@ run_migrations() {
         
         # Primeiro, tenta verificar se o banco está em estado inconsistente
         log_info "Resetando banco de dados para limpar estado inconsistente..."
-        if sudo -u multitenant npx prisma migrate reset --force 2>/dev/null; then
+        if sudo -u multitenant pnpm exec prisma migrate reset --force 2>/dev/null; then
             log_info "Banco de dados resetado com sucesso. Aplicando migrations novamente..."
         else
             log_warn "Não foi possível resetar as migrations. Verificando se o banco está vazio..."
             
             # Se o reset falhar, verificar se o banco está completamente vazio
             # Nesse caso, podemos tentar aplicar as migrations do zero
-            if sudo -u multitenant npx prisma migrate resolve --applied 2>/dev/null; then
+            if sudo -u multitenant pnpm exec prisma migrate resolve --applied 2>/dev/null; then
                 log_info "Estado de migrações resolvido. Tentando aplicar novamente..."
             else
                 log_warn "Não foi possível resolver o estado das migrations automaticamente."
                 
                 # Como último recurso, tentar um reset completo
                 log_info "Forçando reset completo do banco de dados..."
-                sudo -u multitenant npx prisma migrate reset --force <<< "y" 2>/dev/null || true
+                sudo -u multitenant pnpm exec prisma migrate reset --force <<< "y" 2>/dev/null || true
             fi
         fi
         
         # Tentar aplicar novamente
-        if ! sudo -u multitenant npx prisma migrate deploy 2>&1; then
+        if ! sudo -u multitenant pnpm exec prisma migrate deploy 2>&1; then
             log_error "Falha crítica ao aplicar migrations. O banco de dados pode estar em estado inconsistente."
             log_error "Tentando uma abordagem alternativa..."
                 
@@ -712,15 +825,15 @@ run_migrations() {
             if sudo -u multitenant psql -d "$db_name" -tAc "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public');" 2>/dev/null | grep -q "f"; then
                 # Banco está vazio, tentar aplicar migrations do zero
                 log_info "Banco está vazio, tentando aplicar migrations do zero..."
-                if ! sudo -u multitenant npx prisma migrate deploy 2>&1; then
+                if ! sudo -u multitenant pnpm exec prisma migrate deploy 2>&1; then
                     log_warn "Erro persiste. Verificando se é o problema conhecido de nome de tabela..."
                             
                     # Se o erro for o problema conhecido com a tabela SecurityConfig, tentar criar a tabela manualmente
                     log_info "Tentando criar estrutura inicial do security_config se necessário..."
-                    sudo -u multitenant npx prisma migrate resolve --applied 20260222000000_update_rate_limit_defaults 2>/dev/null || true
+                    sudo -u multitenant pnpm exec prisma migrate resolve --applied 20260222000000_update_rate_limit_defaults 2>/dev/null || true
                             
                     # Tentar aplicar novamente
-                    if ! sudo -u multitenant npx prisma migrate deploy 2>&1; then
+                    if ! sudo -u multitenant pnpm exec prisma migrate deploy 2>&1; then
                         log_error "Falha ao aplicar migrations mesmo com banco vazio."
                         return 1
                     fi
@@ -738,14 +851,14 @@ run_migrations() {
                     # A tabela existe, então a migração inicial já foi aplicada
                     # Marcar a migração problemática como resolvida
                     log_info "Tabela security_config existe, marcando migração problemática como resolvida..."
-                    sudo -u multitenant npx prisma migrate resolve --applied 20260222000000_update_rate_limit_defaults 2>/dev/null || true
+                    sudo -u multitenant pnpm exec prisma migrate resolve --applied 20260222000000_update_rate_limit_defaults 2>/dev/null || true
                 else
                     # A tabela não existe, talvez seja necessário aplicar as migrações iniciais primeiro
                     log_info "Tabela security_config não existe, aplicando migrations iniciais..."
                 fi
                         
                 # Tentar aplicar novamente
-                if ! sudo -u multitenant npx prisma migrate deploy 2>&1; then
+                if ! sudo -u multitenant pnpm exec prisma migrate deploy 2>&1; then
                     log_error "Falha ao aplicar migrations mesmo após tentativas de resolução."
                     return 1
                 fi
@@ -759,35 +872,52 @@ run_migrations() {
 run_seeds() {
     log_info "Populando banco de dados (seed)..."
     cd "$PROJECT_ROOT/apps/backend"
+    local seed_expected="dist/prisma/seed.js"
+    local seed_alternative="dist/prisma/prisma/seed.js"
 
-    # O projeto usa seed compilado em dist/prisma/seed.js.
-    # No fluxo nativo, garantir artefato antes de executar.
-    if [[ ! -f dist/prisma/seed.js ]]; then
-        log_warn "Arquivo dist/prisma/seed.js nao encontrado. Compilando seed..."
-        if ! sudo -u multitenant npx tsc prisma/seed.ts \
+    # Tentar o seed padrao do Prisma primeiro.
+    # O proprio comando usa a configuracao de seed do projeto.
+    if sudo -u multitenant pnpm exec prisma db seed; then
+        log_success "Seed executado com sucesso."
+        return 0
+    fi
+
+    # Fallback: compilar seed.ts manualmente se o artefato nao existir.
+    if [[ ! -f "$seed_expected" ]]; then
+        log_warn "prisma db seed falhou e $seed_expected nao existe. Compilando seed.ts..."
+        if ! sudo -u multitenant pnpm exec tsc prisma/seed.ts \
             --outDir dist/prisma \
+            --rootDir prisma \
             --skipLibCheck \
             --module commonjs \
             --target ES2021 \
             --esModuleInterop \
             --resolveJsonModule; then
-            log_error "Falha ao compilar seed.ts para dist/prisma/seed.js"
+            log_error "Falha ao compilar seed.ts para dist/prisma/seed.js com pnpm exec tsc"
+            log_error "Verifique se o pacote 'typescript' esta instalado no workspace."
             return 1
         fi
     fi
 
-    if sudo -u multitenant npx prisma db seed; then
-        log_success "Seed executado com sucesso."
-        return 0
+    # Algumas configuracoes de tsconfig podem gerar dist/prisma/prisma/seed.js.
+    # Normalizar para o caminho esperado pelo comando de seed do Prisma.
+    if [[ ! -f "$seed_expected" ]] && [[ -f "$seed_alternative" ]]; then
+        mkdir -p dist/prisma
+        cp "$seed_alternative" "$seed_expected"
     fi
 
     log_warn "Falha no prisma db seed. Tentando executar seed compilado diretamente..."
-    if sudo -u multitenant node dist/prisma/seed.js; then
+    if [[ ! -f "$seed_expected" ]]; then
+        log_error "Seed compilado nao encontrado em $seed_expected"
+        return 1
+    fi
+
+    if sudo -u multitenant node "$seed_expected"; then
         log_success "Seed executado com sucesso (modo direto)."
         return 0
     fi
 
-    log_error "Seed falhou. Corrija o erro acima e execute: cd apps/backend && npx prisma db seed"
+    log_error "Seed falhou. Corrija o erro acima e execute: cd apps/backend && pnpm exec prisma db seed"
     return 1
 }
 
@@ -830,45 +960,53 @@ setup_systemd_services() {
 
 check_multitenant_environment() {
     log_info "Verificando ambiente do usuário multitenant..."
-    
-    # Verificar se o Node.js está disponível para o usuário multitenant
-    if ! sudo -u multitenant command -v node >/dev/null 2>&1; then
-        log_error "Node.js não está disponível para o usuário multitenant"
-        # Tentar configurar o PATH
-        sudo -u multitenant sh -c 'export PATH="$PATH:/usr/local/bin:/opt/nodejs/bin:$HOME/.nvm/versions/node/*/bin" >> ~/.bashrc'
-        # Atualizar o PATH
-        sudo -u multitenant sh -c 'hash -r'
-    fi
-    
-    # Verificar se o Node.js pode ser executado
-    local node_version=$(sudo -u multitenant node --version 2>/dev/null)
-    if [[ -n "$node_version" ]]; then
-        log_success "Node.js encontrado: $node_version"
+
+    local has_error=0
+
+    # Verificar Node.js no contexto de shell do usuario multitenant
+    if sudo -u multitenant sh -lc 'command -v node >/dev/null 2>&1'; then
+        local node_version
+        node_version="$(sudo -u multitenant sh -lc 'node --version' 2>/dev/null || true)"
+        if [[ -n "$node_version" ]]; then
+            log_success "Node.js encontrado: $node_version"
+        else
+            log_error "Node.js encontrado no PATH, mas nao pode ser executado pelo usuario multitenant"
+            has_error=1
+        fi
     else
-        log_warn "Node.js não pôde ser executado como usuário multitenant"
+        log_error "Node.js nao esta disponivel para o usuario multitenant"
+        has_error=1
     fi
-    
-    # Verificar se os arquivos necessários existem
+
+    # Verificar artefatos necessarios
     if [[ ! -f "$PROJECT_ROOT/apps/backend/dist/main.js" ]]; then
-        log_error "Arquivo backend dist/main.js não encontrado"
-        log_info "Certifique-se de que o build foi concluído com sucesso"
+        log_error "Arquivo backend dist/main.js nao encontrado"
+        log_info "Certifique-se de que o build do backend foi concluido com sucesso"
+        has_error=1
     else
         log_success "Arquivo backend encontrado"
     fi
-    
-    if [[ ! -f "$PROJECT_ROOT/apps/frontend/server.js" ]]; then
-        log_error "Arquivo frontend server.js não encontrado"
-        log_info "Certifique-se de que o build foi concluído com sucesso"
+
+    # O frontend e iniciado com `next start`; o artefato esperado e `.next/BUILD_ID`
+    if [[ ! -f "$PROJECT_ROOT/apps/frontend/.next/BUILD_ID" ]]; then
+        log_error "Artefato do frontend nao encontrado: apps/frontend/.next/BUILD_ID"
+        log_info "Certifique-se de que o build do frontend foi concluido com sucesso"
+        has_error=1
     else
-        log_success "Arquivo frontend encontrado"
+        log_success "Artefatos do frontend encontrados (.next/BUILD_ID)"
     fi
+
+    return "$has_error"
 }
 
 start_systemd_services() {
     log_info "Iniciando servicos..."
     
     # Verificar ambiente do usuário multitenant antes de iniciar
-    check_multitenant_environment
+    if ! check_multitenant_environment; then
+        log_error "Ambiente invalido para iniciar servicos. Corrija os erros acima."
+        return 1
+    fi
     
     # Iniciar backend primeiro e aguardar um pouco
     systemctl start multitenant-backend
