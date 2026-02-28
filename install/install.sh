@@ -59,6 +59,7 @@ Comandos:
   cert      Obtém ou renova certificado Let's Encrypt (usa install/.env.production).
 
 Opções para install:
+  -m, --mode MODE           Modo de instalação: docker|native (ou nativo).
   -d, --domain DOMAIN       Domínio principal (ex: app.exemplo.com.br).
   -e, --email EMAIL         Email para Let's Encrypt e admin.
   -u, --image-owner OWNER   Owner no GHCR (ex: gorinformatica).
@@ -388,6 +389,7 @@ obtain_letsencrypt_cert() {
 
 # --- Instalação inicial ---
 run_install() {
+    local install_mode="${INSTALL_MODE:-}"
     local domain="${INSTALL_DOMAIN:-}"
     local email="${LETSENCRYPT_EMAIL:-}"
     local image_owner="${IMAGE_OWNER:-}"
@@ -402,6 +404,10 @@ run_install() {
     # Parse opções
     while [[ $# -gt 0 ]]; do
         case "$1" in
+            -m|--mode)
+                install_mode="${2,,}"
+                shift 2
+                ;;
             -d|--domain)   domain="$2"; shift 2 ;;
             -e|--email)    email="$2"; shift 2 ;;
             -u|--image-owner) image_owner="$2"; shift 2 ;;
@@ -415,6 +421,43 @@ run_install() {
             *) shift ;;
         esac
     done
+
+    # Compatibilidade: aceitar "nativo" como alias de "native"
+    if [[ "$install_mode" == "nativo" ]]; then
+        install_mode="native"
+    fi
+
+    if [[ "$no_prompt" != "true" && -z "$install_mode" ]]; then
+        local mode_choice=""
+        while true; do
+            read -rp "Forma de instalação [docker/native] (padrão: docker): " mode_choice
+            mode_choice="${mode_choice,,}"
+            mode_choice="${mode_choice:-docker}"
+            [[ "$mode_choice" == "nativo" ]] && mode_choice="native"
+            if [[ "$mode_choice" == "docker" || "$mode_choice" == "native" ]]; then
+                install_mode="$mode_choice"
+                break
+            fi
+            log_warn "Opção inválida. Use: docker ou native."
+        done
+    fi
+
+    install_mode="${install_mode:-docker}"
+    if [[ "$install_mode" != "docker" && "$install_mode" != "native" ]]; then
+        log_error "Modo de instalação inválido: $install_mode (use docker ou native)."
+        show_usage
+        exit 1
+    fi
+
+    if [[ "$install_mode" == "native" ]]; then
+        log_warn "Instalação nativa selecionada."
+        log_warn "Modo nativo ainda não implementado neste instalador."
+        exit 0
+    fi
+
+    check_docker
+    check_docker_compose
+    check_and_open_ports
 
     if [[ "$no_prompt" != "true" ]]; then
         [[ -z "$domain" ]] && read -p "Domínio (ex: app.empresa.com): " domain
@@ -689,15 +732,18 @@ main() {
     echoblue "=============================================="
     echo ""
 
-    check_docker
-    check_docker_compose
-    check_and_open_ports
-
     local cmd="${1:-}"
     shift || true
     case "$cmd" in
-        install) run_install "$@" ;;
-        update)  run_update "$@" ;;
+        install)
+            run_install "$@"
+            ;;
+        update)
+            check_docker
+            check_docker_compose
+            check_and_open_ports
+            run_update "$@"
+            ;;
         cert)    run_cert ;;
         *)       show_usage; exit 1 ;;
     esac
