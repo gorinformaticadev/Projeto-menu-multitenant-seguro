@@ -695,6 +695,93 @@ pull_or_build_stack() {
     fi
 }
 
+detect_docker_installation() {
+    if [[ ! -f "$COMPOSE_PROD" ]]; then
+        return 1
+    fi
+
+    if [[ "${INSTALL_MODE:-}" == "docker" ]]; then
+        return 0
+    fi
+
+    if command -v docker &>/dev/null; then
+        if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^multitenant-"; then
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+list_native_instances() {
+    if [[ ! -d "$NATIVE_BASE_DIR" ]]; then
+        return 0
+    fi
+
+    find "$NATIVE_BASE_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while read -r instance_dir; do
+        if [[ -f "$instance_dir/apps/backend/.env" ]] && [[ -d "$instance_dir/apps/frontend" ]]; then
+            echo "$instance_dir"
+        fi
+    done
+}
+
+run_update_docker() {
+    log_info "Executando update Docker..."
+    check_docker
+    check_docker_compose
+    check_and_open_ports
+
+    # Atualizar configuracao nginx para refletir correcoes de roteamento (/uploads)
+    if [[ -n "${DOMAIN:-}" ]]; then
+        mkdir -p "$NGINX_CONF_DIR"
+        if [[ -f "$NGINX_TEMPLATE_DOCKER" ]]; then
+            sed "s/__DOMAIN__/$DOMAIN/g" "$NGINX_TEMPLATE_DOCKER" > "$NGINX_CONF_DIR/default.conf"
+            log_info "Nginx default.conf atualizado com o dominio ${DOMAIN}."
+        fi
+    fi
+
+    log_info "Baixando imagens..."
+    pull_or_build_stack
+}
+
+run_update_native() {
+    local instance_name_filter="${1:-all}"
+    local native_instances=()
+    local selected_count=0
+
+    while IFS= read -r instance_dir; do
+        [[ -n "$instance_dir" ]] && native_instances+=("$instance_dir")
+    done < <(list_native_instances)
+
+    if [[ "${#native_instances[@]}" -eq 0 ]]; then
+        log_error "Nenhuma instalacao native encontrada em $NATIVE_BASE_DIR."
+        return 1
+    fi
+
+    local instance_dir
+    for instance_dir in "${native_instances[@]}"; do
+        local instance_name
+        instance_name="$(basename "$instance_dir")"
+        if [[ "$instance_name_filter" != "all" ]] && [[ "$instance_name_filter" != "$instance_name" ]]; then
+            continue
+        fi
+
+        selected_count=$((selected_count + 1))
+        log_info "Executando update Native da instancia: $instance_name"
+        native_system_permissions_and_project "$instance_dir"
+        native_install_project_dependencies "$instance_dir"
+        native_build_apps "$instance_dir"
+        native_migrate_and_seed "$instance_dir"
+        native_restart_apps "$instance_name"
+        log_info "Instancia native atualizada: $instance_name"
+    done
+
+    if [[ "$selected_count" -eq 0 ]]; then
+        log_error "A instancia native solicitada nao foi encontrada: $instance_name_filter"
+        return 1
+    fi
+}
+
 # --- Certificado Let's Encrypt ---
 obtain_letsencrypt_cert() {
     local domain="$1"
@@ -1049,7 +1136,40 @@ run_install() {
 
 # --- Atualização ---
 run_update() {
-    local branch="${1:-}"
+    local branch=""
+    local requested_mode=""
+    local requested_instance="all"
+    local no_prompt="false"
+    local mode_choice=""
+    local docker_detected="false"
+    local native_detected="false"
+    local native_instances=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -m|--mode)
+                requested_mode="${2,,}"
+                shift 2
+                ;;
+            --instance)
+                requested_instance="$2"
+                shift 2
+                ;;
+            -n|--no-prompt)
+                no_prompt="true"
+                shift
+                ;;
+            *)
+                if [[ -z "$branch" ]]; then
+                    branch="$1"
+                else
+                    log_warn "Argumento ignorado no update: $1"
+                fi
+                shift
+                ;;
+        esac
+    done
+
     cd "$PROJECT_ROOT"
 
     ensure_env_file
@@ -1087,6 +1207,61 @@ run_update() {
         git pull origin "$branch" || true
     fi
 
+    if detect_docker_installation; then
+        docker_detected="true"
+    fi
+    while IFS= read -r instance_dir; do
+        [[ -n "$instance_dir" ]] && native_instances+=("$instance_dir")
+    done < <(list_native_instances)
+    if [[ "${#native_instances[@]}" -gt 0 ]]; then
+        native_detected="true"
+    fi
+
+    if [[ "$docker_detected" != "true" && "$native_detected" != "true" ]]; then
+        log_error "Nenhuma instalacao Docker ou Native detectada para atualizar."
+        exit 1
+    fi
+
+    if [[ -n "$requested_mode" ]]; then
+        if [[ "$requested_mode" != "docker" && "$requested_mode" != "native" && "$requested_mode" != "all" ]]; then
+            log_error "Modo invalido para update: $requested_mode (use docker, native ou all)."
+            exit 1
+        fi
+        mode_choice="$requested_mode"
+    elif [[ "$docker_detected" == "true" && "$native_detected" == "true" ]]; then
+        if [[ "$no_prompt" == "true" ]]; then
+            mode_choice="all"
+        else
+            while true; do
+                echo "Instalacoes detectadas para update:"
+                echo "[ 1 ] - Docker"
+                echo "[ 2 ] - Native"
+                echo "[ 3 ] - Docker + Native"
+                echo ""
+                echo "[ 0 ] - Cancelar"
+                read -rp "Selecione uma opcao [1/2/3/0]: " mode_choice
+                mode_choice="$(echo "$mode_choice" | tr -d '[:space:]')"
+                case "$mode_choice" in
+                    1) mode_choice="docker"; break ;;
+                    2) mode_choice="native"; break ;;
+                    3) mode_choice="all"; break ;;
+                    0)
+                        log_warn "Update cancelado pelo usuario."
+                        exit 0
+                        ;;
+                    *)
+                        log_warn "Opcao invalida. Escolha 1, 2, 3 ou 0."
+                        ;;
+                esac
+                echo ""
+            done
+        fi
+    elif [[ "$docker_detected" == "true" ]]; then
+        mode_choice="docker"
+    else
+        mode_choice="native"
+    fi
+
     # Atualizar configuração nginx para refletir correções de roteamento (/uploads)
     if [[ -n "${DOMAIN:-}" ]]; then
         mkdir -p "$NGINX_CONF_DIR"
@@ -1096,8 +1271,40 @@ run_update() {
         fi
     fi
 
-    log_info "Baixando imagens..."
-    pull_or_build_stack
+    if [[ "$mode_choice" == "docker" || "$mode_choice" == "all" ]]; then
+        if [[ "$docker_detected" == "true" ]]; then
+            run_update_docker
+        else
+            log_warn "Update Docker solicitado, mas nenhuma instalacao Docker foi detectada."
+        fi
+    fi
+
+    if [[ "$mode_choice" == "native" || "$mode_choice" == "all" ]]; then
+        if [[ "$native_detected" == "true" ]]; then
+            if [[ "$requested_instance" == "all" && "${#native_instances[@]}" -gt 1 && "$no_prompt" != "true" ]]; then
+                echo "Instancias Native detectadas:"
+                echo "[ 1 ] - Todas"
+                local idx=2
+                local instance_dir
+                for instance_dir in "${native_instances[@]}"; do
+                    echo "[ $idx ] - $(basename "$instance_dir")"
+                    idx=$((idx + 1))
+                done
+                echo ""
+                local native_choice=""
+                read -rp "Escolha a instancia native para atualizar [1..$((idx - 1))]: " native_choice
+                native_choice="$(echo "$native_choice" | tr -d '[:space:]')"
+                if [[ "$native_choice" =~ ^[0-9]+$ ]] && [[ "$native_choice" -ge 2 ]] && [[ "$native_choice" -lt "$idx" ]]; then
+                    requested_instance="$(basename "${native_instances[$((native_choice - 2))]}")"
+                else
+                    requested_instance="all"
+                fi
+            fi
+            run_update_native "$requested_instance"
+        else
+            log_warn "Update Native solicitado, mas nenhuma instalacao Native foi detectada."
+        fi
+    fi
 
     echogreen "Atualização concluída."
 }
@@ -1119,9 +1326,6 @@ main() {
             run_install "$@"
             ;;
         update)
-            check_docker
-            check_docker_compose
-            check_and_open_ports
             run_update "$@"
             ;;
         cert)
