@@ -28,12 +28,13 @@ WORKDIR /app
 
 FROM base AS prod-deps
 RUN apk add --no-cache libc6-compat
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
-COPY apps/backend/package.json apps/backend/package.json
-COPY apps/backend/prisma apps/backend/prisma
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --filter backend... --prod --frozen-lockfile
-RUN pnpm --filter backend exec prisma generate --schema prisma/schema.prisma
-RUN node -e "process.chdir('/app/apps/backend'); require('@prisma/client'); console.log('Prisma Client OK')"
+WORKDIR /app/apps/backend
+COPY apps/backend/package.json ./package.json
+COPY apps/backend/prisma ./prisma
+COPY .npmrc* ./
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --no-frozen-lockfile
+RUN pnpm exec prisma generate
+RUN node -e "require('@prisma/client'); console.log('Prisma Client OK')"
 
 FROM node:20-alpine AS runner
 WORKDIR /app/apps/backend
@@ -44,7 +45,6 @@ RUN apk add --no-cache curl postgresql-client
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nestjs
 
-COPY --from=prod-deps --chown=nestjs:nodejs /app/node_modules /app/node_modules
 COPY --from=prod-deps --chown=nestjs:nodejs /app/apps/backend/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/package.json ./package.json
 COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/dist ./dist

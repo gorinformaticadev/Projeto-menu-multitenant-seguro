@@ -455,6 +455,13 @@ run_install() {
     LOCAL_BUILD_ONLY="$local_build_only"
     ensure_env_file
 
+    # Carregar env existente para recuperar credenciais já criadas
+    if [[ -f "$ENV_PRODUCTION" ]]; then
+        set -a
+        source "$ENV_PRODUCTION" 2>/dev/null || true
+        set +a
+    fi
+
     # Limpar volumes se solicitado
     if [[ "$clean_install" == "true" ]]; then
         log_warn "Limpeza solicitada: removendo containers e volumes existentes..."
