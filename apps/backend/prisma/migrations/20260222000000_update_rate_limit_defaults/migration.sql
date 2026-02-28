@@ -1,4 +1,4 @@
--- Atualizar valores padrão de rate limiting para serem mais permissivos
+-- Atualizar valores padrão de rate limiting para serem mais permissivos 
 -- Isso evita bloqueios acidentais em aplicações modernas com SPAs
 
 -- Atualizar configurações existentes
