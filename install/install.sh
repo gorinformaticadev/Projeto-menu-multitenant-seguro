@@ -265,7 +265,19 @@ native_system_update() {
 
 native_firewall_install() {
     log_info "Etapa 4/23: instalando/configurando firewall..."
-    as_root "apt-get install -y ufw && ufw default deny incoming && ufw default allow outgoing && ufw allow ssh && ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp && ufw --force enable && systemctl restart ufw || true"
+    as_root "apt-get install -y ufw iptables-persistent netfilter-persistent"
+    as_root "ufw default deny incoming && ufw default allow outgoing && ufw allow ssh && ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp && ufw --force enable && systemctl restart ufw || true"
+
+    # Regras explicitas (estilo Docker) para evitar bloqueios inesperados na validacao HTTP-01
+    as_root "iptables -C INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT >/dev/null 2>&1 || iptables -I INPUT 1 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT"
+    as_root "iptables -C INPUT -p tcp --dport 80 -j ACCEPT >/dev/null 2>&1 || iptables -I INPUT 1 -p tcp --dport 80 -j ACCEPT"
+    as_root "iptables -C INPUT -p tcp --dport 443 -j ACCEPT >/dev/null 2>&1 || iptables -I INPUT 1 -p tcp --dport 443 -j ACCEPT"
+
+    # Se nftables estiver ativo, aplica regra equivalente (nao falhar se tabela/cadeia nao existir)
+    as_root "if command -v nft >/dev/null 2>&1; then nft add rule inet filter input ct state established,related accept >/dev/null 2>&1 || true; nft add rule inet filter input tcp dport { 80, 443 } accept >/dev/null 2>&1 || true; fi"
+
+    # Persistir regras para reboot
+    as_root "netfilter-persistent save >/dev/null 2>&1 || true"
 }
 
 native_set_timezone() {
@@ -281,8 +293,8 @@ native_install_node() {
 
 native_install_pm2_and_pnpm() {
     log_info "Etapa 7/23: instalando PM2 e pnpm..."
-    as_root "corepack enable || true"
-    as_root "corepack prepare pnpm@latest --activate || npm install -g pnpm"
+    as_root "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack enable || true"
+    as_root "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack prepare pnpm@latest --activate || npm install -g pnpm"
     as_root "npm install -g pm2"
 }
 
@@ -374,7 +386,7 @@ EOF
 native_install_project_dependencies() {
     local app_dir="$1"
     log_info "Etapa 11/23: instalando dependencias do projeto..."
-    run_as_native_user "cd '${app_dir}' && corepack enable || true && pnpm install --frozen-lockfile || pnpm install"
+    run_as_native_user "cd '${app_dir}' && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack enable || true && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install --frozen-lockfile || COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install"
 }
 
 native_install_certbot() {
@@ -467,8 +479,28 @@ native_restart_apps() {
 native_setup_certbot() {
     local domain="$1"
     local email="$2"
-    log_info "Etapa 21/23: emitindo certificado certbot..."
-    as_root "certbot -m '${email}' --nginx --agree-tos --non-interactive --domains '${domain}' --redirect"
+    log_info "Etapa 21/23: emitindo certificado certbot (webroot)..."
+    as_root "mkdir -p /var/www/certbot/.well-known/acme-challenge"
+    # Primeiro valida em staging para evitar limite de tentativas
+    if ! as_root "certbot certonly --webroot -w /var/www/certbot -d '${domain}' -m '${email}' --agree-tos --non-interactive --test-cert"; then
+        log_warn "Falha no teste de staging do certbot."
+        return 1
+    fi
+
+    # Em seguida solicita certificado real
+    if ! as_root "certbot certonly --webroot -w /var/www/certbot -d '${domain}' -m '${email}' --agree-tos --non-interactive --force-renewal"; then
+        log_warn "Falha ao emitir certificado real."
+        return 1
+    fi
+
+    # Aplica HTTPS no vhost após emissão bem sucedida
+    if as_root "certbot install --cert-name '${domain}' --nginx --non-interactive --redirect"; then
+        as_root "systemctl reload nginx || true"
+        return 0
+    fi
+
+    log_warn "Certificado emitido, mas nao foi possivel aplicar redirect HTTPS automaticamente."
+    return 1
 }
 
 native_start_firewall() {
@@ -534,7 +566,9 @@ run_install_native() {
     native_start_pm2_apps "$app_dir" "$instance_name"
     native_configure_nginx_proxy "$domain" "$instance_name"
     native_restart_apps "$instance_name"
-    native_setup_certbot "$domain" "$email"
+    if ! native_setup_certbot "$domain" "$email"; then
+        log_warn "SSL nao foi emitido/configurado nesta execucao. Instalacao native continuara sem abortar."
+    fi
     native_start_firewall
     native_show_report "$domain" "$admin_email" "$admin_pass" "$db_name" "$db_user" "$db_pass" "$jwt_secret" "$enc_key" "$app_dir"
 }
