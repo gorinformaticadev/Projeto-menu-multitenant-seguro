@@ -1,35 +1,33 @@
-# Inicio rapido
+﻿# Inicio rapido
 
-Guia direto para instalar e operar usando o instalador separado.
+Guia direto para subir e operar o sistema usando os scripts oficiais.
 
-## 1. Clonar instalador
+## 1. Instalacao
 
 ```bash
-git clone https://github.com/gorinformaticadev/install-multitenant.git install
-cd install
+bash install/install.sh
 ```
 
-## 2. Instalar
+## 2. Validacao basica
 
 ```bash
-sudo bash install.sh install -d app.empresa.com -e admin@empresa.com -u gorinformatica
+bash install/check.sh
 ```
 
-## 3. Atualizar
+## 3. Atualizacao
 
 ```bash
-sudo bash install.sh update
+bash install/update.sh
 ```
 
-## 4. Desinstalar
+## 4. Desinstalacao
 
 ```bash
-sudo bash install.sh uninstall
+bash install/uninstall.sh
 ```
 
 ## Referencias
 
-- `DOCS/install/README-INSTALADOR.md`
-- `DOCS/install/TROUBLESHOOTING.md`
-- `DOCS/INDICE_DOCUMENTACAO.md`
-
+- Guia completo do instalador: `install/README-INSTALADOR.md`
+- Troubleshooting: `install/TROUBLESHOOTING.md`
+- Documentacao geral: `INDICE_DOCUMENTACAO.md`

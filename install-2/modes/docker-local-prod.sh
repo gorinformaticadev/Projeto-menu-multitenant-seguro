@@ -4,8 +4,8 @@
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INSTALL_DIR="${INSTALLER_ROOT:-$(dirname "$SCRIPT_DIR")}"
-PROJECT_ROOT="${PROJECT_ROOT:-$(dirname "$INSTALL_DIR")/Projeto-menu-multitenant-seguro}"
+INSTALL_DIR="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(dirname "$INSTALL_DIR")"
 
 # common.sh e docker-utils.sh ja foram carregados pelo install.sh
 
@@ -51,11 +51,11 @@ run_docker_local_prod() {
     
     # Executar migrations
     log_info "Executando migrations..."
-    docker compose -f docker-compose.prod.yml --env-file "$env_prod" exec backend pnpm exec prisma migrate deploy || true
+    docker compose -f docker-compose.prod.yml --env-file "$env_prod" exec backend npx prisma migrate deploy || true
     
     # Executar seeds
     log_info "Populando banco de dados..."
-    docker compose -f docker-compose.prod.yml --env-file "$env_prod" exec backend pnpm exec prisma db seed || true
+    docker compose -f docker-compose.prod.yml --env-file "$env_prod" exec backend npx prisma db seed || true
     
     print_separator
     echogreen "✓ Instalação concluída!"

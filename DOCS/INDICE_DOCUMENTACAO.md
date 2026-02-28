@@ -1,24 +1,17 @@
-# Indice da documentacao
+﻿# Indice da documentacao
 
 ## Comecar por aqui
 
-1. `../README.md` - visao geral e novo formato
-2. `install/README-INSTALADOR.md` - guia oficial do instalador separado
-3. `install/TROUBLESHOOTING.md` - problemas comuns
+1. `../README.md` - visao geral do repositorio
+2. `install/README-INSTALADOR.md` - guia oficial de instalacao
+3. `install/TROUBLESHOOTING.md` - problemas comuns de instalacao
 
 ## Operacao
 
-- Instalacao: `install.sh install`
-- Atualizacao: `install.sh update`
-- Desinstalacao: `install.sh uninstall`
-
-## Fluxo resumido
-
-```bash
-git clone https://github.com/gorinformaticadev/install-multitenant.git install
-cd install
-sudo bash install.sh install -d app.empresa.com -e admin@empresa.com -u gorinformatica
-```
+- Instalacao: `install/install.sh`
+- Atualizacao: `install/update.sh`
+- Desinstalacao: `install/uninstall.sh`
+- Validacao: `install/check.sh`
 
 ## Documentacao por area
 
@@ -27,4 +20,3 @@ sudo bash install.sh install -d app.empresa.com -e admin@empresa.com -u gorinfor
 - Scripts auxiliares: `../Scripts/`
 - Historico tecnico: `Documentacoes/`
 - Arquivos herdados da raiz: `raiz/`
-

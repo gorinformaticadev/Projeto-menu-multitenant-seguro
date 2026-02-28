@@ -29,7 +29,7 @@ fi
 
 # Verificar se npx está disponível, senão usar o prisma do node_modules
 if command -v npx >/dev/null 2>&1; then
-  PRISMA_CMD="pnpm exec prisma"
+  PRISMA_CMD="npx prisma"
 else
   PRISMA_CMD="./node_modules/.bin/prisma"
 fi

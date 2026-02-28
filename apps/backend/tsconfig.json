@@ -40,7 +40,6 @@
   },
   "include": [
     "src/**/*",
-    "prisma/seed.ts",
     "../../packages/modules/**/backend/**/*",
     "../../packages/modules/**/module.ts",
     "../../packages/modules/**/permissions.ts"

@@ -8,8 +8,7 @@
 
 # --- Paths (definidos quando sourced; SCRIPT_DIR e PROJECT_ROOT vem de install.sh) ---
 INSTALL2_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-INSTALLER_ROOT="${INSTALLER_ROOT:-$INSTALL2_DIR}"
-PROJECT_ROOT="${PROJECT_ROOT:-$(dirname "$INSTALLER_ROOT")/Projeto-menu-multitenant-seguro}"
+PROJECT_ROOT="$(dirname "$INSTALL2_DIR")"
 
 COMPOSE_PROD="$PROJECT_ROOT/docker-compose.prod.yml"
 COMPOSE_PROD_BUILD="$PROJECT_ROOT/docker-compose.prod.build.yml"
@@ -202,10 +201,10 @@ ensure_production_env_file() {
     if [[ ! -f "$ENV_PRODUCTION" ]]; then
         if [[ -f "$ENV_INSTALLER_EXAMPLE" ]]; then
             cp "$ENV_INSTALLER_EXAMPLE" "$ENV_PRODUCTION"
-            log_info "Arquivo de producao criado: $INSTALLER_ROOT/.env.production"
+            log_info "Arquivo de producao criado: install-2/.env.production"
         elif [[ -f "$ENV_EXAMPLE" ]]; then
             cp "$ENV_EXAMPLE" "$ENV_PRODUCTION"
-            log_info "Arquivo de producao criado: $INSTALLER_ROOT/.env.production"
+            log_info "Arquivo de producao criado: install-2/.env.production"
         else
             log_error "Nenhum .env.example ou .env.installer.example encontrado."
             exit 1
@@ -373,7 +372,7 @@ run_docker_vps_install() {
         fi
     fi
 
-    log_info "Subindo stack (docker-compose.prod.yml) com $INSTALLER_ROOT/.env.production..."
+    log_info "Subindo stack (docker-compose.prod.yml) com install-2/.env.production..."
     cd "$PROJECT_ROOT"
     pull_or_build_stack
 
@@ -425,7 +424,7 @@ run_docker_vps_install() {
 
     echoblue "=========================================================="
     log_info "Guarde estas informacoes em local seguro!"
-    log_info "Arquivo de configuracao: $INSTALLER_ROOT/.env.production"
+    log_info "Arquivo de configuracao: install-2/.env.production"
     echogreen "Instalacao concluida com sucesso!"
     echo -e "\n"
 }

@@ -11,8 +11,7 @@
 # Nao carregar common.sh aqui - ja foi carregado pelo install.sh
 
 INSTALL2_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-INSTALLER_ROOT="${INSTALLER_ROOT:-$INSTALL2_DIR}"
-PROJECT_ROOT="${PROJECT_ROOT:-$(dirname "$INSTALLER_ROOT")/Projeto-menu-multitenant-seguro}"
+PROJECT_ROOT="$(dirname "$INSTALL2_DIR")"
 TEMPLATES_DIR="$INSTALL2_DIR/templates"
 
 # Diretorios de log e dados
@@ -34,30 +33,16 @@ create_system_user() {
     log_success "Usuario 'multitenant' criado."
 }
 
-setup_timezone() {
-    log_info "Configurando timezone para America/Sao_Paulo..."
-    timedatectl set-timezone America/Sao_Paulo 2>/dev/null || {
-        # Fallback para sistemas que não têm systemd
-        echo "America/Sao_Paulo" > /etc/timezone
-        dpkg-reconfigure -f noninteractive tzdata 2>/dev/null || true
-    }
-    log_success "Timezone configurado."
-}
-
 setup_directories() {
     log_info "Criando diretorios necessarios..."
     mkdir -p "$MULTITENANT_LOG_DIR"
     mkdir -p "$MULTITENANT_DATA_DIR"
     mkdir -p "$CERTBOT_WEBROOT"
-    # Garantir que os diretórios de aplicação existam
-    mkdir -p "$PROJECT_ROOT/apps/backend"
-    mkdir -p "$PROJECT_ROOT/apps/frontend"
     # Garantir que o diretório home do usuário multitenant tenha permissões corretas
     mkdir -p /home/multitenant
     chown -R multitenant:multitenant "$MULTITENANT_LOG_DIR"
     chown -R multitenant:multitenant "$MULTITENANT_DATA_DIR"
     chown -R multitenant:multitenant /home/multitenant
-    chown -R multitenant:multitenant "$PROJECT_ROOT/apps"
     log_success "Diretorios criados."
 }
 
@@ -71,46 +56,18 @@ prepare_multitenant_environment() {
     # Garantir que os diretórios de configuração do npm/pnpm existam
     sudo -u multitenant sh -c 'mkdir -p ~/.npm ~/.pnpm-store ~/.config'
     
-    # Aguardar até que o Node.js esteja disponível para o usuário multitenant (até 30 segundos)
-    local attempts=0
-    local max_attempts=15
-    local node_available=false
-    
-    while [[ $attempts -lt $max_attempts ]]; do
-        if sudo -u multitenant sh -c 'command -v node >/dev/null 2>&1'; then
-            node_available=true
-            break
-        fi
-        log_info "Aguardando Node.js estar disponível para o usuário multitenant... (${attempts}/${max_attempts})"
-        sleep 2
-        ((attempts++))
-    done
-    
-    if [[ "$node_available" != true ]]; then
-        log_error "Node.js não está disponível para o usuário multitenant após ${max_attempts} tentativas"
+    # Garantir que os comandos node e npm estejam disponíveis
+    if ! sudo -u multitenant sh -c 'which node >/dev/null'; then
+        log_error "Node.js não está disponível para o usuário multitenant"
         return 1
     fi
     
-    # Aguardar até que o npm esteja disponível
-    attempts=0
-    local npm_available=false
-    
-    while [[ $attempts -lt $max_attempts ]]; do
-        if sudo -u multitenant sh -c 'command -v npm >/dev/null 2>&1'; then
-            npm_available=true
-            break
-        fi
-        log_info "Aguardando npm estar disponível para o usuário multitenant... (${attempts}/${max_attempts})"
-        sleep 2
-        ((attempts++))
-    done
-    
-    if [[ "$npm_available" != true ]]; then
-        log_error "npm não está disponível para o usuário multitenant após ${max_attempts} tentativas"
+    if ! sudo -u multitenant sh -c 'which npm >/dev/null'; then
+        log_error "npm não está disponível para o usuário multitenant"
         return 1
     fi
     
-    if ! sudo -u multitenant sh -c 'command -v pnpm >/dev/null 2>&1'; then
+    if ! sudo -u multitenant sh -c 'which pnpm >/dev/null'; then
         log_error "pnpm não está disponível para o usuário multitenant"
         # Tentar instalar pnpm para o usuário multitenant
         log_info "Tentando instalar pnpm para o usuário multitenant..."
@@ -160,11 +117,6 @@ install_nodejs() {
     apt-get install -y -qq nodejs
 
     log_success "Node.js instalado: $(node --version)"
-
-    # Garantir que o usuário multitenant tenha acesso ao Node.js
-    # Configurar o PATH do usuário multitenant para incluir o diretório do Node.js
-    sudo -u multitenant sh -c 'echo "export PATH=/usr/bin:/usr/local/bin:/opt/nodejs/bin:\$PATH" >> ~/.bashrc'
-    sudo -u multitenant sh -c 'hash -r 2>/dev/null || true'
 
     # Instalar pnpm globalmente
     if ! command -v pnpm &>/dev/null; then
@@ -339,48 +291,6 @@ install_nginx() {
     log_success "Nginx instalado: $(nginx -v 2>&1 | grep -oP 'nginx/\K.*')"
 }
 
-check_and_open_ports_native() {
-    log_info "Verificando portas 80 e 443 para validacao do Let's Encrypt..."
-
-    if ! command -v netstat &>/dev/null; then
-        apt-get install -y -qq net-tools >/dev/null 2>&1 || true
-    fi
-
-    if command -v ufw &>/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
-        log_info "UFW detectado. Liberando portas 80 e 443..."
-        ufw allow 80/tcp >/dev/null 2>&1 || true
-        ufw allow 443/tcp >/dev/null 2>&1 || true
-        log_info "Portas 80/443 liberadas no UFW."
-    fi
-
-    if command -v iptables &>/dev/null; then
-        if iptables -L INPUT -n 2>/dev/null | grep -q "DROP\|REJECT"; then
-            log_warn "Detectadas regras de firewall (iptables). Garanta que 80/443 estejam liberadas."
-        fi
-    fi
-
-    if command -v netstat &>/dev/null; then
-        if netstat -tlnp 2>/dev/null | grep -q ":80 "; then
-            local port80_process
-            port80_process=$(netstat -tlnp 2>/dev/null | grep ":80 " | awk '{print $7}' | head -1)
-            log_info "Porta 80 em uso por: $port80_process"
-        else
-            log_warn "Nenhum processo local ouvindo na porta 80."
-            log_warn "Sem HTTP ativo, o desafio ACME via webroot vai falhar."
-        fi
-
-        if netstat -tlnp 2>/dev/null | grep -q ":443 "; then
-            local port443_process
-            port443_process=$(netstat -tlnp 2>/dev/null | grep ":443 " | awk '{print $7}' | head -1)
-            log_info "Porta 443 em uso por: $port443_process"
-        else
-            log_warn "Nenhum processo local ouvindo na porta 443."
-        fi
-    fi
-
-    log_info "Verificacao de portas finalizada."
-}
-
 configure_nginx_native() {
     local domain="$1"
     local ssl_cert="$2"
@@ -447,7 +357,6 @@ obtain_native_ssl_cert() {
     local email="$2"
 
     log_info "Obtendo certificado SSL para $domain via Certbot..."
-    check_and_open_ports_native
 
     # Testar com staging primeiro
     log_info "Testando com Let's Encrypt staging..."
@@ -479,7 +388,7 @@ obtain_native_ssl_cert() {
     fi
 
     log_warn "Nao foi possivel obter certificado Let's Encrypt."
-    log_warn "Verifique DNS (A/AAAA), abertura de porta 80 no firewall e regra de entrada no provedor cloud."
+    log_warn "Verifique se o DNS de $domain aponta para este servidor e porta 80 esta aberta."
     return 1
 }
 
@@ -647,10 +556,6 @@ configure_backend_env() {
     local env_file="$PROJECT_ROOT/apps/backend/.env"
     local env_example="$PROJECT_ROOT/apps/backend/.env.example"
 
-    # Garantir que o diretório exista
-    mkdir -p "$PROJECT_ROOT/apps/backend"
-    chown multitenant:multitenant "$PROJECT_ROOT/apps/backend"
-
     if [[ ! -f "$env_file" ]] && [[ -f "$env_example" ]]; then
         cp "$env_example" "$env_file"
         log_info "Criado apps/backend/.env a partir de .env.example"
@@ -683,10 +588,6 @@ configure_frontend_env() {
 
     local env_file="$PROJECT_ROOT/apps/frontend/.env.local"
     local env_example="$PROJECT_ROOT/apps/frontend/.env.local.example"
-
-    # Garantir que o diretório exista
-    mkdir -p "$PROJECT_ROOT/apps/frontend"
-    chown multitenant:multitenant "$PROJECT_ROOT/apps/frontend"
 
     if [[ ! -f "$env_file" ]] && [[ -f "$env_example" ]]; then
         cp "$env_example" "$env_file"
@@ -814,36 +715,16 @@ run_migrations() {
 run_seeds() {
     log_info "Populando banco de dados (seed)..."
     cd "$PROJECT_ROOT/apps/backend"
-
-    # O projeto usa seed compilado em dist/prisma/seed.js.
-    # No fluxo nativo, garantir artefato antes de executar.
-    if [[ ! -f dist/prisma/seed.js ]]; then
-        log_warn "Arquivo dist/prisma/seed.js nao encontrado. Compilando seed..."
-        if ! sudo -u multitenant npx tsc prisma/seed.ts \
-            --outDir dist/prisma \
-            --skipLibCheck \
-            --module commonjs \
-            --target ES2021 \
-            --esModuleInterop \
-            --resolveJsonModule; then
-            log_error "Falha ao compilar seed.ts para dist/prisma/seed.js"
-            return 1
+    
+    # Tentar executar o seed com tratamento de erros
+    if ! sudo -u multitenant npx prisma db seed 2>/dev/null; then
+        log_warn "Falha ao executar prisma db seed, tentando alternativa..."
+        if ! sudo -u multitenant node dist/prisma/seed.js 2>/dev/null; then
+            log_warn "Seed nao executou. Execute manualmente: cd apps/backend && npx prisma db seed"
+            log_warn "OBS: Isso pode ser normal se não houver seed definido ou se as tabelas não estiverem prontas ainda"
         fi
     fi
-
-    if sudo -u multitenant npx prisma db seed; then
-        log_success "Seed executado com sucesso."
-        return 0
-    fi
-
-    log_warn "Falha no prisma db seed. Tentando executar seed compilado diretamente..."
-    if sudo -u multitenant node dist/prisma/seed.js; then
-        log_success "Seed executado com sucesso (modo direto)."
-        return 0
-    fi
-
-    log_error "Seed falhou. Corrija o erro acima e execute: cd apps/backend && npx prisma db seed"
-    return 1
+    log_success "Seed executado (ou ignorado se não aplicável)."
 }
 
 # =============================================================================
@@ -886,62 +767,21 @@ setup_systemd_services() {
 check_multitenant_environment() {
     log_info "Verificando ambiente do usuário multitenant..."
     
-    # Verificar se o Node.js pode ser executado (tentar múltiplas vezes)
-    local node_version=""
-    local attempts=0
-    local max_attempts=5  # Aumentar o número de tentativas
+    # Verificar se o Node.js está disponível para o usuário multitenant
+    if ! sudo -u multitenant command -v node >/dev/null 2>&1; then
+        log_error "Node.js não está disponível para o usuário multitenant"
+        # Tentar configurar o PATH
+        sudo -u multitenant sh -c 'export PATH="$PATH:/usr/local/bin:/opt/nodejs/bin:$HOME/.nvm/versions/node/*/bin" >> ~/.bashrc'
+        # Atualizar o PATH
+        sudo -u multitenant sh -c 'hash -r'
+    fi
     
-    while [[ $attempts -lt $max_attempts ]]; do
-        node_version=$(sudo -u multitenant bash -l -c 'node --version' 2>/dev/null)
-        if [[ -n "$node_version" ]]; then
-            break
-        fi
-        log_info "Aguardando Node.js estar disponível para o usuário multitenant... (${attempts}/${max_attempts})"
-        sleep 3
-        ((attempts++))
-    done
-    
+    # Verificar se o Node.js pode ser executado
+    local node_version=$(sudo -u multitenant node --version 2>/dev/null)
     if [[ -n "$node_version" ]]; then
         log_success "Node.js encontrado: $node_version"
     else
-        # Somente se realmente não encontrar o Node.js, tentar configurar o ambiente
-        log_warn "Node.js não está disponível para o usuário multitenant, tentando configurar..."
-        
-        # Tentar configurar o PATH de forma mais robusta
-        sudo -u multitenant sh -c 'echo "export PATH=\"$PATH:/usr/local/bin:/opt/nodejs/bin:$HOME/.nvm/versions/node/*/bin\"" >> ~/.bashrc'
-        sudo -u multitenant sh -c 'echo "export NODE_PATH=\"/usr/local/lib/node_modules:/opt/nodejs/lib/node_modules\"" >> ~/.bashrc'
-        
-        # Atualizar o PATH imediatamente
-        sudo -u multitenant sh -c 'hash -r 2>/dev/null || true'
-        
-        # Tornar as alterações permanentes no ambiente
-        sudo -u multitenant sh -c 'source ~/.bashrc 2>/dev/null || true'
-        
-        # Tentar novamente
-        attempts=0
-        max_attempts=3
-        while [[ $attempts -lt $max_attempts ]]; do
-            node_version=$(sudo -u multitenant bash -l -c 'node --version' 2>/dev/null)
-            if [[ -n "$node_version" ]]; then
-                break
-            fi
-            sleep 2
-            ((attempts++))
-        done
-        
-        if [[ -n "$node_version" ]]; then
-            log_success "Node.js encontrado após configuração: $node_version"
-        else
-            log_warn "Node.js não pôde ser executado como usuário multitenant"
-            # Último recurso: tentar encontrar o binário de Node.js
-            local node_path=$(find /usr -name node -type f -executable 2>/dev/null | head -n 1)
-            if [[ -n "$node_path" ]]; then
-                log_info "Node.js encontrado em: $node_path"
-                # Criar um link simbólico ou atualizar o PATH
-                sudo -u multitenant sh -c "ln -sf \"$node_path\" /home/multitenant/.local/bin/node 2>/dev/null || mkdir -p /home/multitenant/.local/bin 2>/dev/null && ln -sf \"$node_path\" /home/multitenant/.local/bin/node 2>/dev/null"
-                sudo -u multitenant sh -c 'export PATH="$HOME/.local/bin:$PATH" >> ~/.bashrc'
-            fi
-        fi
+        log_warn "Node.js não pôde ser executado como usuário multitenant"
     fi
     
     # Verificar se os arquivos necessários existem
@@ -952,12 +792,11 @@ check_multitenant_environment() {
         log_success "Arquivo backend encontrado"
     fi
     
-    # Para o frontend Next.js, verificar a existência do diretório .next após o build
-    if [[ ! -d "$PROJECT_ROOT/apps/frontend/.next" ]]; then
-        log_error "Diretório .next do frontend não encontrado (build não realizado ou falhou)"
+    if [[ ! -f "$PROJECT_ROOT/apps/frontend/server.js" ]]; then
+        log_error "Arquivo frontend server.js não encontrado"
         log_info "Certifique-se de que o build foi concluído com sucesso"
     else
-        log_success "Build do frontend encontrado (.next)"
+        log_success "Arquivo frontend encontrado"
     fi
 }
 
@@ -1053,7 +892,7 @@ start_pm2_services() {
 fix_project_permissions() {
     log_info "Ajustando permissoes do projeto..."
     chown -R multitenant:multitenant "$PROJECT_ROOT"
-    # Manter diretorio do instalador acessivel ao root para futuras reinstalacoes
+    # Manter install-2 acessivel ao root para futuras reinstalacoes
     chmod -R 755 "$INSTALL2_DIR"
     log_success "Permissoes ajustadas."
 }

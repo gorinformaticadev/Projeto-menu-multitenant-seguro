@@ -8,8 +8,8 @@
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INSTALL_DIR="${INSTALLER_ROOT:-$(dirname "$SCRIPT_DIR")}"
-PROJECT_ROOT="${PROJECT_ROOT:-$(dirname "$INSTALL_DIR")/Projeto-menu-multitenant-seguro}"
+INSTALL_DIR="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(dirname "$INSTALL_DIR")"
 
 # common.sh, docker-utils.sh e native-utils.sh ja foram carregados pelo install.sh
 
@@ -65,7 +65,6 @@ run_native_vps_dev() {
     # --- 1. Preparacao ---
     apt-get update -qq
     create_system_user
-    setup_timezone
     setup_directories
 
     # --- 2. Instalar dependencias ---
@@ -84,13 +83,13 @@ run_native_vps_dev() {
     # --- 3. Configurar PostgreSQL ---
     configure_postgresql "$db_name" "$db_user" "$db_pass"
 
-    # --- 4. Ajustar permissoes ---
-    fix_project_permissions
-
-    # --- 5. Configurar .env dos apps ---
+    # --- 4. Configurar .env dos apps ---
     configure_backend_env "$domain" "$db_user" "$db_pass" "$db_name" \
         "$jwt_secret" "$enc_key" "$admin_email" "$admin_pass" "development"
     configure_frontend_env "$domain"
+
+    # --- 5. Ajustar permissoes ---
+    fix_project_permissions
 
     # --- 6. Build da aplicacao ---
     build_application "development"
@@ -105,18 +104,17 @@ run_native_vps_dev() {
 
     generate_self_signed_cert "$domain"
 
-    # Configurar nginx com autoassinado antes do Certbot para servir ACME challenge.
-    configure_nginx_native "$domain" "$ssl_cert" "$ssl_key"
-
     # Tentar Let's Encrypt (pode falhar em dev)
     if obtain_native_ssl_cert "$domain" "$email" 2>/dev/null; then
         ssl_cert="/etc/letsencrypt/live/$domain/fullchain.pem"
         ssl_key="/etc/letsencrypt/live/$domain/privkey.pem"
-        configure_nginx_native "$domain" "$ssl_cert" "$ssl_key"
         setup_certbot_renewal
     else
         log_info "Usando certificado autoassinado (OK para desenvolvimento)."
     fi
+
+    # --- 9. Configurar Nginx ---
+    configure_nginx_native "$domain" "$ssl_cert" "$ssl_key"
 
     # --- 10. Iniciar com PM2 ---
     setup_pm2_services "development" 1
