@@ -31,6 +31,8 @@ NGINX_TEMPLATE_ACME="$PROJECT_ROOT/multitenant-docker-acme/confs/nginx-multitena
 NGINX_CONF_DIR="$PROJECT_ROOT/nginx/conf.d"
 NGINX_CERTS_DIR="$PROJECT_ROOT/nginx/certs"
 NGINX_WEBROOT="$PROJECT_ROOT/nginx/webroot"
+NATIVE_SYSTEM_USER="multitenant"
+NATIVE_BASE_DIR="/home/${NATIVE_SYSTEM_USER}"
 
 # --- Cores e helpers ---
 echored()   { echo -ne "\033[41m\033[37m\033[1m  $1  \033[0m\n"; }
@@ -215,6 +217,326 @@ check_and_open_ports() {
     fi
     
     log_info "Verificação de portas concluída."
+}
+
+# --- Native helpers ---
+as_root() {
+    local cmd="$1"
+    if [[ $EUID -eq 0 ]]; then
+        bash -lc "$cmd"
+    else
+        sudo su - root -c "$cmd"
+    fi
+}
+
+run_as_native_user() {
+    local cmd="$1"
+    as_root "sudo -u ${NATIVE_SYSTEM_USER} bash -lc $(printf '%q' "$cmd")"
+}
+
+native_system_create_user() {
+    local system_pass="$1"
+    log_info "Etapa 1/23: criando/atualizando usuario ${NATIVE_SYSTEM_USER}..."
+    if id "${NATIVE_SYSTEM_USER}" &>/dev/null; then
+        as_root "echo '${NATIVE_SYSTEM_USER}:${system_pass}' | chpasswd"
+    else
+        as_root "useradd -m -p \"\$(openssl passwd -1 '${system_pass}')\" -s /bin/bash ${NATIVE_SYSTEM_USER}"
+    fi
+}
+
+native_system_permissions_and_project() {
+    local app_dir="$1"
+    log_info "Etapa 2/23: ajustando permissoes e preparando projeto..."
+    as_root "mkdir -p '${app_dir}'"
+    if command -v rsync &>/dev/null; then
+        as_root "rsync -a --delete --exclude '.git' --exclude 'node_modules' --exclude 'apps/backend/node_modules' --exclude 'apps/frontend/node_modules' '${PROJECT_ROOT}/' '${app_dir}/'"
+    else
+        as_root "cp -a '${PROJECT_ROOT}/.' '${app_dir}/'"
+    fi
+    as_root "chown -R ${NATIVE_SYSTEM_USER}:${NATIVE_SYSTEM_USER} '${NATIVE_BASE_DIR}'"
+}
+
+native_system_update() {
+    log_info "Etapa 3/23: atualizando sistema e portas..."
+    as_root "apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && apt-get autoremove -y"
+    as_root "apt-get install -y ca-certificates curl gnupg lsb-release software-properties-common apt-transport-https"
+    as_root "if command -v ufw >/dev/null 2>&1; then ufw --force delete allow 80/tcp >/dev/null 2>&1 || true; ufw --force delete allow 443/tcp >/dev/null 2>&1 || true; fi"
+}
+
+native_firewall_install() {
+    log_info "Etapa 4/23: instalando/configurando firewall..."
+    as_root "apt-get install -y ufw && ufw default deny incoming && ufw default allow outgoing && ufw allow ssh && ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp && ufw --force enable && systemctl restart ufw || true"
+}
+
+native_set_timezone() {
+    log_info "Etapa 5/23: configurando timezone..."
+    as_root "timedatectl set-timezone America/Sao_Paulo"
+}
+
+native_install_node() {
+    log_info "Etapa 6/23: instalando Node.js..."
+    as_root "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -"
+    as_root "DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs"
+}
+
+native_install_pm2_and_pnpm() {
+    log_info "Etapa 7/23: instalando PM2 e pnpm..."
+    as_root "corepack enable || true"
+    as_root "corepack prepare pnpm@latest --activate || npm install -g pnpm"
+    as_root "npm install -g pm2"
+}
+
+native_install_snapd() {
+    log_info "Etapa 8/23: instalando snapd..."
+    as_root "DEBIAN_FRONTEND=noninteractive apt-get install -y snapd"
+    as_root "snap install core || true"
+    as_root "snap refresh core || true"
+}
+
+native_install_nginx() {
+    log_info "Etapa 9/23: instalando nginx..."
+    as_root "DEBIAN_FRONTEND=noninteractive apt-get install -y nginx"
+    as_root "rm -f /etc/nginx/sites-enabled/default"
+}
+
+native_configure_nginx_proxy() {
+    local domain="$1"
+    local instance_name="$2"
+    local conf="/etc/nginx/sites-available/${instance_name}.conf"
+    local tmp_conf
+    log_info "Etapa 10/23 e 19/23: configurando proxy reverso nginx..."
+    as_root "mkdir -p /var/www/certbot"
+    tmp_conf="$(mktemp)"
+    cat > "$tmp_conf" <<EOF
+server {
+    listen 80;
+    server_name ${domain};
+    client_max_body_size 64m;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        try_files \$uri =404;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+    }
+
+    location /api {
+        proxy_pass http://127.0.0.1:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+    }
+
+    location /uploads {
+        proxy_pass http://127.0.0.1:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+    }
+
+    location /socket.io {
+        proxy_pass http://127.0.0.1:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 86400;
+    }
+}
+EOF
+    as_root "install -m 644 '$tmp_conf' '$conf'"
+    rm -f "$tmp_conf"
+    as_root "ln -sfn '${conf}' '/etc/nginx/sites-enabled/${instance_name}.conf'"
+    as_root "nginx -t && systemctl enable nginx && systemctl restart nginx"
+}
+
+native_install_project_dependencies() {
+    local app_dir="$1"
+    log_info "Etapa 11/23: instalando dependencias do projeto..."
+    run_as_native_user "cd '${app_dir}' && corepack enable || true && pnpm install --frozen-lockfile || pnpm install"
+}
+
+native_install_certbot() {
+    log_info "Etapa 12/23: instalando certbot..."
+    as_root "apt-get remove -y certbot >/dev/null 2>&1 || true"
+    as_root "snap install --classic certbot || true"
+    as_root "ln -sfn /snap/bin/certbot /usr/bin/certbot"
+}
+
+native_build_apps() {
+    local app_dir="$1"
+    log_info "Etapa 13/23: build backend/frontend e seed..."
+    run_as_native_user "cd '${app_dir}' && pnpm --filter backend build"
+    run_as_native_user "cd '${app_dir}/apps/backend' && pnpm exec tsc prisma/seed.ts --outDir dist/prisma --skipLibCheck --module commonjs --target ES2021 --esModuleInterop --resolveJsonModule"
+    run_as_native_user "cd '${app_dir}' && pnpm --filter frontend build"
+}
+
+native_setup_database() {
+    local db_name="$1"
+    local db_user="$2"
+    local db_pass="$3"
+    log_info "Etapa 14/23: instalando PostgreSQL/Redis e criando database..."
+    as_root "DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql postgresql-contrib redis-server"
+    as_root "systemctl enable postgresql redis-server && systemctl restart postgresql redis-server"
+    as_root "if ! sudo -u postgres psql -tAc \"SELECT 1 FROM pg_roles WHERE rolname='${db_user}'\" | grep -q 1; then sudo -u postgres psql -c \"CREATE USER \\\"${db_user}\\\" WITH PASSWORD '${db_pass}';\"; else sudo -u postgres psql -c \"ALTER USER \\\"${db_user}\\\" WITH PASSWORD '${db_pass}';\"; fi"
+    as_root "if ! sudo -u postgres psql -tAc \"SELECT 1 FROM pg_database WHERE datname='${db_name}'\" | grep -q 1; then sudo -u postgres psql -c \"CREATE DATABASE \\\"${db_name}\\\" OWNER \\\"${db_user}\\\";\"; fi"
+    as_root "sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE \\\"${db_name}\\\" TO \\\"${db_user}\\\";\""
+}
+
+native_create_app_envs() {
+    local app_dir="$1"
+    local domain="$2"
+    local email="$3"
+    local admin_email="$4"
+    local admin_pass="$5"
+    local db_name="$6"
+    local db_user="$7"
+    local db_pass="$8"
+    local jwt_secret="$9"
+    local enc_key="${10}"
+
+    local backend_env="$app_dir/apps/backend/.env"
+    local frontend_env="$app_dir/apps/frontend/.env.local"
+    local backend_example="$app_dir/apps/backend/.env.example"
+    local frontend_example="$app_dir/apps/frontend/.env.local.example"
+
+    log_info "Etapa 15/23 e 16/23: criando .env e credenciais do seed..."
+    [[ -f "$backend_env" ]] || cp "$backend_example" "$backend_env"
+    [[ -f "$frontend_env" ]] || cp "$frontend_example" "$frontend_env"
+
+    upsert_env "NODE_ENV" "production" "$backend_env"
+    upsert_env "PORT" "4000" "$backend_env"
+    upsert_env "DATABASE_URL" "postgresql://${db_user}:${db_pass}@127.0.0.1:5432/${db_name}?schema=public" "$backend_env"
+    upsert_env "JWT_SECRET" "$jwt_secret" "$backend_env"
+    upsert_env "ENCRYPTION_KEY" "$enc_key" "$backend_env"
+    upsert_env "FRONTEND_URL" "https://${domain}" "$backend_env"
+    upsert_env "UPLOADS_PUBLIC_URL" "https://${domain}/uploads" "$backend_env"
+    upsert_env "REDIS_HOST" "127.0.0.1" "$backend_env"
+    upsert_env "REDIS_PORT" "6379" "$backend_env"
+    upsert_env "INSTALL_ADMIN_EMAIL" "${admin_email:-$email}" "$backend_env"
+    upsert_env "INSTALL_ADMIN_PASSWORD" "$admin_pass" "$backend_env"
+    upsert_env "NEXT_PUBLIC_API_URL" "https://${domain}/api" "$frontend_env"
+
+    as_root "chown ${NATIVE_SYSTEM_USER}:${NATIVE_SYSTEM_USER} '${backend_env}' '${frontend_env}'"
+}
+
+native_migrate_and_seed() {
+    local app_dir="$1"
+    log_info "Etapa 17/23: executando migrate e seed..."
+    run_as_native_user "cd '${app_dir}/apps/backend' && set -a && source ./.env && set +a && pnpm exec prisma migrate deploy --schema prisma/schema.prisma"
+    run_as_native_user "cd '${app_dir}/apps/backend' && set -a && source ./.env && set +a && node dist/prisma/seed.js"
+}
+
+native_start_pm2_apps() {
+    local app_dir="$1"
+    local instance_name="$2"
+    log_info "Etapa 18/23: iniciando PM2 backend/frontend..."
+    run_as_native_user "cd '${app_dir}/apps/backend' && pm2 delete '${instance_name}-backend' >/dev/null 2>&1 || true && pm2 start dist/main.js --name '${instance_name}-backend'"
+    run_as_native_user "cd '${app_dir}/apps/frontend' && pm2 delete '${instance_name}-frontend' >/dev/null 2>&1 || true && pm2 start 'pnpm start' --name '${instance_name}-frontend'"
+    run_as_native_user "pm2 save"
+}
+
+native_restart_apps() {
+    local instance_name="$1"
+    log_info "Etapa 20/23: reiniciando apps..."
+    run_as_native_user "pm2 restart '${instance_name}-backend' '${instance_name}-frontend'"
+    sleep 10
+}
+
+native_setup_certbot() {
+    local domain="$1"
+    local email="$2"
+    log_info "Etapa 21/23: emitindo certificado certbot..."
+    as_root "certbot -m '${email}' --nginx --agree-tos --non-interactive --domains '${domain}' --redirect"
+}
+
+native_start_firewall() {
+    log_info "Etapa 22/23: garantindo firewall ativo..."
+    as_root "service ufw start || true"
+}
+
+native_show_report() {
+    local domain="$1"
+    local admin_email="$2"
+    local admin_pass="$3"
+    local db_name="$4"
+    local db_user="$5"
+    local db_pass="$6"
+    local jwt_secret="$7"
+    local enc_key="$8"
+    local app_dir="$9"
+    echoblue "=========================================================="
+    echoblue "      RELATORIO FINAL DE INSTALACAO - NATIVE             "
+    echoblue "=========================================================="
+    echo "URL: https://${domain}"
+    echo "API: https://${domain}/api"
+    echo "Admin email: ${admin_email}"
+    echo "Admin senha: ${admin_pass}"
+    echo "Database: ${db_name}"
+    echo "DB user: ${db_user}"
+    echo "DB pass: ${db_pass}"
+    echo "JWT_SECRET: ${jwt_secret}"
+    echo "ENCRYPTION_KEY: ${enc_key}"
+    echo "Diretorio: ${app_dir}"
+    log_info "Etapa 23/23 concluida."
+}
+
+run_install_native() {
+    local instance_name="$1"
+    local domain="$2"
+    local email="$3"
+    local admin_email="$4"
+    local admin_pass="$5"
+    local db_name="$6"
+    local db_user="$7"
+    local db_pass="$8"
+    local jwt_secret="$9"
+    local enc_key="${10}"
+    local app_dir="${NATIVE_BASE_DIR}/${instance_name}"
+
+    native_system_create_user "$admin_pass"
+    native_system_permissions_and_project "$app_dir"
+    native_system_update
+    native_firewall_install
+    native_set_timezone
+    native_install_node
+    native_install_pm2_and_pnpm
+    native_install_snapd
+    native_install_nginx
+    native_configure_nginx_proxy "$domain" "$instance_name"
+    native_install_project_dependencies "$app_dir"
+    native_install_certbot
+    native_build_apps "$app_dir"
+    native_setup_database "$db_name" "$db_user" "$db_pass"
+    native_create_app_envs "$app_dir" "$domain" "$email" "$admin_email" "$admin_pass" "$db_name" "$db_user" "$db_pass" "$jwt_secret" "$enc_key"
+    native_migrate_and_seed "$app_dir"
+    native_start_pm2_apps "$app_dir" "$instance_name"
+    native_configure_nginx_proxy "$domain" "$instance_name"
+    native_restart_apps "$instance_name"
+    native_setup_certbot "$domain" "$email"
+    native_start_firewall
+    native_show_report "$domain" "$admin_email" "$admin_pass" "$db_name" "$db_user" "$db_pass" "$jwt_secret" "$enc_key" "$app_dir"
 }
 
 # --- Validações ---
@@ -465,32 +787,24 @@ run_install() {
         exit 1
     fi
 
-    if [[ "$install_mode" == "native" ]]; then
-        log_warn "Instalação nativa selecionada."
-        log_warn "Modo nativo ainda não implementado neste instalador."
-        exit 0
-    fi
-
-    check_docker
-    check_docker_compose
-    check_and_open_ports
-
     if [[ "$no_prompt" != "true" ]]; then
         [[ -z "$domain" ]] && read -p "Domínio (ex: app.empresa.com): " domain
         [[ -z "$email" ]]  && read -p "Email (Let's Encrypt / admin): " email
-        if [[ -z "$image_owner" && "$local_build_only" != "true" ]]; then
+        if [[ "$install_mode" == "docker" && -z "$image_owner" && "$local_build_only" != "true" ]]; then
             read -p "GHCR owner (ex: org/user): " image_owner
         fi
-        [[ -z "$image_repo" ]] && read -p "Image repo prefix [projeto-menu-multitenant-seguro]: " image_repo
-        image_repo="${image_repo:-projeto-menu-multitenant-seguro}"
-        [[ -z "$image_tag" ]] && image_tag="latest"
+        if [[ "$install_mode" == "docker" ]]; then
+            [[ -z "$image_repo" ]] && read -p "Image repo prefix [projeto-menu-multitenant-seguro]: " image_repo
+            image_repo="${image_repo:-projeto-menu-multitenant-seguro}"
+            [[ -z "$image_tag" ]] && image_tag="latest"
+        fi
         [[ -z "$admin_email" ]] && admin_email="$email"
         read -sp "Senha inicial do admin [123456]: " admin_pass
         echo
         admin_pass="${admin_pass:-123456}"
     fi
 
-    if [[ -z "$image_owner" && "$local_build_only" != "true" ]]; then
+    if [[ "$install_mode" == "docker" && -z "$image_owner" && "$local_build_only" != "true" ]]; then
         image_owner="$(resolve_image_owner)"
     fi
 
@@ -499,7 +813,7 @@ run_install() {
         show_usage
         exit 1
     fi
-    if [[ "$local_build_only" != "true" && -z "$image_owner" ]]; then
+    if [[ "$install_mode" == "docker" && "$local_build_only" != "true" && -z "$image_owner" ]]; then
         log_error "IMAGE_OWNER é obrigatório quando LOCAL_BUILD_ONLY=false."
         show_usage
         exit 1
@@ -514,8 +828,14 @@ run_install() {
     LOCAL_BUILD_ONLY="$local_build_only"
     ensure_env_file
 
+    if [[ "$install_mode" == "docker" ]]; then
+        check_docker
+        check_docker_compose
+        check_and_open_ports
+    fi
+
     # Limpar volumes se solicitado
-    if [[ "$clean_install" == "true" ]]; then
+    if [[ "$install_mode" == "docker" && "$clean_install" == "true" ]]; then
         log_warn "Limpeza solicitada: removendo containers e volumes existentes..."
         cd "$PROJECT_ROOT"
         docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml down -v 2>/dev/null || true
@@ -539,12 +859,17 @@ run_install() {
     local db_pass="${DB_PASSWORD:-$(openssl rand -hex 16)}"
     local jwt_secret="${JWT_SECRET:-$(openssl rand -hex 32)}"
     local enc_key="${ENCRYPTION_KEY:-$(openssl rand -hex 32)}"
+    local db_host_env="db"
+    if [[ "$install_mode" == "native" ]]; then
+        db_host_env="127.0.0.1"
+    fi
 
     log_info "Configurando .env..."
     upsert_env "DOMAIN" "$domain"
     upsert_env "LETSENCRYPT_EMAIL" "$email"
     upsert_env "LETSENCRYPT_HOST" "$domain"
     upsert_env "VIRTUAL_HOST" "$domain"
+    upsert_env "INSTALL_MODE" "$install_mode"
     upsert_env "IMAGE_OWNER" "$image_owner"
     upsert_env "IMAGE_REPO" "$image_repo"
     upsert_env "IMAGE_TAG" "$image_tag"
@@ -554,7 +879,7 @@ run_install() {
     upsert_env "DB_USER" "$db_user"
     upsert_env "DB_PASSWORD" "$db_pass"
     upsert_env "DB_NAME" "$db_name"
-    upsert_env "DATABASE_URL" "postgresql://$db_user:$db_pass@db:5432/$db_name?schema=public"
+    upsert_env "DATABASE_URL" "postgresql://$db_user:$db_pass@$db_host_env:5432/$db_name?schema=public"
     upsert_env "JWT_SECRET" "$jwt_secret"
     upsert_env "ENCRYPTION_KEY" "$enc_key"
     upsert_env "REQUIRE_SECRET_MANAGER" "false"
@@ -575,7 +900,7 @@ run_install() {
             cp "$BACKEND_EXAMPLE" "$BACKEND_ENV"
             log_info "Criado apps/backend/.env a partir de .env.example"
         fi
-        upsert_env "DATABASE_URL" "postgresql://$db_user:$db_pass@db:5432/$db_name?schema=public" "$BACKEND_ENV"
+        upsert_env "DATABASE_URL" "postgresql://$db_user:$db_pass@$db_host_env:5432/$db_name?schema=public" "$BACKEND_ENV"
         upsert_env "JWT_SECRET" "$jwt_secret" "$BACKEND_ENV"
         upsert_env "ENCRYPTION_KEY" "$enc_key" "$BACKEND_ENV"
         upsert_env "FRONTEND_URL" "https://$domain" "$BACKEND_ENV"
@@ -590,6 +915,11 @@ run_install() {
             log_info "Criado apps/frontend/.env.local a partir de .env.local.example"
         fi
         upsert_env "NEXT_PUBLIC_API_URL" "https://$domain/api" "$FRONTEND_ENV"
+    fi
+
+    if [[ "$install_mode" == "native" ]]; then
+        run_install_native "$domain_prefix" "$domain" "$email" "${admin_email:-$email}" "$admin_pass" "$db_name" "$db_user" "$db_pass" "$jwt_secret" "$enc_key"
+        return 0
     fi
 
     # Nginx embutido (docker-compose.prod.yml): criar dirs, cert e config
@@ -760,7 +1090,11 @@ main() {
             check_and_open_ports
             run_update "$@"
             ;;
-        cert)    run_cert ;;
+        cert)
+            check_docker
+            check_docker_compose
+            run_cert
+            ;;
         *)       show_usage; exit 1 ;;
     esac
 }
