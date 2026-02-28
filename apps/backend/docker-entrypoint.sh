@@ -33,9 +33,17 @@ if command -v pg_isready >/dev/null 2>&1; then
   i=0
   max_attempts=$((DB_WAIT_TIMEOUT / 2))
   while [ $i -lt $max_attempts ]; do
-    if pg_isready -h "${DB_HOST}" -p "${DB_PORT}" >/dev/null 2>&1; then
-      echo "Database is ready (pg_isready)."
-      break
+    if pg_isready -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER:-postgres}" >/dev/null 2>&1; then
+      echo "Database responded to pg_isready."
+      # O Postgres 15 reinicia após o initdb inicial, causando quedas.
+      # Vamos checar se ele se mantém de pé após 5 segundos.
+      sleep 5
+      if pg_isready -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER:-postgres}" >/dev/null 2>&1; then
+        echo "Database is stable and ready."
+        break
+      else
+        echo "Database restarted (likely initdb phase). Waiting again..."
+      fi
     fi
     i=$((i + 1))
     echo "Waiting for Postgres... (${i}/${max_attempts})"
@@ -61,7 +69,7 @@ if [ -x "/app/node_modules/.bin/prisma" ]; then
 elif [ -x "./node_modules/.bin/prisma" ]; then
   PRISMA_CMD="./node_modules/.bin/prisma"
 else
-  PRISMA_CMD="npx prisma"
+  PRISMA_CMD="pnpm exec prisma"
 fi
 
 # Executa as migrations
