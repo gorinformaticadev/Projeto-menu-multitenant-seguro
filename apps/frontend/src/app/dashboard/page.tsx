@@ -27,15 +27,21 @@ export default function DashboardPage() {
   const { features: moduleFeatures } = useModuleFeatures();
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto">
       {/* Slot Injetado no Topo */}
       <ModuleSlot position="dashboard_top" className="mb-6" />
 
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Bem-vindo ao <PlatformName />, {user?.name}!
-        </p>
+      <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight">Página Inicial</h1>
+          <p className="text-muted-foreground mt-1">
+            Olá, <span className="font-semibold text-foreground">{user?.name}</span>. 👋
+          </p>
+        </div>
+        <div className="hidden md:block text-right">
+          <p className="text-xs font-bold uppercase text-muted-foreground tracking-widest">{PlatformName}</p>
+          <p className="text-sm font-medium">{user?.tenant?.nomeFantasia || 'Acesso Global'}</p>
+        </div>
       </div>
 
       {/* Aviso de 2FA */}
@@ -59,62 +65,8 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Seu Perfil</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-bold">{user?.role}</div>
-            <p className="text-xs text-muted-foreground">
-              Nível de acesso
-            </p>
-          </CardContent>
-        </Card>
-
-        {user?.tenant && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Empresa</CardTitle>
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl font-bold truncate">
-                {user.tenant.nomeFantasia}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Seu tenant
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Status</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-bold text-green-600">Ativo</div>
-            <p className="text-xs text-muted-foreground">
-              Sistema operacional
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Segurança</CardTitle>
-            <Settings className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-bold text-blue-600">Alta</div>
-            <p className="text-xs text-muted-foreground">
-              Isolamento ativo
-            </p>
-          </CardContent>
-        </Card>
+      {/* Seção de Conteúdo do Dashboard - Simplificada */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
 
         {/* Widgets Dinâmicos dos Módulos (Sistema Antigo) */}
         {moduleFeatures.dashboardWidgets.map((widget, index) => {

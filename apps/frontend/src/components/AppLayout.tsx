@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { BottomNav } from "./BottomNav";
 import { useModuleRegistry } from "@/hooks/useModuleRegistry";
 import { ModuleRegistryTaskbar } from "./ModuleRegistryTaskbar";
 import { ModuleLoader } from "@/core/ModuleLoader";
@@ -55,14 +56,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <TopBar />
 
         {/* Layout com Sidebar e Conteúdo */}
-        <div className="flex w-full pt-16">
-          <aside className="flex-shrink-0 h-[calc(100vh-4rem)]">
+        <div className="flex w-full pt-16 pb-16 md:pb-0">
+          <aside className="hidden md:flex flex-shrink-0 h-[calc(100vh-4rem)]">
             <Sidebar />
           </aside>
-          <main className="flex-1 overflow-y-auto bg-background">
+          <main className="flex-1 overflow-y-auto bg-background p-0">
             {children}
           </main>
         </div>
+
+        {/* Navegação Mobile (Apenas Mobile) */}
+        <BottomNav />
 
         {/* Taskbar dos Módulos */}
         <ModuleRegistryTaskbar />
