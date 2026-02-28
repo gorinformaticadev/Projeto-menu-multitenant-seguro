@@ -67,10 +67,10 @@ services:
       - multitenant-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 120s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   db:
     image: postgres:15
