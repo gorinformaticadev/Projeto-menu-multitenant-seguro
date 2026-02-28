@@ -499,6 +499,12 @@ run_install() {
     upsert_env "LOCAL_BUILD_ONLY" "$local_build_only"
     upsert_env "FRONTEND_URL" "https://$domain"
     upsert_env "NEXT_PUBLIC_API_URL" "https://$domain/api"
+    
+    # Garantir que variáveis de imagem sejam substituídas se o .env.production veio de um template
+    sed -i "s/__IMAGE_OWNER__/$image_owner/g" "$ENV_PRODUCTION"
+    sed -i "s/__IMAGE_REPO__/$image_repo/g" "$ENV_PRODUCTION"
+    sed -i "s/__IMAGE_TAG__/$image_tag/g" "$ENV_PRODUCTION"
+
     upsert_env "DB_USER" "$db_user"
     upsert_env "DB_PASSWORD" "$db_pass"
     upsert_env "DB_NAME" "$db_name"
