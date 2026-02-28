@@ -430,15 +430,31 @@ run_install() {
     if [[ "$no_prompt" != "true" && -z "$install_mode" ]]; then
         local mode_choice=""
         while true; do
-            read -rp "Forma de instalação [docker/native] (padrão: docker): " mode_choice
-            mode_choice="${mode_choice,,}"
-            mode_choice="${mode_choice:-docker}"
-            [[ "$mode_choice" == "nativo" ]] && mode_choice="native"
-            if [[ "$mode_choice" == "docker" || "$mode_choice" == "native" ]]; then
-                install_mode="$mode_choice"
-                break
-            fi
-            log_warn "Opção inválida. Use: docker ou native."
+            echo "Forma de instalação:"
+            echo "[ 1 ] - Docker"
+            echo "[ 2 ] - Native"
+            echo ""
+            echo "[ 0 ] - Cancelar"
+            read -rp "Selecione uma opção [1/2/0]: " mode_choice
+            mode_choice="$(echo "$mode_choice" | tr -d '[:space:]')"
+            case "$mode_choice" in
+                1)
+                    install_mode="docker"
+                    break
+                    ;;
+                2)
+                    install_mode="native"
+                    break
+                    ;;
+                0)
+                    log_warn "Instalação cancelada pelo usuário."
+                    exit 0
+                    ;;
+                *)
+                    log_warn "Opção inválida. Escolha 1, 2 ou 0."
+                    ;;
+            esac
+            echo ""
         done
     fi
 
