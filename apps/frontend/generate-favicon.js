@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Ler o SVG
-const svgPath = path.join(__dirname, 'public', 'favicon.svg');
+const svgPath = path.join(__dirname, 'public', 'pwa.svg');
 
 console.log('✅ Favicon SVG encontrado!');
 console.log('📁 Localização:', svgPath);

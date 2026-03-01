@@ -61,7 +61,7 @@ export function BottomNav() {
             aria-label="Launcher de Módulos"
           >
             <img
-              src="/favicon.svg"
+              src="/menu.svg"
               alt="Logo"
               className="w-8 h-8 object-contain"
               onError={(e) => {

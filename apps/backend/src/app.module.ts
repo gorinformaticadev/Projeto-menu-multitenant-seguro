@@ -1,7 +1,8 @@
 import { Module, NestModule, MiddlewareConsumer, DynamicModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
-import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { ThrottlerModule } from "@nestjs/throttler";
+import { SecurityThrottlerGuard } from "./common/guards/security-throttler.guard";
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { CsrfGuard } from "./common/guards/csrf.guard";
 import { ScheduleModule } from '@nestjs/schedule';
@@ -86,7 +87,7 @@ import { HealthModule } from './health/health.module';
     // Rate Limiting Global
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: SecurityThrottlerGuard,
     },
     // CSRF Protection Global (TEMPORARIAMENTE DESABILITADO PARA RESOLVER 403 EM PRODUÇÃO)
     // {

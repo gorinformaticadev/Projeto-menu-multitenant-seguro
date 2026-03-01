@@ -35,6 +35,12 @@ interface SecurityConfig {
   backupRateLimitPerHour: number;
   restoreRateLimitPerHour: number;
   updateRateLimitPerHour: number;
+  rateLimitDevEnabled: boolean;
+  rateLimitProdEnabled: boolean;
+  rateLimitDevRequests: number;
+  rateLimitProdRequests: number;
+  rateLimitDevWindow: number;
+  rateLimitProdWindow: number;
   updatedAt: string;
   updatedBy: string | null;
 }
@@ -152,6 +158,12 @@ export default function SecurityConfigPage() {
         backupRateLimitPerHour: Number(config.backupRateLimitPerHour),
         restoreRateLimitPerHour: Number(config.restoreRateLimitPerHour),
         updateRateLimitPerHour: Number(config.updateRateLimitPerHour),
+        rateLimitDevEnabled: config.rateLimitDevEnabled,
+        rateLimitProdEnabled: config.rateLimitProdEnabled,
+        rateLimitDevRequests: Number(config.rateLimitDevRequests),
+        rateLimitProdRequests: Number(config.rateLimitProdRequests),
+        rateLimitDevWindow: Number(config.rateLimitDevWindow),
+        rateLimitProdWindow: Number(config.rateLimitProdWindow),
       };
 
       const response = await api.put("/security-config", updateData);
@@ -298,9 +310,23 @@ export default function SecurityConfigPage() {
       {/* Rate Limiting Global */}
       <Card>
         <CardHeader>
-          <CardTitle>Rate Limiting Global</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            Rate Limiting Global
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-normal text-muted-foreground">
+                {process.env.NODE_ENV === 'production' ? 'Status (Produção)' : 'Status (Desenvolvimento)'}
+              </span>
+              <Switch
+                checked={process.env.NODE_ENV === 'production' ? config.rateLimitProdEnabled : config.rateLimitDevEnabled}
+                onCheckedChange={(checked: boolean) =>
+                  updateConfig(process.env.NODE_ENV === 'production' ? "rateLimitProdEnabled" : "rateLimitDevEnabled", checked)
+                }
+              />
+            </div>
+          </CardTitle>
           <CardDescription>
-            Controle o número de requisições permitidas para prevenir ataques DDoS
+            Controle o número de requisições permitidas para prevenir ataques DDoS e uso abusivo.
+            O limite atual será aplicado com base no ambiente de execução.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -417,7 +443,7 @@ export default function SecurityConfigPage() {
                   Atenção: Configurações Sensíveis
                 </p>
                 <p className="text-xs text-amber-800 dark:text-amber-200 mt-1">
-                  Estas configurações controlam operações críticas como backup, restore e atualizações do sistema. 
+                  Estas configurações controlam operações críticas como backup, restore e atualizações do sistema.
                   Valores muito altos podem permitir abuse, valores muito baixos podem impedir operações legítimas.
                 </p>
               </div>
