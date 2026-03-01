@@ -1,7 +1,6 @@
 import { Injectable, ExecutionContext, Inject } from '@nestjs/common';
 import { ThrottlerGuard, ThrottlerException, ThrottlerStorage, ThrottlerModuleOptions } from '@nestjs/throttler';
 import { Reflector } from '@nestjs/core';
-import { SecurityConfigService } from '../../security-config/security-config.service';
 
 @Injectable()
 export class SecurityThrottlerGuard extends ThrottlerGuard {
@@ -9,7 +8,6 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
         @Inject('THROTTLER_MODULE_OPTIONS') options: ThrottlerModuleOptions,
         storageService: ThrottlerStorage,
         reflector: Reflector,
-        @Inject(SecurityConfigService) private readonly securityConfigService: SecurityConfigService,
     ) {
         super(options, storageService, reflector);
     }
@@ -20,24 +18,13 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
         const { context, limit, ttl, throttler } = requestProps;
         const isProduction = process.env.NODE_ENV === 'production';
 
-        // Obter configuração do banco de dados
-        const config = await this.securityConfigService.getConfig();
-
-        // Se o throttler for 'login', respeita o limite configurado (mais rígido)
+        // Logica simplificada sem DB por enquanto para testar se volta o serviço
         if (throttler.name === 'login') {
             return super.handleRequest(requestProps);
         }
 
-        // Verifica se o rate limiting está globalmente desabilitado para o ambiente atual
-        const isEnabled = isProduction ? config.rateLimitProdEnabled : config.rateLimitDevEnabled;
-        if (!isEnabled) {
-            return true;
-        }
-
         const req = context.switchToHttp().getRequest();
-
-        // Verifica se há token de autenticação no header (indica que é o sistema interno)
-        const hasAuth = req.headers.authorization || req.user;
+        const hasAuth = req.headers?.authorization || req.user;
 
         if (hasAuth) {
             // 10000 requisições por minuto para usuários autenticados
@@ -48,12 +35,9 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
             });
         }
 
-        // Para usuários não autenticados, usa os limites do banco de dados
-        const dbLimit = isProduction ? config.rateLimitProdRequests : config.rateLimitDevRequests;
-        const dbWindow = isProduction ? config.rateLimitProdWindow : config.rateLimitDevWindow;
-
-        const finalLimit = dbLimit || config.globalMaxRequests || limit;
-        const finalWindow = (dbWindow || config.globalWindowMinutes || (ttl / 60000)) * 60000;
+        // Limites padrão seguros
+        const finalLimit = isProduction ? 100 : 10000;
+        const finalWindow = 60000;
 
         return super.handleRequest({
             ...requestProps,
