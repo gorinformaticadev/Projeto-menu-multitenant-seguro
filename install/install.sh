@@ -386,7 +386,7 @@ EOF
 native_install_project_dependencies() {
     local app_dir="$1"
     log_info "Etapa 11/23: instalando dependencias do projeto..."
-    run_as_native_user "cd '${app_dir}' && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack enable || true && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install --frozen-lockfile || COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install"
+    run_as_native_user "cd '${app_dir}' && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack enable || true && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install --frozen-lockfile || COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install --no-frozen-lockfile"
 }
 
 native_install_certbot() {
