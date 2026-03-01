@@ -15,6 +15,7 @@ import { AlertTriangle, AlertCircle, CheckCircle, ExternalLink } from 'lucide-re
 import { Notification } from '@/types/notifications';
 import { ThemeToggle } from "./ThemeToggle";
 import Image from "next/image";
+import { GlobalSearch } from "./GlobalSearch";
 
 export function TopBar() {
   const { user, logout } = useAuth();
@@ -195,15 +196,7 @@ export function TopBar() {
         >
           <ArrowLeftIcon className="h-5 w-5" />
         </Button>
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Buscar no sistema..."
-            autoFocus={showMobileSearch}
-            className="w-full pl-10 pr-4 py-2 border-none rounded-full bg-gray-100 dark:bg-secondary/50 text-sm focus:outline-none focus:ring-0 dark:text-foreground placeholder:text-gray-400 dark:placeholder:text-muted-foreground/50"
-          />
-        </div>
+        <GlobalSearch mobile onClose={() => setShowMobileSearch(false)} />
       </div>
 
       <div className="h-full px-4 flex items-center justify-between">
@@ -233,14 +226,7 @@ export function TopBar() {
 
         {/* Barra de Busca Desktop */}
         <div className="hidden lg:flex flex-1 max-w-xl mx-4">
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Buscar..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-input rounded-full focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-secondary/50 dark:text-foreground placeholder:text-gray-400 dark:placeholder:text-muted-foreground/50 transition-colors"
-            />
-          </div>
+          <GlobalSearch />
         </div>
 
         {/* Ações do Usuário (Direita) */}
