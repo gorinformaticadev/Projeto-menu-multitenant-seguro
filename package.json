@@ -27,6 +27,6 @@
     "standard-version": "^9.5.0"
   },
   "dependencies": {
-    "googleapis": "^171.0.0"
+    "googleapis": "^171.3.0"
   }
 }
