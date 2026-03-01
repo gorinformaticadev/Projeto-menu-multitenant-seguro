@@ -2,7 +2,8 @@
  * NOTIFICATION DTOs - Data Transfer Objects
  */
 
-import { IsString, IsOptional, IsEnum, IsObject, IsUUID, IsBoolean } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsString, IsOptional, IsEnum, IsObject, IsUUID, IsBoolean, ValidateNested } from 'class-validator';
 
 export class CreateNotificationDto {
   @IsString()
@@ -87,4 +88,26 @@ export class NotificationFiltersDto {
 
   @IsOptional()
   limit?: number;
+}
+
+export class PushSubscriptionKeysDto {
+  @IsString()
+  p256dh: string;
+
+  @IsString()
+  auth: string;
+}
+
+export class SavePushSubscriptionDto {
+  @IsString()
+  endpoint: string;
+
+  @ValidateNested()
+  @Type(() => PushSubscriptionKeysDto)
+  keys: PushSubscriptionKeysDto;
+}
+
+export class RemovePushSubscriptionDto {
+  @IsString()
+  endpoint: string;
 }

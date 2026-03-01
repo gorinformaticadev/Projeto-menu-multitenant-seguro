@@ -17,15 +17,52 @@ import {
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { NotificationService } from './notification.service';
 import { NotificationGateway } from './notification.gateway';
-import { CreateNotificationDto, NotificationFiltersDto, BroadcastNotificationDto } from './notification.dto';
+import { PushNotificationService } from './push-notification.service';
+import {
+  CreateNotificationDto,
+  NotificationFiltersDto,
+  BroadcastNotificationDto,
+  SavePushSubscriptionDto,
+  RemovePushSubscriptionDto,
+} from './notification.dto';
 
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)
 export class NotificationsController {
   constructor(
     private notificationService: NotificationService,
-    private notificationGateway: NotificationGateway
+    private notificationGateway: NotificationGateway,
+    private pushNotificationService: PushNotificationService,
   ) {}
+
+  @Get('push/public-key')
+  getPushPublicKey() {
+    const publicKey = this.pushNotificationService.getPublicKey();
+    return {
+      enabled: !!publicKey,
+      publicKey,
+    };
+  }
+
+  @Post('push/subscribe')
+  async subscribeToPush(@Body() body: SavePushSubscriptionDto, @Request() req) {
+    const userAgentHeader = req.headers?.['user-agent'];
+    const userAgent = Array.isArray(userAgentHeader) ? userAgentHeader[0] : userAgentHeader;
+
+    const success = await this.pushNotificationService.saveSubscription(
+      req.user,
+      body,
+      userAgent,
+    );
+
+    return { success };
+  }
+
+  @Post('push/unsubscribe')
+  async unsubscribeFromPush(@Body() body: RemovePushSubscriptionDto, @Request() req) {
+    const count = await this.pushNotificationService.removeSubscription(req.user, body.endpoint);
+    return { success: count > 0, count };
+  }
 
   /**
    * Cria uma nova notificação

@@ -20,6 +20,7 @@ import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { WsJwtGuard } from '@common/guards/ws-jwt.guard';
 import { NotificationService } from './notification.service';
 import { Notification } from './notification.entity';
+import { PushNotificationService } from './push-notification.service';
 
 interface ConnectionMetrics {
   totalConnections: number;
@@ -93,6 +94,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
 
   constructor(
     private notificationService: NotificationService,
+    private pushNotificationService: PushNotificationService,
     private jwtService: JwtService,
     private configService: ConfigService,
     private prismaService: PrismaService
@@ -370,6 +372,13 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
       } catch (countError) {
         // CRÍTICO: Erro na contagem não deve quebrar a emissão
         this.logger.error('Erro ao atualizar contagens (não crítico):', countError);
+      }
+
+      // Enviar push para PWA/background sem afetar fluxo principal
+      try {
+        await this.pushNotificationService.sendNotification(notification);
+      } catch (pushError) {
+        this.logger.error('Erro ao enviar push (nao critico):', pushError);
       }
       
     } catch (error) {

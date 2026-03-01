@@ -20,8 +20,29 @@ interface UseNotificationsReturn {
   refreshNotifications: () => Promise<void>;
 }
 
+interface BrowserPushSubscriptionPayload {
+  endpoint: string;
+  keys?: {
+    p256dh?: string;
+    auth?: string;
+  };
+}
+
 // Flag para controlar se o Socket.IO está habilitado
 const SOCKET_ENABLED = true;
+
+const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+
+  return outputArray;
+};
 
 export function useNotifications(): UseNotificationsReturn {
   const { user, token } = useAuth();
@@ -33,6 +54,7 @@ export function useNotifications(): UseNotificationsReturn {
   const isActiveRef = useRef(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const permissionAskedRef = useRef(false);
+  const serviceWorkerRegistrationRef = useRef<ServiceWorkerRegistration | null>(null);
 
   const initAudio = useCallback(() => {
     if (audioRef.current || typeof window === 'undefined') return;
@@ -43,10 +65,10 @@ export function useNotifications(): UseNotificationsReturn {
     audioRef.current = audio;
   }, []);
 
-  const requestBrowserNotificationPermission = useCallback(async () => {
-    if (typeof window === 'undefined' || !('Notification' in window)) return;
-    if (window.Notification.permission !== 'default') return;
-    if (permissionAskedRef.current) return;
+  const requestBrowserNotificationPermission = useCallback(async (): Promise<NotificationPermission | 'unsupported'> => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported';
+    if (window.Notification.permission !== 'default') return window.Notification.permission;
+    if (permissionAskedRef.current) return window.Notification.permission;
 
     permissionAskedRef.current = true;
 
@@ -55,6 +77,7 @@ export function useNotifications(): UseNotificationsReturn {
     } catch (error) {
       console.warn('Nao foi possivel solicitar permissao de notificacao:', error);
     }
+    return window.Notification.permission;
   }, []);
 
   const showBrowserNotification = useCallback((notification: AppNotification) => {
@@ -80,6 +103,102 @@ export function useNotifications(): UseNotificationsReturn {
       };
     } catch (error) {
       console.warn('Erro ao exibir notificacao nativa:', error);
+    }
+  }, []);
+
+  const getPushPublicKey = useCallback(async (): Promise<string | null> => {
+    try {
+      const response = await api.get('/notifications/push/public-key');
+      const publicKey = response?.data?.publicKey;
+
+      if (response?.data?.enabled && typeof publicKey === 'string' && publicKey.length > 0) {
+        return publicKey;
+      }
+    } catch (error) {
+      console.warn('Nao foi possivel carregar chave publica de push:', error);
+    }
+
+    return null;
+  }, []);
+
+  const syncPushSubscription = useCallback(async (subscription: PushSubscription) => {
+    try {
+      const data = subscription.toJSON() as BrowserPushSubscriptionPayload;
+      const endpoint = data?.endpoint;
+      const p256dh = data?.keys?.p256dh;
+      const auth = data?.keys?.auth;
+
+      if (!endpoint || !p256dh || !auth) {
+        return;
+      }
+
+      await api.post('/notifications/push/subscribe', {
+        endpoint,
+        keys: { p256dh, auth },
+      });
+    } catch (error) {
+      console.warn('Nao foi possivel sincronizar assinatura push:', error);
+    }
+  }, []);
+
+  const registerPushSubscription = useCallback(async () => {
+    if (typeof window === 'undefined') return;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (!('Notification' in window) || window.Notification.permission !== 'granted') return;
+    if (!window.isSecureContext) return;
+
+    try {
+      const registeredWorker =
+        serviceWorkerRegistrationRef.current || (await navigator.serviceWorker.register('/sw.js'));
+      serviceWorkerRegistrationRef.current = registeredWorker;
+
+      const readyWorker = await navigator.serviceWorker.ready;
+      serviceWorkerRegistrationRef.current = readyWorker;
+
+      let subscription = await readyWorker.pushManager.getSubscription();
+      if (!subscription) {
+        const publicKey = await getPushPublicKey();
+        if (!publicKey) return;
+
+        subscription = await readyWorker.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
+        });
+      }
+
+      if (subscription) {
+        await syncPushSubscription(subscription);
+      }
+    } catch (error) {
+      console.warn('Nao foi possivel registrar push no navegador:', error);
+    }
+  }, [getPushPublicKey, syncPushSubscription]);
+
+  const unregisterPushSubscription = useCallback(async () => {
+    if (typeof window === 'undefined') return;
+    if (!('serviceWorker' in navigator)) return;
+
+    try {
+      const registeredWorker =
+        serviceWorkerRegistrationRef.current || (await navigator.serviceWorker.getRegistration());
+      if (!registeredWorker) return;
+
+      const subscription = await registeredWorker.pushManager.getSubscription();
+      if (!subscription) return;
+
+      try {
+        const payload = subscription.toJSON() as BrowserPushSubscriptionPayload;
+        if (payload?.endpoint) {
+          await api.post('/notifications/push/unsubscribe', { endpoint: payload.endpoint });
+        }
+      } catch (error) {
+        // Se o token já expirou, manter apenas a remoção local.
+        console.warn('Nao foi possivel remover assinatura push no backend:', error);
+      }
+
+      await subscription.unsubscribe();
+    } catch (error) {
+      console.warn('Nao foi possivel limpar assinatura push local:', error);
     }
   }, []);
 
@@ -356,12 +475,13 @@ export function useNotifications(): UseNotificationsReturn {
       }
     } else {
       socketClient.disconnect();
+      void unregisterPushSubscription();
       setNotifications([]);
       setUnreadCount(0);
       setIsConnected(false);
       setConnectionError(null);
     }
-  }, [user, token, setupSocketListeners]);
+  }, [user, token, setupSocketListeners, unregisterPushSubscription]);
 
   /**
    * Inicializa audio e solicita permissao de notificacao apos a primeira interacao.
@@ -372,8 +492,18 @@ export function useNotifications(): UseNotificationsReturn {
 
     initAudio();
 
+    if ('Notification' in window && window.Notification.permission === 'granted') {
+      void registerPushSubscription();
+      return;
+    }
+
     const handleFirstInteraction = () => {
-      requestBrowserNotificationPermission();
+      void (async () => {
+        const permission = await requestBrowserNotificationPermission();
+        if (permission === 'granted') {
+          await registerPushSubscription();
+        }
+      })();
     };
 
     window.addEventListener('pointerdown', handleFirstInteraction, { once: true });
@@ -383,7 +513,7 @@ export function useNotifications(): UseNotificationsReturn {
       window.removeEventListener('pointerdown', handleFirstInteraction);
       window.removeEventListener('keydown', handleFirstInteraction);
     };
-  }, [user, initAudio, requestBrowserNotificationPermission]);
+  }, [user, initAudio, requestBrowserNotificationPermission, registerPushSubscription]);
 
   /**
    * Cleanup ao desmontar

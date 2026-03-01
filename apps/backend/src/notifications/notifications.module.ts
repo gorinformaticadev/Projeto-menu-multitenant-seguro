@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { StringValue } from 'ms';
 import { NotificationService } from './notification.service';
 import { NotificationGateway } from './notification.gateway';
+import { PushNotificationService } from './push-notification.service';
 import { NotificationsController } from './notifications.controller';
 import { PrismaModule } from '@core/prisma/prisma.module';
 
@@ -28,7 +29,7 @@ import { PrismaModule } from '@core/prisma/prisma.module';
     }),
   ],
   controllers: [NotificationsController],
-  providers: [NotificationService, NotificationGateway],
-  exports: [NotificationService, NotificationGateway],
+  providers: [NotificationService, NotificationGateway, PushNotificationService],
+  exports: [NotificationService, NotificationGateway, PushNotificationService],
 })
 export class NotificationsModule {}
