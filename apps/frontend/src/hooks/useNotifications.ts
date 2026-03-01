@@ -5,11 +5,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { socketClient } from '@/lib/socket';
-import { Notification } from '@/types/notifications';
+import type { Notification as AppNotification } from '@/types/notifications';
 import api from '@/lib/api';
 
 interface UseNotificationsReturn {
-  notifications: Notification[];
+  notifications: AppNotification[];
   unreadCount: number;
   isConnected: boolean;
   connectionError: string | null;
@@ -25,27 +25,81 @@ const SOCKET_ENABLED = true;
 
 export function useNotifications(): UseNotificationsReturn {
   const { user, token } = useAuth();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
   const isActiveRef = useRef(true);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const permissionAskedRef = useRef(false);
+
+  const initAudio = useCallback(() => {
+    if (audioRef.current || typeof window === 'undefined') return;
+
+    const audio = new Audio('/notification-sound.mp3');
+    audio.volume = 0.5;
+    audio.preload = 'auto';
+    audioRef.current = audio;
+  }, []);
+
+  const requestBrowserNotificationPermission = useCallback(async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    if (window.Notification.permission !== 'default') return;
+    if (permissionAskedRef.current) return;
+
+    permissionAskedRef.current = true;
+
+    try {
+      await window.Notification.requestPermission();
+    } catch (error) {
+      console.warn('Nao foi possivel solicitar permissao de notificacao:', error);
+    }
+  }, []);
+
+  const showBrowserNotification = useCallback((notification: AppNotification) => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    if (!('Notification' in window) || window.Notification.permission !== 'granted') return;
+
+    const isBackground = document.hidden || !document.hasFocus();
+    if (!isBackground) return;
+
+    try {
+      const nativeNotification = new window.Notification(notification.title || 'Nova notificacao', {
+        body: notification.description || '',
+        icon: '/android-chrome-192x192.png',
+        badge: '/favicon-32x32.png',
+        tag: `notification-${notification.id}`,
+        renotify: true,
+        silent: false,
+      });
+
+      nativeNotification.onclick = () => {
+        window.focus();
+        nativeNotification.close();
+      };
+    } catch (error) {
+      console.warn('Erro ao exibir notificacao nativa:', error);
+    }
+  }, []);
 
   /**
    * Reproduz som de notificação
    */
   const playNotificationSound = useCallback(() => {
+    initAudio();
+
     try {
-      const audio = new Audio('/notification-sound.mp3');
-      audio.volume = 0.5;
+      const audio = audioRef.current;
+      if (!audio) return;
+      audio.currentTime = 0;
       audio.play().catch(error => {
         console.warn('Não foi possível reproduzir som de notificação:', error);
       });
     } catch (error) {
       console.warn('Erro ao tentar reproduzir som:', error);
     }
-  }, []);
+  }, [initAudio]);
 
   /**
    * Marca notificação como lida (via REST quando Socket desabilitado)
@@ -124,7 +178,7 @@ export function useNotifications(): UseNotificationsReturn {
     if (!socket) return null;
 
     // Listener para nova notificação
-    const handleNewNotification = (notification: Notification) => {
+    const handleNewNotification = (notification: AppNotification) => {
       if (!isActiveRef.current) return;
 
       setNotifications(prev => {
@@ -136,10 +190,11 @@ export function useNotifications(): UseNotificationsReturn {
 
       setUnreadCount(prev => prev + 1);
       playNotificationSound();
+      showBrowserNotification(notification);
     };
 
     // Listener para notificação lida
-    const handleNotificationRead = (notification: Notification) => {
+    const handleNotificationRead = (notification: AppNotification) => {
       if (!isActiveRef.current) return;
 
       setNotifications(prev =>
@@ -229,7 +284,7 @@ export function useNotifications(): UseNotificationsReturn {
       socket.off('disconnect', handleDisconnect);
       socket.off('connect_error', handleConnectError);
     };
-  }, [playNotificationSound]);
+  }, [playNotificationSound, showBrowserNotification]);
 
   // ============================================================================
   // EFFECTS
@@ -307,6 +362,28 @@ export function useNotifications(): UseNotificationsReturn {
       setConnectionError(null);
     }
   }, [user, token, setupSocketListeners]);
+
+  /**
+   * Inicializa audio e solicita permissao de notificacao apos a primeira interacao.
+   */
+  useEffect(() => {
+    if (!user) return;
+    if (typeof window === 'undefined') return;
+
+    initAudio();
+
+    const handleFirstInteraction = () => {
+      requestBrowserNotificationPermission();
+    };
+
+    window.addEventListener('pointerdown', handleFirstInteraction, { once: true });
+    window.addEventListener('keydown', handleFirstInteraction, { once: true });
+
+    return () => {
+      window.removeEventListener('pointerdown', handleFirstInteraction);
+      window.removeEventListener('keydown', handleFirstInteraction);
+    };
+  }, [user, initAudio, requestBrowserNotificationPermission]);
 
   /**
    * Cleanup ao desmontar
