@@ -79,6 +79,7 @@ export class UsersController {
    * Atualizar perfil do usuário logado
    */
   @Put('profile')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER, Role.CLIENT)
   updateProfile(
     @Body() updateProfileDto: UpdateProfileDto,
     @CurrentUser() user: any,
@@ -91,6 +92,7 @@ export class UsersController {
    * Alterar senha do usuário logado
    */
   @Put('change-password')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER, Role.CLIENT)
   changePassword(
     @Body() changePasswordDto: ChangePasswordDto,
     @CurrentUser() user: any,
