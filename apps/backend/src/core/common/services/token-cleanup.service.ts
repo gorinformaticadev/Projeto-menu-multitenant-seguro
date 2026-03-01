@@ -27,7 +27,7 @@ export class TokenCleanupService {
     name: 'cleanup-expired-tokens',
   })
   async cleanupExpiredTokens() {
-    this.logger.log('ðŸ§¹ Iniciando limpeza de refresh tokens expirados...');
+    this.logger.log('Iniciando limpeza de refresh tokens expirados...');
 
     try {
       const result = await this.prisma.refreshToken.deleteMany({
@@ -38,9 +38,9 @@ export class TokenCleanupService {
         },
       });
 
-      this.logger.log(`âœ… Limpeza concluída: ${result.count} tokens removidos`);
+      this.logger.log(`Limpeza concluída: ${result.count} tokens removidos`);
     } catch (error) {
-      this.logger.error('âŒ Erro ao limpar tokens expirados:', error);
+      this.logger.error('Erro ao limpar tokens expirados:', error);
     }
   }
 
@@ -51,7 +51,7 @@ export class TokenCleanupService {
    * @returns Número de tokens removidos
    */
   async cleanupOldTokens(olderThanDays: number = 30): Promise<number> {
-    this.logger.log(`ðŸ§¹ Limpando tokens mais antigos que ${olderThanDays} dias...`);
+    this.logger.log(`Limpando tokens mais antigos que ${olderThanDays} dias...`);
 
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
@@ -76,23 +76,23 @@ export class TokenCleanupService {
         },
       });
 
-      this.logger.log(`âœ… ${result.count} tokens removidos`);
+      this.logger.log(`${result.count} tokens removidos`);
       return result.count;
     } catch (error) {
-      this.logger.error('âŒ Erro ao limpar tokens antigos:', error);
+      this.logger.error('Erro ao limpar tokens antigos:', error);
       throw error;
     }
   }
 
   /**
    * Limpa todos os refresh tokens de um usuário específico
-   * Ãštil para forçar logout em todos os dispositivos
+   * Útil para forçar logout em todos os dispositivos
    * 
    * @param userId - ID do usuário
    * @returns Número de tokens removidos
    */
   async revokeAllUserTokens(userId: string): Promise<number> {
-    this.logger.log(`ðŸ”’ Revogando todos os tokens do usuário ${userId}...`);
+    this.logger.log(`Revogando todos os tokens do usuário ${userId}...`);
 
     try {
       const result = await this.prisma.refreshToken.deleteMany({
@@ -101,10 +101,10 @@ export class TokenCleanupService {
         },
       });
 
-      this.logger.log(`âœ… ${result.count} tokens revogados`);
+      this.logger.log(`${result.count} tokens revogados`);
       return result.count;
     } catch (error) {
-      this.logger.error('âŒ Erro ao revogar tokens do usuário:', error);
+      this.logger.error('Erro ao revogar tokens do usuário:', error);
       throw error;
     }
   }
@@ -146,4 +146,3 @@ export class TokenCleanupService {
     };
   }
 }
-

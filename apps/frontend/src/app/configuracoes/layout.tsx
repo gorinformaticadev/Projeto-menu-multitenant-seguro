@@ -51,7 +51,7 @@ export default function ConfiguracoesLayout({
       show: user?.role === "SUPER_ADMIN",
     },
     {
-      name: "Notificacoes Push",
+      name: "Notificações Push",
       href: "/configuracoes/notificacoes-push",
       icon: BellRing,
       description: "Chaves VAPID para PWA/Windows",
@@ -181,4 +181,3 @@ export default function ConfiguracoesLayout({
     </div>
   );
 }
-

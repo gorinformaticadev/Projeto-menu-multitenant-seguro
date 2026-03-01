@@ -26,11 +26,11 @@ export class UpdateService {
   async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: string }> {
     let decryptedTokenForSanitizer = '';
     try {
-      this.logger.log('Iniciando verificacao de atualizacoes...');
+      this.logger.log('Iniciando verificação de atualizações...');
       const settings: any = await this.getSystemSettings();
 
       if (!settings.gitUsername || !settings.gitRepository) {
-        this.logger.warn('Configuracoes do Git nao encontradas');
+        this.logger.warn('Configurações do Git não encontradas');
         return { updateAvailable: false };
       }
 
@@ -49,7 +49,7 @@ export class UpdateService {
       const uniqueCleanTags = Array.from(new Set(cleanTags)).sort((a, b) => semver.rcompare(a, b));
 
       if (uniqueCleanTags.length === 0) {
-        this.logger.warn('Nenhuma tag valida encontrada no repositorio');
+        this.logger.warn('Nenhuma tag válida encontrada no repositório');
         return { updateAvailable: false };
       }
 
@@ -67,8 +67,8 @@ export class UpdateService {
       return { updateAvailable, availableVersion: latestVersion };
     } catch (error: any) {
       const detail = this.sanitizeGitError(String(error?.stderr || error?.message || ''), decryptedTokenForSanitizer);
-      this.logger.error(`Erro ao verificar atualizacoes. detalhe=${detail}`);
-      throw new HttpException('Erro ao verificar atualizacoes', HttpStatus.INTERNAL_SERVER_ERROR);
+      this.logger.error(`Erro ao verificar atualizações. detalhe=${detail}`);
+      throw new HttpException('Erro ao verificar atualizações', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -101,13 +101,13 @@ export class UpdateService {
             },
           });
         } else {
-          throw new HttpException('Ja existe uma atualizacao em andamento', HttpStatus.CONFLICT);
+          throw new HttpException('Já existe uma atualização em andamento', HttpStatus.CONFLICT);
         }
       }
 
       const normalizedCleanVersion = semver.clean(updateData.version);
       if (!normalizedCleanVersion) {
-        throw new HttpException('Versao invalida', HttpStatus.BAD_REQUEST);
+        throw new HttpException('Versão inválida', HttpStatus.BAD_REQUEST);
       }
       const normalizedVersion = this.formatVersion(normalizedCleanVersion);
       requestedVersion = normalizedVersion;
@@ -128,7 +128,7 @@ export class UpdateService {
             duration: 0,
             executionLogs: JSON.stringify({
               idempotent: true,
-              message: `Versao ${normalizedVersion} ja aplicada (atual: ${currentVersion})`,
+               message: `Versão ${normalizedVersion} já aplicada (atual: ${currentVersion})`,
             }),
           },
         });
@@ -145,7 +145,7 @@ export class UpdateService {
         return {
           success: true,
           logId: updateLog.id,
-          message: `Versao ${normalizedVersion} ja esta aplicada. Nenhum redeploy executado.`,
+           message: `Versão ${normalizedVersion} já está aplicada. Nenhum redeploy executado.`,
         };
       }
 
@@ -173,7 +173,7 @@ export class UpdateService {
       const deployResult = await this.runSafeImageDeploy(normalizedVersion, settings);
       const combinedOutput = `${deployResult.stdout || ''}\n${deployResult.stderr || ''}`;
       if (combinedOutput.includes('ROLLBACK_COMPLETED')) {
-        const rollbackError: any = new Error('Deploy reportou rollback automatico; versao anterior foi mantida');
+         const rollbackError: any = new Error('Deploy reportou rollback automático; versão anterior foi mantida');
         rollbackError.stdout = deployResult.stdout || '';
         rollbackError.stderr = deployResult.stderr || '';
         rollbackError.exitCode = 2;
@@ -210,16 +210,16 @@ export class UpdateService {
       return {
         success: true,
         logId: updateLog.id,
-        message: `Atualizacao para ${normalizedVersion} concluida com sucesso`,
+         message: `Atualização para ${normalizedVersion} concluída com sucesso`,
       };
     } catch (error: any) {
       const stdoutRaw = typeof error?.stdout === 'string' ? error.stdout : '';
       const stderrRaw = typeof error?.stderr === 'string' ? error.stderr : '';
-      const errorMessageRaw = String(error?.message || 'Erro desconhecido durante atualizacao');
+      const errorMessageRaw = String(error?.message || 'Erro desconhecido durante atualização');
       const stdout = this.sanitizeGitError(stdoutRaw);
       const stderr = this.sanitizeGitError(stderrRaw);
       const errorMessage = this.sanitizeGitError(errorMessageRaw);
-      this.logger.error(`Erro durante atualizacao: ${errorMessage}`);
+      this.logger.error(`Erro durante atualização: ${errorMessage}`);
       const combinedErrorOutput = `${stdout}\n${stderr}\n${errorMessage}`;
       const exitCode = Number(error?.code ?? error?.exitCode ?? -1);
       const rollbackDetected =
@@ -254,8 +254,8 @@ export class UpdateService {
 
       throw new HttpException(
         rollbackDetected
-          ? `Erro durante atualizacao: ${errorMessage}. Rollback automatico executado.`
-          : `Erro durante atualizacao: ${errorMessage}`,
+          ? `Erro durante atualização: ${errorMessage}. Rollback automático executado.`
+          : `Erro durante atualização: ${errorMessage}`,
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -284,7 +284,7 @@ export class UpdateService {
       if (config.releaseTag) {
         const normalized = semver.clean(config.releaseTag);
         if (!normalized) {
-          throw new HttpException('releaseTag invalida', HttpStatus.BAD_REQUEST);
+          throw new HttpException('releaseTag inválida', HttpStatus.BAD_REQUEST);
         }
         updateData.releaseTag = this.formatVersion(normalized);
       }
@@ -306,13 +306,13 @@ export class UpdateService {
         details: { configFields: Object.keys(config) },
       });
 
-      return { success: true, message: 'Configuracoes atualizadas com sucesso' };
+      return { success: true, message: 'Configurações atualizadas com sucesso' };
     } catch (error) {
-      this.logger.error('Erro ao atualizar configuracoes:', error);
+      this.logger.error('Erro ao atualizar configurações:', error);
       if (error instanceof HttpException) {
         throw error;
       }
-      throw new HttpException('Erro ao atualizar configuracoes', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException('Erro ao atualizar configurações', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -338,7 +338,7 @@ export class UpdateService {
   async getUpdateLogDetails(logId: string): Promise<unknown> {
     const log = await (this.prisma as any).updateLog.findUnique({ where: { id: logId } });
     if (!log) {
-      throw new HttpException('Log nao encontrado', HttpStatus.NOT_FOUND);
+      throw new HttpException('Log não encontrado', HttpStatus.NOT_FOUND);
     }
     return log;
   }
@@ -374,7 +374,7 @@ export class UpdateService {
   private async runSafeImageDeploy(version: string, settings: any): Promise<{ stdout: string; stderr: string }> {
     const scriptPath = path.join(process.cwd(), 'install', 'update-images.sh');
     if (!fs.existsSync(scriptPath)) {
-      throw new HttpException('Runner de deploy nao encontrado (install/update-images.sh)', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException('Runner de deploy não encontrado (install/update-images.sh)', HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     const composeFile = settings.composeFile || 'docker-compose.prod.yml';
@@ -384,10 +384,10 @@ export class UpdateService {
     const allowedEnv = new Set(['install/.env.production', '.env.production', '.env']);
 
     if (!allowedCompose.has(composeFile)) {
-      throw new HttpException('composeFile nao permitido para deploy', HttpStatus.BAD_REQUEST);
+      throw new HttpException('composeFile não permitido para deploy', HttpStatus.BAD_REQUEST);
     }
     if (!allowedEnv.has(envFile)) {
-      throw new HttpException('envFile nao permitido para deploy', HttpStatus.BAD_REQUEST);
+      throw new HttpException('envFile não permitido para deploy', HttpStatus.BAD_REQUEST);
     }
 
     const env = {
@@ -437,11 +437,11 @@ export class UpdateService {
     const isWeak = !key || key.length < 32 || key === 'default-key-change-in-production';
 
     if (isProd && isWeak) {
-      throw new Error('ENCRYPTION_KEY ausente ou fraca para ambiente de producao');
+      throw new Error('ENCRYPTION_KEY ausente ou fraca para ambiente de produção');
     }
 
     if (isWeak) {
-      this.logger.warn('ENCRYPTION_KEY fraca/ausente fora de producao. Usando derivacao temporaria.');
+      this.logger.warn('ENCRYPTION_KEY fraca/ausente fora de produção. Usando derivação temporária.');
     }
 
     const source = key || 'development-only-insecure-key';
@@ -451,7 +451,7 @@ export class UpdateService {
   private decryptTokenLegacyCbc(encryptedToken: string): string {
     const [ivHex, encrypted] = encryptedToken.split(':');
     if (!ivHex || !encrypted) {
-      throw new Error('Token criptografado invalido');
+      throw new Error('Token criptografado inválido');
     }
     const iv = Buffer.from(ivHex, 'hex');
     const legacyKeyRaw = (this.encryptionKeyRaw || 'development-only-insecure-key').slice(0, 32).padEnd(32, '0');
@@ -497,7 +497,7 @@ export class UpdateService {
       return stdout;
     } catch (error: any) {
       const sanitizedStderr = this.sanitizeGitError(String(error?.stderr || error?.message || ''), decryptedToken);
-      this.logger.warn(`Falha ao usar gitToken; tentando repositorio sem autenticacao. detalhe=${sanitizedStderr}`);
+      this.logger.warn(`Falha ao usar gitToken; tentando repositório sem autenticação. detalhe=${sanitizedStderr}`);
       const { stdout } = await this.execFileAsync('git', ['ls-remote', '--tags', repoUrl], options);
       return stdout;
     }
@@ -538,4 +538,3 @@ export class UpdateService {
     return sanitized;
   }
 }
-

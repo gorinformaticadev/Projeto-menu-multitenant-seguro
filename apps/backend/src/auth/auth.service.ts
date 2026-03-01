@@ -136,7 +136,7 @@ export class AuthService {
       let errorMessage = 'Credenciais inválidas';
 
       if (attemptsRemaining === 1) {
-        errorMessage = `Credenciais inválidas. ATENÃ‡ÃƒO: Você tem apenas ${attemptsRemaining} tentativa restante antes de sua conta ser bloqueada por ${lockDurationMinutes} minutos.`;
+        errorMessage = `Credenciais inválidas. ATENÇÃO: Você tem apenas ${attemptsRemaining} tentativa restante antes de sua conta ser bloqueada por ${lockDurationMinutes} minutos.`;
       } else if (attemptsRemaining <= 3) {
         errorMessage = `Credenciais inválidas. Você tem ${attemptsRemaining} tentativas restantes.`;
       }

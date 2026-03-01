@@ -79,7 +79,7 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
 
           if (data.status === 'SUCCESS') {
             toast({
-              title: 'Restore concluido',
+              title: 'Restore concluído',
               description: `Banco restaurado com sucesso a partir de ${data.fileName}`,
             });
             onRestoreComplete?.();
@@ -108,7 +108,7 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
 
     if (confirmationText !== expectedConfirmation) {
       toast({
-        title: 'Confirmacao invalida',
+        title: 'Confirmação inválida',
         description: `Digite exatamente: ${expectedConfirmation}`,
         variant: 'destructive',
       });
@@ -127,7 +127,7 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
 
       const restoreLogId = response.data?.data?.restoreLogId;
       if (!restoreLogId) {
-        throw new Error('restoreLogId nao retornado');
+        throw new Error('restoreLogId não retornado');
       }
 
       pollRestoreLog(restoreLogId);
@@ -149,17 +149,17 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
           Restaurar Banco por Backup
         </CardTitle>
         <CardDescription>
-          Restaura o banco usando um arquivo ja existente no servidor
+          Restaura o banco usando um arquivo já existente no servidor
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-start gap-3 p-4 border border-red-200 bg-red-50 rounded-lg">
           <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-red-800">
-            <p className="font-bold mb-1">Operacao destrutiva</p>
+            <p className="font-bold mb-1">Operação destrutiva</p>
             <ul className="list-disc list-inside space-y-1">
               <li>Substitui dados atuais pelo backup selecionado</li>
-              <li>Bloqueia operacao concorrente com update/restore</li>
+              <li>Bloqueia operação concorrente com update/restore</li>
               <li>Exige SUPER_ADMIN autenticado</li>
             </ul>
           </div>

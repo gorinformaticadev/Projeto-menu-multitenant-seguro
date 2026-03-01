@@ -1,12 +1,12 @@
 import { IsString, IsOptional, IsEnum, Matches } from 'class-validator';
 
 /**
- * DTO para execucao de atualizacao
+ * DTO para execução de atualização
  */
 export class ExecuteUpdateDto {
   @IsString()
   @Matches(/^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.-]+)?$/, {
-    message: 'Versao deve seguir o formato semver (ex: v1.2.3 ou 1.2.3)',
+    message: 'Versão deve seguir o formato semver (ex: v1.2.3 ou 1.2.3)',
   })
   version: string;
 
@@ -18,7 +18,7 @@ export class ExecuteUpdateDto {
 }
 
 /**
- * DTO para configuracao do sistema de updates
+ * DTO para configuração do sistema de updates
  */
 export class UpdateConfigDto {
   @IsOptional()
@@ -54,14 +54,14 @@ export class UpdateConfigDto {
   @IsOptional()
   @IsString()
   @Matches(/^(docker-compose\.prod\.yml|docker-compose\.prod\.external\.yml)$/, {
-    message: 'composeFile invalido. Use docker-compose.prod.yml ou docker-compose.prod.external.yml',
+    message: 'composeFile inválido. Use docker-compose.prod.yml ou docker-compose.prod.external.yml',
   })
   composeFile?: string;
 
   @IsOptional()
   @IsString()
   @Matches(/^(install\/\.env\.production|\.env\.production|\.env)$/, {
-    message: 'envFile invalido. Use install/.env.production, .env.production ou .env',
+    message: 'envFile inválido. Use install/.env.production, .env.production ou .env',
   })
   envFile?: string;
 }
@@ -79,7 +79,7 @@ export class UpdateStatusDto {
 }
 
 /**
- * DTO de resposta para logs de atualizacao
+ * DTO de resposta para logs de atualização
  */
 export class UpdateLogDto {
   id: string;

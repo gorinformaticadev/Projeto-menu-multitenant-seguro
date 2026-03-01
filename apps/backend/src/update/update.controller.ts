@@ -38,7 +38,7 @@ export class UpdateController {
     try {
       return await this.updateService.getUpdateStatus();
     } catch (error) {
-      this.rethrowPreservingHttp(error, 'Erro ao buscar status de atualizacoes');
+      this.rethrowPreservingHttp(error, 'Erro ao buscar status de atualizações');
     }
   }
 
@@ -52,12 +52,12 @@ export class UpdateController {
       return {
         success: true,
         message: result.updateAvailable
-          ? `Nova versao disponivel: ${result.availableVersion}`
-          : 'Sistema esta atualizado',
+          ? `Nova versão disponível: ${result.availableVersion}`
+          : 'Sistema está atualizado',
         ...result,
       };
     } catch (error) {
-      this.rethrowPreservingHttp(error, 'Erro ao verificar atualizacoes');
+      this.rethrowPreservingHttp(error, 'Erro ao verificar atualizações');
     }
   }
 
@@ -73,7 +73,7 @@ export class UpdateController {
 
       return await this.updateService.executeUpdate(updateData, userId, ipAddress, userAgent);
     } catch (error) {
-      this.rethrowPreservingHttp(error, 'Erro ao executar atualizacao');
+      this.rethrowPreservingHttp(error, 'Erro ao executar atualização');
     }
   }
 
@@ -85,7 +85,7 @@ export class UpdateController {
       const userId = req.user.sub;
       return await this.updateService.updateConfig(config, userId);
     } catch (error) {
-      this.rethrowPreservingHttp(error, 'Erro ao atualizar configuracoes');
+      this.rethrowPreservingHttp(error, 'Erro ao atualizar configurações');
     }
   }
 
@@ -96,7 +96,7 @@ export class UpdateController {
     try {
       const limitNum = limit ? parseInt(limit, 10) : 50;
       if (limitNum > 200) {
-        throw new HttpException('Limite maximo de 200 registros', HttpStatus.BAD_REQUEST);
+        throw new HttpException('Limite máximo de 200 registros', HttpStatus.BAD_REQUEST);
       }
 
       const logs = await this.updateService.getUpdateLogs(limitNum);
@@ -106,7 +106,7 @@ export class UpdateController {
         total: logs.length,
       };
     } catch (error) {
-      this.rethrowPreservingHttp(error, 'Erro ao buscar logs de atualizacao');
+      this.rethrowPreservingHttp(error, 'Erro ao buscar logs de atualização');
     }
   }
 
@@ -134,14 +134,14 @@ export class UpdateController {
       const result = await this.updateService.checkForUpdates();
       return {
         success: true,
-        message: 'Conexao com repositorio estabelecida com sucesso',
+        message: 'Conexão com repositório estabelecida com sucesso',
         connected: true,
         ...result,
       };
     } catch (_error) {
       return {
         success: false,
-        message: 'Falha na conexao com o repositorio',
+        message: 'Falha na conexão com o repositório',
         connected: false,
       };
     }

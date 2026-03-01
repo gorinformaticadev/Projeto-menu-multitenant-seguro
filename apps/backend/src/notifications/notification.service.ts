@@ -130,7 +130,7 @@ export class NotificationService {
   }
 
   /**
-   * Marca notificação como NÃƒO lida
+   * Marca notificação como NÃO lida
    */
   async markAsUnread(id: string, user: unknown): Promise<Notification | null> {
     const where = {
@@ -307,7 +307,7 @@ export class NotificationService {
   }
 
   // ============================================================================
-  // MÃ‰TODOS PRIVADOS
+  // MÉTODOS PRIVADOS
   // ============================================================================
 
   private buildWhereClause(user: any, filters?: NotificationFilters) {
