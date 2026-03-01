@@ -21,10 +21,10 @@ export function BottomNav() {
   const leftItems = [
     { label: "Home", href: "/dashboard", icon: Home },
     { label: "Empresas", href: "/empresas", icon: Building2, adminOnly: true },
-    { label: "Usuários", href: "/usuarios", icon: Users, adminOnly: true },
   ].filter(item => !item.adminOnly || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN");
 
   const rightItems = [
+    { label: "Usuários", href: "/usuarios", icon: Users, adminOnly: true },
     { label: "Config", href: "/configuracoes", icon: MoreHorizontal },
   ].filter(item => !item.adminOnly || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN");
 
@@ -60,7 +60,14 @@ export function BottomNav() {
             className="flex flex-col items-center justify-center -translate-y-5 bg-primary text-primary-foreground w-14 h-14 rounded-2xl shadow-lg shadow-primary/20 ring-4 ring-background transition-all active:scale-90 hover:brightness-110"
             aria-label="Launcher de Módulos"
           >
-            <LayoutGrid size={28} />
+            <img
+              src="/favicon.svg"
+              alt="Logo"
+              className="w-8 h-8 object-contain"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/favicon-32x32.png';
+              }}
+            />
           </button>
         </div>
 
