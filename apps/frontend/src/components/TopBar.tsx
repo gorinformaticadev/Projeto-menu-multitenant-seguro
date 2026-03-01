@@ -273,7 +273,7 @@ export function TopBar() {
 
             {/* Dropdown de Notificações */}
             {showNotifications && (
-              <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-popover rounded-lg shadow-lg dark:shadow-shadow-dark border border-gray-200 dark:border-border z-50">
+              <div className="fixed top-[4.25rem] left-2 right-2 w-auto max-w-none bg-white dark:bg-popover rounded-lg shadow-lg dark:shadow-shadow-dark border border-gray-200 dark:border-border z-50 md:absolute md:top-auto md:left-auto md:right-0 md:mt-2 md:w-96">
                 {/* Header */}
                 <div className="px-4 py-3 border-b border-gray-200 dark:border-border flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -306,7 +306,7 @@ export function TopBar() {
                     <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">Você está em dia!</p>
                   </div>
                 ) : (
-                  <div className="max-h-96 overflow-y-auto custom-scrollbar">
+                  <div className="max-h-[60vh] overflow-y-auto custom-scrollbar md:max-h-96">
                     {notifications.map((notification) => {
                       const Icon = getNotificationIcon(notification.type);
                       const isUnread = !notification.read;

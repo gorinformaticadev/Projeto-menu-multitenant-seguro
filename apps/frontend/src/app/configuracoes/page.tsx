@@ -39,7 +39,7 @@ export default function ConfiguracoesPage() {
       iconColor: "text-blue-500"
     },
     {
-      name: "NotificaÃ§Ãµes Push",
+      name: "Notificacoes Push",
       href: "/configuracoes/notificacoes-push",
       icon: BellRing,
       description: "Gerencie chaves VAPID do PWA/Windows em background",
