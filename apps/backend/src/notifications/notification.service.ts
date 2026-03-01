@@ -1,5 +1,5 @@
-/**
- * NOTIFICATION SERVICE - Lógica de negócio e persistência
+﻿/**
+ * NOTIFICATION SERVICE - LÃ³gica de negÃ³cio e persistÃªncia
  */
 
 import { Injectable, Logger } from '@nestjs/common';
@@ -21,7 +21,7 @@ export class NotificationService {
     }
 
   /**
-   * Cria uma nova notificação
+   * Cria uma nova notificaÃ§Ã£o
    */
   async create(data: NotificationCreateData): Promise<Notification> {
     try {
@@ -39,16 +39,16 @@ export class NotificationService {
         },
       });
 
-      this.logger.log(`Notificação criada: ${notification.id} - ${notification.title}`);
+      this.logger.log(`NotificaÃ§Ã£o criada: ${notification.id} - ${notification.title}`);
       return this.mapToEntity(notification);
     } catch (error) {
-      this.logger.error('Erro ao criar notificação:', error);
+      this.logger.error('Erro ao criar notificaÃ§Ã£o:', error);
       throw error;
     }
   }
 
   /**
-   * Busca notificações para o dropdown (últimas 10)
+   * Busca notificaÃ§Ãµes para o dropdown (Ãºltimas 10)
    */
   async findForDropdown(user: unknown): Promise<NotificationResponse> {
     const where = this.buildWhereClause(user);
@@ -74,7 +74,7 @@ export class NotificationService {
   }
 
   /**
-   * Busca notificações com filtros e paginação
+   * Busca notificaÃ§Ãµes com filtros e paginaÃ§Ã£o
    */
   async findMany(user: any, filters: NotificationFilters = {}): Promise<NotificationResponse> {
     const where = this.buildWhereClause(user, filters);
@@ -104,7 +104,7 @@ export class NotificationService {
   }
 
   /**
-   * Marca notificação como lida
+   * Marca notificaÃ§Ã£o como lida
    */
   async markAsRead(id: string, user: unknown): Promise<Notification | null> {
     const where = {
@@ -121,16 +121,16 @@ export class NotificationService {
         },
       });
 
-      this.logger.log(`Notificação marcada como lida: ${id}`);
+      this.logger.log(`NotificaÃ§Ã£o marcada como lida: ${id}`);
       return this.mapToEntity(notification);
     } catch (error) {
-      this.logger.warn(`Notificação não encontrada ou sem permissão: ${id}`);
+      this.logger.warn(`NotificaÃ§Ã£o nÃ£o encontrada ou sem permissÃ£o: ${id}`);
       return null;
     }
   }
 
   /**
-   * Marca notificação como NÃO lida
+   * Marca notificaÃ§Ã£o como NÃƒO lida
    */
   async markAsUnread(id: string, user: unknown): Promise<Notification | null> {
     const where = {
@@ -147,16 +147,16 @@ export class NotificationService {
         },
       });
 
-      this.logger.log(`Notificação marcada como não lida: ${id}`);
+      this.logger.log(`NotificaÃ§Ã£o marcada como nÃ£o lida: ${id}`);
       return this.mapToEntity(notification);
     } catch (error) {
-      this.logger.warn(`Notificação não encontrada ou sem permissão: ${id}`);
+      this.logger.warn(`NotificaÃ§Ã£o nÃ£o encontrada ou sem permissÃ£o: ${id}`);
       return null;
     }
   }
 
   /**
-   * Marca todas as notificações como lidas
+   * Marca todas as notificaÃ§Ãµes como lidas
    */
   async markAllAsRead(user: any, filters?: NotificationFilters): Promise<number> {
     const where = this.buildWhereClause(user, filters);
@@ -169,12 +169,12 @@ export class NotificationService {
       },
     });
 
-    this.logger.log(`${result.count} notificações marcadas como lidas`);
+    this.logger.log(`${result.count} notificaÃ§Ãµes marcadas como lidas`);
     return result.count;
   }
 
   /**
-   * Deleta uma notificação
+   * Deleta uma notificaÃ§Ã£o
    */
   async delete(id: string, user: unknown): Promise<Notification | null> {
     const where = {
@@ -187,16 +187,16 @@ export class NotificationService {
         where,
       });
 
-      this.logger.log(`Notificação deletada: ${id}`);
+      this.logger.log(`NotificaÃ§Ã£o deletada: ${id}`);
       return this.mapToEntity(notification);
     } catch (error) {
-      this.logger.warn(`Notificação não encontrada ou sem permissão: ${id}`);
+      this.logger.warn(`NotificaÃ§Ã£o nÃ£o encontrada ou sem permissÃ£o: ${id}`);
       return null;
     }
   }
 
   /**
-   * Deleta múltiplas notificações
+   * Deleta mÃºltiplas notificaÃ§Ãµes
    */
   async deleteMany(ids: string[], user: unknown): Promise<number> {
     const where = {
@@ -208,12 +208,12 @@ export class NotificationService {
       where,
     });
 
-    this.logger.log(`${result.count} notificações deletadas`);
+    this.logger.log(`${result.count} notificaÃ§Ãµes deletadas`);
     return result.count;
   }
 
   /**
-   * Conta notificações não lidas
+   * Conta notificaÃ§Ãµes nÃ£o lidas
    */
   async countUnread(user: unknown): Promise<number> {
     const where = {
@@ -225,7 +225,7 @@ export class NotificationService {
   }
 
   /**
-   * Envia notificação em massa (Broadcast)
+   * Envia notificaÃ§Ã£o em massa (Broadcast)
    */
   async broadcast(dto: BroadcastNotificationDto, authorInfo: unknown): Promise<{ count: number }> {
     const where: any = {};
@@ -242,7 +242,7 @@ export class NotificationService {
       where.tenantId = { in: dto.tenantIds };
     }
 
-    // Buscar Usuários Alvo
+    // Buscar UsuÃ¡rios Alvo
     const users = await this.prisma.user.findMany({
       where,
       select: { id: true, tenantId: true }
@@ -281,13 +281,13 @@ export class NotificationService {
       data: notificationsData
     });
 
-    this.logger.log(`Broadcast enviado para ${result.count} usuários. Scope: ${dto.scope}`);
+    this.logger.log(`Broadcast enviado para ${result.count} usuÃ¡rios. Scope: ${dto.scope}`);
 
     return { count: result.count };
   }
 
   /**
-   * Busca uma notificação por ID
+   * Busca uma notificaÃ§Ã£o por ID
    */
   async findById(id: string, user: unknown): Promise<Notification | null> {
     const where = {
@@ -307,29 +307,32 @@ export class NotificationService {
   }
 
   // ============================================================================
-  // MÉTODOS PRIVADOS
+  // MÃ‰TODOS PRIVADOS
   // ============================================================================
 
   private buildWhereClause(user: any, filters?: NotificationFilters) {
     const where: any = {};
 
-    // Filtros de permissão baseados no papel do usuário
+    // Filtros de permissÃ£o baseados no papel do usuÃ¡rio
     if (user.role === 'USER') {
-      // Usuário comum: apenas suas próprias notificações
+      // UsuÃ¡rio comum: apenas suas prÃ³prias notificaÃ§Ãµes
       where.userId = user.id;
-    } else if (user.role === 'ADMIN') {
-      // Admin: notificações do seu tenant
-      where.OR = [
-        { tenantId: user.tenantId, userId: null }, // Notificações do tenant
-        { userId: user.id }, // Suas próprias notificações
-      ];
-    } else if (user.role === 'SUPER_ADMIN') {
-      // Super Admin: Vê apenas suas próprias notificações ou notificações globais (sem usuário)
-      // Evita listar notificações destinadas a outros usuários individualmente
-      where.OR = [
-        { userId: user.id },
-        { userId: null }
-      ];
+    } else if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+      // Perfis administrativos:
+      // - visualizam tudo da prÃ³pria tenant (incluindo notificaÃ§Ãµes de outros usuÃ¡rios da tenant)
+      // - mantÃªm acesso Ã s prÃ³prias notificaÃ§Ãµes diretas
+      if (user.tenantId) {
+        where.OR = [
+          { tenantId: user.tenantId },
+          { userId: user.id },
+        ];
+      } else {
+        // Fallback seguro para contas administrativas sem tenant vinculada
+        where.OR = [
+          { userId: user.id },
+          { userId: null, tenantId: null },
+        ];
+      }
     }
 
     // Aplicar filtros adicionais

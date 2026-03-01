@@ -430,8 +430,8 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     // Sala do usuário específico
     await client.join(`user:${user.id}`);
     
-    // Sala do tenant (para admins)
-    if (user.tenantId) {
+    // Sala do tenant apenas para perfis administrativos
+    if (user.tenantId && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN')) {
       await client.join(`tenant:${user.tenantId}`);
     }
     
