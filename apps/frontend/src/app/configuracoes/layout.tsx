@@ -83,41 +83,22 @@ export default function ConfiguracoesLayout({
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Sidebar Mobile Overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <div className={cn(
-        "fixed inset-y-0 left-0 z-50 w-60 bg-card border-r transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
-        sidebarOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
+      {/* Sidebar - Desktop Only */}
+      <div className="hidden lg:block w-72 bg-card border-r h-full overflow-y-auto">
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b">
+          <div className="flex items-center justify-between p-8 border-b">
             <div>
-              <h2 className="text-lg font-semibold">Configurações</h2>
-              <p className="text-sm text-muted-foreground">
-                Gerencie o sistema
+              <h2 className="text-xl font-bold tracking-tight">Painel</h2>
+              <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mt-1">
+                Configurações
               </p>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
           </div>
 
           {/* Navigation */}
           <div className="flex-1 p-6">
-            <nav className="space-y-2">
+            <nav className="space-y-1.5">
               {visibleItems.map((item) => {
                 const isActive = pathname === item.href ||
                   (item.href !== "/configuracoes" && pathname.startsWith(item.href));
@@ -128,57 +109,39 @@ export default function ConfiguracoesLayout({
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-3 p-3 rounded-lg text-sm transition-colors group",
+                      "flex items-center gap-3 p-3.5 rounded-2xl text-sm transition-all group",
                       isActive
-                        ? "bg-primary text-primary-foreground"
+                        ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]"
                         : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                     )}
-                    onClick={() => setSidebarOpen(false)}
                   >
-                    <Icon className="h-5 w-5 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium">{item.name}</div>
-                      <div className={cn(
-                        "text-xs truncate",
-                        isActive
-                          ? "text-primary-foreground/80"
-                          : "text-muted-foreground"
-                      )}>
-                        {item.description}
-                      </div>
+                    <div className={cn(
+                      "p-2 rounded-xl transition-colors",
+                      isActive ? "bg-white/10" : "bg-slate-50 group-hover:bg-accent"
+                    )}>
+                      <Icon className="h-5 w-5 flex-shrink-0" />
                     </div>
-                    <ChevronRight className={cn(
-                      "h-4 w-4 flex-shrink-0 transition-transform",
-                      isActive ? "rotate-90" : "group-hover:translate-x-1"
-                    )} />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold">{item.name}</div>
+                    </div>
+                    {!isActive && <ChevronRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />}
                   </Link>
                 );
               })}
             </nav>
           </div>
 
-          {/* Footer */}
-          <div className="p-6 border-t space-y-4">
-            {/* User Info */}
-            <div className="text-xs text-muted-foreground">
-              <div className="flex items-center justify-between">
-                <span>Usuário: {user?.name}</span>
-                <span className="px-2 py-1 bg-primary/10 text-primary rounded text-xs">
-                  {user?.role}
-                </span>
+          {/* Footer Card */}
+          <div className="p-6 border-t">
+            <div className="p-4 bg-slate-50 rounded-3xl border border-slate-100">
+              <div className="flex items-center gap-2 mb-2">
+                <Shield className="h-4 w-4 text-primary" />
+                <span className="text-xs font-bold uppercase tracking-tighter">Segurança Ativa</span>
               </div>
-            </div>
-
-            {/* Access Info */}
-            <div className="p-3 bg-muted rounded-lg">
-              <div className="flex items-center gap-2 mb-1">
-                <Shield className="h-3 w-3 text-muted-foreground" />
-                <span className="text-xs font-medium">Acesso Restrito</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[10px] text-muted-foreground leading-snug">
                 {user?.role === "SUPER_ADMIN"
-                  ? "Você tem acesso completo a todas as configurações do sistema."
-                  : "Algumas configurações são restritas a SUPER_ADMIN."
+                  ? "Acesso Total habilitado para gerenciamento master."
+                  : "Acesso administrativo limitado ao escopo da empresa."
                 }
               </p>
             </div>
@@ -187,21 +150,22 @@ export default function ConfiguracoesLayout({
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Mobile Header */}
-        <div className="lg:hidden flex items-center justify-between p-4 border-b bg-card">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarOpen(true)}
-          >
-            <Menu className="h-4 w-4" />
-          </Button>
-          <h1 className="font-semibold">Configurações</h1>
-          <div className="w-8" /> {/* Spacer */}
-        </div>
+      <div className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0">
+        {/* Mobile Title Barrier (Small indicator on sub-pages) */}
+        {pathname !== "/configuracoes" && (
+          <div className="lg:hidden flex items-center justify-between p-4 border-b bg-background/80 backdrop-blur-md sticky top-0 z-30">
+            <Link href="/configuracoes" className="p-2 -ml-2 text-primary font-bold text-xs flex items-center gap-1">
+              <ChevronRight className="h-4 w-4 rotate-180" />
+              Voltar
+            </Link>
+            <h1 className="text-sm font-bold truncate px-4">
+              {visibleItems.find(i => pathname.startsWith(i.href))?.name || "Configurações"}
+            </h1>
+            <div className="w-10" />
+          </div>
+        )}
 
-        {/* Content */}
+        {/* Content Viewer */}
         <div className="flex-1 overflow-auto">
           {children}
         </div>

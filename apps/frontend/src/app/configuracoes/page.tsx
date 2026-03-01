@@ -1,180 +1,172 @@
 "use client";
 
+import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Shield, Building2, Package, Download, Info, CheckCircle, AlertTriangle } from "lucide-react";
+import {
+  Shield,
+  Building2,
+  Package,
+  Download,
+  ChevronRight,
+  Clock,
+  LayoutDashboard,
+  Cog
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function ConfiguracoesPage() {
   const { user } = useAuth();
 
-  const quickStats = [
+  const menuItems = [
     {
-      title: "Nível de Acesso",
-      value: user?.role || "N/A",
-      description: user?.role === "SUPER_ADMIN" ? "Acesso completo" : "Acesso limitado",
+      name: "Segurança",
+      href: "/configuracoes/seguranca",
       icon: Shield,
-      color: user?.role === "SUPER_ADMIN" ? "text-green-600" : "text-blue-600",
+      description: "Políticas de segurança, autenticação e controle de acesso",
+      show: user?.role === "SUPER_ADMIN",
+      color: "bg-red-50 text-red-600 border-red-100",
+      iconColor: "text-red-500"
     },
     {
-      title: "Usuário Ativo",
-      value: user?.name || "N/A",
-      description: "Sessão ativa",
-      icon: CheckCircle,
-      color: "text-green-600",
+      name: "Identidade da Plataforma",
+      href: "/configuracoes/identidade",
+      icon: Building2,
+      description: "Logo, cores e informações básicas do sistema",
+      show: user?.role === "SUPER_ADMIN",
+      color: "bg-blue-50 text-blue-600 border-blue-100",
+      iconColor: "text-blue-500"
+    },
+    {
+      name: "Gerenciamento de Módulos",
+      href: "/configuracoes/sistema/modulos",
+      icon: Package,
+      description: "Instalar, remover e gerenciar extensões",
+      show: user?.role === "SUPER_ADMIN",
+      color: "bg-amber-50 text-amber-600 border-amber-100",
+      iconColor: "text-amber-500"
+    },
+    {
+      name: "Sistema de Updates",
+      href: "/configuracoes/sistema/updates",
+      icon: Download,
+      description: "Gerenciar atualizações automáticas via repositório",
+      show: user?.role === "SUPER_ADMIN",
+      color: "bg-green-50 text-green-600 border-green-100",
+      iconColor: "text-green-500"
+    },
+    {
+      name: "Agendamento de Tarefas",
+      href: "/configuracoes/sistema/cron",
+      icon: Clock,
+      description: "Gerenciar jobs, backups e cronogramas",
+      show: user?.role === "SUPER_ADMIN",
+      color: "bg-indigo-50 text-indigo-600 border-indigo-100",
+      iconColor: "text-indigo-500"
+    },
+    {
+      name: "Configurações da Empresa",
+      href: "/configuracoes/empresa",
+      icon: Building2,
+      description: "Informações cadastrais e faturamento",
+      show: user?.role === "ADMIN",
+      color: "bg-teal-50 text-teal-600 border-teal-100",
+      iconColor: "text-teal-500"
     },
   ];
 
-  const availableSections = [
-    {
-      title: "Configurações de Segurança",
-      description: "Políticas de segurança, autenticação e controle de acesso",
-      icon: Shield,
-      available: user?.role === "SUPER_ADMIN",
-    },
-    {
-      title: "Identidade da Plataforma",
-      description: "Configure informações básicas da plataforma",
-      icon: Building2,
-      available: user?.role === "SUPER_ADMIN",
-    },
-    {
-      title: "Gerenciamento de Módulos",
-      description: "Instalar, remover e gerenciar módulos do sistema",
-      icon: Package,
-      available: user?.role === "SUPER_ADMIN",
-    },
-    {
-      title: "Sistema de Updates",
-      description: "Gerenciar atualizações automáticas via Git",
-      icon: Download,
-      available: user?.role === "SUPER_ADMIN",
-    },
-    {
-      title: "Configurações da Empresa",
-      description: "Informações e configurações específicas da empresa",
-      icon: Building2,
-      available: user?.role === "ADMIN",
-    },
-  ];
+  const visibleItems = menuItems.filter(item => item.show);
 
   return (
     <ProtectedRoute allowedRoles={["SUPER_ADMIN", "ADMIN"]}>
-      <div className="p-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <Settings className="h-8 w-8" />
-            Visão Geral das Configurações
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Painel de controle das configurações do sistema
+      <div className="p-4 md:p-8 max-w-4xl mx-auto pb-24">
+
+        {/* Header Superior Limpo */}
+        <div className="mb-10 text-center md:text-left">
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-primary/10 text-primary mb-4">
+            <Cog className="h-8 w-8 animate-spin-slow" style={{ animationDuration: '8s' }} />
+          </div>
+          <h1 className="text-3xl font-extrabold tracking-tight">Configurações</h1>
+          <p className="text-muted-foreground mt-2 max-w-md mx-auto md:mx-0">
+            Gerencie as preferências e permissões do seu ecossistema SaaS.
           </p>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
-          {quickStats.map((stat) => {
-            const IconComponent = stat.icon;
+        {/* Hub de Opções Estilo Dashboard/Grid */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {visibleItems.map((item) => {
+            const Icon = item.icon;
             return (
-              <Card key={stat.title}>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                    <IconComponent className="h-4 w-4" />
-                    {stat.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="text-2xl font-bold mb-1">{stat.value}</div>
-                  <p className={`text-sm ${stat.color}`}>{stat.description}</p>
-                </CardContent>
-              </Card>
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "group relative flex flex-col p-6 rounded-[2rem] border-2 bg-card transition-all hover:shadow-xl hover:-translate-y-1 active:scale-95",
+                  "border-slate-100 hover:border-primary/20 shadow-sm"
+                )}
+              >
+                <div className={cn(
+                  "w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110",
+                  item.color
+                )}>
+                  <Icon className="h-6 w-6" />
+                </div>
+
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold flex items-center gap-2 group-hover:text-primary transition-colors">
+                    {item.name}
+                    <ChevronRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+                    {item.description}
+                  </p>
+                </div>
+
+                {/* Badge de Acesso (Sutil) */}
+                <div className="absolute top-4 right-4 text-[10px] font-bold uppercase tracking-widest text-slate-300 opacity-40">
+                  SaaS Config
+                </div>
+              </Link>
             );
           })}
         </div>
 
-        {/* Available Sections */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Info className="h-5 w-5" />
-              Seções Disponíveis
-            </CardTitle>
-            <CardDescription>
-              Configurações que você pode acessar com seu nível de permissão
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {availableSections.map((section) => {
-                const IconComponent = section.icon;
-                return (
-                  <div 
-                    key={section.title}
-                    className={`flex items-center gap-3 p-3 rounded-lg border ${
-                      section.available 
-                        ? 'bg-green-50 border-green-200' 
-                        : 'bg-gray-50 border-gray-200 opacity-60'
-                    }`}
-                  >
-                    <IconComponent className={`h-5 w-5 ${
-                      section.available ? 'text-green-600' : 'text-gray-400'
-                    }`} />
-                    <div className="flex-1">
-                      <div className="font-medium">{section.title}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {section.description}
-                      </div>
-                    </div>
-                    <div className="flex items-center">
-                      {section.available ? (
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <AlertTriangle className="h-4 w-4 text-gray-400" />
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+        {/* Card de Informações de Conta (Rodapé do Conteúdo) */}
+        <div className="mt-12 p-6 rounded-[2.5rem] bg-slate-50 border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-4 text-center md:text-left">
+            <div className="w-14 h-14 rounded-full bg-white shadow-sm flex items-center justify-center text-xl font-bold border border-slate-200">
+              {user?.name?.charAt(0)}
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Instructions */}
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Info className="h-5 w-5" />
-              Como Usar
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3 text-sm text-muted-foreground">
-              <p>• Use o menu lateral para navegar entre as diferentes seções de configuração</p>
-              <p>• Seções marcadas com ✓ estão disponíveis para seu nível de acesso</p>
-              <p>• SUPER_ADMIN tem acesso a todas as configurações do sistema</p>
-              <p>• ADMIN tem acesso limitado às configurações da empresa</p>
+            <div>
+              <h4 className="font-bold text-slate-800">{user?.name}</h4>
+              <p className="text-xs text-muted-foreground">{user?.email}</p>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* User Info */}
-        <div className="mt-8 p-4 bg-muted rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <Shield className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Informações da Sessão</span>
           </div>
-          <div className="text-sm text-muted-foreground">
-            <p>Usuário: <span className="font-medium">{user?.name}</span></p>
-            <p>Email: <span className="font-medium">{user?.email}</span></p>
-            <p>Nível de acesso: <span className="font-medium">{user?.role}</span></p>
-            {user?.role === "SUPER_ADMIN" && (
-              <p className="text-green-600 mt-1">✓ Acesso completo a todas as configurações</p>
-            )}
-            {user?.role === "ADMIN" && (
-              <p className="text-blue-600 mt-1">ℹ Acesso limitado às configurações da empresa</p>
-            )}
+
+          <div className="flex gap-2">
+            <span className="px-4 py-2 bg-white rounded-full text-xs font-bold border border-slate-200 shadow-sm">
+              {user?.role} Access
+            </span>
+            <Link
+              href="/perfil"
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-full text-xs font-bold shadow-md hover:brightness-110 active:scale-95 transition-all"
+            >
+              Ver Perfil
+            </Link>
           </div>
         </div>
+
+        {/* Atalho para Dashboard rápido */}
+        <div className="mt-8 text-center">
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-primary transition-colors"
+          >
+            <LayoutDashboard className="h-3 w-3" />
+            Voltar para o Painel Principal
+          </Link>
+        </div>
+
       </div>
     </ProtectedRoute>
   );
