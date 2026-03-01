@@ -24,6 +24,7 @@ export function TopBar() {
   const [userTenantLogo, setUserTenantLogo] = useState<string | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showMobileSearch, setShowMobileSearch] = useState(false); // Adicionado estado
 
   // Hook do sistema de notificações
   const {
@@ -34,9 +35,6 @@ export function TopBar() {
     markAsRead,
     markAllAsRead
   } = useNotificationContext();
-
-
-  // console.log('👀 [TopBar] Render com unreadCount:', unreadCount);
 
   // Hook para fechar menu ao clicar fora
   const userMenuRef = useClickOutside<HTMLDivElement>(() => {
@@ -56,7 +54,6 @@ export function TopBar() {
       try {
         const { logoUrl, timestamp } = JSON.parse(cached);
         if (Date.now() - timestamp < 10 * 60 * 1000) { // 10 minutos
-          // console.log('🎨 Usando cache master logo:', logoUrl);
           setMasterLogo(logoUrl);
           return;
         }
@@ -65,7 +62,6 @@ export function TopBar() {
       }
     }
 
-    // console.log('🌐 Buscando master logo da API');
     api.get("/api/tenants/public/master-logo")
       .then(response => {
         const logoUrl = response.data?.logoUrl;
@@ -75,7 +71,6 @@ export function TopBar() {
             logoUrl,
             timestamp: Date.now()
           }));
-          // console.log('💾 Master logo cacheado:', logoUrl);
         }
       })
       .catch(error => {
@@ -89,22 +84,19 @@ export function TopBar() {
       if (user?.tenantId) {
         const cacheKey = `tenant-logo-${user.tenantId}`;
 
-        // Limpar cache antigo de outros tenants
         Object.keys(localStorage).forEach(key => {
           if (key.startsWith('tenant-logo-') && key !== cacheKey) {
             localStorage.removeItem(key);
           }
         });
 
-        // Tentar usar cache local primeiro
         const cached = localStorage.getItem(cacheKey);
         if (cached) {
           try {
             const { logoUrl, timestamp } = JSON.parse(cached);
             if (Date.now() - timestamp < 10 * 60 * 1000) { // 10 minutos
-              // console.log('🎨 Usando cache tenant logo:', logoUrl);
               setUserTenantLogo(logoUrl);
-              return; // Usa cache e não faz requisição
+              return;
             }
           } catch (e) {
             localStorage.removeItem(cacheKey);
@@ -112,9 +104,6 @@ export function TopBar() {
         }
 
         try {
-          // Busca fresca se não houver cache válido
-          // Removido timestamp forçado para permitir cache HTTP se aplicável, 
-          // mas o cache local (acima) é a principal defesa contra 429
           const response = await api.get(`/tenants/public/${user.tenantId}/logo`);
           const logoUrl = response.data?.logoUrl;
 
@@ -129,12 +118,9 @@ export function TopBar() {
           }
         } catch (error) {
           console.error("Erro ao buscar logo do tenant:", error);
-          // Em caso de erro, mantemos o que tiver no estado ou null, 
-          // mas não limpamos o cache imediatamente para evitar loops se o erro for intermitente (ex: 429)
           if (!cached) setUserTenantLogo(null);
         }
       } else if (user?.role === "SUPER_ADMIN") {
-        // SUPER_ADMIN usa o logo master
         setUserTenantLogo(masterLogo);
       }
     }
@@ -156,7 +142,6 @@ export function TopBar() {
     setUserTenantLogo(null);
   };
 
-  // Utilitários para notificações
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'warning': return AlertTriangle;
@@ -165,23 +150,6 @@ export function TopBar() {
       default: return Info;
     }
   };
-
-  // const getNotificationColor = (type: string) => {
-  //   switch (type) {
-  //     case 'warning': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-  //     case 'error': return 'text-red-600 bg-red-50 border-red-200';
-  //     case 'success': return 'text-green-600 bg-green-50 border-green-200';
-  //     default: return 'text-blue-600 bg-blue-50 border-blue-200';
-  //   }
-  // };
-  // const getSeverityBadgeColor = (type: string) => {
-  //   switch (type) {
-  //     case 'warning': return 'bg-yellow-100 text-yellow-800';
-  //     case 'error': return 'bg-red-100 text-red-800';
-  //     case 'success': return 'bg-green-100 text-green-800';
-  //     default: return 'bg-blue-100 text-blue-800';
-  //   }
-  // };
 
   const formatNotificationTime = (dateInput: Date | string) => {
     const now = new Date();
@@ -201,14 +169,43 @@ export function TopBar() {
   };
 
   const handleNotificationClick = async (notification: Notification) => {
-    // Marca como lida se não estiver
     if (!notification.read) {
       markAsRead(notification.id);
     }
   };
 
+  // Ícone de seta para voltar (usado na busca mobile)
+  const ArrowLeftIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>
+  );
+
   return (
     <div className="fixed top-0 left-0 right-0 h-16 bg-white dark:bg-card border-b border-gray-200 dark:border-border shadow-sm z-50 transition-colors duration-200">
+
+      {/* OVERLAY DE BUSCA MOBILE */}
+      <div
+        className={`absolute inset-0 bg-white dark:bg-card px-4 flex items-center transition-transform duration-300 z-50 ${showMobileSearch ? 'translate-y-0' : '-translate-y-full'
+          }`}
+      >
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setShowMobileSearch(false)}
+          className="mr-2 text-gray-500 dark:text-muted-foreground flex-shrink-0"
+        >
+          <ArrowLeftIcon className="h-5 w-5" />
+        </Button>
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Buscar no sistema..."
+            autoFocus={showMobileSearch}
+            className="w-full pl-10 pr-4 py-2 border-none rounded-full bg-gray-100 dark:bg-secondary/50 text-sm focus:outline-none focus:ring-0 dark:text-foreground placeholder:text-gray-400 dark:placeholder:text-muted-foreground/50"
+          />
+        </div>
+      </div>
+
       <div className="h-full px-4 flex items-center justify-between">
         {/* Logo e Nome do Sistema */}
         <div className="flex items-center gap-3">
@@ -225,32 +222,36 @@ export function TopBar() {
               </div>
             )}
           </div>
-          <div className="hidden md:block">
-            <h1 className="text-lg font-bold text-gray-900 dark:text-foreground">{platformName}</h1>
+          {/* Nome e Tenant responsivos */}
+          <div className="flex flex-col max-w-[120px] md:max-w-none">
+            <h1 className="text-sm md:text-lg font-bold text-gray-900 dark:text-foreground leading-tight truncate">{platformName}</h1>
             {user?.tenant && (
-              <p className="text-xs text-gray-500 dark:text-muted-foreground">{user.tenant.nomeFantasia}</p>
+              <p className="text-xs text-gray-500 dark:text-muted-foreground truncate">{user.tenant.nomeFantasia}</p>
             )}
           </div>
         </div>
 
-
-        {/* Barra de Busca (Centro) */}
+        {/* Barra de Busca Desktop */}
         <div className="hidden lg:flex flex-1 max-w-xl mx-4">
           <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-muted-foreground" />
             <input
               type="text"
               placeholder="Buscar..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-secondary/50 dark:text-foreground placeholder:text-gray-400 dark:placeholder:text-muted-foreground/50 transition-colors"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-input rounded-full focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-secondary/50 dark:text-foreground placeholder:text-gray-400 dark:placeholder:text-muted-foreground/50 transition-colors"
             />
           </div>
         </div>
 
-
         {/* Ações do Usuário (Direita) */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 md:gap-2">
           {/* Botão de Busca Mobile */}
-          <Button variant="ghost" size="icon" className="lg:hidden text-gray-600 dark:text-muted-foreground hover:bg-gray-100 dark:hover:bg-accent">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden text-gray-600 dark:text-muted-foreground hover:bg-gray-100 dark:hover:bg-accent rounded-full"
+            onClick={() => setShowMobileSearch(true)}
+          >
             <Search className="h-5 w-5" />
           </Button>
 
@@ -400,7 +401,7 @@ export function TopBar() {
           <div className="relative" ref={userMenuRef}>
             <Button
               variant="ghost"
-              className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-accent transition-colors"
+              className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-accent transition-colors p-1 md:px-3 md:py-2 rounded-full md:rounded-md"
               onClick={() => setShowUserMenu(!showUserMenu)}
             >
               {/* Logo do Tenant do Usuário */}
