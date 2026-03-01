@@ -11,14 +11,14 @@ export class SecurityConfigService {
     }
 
   /**
-   * ObtÃ©m a configuraÃ§Ã£o de seguranÃ§a atual
-   * Se nÃ£o existir, cria uma com valores padrÃ£o
+   * Obtém a configuração de segurança atual
+   * Se não existir, cria uma com valores padrão
    */
   async getConfig() {
     let config = await this.prisma.securityConfig.findFirst();
 
     if (!config) {
-      // Criar configuraÃ§Ã£o padrÃ£o
+      // Criar configuração padrão
       config = await this.prisma.securityConfig.create({
         data: {
       // Empty implementation
@@ -30,7 +30,7 @@ export class SecurityConfigService {
   }
 
   /**
-   * Atualiza a configuraÃ§Ã£o de seguranÃ§a
+   * Atualiza a configuração de segurança
    * Apenas SUPER_ADMIN pode fazer isso
    */
   async updateConfig(dto: UpdateSecurityConfigDto, userId: string) {
@@ -68,7 +68,7 @@ export class SecurityConfigService {
   }
 
   /**
-   * ObtÃ©m configuraÃ§Ã£o especÃ­fica de rate limiting para login
+   * Obtém configuração específica de rate limiting para login
    */
   async getLoginRateLimit() {
     const config = await this.getConfig();
@@ -79,7 +79,7 @@ export class SecurityConfigService {
   }
 
   /**
-   * ObtÃ©m configuraÃ§Ã£o de validaÃ§Ã£o de senha
+   * Obtém configuração de validação de senha
    */
   async getPasswordPolicy() {
     const config = await this.getConfig();
@@ -93,7 +93,7 @@ export class SecurityConfigService {
   }
 
   /**
-   * ObtÃ©m configuraÃ§Ã£o de JWT
+   * Obtém configuração de JWT
    */
   async getJwtConfig() {
     const config = await this.getConfig();
@@ -104,7 +104,7 @@ export class SecurityConfigService {
   }
 
   /**
-   * ObtÃ©m configuraÃ§Ã£o de 2FA
+   * Obtém configuração de 2FA
    */
   async getTwoFactorConfig() {
     const config = await this.getConfig();
@@ -115,7 +115,7 @@ export class SecurityConfigService {
   }
 
   /**
-   * ObtÃ©m credenciais SMTP descriptografadas
+   * Obtém credenciais SMTP descriptografadas
    */
   async getSmtpCredentials() {
     const config = await this.getConfig();

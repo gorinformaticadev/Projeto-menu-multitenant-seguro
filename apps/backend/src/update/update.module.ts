@@ -6,13 +6,13 @@ import { PrismaModule } from '@core/prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
 
 /**
- * MÃ³dulo do Sistema de AtualizaÃ§Ãµes
+ * Módulo do Sistema de Atualizações
  * 
  * Funcionalidades:
- * - VerificaÃ§Ã£o automÃ¡tica de novas versÃµes via Git
- * - ExecuÃ§Ã£o segura de atualizaÃ§Ãµes com backup
- * - Rollback automÃ¡tico em caso de falhas
- * - Auditoria completa de todas as operaÃ§Ãµes
+ * - Verificação automática de novas versões via Git
+ * - Execução segura de atualizações com backup
+ * - Rollback automático em caso de falhas
+ * - Auditoria completa de todas as operações
  * - Interface REST para administradores
  */
 @Module({

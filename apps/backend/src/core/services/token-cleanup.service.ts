@@ -3,11 +3,11 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '@core/prisma/prisma.service';
 
 /**
- * ServiÃ§o de limpeza de tokens expirados
+ * Serviço de limpeza de tokens expirados
  * 
- * Executa tarefas de manutenÃ§Ã£o periÃ³dicas para:
+ * Executa tarefas de manutenção periódicas para:
  * - Remover refresh tokens expirados do banco de dados
- * - Limpar sessÃµes antigas
+ * - Limpar sessões antigas
  * - Otimizar armazenamento
  */
 @Injectable()
@@ -38,17 +38,17 @@ export class TokenCleanupService {
         },
       });
 
-      this.logger.log(`âœ… Limpeza concluÃ­da: ${result.count} tokens removidos`);
+      this.logger.log(`âœ… Limpeza concluída: ${result.count} tokens removidos`);
     } catch (error) {
       this.logger.error('âŒ Erro ao limpar tokens expirados:', error);
     }
   }
 
   /**
-   * Limpa tokens antigos manualmente (mÃ©todo pÃºblico para admin)
+   * Limpa tokens antigos manualmente (método público para admin)
    * 
    * @param olderThanDays - Remove tokens mais antigos que X dias
-   * @returns NÃºmero de tokens removidos
+   * @returns Número de tokens removidos
    */
   async cleanupOldTokens(olderThanDays: number = 30): Promise<number> {
     this.logger.log(`ðŸ§¹ Limpando tokens mais antigos que ${olderThanDays} dias...`);
@@ -66,7 +66,7 @@ export class TokenCleanupService {
                 lt: new Date(),
               },
             },
-            // Tokens muito antigos (mesmo se nÃ£o expirados)
+            // Tokens muito antigos (mesmo se não expirados)
             {
               createdAt: {
                 lt: cutoffDate,
@@ -85,14 +85,14 @@ export class TokenCleanupService {
   }
 
   /**
-   * Limpa todos os refresh tokens de um usuÃ¡rio especÃ­fico
-   * Ãštil para forÃ§ar logout em todos os dispositivos
+   * Limpa todos os refresh tokens de um usuário específico
+   * Ãštil para forçar logout em todos os dispositivos
    * 
-   * @param userId - ID do usuÃ¡rio
-   * @returns NÃºmero de tokens removidos
+   * @param userId - ID do usuário
+   * @returns Número de tokens removidos
    */
   async revokeAllUserTokens(userId: string): Promise<number> {
-    this.logger.log(`ðŸ”’ Revogando todos os tokens do usuÃ¡rio ${userId}...`);
+    this.logger.log(`ðŸ”’ Revogando todos os tokens do usuário ${userId}...`);
 
     try {
       const result = await this.prisma.refreshToken.deleteMany({
@@ -104,15 +104,15 @@ export class TokenCleanupService {
       this.logger.log(`âœ… ${result.count} tokens revogados`);
       return result.count;
     } catch (error) {
-      this.logger.error('âŒ Erro ao revogar tokens do usuÃ¡rio:', error);
+      this.logger.error('âŒ Erro ao revogar tokens do usuário:', error);
       throw error;
     }
   }
 
   /**
-   * ObtÃ©m estatÃ­sticas sobre tokens
+   * Obtém estatísticas sobre tokens
    * 
-   * @returns EstatÃ­sticas de tokens
+   * @returns Estatísticas de tokens
    */
   async getTokenStats() {
     const [total, expired, active] = await Promise.all([

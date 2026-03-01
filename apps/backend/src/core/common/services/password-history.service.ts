@@ -9,7 +9,7 @@ export class PasswordHistoryService {
     }
 
   /**
-   * Verificar se a senha jÃ¡ foi usada recentemente
+   * Verificar se a senha já foi usada recentemente
    */
   async isPasswordReused(userId: string, newPassword: string): Promise<{
     isReused: boolean;
@@ -23,34 +23,34 @@ export class PasswordHistoryService {
       return { isReused: false };
     }
 
-    // Buscar configuraÃ§Ã£o de limite de reutilizaÃ§Ã£o
+    // Buscar configuração de limite de reutilização
     const securityConfig = await this.prisma.securityConfig.findFirst();
     const reuseLimit = securityConfig?.passwordReuseLimit || 5;
 
     try {
       const passwordHistory: string[] = JSON.parse(user.passwordHistory);
 
-      // Verificar contra cada senha no histÃ³rico
+      // Verificar contra cada senha no histórico
       for (let i = 0; i < passwordHistory.length; i++) {
         const isMatch = await bcrypt.compare(newPassword, passwordHistory[i]);
         if (isMatch) {
           const _positionInHistory = i + 1;
           return {
             isReused: true,
-            message: `Esta senha jÃ¡ foi utilizada recentemente. VocÃª nÃ£o pode reutilizar as Ãºltimas ${reuseLimit} senhas.`,
+            message: `Esta senha já foi utilizada recentemente. Você não pode reutilizar as últimas ${reuseLimit} senhas.`,
           };
         }
       }
 
       return { isReused: false };
     } catch (error) {
-      // Se houver erro ao parsear JSON, considerar que nÃ£o hÃ¡ histÃ³rico
+      // Se houver erro ao parsear JSON, considerar que não há histórico
       return { isReused: false };
     }
   }
 
   /**
-   * Adicionar nova senha ao histÃ³rico
+   * Adicionar nova senha ao histórico
    */
   async addPasswordToHistory(userId: string, hashedPassword: string): Promise<void> {
     const user = await this.prisma.user.findUnique({
@@ -61,7 +61,7 @@ export class PasswordHistoryService {
       return;
     }
 
-    // Buscar configuraÃ§Ã£o de limite
+    // Buscar configuração de limite
     const securityConfig = await this.prisma.securityConfig.findFirst();
     const reuseLimit = securityConfig?.passwordReuseLimit || 5;
 
@@ -75,15 +75,15 @@ export class PasswordHistoryService {
       }
     }
 
-    // Adicionar nova senha no inÃ­cio do array
+    // Adicionar nova senha no início do array
     passwordHistory.unshift(hashedPassword);
 
-    // Manter apenas as Ãºltimas N senhas
+    // Manter apenas as últimas N senhas
     if (passwordHistory.length > reuseLimit) {
       passwordHistory = passwordHistory.slice(0, reuseLimit);
     }
 
-    // Salvar histÃ³rico atualizado
+    // Salvar histórico atualizado
     await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -110,19 +110,19 @@ export class PasswordHistoryService {
     const requireSpecial = securityConfig?.passwordRequireSpecial ?? true;
 
     if (password.length < minLength) {
-      errors.push(`A senha deve ter no mÃ­nimo ${minLength} caracteres`);
+      errors.push(`A senha deve ter no mínimo ${minLength} caracteres`);
     }
 
     if (requireUppercase && !/[A-Z]/.test(password)) {
-      errors.push('A senha deve conter pelo menos uma letra maiÃºscula');
+      errors.push('A senha deve conter pelo menos uma letra maiúscula');
     }
 
     if (requireLowercase && !/[a-z]/.test(password)) {
-      errors.push('A senha deve conter pelo menos uma letra minÃºscula');
+      errors.push('A senha deve conter pelo menos uma letra minúscula');
     }
 
     if (requireNumbers && !/\d/.test(password)) {
-      errors.push('A senha deve conter pelo menos um nÃºmero');
+      errors.push('A senha deve conter pelo menos um número');
     }
 
     if (requireSpecial && !/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
@@ -136,7 +136,7 @@ export class PasswordHistoryService {
   }
 
   /**
-   * Verificar se senha Ã© comum/fraca
+   * Verificar se senha é comum/fraca
    */
   isCommonPassword(password: string): boolean {
     // Lista de senhas mais comuns (top 100)
@@ -155,15 +155,15 @@ export class PasswordHistoryService {
   }
 
   /**
-   * Gerar sugestÃµes de senha forte
+   * Gerar sugestões de senha forte
    */
   generatePasswordSuggestions(): string[] {
     const suggestions = [
       'Use pelo menos 12 caracteres',
-      'Combine letras maiÃºsculas e minÃºsculas',
-      'Inclua nÃºmeros e caracteres especiais',
-      'Evite informaÃ§Ãµes pessoais (nome, data de nascimento)',
-      'NÃ£o reutilize senhas de outros serviÃ§os',
+      'Combine letras maiúsculas e minúsculas',
+      'Inclua números e caracteres especiais',
+      'Evite informações pessoais (nome, data de nascimento)',
+      'Não reutilize senhas de outros serviços',
       'Use um gerenciador de senhas',
       'Considere usar uma frase-senha (passphrase)',
     ];
@@ -172,7 +172,7 @@ export class PasswordHistoryService {
   }
 
   /**
-   * Calcular forÃ§a da senha
+   * Calcular força da senha
    */
   calculatePasswordStrength(password: string): {
     score: number; // 0-100
@@ -182,29 +182,29 @@ export class PasswordHistoryService {
     let score = 0;
     const feedback: string[] = [];
 
-    // Comprimento (atÃ© 40 pontos)
+    // Comprimento (até 40 pontos)
     if (password.length >= 8) score += 10;
     if (password.length >= 12) score += 10;
     if (password.length >= 16) score += 10;
     if (password.length >= 20) score += 10;
 
-    // Complexidade (atÃ© 40 pontos)
+    // Complexidade (até 40 pontos)
     if (/[a-z]/.test(password)) {
       score += 10;
     } else {
-      feedback.push('Adicione letras minÃºsculas');
+      feedback.push('Adicione letras minúsculas');
     }
 
     if (/[A-Z]/.test(password)) {
       score += 10;
     } else {
-      feedback.push('Adicione letras maiÃºsculas');
+      feedback.push('Adicione letras maiúsculas');
     }
 
     if (/\d/.test(password)) {
       score += 10;
     } else {
-      feedback.push('Adicione nÃºmeros');
+      feedback.push('Adicione números');
     }
 
     if (/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
@@ -213,7 +213,7 @@ export class PasswordHistoryService {
       feedback.push('Adicione caracteres especiais');
     }
 
-    // Diversidade (atÃ© 20 pontos)
+    // Diversidade (até 20 pontos)
     const uniqueChars = new Set(password).size;
     if (uniqueChars >= 8) score += 5;
     if (uniqueChars >= 12) score += 5;
@@ -222,7 +222,7 @@ export class PasswordHistoryService {
     // Penalidades
     if (this.isCommonPassword(password)) {
       score -= 50;
-      feedback.push('Esta senha Ã© muito comum. Escolha uma senha mais Ãºnica.');
+      feedback.push('Esta senha é muito comum. Escolha uma senha mais única.');
     }
 
     if (/(.)\1{2,}/.test(password)) {
@@ -232,13 +232,13 @@ export class PasswordHistoryService {
 
     if (/012|123|234|345|456|567|678|789|abc|bcd|cde/.test(password.toLowerCase())) {
       score -= 10;
-      feedback.push('Evite sequÃªncias Ã³bvias');
+      feedback.push('Evite sequências óbvias');
     }
 
-    // Garantir que score estÃ¡ entre 0-100
+    // Garantir que score está entre 0-100
     score = Math.max(0, Math.min(100, score));
 
-    // Determinar nÃ­vel
+    // Determinar nível
     let level: 'weak' | 'medium' | 'strong' | 'very_strong';
     if (score < 40) {
       level = 'weak';

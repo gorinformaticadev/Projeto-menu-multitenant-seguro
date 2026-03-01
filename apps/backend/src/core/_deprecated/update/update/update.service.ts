@@ -14,12 +14,12 @@ import * as fs from 'fs/promises';
 const execAsync = promisify(exec);
 
 /**
- * ServiÃ§o principal do Sistema de AtualizaÃ§Ãµes
+ * Serviço principal do Sistema de Atualizações
  * 
  * Responsabilidades:
- * - Verificar versÃµes disponÃ­veis no repositÃ³rio Git
- * - Executar atualizaÃ§Ãµes com backup e rollback
- * - Gerenciar configuraÃ§Ãµes do sistema
+ * - Verificar versões disponíveis no repositório Git
+ * - Executar atualizações com backup e rollback
+ * - Gerenciar configurações do sistema
  * - Registrar logs de auditoria
  */
 @Injectable()
@@ -33,28 +33,28 @@ export class UpdateService {
   ) { }
 
   /**
-   * Verifica se hÃ¡ atualizaÃ§Ãµes disponÃ­veis no repositÃ³rio Git
-   * Compara versÃµes usando semver e atualiza status no banco
+   * Verifica se há atualizações disponíveis no repositório Git
+   * Compara versões usando semver e atualiza status no banco
    */
   async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: string }> {
     try {
-      this.logger.log('Iniciando verificaÃ§Ã£o de atualizaÃ§Ãµes...');
+      this.logger.log('Iniciando verificação de atualizações...');
 
-      // Buscar configuraÃ§Ãµes do sistema
+      // Buscar configurações do sistema
       const settings: any = await this.getSystemSettings();
 
       if (!settings.gitUsername || !settings.gitRepository) {
-        this.logger.warn('ConfiguraÃ§Ãµes do Git nÃ£o encontradas');
+        this.logger.warn('Configurações do Git não encontradas');
         return { updateAvailable: false };
       }
 
-      // Construir URL do repositÃ³rio
+      // Construir URL do repositório
       const repoUrl = `https://github.com/${settings.gitUsername}/${settings.gitRepository}.git`;
 
       // Buscar tags remotas
       const { stdout } = await execAsync(`git ls-remote --tags ${repoUrl}`);
 
-      // Extrair versÃµes vÃ¡lidas (semver)
+      // Extrair versões válidas (semver)
       const tags = stdout
         .split('\n')
         .map(line => line.split('\t')[1])
@@ -64,7 +64,7 @@ export class UpdateService {
         .sort((a, b) => semver.rcompare(semver.clean(a)!, semver.clean(b)!));
 
       if (tags.length === 0) {
-        this.logger.warn('Nenhuma tag vÃ¡lida encontrada no repositÃ³rio');
+        this.logger.warn('Nenhuma tag válida encontrada no repositório');
         return { updateAvailable: false };
       }
 
@@ -80,21 +80,21 @@ export class UpdateService {
         lastUpdateCheck: new Date(),
       });
 
-      this.logger.log(`VerificaÃ§Ã£o concluÃ­da. VersÃ£o atual: ${currentVersion}, DisponÃ­vel: ${latestVersion}, Update disponÃ­vel: ${updateAvailable}`);
+      this.logger.log(`Verificação concluída. Versão atual: ${currentVersion}, Disponível: ${latestVersion}, Update disponível: ${updateAvailable}`);
 
       return { updateAvailable, availableVersion: latestVersion };
     } catch (error) {
-      this.logger.error('Erro ao verificar atualizaÃ§Ãµes:', error);
+      this.logger.error('Erro ao verificar atualizações:', error);
       throw new HttpException(
-        'Erro ao verificar atualizaÃ§Ãµes',
+        'Erro ao verificar atualizações',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
 
   /**
-   * Executa atualizaÃ§Ã£o para versÃ£o especificada
-   * Inclui backup automÃ¡tico, rollback em caso de falha
+   * Executa atualização para versão especificada
+   * Inclui backup automático, rollback em caso de falha
    */
   async executeUpdate(
     updateData: ExecuteUpdateDto,
@@ -105,21 +105,21 @@ export class UpdateService {
     let updateLog: any;
 
     try {
-      this.logger.log(`Iniciando atualizaÃ§Ã£o para versÃ£o ${updateData.version}...`);
+      this.logger.log(`Iniciando atualização para versão ${updateData.version}...`);
 
-      // Verificar se jÃ¡ existe uma atualizaÃ§Ã£o em andamento
+      // Verificar se já existe uma atualização em andamento
       const runningUpdate = await (this.prisma as any).updateLog.findFirst({
         where: { status: 'STARTED' },
       });
 
       if (runningUpdate) {
         throw new HttpException(
-          'JÃ¡ existe uma atualizaÃ§Ã£o em andamento',
+          'Já existe uma atualização em andamento',
           HttpStatus.CONFLICT,
         );
       }
 
-      // Criar log de atualizaÃ§Ã£o
+      // Criar log de atualização
       updateLog = await (this.prisma as any).updateLog.create({
         data: {
           version: updateData.version,
@@ -141,7 +141,7 @@ export class UpdateService {
         details: { version: updateData.version, logId: updateLog.id },
       });
 
-      // Executar script de atualizaÃ§Ã£o
+      // Executar script de atualização
       const scriptPath = path.join(process.cwd(), 'scripts', 'update.sh');
       const command = `bash ${scriptPath} ${updateData.version} ${updateData.packageManager}`;
 
@@ -166,7 +166,7 @@ export class UpdateService {
         },
       });
 
-      // Atualizar versÃ£o atual no sistema
+      // Atualizar versão atual no sistema
       await this.updateSystemSettings({
         appVersion: updateData.version,
         updateAvailable: false,
@@ -182,16 +182,16 @@ export class UpdateService {
         details: { version: updateData.version, duration, logId: updateLog.id },
       });
 
-      this.logger.log(`AtualizaÃ§Ã£o para ${updateData.version} concluÃ­da com sucesso em ${duration}s`);
+      this.logger.log(`Atualização para ${updateData.version} concluída com sucesso em ${duration}s`);
 
       return {
         success: true,
         logId: updateLog.id,
-        message: `AtualizaÃ§Ã£o para ${updateData.version} concluÃ­da com sucesso`,
+        message: `Atualização para ${updateData.version} concluída com sucesso`,
       };
 
     } catch (error: any) {
-      this.logger.error('Erro durante atualizaÃ§Ã£o:', error);
+      this.logger.error('Erro durante atualização:', error);
 
       if (updateLog) {
         // Atualizar log como falha
@@ -217,14 +217,14 @@ export class UpdateService {
       }
 
       throw new HttpException(
-        `Erro durante atualizaÃ§Ã£o: ${error.message}`,
+        `Erro durante atualização: ${error.message}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
 
   /**
-   * Retorna status atual do sistema de atualizaÃ§Ãµes
+   * Retorna status atual do sistema de atualizações
    */
   async getUpdateStatus(): Promise<UpdateStatusDto> {
     const settings: any = await this.getSystemSettings();
@@ -240,7 +240,7 @@ export class UpdateService {
   }
 
   /**
-   * Atualiza configuraÃ§Ãµes do sistema de updates
+   * Atualiza configurações do sistema de updates
    */
   async updateConfig(
     config: UpdateConfigDto,
@@ -266,23 +266,23 @@ export class UpdateService {
         details: { configFields: Object.keys(config) },
       });
 
-      this.logger.log('ConfiguraÃ§Ãµes do sistema de updates atualizadas');
+      this.logger.log('Configurações do sistema de updates atualizadas');
 
       return {
         success: true,
-        message: 'ConfiguraÃ§Ãµes atualizadas com sucesso',
+        message: 'Configurações atualizadas com sucesso',
       };
     } catch (error) {
-      this.logger.error('Erro ao atualizar configuraÃ§Ãµes:', error);
+      this.logger.error('Erro ao atualizar configurações:', error);
       throw new HttpException(
-        'Erro ao atualizar configuraÃ§Ãµes',
+        'Erro ao atualizar configurações',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
 
   /**
-   * Retorna histÃ³rico de atualizaÃ§Ãµes
+   * Retorna histórico de atualizações
    */
   async getUpdateLogs(limit: number = 50): Promise<any[]> {
     return (this.prisma as any).updateLog.findMany({
@@ -304,7 +304,7 @@ export class UpdateService {
   }
 
   /**
-   * Retorna detalhes de um log especÃ­fico
+   * Retorna detalhes de um log específico
    */
   async getUpdateLogDetails(logId: string): Promise<unknown> {
     const log = await (this.prisma as any).updateLog.findUnique({
@@ -312,14 +312,14 @@ export class UpdateService {
     });
 
     if (!log) {
-      throw new HttpException('Log nÃ£o encontrado', HttpStatus.NOT_FOUND);
+      throw new HttpException('Log não encontrado', HttpStatus.NOT_FOUND);
     }
 
     return log;
   }
 
   /**
-   * Busca ou cria configuraÃ§Ãµes do sistema
+   * Busca ou cria configurações do sistema
    */
   private async getSystemSettings(): Promise<unknown> {
     let settings = await (this.prisma as any).systemSettings.findFirst();
@@ -339,7 +339,7 @@ export class UpdateService {
   }
 
   /**
-   * Atualiza configuraÃ§Ãµes do sistema
+   * Atualiza configurações do sistema
    */
   private async updateSystemSettings(data: any): Promise<void> {
     const settings: any = await this.getSystemSettings();

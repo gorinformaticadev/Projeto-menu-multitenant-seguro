@@ -22,12 +22,12 @@ import { ExecuteUpdateDto, UpdateConfigDto } from './dto/update.dto';
 import { Throttle } from '@nestjs/throttler';
 
 /**
- * Controller do Sistema de AtualizaÃ§Ãµes
+ * Controller do Sistema de Atualizações
  * 
- * Endpoints protegidos para gerenciar atualizaÃ§Ãµes do sistema:
- * - VerificaÃ§Ã£o de status e versÃµes disponÃ­veis
- * - ExecuÃ§Ã£o de atualizaÃ§Ãµes (apenas SUPER_ADMIN)
- * - ConfiguraÃ§Ã£o do sistema de updates
+ * Endpoints protegidos para gerenciar atualizações do sistema:
+ * - Verificação de status e versões disponíveis
+ * - Execução de atualizações (apenas SUPER_ADMIN)
+ * - Configuração do sistema de updates
  * - Consulta de logs e auditoria
  */
 @Controller('api/update')
@@ -39,8 +39,8 @@ export class UpdateController {
 
   /**
    * GET /api/update/status
-   * Retorna status atual do sistema de atualizaÃ§Ãµes
-   * AcessÃ­vel para usuÃ¡rios autenticados
+   * Retorna status atual do sistema de atualizações
+   * Acessível para usuários autenticados
    */
   @Get('status')
   async getStatus() {
@@ -48,7 +48,7 @@ export class UpdateController {
       return await this.updateService.getUpdateStatus();
     } catch (error) {
       throw new HttpException(
-        'Erro ao buscar status de atualizaÃ§Ãµes',
+        'Erro ao buscar status de atualizações',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -56,13 +56,13 @@ export class UpdateController {
 
   /**
    * GET /api/update/check
-   * ForÃ§a verificaÃ§Ã£o de novas versÃµes no repositÃ³rio
+   * Força verificação de novas versões no repositório
    * Apenas SUPER_ADMIN pode executar
    */
   @Get('check')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
-  @Throttle({ default: { limit: 10, ttl: 60000 } }) // MÃ¡ximo 10 verificaÃ§Ãµes por minuto
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // Máximo 10 verificações por minuto
   async checkForUpdates(@Request() req) {
     try {
       const result = await this.updateService.checkForUpdates();
@@ -70,13 +70,13 @@ export class UpdateController {
       return {
         success: true,
         message: result.updateAvailable 
-          ? `Nova versÃ£o disponÃ­vel: ${result.availableVersion}`
-          : 'Sistema estÃ¡ atualizado',
+          ? `Nova versão disponível: ${result.availableVersion}`
+          : 'Sistema está atualizado',
         ...result,
       };
     } catch (error) {
       throw new HttpException(
-        'Erro ao verificar atualizaÃ§Ãµes',
+        'Erro ao verificar atualizações',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -84,13 +84,13 @@ export class UpdateController {
 
   /**
    * POST /api/update/execute
-   * Executa atualizaÃ§Ã£o para versÃ£o especificada
+   * Executa atualização para versão especificada
    * Apenas SUPER_ADMIN pode executar
    */
   @Post('execute')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
-  @Throttle({ default: { limit: 3, ttl: 3600000 } }) // MÃ¡ximo 3 atualizaÃ§Ãµes por hora
+  @Throttle({ default: { limit: 3, ttl: 3600000 } }) // Máximo 3 atualizações por hora
   async executeUpdate(
     @Body() updateData: ExecuteUpdateDto,
     @Request() req,
@@ -110,7 +110,7 @@ export class UpdateController {
       return result;
     } catch (error) {
       throw new HttpException(
-        error.message || 'Erro ao executar atualizaÃ§Ã£o',
+        error.message || 'Erro ao executar atualização',
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -118,7 +118,7 @@ export class UpdateController {
 
   /**
    * PUT /api/update/config
-   * Atualiza configuraÃ§Ãµes do sistema de updates
+   * Atualiza configurações do sistema de updates
    * Apenas SUPER_ADMIN pode executar
    */
   @Put('config')
@@ -136,7 +136,7 @@ export class UpdateController {
       return result;
     } catch (error) {
       throw new HttpException(
-        'Erro ao atualizar configuraÃ§Ãµes',
+        'Erro ao atualizar configurações',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -144,7 +144,7 @@ export class UpdateController {
 
   /**
    * GET /api/update/logs
-   * Retorna histÃ³rico de atualizaÃ§Ãµes
+   * Retorna histórico de atualizações
    * Apenas SUPER_ADMIN pode acessar
    */
   @Get('logs')
@@ -156,7 +156,7 @@ export class UpdateController {
       
       if (limitNum > 200) {
         throw new HttpException(
-          'Limite mÃ¡ximo de 200 registros',
+          'Limite máximo de 200 registros',
           HttpStatus.BAD_REQUEST,
         );
       }
@@ -170,7 +170,7 @@ export class UpdateController {
       };
     } catch (error) {
       throw new HttpException(
-        'Erro ao buscar logs de atualizaÃ§Ã£o',
+        'Erro ao buscar logs de atualização',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -178,7 +178,7 @@ export class UpdateController {
 
   /**
    * GET /api/update/logs/:id
-   * Retorna detalhes de uma atualizaÃ§Ã£o especÃ­fica
+   * Retorna detalhes de uma atualização específica
    * Apenas SUPER_ADMIN pode acessar
    */
   @Get('logs/:id')
@@ -202,28 +202,28 @@ export class UpdateController {
 
   /**
    * GET /api/update/test-connection
-   * Testa conectividade com o repositÃ³rio Git
+   * Testa conectividade com o repositório Git
    * Apenas SUPER_ADMIN pode executar
    */
   @Get('test-connection')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
-  @Throttle({ default: { limit: 5, ttl: 60000 } }) // MÃ¡ximo 5 testes por minuto
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // Máximo 5 testes por minuto
   async testConnection() {
     try {
-      // Tenta verificar atualizaÃ§Ãµes para testar conectividade
+      // Tenta verificar atualizações para testar conectividade
       const result = await this.updateService.checkForUpdates();
       
       return {
         success: true,
-        message: 'ConexÃ£o com repositÃ³rio estabelecida com sucesso',
+        message: 'Conexão com repositório estabelecida com sucesso',
         connected: true,
         ...result,
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Falha na conexÃ£o com o repositÃ³rio',
+        message: 'Falha na conexão com o repositório',
         connected: false,
         error: error.message,
       };

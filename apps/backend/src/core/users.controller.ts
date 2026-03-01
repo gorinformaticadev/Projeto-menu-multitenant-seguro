@@ -20,12 +20,12 @@ export class UsersController {
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @SkipTenantIsolation()
   create(@Body() createUserDto: CreateUserDto, @CurrentUser() user: any) {
-    // Se for ADMIN, forÃ§a o tenantId do usuÃ¡rio logado
+    // Se for ADMIN, força o tenantId do usuário logado
     if (user.role === Role.ADMIN) {
       createUserDto.tenantId = user.tenantId;
-      // ADMIN sÃ³ pode criar USER ou CLIENT
+      // ADMIN só pode criar USER ou CLIENT
       if (createUserDto.role === Role.SUPER_ADMIN || createUserDto.role === Role.ADMIN) {
-        throw new Error('ADMIN nÃ£o pode criar SUPER_ADMIN ou ADMIN');
+        throw new Error('ADMIN não pode criar SUPER_ADMIN ou ADMIN');
       }
     }
     return this.usersService.create(createUserDto);
@@ -35,7 +35,7 @@ export class UsersController {
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @SkipTenantIsolation()
   findAll(@Query('tenantId') tenantId?: string, @CurrentUser() user?: any) {
-    // Se for ADMIN, forÃ§a buscar apenas do seu tenant
+    // Se for ADMIN, força buscar apenas do seu tenant
     if (user?.role === Role.ADMIN) {
       return this.usersService.findAll(user.tenantId);
     }
@@ -46,9 +46,9 @@ export class UsersController {
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @SkipTenantIsolation()
   findByTenant(@Param('tenantId') tenantId: string, @CurrentUser() user: any) {
-    // ADMIN sÃ³ pode acessar o prÃ³prio tenant
+    // ADMIN só pode acessar o próprio tenant
     if (user.role === Role.ADMIN && user.tenantId !== tenantId) {
-      throw new Error('ADMIN nÃ£o pode acessar usuÃ¡rios de outros tenants');
+      throw new Error('ADMIN não pode acessar usuários de outros tenants');
     }
     return this.usersService.findByTenant(tenantId);
   }
@@ -76,7 +76,7 @@ export class UsersController {
 
   /**
    * PUT /users/profile
-   * Atualizar perfil do usuÃ¡rio logado
+   * Atualizar perfil do usuário logado
    */
   @Put('profile')
   updateProfile(
@@ -88,7 +88,7 @@ export class UsersController {
 
   /**
    * PUT /users/change-password
-   * Alterar senha do usuÃ¡rio logado
+   * Alterar senha do usuário logado
    */
   @Put('change-password')
   changePassword(
@@ -100,7 +100,7 @@ export class UsersController {
 
   /**
    * POST /users/:id/unlock
-   * Desbloquear usuÃ¡rio
+   * Desbloquear usuário
    * Apenas SUPER_ADMIN e ADMIN
    */
   @Post(':id/unlock')

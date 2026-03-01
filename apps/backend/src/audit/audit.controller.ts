@@ -40,7 +40,7 @@ export class AuditController {
 
   /**
    * GET /audit-logs/stats
-   * EstatÃ­sticas de logs
+   * Estatísticas de logs
    */
   @Get('stats')
   async getStats(
@@ -57,7 +57,7 @@ export class AuditController {
 
   /**
    * GET /audit-logs/:id
-   * Buscar log especÃ­fico
+   * Buscar log específico
    */
   @Get(':id')
   async findOne(@Param('id') id: string) {

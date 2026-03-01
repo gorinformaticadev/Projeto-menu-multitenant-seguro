@@ -2,7 +2,7 @@
 import { Role } from '@prisma/client';
 import { PrismaService } from '@core/prisma/prisma.service';
 
-// Validador personalizado para senha baseado nas configuraÃ§Ãµes
+// Validador personalizado para senha baseado nas configurações
 function IsValidPassword(validationOptions?: ValidationOptions) {
   return function (object: object, propertyName: string) {
     registerDecorator({
@@ -12,15 +12,15 @@ function IsValidPassword(validationOptions?: ValidationOptions) {
       options: validationOptions,
       validator: {
         async validate(value: unknown, args: ValidationArguments) {
-          if (!value || typeof value !== 'string' || value.trim() === '') return true; // Se nÃ£o hÃ¡ senha, Ã© vÃ¡lido (para ediÃ§Ã£o)
+          if (!value || typeof value !== 'string' || value.trim() === '') return true; // Se não há senha, é válido (para edição)
 
           try {
-            // Buscar configuraÃ§Ãµes de senha do banco
+            // Buscar configurações de senha do banco
             const prisma = new PrismaService();
             const config = await prisma.securityConfig.findFirst();
 
             if (!config) {
-              // Usar valores padrÃ£o se nÃ£o houver configuraÃ§Ã£o
+              // Usar valores padrão se não houver configuração
               const minLength = 8;
               const requireUppercase = true;
               const requireLowercase = true;
@@ -36,7 +36,7 @@ function IsValidPassword(validationOptions?: ValidationOptions) {
               return true;
             }
 
-            // Validar baseado nas configuraÃ§Ãµes do banco
+            // Validar baseado nas configurações do banco
             if (value.length < config.passwordMinLength) return false;
             if (config.passwordRequireUppercase && !/[A-Z]/.test(value)) return false;
             if (config.passwordRequireLowercase && !/[a-z]/.test(value)) return false;
@@ -45,12 +45,12 @@ function IsValidPassword(validationOptions?: ValidationOptions) {
 
             return true;
           } catch (error) {
-            // Em caso de erro, usar validaÃ§Ã£o bÃ¡sica
+            // Em caso de erro, usar validação básica
             return value.length >= 8 && /[A-Z]/.test(value) && /[a-z]/.test(value) && /\d/.test(value);
           }
         },
         defaultMessage(args: ValidationArguments) {
-          return 'A senha nÃ£o atende aos requisitos de seguranÃ§a configurados';
+          return 'A senha não atende aos requisitos de segurança configurados';
         },
       },
     });
@@ -64,7 +64,7 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsString()
-  @MinLength(3, { message: 'Nome deve ter no mÃ­nimo 3 caracteres' })
+  @MinLength(3, { message: 'Nome deve ter no mínimo 3 caracteres' })
   name?: string;
 
   @IsOptional()

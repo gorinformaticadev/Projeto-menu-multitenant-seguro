@@ -6,17 +6,17 @@ export class Login2FADto {
   @ToLowerCase()
   @IsEmail({
       // Empty implementation
-    }, { message: 'Email invÃ¡lido' })
-  @IsNotEmpty({ message: 'Email Ã© obrigatÃ³rio' })
+    }, { message: 'Email inválido' })
+  @IsNotEmpty({ message: 'Email é obrigatório' })
   email: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Senha Ã© obrigatÃ³ria' })
+  @IsNotEmpty({ message: 'Senha é obrigatória' })
   password: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'CÃ³digo 2FA Ã© obrigatÃ³rio' })
-  @Length(6, 6, { message: 'CÃ³digo deve ter 6 dÃ­gitos' })
+  @IsNotEmpty({ message: 'Código 2FA é obrigatório' })
+  @Length(6, 6, { message: 'Código deve ter 6 dígitos' })
   twoFactorToken: string;
 }
 

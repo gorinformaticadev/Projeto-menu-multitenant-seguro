@@ -3,11 +3,11 @@ import { IsStrongPassword } from '@core/common/validators/password.validator';
 
 export class ChangePasswordDto {
   @IsString()
-  @IsNotEmpty({ message: 'Senha atual Ã© obrigatÃ³ria' })
+  @IsNotEmpty({ message: 'Senha atual é obrigatória' })
   currentPassword: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Nova senha Ã© obrigatÃ³ria' })
+  @IsNotEmpty({ message: 'Nova senha é obrigatória' })
   @IsStrongPassword()
   newPassword: string;
 }

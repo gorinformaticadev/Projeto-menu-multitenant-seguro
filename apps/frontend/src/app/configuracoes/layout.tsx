@@ -30,24 +30,24 @@ export default function ConfiguracoesLayout({
 
   const menuItems = [
     {
-      name: "VisÃ£o Geral",
+      name: "Visão Geral",
       href: "/configuracoes",
       icon: Settings,
-      description: "ConfiguraÃ§Ãµes gerais do sistema",
+      description: "Configurações gerais do sistema",
       show: true,
     },
     {
-      name: "SeguranÃ§a",
+      name: "Segurança",
       href: "/configuracoes/seguranca",
       icon: Shield,
-      description: "PolÃ­ticas de seguranÃ§a e autenticaÃ§Ã£o",
+      description: "Políticas de segurança e autenticação",
       show: user?.role === "SUPER_ADMIN",
     },
     {
       name: "Identidade da Plataforma",
       href: "/configuracoes/identidade",
       icon: Building2,
-      description: "InformaÃ§Ãµes bÃ¡sicas da plataforma",
+      description: "Informações básicas da plataforma",
       show: user?.role === "SUPER_ADMIN",
     },
     {
@@ -58,24 +58,24 @@ export default function ConfiguracoesLayout({
       show: user?.role === "SUPER_ADMIN",
     },
     {
-      name: "Gerenciamento de MÃ³dulos",
+      name: "Gerenciamento de Módulos",
       href: "/configuracoes/sistema/modulos",
       icon: Package,
-      description: "Instalar e gerenciar mÃ³dulos",
+      description: "Instalar e gerenciar módulos",
       show: user?.role === "SUPER_ADMIN",
     },
     {
       name: "Sistema de Updates",
       href: "/configuracoes/sistema/updates",
       icon: Download,
-      description: "AtualizaÃ§Ãµes automÃ¡ticas via Git",
+      description: "Atualizações automáticas via Git",
       show: user?.role === "SUPER_ADMIN",
     },
     {
-      name: "ConfiguraÃ§Ãµes da Empresa",
+      name: "Configurações da Empresa",
       href: "/configuracoes/empresa",
       icon: Building2,
-      description: "InformaÃ§Ãµes da empresa",
+      description: "Informações da empresa",
       show: user?.role === "ADMIN",
     },
     {
@@ -99,7 +99,7 @@ export default function ConfiguracoesLayout({
             <div>
               <h2 className="text-xl font-bold tracking-tight">Painel</h2>
               <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mt-1">
-                ConfiguraÃ§Ãµes
+                Configurações
               </p>
             </div>
           </div>
@@ -144,7 +144,7 @@ export default function ConfiguracoesLayout({
             <div className="p-4 bg-slate-50 rounded-3xl border border-slate-100">
               <div className="flex items-center gap-2 mb-2">
                 <Shield className="h-4 w-4 text-primary" />
-                <span className="text-xs font-bold uppercase tracking-tighter">SeguranÃ§a Ativa</span>
+                <span className="text-xs font-bold uppercase tracking-tighter">Segurança Ativa</span>
               </div>
               <p className="text-[10px] text-muted-foreground leading-snug">
                 {user?.role === "SUPER_ADMIN"
@@ -167,7 +167,7 @@ export default function ConfiguracoesLayout({
               Voltar
             </Link>
             <h1 className="text-sm font-bold truncate px-4">
-              {visibleItems.find(i => pathname.startsWith(i.href))?.name || "ConfiguraÃ§Ãµes"}
+              {visibleItems.find(i => pathname.startsWith(i.href))?.name || "Configurações"}
             </h1>
             <div className="w-10" />
           </div>

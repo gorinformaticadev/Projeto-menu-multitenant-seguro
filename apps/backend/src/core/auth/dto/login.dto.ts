@@ -6,13 +6,13 @@ export class LoginDto {
   @ToLowerCase()
   @IsEmail({
       // Empty implementation
-    }, { message: 'Email invÃ¡lido' })
-  @IsNotEmpty({ message: 'Email Ã© obrigatÃ³rio' })
+    }, { message: 'Email inválido' })
+  @IsNotEmpty({ message: 'Email é obrigatório' })
   email: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Senha Ã© obrigatÃ³ria' })
-  @MinLength(6, { message: 'Senha deve ter no mÃ­nimo 6 caracteres' })
+  @IsNotEmpty({ message: 'Senha é obrigatória' })
+  @MinLength(6, { message: 'Senha deve ter no mínimo 6 caracteres' })
   password: string;
 }
 

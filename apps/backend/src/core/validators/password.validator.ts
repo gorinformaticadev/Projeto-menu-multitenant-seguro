@@ -26,11 +26,11 @@ export class IsStrongPasswordConstraint implements ValidatorConstraintInterface 
   async validate(password: string, args: ValidationArguments): Promise<boolean> {
     if (!password) return false;
 
-    // Buscar polÃ­tica de senha do banco
+    // Buscar política de senha do banco
     const config = await this.prisma.securityConfig.findFirst();
 
     if (!config) {
-      // PolÃ­tica padrÃ£o se nÃ£o houver configuraÃ§Ã£o
+      // Política padrão se não houver configuração
       return this.validatePassword(password, {
         minLength: 8,
         requireUppercase: true,
@@ -50,22 +50,22 @@ export class IsStrongPasswordConstraint implements ValidatorConstraintInterface 
   }
 
   private validatePassword(password: string, policy: PasswordPolicy): boolean {
-    // Tamanho mÃ­nimo
+    // Tamanho mínimo
     if (password.length < policy.minLength) {
       return false;
     }
 
-    // Letra maiÃºscula
+    // Letra maiúscula
     if (policy.requireUppercase && !/[A-Z]/.test(password)) {
       return false;
     }
 
-    // Letra minÃºscula
+    // Letra minúscula
     if (policy.requireLowercase && !/[a-z]/.test(password)) {
       return false;
     }
 
-    // NÃºmeros
+    // Números
     if (policy.requireNumbers && !/\d/.test(password)) {
       return false;
     }
@@ -79,8 +79,8 @@ export class IsStrongPasswordConstraint implements ValidatorConstraintInterface 
   }
 
   defaultMessage(args: ValidationArguments): string {
-    // Mensagem padrÃ£o (a mensagem real serÃ¡ gerada de forma assÃ­ncrona)
-    return 'A senha nÃ£o atende aos requisitos de seguranÃ§a configurados';
+    // Mensagem padrão (a mensagem real será gerada de forma assíncrona)
+    return 'A senha não atende aos requisitos de segurança configurados';
   }
 }
 

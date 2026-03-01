@@ -29,7 +29,7 @@ export class TenantModulesController {
     @Param('moduleName') moduleName: string
   ) {
     await this.tenantModuleService.activateModuleForTenant(moduleName, tenantId);
-    return { message: `MÃ³dulo ${moduleName} ativado para o tenant ${tenantId}` };
+    return { message: `Módulo ${moduleName} ativado para o tenant ${tenantId}` };
   }
 
   @Post(':moduleName/deactivate')
@@ -39,7 +39,7 @@ export class TenantModulesController {
     @Param('moduleName') moduleName: string
   ) {
     await this.tenantModuleService.deactivateModuleForTenant(moduleName, tenantId);
-    return { message: `MÃ³dulo ${moduleName} desativado para o tenant ${tenantId}` };
+    return { message: `Módulo ${moduleName} desativado para o tenant ${tenantId}` };
   }
 
   @Get('active')

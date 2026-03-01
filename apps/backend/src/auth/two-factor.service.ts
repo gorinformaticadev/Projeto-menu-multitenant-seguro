@@ -20,7 +20,7 @@ export class TwoFactorService {
     });
 
     if (!user) {
-      throw new Error('UsuÃ¡rio nÃ£o encontrado');
+      throw new Error('Usuário não encontrado');
     }
 
     // Gerar secret
@@ -33,7 +33,7 @@ export class TwoFactorService {
     // Criptografar o secret antes de salvar
     const encryptedSecret = encryptSensitiveData(secret.base32);
 
-    // Salvar secret criptografado temporÃ¡rio (nÃ£o ativado ainda)
+    // Salvar secret criptografado temporário (não ativado ainda)
     await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -51,7 +51,7 @@ export class TwoFactorService {
   }
 
   /**
-   * Ativar 2FA apÃ³s verificar cÃ³digo
+   * Ativar 2FA após verificar código
    */
   async enable(userId: string, token: string) {
     const user = await this.prisma.user.findUnique({
@@ -59,10 +59,10 @@ export class TwoFactorService {
     });
 
     if (!user || !user.twoFactorSecret) {
-      throw new Error('Secret nÃ£o encontrado');
+      throw new Error('Secret não encontrado');
     }
 
-    // Descriptografar o secret para verificaÃ§Ã£o
+    // Descriptografar o secret para verificação
     const decryptedSecret = decryptSensitiveData(user.twoFactorSecret);
 
     // Verificar token
@@ -70,11 +70,11 @@ export class TwoFactorService {
       secret: decryptedSecret,
       encoding: 'base32',
       token,
-      window: 2, // Aceita 2 cÃ³digos antes/depois (60 segundos de margem)
+      window: 2, // Aceita 2 códigos antes/depois (60 segundos de margem)
     });
 
     if (!isValid) {
-      throw new Error('CÃ³digo invÃ¡lido');
+      throw new Error('Código inválido');
     }
 
     // Ativar 2FA
@@ -97,10 +97,10 @@ export class TwoFactorService {
     });
 
     if (!user || !user.twoFactorSecret) {
-      throw new Error('2FA nÃ£o estÃ¡ ativado');
+      throw new Error('2FA não está ativado');
     }
 
-    // Descriptografar o secret para verificaÃ§Ã£o
+    // Descriptografar o secret para verificação
     const decryptedSecret = decryptSensitiveData(user.twoFactorSecret);
 
     // Verificar token antes de desativar
@@ -112,7 +112,7 @@ export class TwoFactorService {
     });
 
     if (!isValid) {
-      throw new Error('CÃ³digo invÃ¡lido');
+      throw new Error('Código inválido');
     }
 
     // Desativar 2FA
@@ -128,10 +128,10 @@ export class TwoFactorService {
   }
 
   /**
-   * Verificar cÃ³digo 2FA
+   * Verificar código 2FA
    */
   verify(secret: string, token: string): boolean {
-    // Descriptografar o secret antes da verificaÃ§Ã£o
+    // Descriptografar o secret antes da verificação
     const decryptedSecret = decryptSensitiveData(secret);
     
     return speakeasy.totp.verify({

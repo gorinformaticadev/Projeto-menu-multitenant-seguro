@@ -2,10 +2,10 @@
 import { SKIP_CSRF_KEY } from '@core/guards/csrf.guard';
 
 /**
- * Decorator para pular validaÃ§Ã£o CSRF em rotas especÃ­ficas
+ * Decorator para pular validação CSRF em rotas específicas
  * 
- * Use com cautela! Apenas em rotas que realmente nÃ£o precisam de proteÃ§Ã£o CSRF,
- * como endpoints pÃºblicos de login ou que jÃ¡ usam outras formas de autenticaÃ§Ã£o.
+ * Use com cautela! Apenas em rotas que realmente não precisam de proteção CSRF,
+ * como endpoints públicos de login ou que já usam outras formas de autenticação.
  * 
  * @example
  * @SkipCsrf()
