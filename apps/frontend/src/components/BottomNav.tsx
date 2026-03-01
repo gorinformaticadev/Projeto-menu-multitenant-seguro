@@ -21,10 +21,10 @@ export function BottomNav() {
   const leftItems = [
     { label: "Home", href: "/dashboard", icon: Home },
     { label: "Empresas", href: "/empresas", icon: Building2, adminOnly: true },
+    { label: "Usuários", href: "/usuarios", icon: Users, adminOnly: true },
   ].filter(item => !item.adminOnly || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN");
 
   const rightItems = [
-    { label: "Usuários", href: "/usuarios", icon: Users, adminOnly: true },
     { label: "Config", href: "/configuracoes", icon: MoreHorizontal },
   ].filter(item => !item.adminOnly || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN");
 
