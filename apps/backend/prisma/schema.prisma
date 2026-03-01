@@ -171,6 +171,9 @@ model SecurityConfig {
   platformName               String?  @default("Sistema Multitenant")
   platformEmail              String?
   platformPhone              String?
+  webPushPublicKey           String?
+  webPushPrivateKey          String?
+  webPushSubject             String?  @default("mailto:suporte@example.com")
   rateLimitDevEnabled        Boolean  @default(false)
   rateLimitProdEnabled       Boolean  @default(false)
   rateLimitDevRequests       Int      @default(10000)
@@ -498,5 +501,4 @@ enum RestoreStatus {
   SUCCESS
   FAILED
 }
-
 

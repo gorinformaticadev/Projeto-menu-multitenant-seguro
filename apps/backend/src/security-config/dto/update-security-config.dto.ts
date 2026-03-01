@@ -198,4 +198,17 @@ export class UpdateSecurityConfigDto {
   @IsOptional()
   @IsString()
   platformPhone?: string;
+
+  // Web Push (PWA/Windows)
+  @IsOptional()
+  @IsString()
+  webPushPublicKey?: string;
+
+  @IsOptional()
+  @IsString()
+  webPushPrivateKey?: string;
+
+  @IsOptional()
+  @IsString()
+  webPushSubject?: string;
 }

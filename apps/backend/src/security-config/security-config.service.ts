@@ -1,6 +1,7 @@
- import { Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { UpdateSecurityConfigDto } from './dto/update-security-config.dto';
+import { UpdateWebPushConfigDto } from './dto/update-web-push-config.dto';
 import { encryptSensitiveData, decryptSensitiveData } from '@core/common/utils/security.utils';
 
 @Injectable()
@@ -44,6 +45,20 @@ export class SecurityConfigService {
     
     if (dto.smtpUsername) {
       updateData.smtpUsername = encryptSensitiveData(dto.smtpUsername);
+    }
+
+    if (dto.webPushPrivateKey !== undefined) {
+      const privateKey = this.normalizeString(dto.webPushPrivateKey);
+      updateData.webPushPrivateKey = privateKey ? encryptSensitiveData(privateKey) : null;
+    }
+
+    if (dto.webPushPublicKey !== undefined) {
+      updateData.webPushPublicKey = this.normalizeString(dto.webPushPublicKey);
+    }
+
+    if (dto.webPushSubject !== undefined) {
+      updateData.webPushSubject =
+        this.normalizeString(dto.webPushSubject) || 'mailto:suporte@example.com';
     }
 
     return this.prisma.securityConfig.update({
@@ -113,6 +128,53 @@ export class SecurityConfigService {
       smtpUsername,
       smtpPassword,
     };
+  }
+
+  /**
+   * Obtém configuração de Web Push para painel administrativo
+   */
+  async getWebPushConfig() {
+    const config = await this.getConfig();
+
+    return {
+      webPushPublicKey: this.normalizeString(config.webPushPublicKey),
+      webPushSubject:
+        this.normalizeString(config.webPushSubject) || 'mailto:suporte@example.com',
+      hasPrivateKey: !!this.normalizeString(config.webPushPrivateKey),
+    };
+  }
+
+  /**
+   * Atualiza configuração de Web Push
+   */
+  async updateWebPushConfig(dto: UpdateWebPushConfigDto, userId: string) {
+    const config = await this.getConfig();
+    const updateData: any = { updatedBy: userId };
+
+    if (dto.webPushPublicKey !== undefined) {
+      updateData.webPushPublicKey = this.normalizeString(dto.webPushPublicKey);
+    }
+
+    if (dto.webPushSubject !== undefined) {
+      updateData.webPushSubject =
+        this.normalizeString(dto.webPushSubject) || 'mailto:suporte@example.com';
+    }
+
+    if (dto.clearPrivateKey) {
+      updateData.webPushPrivateKey = null;
+    }
+
+    if (dto.webPushPrivateKey !== undefined) {
+      const privateKey = this.normalizeString(dto.webPushPrivateKey);
+      updateData.webPushPrivateKey = privateKey ? encryptSensitiveData(privateKey) : null;
+    }
+
+    await this.prisma.securityConfig.update({
+      where: { id: config.id },
+      data: updateData,
+    });
+
+    return this.getWebPushConfig();
   }
 
   /**
@@ -220,5 +282,13 @@ export class SecurityConfigService {
       updateRateLimitPerHour: config.updateRateLimitPerHour || 2,
     };
   }
-}
 
+  private normalizeString(value?: string | null): string | null {
+    if (value === undefined || value === null) {
+      return null;
+    }
+
+    const normalized = String(value).trim();
+    return normalized.length > 0 ? normalized : null;
+  }
+}

@@ -36,8 +36,8 @@ export class NotificationsController {
   ) {}
 
   @Get('push/public-key')
-  getPushPublicKey() {
-    const publicKey = this.pushNotificationService.getPublicKey();
+  async getPushPublicKey() {
+    const publicKey = await this.pushNotificationService.getPublicKey();
     return {
       enabled: !!publicKey,
       publicKey,

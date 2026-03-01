@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import {
   Shield,
+  BellRing,
   Building2,
   Settings,
   Download,
@@ -29,45 +30,52 @@ export default function ConfiguracoesLayout({
 
   const menuItems = [
     {
-      name: "Visão Geral",
+      name: "VisÃ£o Geral",
       href: "/configuracoes",
       icon: Settings,
-      description: "Configurações gerais do sistema",
+      description: "ConfiguraÃ§Ãµes gerais do sistema",
       show: true,
     },
     {
-      name: "Segurança",
+      name: "SeguranÃ§a",
       href: "/configuracoes/seguranca",
       icon: Shield,
-      description: "Políticas de segurança e autenticação",
+      description: "PolÃ­ticas de seguranÃ§a e autenticaÃ§Ã£o",
       show: user?.role === "SUPER_ADMIN",
     },
     {
       name: "Identidade da Plataforma",
       href: "/configuracoes/identidade",
       icon: Building2,
-      description: "Informações básicas da plataforma",
+      description: "InformaÃ§Ãµes bÃ¡sicas da plataforma",
       show: user?.role === "SUPER_ADMIN",
     },
     {
-      name: "Gerenciamento de Módulos",
+      name: "NotificaÃ§Ãµes Push",
+      href: "/configuracoes/notificacoes-push",
+      icon: BellRing,
+      description: "Chaves VAPID para PWA/Windows",
+      show: user?.role === "SUPER_ADMIN",
+    },
+    {
+      name: "Gerenciamento de MÃ³dulos",
       href: "/configuracoes/sistema/modulos",
       icon: Package,
-      description: "Instalar e gerenciar módulos",
+      description: "Instalar e gerenciar mÃ³dulos",
       show: user?.role === "SUPER_ADMIN",
     },
     {
       name: "Sistema de Updates",
       href: "/configuracoes/sistema/updates",
       icon: Download,
-      description: "Atualizações automáticas via Git",
+      description: "AtualizaÃ§Ãµes automÃ¡ticas via Git",
       show: user?.role === "SUPER_ADMIN",
     },
     {
-      name: "Configurações da Empresa",
+      name: "ConfiguraÃ§Ãµes da Empresa",
       href: "/configuracoes/empresa",
       icon: Building2,
-      description: "Informações da empresa",
+      description: "InformaÃ§Ãµes da empresa",
       show: user?.role === "ADMIN",
     },
     {
@@ -91,7 +99,7 @@ export default function ConfiguracoesLayout({
             <div>
               <h2 className="text-xl font-bold tracking-tight">Painel</h2>
               <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mt-1">
-                Configurações
+                ConfiguraÃ§Ãµes
               </p>
             </div>
           </div>
@@ -136,7 +144,7 @@ export default function ConfiguracoesLayout({
             <div className="p-4 bg-slate-50 rounded-3xl border border-slate-100">
               <div className="flex items-center gap-2 mb-2">
                 <Shield className="h-4 w-4 text-primary" />
-                <span className="text-xs font-bold uppercase tracking-tighter">Segurança Ativa</span>
+                <span className="text-xs font-bold uppercase tracking-tighter">SeguranÃ§a Ativa</span>
               </div>
               <p className="text-[10px] text-muted-foreground leading-snug">
                 {user?.role === "SUPER_ADMIN"
@@ -159,7 +167,7 @@ export default function ConfiguracoesLayout({
               Voltar
             </Link>
             <h1 className="text-sm font-bold truncate px-4">
-              {visibleItems.find(i => pathname.startsWith(i.href))?.name || "Configurações"}
+              {visibleItems.find(i => pathname.startsWith(i.href))?.name || "ConfiguraÃ§Ãµes"}
             </h1>
             <div className="w-10" />
           </div>
@@ -173,3 +181,4 @@ export default function ConfiguracoesLayout({
     </div>
   );
 }
+

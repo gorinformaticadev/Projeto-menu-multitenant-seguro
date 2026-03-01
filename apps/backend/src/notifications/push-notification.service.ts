@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@core/prisma/prisma.service';
+import { decryptSensitiveData } from '@core/common/utils/security.utils';
 import { Notification } from './notification.entity';
 import { SavePushSubscriptionDto } from './notification.dto';
 
@@ -18,29 +19,38 @@ interface WebPushModuleLike {
   ): Promise<unknown>;
 }
 
+interface ResolvedVapidConfig {
+  publicKey: string;
+  privateKey: string;
+  subject: string;
+  source: 'database' | 'env';
+}
+
 @Injectable()
 export class PushNotificationService {
   private readonly logger = new Logger(PushNotificationService.name);
-  private readonly vapidPublicKey: string | null;
-  private readonly vapidPrivateKey: string | null;
-  private readonly vapidSubject: string;
   private webPush: WebPushModuleLike | null = null;
   private enabled = false;
+  private cachedConfig: ResolvedVapidConfig | null = null;
+  private cachedConfigAt = 0;
+  private lastVapidFingerprint: string | null = null;
+  private warnedMissingConfig = false;
+  private warnedMissingDependency = false;
+  private readonly configCacheTtlMs = 60 * 1000;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
-  ) {
-    this.vapidPublicKey = this.configService.get<string>('WEB_PUSH_PUBLIC_KEY') || null;
-    this.vapidPrivateKey = this.configService.get<string>('WEB_PUSH_PRIVATE_KEY') || null;
-    this.vapidSubject =
-      this.configService.get<string>('WEB_PUSH_SUBJECT') || 'mailto:suporte@example.com';
+  ) {}
 
-    this.initialize();
-  }
+  async getPublicKey(): Promise<string | null> {
+    const config = await this.getResolvedVapidConfig();
+    if (!config) {
+      return null;
+    }
 
-  getPublicKey(): string | null {
-    return this.enabled ? this.vapidPublicKey : null;
+    await this.initialize(config);
+    return this.enabled ? config.publicKey : null;
   }
 
   async saveSubscription(
@@ -100,6 +110,13 @@ export class PushNotificationService {
   }
 
   async sendNotification(notification: Notification): Promise<void> {
+    const config = await this.getResolvedVapidConfig();
+    if (!config) {
+      return;
+    }
+
+    await this.initialize(config);
+
     if (!this.enabled || !this.webPush) {
       return;
     }
@@ -185,29 +202,32 @@ export class PushNotificationService {
     }
   }
 
-  private initialize(): void {
-    if (!this.vapidPublicKey || !this.vapidPrivateKey) {
-      this.logger.warn(
-        'Web Push desabilitado: WEB_PUSH_PUBLIC_KEY/WEB_PUSH_PRIVATE_KEY nao configuradas.',
-      );
+  private async initialize(config: ResolvedVapidConfig): Promise<void> {
+    const vapidFingerprint = `${config.subject}|${config.publicKey}|${config.privateKey}`;
+    if (this.enabled && this.webPush && this.lastVapidFingerprint === vapidFingerprint) {
       return;
     }
 
     try {
-      // Dependencia opcional para nao quebrar instalacoes existentes.
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const webPush = require('web-push') as WebPushModuleLike;
+      if (!this.webPush) {
+        // Dependencia opcional para nao quebrar instalacoes existentes.
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        this.webPush = require('web-push') as WebPushModuleLike;
+      }
 
-      webPush.setVapidDetails(this.vapidSubject, this.vapidPublicKey, this.vapidPrivateKey);
-      this.webPush = webPush;
+      this.webPush.setVapidDetails(config.subject, config.publicKey, config.privateKey);
+      this.lastVapidFingerprint = vapidFingerprint;
       this.enabled = true;
-      this.logger.log('Web Push habilitado com sucesso.');
+      this.warnedMissingDependency = false;
     } catch (error) {
       this.enabled = false;
-      this.logger.warn(
-        'Web Push desabilitado: dependencia "web-push" nao encontrada. Instale com "pnpm -C apps/backend add web-push".',
-      );
-      this.logger.debug(`Detalhe: ${(error as Error)?.message || String(error)}`);
+      if (!this.warnedMissingDependency) {
+        this.warnedMissingDependency = true;
+        this.logger.warn(
+          'Web Push desabilitado: dependencia "web-push" nao encontrada. Execute a atualizacao para instalar as dependencias.',
+        );
+        this.logger.debug(`Detalhe: ${(error as Error)?.message || String(error)}`);
+      }
     }
   }
 
@@ -234,5 +254,109 @@ export class PushNotificationService {
     });
 
     return superAdmins.map((u) => u.id);
+  }
+
+  private async getResolvedVapidConfig(): Promise<ResolvedVapidConfig | null> {
+    if (
+      this.cachedConfig &&
+      Date.now() - this.cachedConfigAt < this.configCacheTtlMs
+    ) {
+      return this.cachedConfig;
+    }
+
+    const databaseConfig = await this.getVapidConfigFromDatabase();
+    const envConfig = this.getVapidConfigFromEnv();
+    const resolved = databaseConfig || envConfig;
+
+    this.cachedConfig = resolved;
+    this.cachedConfigAt = Date.now();
+
+    if (!resolved && !this.warnedMissingConfig) {
+      this.warnedMissingConfig = true;
+      this.logger.warn(
+        'Web Push desabilitado: configure WEB_PUSH_PUBLIC_KEY/WEB_PUSH_PRIVATE_KEY no painel ou no .env.',
+      );
+    }
+
+    if (resolved) {
+      this.warnedMissingConfig = false;
+    }
+
+    return resolved;
+  }
+
+  private async getVapidConfigFromDatabase(): Promise<ResolvedVapidConfig | null> {
+    try {
+      const config = await this.prisma.securityConfig.findFirst({
+        select: {
+          webPushPublicKey: true,
+          webPushPrivateKey: true,
+          webPushSubject: true,
+        },
+      });
+
+      const publicKey = this.normalizeString(config?.webPushPublicKey);
+      const privateKeyRaw = this.normalizeString(config?.webPushPrivateKey);
+
+      if (!publicKey || !privateKeyRaw) {
+        return null;
+      }
+
+      const privateKey = this.tryDecryptPrivateKey(privateKeyRaw);
+      if (!privateKey) {
+        return null;
+      }
+
+      return {
+        publicKey,
+        privateKey,
+        subject:
+          this.normalizeString(config?.webPushSubject) || 'mailto:suporte@example.com',
+        source: 'database',
+      };
+    } catch (error) {
+      this.logger.error('Falha ao carregar configuracao de Web Push do banco:', error);
+      return null;
+    }
+  }
+
+  private getVapidConfigFromEnv(): ResolvedVapidConfig | null {
+    const publicKey = this.normalizeString(
+      this.configService.get<string>('WEB_PUSH_PUBLIC_KEY'),
+    );
+    const privateKey = this.normalizeString(
+      this.configService.get<string>('WEB_PUSH_PRIVATE_KEY'),
+    );
+
+    if (!publicKey || !privateKey) {
+      return null;
+    }
+
+    return {
+      publicKey,
+      privateKey,
+      subject:
+        this.normalizeString(this.configService.get<string>('WEB_PUSH_SUBJECT')) ||
+        'mailto:suporte@example.com',
+      source: 'env',
+    };
+  }
+
+  private tryDecryptPrivateKey(raw: string): string | null {
+    try {
+      return decryptSensitiveData(raw);
+    } catch {
+      // Compatibilidade com dados legados salvos sem criptografia.
+      return this.normalizeString(raw);
+    }
+  }
+
+  private normalizeString(value?: string | null): string | null {
+    if (value === undefined || value === null) {
+      return null;
+    }
+
+    const normalized = String(value).trim();
+    return normalized.length > 0 ? normalized : null;
   }
 }
