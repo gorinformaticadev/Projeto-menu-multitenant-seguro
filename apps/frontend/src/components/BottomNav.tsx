@@ -18,57 +18,72 @@ export function BottomNav() {
   // Obtém módulos ativos para o launcher
   const taskbarItems = moduleRegistry.getTaskbarItems(user?.role);
 
-  const navItems = [
+  const leftItems = [
     { label: "Home", href: "/dashboard", icon: Home },
     { label: "Empresas", href: "/empresas", icon: Building2, adminOnly: true },
-    { label: "Usuários", href: "/usuarios", icon: Users, adminOnly: true },
-  ];
+  ].filter(item => !item.adminOnly || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN");
 
-  const filteredNavItems = navItems.filter(item =>
-    !item.adminOnly || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN"
-  );
+  const rightItems = [
+    { label: "Usuários", href: "/usuarios", icon: Users, adminOnly: true },
+    { label: "Config", href: "/configuracoes", icon: MoreHorizontal },
+  ].filter(item => !item.adminOnly || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN");
 
   return (
     <>
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-lg border-t z-50 px-4 h-16 flex items-center justify-around pb-safe shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
-        {filteredNavItems.map((item) => {
-          const isActive = pathname === item.href;
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex flex-col items-center gap-1 transition-all active:scale-95",
-                isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Icon size={20} className={isActive ? "fill-primary/10" : ""} />
-              <span className="text-[10px] font-bold">{item.label}</span>
-            </Link>
-          );
-        })}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-lg border-t z-50 px-2 h-16 flex items-center justify-between pb-safe shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
 
-        {/* Botão Central: App Launcher */}
-        <button
-          onClick={() => setIsLauncherOpen(true)}
-          className="flex flex-col items-center justify-center -translate-y-5 bg-primary text-primary-foreground w-14 h-14 rounded-2xl shadow-lg shadow-primary/20 ring-4 ring-background transition-all active:scale-90 hover:brightness-110"
-          aria-label="Launcher de Módulos"
-        >
-          <Users size={28} />
-        </button>
+        {/* Esquerda: Home, Empresas */}
+        <div className="flex flex-1 justify-around">
+          {leftItems.map((item) => {
+            const isActive = pathname === item.href;
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex flex-col items-center gap-1 transition-all active:scale-95",
+                  isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Icon size={20} className={isActive ? "fill-primary/10" : ""} />
+                <span className="text-[10px] font-bold">{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
 
-        {/* Menu "Mais" / Configurações Rápidas */}
-        <Link
-          href="/configuracoes"
-          className={cn(
-            "flex flex-col items-center gap-1 transition-all active:scale-95",
-            pathname === "/configuracoes" ? "text-primary" : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <MoreHorizontal size={20} />
-          <span className="text-[10px] font-bold">Config</span>
-        </Link>
+        {/* Centro: Módulos do Sistema */}
+        <div className="flex-shrink-0 px-2">
+          <button
+            onClick={() => setIsLauncherOpen(true)}
+            className="flex flex-col items-center justify-center -translate-y-5 bg-primary text-primary-foreground w-14 h-14 rounded-2xl shadow-lg shadow-primary/20 ring-4 ring-background transition-all active:scale-90 hover:brightness-110"
+            aria-label="Launcher de Módulos"
+          >
+            <LayoutGrid size={28} />
+          </button>
+        </div>
+
+        {/* Direita: Usuários, Config */}
+        <div className="flex flex-1 justify-around">
+          {rightItems.map((item) => {
+            const isActive = pathname === item.href;
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex flex-col items-center gap-1 transition-all active:scale-95",
+                  isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Icon size={20} className={isActive ? "fill-primary/10" : ""} />
+                <span className="text-[10px] font-bold">{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
       </nav>
 
       {/* App Launcher Modal */}
