@@ -2,7 +2,7 @@
 
 ## ✅ Arquivos Já Criados
 
-- ✅ `frontend/public/favicon.svg` - Favicon SVG (funciona em navegadores modernos)
+- ✅ `frontend/public/pwa.svg` - Favicon SVG (funciona em navegadores modernos)
 - ✅ `frontend/public/apple-touch-icon.svg` - Ícone para iOS
 - ✅ `frontend/public/manifest.json` - Manifest PWA
 - ✅ `frontend/src/app/layout.tsx` - Metadata atualizado
@@ -23,7 +23,7 @@ Para suporte a navegadores antigos, você pode gerar um `favicon.ico`:
 ### Opção 1: Online (Mais Fácil)
 
 1. **Acessar:** https://realfavicongenerator.net/
-2. **Upload:** `frontend/public/favicon.svg`
+2. **Upload:** `frontend/public/pwa.svg`
 3. **Gerar:** Clicar em "Generate your Favicons and HTML code"
 4. **Download:** Baixar o pacote
 5. **Copiar:** `favicon.ico` para `frontend/public/`
@@ -38,7 +38,7 @@ Para suporte a navegadores antigos, você pode gerar um `favicon.ico`:
 
 # Converter SVG para ICO
 cd frontend/public
-magick convert favicon.svg -define icon:auto-resize=16,32,48 favicon.ico
+magick convert pwa.svg -define icon:auto-resize=16,32,48 favicon.ico
 ```
 
 ### Opção 3: Usando Node.js
@@ -49,7 +49,7 @@ npm install -g svg2ico
 
 # Converter
 cd frontend/public
-svg2ico favicon.svg favicon.ico
+svg2ico pwa.svg favicon.ico
 ```
 
 ### Opção 4: Usar o Gerador HTML
@@ -72,7 +72,7 @@ svg2ico favicon.svg favicon.ico
 - **Gradiente:** Visual moderno
 
 ### Tamanhos
-- **favicon.svg:** Escalável (qualquer tamanho)
+- **pwa.svg:** Escalável (qualquer tamanho)
 - **favicon.ico:** 16x16, 32x32, 48x48
 - **apple-touch-icon:** 180x180
 
@@ -125,7 +125,7 @@ Cmd + Shift + Delete (Mac)
 **Solução 3: Verificar arquivo**
 ```bash
 # Verificar se arquivo existe
-ls frontend/public/favicon.svg
+ls frontend/public/pwa.svg
 
 # Deve mostrar o arquivo
 ```
@@ -133,7 +133,7 @@ ls frontend/public/favicon.svg
 ### Favicon aparece mas está errado
 
 **Solução: Regenerar**
-1. Editar `frontend/public/favicon.svg`
+1. Editar `frontend/public/pwa.svg`
 2. Salvar
 3. Limpar cache do navegador
 4. Recarregar página
@@ -154,7 +154,7 @@ ls frontend/public/favicon.svg
 ## 🎯 Recomendação
 
 **Para desenvolvimento:**
-- ✅ Usar apenas `favicon.svg` (já funciona!)
+- ✅ Usar apenas `pwa.svg` (já funciona!)
 
 **Para produção:**
 - ✅ Gerar `favicon.ico` para compatibilidade

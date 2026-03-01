@@ -15,11 +15,9 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     }
 
     protected async handleRequest(
-        context: ExecutionContext,
-        limit: number,
-        ttl: number,
-        throttler: any,
+        requestProps: any // Em v6 é ThrottlerRequest
     ): Promise<boolean> {
+        const { context, limit, ttl, throttler } = requestProps;
         const isProduction = process.env.NODE_ENV === 'production';
 
         // Obter configuração do banco de dados
@@ -27,7 +25,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
 
         // Se o throttler for 'login', respeita o limite configurado (mais rígido)
         if (throttler.name === 'login') {
-            return super.handleRequest(context, limit, ttl, throttler);
+            return super.handleRequest(requestProps);
         }
 
         // Verifica se o rate limiting está globalmente desabilitado para o ambiente atual
@@ -39,13 +37,15 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
         const req = context.switchToHttp().getRequest();
 
         // Verifica se há token de autenticação no header (indica que é o sistema interno)
-        // Se houver, aplica um limite muito generoso
         const hasAuth = req.headers.authorization || req.user;
 
         if (hasAuth) {
-            // 10000 requisições por minuto para usuários autenticados (quase ilimitado)
-            const authenticatedLimit = 10000;
-            return super.handleRequest(context, authenticatedLimit, ttl, throttler);
+            // 10000 requisições por minuto para usuários autenticados
+            return super.handleRequest({
+                ...requestProps,
+                limit: 10000,
+                ttl: 60000
+            });
         }
 
         // Para usuários não autenticados, usa os limites do banco de dados
@@ -55,12 +55,11 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
         const finalLimit = dbLimit || config.globalMaxRequests || limit;
         const finalWindow = (dbWindow || config.globalWindowMinutes || (ttl / 60000)) * 60000;
 
-        return super.handleRequest(
-            context,
-            finalLimit,
-            finalWindow,
-            throttler
-        );
+        return super.handleRequest({
+            ...requestProps,
+            limit: finalLimit,
+            ttl: finalWindow
+        });
     }
 
     protected throwThrottlerException(context: ExecutionContext): void {
