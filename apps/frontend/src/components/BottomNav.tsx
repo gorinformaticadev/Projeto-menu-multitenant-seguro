@@ -24,7 +24,7 @@ export function BottomNav() {
     { label: "Usuários", href: "/usuarios", icon: Users, adminOnly: true },
   ];
 
-  const filteredNavItems = navItems.filter(item => 
+  const filteredNavItems = navItems.filter(item =>
     !item.adminOnly || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN"
   );
 
@@ -35,8 +35,8 @@ export function BottomNav() {
           const isActive = pathname === item.href;
           const Icon = item.icon;
           return (
-            <Link 
-              key={item.href} 
+            <Link
+              key={item.href}
               href={item.href}
               className={cn(
                 "flex flex-col items-center gap-1 transition-all active:scale-95",
@@ -50,16 +50,16 @@ export function BottomNav() {
         })}
 
         {/* Botão Central: App Launcher */}
-        <button 
+        <button
           onClick={() => setIsLauncherOpen(true)}
           className="flex flex-col items-center justify-center -translate-y-5 bg-primary text-primary-foreground w-14 h-14 rounded-2xl shadow-lg shadow-primary/20 ring-4 ring-background transition-all active:scale-90 hover:brightness-110"
           aria-label="Launcher de Módulos"
         >
-          <LayoutGrid size={28} />
+          <Users size={28} />
         </button>
 
         {/* Menu "Mais" / Configurações Rápidas */}
-        <Link 
+        <Link
           href="/configuracoes"
           className={cn(
             "flex flex-col items-center gap-1 transition-all active:scale-95",
@@ -88,7 +88,7 @@ export function BottomNav() {
                   className="flex flex-col items-center gap-2 group transition-all active:scale-95"
                 >
                   <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300 shadow-sm">
-                    <Package size={32} />
+                    <LayoutGrid size={32} />
                   </div>
                   <span className="text-[11px] font-bold text-center truncate w-full px-1">
                     {item.name}
@@ -97,18 +97,18 @@ export function BottomNav() {
               ))
             ) : (
               <div className="col-span-3 py-10 text-center text-muted-foreground text-sm flex flex-col items-center gap-2">
-                <Package className="opacity-20" size={48} />
+                <LayoutGrid className="opacity-20" size={48} />
                 <p>Nenhum módulo modular carregado.</p>
               </div>
             )}
           </div>
           <div className="px-4">
-            <Button 
-                variant="outline" 
-                className="w-full rounded-xl py-6 font-bold" 
-                onClick={() => setIsLauncherOpen(false)}
+            <Button
+              variant="outline"
+              className="w-full rounded-xl py-6 font-bold"
+              onClick={() => setIsLauncherOpen(false)}
             >
-                Fechar
+              Fechar
             </Button>
           </div>
         </DialogContent>
