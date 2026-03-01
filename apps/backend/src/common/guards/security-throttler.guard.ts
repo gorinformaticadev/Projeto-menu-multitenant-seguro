@@ -1,12 +1,20 @@
-import { Injectable, ExecutionContext, Inject } from '@nestjs/common';
-import { ThrottlerGuard, ThrottlerException, ThrottlerStorage, ThrottlerModuleOptions } from '@nestjs/throttler';
+import { Injectable, ExecutionContext } from '@nestjs/common';
+import {
+    ThrottlerGuard,
+    ThrottlerException,
+    ThrottlerStorage,
+    ThrottlerModuleOptions,
+    InjectThrottlerOptions,
+    InjectThrottlerStorage,
+    ThrottlerLimitDetail,
+} from '@nestjs/throttler';
 import { Reflector } from '@nestjs/core';
 
 @Injectable()
 export class SecurityThrottlerGuard extends ThrottlerGuard {
     constructor(
-        @Inject('THROTTLER_MODULE_OPTIONS') options: ThrottlerModuleOptions,
-        storageService: ThrottlerStorage,
+        @InjectThrottlerOptions() options: ThrottlerModuleOptions,
+        @InjectThrottlerStorage() storageService: ThrottlerStorage,
         reflector: Reflector,
     ) {
         super(options, storageService, reflector);
@@ -19,7 +27,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
         const isProduction = process.env.NODE_ENV === 'production';
 
         // Logica simplificada sem DB por enquanto para testar se volta o serviço
-        if (throttler.name === 'login') {
+        if (throttler?.name === 'login') {
             return super.handleRequest(requestProps);
         }
 
@@ -46,7 +54,10 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
         });
     }
 
-    protected throwThrottlerException(context: ExecutionContext): void {
+    protected async throwThrottlingException(
+        _context: ExecutionContext,
+        _throttlerLimitDetail: ThrottlerLimitDetail,
+    ): Promise<void> {
         throw new ThrottlerException(
             'Limite de requisições atingido. Para evitar sobrecarga, o sistema bloqueou novas tentativas. Tente novamente em instantes.'
         );
