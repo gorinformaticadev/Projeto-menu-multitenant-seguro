@@ -3,12 +3,49 @@ import { PrismaService } from '@core/prisma/prisma.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import * as bcrypt from 'bcrypt';
-import { unlink } from 'fs/promises';
-import { join } from 'path';
+import { access, unlink } from 'fs/promises';
+import { basename, join, resolve } from 'path';
 
 @Injectable()
 export class TenantsService {
   constructor(private prisma: PrismaService) { }
+
+  private getLogosUploadDir(): string {
+    return resolve(process.cwd(), process.env.LOGOS_UPLOAD_DIR || './uploads/logos');
+  }
+
+  private getSafeLogoFilename(logoUrl?: string | null): string | null {
+    if (!logoUrl || typeof logoUrl !== 'string') {
+      return null;
+    }
+
+    const normalized = logoUrl.trim();
+    if (!normalized) {
+      return null;
+    }
+
+    const safeName = basename(normalized);
+    if (safeName !== normalized) {
+      return null;
+    }
+
+    return safeName;
+  }
+
+  private async resolveExistingLogo(logoUrl?: string | null): Promise<string | null> {
+    const safeName = this.getSafeLogoFilename(logoUrl);
+    if (!safeName) {
+      return null;
+    }
+
+    try {
+      const logoPath = join(this.getLogosUploadDir(), safeName);
+      await access(logoPath);
+      return safeName;
+    } catch {
+      return null;
+    }
+  }
 
   async findAll() {
     return this.prisma.tenant.findMany({
@@ -287,14 +324,16 @@ export class TenantsService {
         },
       });
 
+      const validFallbackLogo = await this.resolveExistingLogo(fallbackTenant?.logoUrl);
       return {
-        logoUrl: fallbackTenant?.logoUrl || null,
+        logoUrl: validFallbackLogo,
         nomeFantasia: fallbackTenant?.nomeFantasia || 'Sistema',
       };
     }
 
+    const validMasterLogo = await this.resolveExistingLogo(masterTenant.logoUrl);
     return {
-      logoUrl: masterTenant.logoUrl || null,
+      logoUrl: validMasterLogo,
       nomeFantasia: masterTenant.nomeFantasia,
     };
   }
@@ -312,8 +351,9 @@ export class TenantsService {
       throw new NotFoundException('Empresa não encontrada');
     }
 
+    const validTenantLogo = await this.resolveExistingLogo(tenant.logoUrl);
     return {
-      logoUrl: tenant.logoUrl || null,
+      logoUrl: validTenantLogo,
       nomeFantasia: tenant.nomeFantasia,
     };
   }

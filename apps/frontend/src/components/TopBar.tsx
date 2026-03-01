@@ -141,6 +141,21 @@ export function TopBar() {
     fetchUserTenantLogo();
   }, [user, masterLogo]);
 
+  const handleTenantLogoError = (target: HTMLImageElement, place: 'menu' | 'dropdown') => {
+    console.error(`Erro ao carregar logo do tenant no ${place}:`, userTenantLogo);
+    target.style.display = 'none';
+    const fallbackClass = place === 'menu' ? '.fallback-avatar' : '.fallback-avatar-dropdown';
+    const fallback = target.parentElement?.querySelector(fallbackClass);
+    if (fallback) {
+      fallback.classList.remove('hidden');
+    }
+
+    if (user?.tenantId) {
+      localStorage.removeItem(`tenant-logo-${user.tenantId}`);
+    }
+    setUserTenantLogo(null);
+  };
+
   // Utilitários para notificações
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -392,17 +407,11 @@ export function TopBar() {
               {userTenantLogo ? (
                 <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 dark:bg-secondary border border-gray-200 dark:border-border">
                   <img
-                    src={`/uploads/logos/${userTenantLogo}?t=${Date.now()}`}
+                    src={`/uploads/logos/${userTenantLogo}`}
                     alt="Logo Tenant"
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      console.error('Erro ao carregar logo do tenant no menu:', userTenantLogo);
-                      const target = e.currentTarget as HTMLImageElement;
-                      target.style.display = 'none';
-                      const fallback = target.parentElement?.querySelector('.fallback-avatar');
-                      if (fallback) {
-                        fallback.classList.remove('hidden');
-                      }
+                      handleTenantLogoError(e.currentTarget as HTMLImageElement, 'menu');
                     }}
                   />
                   <div className="w-full h-full rounded-full bg-primary flex items-center justify-center text-white font-semibold fallback-avatar hidden">
@@ -432,17 +441,11 @@ export function TopBar() {
                     {userTenantLogo ? (
                       <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 dark:bg-secondary border border-gray-200 dark:border-border flex-shrink-0">
                         <img
-                          src={`/uploads/logos/${userTenantLogo}?t=${Date.now()}`}
+                          src={`/uploads/logos/${userTenantLogo}`}
                           alt="Logo Tenant"
                           className="w-full h-full object-cover"
                           onError={(e) => {
-                            console.error('Erro ao carregar logo do tenant no dropdown:', userTenantLogo);
-                            const target = e.currentTarget as HTMLImageElement;
-                            target.style.display = 'none';
-                            const fallback = target.parentElement?.querySelector('.fallback-avatar-dropdown');
-                            if (fallback) {
-                              fallback.classList.remove('hidden');
-                            }
+                            handleTenantLogoError(e.currentTarget as HTMLImageElement, 'dropdown');
                           }}
                         />
                         <div className="w-full h-full rounded-full bg-primary flex items-center justify-center text-white font-semibold fallback-avatar-dropdown hidden">
