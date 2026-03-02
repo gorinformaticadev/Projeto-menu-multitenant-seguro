@@ -58,6 +58,7 @@ model User {
   backupLogs               BackupLog[]
   backupRestoreLogs        BackupRestoreLog[]
   pushSubscriptions        PushSubscription[]
+  seedHistory             SeedHistory[]
 
   @@index([tenantId])
   @@index([email])
@@ -381,6 +382,30 @@ model PushSubscription {
   @@map("push_subscriptions")
 }
 
+model SeedHistory {
+  id          String        @id @default(cuid())
+  executionId String
+  seedKey     String
+  module      String
+  version     Int
+  status      SeedRunStatus @default(STARTED)
+  force       Boolean       @default(false)
+  startedAt   DateTime      @default(now())
+  finishedAt  DateTime?
+  durationMs  Int?
+  host        String?
+  error       String?
+  summary     Json?
+  userId      String?
+  user        User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([module, version, status])
+  @@index([executionId])
+  @@index([startedAt])
+  @@index([userId])
+  @@map("seed_history")
+}
+
 model SecureFile {
   id             String    @id @default(uuid())
   tenantId       String
@@ -502,3 +527,10 @@ enum RestoreStatus {
   FAILED
 }
 
+enum SeedRunStatus {
+  STARTED
+  SUCCESS
+  FAILED
+  SKIPPED
+  FORCED
+}

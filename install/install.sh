@@ -446,6 +446,7 @@ native_create_app_envs() {
     upsert_env "UPLOADS_PUBLIC_URL" "https://${domain}/uploads" "$backend_env"
     upsert_env "REDIS_HOST" "127.0.0.1" "$backend_env"
     upsert_env "REDIS_PORT" "6379" "$backend_env"
+    upsert_env "SEED_LOCK_ID" "${SEED_LOCK_ID:-87456321}" "$backend_env"
     upsert_env "INSTALL_ADMIN_EMAIL" "${admin_email:-$email}" "$backend_env"
     upsert_env "INSTALL_ADMIN_PASSWORD" "$admin_pass" "$backend_env"
     upsert_env "NEXT_PUBLIC_API_URL" "https://${domain}/api" "$frontend_env"
@@ -457,7 +458,7 @@ native_migrate_and_seed() {
     local app_dir="$1"
     log_info "Etapa 17/23: executando migrate e seed..."
     run_as_native_user "cd '${app_dir}/apps/backend' && set -a && source ./.env && set +a && pnpm exec prisma migrate deploy --schema prisma/schema.prisma"
-    run_as_native_user "cd '${app_dir}/apps/backend' && set -a && source ./.env && set +a && node dist/prisma/seed.js"
+    run_as_native_user "cd '${app_dir}/apps/backend' && set -a && source ./.env && set +a && node dist/prisma/seed.js deploy"
 }
 
 native_start_pm2_apps() {
@@ -1007,6 +1008,9 @@ run_install() {
     upsert_env "JWT_SECRET" "$jwt_secret"
     upsert_env "ENCRYPTION_KEY" "$enc_key"
     upsert_env "REQUIRE_SECRET_MANAGER" "false"
+    upsert_env "SEED_ON_START" "${SEED_ON_START:-true}"
+    upsert_env "SEED_FORCE" "${SEED_FORCE:-false}"
+    upsert_env "SEED_LOCK_ID" "${SEED_LOCK_ID:-87456321}"
     upsert_env "NODE_ENV" "production"
     upsert_env "PORT" "4000"
     # Variáveis de instalação (documentação / uso futuro pelo backend)
@@ -1032,6 +1036,7 @@ run_install() {
         upsert_env "NODE_ENV" "production" "$BACKEND_ENV"
         upsert_env "INSTALL_ADMIN_EMAIL" "${admin_email:-$email}" "$BACKEND_ENV"
         upsert_env "INSTALL_ADMIN_PASSWORD" "$admin_pass" "$BACKEND_ENV"
+        upsert_env "SEED_LOCK_ID" "${SEED_LOCK_ID:-87456321}" "$BACKEND_ENV"
     fi
     if [[ -f "$FRONTEND_EXAMPLE" ]]; then
         if [[ ! -f "$FRONTEND_ENV" ]]; then

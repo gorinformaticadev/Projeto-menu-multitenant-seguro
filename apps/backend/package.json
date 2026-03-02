@@ -14,6 +14,8 @@
     "test": "pnpm run prisma:generate && jest --runInBand --passWithNoTests",
     "prisma:generate": "pnpm exec prisma generate",
     "prisma:migrate": "prisma migrate deploy",
+    "seed:deploy": "node dist/prisma/seed.js deploy",
+    "seed:force": "node dist/prisma/seed.js deploy --force",
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "security:audit": "pnpm audit --audit-level=moderate",

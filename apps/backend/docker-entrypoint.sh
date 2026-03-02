@@ -66,34 +66,30 @@ fi
 
 # Executa as migrations
 echo "Running prisma migrate deploy..."
-MIGRATE_OUTPUT=$($PRISMA_CMD migrate deploy --schema "$PRISMA_SCHEMA" 2>&1) || MIGRATE_EXIT_CODE=$?
+if ! $PRISMA_CMD migrate deploy --schema "$PRISMA_SCHEMA"; then
+  echo "ERROR: prisma migrate deploy failed. Aborting startup."
+  exit 1
+fi
+echo "Migrations applied successfully."
 
-if [ "${MIGRATE_EXIT_CODE:-0}" -ne 0 ]; then
-  echo "$MIGRATE_OUTPUT"
-  
-  # Verifica se o erro é porque as migrações já foram aplicadas
-  if echo "$MIGRATE_OUTPUT" | grep -qi "already applied\|no pending migrations\|database is already in sync"; then
-    echo "INFO: Database schema is already up to date."
-  else
-    echo "WARNING: prisma migrate deploy failed. Attempting db push as fallback..."
-    if ! $PRISMA_CMD db push --schema "$PRISMA_SCHEMA" --skip-generate --accept-data-loss 2>&1; then
-      echo "WARNING: Migration issues detected. Application will attempt to start anyway."
-      echo "You may need to manually fix the database schema."
+# Executa o seed versionado (apenas pendentes por padrao)
+SEED_FILE="./dist/prisma/seed.js"
+SEED_ON_START="${SEED_ON_START:-true}"
+SEED_FORCE="${SEED_FORCE:-false}"
+
+if [ "$SEED_ON_START" = "true" ]; then
+  if [ -f "$SEED_FILE" ]; then
+    echo "Running application seed pipeline (deploy mode)..."
+    if [ "$SEED_FORCE" = "true" ]; then
+      node "$SEED_FILE" deploy --force
+    else
+      node "$SEED_FILE" deploy
     fi
+  else
+    echo "Seed disabled: $SEED_FILE not found."
   fi
 else
-  echo "$MIGRATE_OUTPUT"
-  echo "Migrations applied successfully."
-fi
-
-# Executa o seed (idempotente)
-# O seed compilado está em dist/prisma/seed.js
-SEED_FILE="./dist/prisma/seed.js"
-if [ -f "$SEED_FILE" ]; then
-  echo "Running application seed (idempotent)..."
-  node "$SEED_FILE" || echo "WARNING: Seed returned non-zero exit code (may be safe to ignore on re-runs)."
-else
-  echo "Seed disabled: $SEED_FILE not found."
+  echo "Seed skipped: SEED_ON_START=false"
 fi
 
 echo "Starting NestJS application..."
