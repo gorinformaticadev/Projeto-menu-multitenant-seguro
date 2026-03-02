@@ -41,7 +41,7 @@ export class NotificationService {
 
       this.logger.log(`Notificação criada: ${notification.id} - ${notification.title}`);
       return this.mapToEntity(notification);
-    } catch {
+    } catch (error) {
       this.logger.error('Erro ao criar notificação:', error);
       throw error;
     }
@@ -406,4 +406,5 @@ export class NotificationService {
     }
   }
 }
+
 
