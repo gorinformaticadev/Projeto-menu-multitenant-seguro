@@ -237,8 +237,12 @@ if [ -z "$TARGET_FRONTEND_IMAGE" ] || [ -z "$TARGET_BACKEND_IMAGE" ]; then
 fi
 
 export RELEASE_TAG
+export APP_VERSION="${APP_VERSION:-$RELEASE_TAG}"
+export GIT_SHA="${GIT_SHA:-unknown}"
+export BUILD_TIME="${BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 
 log "versao alvo (RELEASE_TAG): $RELEASE_TAG"
+log "metadata runtime: APP_VERSION=$APP_VERSION GIT_SHA=$GIT_SHA BUILD_TIME=$BUILD_TIME"
 log "frontend anterior: cid=$PREV_FRONTEND_CONTAINER_ID image_id=$PREV_FRONTEND_IMAGE_ID image_name=$PREV_FRONTEND_IMAGE_NAME"
 log "backend anterior:  cid=$PREV_BACKEND_CONTAINER_ID image_id=$PREV_BACKEND_IMAGE_ID image_name=$PREV_BACKEND_IMAGE_NAME"
 log "frontend alvo compose image: $TARGET_FRONTEND_IMAGE"

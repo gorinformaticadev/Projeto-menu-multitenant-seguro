@@ -71,6 +71,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Resolve build metadata
+        id: meta-vars
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="$(grep -m1 '"version"' apps/backend/package.json | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')"
+          fi
+          build_time="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "app_version=${version}" >> "$GITHUB_OUTPUT"
+          echo "git_sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "build_time=${build_time}" >> "$GITHUB_OUTPUT"
+
       - name: Docker metadata (backend)
         id: meta-backend
         uses: docker/metadata-action@v5
@@ -97,6 +111,9 @@ jobs:
             --platform linux/amd64 \
             --target runner \
             --file ./apps/backend/Dockerfile \
+            --build-arg APP_VERSION=${{ steps.meta-vars.outputs.app_version }} \
+            --build-arg GIT_SHA=${{ steps.meta-vars.outputs.git_sha }} \
+            --build-arg BUILD_TIME=${{ steps.meta-vars.outputs.build_time }} \
             --load \
             --tag backend-prisma-check:ci \
             .
@@ -107,6 +124,10 @@ jobs:
         with:
           context: .
           file: ./apps/backend/Dockerfile
+          build-args: |
+            APP_VERSION=${{ steps.meta-vars.outputs.app_version }}
+            GIT_SHA=${{ steps.meta-vars.outputs.git_sha }}
+            BUILD_TIME=${{ steps.meta-vars.outputs.build_time }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta-backend.outputs.tags }}
@@ -121,6 +142,9 @@ jobs:
           file: ./apps/frontend/Dockerfile
           build-args: |
             NEXT_PUBLIC_API_URL=/api
+            APP_VERSION=${{ steps.meta-vars.outputs.app_version }}
+            GIT_SHA=${{ steps.meta-vars.outputs.git_sha }}
+            BUILD_TIME=${{ steps.meta-vars.outputs.build_time }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta-frontend.outputs.tags }}

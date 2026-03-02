@@ -38,6 +38,12 @@ FROM node:20-alpine AS runner
 WORKDIR /app/apps/backend
 ENV NODE_ENV=production
 ENV PORT=4000
+ARG APP_VERSION=0.0.0
+ARG GIT_SHA=unknown
+ARG BUILD_TIME=unknown
+ENV APP_VERSION=$APP_VERSION
+ENV GIT_SHA=$GIT_SHA
+ENV BUILD_TIME=$BUILD_TIME
 
 RUN apk add --no-cache curl postgresql-client
 RUN addgroup --system --gid 1001 nodejs

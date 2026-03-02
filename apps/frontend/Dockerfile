@@ -12,7 +12,13 @@ COPY apps/frontend/package.json apps/frontend/package.json
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --filter frontend... --frozen-lockfile
 COPY apps/frontend apps/frontend
 ARG NEXT_PUBLIC_API_URL=/api
+ARG APP_VERSION=0.0.0
+ARG GIT_SHA=unknown
+ARG BUILD_TIME=unknown
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_APP_VERSION=$APP_VERSION
+ENV NEXT_PUBLIC_GIT_SHA=$GIT_SHA
+ENV NEXT_PUBLIC_BUILD_TIME=$BUILD_TIME
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV CI=true
 RUN pnpm --filter frontend build
@@ -23,6 +29,12 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=5000
 ENV HOSTNAME=0.0.0.0
+ARG APP_VERSION=0.0.0
+ARG GIT_SHA=unknown
+ARG BUILD_TIME=unknown
+ENV APP_VERSION=$APP_VERSION
+ENV GIT_SHA=$GIT_SHA
+ENV BUILD_TIME=$BUILD_TIME
 RUN apk add --no-cache curl
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs

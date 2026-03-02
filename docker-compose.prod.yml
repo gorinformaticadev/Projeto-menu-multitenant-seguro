@@ -25,6 +25,9 @@ services:
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-/api}
+      - APP_VERSION=${APP_VERSION:-latest}
+      - GIT_SHA=${GIT_SHA:-unknown}
+      - BUILD_TIME=${BUILD_TIME:-unknown}
       - PORT=5000
       - HOSTNAME=0.0.0.0
     depends_on:
@@ -45,6 +48,9 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
+      - APP_VERSION=${APP_VERSION:-latest}
+      - GIT_SHA=${GIT_SHA:-unknown}
+      - BUILD_TIME=${BUILD_TIME:-unknown}
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
