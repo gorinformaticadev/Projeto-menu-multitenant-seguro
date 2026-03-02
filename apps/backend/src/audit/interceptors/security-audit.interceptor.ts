@@ -17,15 +17,12 @@ export class SecurityAuditInterceptor implements NestInterceptor {
     // Coletar informações básicas
     const startTime = Date.now();
     const userAgent = request.get('user-agent') || '';
-    const ipAddress = this.getClientIp(request);
-    const method = request.method;
-    const url = request.url;
-    const userId = (request as any).user?.id;
+    const ipAddress = this.getClientIp(request);    const userId = (request as any).user?.id;
     const tenantId = (request as any).user?.tenantId;
 
     return next.handle().pipe(
       tap({
-        next: (data) => {
+        next: (_data) => {
           // Log de sucesso para operações críticas
           this.logSuccessfulOperation(request, response, startTime, {
             userId,
@@ -52,10 +49,7 @@ export class SecurityAuditInterceptor implements NestInterceptor {
     response: any,
     startTime: number,
     context: { userId?: string; tenantId?: string; ipAddress: string; userAgent: string }
-  ) {
-    const method = request.method;
-    const url = request.url;
-    const statusCode = response.statusCode;
+  ) {    const statusCode = response.statusCode;
     const duration = Date.now() - startTime;
 
     // Operações que merecem log automático
@@ -98,9 +92,6 @@ export class SecurityAuditInterceptor implements NestInterceptor {
     error: any,
     context: { userId?: string; tenantId?: string; ipAddress: string; userAgent: string }
   ) {
-    const method = request.method;
-    const url = request.url;
-
     // Log violações de segurança
     this.auditService.log({
       action: `SECURITY_VIOLATION_${error.status || 500}_${method}_${url.replace(/\//g, '_').toUpperCase()}`,

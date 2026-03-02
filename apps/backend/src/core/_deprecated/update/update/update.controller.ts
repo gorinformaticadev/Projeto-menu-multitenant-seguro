@@ -46,7 +46,7 @@ export class UpdateController {
   async getStatus() {
     try {
       return await this.updateService.getUpdateStatus();
-    } catch (error) {
+    } catch {
       throw new HttpException(
         'Erro ao buscar status de atualizações',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -63,7 +63,7 @@ export class UpdateController {
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   @Throttle({ default: { limit: 10, ttl: 60000 } }) // Máximo 10 verificações por minuto
-  async checkForUpdates(@Request() req) {
+  async checkForUpdates(@Request() _req) {
     try {
       const result = await this.updateService.checkForUpdates();
       
@@ -74,7 +74,7 @@ export class UpdateController {
           : 'Sistema está atualizado',
         ...result,
       };
-    } catch (error) {
+    } catch {
       throw new HttpException(
         'Erro ao verificar atualizações',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -108,7 +108,7 @@ export class UpdateController {
       );
 
       return result;
-    } catch (error) {
+    } catch {
       throw new HttpException(
         error.message || 'Erro ao executar atualização',
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
@@ -134,7 +134,7 @@ export class UpdateController {
       const result = await this.updateService.updateConfig(config, userId);
       
       return result;
-    } catch (error) {
+    } catch {
       throw new HttpException(
         'Erro ao atualizar configurações',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -168,7 +168,7 @@ export class UpdateController {
         data: logs,
         total: logs.length,
       };
-    } catch (error) {
+    } catch {
       throw new HttpException(
         'Erro ao buscar logs de atualização',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -192,7 +192,7 @@ export class UpdateController {
         success: true,
         data: log,
       };
-    } catch (error) {
+    } catch {
       throw new HttpException(
         error.message || 'Erro ao buscar detalhes do log',
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
@@ -220,7 +220,7 @@ export class UpdateController {
         connected: true,
         ...result,
       };
-    } catch (error) {
+    } catch {
       return {
         success: false,
         message: 'Falha na conexão com o repositório',
@@ -230,3 +230,4 @@ export class UpdateController {
     }
   }
 }
+

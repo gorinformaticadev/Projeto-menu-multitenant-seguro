@@ -33,9 +33,7 @@ export class PasswordHistoryService {
       // Verificar contra cada senha no histórico
       for (let i = 0; i < passwordHistory.length; i++) {
         const isMatch = await bcrypt.compare(newPassword, passwordHistory[i]);
-        if (isMatch) {
-          const _positionInHistory = i + 1;
-          return {
+        if (isMatch) {          return {
             isReused: true,
             message: `Esta senha já foi utilizada recentemente. Você não pode reutilizar as últimas ${reuseLimit} senhas.`,
           };
@@ -43,7 +41,7 @@ export class PasswordHistoryService {
       }
 
       return { isReused: false };
-    } catch (error) {
+    } catch {
       // Se houver erro ao parsear JSON, considerar que não há histórico
       return { isReused: false };
     }
@@ -70,7 +68,7 @@ export class PasswordHistoryService {
     if (user.passwordHistory) {
       try {
         passwordHistory = JSON.parse(user.passwordHistory);
-      } catch (error) {
+      } catch {
         passwordHistory = [];
       }
     }
@@ -257,4 +255,5 @@ export class PasswordHistoryService {
     };
   }
 }
+
 

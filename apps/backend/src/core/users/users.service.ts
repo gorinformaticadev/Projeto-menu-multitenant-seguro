@@ -47,7 +47,8 @@ export class UsersService {
     });
 
     // Remove a senha do retorno
-    const { password: _, ...userWithoutPassword } = user;
+    const userWithoutPassword = { ...user };
+    delete userWithoutPassword.password;
     return userWithoutPassword;
   }
 
@@ -70,7 +71,11 @@ export class UsersService {
     });
 
     // Remove password do retorno
-    return users.map(({ password, ...user }) => user);
+    return users.map((item) => {
+      const userWithoutPassword = { ...item };
+      delete userWithoutPassword.password;
+      return userWithoutPassword;
+    });
   }
 
   async findOne(id: string) {
@@ -90,7 +95,8 @@ export class UsersService {
       throw new NotFoundException('Usuário não encontrado');
     }
 
-    const { password, ...userWithoutPassword } = user;
+    const userWithoutPassword = { ...user };
+    delete userWithoutPassword.password;
     return userWithoutPassword;
   }
 
@@ -136,7 +142,8 @@ export class UsersService {
       },
     });
 
-    const { password, ...userWithoutPassword } = user;
+    const userWithoutPassword = { ...user };
+    delete userWithoutPassword.password;
     return userWithoutPassword;
   }
 
@@ -162,7 +169,11 @@ export class UsersService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return users.map(({ password, ...user }) => user);
+    return users.map((item) => {
+      const userWithoutPassword = { ...item };
+      delete userWithoutPassword.password;
+      return userWithoutPassword;
+    });
   }
 
   /**
@@ -262,8 +273,10 @@ export class UsersService {
     });
 
     // Remove a senha do retorno
-    const { password, ...userWithoutPassword } = user;
+    const userWithoutPassword = { ...user };
+    delete userWithoutPassword.password;
     return userWithoutPassword;
   }
 }
+
 

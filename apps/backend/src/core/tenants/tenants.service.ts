@@ -192,7 +192,7 @@ export class TenantsService {
       try {
         const oldLogoPath = join(process.cwd(), 'uploads', 'logos', tenant.logoUrl);
         await unlink(oldLogoPath);
-      } catch (error) {
+      } catch {
         // Ignora erro se o arquivo não existir
       }
     }
@@ -215,7 +215,7 @@ export class TenantsService {
     try {
       const logoPath = join(process.cwd(), 'uploads', 'logos', tenant.logoUrl);
       await unlink(logoPath);
-    } catch (error) {
+    } catch {
       // Ignora erro se o arquivo não existir
     }
 
@@ -250,7 +250,7 @@ export class TenantsService {
       try {
         const logoPath = join(process.cwd(), 'uploads', 'logos', tenant.logoUrl);
         await unlink(logoPath);
-      } catch (error) {
+      } catch {
         // Ignora erro se o arquivo não existir
       }
     }
@@ -320,7 +320,7 @@ export class TenantsService {
 
   // Métodos para gerenciamento de módulos dos tenants
 
-  async getTenantActiveModules(tenantId: string) {
+  async getTenantActiveModules(_tenantId: string) {
     // Método temporariamente desabilitado - usar ModuleSecurityService
     return {
       activeModules: [],
@@ -328,23 +328,24 @@ export class TenantsService {
     };
   }
 
-  async activateModuleForTenant(tenantId: string, moduleName: string) {
+  async activateModuleForTenant(_tenantId: string, _moduleName: string) {
     // Método temporariamente desabilitado - usar ModuleInstallerService
     throw new BadRequestException('Use o novo sistema de módulos');
   }
 
-  async deactivateModuleForTenant(tenantId: string, moduleName: string) {
+  async deactivateModuleForTenant(_tenantId: string, _moduleName: string) {
     // Método temporariamente desabilitado - usar ModuleInstallerService
     throw new BadRequestException('Use o novo sistema de módulos');
   }
 
-  async toggleModuleForTenant(tenantId: string, moduleName: string) {
+  async toggleModuleForTenant(_tenantId: string, _moduleName: string) {
     // Método temporariamente desabilitado - usar ModuleInstallerService
     throw new BadRequestException('Use o novo sistema de módulos');
   }
 
-  async configureTenantModule(tenantId: string, moduleName: string, config: unknown) {
+  async configureTenantModule(_tenantId: string, _moduleName: string, _config: unknown) {
     // Método temporariamente desabilitado - usar ModuleInstallerService
     throw new BadRequestException('Use o novo sistema de módulos');
   }
 }
+

@@ -11,13 +11,11 @@ import {
   ConnectedSocket,
   MessageBody,
 } from '@nestjs/websockets';
-import { Logger, UseGuards } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@core/prisma/prisma.service';
-import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
-import { WsJwtGuard } from '@common/guards/ws-jwt.guard';
 import { NotificationService } from './notification.service';
 import { Notification } from './notification.entity';
 import { PushNotificationService } from './push-notification.service';
@@ -541,3 +539,4 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     return this.validateTokenForConnection(token);
   }
 }
+

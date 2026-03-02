@@ -37,14 +37,14 @@ export class WhatsAppGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('send_message')
-  handleSendMessage(client: Socket, payload: unknown) {
+  handleSendMessage(_client: Socket, _payload: unknown) {
     this.logger.log(`WhatsApp message handling prepared`);
     // Implementação futura
     return { status: 'prepared' };
   }
 
   @SubscribeMessage('join_room')
-  handleJoinRoom(client: Socket, payload: unknown) {
+  handleJoinRoom(_client: Socket, _payload: unknown) {
     this.logger.log(`WhatsApp room joining prepared`);
     // Implementação futura
     return { status: 'prepared' };
