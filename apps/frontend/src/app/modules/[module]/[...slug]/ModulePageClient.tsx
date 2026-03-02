@@ -16,8 +16,11 @@ interface ModulePageClientProps {
 // Interface para o contexto do webpack
 interface WebpackContext {
     keys(): string[];
-    (id: string): any;
+    (id: string): unknown;
 }
+
+type ModuleComponent = React.ComponentType<Record<string, never>>;
+type LoadedModule = { default?: ModuleComponent } | ModuleComponent;
 
 declare const require: {
     context?: (path: string, deep?: boolean, filter?: RegExp) => WebpackContext;
@@ -43,7 +46,7 @@ function loadModuleContext() {
 /**
  * Busca um componente de página no contexto de módulos
  */
-function findPageComponent(moduleSlug: string, route: string): React.ComponentType | null {
+function findPageComponent(moduleSlug: string, route: string): ModuleComponent | null {
     const context = loadModuleContext();
     if (!context) return null;
 
@@ -72,8 +75,11 @@ function findPageComponent(moduleSlug: string, route: string): React.ComponentTy
     for (const path of possiblePaths) {
         if (keys.includes(path)) {
             console.log('[ModulePage] Encontrado:', path);
-            const module = context(path);
-            return module.default || module;
+            const loadedModule = context(path) as LoadedModule;
+            if (typeof loadedModule === 'function') {
+                return loadedModule;
+            }
+            return loadedModule.default || null;
         }
     }
 
@@ -83,8 +89,11 @@ function findPageComponent(moduleSlug: string, route: string): React.ComponentTy
     for (const key of keys) {
         if (key.startsWith(`./${moduleSlug}/`) && key.includes(routePattern) && key.endsWith('/page.tsx')) {
             console.log('[ModulePage] Match parcial encontrado:', key);
-            const module = context(key);
-            return module.default || module;
+            const loadedModule = context(key) as LoadedModule;
+            if (typeof loadedModule === 'function') {
+                return loadedModule;
+            }
+            return loadedModule.default || null;
         }
     }
 
@@ -102,7 +111,7 @@ export default function ModulePageClient({ moduleSlug, slug }: ModulePageClientP
     const route = slug?.join('/') || 'index';
 
     // Para evitar problemas de hidratação, usamos useEffect para carregar o componente
-    const [Component, setComponent] = React.useState<React.ComponentType<any> | null>(null);
+    const [Component, setComponent] = React.useState<ModuleComponent | null>(null);
     const [error, setError] = React.useState<string | null>(null);
     const [loading, setLoading] = React.useState(true);
 
@@ -127,7 +136,7 @@ export default function ModulePageClient({ moduleSlug, slug }: ModulePageClientP
                     }
                 }
 
-            } catch (err: any) {
+            } catch (err: unknown) {
                 if (mounted) {
                     console.error(`[ModulePage] Falha ao carregar ${moduleSlug}/${route}:`, err);
 
@@ -190,4 +199,3 @@ export default function ModulePageClient({ moduleSlug, slug }: ModulePageClientP
 
     return <Component />;
 }
-

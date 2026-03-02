@@ -31,7 +31,7 @@ export default function CronJobsPage() {
             setLoading(true);
             const response = await api.get("/cron");
             setJobs(response.data);
-        } catch (error) {
+        } catch {
             toast({
                 title: "Erro ao carregar jobs",
                 description: "Não foi possível listar as tarefas agendadas",
@@ -54,7 +54,7 @@ export default function CronJobsPage() {
                 description: "A tarefa foi colocada na fila de execução",
             });
             fetchJobs();
-        } catch (error) {
+        } catch {
             toast({
                 title: "Erro ao iniciar job",
                 variant: "destructive",
@@ -70,7 +70,7 @@ export default function CronJobsPage() {
                 description: "O status do agendamento foi atualizado",
             });
             fetchJobs();
-        } catch (error) {
+        } catch {
             toast({
                 title: "Erro ao atualizar status",
                 variant: "destructive",

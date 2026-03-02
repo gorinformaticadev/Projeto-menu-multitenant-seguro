@@ -105,7 +105,7 @@ export default function ModulesManagementPage() {
             await axios.post(`/api/modules/${id}/validate`);
             alert('Módulo validado com sucesso!');
             loadModules();
-        } catch (error) {
+        } catch {
             alert('Erro ao validar módulo');
         }
     };
@@ -129,7 +129,7 @@ export default function ModulesManagementPage() {
             await axios.post(`/api/modules/${id}/disable`);
             alert('Módulo desativado com sucesso!');
             loadModules();
-        } catch (error) {
+        } catch {
             alert('Erro ao desativar módulo');
         }
     };
@@ -141,7 +141,7 @@ export default function ModulesManagementPage() {
             await axios.delete(`/api/modules/${id}`);
             alert('Módulo removido com sucesso!');
             loadModules();
-        } catch (error) {
+        } catch {
             alert('Erro ao remover módulo');
         }
     };

@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   Info,
   Database,
+  Monitor,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
@@ -40,6 +41,7 @@ interface UpdateStatus {
   lastCheck?: string;
   isConfigured: boolean;
   checkEnabled: boolean;
+  mode: 'docker' | 'native';
 }
 
 interface UpdateLog {
@@ -64,10 +66,38 @@ interface UpdateConfig {
   updateCheckEnabled: boolean;
 }
 
+interface BackupLog {
+  id: string;
+  operationType: string;
+  status: string;
+  startedAt: string;
+  fileName?: string;
+  fileSize?: number;
+  durationSeconds?: number;
+  executedBy?: string;
+  errorMessage?: string;
+}
+
+interface ApiErrorMessage {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+  message?: string;
+}
+
 function normalizeVersionTag(version: string): string {
   const value = (version || '').trim();
   if (!value) return value;
   return value.startsWith('v') ? value : `v${value}`;
+}
+
+function getApiErrorMessage(error: unknown): string {
+  return (
+    (error as ApiErrorMessage).response?.data?.message ||
+    (error instanceof Error ? error.message : 'Erro interno do servidor')
+  );
 }
 
 export default function UpdatesPage() {
@@ -95,7 +125,7 @@ export default function UpdatesPage() {
 
   const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState('status');
-  const [backupLogs, setBackupLogs] = useState<any[]>([]);
+  const [backupLogs, setBackupLogs] = useState<BackupLog[]>([]);
 
 
 
@@ -111,7 +141,7 @@ export default function UpdatesPage() {
     } catch (error: unknown) {
       toast({
         title: 'Erro ao carregar status',
-        description: (error as any).response?.data?.message || (error instanceof Error ? error.message : 'Erro interno do servidor'),
+        description: getApiErrorMessage(error),
         variant: 'destructive',
       });
     } finally {
@@ -137,7 +167,7 @@ export default function UpdatesPage() {
     } catch (error: unknown) {
       toast({
         title: 'Erro na verificação',
-        description: (error as any).response?.data?.message || (error instanceof Error ? error.message : 'Erro interno do servidor'),
+        description: getApiErrorMessage(error),
         variant: 'destructive',
       });
     } finally {
@@ -176,7 +206,7 @@ export default function UpdatesPage() {
     } catch (error: unknown) {
       toast({
         title: 'Erro na atualização',
-        description: (error as any).response?.data?.message || (error instanceof Error ? error.message : 'Erro interno do servidor'),
+        description: getApiErrorMessage(error),
         variant: 'destructive',
       });
     } finally {
@@ -203,7 +233,7 @@ export default function UpdatesPage() {
     } catch (error: unknown) {
       toast({
         title: 'Erro ao salvar configurações',
-        description: (error as any).response?.data?.message || (error instanceof Error ? error.message : 'Erro interno do servidor'),
+        description: getApiErrorMessage(error),
         variant: 'destructive',
       });
     } finally {
@@ -222,7 +252,7 @@ export default function UpdatesPage() {
     } catch (error: unknown) {
       toast({
         title: 'Erro ao carregar histórico',
-        description: (error as any).response?.data?.message || (error instanceof Error ? error.message : 'Erro interno do servidor'),
+        description: getApiErrorMessage(error),
         variant: 'destructive',
       });
     } finally {
@@ -264,7 +294,7 @@ export default function UpdatesPage() {
     } catch (error: unknown) {
       toast({
         title: 'Erro no teste de conexão',
-        description: (error as any).response?.data?.message || (error instanceof Error ? error.message : 'Erro interno do servidor'),
+        description: getApiErrorMessage(error),
         variant: 'destructive',
       });
     }
@@ -408,12 +438,37 @@ export default function UpdatesPage() {
                         )}
                       </div>
                     </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Modo de Instalação</Label>
+                      <div className="flex items-center gap-2">
+                        {status.mode === 'docker' ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            <Settings className="w-3 h-3 mr-1" />
+                            Container Docker
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            <Monitor className="w-3 h-3 mr-1" />
+                            Nativo (PM2)
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
 
                 {status?.lastCheck && (
-                  <div className="text-sm text-muted-foreground">
-                    Última verificação: {new Date(status.lastCheck).toLocaleString('pt-BR')}
+                  <div className="flex items-center justify-between text-sm text-muted-foreground pt-2">
+                    <div>
+                      Última verificação: {new Date(status.lastCheck).toLocaleString('pt-BR')}
+                    </div>
+                    {status.mode === 'native' && (
+                      <div className="flex items-center text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                        <AlertTriangle className="w-3 h-3 mr-1" />
+                        Aviso: Build nativo pode levar até 10 minutos.
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -902,4 +957,3 @@ export default function UpdatesPage() {
     </div>
   );
 }
-

@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { use2FAStatus } from "@/hooks/use2FAStatus";
 import { useModuleFeatures } from "@/hooks/useModuleFeatures";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Building2, Users, Settings, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModuleSlot } from "@/components/ModuleSlot";

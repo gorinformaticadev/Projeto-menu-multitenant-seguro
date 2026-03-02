@@ -76,7 +76,7 @@ export default function SecurityConfigPage() {
             setLoading(false);
             return;
           }
-        } catch (e) {
+        } catch {
           // Cache inválido, continua
         }
       }

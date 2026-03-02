@@ -92,7 +92,7 @@ export default function NotificacaoPage() {
             await fetchNotifications();
             refreshGlobalBadge(); // Atualiza badge HEADER
             toast({ description: "Notificação marcada como lida." });
-        } catch (error) {
+        } catch {
             toast({ title: "Erro", description: "Falha ao atualizar status.", variant: "destructive" });
         } finally {
             setProcessingId(null);
@@ -106,7 +106,7 @@ export default function NotificacaoPage() {
             await fetchNotifications();
             refreshGlobalBadge(); // Atualiza badge HEADER
             toast({ description: "Notificação marcada como não lida." });
-        } catch (error) {
+        } catch {
             toast({ title: "Erro", description: "Falha ao atualizar status.", variant: "destructive" });
         } finally {
             setProcessingId(null);
@@ -121,7 +121,7 @@ export default function NotificacaoPage() {
             refreshGlobalBadge(); // Atualiza badge HEADER
             setSelectedIds(prev => prev.filter(pid => pid !== id));
             toast({ description: "Notificação excluída." });
-        } catch (error) {
+        } catch {
             toast({ title: "Erro", description: "Falha ao excluir.", variant: "destructive" });
         } finally {
             setProcessingId(null);
@@ -159,7 +159,7 @@ export default function NotificacaoPage() {
             await fetchNotifications();
             refreshGlobalBadge(); // Atualiza badge HEADER
             toast({ description: "Todas as notificações marcadas como lidas." });
-        } catch (error) {
+        } catch {
             toast({ title: "Erro", description: "Falha ao atualizar.", variant: "destructive" });
         } finally {
             setLoading(false);
@@ -217,7 +217,7 @@ export default function NotificacaoPage() {
                 hour: '2-digit',
                 minute: '2-digit'
             }).format(new Date(dateString));
-        } catch (e) {
+        } catch {
             return 'Data inválida';
         }
     };

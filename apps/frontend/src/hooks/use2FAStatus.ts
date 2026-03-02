@@ -18,7 +18,7 @@ export function use2FAStatus() {
         // Primeiro tenta obter o status do usuário
         const userResponse = await api.get('/auth/2fa/status');
         setStatus(userResponse.data);
-      } catch (err) {
+      } catch {
         try {
           // Se falhar, tenta obter a configuração global
           const configResponse = await api.get('/security-config/2fa-status');
@@ -26,7 +26,7 @@ export function use2FAStatus() {
             enabled: configResponse.data.enabled || false,
             suggested: true, // Por padrão, sugerimos 2FA
           });
-        } catch (configErr) {
+        } catch {
           setError('Falha ao carregar status de 2FA');
           // Valores padrão se ambos falharem
           setStatus({

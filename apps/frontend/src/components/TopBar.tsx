@@ -7,7 +7,6 @@ import { useSystemVersion } from "@/hooks/useSystemVersion";
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { Button } from "./ui/button";
 import { Bell, Search, User, LogOut, Info } from "lucide-react";
-import { API_URL } from "@/lib/api";
 import api from "@/lib/api";
 import { ModuleRegistryUserMenu } from "./ModuleRegistryUserMenu";
 import { useNotificationContext } from '@/providers/NotificationProvider';
@@ -58,7 +57,7 @@ export function TopBar() {
           setMasterLogo(logoUrl);
           return;
         }
-      } catch (e) {
+      } catch {
         localStorage.removeItem(cacheKey);
       }
     }
@@ -99,7 +98,7 @@ export function TopBar() {
               setUserTenantLogo(logoUrl);
               return;
             }
-          } catch (e) {
+          } catch {
             localStorage.removeItem(cacheKey);
           }
         }
@@ -204,9 +203,12 @@ export function TopBar() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             {masterLogo ? (
-              <img
+              <Image
                 src={`/uploads/logos/${masterLogo}`}
                 alt="Logo"
+                width={160}
+                height={40}
+                unoptimized
                 className="h-10 w-auto object-contain"
               />
             ) : (
@@ -393,12 +395,15 @@ export function TopBar() {
               {/* Logo do Tenant do Usuário */}
               {userTenantLogo ? (
                 <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 dark:bg-secondary border border-gray-200 dark:border-border">
-                  <img
+                  <Image
                     src={`/uploads/logos/${userTenantLogo}`}
                     alt="Logo Tenant"
+                    width={32}
+                    height={32}
+                    unoptimized
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      handleTenantLogoError(e.currentTarget as HTMLImageElement, 'menu');
+                      handleTenantLogoError(e.currentTarget, 'menu');
                     }}
                   />
                   <div className="w-full h-full rounded-full bg-primary flex items-center justify-center text-white font-semibold fallback-avatar hidden">
@@ -427,12 +432,15 @@ export function TopBar() {
                     {/* Logo da Tenant no Menu */}
                     {userTenantLogo ? (
                       <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 dark:bg-secondary border border-gray-200 dark:border-border flex-shrink-0">
-                        <img
+                        <Image
                           src={`/uploads/logos/${userTenantLogo}`}
                           alt="Logo Tenant"
+                          width={40}
+                          height={40}
+                          unoptimized
                           className="w-full h-full object-cover"
                           onError={(e) => {
-                            handleTenantLogoError(e.currentTarget as HTMLImageElement, 'dropdown');
+                            handleTenantLogoError(e.currentTarget, 'dropdown');
                           }}
                         />
                         <div className="w-full h-full rounded-full bg-primary flex items-center justify-center text-white font-semibold fallback-avatar-dropdown hidden">

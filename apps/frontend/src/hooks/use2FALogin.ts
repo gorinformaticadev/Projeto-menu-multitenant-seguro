@@ -33,7 +33,7 @@ export function use2FALogin() {
       // Erro de login
       setError(result.error || "Erro ao fazer login");
       return { success: false, requires2FA: false };
-    } catch (err: unknown) {
+    } catch {
       // Erro inesperado
       setError("Erro ao fazer login");
       return { success: false, requires2FA: false };
@@ -58,7 +58,7 @@ export function use2FALogin() {
       // Erro no código 2FA
       setError(result.error || "Código inválido");
       return { success: false };
-    } catch (err: unknown) {
+    } catch {
       // Erro inesperado
       setError("Erro ao validar código");
       return { success: false };

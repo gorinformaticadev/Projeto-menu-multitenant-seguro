@@ -30,7 +30,7 @@ export function useTokenExpiration() {
         const remaining = Math.floor((exp - now) / 1000); // Segundos restantes
 
         setTimeRemaining(remaining > 0 ? remaining : 0);
-      } catch (error) {
+      } catch {
         setTimeRemaining(null);
       }
     };

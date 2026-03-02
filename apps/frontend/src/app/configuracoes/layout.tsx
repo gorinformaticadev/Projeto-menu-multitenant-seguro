@@ -1,6 +1,5 @@
 ﻿"use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,11 +12,8 @@ import {
   Download,
   Package,
   ChevronRight,
-  Menu,
-  X,
   Clock
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 export default function ConfiguracoesLayout({
   children,
@@ -26,7 +22,6 @@ export default function ConfiguracoesLayout({
 }) {
   const pathname = usePathname();
   const { user } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const menuItems = [
     {

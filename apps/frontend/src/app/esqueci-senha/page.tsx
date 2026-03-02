@@ -55,7 +55,7 @@ export default function ForgotPasswordPage() {
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Erro",
         description: "Erro de conexão. Tente novamente.",

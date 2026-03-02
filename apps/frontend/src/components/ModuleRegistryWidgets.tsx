@@ -7,6 +7,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import type { SVGProps } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { moduleRegistry, ModuleDashboardWidget } from '@/lib/module-registry';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,8 +17,10 @@ import * as LucideIcons from 'lucide-react';
 
 // Helper para ícones dinâmicos
 // Helper para ícones dinâmicos
-const getIconComponent = (iconName: string): any => {
-  const Icon = (LucideIcons as any)[iconName];
+type LucideIconComponent = (props: SVGProps<SVGSVGElement>) => React.JSX.Element;
+const getIconComponent = (iconName: string): LucideIconComponent => {
+  const icons = LucideIcons as unknown as Record<string, LucideIconComponent>;
+  const Icon = icons[iconName];
   return Icon || Package;
 };
 

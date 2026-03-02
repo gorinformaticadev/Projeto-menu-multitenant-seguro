@@ -1,4 +1,4 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
+import axios, { InternalAxiosRequestConfig } from "axios";
 
 interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
@@ -63,7 +63,7 @@ export const getSecureToken = async (): Promise<string | null> => {
     if (tokenCookie) {
       return tokenCookie.split('=')[1];
     }
-  } catch (e) {
+  } catch {
     // Ignora erro ao ler cookie
   }
 
@@ -72,7 +72,7 @@ export const getSecureToken = async (): Promise<string | null> => {
   if (encrypted) {
     try {
       return atob(encrypted); // Descriptografia simples
-    } catch (e) {
+    } catch {
       // Erro ao decodificar token
       return null;
     }
@@ -91,7 +91,7 @@ const getSecureRefreshToken = async (): Promise<string | null> => {
     if (tokenCookie) {
       return tokenCookie.split('=')[1];
     }
-  } catch (e) {
+  } catch {
     // Ignora erro ao ler cookie
   }
 

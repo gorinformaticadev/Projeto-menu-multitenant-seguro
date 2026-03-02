@@ -1,4 +1,4 @@
-import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, Logger, HttpException, HttpStatus, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ExecuteUpdateDto, UpdateConfigDto, UpdateStatusDto } from './dto/update.dto';
@@ -11,7 +11,7 @@ import * as fs from 'fs';
 import { resolveAppVersionTag } from '../common/utils/app-version.util';
 
 @Injectable()
-export class UpdateService {
+export class UpdateService implements OnModuleInit {
   private readonly logger = new Logger(UpdateService.name);
   private readonly encryptionKeyRaw = process.env.ENCRYPTION_KEY || '';
   private readonly encryptionKey: Buffer;
@@ -24,6 +24,27 @@ export class UpdateService {
   ) {
     this.encryptionKey = this.resolveEncryptionKey();
     this.localAppVersionTag = resolveAppVersionTag();
+  }
+
+  async onModuleInit() {
+    await this.syncSystemVersionWithFilesystem();
+  }
+
+  private async syncSystemVersionWithFilesystem() {
+    try {
+      const realVersion = resolveAppVersionTag();
+      const settings: any = await this.getSystemSettings();
+
+      if (settings.appVersion !== realVersion) {
+        this.logger.log(`Sincronizando versão: Banco(${settings.appVersion}) -> Arquivos(${realVersion})`);
+        await this.updateSystemSettings({
+          appVersion: realVersion,
+          updateAvailable: false,
+        });
+      }
+    } catch (error) {
+      this.logger.error('Falha ao sincronizar versão do sistema no startup:', error);
+    }
   }
 
   async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: string }> {
@@ -131,7 +152,7 @@ export class UpdateService {
             duration: 0,
             executionLogs: JSON.stringify({
               idempotent: true,
-               message: `Versão ${normalizedVersion} já aplicada (atual: ${currentVersion})`,
+              message: `Versão ${normalizedVersion} já aplicada (atual: ${currentVersion})`,
             }),
           },
         });
@@ -148,7 +169,7 @@ export class UpdateService {
         return {
           success: true,
           logId: updateLog.id,
-           message: `Versão ${normalizedVersion} já está aplicada. Nenhum redeploy executado.`,
+          message: `Versão ${normalizedVersion} já está aplicada. Nenhum redeploy executado.`,
         };
       }
 
@@ -173,10 +194,15 @@ export class UpdateService {
       });
 
       const startTime = Date.now();
-      const deployResult = await this.runSafeImageDeploy(normalizedVersion, settings);
+      const mode = this.getInstallationMode();
+
+      const deployResult = mode === 'docker'
+        ? await this.runSafeImageDeploy(normalizedVersion, settings)
+        : await this.runSafeNativeDeploy(normalizedVersion, settings);
+
       const combinedOutput = `${deployResult.stdout || ''}\n${deployResult.stderr || ''}`;
       if (combinedOutput.includes('ROLLBACK_COMPLETED')) {
-         const rollbackError: any = new Error('Deploy reportou rollback automático; versão anterior foi mantida');
+        const rollbackError: any = new Error('Deploy reportou rollback automático; versão anterior foi mantida');
         rollbackError.stdout = deployResult.stdout || '';
         rollbackError.stderr = deployResult.stderr || '';
         rollbackError.exitCode = 2;
@@ -213,7 +239,7 @@ export class UpdateService {
       return {
         success: true,
         logId: updateLog.id,
-         message: `Atualização para ${normalizedVersion} concluída com sucesso`,
+        message: `Atualização para ${normalizedVersion} concluída com sucesso`,
       };
     } catch (error: any) {
       const stdoutRaw = typeof error?.stdout === 'string' ? error.stdout : '';
@@ -273,6 +299,7 @@ export class UpdateService {
       lastCheck: settings.lastUpdateCheck || undefined,
       isConfigured: !!(settings.gitUsername && settings.gitRepository),
       checkEnabled: settings.updateCheckEnabled || false,
+      mode: this.getInstallationMode(),
     };
   }
 
@@ -408,6 +435,50 @@ export class UpdateService {
       timeout: 30 * 60 * 1000,
       maxBuffer: 20 * 1024 * 1024,
     });
+  }
+
+  private async runSafeNativeDeploy(version: string, _settings: any): Promise<{ stdout: string; stderr: string }> {
+    const scriptPath = path.join(process.cwd(), 'install', 'update-native.sh');
+    if (!fs.existsSync(scriptPath)) {
+      throw new HttpException('Runner de deploy nativo não encontrado (install/update-native.sh)', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    const env = {
+      ...process.env,
+      PROJECT_ROOT: process.cwd(),
+      RELEASE_TAG: version,
+    };
+
+    return this.execFileAsync('bash', [scriptPath], {
+      cwd: process.cwd(),
+      env,
+      timeout: 45 * 60 * 1000, // Native build can take longer
+      maxBuffer: 50 * 1024 * 1024,
+    });
+  }
+
+  private getInstallationMode(): 'docker' | 'native' {
+    try {
+      if (process.env.IS_DOCKER === 'true') {
+        return 'docker';
+      }
+
+      if (fs.existsSync('/.dockerenv')) {
+        return 'docker';
+      }
+
+      const cgroupPath = '/proc/1/cgroup';
+      if (fs.existsSync(cgroupPath)) {
+        const cgroup = fs.readFileSync(cgroupPath, 'utf8');
+        if (/docker|containerd|kubepods/i.test(cgroup)) {
+          return 'docker';
+        }
+      }
+    } catch (error) {
+      this.logger.warn(`Falha ao detectar modo de instalação automaticamente: ${String(error)}`);
+    }
+
+    return 'native';
   }
 
   private encryptToken(token: string): string {

@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { Home, Building2, Users, LayoutGrid, MoreHorizontal, Package } from "lucide-react";
+import { Home, Building2, Users, LayoutGrid, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { moduleRegistry } from "@/lib/module-registry";
 import { Button } from "./ui/button";
@@ -60,12 +61,14 @@ export function BottomNav() {
             className="flex flex-col items-center justify-center -translate-y-5 bg-primary text-primary-foreground w-14 h-14 rounded-2xl shadow-lg shadow-primary/20 ring-4 ring-background transition-all active:scale-90 hover:brightness-110"
             aria-label="Launcher de Módulos"
           >
-            <img
+            <Image
               src="/menu.svg"
               alt="Logo"
+              width={32}
+              height={32}
               className="w-8 h-8 object-contain"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = '/favicon-32x32.png';
+                e.currentTarget.src = '/favicon-32x32.png';
               }}
             />
           </button>

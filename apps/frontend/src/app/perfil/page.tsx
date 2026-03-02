@@ -57,7 +57,7 @@ export default function PerfilPage() {
             });
             return;
           }
-        } catch (e) {
+        } catch {
           // Cache inválido, continua
         }
       }

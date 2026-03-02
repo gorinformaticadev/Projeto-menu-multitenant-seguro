@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,12 +46,12 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
     [selectedFileName],
   );
 
-  const loadAvailableBackups = async () => {
+  const loadAvailableBackups = useCallback(async () => {
     try {
       setLoadingBackups(true);
       const response = await api.get('/api/backup/available');
       setAvailableBackups(response.data.data || []);
-    } catch (error) {
+    } catch {
       toast({
         title: 'Erro ao carregar backups',
         description: 'Nao foi possivel listar backups disponiveis',
@@ -60,11 +60,11 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
     } finally {
       setLoadingBackups(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     loadAvailableBackups();
-  }, []);
+  }, [loadAvailableBackups]);
 
   const pollRestoreLog = (logId: string) => {
     const interval = setInterval(async () => {
@@ -131,11 +131,13 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
       }
 
       pollRestoreLog(restoreLogId);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
       setLoadingRestore(false);
       toast({
         title: 'Erro ao iniciar restore',
-        description: error?.response?.data?.message || 'Erro interno do servidor',
+        description: message || 'Erro interno do servidor',
         variant: 'destructive',
       });
     }

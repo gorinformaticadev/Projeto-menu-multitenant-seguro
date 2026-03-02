@@ -28,7 +28,7 @@ export function useSystemVersion() {
           setLoading(false);
           return;
         }
-      } catch (error) {
+      } catch {
         console.log('API de versão do sistema não disponível, tentando status de updates');
       }
 
@@ -41,7 +41,7 @@ export function useSystemVersion() {
           setLoading(false);
           return;
         }
-      } catch (error) {
+      } catch {
         console.log('API de updates não disponível, usando package.json local');
       }
 

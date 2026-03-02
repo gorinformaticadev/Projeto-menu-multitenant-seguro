@@ -38,6 +38,14 @@ interface Tenant {
   ativo: boolean;
 }
 
+interface UserFormPayload {
+  email: string;
+  name: string;
+  role: string;
+  password?: string;
+  tenantId?: string;
+}
+
 export const dynamic = 'force-dynamic';
 
 function UsuariosContent() {
@@ -81,10 +89,6 @@ function UsuariosContent() {
     setFormData(prev => ({ ...prev, password: value }));
   }, []);
 
-  const handleConfirmPasswordChange = useCallback((value: string) => {
-    setFormData(prev => ({ ...prev, confirmPassword: value }));
-  }, []);
-
   const loadTenants = useCallback(async () => {
     const cacheKey = 'tenants-list-cache';
     const cacheTTL = 5 * 60 * 1000; // 5 minutos
@@ -99,7 +103,7 @@ function UsuariosContent() {
           setLoading(false);
           return;
         }
-      } catch (e) {
+      } catch {
         // Cache inválido, continua
       }
     }
@@ -202,7 +206,7 @@ function UsuariosContent() {
     setSubmitting(true);
 
     try {
-      const dataToSend: any = {
+      const dataToSend: UserFormPayload = {
         email: formData.email,
         name: formData.name,
         role: formData.role,

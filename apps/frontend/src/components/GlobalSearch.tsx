@@ -1,15 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, X, Command as CommandIcon, Keyboard } from "lucide-react";
+import { Search, X, Keyboard } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { moduleRegistry, ModuleMenu } from "@/lib/module-registry";
+import { moduleRegistry } from "@/lib/module-registry";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import * as LucideIcons from "lucide-react";
 
 // Mapeamento de ícones (similar ao Sidebar)
-const iconMap: Record<string, React.ElementType> = LucideIcons as any;
+const iconMap = LucideIcons as unknown as Record<string, React.ElementType>;
 
 interface GlobalSearchProps {
     onClose?: () => void;

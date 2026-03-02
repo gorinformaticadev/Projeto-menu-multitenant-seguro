@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 export default function TestModulePage() {
   return (
     <div className="container mx-auto py-6 px-4">
@@ -24,12 +26,12 @@ export default function TestModulePage() {
         </div>
         
         <div className="mt-6">
-          <a 
+          <Link
             href="/modules/module-exemplo" 
             className="inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
             🚀 Testar Módulo Exemplo
-          </a>
+          </Link>
         </div>
       </div>
     </div>

@@ -76,6 +76,7 @@ export class UpdateStatusDto {
   lastCheck?: Date;
   isConfigured: boolean;
   checkEnabled: boolean;
+  mode: 'docker' | 'native';
 }
 
 /**

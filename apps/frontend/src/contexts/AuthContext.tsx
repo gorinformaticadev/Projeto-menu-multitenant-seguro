@@ -143,7 +143,7 @@ const SecureStorage = {
         if (tokenCookie) {
           return tokenCookie.split('=')[1];
         }
-      } catch (e) {
+      } catch {
         // Ignora erro ao ler cookie
       }
 
@@ -187,7 +187,7 @@ const SecureStorage = {
         if (tokenCookie) {
           return tokenCookie.split('=')[1];
         }
-      } catch (e) {
+      } catch {
         // Ignora erro ao ler cookie
       }
 

@@ -198,7 +198,7 @@ export function Sidebar() {
   };
 
   // Configuração dos grupos
-  const groupConfig: Record<string, { name: string; icon: any; order: number }> = {
+  const groupConfig: Record<string, { name: string; icon: React.ElementType; order: number }> = {
     administration: {
       name: 'Administração',
       icon: Settings,
@@ -291,9 +291,8 @@ export function Sidebar() {
 
                   const iconName = mainMenu?.icon;
 
-                  const DynamicIcon = iconName
-                    ? (LucideIcons as any)[iconName] || Package
-                    : Package;
+                  const icons = LucideIcons as unknown as Record<string, React.ElementType>;
+                  const DynamicIcon = iconName ? icons[iconName] || Package : Package;
 
                   config = {
                     name: moduleData.name,
