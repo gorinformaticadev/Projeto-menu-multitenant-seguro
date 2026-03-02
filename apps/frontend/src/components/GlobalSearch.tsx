@@ -246,10 +246,10 @@ export function GlobalSearch({ onClose, mobile }: GlobalSearchProps) {
                     <div className="flex flex-col items-center gap-2">
                         <Search className="h-8 w-8 text-gray-300 dark:text-muted/30" />
                         <p className="text-sm text-gray-500 dark:text-muted-foreground font-medium">
-                            Nenhum resultado encontrado para "{query}"
+                            Nenhum resultado encontrado para &quot;{query}&quot;
                         </p>
                         <p className="text-xs text-gray-400 dark:text-muted-foreground/60">
-                            Tente buscar por termos mais genéricos como "Usuários", "Configurações" ou o nome de um módulo.
+                            Tente buscar por termos mais genéricos como &quot;Usuários&quot;, &quot;Configurações&quot; ou o nome de um módulo.
                         </p>
                     </div>
                 </div>

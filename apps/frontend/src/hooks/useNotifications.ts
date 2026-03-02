@@ -143,16 +143,16 @@ export function useNotifications(): UseNotificationsReturn {
 
   const registerPushSubscription = useCallback(async () => {
     if (typeof window === 'undefined') return;
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (!('serviceWorker' in window.navigator) || !('PushManager' in window)) return;
     if (!('Notification' in window) || window.Notification.permission !== 'granted') return;
     if (!window.isSecureContext) return;
 
     try {
       const registeredWorker =
-        serviceWorkerRegistrationRef.current || (await navigator.serviceWorker.register('/sw.js'));
+        serviceWorkerRegistrationRef.current || (await window.navigator.serviceWorker.register('/sw.js'));
       serviceWorkerRegistrationRef.current = registeredWorker;
 
-      const readyWorker = await navigator.serviceWorker.ready;
+      const readyWorker = await window.navigator.serviceWorker.ready;
       serviceWorkerRegistrationRef.current = readyWorker;
 
       let subscription = await readyWorker.pushManager.getSubscription();
@@ -176,11 +176,11 @@ export function useNotifications(): UseNotificationsReturn {
 
   const unregisterPushSubscription = useCallback(async () => {
     if (typeof window === 'undefined') return;
-    if (!('serviceWorker' in navigator)) return;
+    if (!('serviceWorker' in window.navigator)) return;
 
     try {
       const registeredWorker =
-        serviceWorkerRegistrationRef.current || (await navigator.serviceWorker.getRegistration());
+        serviceWorkerRegistrationRef.current || (await window.navigator.serviceWorker.getRegistration());
       if (!registeredWorker) return;
 
       const subscription = await registeredWorker.pushManager.getSubscription();
