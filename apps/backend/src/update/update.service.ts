@@ -8,7 +8,21 @@ import * as semver from 'semver';
 import * as crypto from 'crypto';
 import * as path from 'path';
 import * as fs from 'fs';
+import { Prisma, SystemSettings, UpdateLog } from '@prisma/client';
 import { resolveAppVersionTag } from '../common/utils/app-version.util';
+
+type UpdateExecutionResult = { stdout: string; stderr: string };
+type UpdateLogListItem = Pick<
+  UpdateLog,
+  'id' | 'version' | 'status' | 'startedAt' | 'completedAt' | 'duration' | 'packageManager' | 'errorMessage' | 'rollbackReason' | 'executedBy'
+>;
+type UpdateExecutionError = Error & {
+  stdout?: string;
+  stderr?: string;
+  status?: number;
+  code?: number | string;
+  exitCode?: number;
+};
 
 @Injectable()
 export class UpdateService implements OnModuleInit {
@@ -33,7 +47,7 @@ export class UpdateService implements OnModuleInit {
   private async syncSystemVersionWithFilesystem() {
     try {
       const realVersion = resolveAppVersionTag();
-      const settings: any = await this.getSystemSettings();
+      const settings = await this.getSystemSettings();
 
       if (settings.appVersion !== realVersion) {
         this.logger.log(`Sincronizando versão: Banco(${settings.appVersion}) -> Arquivos(${realVersion})`);
@@ -51,7 +65,7 @@ export class UpdateService implements OnModuleInit {
     let decryptedTokenForSanitizer = '';
     try {
       this.logger.log('Iniciando verificação de atualizações...');
-      const settings: any = await this.getSystemSettings();
+      const settings = await this.getSystemSettings();
 
       if (!settings.gitUsername || !settings.gitRepository) {
         this.logger.warn('Configurações do Git não encontradas');
@@ -89,8 +103,12 @@ export class UpdateService implements OnModuleInit {
       });
 
       return { updateAvailable, availableVersion: latestVersion };
-    } catch (error: any) {
-      const detail = this.sanitizeGitError(String(error?.stderr || error?.message || ''), decryptedTokenForSanitizer);
+    } catch (error: unknown) {
+      const parsedError = this.asUpdateExecutionError(error);
+      const detail = this.sanitizeGitError(
+        String(parsedError.stderr || parsedError.message || ''),
+        decryptedTokenForSanitizer,
+      );
       this.logger.error(`Erro ao verificar atualizações. detalhe=${detail}`);
       throw new HttpException('Erro ao verificar atualizações', HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -102,11 +120,11 @@ export class UpdateService implements OnModuleInit {
     ipAddress?: string,
     userAgent?: string,
   ): Promise<{ success: boolean; logId: string; message: string }> {
-    let updateLog: any;
+    let updateLog: UpdateLog | null = null;
     let requestedVersion = updateData.version;
 
     try {
-      const runningUpdate = await (this.prisma as any).updateLog.findFirst({
+      const runningUpdate = await this.prisma.updateLog.findFirst({
         where: { status: 'STARTED' },
         orderBy: { startedAt: 'asc' },
       });
@@ -115,7 +133,7 @@ export class UpdateService implements OnModuleInit {
         const startedAt = runningUpdate.startedAt ? new Date(runningUpdate.startedAt) : new Date();
         const ageMs = Date.now() - startedAt.getTime();
         if (ageMs > 60 * 60 * 1000) {
-          await (this.prisma as any).updateLog.update({
+          await this.prisma.updateLog.update({
             where: { id: runningUpdate.id },
             data: {
               status: 'FAILED',
@@ -136,11 +154,11 @@ export class UpdateService implements OnModuleInit {
       const normalizedVersion = this.formatVersion(normalizedCleanVersion);
       requestedVersion = normalizedVersion;
 
-      const settings: any = await this.getSystemSettings();
+      const settings = await this.getSystemSettings();
       const currentVersion = semver.clean(settings.appVersion || this.localAppVersionTag) || semver.clean(this.localAppVersionTag) || '0.0.0';
 
       if (!semver.gt(normalizedCleanVersion, currentVersion)) {
-        updateLog = await (this.prisma as any).updateLog.create({
+        updateLog = await this.prisma.updateLog.create({
           data: {
             version: normalizedVersion,
             status: 'SUCCESS',
@@ -173,7 +191,7 @@ export class UpdateService implements OnModuleInit {
         };
       }
 
-      updateLog = await (this.prisma as any).updateLog.create({
+      updateLog = await this.prisma.updateLog.create({
         data: {
           version: normalizedVersion,
           status: 'STARTED',
@@ -202,7 +220,9 @@ export class UpdateService implements OnModuleInit {
 
       const combinedOutput = `${deployResult.stdout || ''}\n${deployResult.stderr || ''}`;
       if (combinedOutput.includes('ROLLBACK_COMPLETED')) {
-        const rollbackError: any = new Error('Deploy reportou rollback automático; versão anterior foi mantida');
+        const rollbackError = this.asUpdateExecutionError(
+          new Error('Deploy reportou rollback automático; versão anterior foi mantida'),
+        );
         rollbackError.stdout = deployResult.stdout || '';
         rollbackError.stderr = deployResult.stderr || '';
         rollbackError.exitCode = 2;
@@ -211,7 +231,7 @@ export class UpdateService implements OnModuleInit {
       }
       const duration = Math.floor((Date.now() - startTime) / 1000);
 
-      await (this.prisma as any).updateLog.update({
+      await this.prisma.updateLog.update({
         where: { id: updateLog.id },
         data: {
           status: 'SUCCESS',
@@ -241,21 +261,22 @@ export class UpdateService implements OnModuleInit {
         logId: updateLog.id,
         message: `Atualização para ${normalizedVersion} concluída com sucesso`,
       };
-    } catch (error: any) {
-      const stdoutRaw = typeof error?.stdout === 'string' ? error.stdout : '';
-      const stderrRaw = typeof error?.stderr === 'string' ? error.stderr : '';
-      const errorMessageRaw = String(error?.message || 'Erro desconhecido durante atualização');
+    } catch (error: unknown) {
+      const parsedError = this.asUpdateExecutionError(error);
+      const stdoutRaw = typeof parsedError.stdout === 'string' ? parsedError.stdout : '';
+      const stderrRaw = typeof parsedError.stderr === 'string' ? parsedError.stderr : '';
+      const errorMessageRaw = String(parsedError.message || 'Erro desconhecido durante atualização');
       const stdout = this.sanitizeGitError(stdoutRaw);
       const stderr = this.sanitizeGitError(stderrRaw);
       const errorMessage = this.sanitizeGitError(errorMessageRaw);
       this.logger.error(`Erro durante atualização: ${errorMessage}`);
       const combinedErrorOutput = `${stdout}\n${stderr}\n${errorMessage}`;
-      const exitCode = Number(error?.code ?? error?.exitCode ?? -1);
+      const exitCode = Number(parsedError.code ?? parsedError.exitCode ?? -1);
       const rollbackDetected =
         combinedErrorOutput.includes('ROLLBACK_COMPLETED') || exitCode === 2;
 
       if (updateLog) {
-        await (this.prisma as any).updateLog.update({
+        await this.prisma.updateLog.update({
           where: { id: updateLog.id },
           data: {
             status: 'FAILED',
@@ -285,13 +306,13 @@ export class UpdateService implements OnModuleInit {
         rollbackDetected
           ? `Erro durante atualização: ${errorMessage}. Rollback automático executado.`
           : `Erro durante atualização: ${errorMessage}`,
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+        parsedError.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
 
   async getUpdateStatus(): Promise<UpdateStatusDto> {
-    const settings: any = await this.getSystemSettings();
+    const settings = await this.getSystemSettings();
     return {
       currentVersion: this.formatVersion(settings.appVersion || this.localAppVersionTag),
       availableVersion: settings.availableVersion ? this.formatVersion(settings.availableVersion) : undefined,
@@ -305,7 +326,7 @@ export class UpdateService implements OnModuleInit {
 
   async updateConfig(config: UpdateConfigDto, updatedBy: string): Promise<{ success: boolean; message: string }> {
     try {
-      const updateData: any = { ...config, updatedBy };
+      const updateData: Prisma.SystemSettingsUncheckedUpdateInput = { ...config, updatedBy };
 
       if (config.gitToken) {
         updateData.gitToken = this.encryptToken(config.gitToken);
@@ -346,8 +367,8 @@ export class UpdateService implements OnModuleInit {
     }
   }
 
-  async getUpdateLogs(limit: number = 50): Promise<any[]> {
-    return (this.prisma as any).updateLog.findMany({
+  async getUpdateLogs(limit: number = 50): Promise<UpdateLogListItem[]> {
+    return this.prisma.updateLog.findMany({
       orderBy: { startedAt: 'desc' },
       take: limit,
       select: {
@@ -365,19 +386,19 @@ export class UpdateService implements OnModuleInit {
     });
   }
 
-  async getUpdateLogDetails(logId: string): Promise<unknown> {
-    const log = await (this.prisma as any).updateLog.findUnique({ where: { id: logId } });
+  async getUpdateLogDetails(logId: string): Promise<UpdateLog> {
+    const log = await this.prisma.updateLog.findUnique({ where: { id: logId } });
     if (!log) {
       throw new HttpException('Log não encontrado', HttpStatus.NOT_FOUND);
     }
     return log;
   }
 
-  private async getSystemSettings(): Promise<unknown> {
-    let settings = await (this.prisma as any).systemSettings.findFirst();
+  private async getSystemSettings(): Promise<SystemSettings> {
+    let settings = await this.prisma.systemSettings.findFirst();
 
     if (!settings) {
-      settings = await (this.prisma as any).systemSettings.create({
+      settings = await this.prisma.systemSettings.create({
         data: {
           appVersion: this.localAppVersionTag,
           packageManager: 'docker',
@@ -393,15 +414,15 @@ export class UpdateService implements OnModuleInit {
     return settings;
   }
 
-  private async updateSystemSettings(data: any): Promise<void> {
-    const settings: any = await this.getSystemSettings();
-    await (this.prisma as any).systemSettings.update({
+  private async updateSystemSettings(data: Prisma.SystemSettingsUncheckedUpdateInput): Promise<void> {
+    const settings = await this.getSystemSettings();
+    await this.prisma.systemSettings.update({
       where: { id: settings.id },
       data: { ...data, updatedAt: new Date() },
     });
   }
 
-  private async runSafeImageDeploy(version: string, settings: any): Promise<{ stdout: string; stderr: string }> {
+  private async runSafeImageDeploy(version: string, settings: SystemSettings): Promise<UpdateExecutionResult> {
     const scriptPath = path.join(process.cwd(), 'install', 'update-images.sh');
     if (!fs.existsSync(scriptPath)) {
       throw new HttpException('Runner de deploy não encontrado (install/update-images.sh)', HttpStatus.INTERNAL_SERVER_ERROR);
@@ -437,7 +458,7 @@ export class UpdateService implements OnModuleInit {
     });
   }
 
-  private async runSafeNativeDeploy(version: string, _settings: any): Promise<{ stdout: string; stderr: string }> {
+  private async runSafeNativeDeploy(version: string, _settings: SystemSettings): Promise<UpdateExecutionResult> {
     const scriptPath = path.join(process.cwd(), 'install', 'update-native.sh');
     if (!fs.existsSync(scriptPath)) {
       throw new HttpException('Runner de deploy nativo não encontrado (install/update-native.sh)', HttpStatus.INTERNAL_SERVER_ERROR);
@@ -541,7 +562,7 @@ export class UpdateService implements OnModuleInit {
     return clean ? `v${clean}` : version;
   }
 
-  private buildPublicGitRepoUrl(settings: any): string {
+  private buildPublicGitRepoUrl(settings: SystemSettings): string {
     const repository = String(settings.gitRepository || '').replace(/\.git$/i, '');
     return `https://github.com/${settings.gitUsername}/${repository}.git`;
   }
@@ -569,8 +590,12 @@ export class UpdateService implements OnModuleInit {
         options,
       );
       return stdout;
-    } catch (error: any) {
-      const sanitizedStderr = this.sanitizeGitError(String(error?.stderr || error?.message || ''), decryptedToken);
+    } catch (error: unknown) {
+      const parsedError = this.asUpdateExecutionError(error);
+      const sanitizedStderr = this.sanitizeGitError(
+        String(parsedError.stderr || parsedError.message || ''),
+        decryptedToken,
+      );
       this.logger.warn(`Falha ao usar gitToken; tentando repositório sem autenticação. detalhe=${sanitizedStderr}`);
       const { stdout } = await this.execFileAsync('git', ['ls-remote', '--tags', repoUrl], options);
       return stdout;
@@ -610,5 +635,13 @@ export class UpdateService implements OnModuleInit {
       }
     }
     return sanitized;
+  }
+
+  private asUpdateExecutionError(error: unknown): UpdateExecutionError {
+    if (error instanceof Error) {
+      return error as UpdateExecutionError;
+    }
+
+    return new Error(String(error)) as UpdateExecutionError;
   }
 }

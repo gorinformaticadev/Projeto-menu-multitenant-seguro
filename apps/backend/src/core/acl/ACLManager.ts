@@ -294,21 +294,22 @@ export class ACLManager {
    */
   public debug(): void {
     this.roles.forEach((role, _name) => {
-      console.log(`Role: ${role.name}`);
+      console.warn(`Role: ${role.name}`);
       if (role.description) {
-        console.log(`  Description: ${role.description}`);
+        console.warn(`  Description: ${role.description}`);
       }
-      console.log(`    Permissions: ${role.permissions.join(', ')}`);
+      console.warn(`    Permissions: ${role.permissions.join(', ')}`);
     });
 
     this.permissions.forEach((permission, _name) => {
-      console.log(`Permission: ${permission.name}`);
+      console.warn(`Permission: ${permission.name}`);
       if (permission.description) {
-        console.log(`  Description: ${permission.description}`);
+        console.warn(`  Description: ${permission.description}`);
       }
       if (permission.module) {
-        console.log(`  Module: ${permission.module}`);
+        console.warn(`  Module: ${permission.module}`);
       }
     });
   }
 }
+

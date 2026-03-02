@@ -279,6 +279,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 4000;
   await app.listen(port, '0.0.0.0');
-  console.log(`🛡️  Headers de segurança ativados (Helmet)`);
+  console.warn(`🛡️  Headers de segurança ativados (Helmet)`);
 }
 bootstrap();
+

@@ -16,7 +16,7 @@ export class SseJwtGuard implements CanActivate {
     const token = request.query?.token;
 
     if (!token) {
-      console.log('❌ [SseJwtGuard] Token não fornecido na query string');
+      console.warn('❌ [SseJwtGuard] Token não fornecido na query string');
       throw new UnauthorizedException('Token não fornecido');
     }
 
@@ -27,7 +27,7 @@ export class SseJwtGuard implements CanActivate {
         ignoreExpiration: false, // Verificar expiração mas com timeout maior
       });
 
-      console.log('✅ [SseJwtGuard] Token validado com sucesso para usuário:', payload.email);
+      console.warn('✅ [SseJwtGuard] Token validado com sucesso para usuário:', payload.email);
 
       // Anexar usuário ao request
       request.user = payload;
@@ -37,7 +37,7 @@ export class SseJwtGuard implements CanActivate {
       console.error('❌ [SseJwtGuard] Erro na validação do token:', error.message);
       // Não bloquear SSE por token expirado - permitir progresso
       if (error.name === 'TokenExpiredError') {
-        console.log('⚠️ [SseJwtGuard] Token expirado mas permitindo SSE para progresso');
+        console.warn('⚠️ [SseJwtGuard] Token expirado mas permitindo SSE para progresso');
         // Decodificar sem verificar para obter dados do usuário
         const decoded = this.jwtService.decode(token);
         request.user = decoded;
@@ -47,3 +47,4 @@ export class SseJwtGuard implements CanActivate {
     }
   }
 }
+

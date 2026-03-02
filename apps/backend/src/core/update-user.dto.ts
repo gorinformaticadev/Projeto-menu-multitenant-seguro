@@ -11,7 +11,7 @@ function IsValidPassword(validationOptions?: ValidationOptions) {
       propertyName: propertyName,
       options: validationOptions,
       validator: {
-        async validate(value: unknown, args: ValidationArguments) {
+        async validate(value: unknown, _args: ValidationArguments) {
           if (!value || typeof value !== 'string' || value.trim() === '') return true; // Se não há senha, é válido (para edição)
 
           try {
@@ -49,7 +49,7 @@ function IsValidPassword(validationOptions?: ValidationOptions) {
             return value.length >= 8 && /[A-Z]/.test(value) && /[a-z]/.test(value) && /\d/.test(value);
           }
         },
-        defaultMessage(args: ValidationArguments) {
+        defaultMessage(_args: ValidationArguments) {
           return 'A senha não atende aos requisitos de segurança configurados';
         },
       },
@@ -83,4 +83,5 @@ export class ToggleUserStatusDto {
   @IsBoolean()
   ativo: boolean;
 }
+
 

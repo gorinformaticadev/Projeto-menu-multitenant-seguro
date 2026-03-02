@@ -23,7 +23,7 @@ export class IsStrongPasswordConstraint implements ValidatorConstraintInterface 
       // Empty implementation
     }
 
-  async validate(password: string, args: ValidationArguments): Promise<boolean> {
+  async validate(password: string, _args: ValidationArguments): Promise<boolean> {
     if (!password) return false;
 
     // Buscar política de senha do banco
@@ -78,7 +78,7 @@ export class IsStrongPasswordConstraint implements ValidatorConstraintInterface 
     return true;
   }
 
-  defaultMessage(args: ValidationArguments): string {
+  defaultMessage(_args: ValidationArguments): string {
     // Mensagem padrão (a mensagem real será gerada de forma assíncrona)
     return 'A senha não atende aos requisitos de segurança configurados';
   }
@@ -95,4 +95,5 @@ export function IsStrongPassword(validationOptions?: ValidationOptions) {
     });
   };
 }
+
 

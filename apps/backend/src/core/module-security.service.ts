@@ -185,13 +185,13 @@ export class ModuleSecurityService {
                 }
 
                 // Filtra menus recursivamente baseado na role
-                // console.log(`🔒 [ModuleSecurity] Filtrando módulo ${module.slug} para role: ${userRole}`);
+                // console.warn(`🔒 [ModuleSecurity] Filtrando módulo ${module.slug} para role: ${userRole}`);
                 const filteredMenus = this.filterMenusByRole(menuTree, userRole);
-                // console.log(`🔒 [ModuleSecurity] Menus filtrados: ${filteredMenus.length} (Original: ${menuTree.length})`);
+                // console.warn(`🔒 [ModuleSecurity] Menus filtrados: ${filteredMenus.length} (Original: ${menuTree.length})`);
 
                 // Se o módulo tem menus, mas todos foram proibidos, não retornamos o módulo para o frontend
                 if (module.menus.length > 0 && filteredMenus.length === 0) {
-                    console.log(`⛔ [ModuleSecurity] Módulo ${module.slug} totalmente ocultado por permissão.`);
+                    console.warn(`⛔ [ModuleSecurity] Módulo ${module.slug} totalmente ocultado por permissão.`);
                     return acc;
                 }
 

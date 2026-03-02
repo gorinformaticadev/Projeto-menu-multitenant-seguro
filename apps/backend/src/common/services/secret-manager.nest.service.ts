@@ -28,7 +28,7 @@ export class SecretManagerService implements OnModuleInit {
       await SecretLoaderMiddleware.loadSecrets();
       
       this.isInitialized = true;
-      console.log(`✅ Secret Manager inicializado (${this.secretManager.getProviderName()})`);
+      console.warn(`✅ Secret Manager inicializado (${this.secretManager.getProviderName()})`);
     } catch (error) {
       console.error('❌ Falha ao inicializar Secret Manager:', error.message);
       throw error;
@@ -165,6 +165,6 @@ export class SecretManagerService implements OnModuleInit {
   clearSensitiveData(): void {
     // Esta é uma operação limitada pois process.env é global
     // Em produção, considere usar técnicas mais avançadas
-    console.log('🧹 Limpando dados sensíveis da memória (limitado)');
+    console.warn('🧹 Limpando dados sensíveis da memória (limitado)');
   }
 }

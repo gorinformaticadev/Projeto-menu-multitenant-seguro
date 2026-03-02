@@ -128,14 +128,14 @@ export class DashboardManager {
    * Debug - lista todos os widgets
    */
   public debug(): void {
-    console.log(`Total widgets: ${this.count()}`);
+    console.warn(`Total widgets: ${this.count()}`);
     this.widgets
       .sort((a, b) => a.order - b.order)
       .forEach(widget => {
-        console.log(`  [${widget.order}] ${widget.title} (${widget.id})`);
+        console.warn(`  [${widget.order}] ${widget.title} (${widget.id})`);
         if (widget.permissions || widget.roles) {
-          console.log(`      Permissions: ${widget.permissions?.join(', ') || 'none'}`);
-          console.log(`      Roles: ${widget.roles?.join(', ') || 'none'}`);
+          console.warn(`      Permissions: ${widget.permissions?.join(', ') || 'none'}`);
+          console.warn(`      Roles: ${widget.roles?.join(', ') || 'none'}`);
         }
         if (widget.refresh) {
       // Empty implementation
@@ -143,3 +143,4 @@ export class DashboardManager {
       });
   }
 }
+

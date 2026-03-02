@@ -133,11 +133,11 @@ export function IsValidCPFOrCNPJ(validationOptions?: ValidationOptions) {
       propertyName: propertyName,
       options: validationOptions,
       validator: {
-        validate(value: unknown, args: ValidationArguments) {
+        validate(value: unknown, _args: ValidationArguments) {
           if (typeof value !== 'string') return false;
           return isValidCPFOrCNPJ(value);
         },
-        defaultMessage(args: ValidationArguments) {
+        defaultMessage(_args: ValidationArguments) {
           return 'CPF ou CNPJ inválido';
         },
       },
@@ -156,11 +156,11 @@ export function IsValidCPF(validationOptions?: ValidationOptions) {
       propertyName: propertyName,
       options: validationOptions,
       validator: {
-        validate(value: unknown, args: ValidationArguments) {
+        validate(value: unknown, _args: ValidationArguments) {
           if (typeof value !== 'string') return false;
           return isValidCPF(value);
         },
-        defaultMessage(args: ValidationArguments) {
+        defaultMessage(_args: ValidationArguments) {
           return 'CPF inválido';
         },
       },
@@ -179,11 +179,11 @@ export function IsValidCNPJ(validationOptions?: ValidationOptions) {
       propertyName: propertyName,
       options: validationOptions,
       validator: {
-        validate(value: unknown, args: ValidationArguments) {
+        validate(value: unknown, _args: ValidationArguments) {
           if (typeof value !== 'string') return false;
           return isValidCNPJ(value);
         },
-        defaultMessage(args: ValidationArguments) {
+        defaultMessage(_args: ValidationArguments) {
           return 'CNPJ inválido';
         },
       },

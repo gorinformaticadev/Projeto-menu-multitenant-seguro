@@ -173,8 +173,8 @@ export class NotificationManager {
    * Debug - lista todos os canais
    */
   public debug(): void {
-    console.log(`Total channels: ${this.count()}`);
-    console.log(`Enabled: ${this.getChannels(true).length}`);
+    console.warn(`Total channels: ${this.count()}`);
+    console.warn(`Enabled: ${this.getChannels(true).length}`);
     this.channels.forEach((channel, _name) => {
       const _status = channel.enabled ? '✅' : '❌';
       if (channel.description) {
@@ -183,3 +183,4 @@ export class NotificationManager {
     });
   }
 }
+

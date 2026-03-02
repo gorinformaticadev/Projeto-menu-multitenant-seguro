@@ -25,7 +25,7 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('Usuário não autenticado');
     }
 
-    console.log(`RolesGuard Debug: User Email: ${user.email}, User Role: ${user.role}, Required Roles: ${JSON.stringify(requiredRoles)}`);
+    console.warn(`RolesGuard Debug: User Email: ${user.email}, User Role: ${user.role}, Required Roles: ${JSON.stringify(requiredRoles)}`);
 
     const hasRole = requiredRoles.some((role) => user.role === role);
 
@@ -37,3 +37,4 @@ export class RolesGuard implements CanActivate {
     return true;
   }
 }
+

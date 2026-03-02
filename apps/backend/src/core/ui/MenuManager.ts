@@ -142,14 +142,14 @@ export class MenuManager {
    * Debug - lista todos os itens
    */
   public debug(): void {
-    console.log(`Total items: ${this.count()}`);
+    console.warn(`Total items: ${this.count()}`);
     this.items
       .sort((a, b) => a.order - b.order)
       .forEach(item => {
-        console.log(`  [${item.order}] ${item.label} (${item.id})`);
+        console.warn(`  [${item.order}] ${item.label} (${item.id})`);
         if (item.permissions || item.roles) {
-          console.log(`      Permissions: ${item.permissions?.join(', ') || 'none'}`);
-          console.log(`      Roles: ${item.roles?.join(', ') || 'none'}`);
+          console.warn(`      Permissions: ${item.permissions?.join(', ') || 'none'}`);
+          console.warn(`      Roles: ${item.roles?.join(', ') || 'none'}`);
         }
         if (item.children && item.children.length > 0) {
           item.children.forEach(child => {
@@ -159,3 +159,4 @@ export class MenuManager {
       });
   }
 }
+

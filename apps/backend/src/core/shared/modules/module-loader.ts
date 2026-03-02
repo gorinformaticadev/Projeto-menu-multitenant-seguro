@@ -29,7 +29,7 @@ export async function loadExternalModules(): Promise<void> {
     const _data = await response.json();
     const modules = _data.modules || [];
 
-    console.log(`📦 ${modules.length} módulo(s) encontrado(s) no banco de dados`);
+    console.warn(`📦 ${modules.length} módulo(s) encontrado(s) no banco de dados`);
 
     // Para cada módulo retornado pela API, tentar carregar sua definição
     for (const module of modules) {
@@ -109,3 +109,4 @@ async function loadModuleDynamically(moduleData: any): Promise<void> {
     moduleRegistry.register(fallbackContribution);
   }
 }
+

@@ -12,8 +12,8 @@ import {
  */
 @ValidatorConstraint({ name: 'validTenantId', async: false })
 export class ValidTenantIdValidator implements ValidatorConstraintInterface {
-  validate(value: unknown, args: ValidationArguments) {
-    const object = args.object as any;
+  validate(value: unknown, _args: ValidationArguments) {
+    const object = _args.object as { user?: { tenantId?: string; role?: string } };
     const userTenantId = object.user?.tenantId;
     const userRole = object.user?.role;
     
@@ -31,7 +31,7 @@ export class ValidTenantIdValidator implements ValidatorConstraintInterface {
     return value === userTenantId;
   }
 
-  defaultMessage(args: ValidationArguments) {
+  defaultMessage(_args: ValidationArguments) {
     return `tenantId inválido ou não autorizado`;
   }
 }
@@ -71,8 +71,8 @@ export class ValidUuidFormatValidator implements ValidatorConstraintInterface {
     );
   }
 
-  defaultMessage(args: ValidationArguments) {
-    return `${args.property} deve conter UUID(s) válido(s)`;
+  defaultMessage(_args: ValidationArguments) {
+    return `${_args.property} deve conter UUID(s) válido(s)`;
   }
 }
 
@@ -96,8 +96,8 @@ export function IsValidUuid(validationOptions?: ValidationOptions) {
  */
 @ValidatorConstraint({ name: 'reasonablePayloadSize', async: false })
 export class ReasonablePayloadSizeValidator implements ValidatorConstraintInterface {
-  validate(value: unknown, args: ValidationArguments) {
-    const maxSize = args.constraints[0] || 10000; // 10KB por padrão
+  validate(value: unknown, _args: ValidationArguments) {
+    const maxSize = _args.constraints[0] || 10000; // 10KB por padrão
     
     if (!value) return true;
     
@@ -109,8 +109,8 @@ export class ReasonablePayloadSizeValidator implements ValidatorConstraintInterf
     }
   }
 
-  defaultMessage(args: ValidationArguments) {
-    const maxSize = args.constraints[0] || 10000;
+  defaultMessage(_args: ValidationArguments) {
+    const maxSize = _args.constraints[0] || 10000;
     return `Payload excede o tamanho máximo permitido (${maxSize} bytes)`;
   }
 }
