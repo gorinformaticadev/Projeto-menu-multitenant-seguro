@@ -116,7 +116,7 @@ export class SecureFilesService {
       if (file.path) {
         try {
           await fsPromises.unlink(file.path);
-        } catch (unlinkError) {
+        } catch {
           this.logger.warn(`Não foi possível deletar arquivo temporário: ${file.path}`);
         }
       }

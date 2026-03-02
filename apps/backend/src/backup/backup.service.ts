@@ -786,7 +786,7 @@ export class BackupService {
               isValid = true;
               detectedFormat = 'PLAIN';
             }
-          } catch (err) {
+          } catch {
             this.logger.warn('Não foi possível ler arquivo como texto');
           }
         }

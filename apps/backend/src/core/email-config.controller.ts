@@ -2,7 +2,6 @@ import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request } f
 import { SkipThrottle } from '@nestjs/throttler';
 import { EmailConfigService } from './email-config.service';
 import { CreateEmailConfigDto, UpdateEmailConfigDto } from './dto/email-config.dto';
-import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';

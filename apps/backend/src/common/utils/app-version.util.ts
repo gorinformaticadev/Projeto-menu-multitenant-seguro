@@ -34,7 +34,7 @@ export function resolveAppVersionTag(options?: { cwd?: string; env?: NodeJS.Proc
       if (clean) {
         return formatVersionTag(clean);
       }
-    } catch (_error) {
+    } catch {
       // Ignore and try next candidate path.
     }
   }

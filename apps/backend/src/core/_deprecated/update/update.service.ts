@@ -9,7 +9,6 @@ import { promisify } from 'util';
 import * as semver from 'semver';
 import * as crypto from 'crypto';
 import * as path from 'path';
-import * as fs from 'fs/promises';
 
 const execAsync = promisify(exec);
 

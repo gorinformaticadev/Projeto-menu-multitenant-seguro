@@ -4,7 +4,6 @@ import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from "@nestjs/throttler";
 import { SecurityThrottlerGuard } from "./common/guards/security-throttler.guard";
 import { ServeStaticModule } from '@nestjs/serve-static';
-import { CsrfGuard } from "./common/guards/csrf.guard";
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { PrismaModule } from './core/prisma/prisma.module';

@@ -191,7 +191,7 @@ export class CronService implements OnModuleInit {
             if (this.schedulerRegistry.doesExist('cron', key)) {
                 this.schedulerRegistry.deleteCronJob(key);
             }
-        } catch (error) {
+        } catch {
       // Error handled silently
     }
     }
@@ -208,7 +208,7 @@ export class CronService implements OnModuleInit {
             if (j.job) {
                 try {
                     j.definition.nextRun = j.job.nextDate().toJSDate();
-                } catch (error) {
+                } catch {
       // Error handled silently
     }
             }

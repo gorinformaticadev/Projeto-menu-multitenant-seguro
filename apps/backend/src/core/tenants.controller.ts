@@ -8,7 +8,6 @@ import { TenantModuleService } from '../core/modules/engine/backend/tenant-modul
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { ChangeAdminPasswordDto } from './dto/change-admin-password.dto';
-import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { SkipTenantIsolation } from '@core/common/decorators/skip-tenant-isolation.decorator';

@@ -44,7 +44,7 @@ function IsValidPassword(validationOptions?: ValidationOptions) {
             if (config.passwordRequireSpecial && !/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value)) return false;
 
             return true;
-          } catch (error) {
+          } catch {
             // Em caso de erro, usar validação básica
             return value.length >= 8 && /[A-Z]/.test(value) && /[a-z]/.test(value) && /\d/.test(value);
           }
@@ -83,4 +83,3 @@ export class ToggleUserStatusDto {
   @IsBoolean()
   ativo: boolean;
 }
-

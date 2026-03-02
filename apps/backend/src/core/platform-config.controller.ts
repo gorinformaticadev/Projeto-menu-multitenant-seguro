@@ -1,7 +1,6 @@
 import { Controller, Get, Put, Body, UseGuards, Request } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { PlatformConfigService } from './platform-config.service';
-import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
