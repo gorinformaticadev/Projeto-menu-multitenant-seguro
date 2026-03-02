@@ -12,6 +12,12 @@ describe('SecurityThrottlerGuard identity resolution', () => {
       isProduction: false,
     }),
   };
+  const auditService = {
+    log: jest.fn(),
+  };
+  const rateLimitMetricsService = {
+    record: jest.fn(),
+  };
 
   const createGuard = () =>
     new SecurityThrottlerGuard(
@@ -19,6 +25,8 @@ describe('SecurityThrottlerGuard identity resolution', () => {
       new ThrottlerStorageService(),
       new Reflector(),
       securityConfigService as any,
+      auditService as any,
+      rateLimitMetricsService as any,
     );
 
   it('uses tenant:user tracker when request is authenticated', () => {

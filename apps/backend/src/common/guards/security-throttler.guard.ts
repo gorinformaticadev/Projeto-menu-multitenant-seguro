@@ -11,6 +11,8 @@ import {
 import { Reflector } from '@nestjs/core';
 import { createHash } from 'crypto';
 import { SecurityConfigService } from '../../security-config/security-config.service';
+import { AuditService } from '../../audit/audit.service';
+import { RateLimitMetricsService } from '../services/rate-limit-metrics.service';
 
 type ThrottleScope = 'ip' | 'user' | 'tenant-user' | 'tenant' | 'api-key';
 
@@ -28,14 +30,26 @@ type RateLimitConfigSnapshot = {
   isProduction: boolean;
 };
 
+type RateLimitTelemetry = {
+  req: Record<string, any>;
+  identity: ThrottleIdentity;
+  blocked: boolean;
+  limit: number;
+  windowSec: number;
+  retryAfterSec?: number;
+};
+
 @Injectable()
 export class SecurityThrottlerGuard extends ThrottlerGuard {
   private readonly logger = new Logger(SecurityThrottlerGuard.name);
   private readonly configCacheTtlMs = 15000;
+  private readonly blockAuditCooldownMs = this.readEnvNumber('RATE_LIMIT_BLOCK_AUDIT_COOLDOWN_MS', 30000);
+  private readonly maxDedupEntries = this.readEnvNumber('RATE_LIMIT_BLOCK_AUDIT_DEDUP_MAX', 5000);
   private cachedRateLimitConfig: RateLimitConfigSnapshot | null = null;
   private rateLimitConfigExpiresAt = 0;
+  private readonly blockedAuditDedup = new Map<string, number>();
 
-  // Política por escopo para reduzir falso positivo e separar tráfego anônimo/autenticado.
+  // Scope policy to reduce false positives and isolate anonymous/authenticated traffic.
   private readonly anonymousLimitCap = this.readEnvNumber('RATE_LIMIT_ANON_LIMIT', 120);
   private readonly userLimitFloor = this.readEnvNumber('RATE_LIMIT_USER_LIMIT', 1000);
   private readonly tenantLimitFloor = this.readEnvNumber('RATE_LIMIT_TENANT_LIMIT', 2000);
@@ -47,6 +61,8 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     @InjectThrottlerStorage() storageService: ThrottlerStorage,
     reflector: Reflector,
     private readonly securityConfigService: SecurityConfigService,
+    private readonly auditService: AuditService,
+    private readonly rateLimitMetricsService: RateLimitMetricsService,
   ) {
     super(options, storageService, reflector);
   }
@@ -57,7 +73,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     const identity = this.resolveThrottleIdentity(req);
     const rateLimitConfig = await this.getRateLimitConfigCached();
 
-    // Mantém limites declarados em @Throttle para não quebrar regras por endpoint.
+    // Keep limits declared with @Throttle to avoid breaking endpoint-specific rules.
     const moduleLimit = this.toPositiveNumber(throttler?.limit, requestProps.limit);
     const moduleTtl = this.toPositiveNumber(throttler?.ttl, requestProps.ttl);
     const resolvedLimit = this.toPositiveNumber(requestProps.limit, moduleLimit);
@@ -68,12 +84,12 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
 
     const hasExplicitRouteConfig = resolvedLimit !== moduleLimit || resolvedTtl !== moduleTtl;
 
-    // Se desativado no painel, mantém apenas limites explícitos de endpoints críticos.
+    // If disabled from panel, keep only explicit limits for critical endpoints.
     if (rateLimitConfig?.enabled === false && !hasExplicitRouteConfig) {
       return true;
     }
 
-    // Aplica configuração adaptativa do painel apenas quando a rota não define @Throttle próprio.
+    // Apply adaptive panel config only when route does not define custom @Throttle.
     if (!hasExplicitRouteConfig && throttler?.name === 'default') {
       if (rateLimitConfig?.enabled === true) {
         limit = this.toPositiveNumber(rateLimitConfig.requests, limit);
@@ -83,13 +99,25 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
       limit = this.applyScopePolicy(limit, identity.scope, identity.path);
     }
 
-    return super.handleRequest({
+    const allowed = await super.handleRequest({
       ...requestProps,
       limit,
       ttl,
-      // Força chave por escopo para isolamento multitenant e API key.
+      // Force tracker key by scope to preserve multitenant and API key isolation.
       getTracker: async () => identity.tracker,
     });
+
+    if (allowed) {
+      this.captureRateLimitTelemetry({
+        req,
+        identity,
+        blocked: false,
+        limit,
+        windowSec: Math.max(1, Math.ceil(ttl / 1000)),
+      });
+    }
+
+    return allowed;
   }
 
   protected async getTracker(req: Record<string, any>): Promise<string> {
@@ -110,28 +138,138 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     );
     const windowSec = Math.max(1, Math.ceil(throttlerLimitDetail.ttl / 1000));
 
-    // RFC e padrão moderno de headers.
+    // RFC-compliant + modern headers.
     res.header('Retry-After', String(retryAfterSec));
     res.header('RateLimit-Limit', String(throttlerLimitDetail.limit));
     res.header('RateLimit-Remaining', '0');
     res.header('RateLimit-Reset', String(retryAfterSec));
     res.header('RateLimit-Policy', `${throttlerLimitDetail.limit};w=${windowSec}`);
 
-    // Compatibilidade com cabeçalhos legados usados pelo throttler.
+    // Legacy compatibility headers.
     res.header('X-RateLimit-Limit', String(throttlerLimitDetail.limit));
     res.header('X-RateLimit-Remaining', '0');
     res.header('X-RateLimit-Reset', String(retryAfterSec));
 
-    throw new HttpException({
-      statusCode: 429,
-      code: 'RATE_LIMIT_EXCEEDED',
-      message:
-        'Muitas requisicoes em curto periodo. Aguarde alguns instantes e tente novamente.',
-      retryAfterSec,
-      windowSec,
+    const identity = this.resolveThrottleIdentity(req);
+    this.captureRateLimitTelemetry({
+      req,
+      identity,
+      blocked: true,
       limit: throttlerLimitDetail.limit,
-      path: this.getRequestPath(req),
-    }, HttpStatus.TOO_MANY_REQUESTS);
+      windowSec,
+      retryAfterSec,
+    });
+
+    throw new HttpException(
+      {
+        statusCode: 429,
+        code: 'RATE_LIMIT_EXCEEDED',
+        message: 'Muitas requisicoes em curto periodo. Aguarde alguns instantes e tente novamente.',
+        retryAfterSec,
+        windowSec,
+        limit: throttlerLimitDetail.limit,
+        path: this.getRequestPath(req),
+      },
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
+  }
+
+  private captureRateLimitTelemetry(data: RateLimitTelemetry): void {
+    void this.recordRateLimitTelemetry(data);
+  }
+
+  private async recordRateLimitTelemetry(data: RateLimitTelemetry): Promise<void> {
+    const tenantId = this.resolveTenantId(data.req);
+    const userId = this.normalizeText(data.req?.user?.id || data.req?.user?.sub);
+
+    try {
+      await this.rateLimitMetricsService.record({
+        tenantId,
+        scope: data.identity.scope,
+        path: data.identity.path,
+        blocked: data.blocked,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao registrar metricas de rate limit. detalhe=${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    if (!data.blocked) {
+      return;
+    }
+
+    if (!this.shouldAuditBlockedEvent(data, tenantId)) {
+      return;
+    }
+
+    try {
+      await this.auditService.log({
+        action: 'RATE_LIMIT_BLOCKED',
+        userId: userId || undefined,
+        tenantId: tenantId || undefined,
+        ipAddress: data.identity.clientIp,
+        userAgent: this.resolveUserAgent(data.req),
+        details: {
+          scope: data.identity.scope,
+          tracker: data.identity.tracker,
+          path: data.identity.path,
+          method: this.resolveRequestMethod(data.req),
+          limit: data.limit,
+          windowSec: data.windowSec,
+          retryAfterSec: data.retryAfterSec ?? 0,
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao gravar auditoria de bloqueio de rate limit. detalhe=${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private shouldAuditBlockedEvent(data: RateLimitTelemetry, tenantId: string | null): boolean {
+    const now = Date.now();
+    const method = this.resolveRequestMethod(data.req);
+    const dedupKey = [
+      tenantId || 'anonymous',
+      method,
+      data.identity.scope,
+      data.identity.path,
+      data.identity.tracker,
+    ].join('|');
+
+    const lastSeenAt = this.blockedAuditDedup.get(dedupKey);
+    if (typeof lastSeenAt === 'number' && now - lastSeenAt < this.blockAuditCooldownMs) {
+      return false;
+    }
+
+    this.blockedAuditDedup.set(dedupKey, now);
+    this.pruneBlockedAuditDedup(now);
+    return true;
+  }
+
+  private pruneBlockedAuditDedup(now: number): void {
+    if (this.blockedAuditDedup.size <= this.maxDedupEntries) {
+      return;
+    }
+
+    for (const [key, timestamp] of this.blockedAuditDedup.entries()) {
+      if (now - timestamp >= this.blockAuditCooldownMs) {
+        this.blockedAuditDedup.delete(key);
+      }
+
+      if (this.blockedAuditDedup.size <= this.maxDedupEntries) {
+        return;
+      }
+    }
+
+    while (this.blockedAuditDedup.size > this.maxDedupEntries) {
+      const oldestKey = this.blockedAuditDedup.keys().next().value;
+      if (!oldestKey) {
+        return;
+      }
+      this.blockedAuditDedup.delete(oldestKey);
+    }
   }
 
   private applyScopePolicy(baseLimit: number, scope: ThrottleScope, path: string): number {
@@ -158,7 +296,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     const path = this.getRequestPath(req);
     const clientIp = this.resolveClientIp(req);
 
-    const tenantId = this.normalizeText(req?.apiKey?.tenantId || req?.user?.tenantId || req?.tenantId);
+    const tenantId = this.resolveTenantId(req);
     const apiKeyId = this.normalizeText(req?.apiKey?.id || req?.user?.apiKeyId || req?.auth?.apiKeyId);
 
     if (apiKeyId) {
@@ -179,6 +317,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
         clientIp,
       };
     }
+
     if (userId) {
       return {
         scope: 'user',
@@ -187,6 +326,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
         clientIp,
       };
     }
+
     if (tenantId) {
       return {
         scope: 'tenant',
@@ -212,6 +352,10 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
       path,
       clientIp,
     };
+  }
+
+  private resolveTenantId(req: Record<string, any>): string | null {
+    return this.normalizeText(req?.apiKey?.tenantId || req?.user?.tenantId || req?.tenantId);
   }
 
   private resolveAuthTarget(path: string, req: Record<string, any>): string | null {
@@ -245,6 +389,23 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     const rawPath = this.normalizeText(req?.originalUrl || req?.url || req?.path || req?.route?.path) || '/';
     const [pathWithoutQuery] = rawPath.split('?');
     return pathWithoutQuery.toLowerCase();
+  }
+
+  private resolveRequestMethod(req: Record<string, any>): string {
+    const method = this.normalizeText(req?.method);
+    return method ? method.toUpperCase() : 'UNKNOWN';
+  }
+
+  private resolveUserAgent(req: Record<string, any>): string | undefined {
+    const header = req?.headers?.['user-agent'];
+    const userAgent = Array.isArray(header) ? header[0] : header;
+
+    if (typeof userAgent !== 'string') {
+      return undefined;
+    }
+
+    const normalized = userAgent.trim();
+    return normalized.length > 0 ? normalized : undefined;
   }
 
   private resolveClientIp(req: Record<string, any>): string {
