@@ -61,6 +61,12 @@ async function bootstrap() {
   const dynamicModule = await AppModule.register();
   const app = await NestFactory.create<NestExpressApplication>(dynamicModule);
   app.setGlobalPrefix('api');
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  // Quando atrás de Nginx/Proxy reverso, usa o primeiro hop confiável para req.ip.
+  if (isProduction) {
+    app.set('trust proxy', 1);
+  }
 
   // ============================================
   // 🔧 REDIS ADAPTER PARA ESCALABILIDADE HORIZONTAL
@@ -82,8 +88,6 @@ async function bootstrap() {
   // ============================================
   // 🛡️ SEGURANÇA: Headers de Proteção (Helmet)
   // ============================================
-  const isProduction = process.env.NODE_ENV === 'production';
-
   app.use(
     helmet({
       // Content Security Policy - Previne XSS

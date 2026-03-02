@@ -34,7 +34,7 @@ export class AuthController {
    */
   @SkipCsrf()
   @Post('login')
-  @Throttle({ login: { limit: 5, ttl: 60000 } }) // 5 tentativas por minuto
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 tentativas por minuto
   async login(
     @Body() loginDto: LoginDto,
     @Req() req: Request,
@@ -83,7 +83,7 @@ export class AuthController {
    */
   @SkipCsrf()
   @Post('login-2fa')
-  @Throttle({ login: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async login2FA(
     @Body() login2FADto: Login2FADto,
     @Req() req: Request,

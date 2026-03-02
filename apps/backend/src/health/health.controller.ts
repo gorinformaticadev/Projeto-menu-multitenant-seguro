@@ -1,5 +1,7 @@
 import { Controller, Get, Head, SetMetadata } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 
+@SkipThrottle()
 @Controller('health')
 @SetMetadata('skipCsrf', true)
 @SetMetadata('isPublic', true)

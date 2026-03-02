@@ -45,8 +45,7 @@ import { HealthModule } from './health/health.module';
     SentryModule,
     CommonModule,
     // ============================================
-    // 🛡️  RATE LIMITING - Proteção contra Brute Force
-    // Configurações ajustadas por ambiente
+    // 🛡️  RATE LIMITING - Guard global + limites por endpoint via @Throttle
     // ============================================
     ThrottlerModule.forRoot([
       {
@@ -54,12 +53,6 @@ import { HealthModule } from './health/health.module';
         ttl: 60000, // 60 segundos (1 minuto)
         // Desenvolvimento: 10000 req/min (AUMENTADO DEBUG)
         limit: 10000,
-      },
-      {
-        name: 'login',
-        ttl: 60000, // 60 segundos
-        // Desenvolvimento: 10 tentativas | Produção: 5 tentativas
-        limit: process.env.NODE_ENV === 'production' ? 5 : 10,
       },
     ]),
     PrismaModule,
