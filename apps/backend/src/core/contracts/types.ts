@@ -6,12 +6,12 @@
 /**
  * Request genérico (abstração)
  */
-export type RequestInstance = any;
+export type RequestInstance = unknown;
 
 /**
  * Response genérico (abstração)
  */
-export type ResponseInstance = any;
+export type ResponseInstance = unknown;
 
 /**
  * Papel/Role no sistema
@@ -92,7 +92,7 @@ export interface RequestContext {
 /**
  * Resultado de operação genérico
  */
-export interface OperationResult<T = any> {
+export interface OperationResult<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;

@@ -1,6 +1,7 @@
 import { UpdateService } from './update.service';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import * as fs from 'fs';
 
 type UpdateServiceTestHandle = {
   execFileAsync: jest.Mock;
@@ -82,5 +83,37 @@ describe('UpdateService', () => {
     const service = asPrivateApi(createService());
     expect(service.formatVersion('1.2.3')).toBe('v1.2.3');
     expect(service.formatVersion('v1.2.3')).toBe('v1.2.3');
+  });
+
+  it('runSafeNativeDeploy injeta repo e auth header quando git esta configurado', async () => {
+    const service = asPrivateApi(createService()) as unknown as Record<string, any>;
+    const existsSyncSpy = jest.spyOn(fs, 'existsSync').mockImplementation((target: fs.PathLike) => {
+      return String(target).replace(/\\/g, '/').endsWith('/install/update-native.sh');
+    });
+
+    const calls: Array<{ cmd: string; args: string[]; options: any }> = [];
+    service.getProjectRoot = jest.fn(() => '/repo-root');
+    service.execFileAsync = jest.fn(async (cmd: string, args: string[], options: any) => {
+      calls.push({ cmd, args, options });
+      return { stdout: 'ok', stderr: '' };
+    });
+
+    const encryptedToken = service.encryptToken('my-secret-token');
+    await service.runSafeNativeDeploy('v1.2.3', {
+      gitUsername: 'org',
+      gitRepository: 'repo',
+      gitToken: encryptedToken,
+    });
+
+    expect(calls.length).toBe(1);
+    expect(calls[0].cmd).toBe('bash');
+    expect(calls[0].args[0].replace(/\\/g, '/')).toBe('install/update-native.sh');
+    expect(calls[0].options.cwd).toBe('/repo-root');
+    expect(calls[0].options.env.PROJECT_ROOT).toBe('/repo-root');
+    expect(calls[0].options.env.RELEASE_TAG).toBe('v1.2.3');
+    expect(calls[0].options.env.GIT_REPO_URL).toBe('https://github.com/org/repo.git');
+    expect(String(calls[0].options.env.GIT_AUTH_HEADER || '').startsWith('AUTHORIZATION: basic ')).toBe(true);
+
+    existsSyncSpy.mockRestore();
   });
 });

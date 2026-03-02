@@ -12,7 +12,7 @@ export interface WhatsAppMessage {
   type: 'text' | 'image' | 'document' | 'audio';
   timestamp: Date;
   tenantId?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface WhatsAppContact {

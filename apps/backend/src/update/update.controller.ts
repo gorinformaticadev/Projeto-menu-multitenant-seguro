@@ -138,7 +138,7 @@ export class UpdateController {
         connected: true,
         ...result,
       };
-    } catch (_error) {
+    } catch {
       return {
         success: false,
         message: 'Falha na conexão com o repositório',

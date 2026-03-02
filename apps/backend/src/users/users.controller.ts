@@ -12,6 +12,12 @@ import { SkipTenantIsolation } from '@core/common/decorators/skip-tenant-isolati
 import { Role } from '@prisma/client';
 import { CurrentUser } from '@core/common/decorators/current-user.decorator';
 
+type AuthenticatedUser = {
+  id: string;
+  role: Role;
+  tenantId?: string | null;
+};
+
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
@@ -20,7 +26,7 @@ export class UsersController {
   @Post()
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @SkipTenantIsolation()
-  create(@Body() createUserDto: CreateUserDto, @CurrentUser() user: any) {
+  create(@Body() createUserDto: CreateUserDto, @CurrentUser() user: AuthenticatedUser) {
     // Se for ADMIN, força o tenantId do usuário logado
     if (user.role === Role.ADMIN) {
       createUserDto.tenantId = user.tenantId;
@@ -35,7 +41,7 @@ export class UsersController {
   @Get()
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @SkipTenantIsolation()
-  findAll(@Query('tenantId') tenantId?: string, @CurrentUser() user?: any) {
+  findAll(@Query('tenantId') tenantId?: string, @CurrentUser() user?: AuthenticatedUser) {
     // Se for ADMIN, força buscar apenas do seu tenant
     if (user?.role === Role.ADMIN) {
       return this.usersService.findAll(user.tenantId);
@@ -46,7 +52,7 @@ export class UsersController {
   @Get('tenant/:tenantId')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @SkipTenantIsolation()
-  findByTenant(@Param('tenantId') tenantId: string, @CurrentUser() user: any) {
+  findByTenant(@Param('tenantId') tenantId: string, @CurrentUser() user: AuthenticatedUser) {
     // ADMIN só pode acessar o próprio tenant
     if (user.role === Role.ADMIN && user.tenantId !== tenantId) {
       throw new Error('ADMIN não pode acessar usuários de outros tenants');
@@ -63,7 +69,7 @@ export class UsersController {
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER, Role.CLIENT)
   updatePreferences(
     @Body() updateUserPreferencesDto: UpdateUserPreferencesDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     if (updateUserPreferencesDto.theme) {
       return this.usersService.updatePreferences(user.id, updateUserPreferencesDto.theme);
@@ -81,7 +87,7 @@ export class UsersController {
   @Patch(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @SkipTenantIsolation()
-  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto, @CurrentUser() currentUser: any) {
+  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto, @CurrentUser() currentUser: AuthenticatedUser) {
     // Verificar se está tentando editar um SUPER_ADMIN
     const targetUser = await this.usersService.findOne(id);
     
@@ -103,7 +109,7 @@ export class UsersController {
   @Delete(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @SkipTenantIsolation()
-  async remove(@Param('id') id: string, @CurrentUser() currentUser: any) {
+  async remove(@Param('id') id: string) {
     // Verificar se está tentando deletar um SUPER_ADMIN
     const targetUser = await this.usersService.findOne(id);
     
@@ -122,7 +128,7 @@ export class UsersController {
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER, Role.CLIENT)
   updateProfile(
     @Body() updateProfileDto: UpdateProfileDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.usersService.updateProfile(user.id, updateProfileDto);
   }
@@ -135,7 +141,7 @@ export class UsersController {
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER, Role.CLIENT)
   changePassword(
     @Body() changePasswordDto: ChangePasswordDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.usersService.changePassword(user.id, changePasswordDto);
   }

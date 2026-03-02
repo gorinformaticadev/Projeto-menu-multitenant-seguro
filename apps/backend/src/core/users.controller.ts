@@ -4,12 +4,17 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { SkipTenantIsolation } from '@core/common/decorators/skip-tenant-isolation.decorator';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '@core/common/decorators/current-user.decorator';
+
+type AuthenticatedUser = {
+  id: string;
+  role: Role;
+  tenantId?: string | null;
+};
 
 @Controller('users')
 @UseGuards(RolesGuard)
@@ -19,7 +24,7 @@ export class UsersController {
   @Post()
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @SkipTenantIsolation()
-  create(@Body() createUserDto: CreateUserDto, @CurrentUser() user: any) {
+  create(@Body() createUserDto: CreateUserDto, @CurrentUser() user: AuthenticatedUser) {
     // Se for ADMIN, força o tenantId do usuário logado
     if (user.role === Role.ADMIN) {
       createUserDto.tenantId = user.tenantId;
@@ -34,7 +39,7 @@ export class UsersController {
   @Get()
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @SkipTenantIsolation()
-  findAll(@Query('tenantId') tenantId?: string, @CurrentUser() user?: any) {
+  findAll(@Query('tenantId') tenantId?: string, @CurrentUser() user?: AuthenticatedUser) {
     // Se for ADMIN, força buscar apenas do seu tenant
     if (user?.role === Role.ADMIN) {
       return this.usersService.findAll(user.tenantId);
@@ -45,7 +50,7 @@ export class UsersController {
   @Get('tenant/:tenantId')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @SkipTenantIsolation()
-  findByTenant(@Param('tenantId') tenantId: string, @CurrentUser() user: any) {
+  findByTenant(@Param('tenantId') tenantId: string, @CurrentUser() user: AuthenticatedUser) {
     // ADMIN só pode acessar o próprio tenant
     if (user.role === Role.ADMIN && user.tenantId !== tenantId) {
       throw new Error('ADMIN não pode acessar usuários de outros tenants');
@@ -82,7 +87,7 @@ export class UsersController {
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER, Role.CLIENT)
   updateProfile(
     @Body() updateProfileDto: UpdateProfileDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.usersService.updateProfile(user.id, updateProfileDto);
   }
@@ -95,7 +100,7 @@ export class UsersController {
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER, Role.CLIENT)
   changePassword(
     @Body() changePasswordDto: ChangePasswordDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.usersService.changePassword(user.id, changePasswordDto);
   }

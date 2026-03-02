@@ -133,6 +133,7 @@ export class AWSSecretManager implements SecretManager {
   constructor() {
     try {
       // Import dinâmico para evitar dependência obrigatória
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const AWS = require('aws-sdk');
       this.client = new AWS.SecretsManager({
         region: process.env.AWS_REGION || 'us-east-1'

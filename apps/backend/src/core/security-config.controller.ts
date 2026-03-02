@@ -2,11 +2,12 @@ import { Controller, Get, Put, Body, UseGuards, Request } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { SecurityConfigService } from './security-config.service';
 import { UpdateSecurityConfigDto } from './dto/update-security-config.dto';
-import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { Public } from '@core/common/decorators/public.decorator';
 import { Role } from '@prisma/client';
+
+type AuthenticatedRequest = { user: { id: string; [key: string]: unknown } };
 
 @SkipThrottle()
 @Controller('security-config')
@@ -36,7 +37,7 @@ export class SecurityConfigController {
   @Roles(Role.SUPER_ADMIN)
   async updateConfig(
     @Body() dto: UpdateSecurityConfigDto,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     return this.securityConfigService.updateConfig(dto, req.user.id);
   }

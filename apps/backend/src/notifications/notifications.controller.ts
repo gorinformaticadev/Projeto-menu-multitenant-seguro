@@ -68,7 +68,7 @@ export class NotificationsController {
    * Cria uma nova notificação
    */
   @Post()
-  async create(@Body() createDto: CreateNotificationDto, @Request() req) {
+  async create(@Body() createDto: CreateNotificationDto) {
     const notification = await this.notificationService.create(createDto);
 
     // Emite via Socket.IO

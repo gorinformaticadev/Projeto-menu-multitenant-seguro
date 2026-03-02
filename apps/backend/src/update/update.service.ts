@@ -423,7 +423,8 @@ export class UpdateService implements OnModuleInit {
   }
 
   private async runSafeImageDeploy(version: string, settings: SystemSettings): Promise<UpdateExecutionResult> {
-    const scriptPath = path.join(process.cwd(), 'install', 'update-images.sh');
+    const root = this.getProjectRoot();
+    const scriptPath = path.join(root, 'install', 'update-images.sh');
     if (!fs.existsSync(scriptPath)) {
       throw new HttpException('Runner de deploy não encontrado (install/update-images.sh)', HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -443,35 +444,48 @@ export class UpdateService implements OnModuleInit {
 
     const env = {
       ...process.env,
-      PROJECT_ROOT: process.cwd(),
+      PROJECT_ROOT: root,
       RELEASE_TAG: version,
       COMPOSE_FILE: composeFile,
       ENV_FILE: envFile,
       HEALTH_TIMEOUT: process.env.UPDATE_HEALTH_TIMEOUT || '120',
     };
 
-    return this.execFileAsync('bash', [scriptPath], {
-      cwd: process.cwd(),
+    return this.execFileAsync('bash', [path.join('install', 'update-images.sh')], {
+      cwd: root,
       env,
       timeout: 30 * 60 * 1000,
       maxBuffer: 20 * 1024 * 1024,
     });
   }
 
-  private async runSafeNativeDeploy(version: string, _settings: SystemSettings): Promise<UpdateExecutionResult> {
-    const scriptPath = path.join(process.cwd(), 'install', 'update-native.sh');
+  private async runSafeNativeDeploy(version: string, settings: SystemSettings): Promise<UpdateExecutionResult> {
+    const root = this.getProjectRoot();
+    const scriptPath = path.join(root, 'install', 'update-native.sh');
     if (!fs.existsSync(scriptPath)) {
       throw new HttpException('Runner de deploy nativo não encontrado (install/update-native.sh)', HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    const env = {
+    const hasRepoConfig = !!(settings.gitUsername && settings.gitRepository);
+    const decryptedToken = hasRepoConfig ? this.tryDecryptToken(settings.gitToken) : '';
+    const basicAuth = decryptedToken
+      ? Buffer.from(`x-access-token:${decryptedToken}`, 'utf8').toString('base64')
+      : '';
+
+    const env: NodeJS.ProcessEnv = {
       ...process.env,
-      PROJECT_ROOT: process.cwd(),
+      PROJECT_ROOT: root,
       RELEASE_TAG: version,
     };
+    if (hasRepoConfig) {
+      env.GIT_REPO_URL = this.buildPublicGitRepoUrl(settings);
+    }
+    if (basicAuth) {
+      env.GIT_AUTH_HEADER = `AUTHORIZATION: basic ${basicAuth}`;
+    }
 
-    return this.execFileAsync('bash', [scriptPath], {
-      cwd: process.cwd(),
+    return this.execFileAsync('bash', [path.join('install', 'update-native.sh')], {
+      cwd: root,
       env,
       timeout: 45 * 60 * 1000, // Native build can take longer
       maxBuffer: 50 * 1024 * 1024,
@@ -500,6 +514,24 @@ export class UpdateService implements OnModuleInit {
     }
 
     return 'native';
+  }
+
+  private getProjectRoot(): string {
+    const cwd = process.cwd();
+    const candidates = [
+      cwd,
+      path.resolve(cwd, '..'), // if in apps/backend or similar
+      path.resolve(cwd, '..', '..'), // if in apps/backend/dist
+      path.resolve(__dirname, '..', '..', '..'), // src/update -> src -> apps/backend -> root
+      path.resolve(__dirname, '..', '..', '..', '..'), // dist/src/update -> ... -> root
+    ];
+
+    for (const root of candidates) {
+      if (fs.existsSync(path.join(root, 'install'))) {
+        return root;
+      }
+    }
+    return cwd;
   }
 
   private encryptToken(token: string): string {

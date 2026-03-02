@@ -101,7 +101,6 @@ export class TokenBlacklistService {
       });
 
       // Adicionar todos à blacklist
-      const _now = new Date();
       for (const refreshToken of refreshTokens) {
         await this.blacklistToken(refreshToken.token, refreshToken.expiresAt, userId);
       }

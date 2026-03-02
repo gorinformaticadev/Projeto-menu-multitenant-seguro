@@ -56,8 +56,6 @@ async function loadModuleDynamically(moduleData: any): Promise<void> {
   try {
     // Tentar carregar definição do módulo se existir
     // Convenção: @modules/{slug}/frontend/index.ts exporta ModuleContribution
-    const _modulePath = `@modules/${slug}/frontend`;
-
     // Import dinâmico (pode falhar se módulo não tiver definição frontend)
     const moduleDefinition = await import(
       /* webpackIgnore: true */
@@ -87,7 +85,7 @@ async function loadModuleDynamically(moduleData: any): Promise<void> {
       moduleRegistry.register(basicContribution);
     }
 
-  } catch (error) {
+  } catch {
     console.warn(`⚠️ Não foi possível carregar definição de ${slug}, usando fallback`);
 
     // Fallback: registrar apenas com dados da API

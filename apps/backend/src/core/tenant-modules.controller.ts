@@ -1,6 +1,5 @@
 import { Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
 import { TenantModuleService } from '@core/modules/engine/backend/tenant-module.service';
-import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';

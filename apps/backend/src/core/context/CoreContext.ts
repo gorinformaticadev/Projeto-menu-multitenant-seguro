@@ -21,7 +21,7 @@ export interface DatabaseConnection {
  */
 export interface CacheManager {
   get<T>(key: string): Promise<T | null>;
-  set(key: string, value: any, ttl?: number): Promise<void>;
+  set(key: string, value: unknown, ttl?: number): Promise<void>;
   del(key: string): Promise<void>;
   clear(): Promise<void>;
 }
@@ -49,7 +49,7 @@ export interface RouterManager {
  */
 export interface NotificationManager {
   registerChannel(name: string, handler: unknown): void;
-  send(channel: string, message: any, targets: unknown[]): Promise<void>;
+  send(channel: string, message: unknown, targets: unknown[]): Promise<void>;
   broadcast(message: unknown): Promise<void>;
 }
 

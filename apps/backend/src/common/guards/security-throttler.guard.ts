@@ -23,7 +23,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     protected async handleRequest(
         requestProps: any // Em v6 é ThrottlerRequest
     ): Promise<boolean> {
-        const { context, limit, ttl, throttler } = requestProps;
+        const { context, throttler } = requestProps;
         const isProduction = process.env.NODE_ENV === 'production';
 
         // Logica simplificada sem DB por enquanto para testar se volta o serviço

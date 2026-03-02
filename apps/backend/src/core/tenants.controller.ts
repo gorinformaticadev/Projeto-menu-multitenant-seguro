@@ -8,13 +8,21 @@ import { TenantModuleService } from '../core/modules/engine/backend/tenant-modul
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { ChangeAdminPasswordDto } from './dto/change-admin-password.dto';
-import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { SkipTenantIsolation } from '@core/common/decorators/skip-tenant-isolation.decorator';
 import { Public } from '@core/common/decorators/public.decorator';
 import { Role } from '@prisma/client';
 import { multerConfig } from '@core/common/config/multer.config';
+
+type TenantRequest = ExpressRequest & {
+  user: {
+    id?: string;
+    role: Role;
+    tenantId?: string | null;
+    [key: string]: unknown;
+  };
+};
 
 @SkipThrottle()
 @Controller('tenants')
@@ -93,7 +101,7 @@ export class TenantsController {
 
   @Get('my-tenant')
   @Roles(Role.ADMIN)
-  async getMyTenant(@Req() req: ExpressRequest & { user: any }) {
+  async getMyTenant(@Req() req: TenantRequest) {
     return this.tenantsService.findOne(req.user.tenantId);
   }
 
@@ -113,14 +121,14 @@ export class TenantsController {
 
   @Put('my-tenant')
   @Roles(Role.ADMIN)
-  async updateMyTenant(@Body() updateTenantDto: UpdateTenantDto, @Req() req: ExpressRequest & { user: any }) {
+  async updateMyTenant(@Body() updateTenantDto: UpdateTenantDto, @Req() req: TenantRequest) {
     return this.tenantsService.update(req.user.tenantId, updateTenantDto);
   }
 
   @Post('my-tenant/upload-logo')
   @Roles(Role.ADMIN)
   @UseInterceptors(FileInterceptor('logo', multerConfig))
-  async uploadMyTenantLogo(@Req() req: ExpressRequest & { user: any }, @UploadedFile() file: Express.Multer.File) {
+  async uploadMyTenantLogo(@Req() req: TenantRequest, @UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo foi enviado');
     }
@@ -133,7 +141,7 @@ export class TenantsController {
 
   @Patch('my-tenant/remove-logo')
   @Roles(Role.ADMIN)
-  async removeMyTenantLogo(@Req() req: ExpressRequest & { user: any }) {
+  async removeMyTenantLogo(@Req() req: TenantRequest) {
     return this.tenantsService.removeLogo(req.user.tenantId);
   }
 
@@ -199,7 +207,7 @@ export class TenantsController {
   @Get('my-tenant/modules/active')
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   @SkipThrottle()
-  async getMyTenantActiveModules(@Req() req: ExpressRequest & { user: any }) {
+  async getMyTenantActiveModules(@Req() req: TenantRequest) {
     if (!req.user.tenantId) {
       if (req.user.role === Role.SUPER_ADMIN) {
         // Se for SUPER_ADMIN sem tenant, retornamos uma lista vazia ou erro.
@@ -255,7 +263,7 @@ export class TenantsController {
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   @SkipThrottle()
   @UseInterceptors(DuplicateRequestInterceptor)
-  async toggleMyTenantModule(@Param('moduleName') moduleName: string, @Req() req: ExpressRequest & { user: any }) {
+  async toggleMyTenantModule(@Param('moduleName') moduleName: string, @Req() req: TenantRequest) {
     if (!req.user.tenantId) {
       if (req.user.role === Role.SUPER_ADMIN) {
         throw new BadRequestException('SUPER_ADMIN não possui contexto de tenant. Use um usuário ADMIN de tenant.');

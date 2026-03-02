@@ -176,7 +176,6 @@ export class NotificationManager {
     console.warn(`Total channels: ${this.count()}`);
     console.warn(`Enabled: ${this.getChannels(true).length}`);
     this.channels.forEach((channel, _name) => {
-      const _status = channel.enabled ? '✅' : '❌';
       if (channel.description) {
       // Empty implementation
     }

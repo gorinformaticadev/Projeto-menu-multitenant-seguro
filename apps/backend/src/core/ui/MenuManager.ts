@@ -152,7 +152,7 @@ export class MenuManager {
           console.warn(`      Roles: ${item.roles?.join(', ') || 'none'}`);
         }
         if (item.children && item.children.length > 0) {
-          item.children.forEach(child => {
+          item.children.forEach(_child => {
       // Empty implementation
     });
         }

@@ -107,7 +107,7 @@ export class PasswordResetService {
         payload = this.jwtService.verify(token, {
           secret: this.config.get('JWT_SECRET'),
         });
-      } catch (error) {
+      } catch {
         this.logger.warn('Token de reset inválido ou expirado');
         throw new BadRequestException('Token inválido ou expirado. Solicite um novo link de recuperação.');
       }
