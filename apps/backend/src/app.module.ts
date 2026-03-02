@@ -1,5 +1,5 @@
 import { Module, NestModule, MiddlewareConsumer, DynamicModule } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from "@nestjs/throttler";
 import { SecurityThrottlerGuard } from "./common/guards/security-throttler.guard";
@@ -28,6 +28,7 @@ import { WhatsAppModule } from './core/whatsapp/whatsapp.module';
 import { CronModule } from './core/cron/cron.module';
 import { BackupModule } from './backup/backup.module';
 import { HealthModule } from './health/health.module';
+import { RedisThrottlerStorage } from './common/services/redis-throttler.storage';
 
 @Module({
   imports: [
@@ -47,14 +48,29 @@ import { HealthModule } from './health/health.module';
     // ============================================
     // 🛡️  RATE LIMITING - Guard global + limites por endpoint via @Throttle
     // ============================================
-    ThrottlerModule.forRoot([
-      {
-        name: 'default',
-        ttl: 60000, // 60 segundos (1 minuto)
-        // Desenvolvimento: 10000 req/min (AUMENTADO DEBUG)
-        limit: 10000,
-      },
-    ]),
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        storage: new RedisThrottlerStorage({
+          enabled: configService.get('RATE_LIMIT_REDIS_ENABLED', 'true') !== 'false',
+          host: configService.get('REDIS_HOST', '127.0.0.1'),
+          port: Number(configService.get('REDIS_PORT', 6379)),
+          username: configService.get('REDIS_USERNAME'),
+          password: configService.get('REDIS_PASSWORD'),
+          db: Number(configService.get('REDIS_DB', 0)),
+          keyPrefix: configService.get('RATE_LIMIT_REDIS_PREFIX', 'rate-limit'),
+          connectTimeout: Number(configService.get('RATE_LIMIT_REDIS_CONNECT_TIMEOUT', 1000)),
+        }),
+        throttlers: [
+          {
+            name: 'default',
+            ttl: 60000, // 60 segundos (1 minuto)
+            // Desenvolvimento: 10000 req/min (AUMENTADO DEBUG)
+            limit: 10000,
+          },
+        ],
+      }),
+    }),
     PrismaModule,
     ValidatorsModule,
     AuthModule,
