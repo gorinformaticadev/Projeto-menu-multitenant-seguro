@@ -1,5 +1,6 @@
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { CspReportController } from './controllers/csp-report.controller';
+import { SystemVersionController } from './controllers/system-version.controller';
 import { CspMiddleware } from './middleware/csp.middleware';
 import { PlatformInitService } from './services/platform-init.service';
 import { ModuleDatabaseExecutorService } from '../core/services/module-database-executor.service';
@@ -15,7 +16,7 @@ import { ModuleInstallerService } from '@core/module-installer.service';
 
 @Module({
   imports: [PrismaModule, SecurityConfigModule, NotificationsModule, AuditModule],
-  controllers: [CspReportController, UserModulesController, ModuleInstallerController],
+  controllers: [CspReportController, SystemVersionController, UserModulesController, ModuleInstallerController],
   providers: [
     PlatformInitService,
     ModuleSecurityService,
@@ -46,4 +47,3 @@ export class CommonModule implements NestModule {
     }
   }
 }
-

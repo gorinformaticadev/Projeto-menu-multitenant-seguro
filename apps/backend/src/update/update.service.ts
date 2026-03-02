@@ -8,12 +8,14 @@ import * as semver from 'semver';
 import * as crypto from 'crypto';
 import * as path from 'path';
 import * as fs from 'fs';
+import { resolveAppVersionTag } from '../common/utils/app-version.util';
 
 @Injectable()
 export class UpdateService {
   private readonly logger = new Logger(UpdateService.name);
   private readonly encryptionKeyRaw = process.env.ENCRYPTION_KEY || '';
   private readonly encryptionKey: Buffer;
+  private readonly localAppVersionTag: string;
   private readonly execFileAsync = promisify(execFile);
 
   constructor(
@@ -21,6 +23,7 @@ export class UpdateService {
     private auditService: AuditService,
   ) {
     this.encryptionKey = this.resolveEncryptionKey();
+    this.localAppVersionTag = resolveAppVersionTag();
   }
 
   async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: string }> {
@@ -55,7 +58,7 @@ export class UpdateService {
 
       const latestClean = uniqueCleanTags[0];
       const latestVersion = this.formatVersion(latestClean);
-      const currentClean = semver.clean(settings.appVersion || 'v1.0.0') || '1.0.0';
+      const currentClean = semver.clean(settings.appVersion || this.localAppVersionTag) || semver.clean(this.localAppVersionTag) || '0.0.0';
       const updateAvailable = semver.gt(latestClean, currentClean);
 
       await this.updateSystemSettings({
@@ -113,7 +116,7 @@ export class UpdateService {
       requestedVersion = normalizedVersion;
 
       const settings: any = await this.getSystemSettings();
-      const currentVersion = semver.clean(settings.appVersion || 'v1.0.0') || '1.0.0';
+      const currentVersion = semver.clean(settings.appVersion || this.localAppVersionTag) || semver.clean(this.localAppVersionTag) || '0.0.0';
 
       if (!semver.gt(normalizedCleanVersion, currentVersion)) {
         updateLog = await (this.prisma as any).updateLog.create({
@@ -264,7 +267,7 @@ export class UpdateService {
   async getUpdateStatus(): Promise<UpdateStatusDto> {
     const settings: any = await this.getSystemSettings();
     return {
-      currentVersion: this.formatVersion(settings.appVersion || 'v1.0.0'),
+      currentVersion: this.formatVersion(settings.appVersion || this.localAppVersionTag),
       availableVersion: settings.availableVersion ? this.formatVersion(settings.availableVersion) : undefined,
       updateAvailable: settings.updateAvailable || false,
       lastCheck: settings.lastUpdateCheck || undefined,
@@ -349,7 +352,7 @@ export class UpdateService {
     if (!settings) {
       settings = await (this.prisma as any).systemSettings.create({
         data: {
-          appVersion: 'v1.0.0',
+          appVersion: this.localAppVersionTag,
           packageManager: 'docker',
           updateCheckEnabled: true,
           gitReleaseBranch: 'main',

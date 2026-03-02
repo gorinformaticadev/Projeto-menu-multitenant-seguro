@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
+import frontendPackage from '../../package.json';
 
 /**
  * Hook para gerenciar a versão do sistema
@@ -10,51 +11,48 @@ import api from '@/lib/api';
  * 3. Versão padrão como fallback
  */
 export function useSystemVersion() {
-  const [version, setVersion] = useState<string>('1.0.0');
+  const localPackageVersion = normalizeVersion(frontendPackage.version || '0.0.0');
+  const [version, setVersion] = useState<string>(localPackageVersion);
   const [loading, setLoading] = useState(true);
-  const [source, setSource] = useState<'api' | 'package' | 'default'>('default');
+  const [source, setSource] = useState<'system-api' | 'update-api' | 'package'>('package');
 
   useEffect(() => {
     const fetchVersion = async () => {
       setLoading(true);
       
       try {
-        // Primeiro tenta buscar da API de updates
-        const response = await api.get('/api/update/status');
-        if (response.data?.currentVersion) {
-          setVersion(response.data.currentVersion);
-          setSource('api');
+        const response = await api.get('/api/system/version');
+        if (response.data?.version) {
+          setVersion(normalizeVersion(response.data.version));
+          setSource('system-api');
           setLoading(false);
           return;
         }
       } catch (error) {
-        console.log('API de updates não disponível, tentando package.json');
+        console.log('API de versão do sistema não disponível, tentando status de updates');
       }
 
       try {
-        // Se não conseguir da API, tenta buscar do package.json
-        const packageResponse = await fetch('/package.json');
-        if (packageResponse.ok) {
-          const packageData = await packageResponse.json();
-          if (packageData.version) {
-            setVersion(packageData.version);
-            setSource('package');
-            setLoading(false);
-            return;
-          }
+        // Segundo tenta buscar da API de updates
+        const response = await api.get('/api/update/status');
+        if (response.data?.currentVersion) {
+          setVersion(normalizeVersion(response.data.currentVersion));
+          setSource('update-api');
+          setLoading(false);
+          return;
         }
       } catch (error) {
-        console.log('Package.json não disponível, usando versão padrão');
+        console.log('API de updates não disponível, usando package.json local');
       }
 
-      // Fallback para versão padrão
-      setVersion('1.0.0');
-      setSource('default');
+      // Fallback para versão do package local (buildado com pnpm version/release)
+      setVersion(localPackageVersion);
+      setSource('package');
       setLoading(false);
     };
 
     fetchVersion();
-  }, []);
+  }, [localPackageVersion]);
 
   /**
    * Força uma nova busca da versão
@@ -63,13 +61,22 @@ export function useSystemVersion() {
     setLoading(true);
     
     try {
-      const response = await api.get('/api/update/status');
-      if (response.data?.currentVersion) {
-        setVersion(response.data.currentVersion);
-        setSource('api');
+      const response = await api.get('/api/system/version');
+      if (response.data?.version) {
+        setVersion(normalizeVersion(response.data.version));
+        setSource('system-api');
+        return;
+      }
+
+      const updateResponse = await api.get('/api/update/status');
+      if (updateResponse.data?.currentVersion) {
+        setVersion(normalizeVersion(updateResponse.data.currentVersion));
+        setSource('update-api');
       }
     } catch (error) {
       console.log('Erro ao atualizar versão:', error);
+      setVersion(localPackageVersion);
+      setSource('package');
     } finally {
       setLoading(false);
     }
@@ -83,3 +90,6 @@ export function useSystemVersion() {
   };
 }
 
+function normalizeVersion(value: string): string {
+  return String(value || '').replace(/^v/i, '').trim() || '0.0.0';
+}
