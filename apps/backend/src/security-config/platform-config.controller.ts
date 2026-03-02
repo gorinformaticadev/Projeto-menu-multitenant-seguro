@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Body, UseGuards, Req, Request } from '@nestjs/common';
+import { Controller, Get, Put, Body, UseGuards, Request } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { PlatformConfigService } from './platform-config.service';
 import { RolesGuard } from '@core/common/guards/roles.guard';
@@ -7,6 +7,8 @@ import { Roles } from '@core/common/decorators/roles.decorator';
 import { Public } from '@core/common/decorators/public.decorator';
 import { Role } from '@prisma/client';
 import { IsString, IsOptional } from 'class-validator';
+
+type AuthenticatedRequest = { user: { id: string; [key: string]: unknown } };
 
 export class UpdatePlatformConfigDto {
   @IsOptional()
@@ -50,7 +52,7 @@ export class PlatformConfigController {
   @Roles(Role.SUPER_ADMIN)
   async updatePlatformConfig(
     @Body() dto: UpdatePlatformConfigDto,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     return this.platformConfigService.updatePlatformConfig(
       dto.platformName,

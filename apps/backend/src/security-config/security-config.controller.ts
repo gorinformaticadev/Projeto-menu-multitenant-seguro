@@ -9,6 +9,8 @@ import { Roles } from '@core/common/decorators/roles.decorator';
 import { Public } from '@core/common/decorators/public.decorator';
 import { Role } from '@prisma/client';
 
+type AuthenticatedRequest = { user: { id: string; [key: string]: unknown } };
+
 @SkipThrottle()
 @Controller('security-config')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -39,7 +41,7 @@ export class SecurityConfigController {
   @Roles(Role.SUPER_ADMIN)
   async updateConfig(
     @Body() dto: UpdateSecurityConfigDto,
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
   ) {
     return this.securityConfigService.updateConfig(dto, req.user.id);
   }
@@ -66,7 +68,7 @@ export class SecurityConfigController {
   @Roles(Role.SUPER_ADMIN)
   async updateWebPushConfig(
     @Body() dto: UpdateWebPushConfigDto,
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
   ) {
     return this.securityConfigService.updateWebPushConfig(dto, req.user.id);
   }

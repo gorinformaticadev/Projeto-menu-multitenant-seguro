@@ -2,10 +2,11 @@ import { Controller, Get, Query, Param, UseGuards } from '@nestjs/common';
 import { AuditService } from './audit.service';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { Roles } from '@core/common/decorators/roles.decorator';
+import { Role } from '@prisma/client';
 
 @Controller('audit-logs')
 @UseGuards(RolesGuard)
-@Roles('SUPER_ADMIN' as any) // Apenas SUPER_ADMIN pode ver logs
+@Roles(Role.SUPER_ADMIN) // Apenas SUPER_ADMIN pode ver logs
 export class AuditController {
   constructor(private readonly auditService: AuditService) {
     // Empty implementation

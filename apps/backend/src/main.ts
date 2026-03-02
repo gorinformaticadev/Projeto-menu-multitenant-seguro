@@ -76,7 +76,7 @@ async function bootstrap() {
   // ============================================
   // 📊 MONITORAMENTO - Sentry
   // ============================================
-  const _sentryService = app.get(SentryService);
+  app.get(SentryService);
   app.useGlobalFilters(new SentryExceptionFilter());
 
   // ============================================

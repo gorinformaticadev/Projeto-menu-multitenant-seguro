@@ -6,6 +6,8 @@ import { Roles } from '@core/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { IsString, IsOptional } from 'class-validator';
 
+type AuthenticatedRequest = { user: { id: string; [key: string]: unknown } };
+
 export class UpdatePlatformConfigDto {
   @IsOptional()
   @IsString()
@@ -47,7 +49,7 @@ export class PlatformConfigController {
   @Roles(Role.SUPER_ADMIN)
   async updatePlatformConfig(
     @Body() dto: UpdatePlatformConfigDto,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     return this.platformConfigService.updatePlatformConfig(
       dto.platformName,

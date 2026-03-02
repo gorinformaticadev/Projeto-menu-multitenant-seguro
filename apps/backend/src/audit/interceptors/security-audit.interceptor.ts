@@ -4,21 +4,42 @@ import { tap } from 'rxjs/operators';
 import { AuditService } from '../audit.service';
 import { Request } from 'express';
 
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id?: string;
+    tenantId?: string;
+  };
+}
+
+interface SecurityError {
+  status?: number;
+  message?: string;
+  stack?: string;
+}
+
+interface LogContext {
+  userId?: string;
+  tenantId?: string;
+  ipAddress: string;
+  userAgent: string;
+}
+
 @Injectable()
 export class SecurityAuditInterceptor implements NestInterceptor {
   constructor(private auditService: AuditService) {
       // Empty implementation
     }
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const request = context.switchToHttp().getRequest<Request>();
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const response = context.switchToHttp().getResponse();
 
     // Coletar informações básicas
     const startTime = Date.now();
     const userAgent = request.get('user-agent') || '';
-    const ipAddress = this.getClientIp(request);    const userId = (request as any).user?.id;
-    const tenantId = (request as any).user?.tenantId;
+    const ipAddress = this.getClientIp(request);
+    const userId = request.user?.id;
+    const tenantId = request.user?.tenantId;
 
     return next.handle().pipe(
       tap({
@@ -46,11 +67,14 @@ export class SecurityAuditInterceptor implements NestInterceptor {
 
   private logSuccessfulOperation(
     request: Request,
-    response: any,
+    response: { statusCode: number },
     startTime: number,
-    context: { userId?: string; tenantId?: string; ipAddress: string; userAgent: string }
-  ) {    const statusCode = response.statusCode;
+    context: LogContext
+  ) {
+    const statusCode = response.statusCode;
     const duration = Date.now() - startTime;
+    const method = request.method;
+    const url = request.url;
 
     // Operações que merecem log automático
     const criticalOperations = [
@@ -89,9 +113,12 @@ export class SecurityAuditInterceptor implements NestInterceptor {
 
   private logSecurityViolation(
     request: Request,
-    error: any,
-    context: { userId?: string; tenantId?: string; ipAddress: string; userAgent: string }
+    error: SecurityError,
+    context: LogContext
   ) {
+    const method = request.method;
+    const url = request.url;
+
     // Log violações de segurança
     this.auditService.log({
       action: `SECURITY_VIOLATION_${error.status || 500}_${method}_${url.replace(/\//g, '_').toUpperCase()}`,

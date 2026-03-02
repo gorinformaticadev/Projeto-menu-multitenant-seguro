@@ -13,7 +13,7 @@ export interface Notification {
   readAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface NotificationCreateData {
@@ -22,7 +22,7 @@ export interface NotificationCreateData {
   type: 'info' | 'success' | 'warning' | 'error';
   tenantId?: string | null;
   userId?: string | null;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface NotificationFilters {

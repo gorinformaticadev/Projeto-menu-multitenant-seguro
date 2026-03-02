@@ -7,6 +7,8 @@ import { Roles } from '@core/common/decorators/roles.decorator';
 import { Public } from '@core/common/decorators/public.decorator';
 import { Role } from '@prisma/client';
 
+type AuthenticatedRequest = { user: { id: string; [key: string]: unknown } };
+
 @SkipThrottle()
 @Controller('security-config')
 @UseGuards(RolesGuard)
@@ -35,7 +37,7 @@ export class SecurityConfigController {
   @Roles(Role.SUPER_ADMIN)
   async updateConfig(
     @Body() dto: UpdateSecurityConfigDto,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     return this.securityConfigService.updateConfig(dto, req.user.id);
   }

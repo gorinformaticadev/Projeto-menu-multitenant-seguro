@@ -7,6 +7,8 @@ import { Roles } from '@core/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { EmailService } from '../email/email.service';
 
+type AuthenticatedRequest = { user: { id: string; [key: string]: unknown } };
+
 @SkipThrottle()
 @Controller('email-config')
 @UseGuards(RolesGuard)
@@ -73,7 +75,7 @@ export class EmailConfigController {
   @Roles(Role.SUPER_ADMIN)
   async createConfig(
     @Body() dto: CreateEmailConfigDto,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     return this.emailConfigService.createConfig(dto, req.user.id);
   }
@@ -89,7 +91,7 @@ export class EmailConfigController {
   async updateConfig(
     @Param('id') id: string,
     @Body() dto: UpdateEmailConfigDto,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     return this.emailConfigService.updateConfig(id, dto, req.user.id);
   }
@@ -104,7 +106,7 @@ export class EmailConfigController {
   @Roles(Role.SUPER_ADMIN)
   async activateConfig(
     @Param('id') id: string,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     return this.emailConfigService.activateConfig(id, req.user.id);
   }
@@ -133,7 +135,7 @@ export class EmailConfigController {
     @Body('email') email: string,
     @Body('smtpUser') smtpUser: string,
     @Body('smtpPass') smtpPass: string,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     return this.emailConfigService.testConfig(email, smtpUser, smtpPass, req.user, this.emailService);
   }

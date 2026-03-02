@@ -8,7 +8,7 @@ import { Tenant, User } from '../contracts/types';
 /**
  * Router genérico (abstração para evitar dependência direta do Express)
  */
-export type RouterInstance = any;
+export type RouterInstance = unknown;
 
 /**
  * Payload do evento core:boot
@@ -170,4 +170,4 @@ export type EventName = keyof EventMap;
 /**
  * Listener de evento
  */
-export type EventListener<T = any> = (payload: T) => void | Promise<void>;
+export type EventListener<T = unknown> = (payload: T) => void | Promise<void>;

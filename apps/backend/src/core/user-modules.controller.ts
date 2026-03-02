@@ -3,6 +3,9 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ModuleSecurityService } from './module-security.service';
 import { CurrentUser } from './decorators/current-user.decorator';
 
+type ModuleUser = { tenantId?: string; role?: string };
+type TenantRequest = { tenantId?: string };
+
 /**
  * Controller para API de módulos do usuário
  * Endpoint: /api/me/modules
@@ -18,8 +21,8 @@ export class UserModulesController {
      */
     @Get('modules')
     async getMyModules(
-        @CurrentUser() user: any,
-        @Req() req: any) {
+        @CurrentUser() user: ModuleUser,
+        @Req() req: TenantRequest) {
         const tenantId = req.tenantId || user.tenantId;
 
         if (!tenantId) {

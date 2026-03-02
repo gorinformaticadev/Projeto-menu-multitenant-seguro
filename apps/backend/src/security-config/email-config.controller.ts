@@ -2,11 +2,12 @@
 import { SkipThrottle } from '@nestjs/throttler';
 import { EmailConfigService } from './email-config.service';
 import { CreateEmailConfigDto, UpdateEmailConfigDto } from './dto/email-config.dto';
-import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { EmailService } from '../email/email.service';
+
+type AuthenticatedRequest = { user: { id: string; [key: string]: unknown } };
 
 @SkipThrottle()
 @Controller('email-config')
@@ -76,7 +77,7 @@ export class EmailConfigController {
   @Roles(Role.SUPER_ADMIN)
   async createConfig(
     @Body() dto: CreateEmailConfigDto,
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
   ) {
     return this.emailConfigService.createConfig(dto, req.user.id);
   }
@@ -92,7 +93,7 @@ export class EmailConfigController {
   async updateConfig(
     @Param('id') id: string,
     @Body() dto: UpdateEmailConfigDto,
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
   ) {
     return this.emailConfigService.updateConfig(id, dto, req.user.id);
   }
@@ -107,7 +108,7 @@ export class EmailConfigController {
   @Roles(Role.SUPER_ADMIN)
   async activateConfig(
     @Param('id') id: string,
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
   ) {
     return this.emailConfigService.activateConfig(id, req.user.id);
   }
@@ -136,7 +137,7 @@ export class EmailConfigController {
     @Body('email') email: string,
     @Body('smtpUser') smtpUser: string,
     @Body('smtpPass') smtpPass: string,
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
   ) {
     return this.emailConfigService.testConfig(email, smtpUser, smtpPass, req.user, this.emailService);
   }

@@ -75,7 +75,7 @@ export interface ModuleContract {
   enabled?: boolean;
 
   /** Configurações padrão do módulo */
-  defaultConfig?: Record<string, any>;
+  defaultConfig?: Record<string, unknown>;
 }
 
 /**

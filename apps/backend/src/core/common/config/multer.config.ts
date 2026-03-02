@@ -64,8 +64,9 @@ export const multerConfig = {
     }
     
     // Validação 4: Caracteres perigosos no nome
-    const dangerousChars = /[<>:"/\\|?*\x00-\x1f]/;
-    if (dangerousChars.test(file.originalname)) {
+    const dangerousChars = /[<>:"/\\|?*]/;
+    const hasControlChars = [...file.originalname].some((char) => char.charCodeAt(0) < 32);
+    if (dangerousChars.test(file.originalname) || hasControlChars) {
       return callback(new BadRequestException('Nome do arquivo contém caracteres inválidos.'), false);
     }
     
