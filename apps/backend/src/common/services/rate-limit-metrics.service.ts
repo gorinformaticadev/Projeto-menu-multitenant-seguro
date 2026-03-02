@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
+import { createHash } from 'crypto';
 
 export type RateLimitMetricInput = {
   tenantId?: string | null;
@@ -13,6 +14,14 @@ export type RateLimitStatsParams = {
   hours?: number;
   tenantId?: string;
   top?: number;
+};
+
+export type RateLimitBlockedAuditDedupInput = {
+  tenantId?: string | null;
+  scope: RateLimitMetricInput['scope'];
+  path: string;
+  tracker: string;
+  method: string;
 };
 
 type CounterPair = { hits: number; blocked: number };
@@ -31,8 +40,11 @@ export class RateLimitMetricsService {
   private readonly redisPrefix = process.env.RATE_LIMIT_REDIS_PREFIX || 'rate-limit';
   private readonly retentionHours = this.readEnvNumber('RATE_LIMIT_METRICS_RETENTION_HOURS', 168);
   private readonly maxQueryHours = this.readEnvNumber('RATE_LIMIT_METRICS_MAX_QUERY_HOURS', 168);
+  private readonly blockAuditCooldownMs = this.readEnvNumber('RATE_LIMIT_BLOCK_AUDIT_COOLDOWN_MS', 30000);
+  private readonly maxDedupEntries = this.readEnvNumber('RATE_LIMIT_BLOCK_AUDIT_DEDUP_MAX', 5000);
   private readonly redis?: Redis;
   private readonly memoryBuckets = new Map<string, MemoryBucket>();
+  private readonly memoryAuditDedup = new Map<string, number>();
 
   constructor() {
     if (!this.redisEnabled) {
@@ -180,6 +192,30 @@ export class RateLimitMetricsService {
       topEndpoints: this.mapEndpointMap(endpointHits, top),
       topBlockedEndpoints: this.mapEndpointMap(endpointBlocked, top),
     };
+  }
+
+  async shouldEmitBlockedAudit(input: RateLimitBlockedAuditDedupInput): Promise<boolean> {
+    const dedupToken = this.buildBlockedAuditDedupToken(input);
+    const cooldownSeconds = Math.max(1, Math.ceil(this.blockAuditCooldownMs / 1000));
+
+    if (this.redis) {
+      try {
+        if (this.redis.status === 'wait') {
+          await this.redis.connect();
+        }
+
+        const keyHash = this.hashIdentifier(dedupToken);
+        const redisKey = `${this.redisPrefix}:audit:rl-block:dedup:${keyHash}`;
+        const result = await this.redis.set(redisKey, '1', 'EX', cooldownSeconds, 'NX');
+        return result === 'OK';
+      } catch (error) {
+        this.logger.warn(
+          `Erro ao aplicar dedupe de auditoria de rate limit no Redis; usando memÃ³ria local. detalhe=${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    return this.shouldEmitBlockedAuditInMemory(dedupToken);
   }
 
   private aggregateFromMemory(
@@ -368,6 +404,51 @@ export class RateLimitMetricsService {
       .slice(0, top);
   }
 
+  private shouldEmitBlockedAuditInMemory(dedupToken: string): boolean {
+    const now = Date.now();
+    const previous = this.memoryAuditDedup.get(dedupToken);
+    if (typeof previous === 'number' && now - previous < this.blockAuditCooldownMs) {
+      return false;
+    }
+
+    this.memoryAuditDedup.set(dedupToken, now);
+    this.pruneMemoryAuditDedup(now);
+    return true;
+  }
+
+  private pruneMemoryAuditDedup(now: number): void {
+    if (this.memoryAuditDedup.size <= this.maxDedupEntries) {
+      return;
+    }
+
+    for (const [key, timestamp] of this.memoryAuditDedup.entries()) {
+      if (now - timestamp >= this.blockAuditCooldownMs) {
+        this.memoryAuditDedup.delete(key);
+      }
+
+      if (this.memoryAuditDedup.size <= this.maxDedupEntries) {
+        return;
+      }
+    }
+
+    while (this.memoryAuditDedup.size > this.maxDedupEntries) {
+      const oldestKey = this.memoryAuditDedup.keys().next().value;
+      if (!oldestKey) {
+        return;
+      }
+      this.memoryAuditDedup.delete(oldestKey);
+    }
+  }
+
+  private buildBlockedAuditDedupToken(input: RateLimitBlockedAuditDedupInput): string {
+    const tenantId = this.normalizeTenant(input.tenantId);
+    const path = this.normalizePath(input.path);
+    const tracker = this.normalizeTracker(input.tracker);
+    const method = this.normalizeMethod(input.method);
+
+    return `${tenantId}|${method}|${input.scope}|${path}|${tracker}`;
+  }
+
   private listBuckets(hours: number): string[] {
     const list: string[] = [];
     const now = new Date();
@@ -393,6 +474,16 @@ export class RateLimitMetricsService {
     return normalized.length > 0 ? normalized : 'anonymous';
   }
 
+  private normalizeMethod(method?: string): string {
+    const normalized = String(method || '').trim().toUpperCase();
+    return normalized.length > 0 ? normalized : 'UNKNOWN';
+  }
+
+  private normalizeTracker(tracker?: string): string {
+    const normalized = String(tracker || '').trim().toLowerCase();
+    return normalized.length > 0 ? normalized : 'unknown';
+  }
+
   private normalizePath(path: string): string {
     const raw = String(path || '/').trim().toLowerCase();
     const [withoutQuery] = raw.split('?');
@@ -413,6 +504,10 @@ export class RateLimitMetricsService {
 
   private bumpMap(target: Map<string, number>, key: string, amount: number): void {
     target.set(key, (target.get(key) || 0) + amount);
+  }
+
+  private hashIdentifier(value: string): string {
+    return createHash('sha256').update(value, 'utf8').digest('hex').slice(0, 32);
   }
 
   private pruneMemoryBuckets(): void {

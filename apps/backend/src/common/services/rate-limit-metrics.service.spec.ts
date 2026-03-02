@@ -9,6 +9,8 @@ describe('RateLimitMetricsService', () => {
       RATE_LIMIT_REDIS_ENABLED: 'false',
       RATE_LIMIT_METRICS_RETENTION_HOURS: '24',
       RATE_LIMIT_METRICS_MAX_QUERY_HOURS: '24',
+      RATE_LIMIT_BLOCK_AUDIT_COOLDOWN_MS: '50',
+      RATE_LIMIT_BLOCK_AUDIT_DEDUP_MAX: '100',
     };
   });
 
@@ -77,5 +79,55 @@ describe('RateLimitMetricsService', () => {
     const stats = await service.getStats({ hours: 99 });
 
     expect(stats.windowHours).toBe(2);
+  });
+
+  it('deduplicates blocked audit emission in memory fallback mode', async () => {
+    const service = new RateLimitMetricsService();
+
+    const first = await service.shouldEmitBlockedAudit({
+      tenantId: 'tenant-a',
+      scope: 'tenant-user',
+      path: '/api/users?include=all',
+      tracker: 'tenant:tenant-a:user:user-1',
+      method: 'post',
+    });
+
+    const second = await service.shouldEmitBlockedAudit({
+      tenantId: 'tenant-a',
+      scope: 'tenant-user',
+      path: '/api/users',
+      tracker: 'tenant:tenant-a:user:user-1',
+      method: 'POST',
+    });
+
+    expect(first).toBe(true);
+    expect(second).toBe(false);
+  });
+
+  it('allows blocked audit after cooldown expires', async () => {
+    process.env.RATE_LIMIT_BLOCK_AUDIT_COOLDOWN_MS = '1';
+
+    const service = new RateLimitMetricsService();
+
+    const first = await service.shouldEmitBlockedAudit({
+      tenantId: 'tenant-a',
+      scope: 'ip',
+      path: '/api/auth/login',
+      tracker: 'ip:10.0.0.1:target:abc',
+      method: 'POST',
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const second = await service.shouldEmitBlockedAudit({
+      tenantId: 'tenant-a',
+      scope: 'ip',
+      path: '/api/auth/login',
+      tracker: 'ip:10.0.0.1:target:abc',
+      method: 'POST',
+    });
+
+    expect(first).toBe(true);
+    expect(second).toBe(true);
   });
 });

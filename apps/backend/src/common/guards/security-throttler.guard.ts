@@ -43,11 +43,8 @@ type RateLimitTelemetry = {
 export class SecurityThrottlerGuard extends ThrottlerGuard {
   private readonly logger = new Logger(SecurityThrottlerGuard.name);
   private readonly configCacheTtlMs = 15000;
-  private readonly blockAuditCooldownMs = this.readEnvNumber('RATE_LIMIT_BLOCK_AUDIT_COOLDOWN_MS', 30000);
-  private readonly maxDedupEntries = this.readEnvNumber('RATE_LIMIT_BLOCK_AUDIT_DEDUP_MAX', 5000);
   private cachedRateLimitConfig: RateLimitConfigSnapshot | null = null;
   private rateLimitConfigExpiresAt = 0;
-  private readonly blockedAuditDedup = new Map<string, number>();
 
   // Scope policy to reduce false positives and isolate anonymous/authenticated traffic.
   private readonly anonymousLimitCap = this.readEnvNumber('RATE_LIMIT_ANON_LIMIT', 120);
@@ -199,7 +196,22 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
       return;
     }
 
-    if (!this.shouldAuditBlockedEvent(data, tenantId)) {
+    let shouldAudit = true;
+    try {
+      shouldAudit = await this.rateLimitMetricsService.shouldEmitBlockedAudit({
+        tenantId,
+        scope: data.identity.scope,
+        path: data.identity.path,
+        tracker: data.identity.tracker,
+        method: this.resolveRequestMethod(data.req),
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao aplicar dedupe de auditoria de rate limit; evento sera registrado. detalhe=${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    if (!shouldAudit) {
       return;
     }
 
@@ -224,51 +236,6 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
       this.logger.warn(
         `Falha ao gravar auditoria de bloqueio de rate limit. detalhe=${error instanceof Error ? error.message : String(error)}`,
       );
-    }
-  }
-
-  private shouldAuditBlockedEvent(data: RateLimitTelemetry, tenantId: string | null): boolean {
-    const now = Date.now();
-    const method = this.resolveRequestMethod(data.req);
-    const dedupKey = [
-      tenantId || 'anonymous',
-      method,
-      data.identity.scope,
-      data.identity.path,
-      data.identity.tracker,
-    ].join('|');
-
-    const lastSeenAt = this.blockedAuditDedup.get(dedupKey);
-    if (typeof lastSeenAt === 'number' && now - lastSeenAt < this.blockAuditCooldownMs) {
-      return false;
-    }
-
-    this.blockedAuditDedup.set(dedupKey, now);
-    this.pruneBlockedAuditDedup(now);
-    return true;
-  }
-
-  private pruneBlockedAuditDedup(now: number): void {
-    if (this.blockedAuditDedup.size <= this.maxDedupEntries) {
-      return;
-    }
-
-    for (const [key, timestamp] of this.blockedAuditDedup.entries()) {
-      if (now - timestamp >= this.blockAuditCooldownMs) {
-        this.blockedAuditDedup.delete(key);
-      }
-
-      if (this.blockedAuditDedup.size <= this.maxDedupEntries) {
-        return;
-      }
-    }
-
-    while (this.blockedAuditDedup.size > this.maxDedupEntries) {
-      const oldestKey = this.blockedAuditDedup.keys().next().value;
-      if (!oldestKey) {
-        return;
-      }
-      this.blockedAuditDedup.delete(oldestKey);
     }
   }
 
