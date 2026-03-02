@@ -459,18 +459,30 @@ export class UpdateService implements OnModuleInit {
     });
   }
 
-  private async runSafeNativeDeploy(version: string, _settings: SystemSettings): Promise<UpdateExecutionResult> {
+  private async runSafeNativeDeploy(version: string, settings: SystemSettings): Promise<UpdateExecutionResult> {
     const root = this.getProjectRoot();
     const scriptPath = path.join(root, 'install', 'update-native.sh');
     if (!fs.existsSync(scriptPath)) {
       throw new HttpException('Runner de deploy nativo não encontrado (install/update-native.sh)', HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    const env = {
+    const hasRepoConfig = !!(settings.gitUsername && settings.gitRepository);
+    const decryptedToken = hasRepoConfig ? this.tryDecryptToken(settings.gitToken) : '';
+    const basicAuth = decryptedToken
+      ? Buffer.from(`x-access-token:${decryptedToken}`, 'utf8').toString('base64')
+      : '';
+
+    const env: NodeJS.ProcessEnv = {
       ...process.env,
       PROJECT_ROOT: root,
       RELEASE_TAG: version,
     };
+    if (hasRepoConfig) {
+      env.GIT_REPO_URL = this.buildPublicGitRepoUrl(settings);
+    }
+    if (basicAuth) {
+      env.GIT_AUTH_HEADER = `AUTHORIZATION: basic ${basicAuth}`;
+    }
 
     return this.execFileAsync('bash', [path.join('install', 'update-native.sh')], {
       cwd: root,
