@@ -40,6 +40,8 @@ services:
       - REDIS_PORT=6379
     networks:
       - multitenant-network
+    volumes:
+      - backups:/app/apps/backend/backups
 
   db:
     environment:
@@ -56,3 +58,7 @@ services:
 networks:
   multitenant-network:
     driver: bridge
+
+volumes:
+  backups:
+    driver: local

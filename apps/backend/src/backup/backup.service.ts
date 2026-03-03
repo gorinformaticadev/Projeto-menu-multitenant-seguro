@@ -27,14 +27,14 @@ export class BackupService {
     private prisma: PrismaService,
     private auditService: AuditService,
   ) {
-    // Configurações a partir de variáveis de ambiente
-    // Usar diretório permanente para backups (não temporário)
-    this.tempDir = process.env.BACKUP_DIR || path.join(process.cwd(), 'backups');
+    // Usa um diretorio fixo para evitar divergencia entre Docker e nativo.
+    this.tempDir = path.join(process.cwd(), 'backups');
     this.maxFileSize = parseInt(process.env.BACKUP_MAX_SIZE || '2147483648', 10); // 2GB
     this.timeout = parseInt(process.env.BACKUP_TIMEOUT || '900', 10) * 1000; // 15 min em ms
 
     // Criar diretório de backups se não existir
     this.ensureTempDirExists();
+    this.assertBackupsDirWritable();
   }
 
   /**
@@ -42,6 +42,15 @@ export class BackupService {
    */
   getBackupsDir(): string {
     return this.tempDir;
+  }
+
+  resolveBackupPath(fileName: string): string {
+    const normalizedName = this.validateBackupFileName(fileName);
+    const absolutePath = path.resolve(path.join(this.tempDir, normalizedName));
+    if (!fs.existsSync(absolutePath)) {
+      throw new HttpException('Arquivo de backup nao encontrado', HttpStatus.NOT_FOUND);
+    }
+    return absolutePath;
   }
 
   async restoreFromBackup(
@@ -54,10 +63,7 @@ export class BackupService {
 
     try {
       const normalizedName = this.validateBackupFileName(dto.backupFile);
-      const filePath = path.resolve(path.join(this.tempDir, normalizedName));
-      if (!fs.existsSync(filePath)) {
-        throw new HttpException('Arquivo de backup nao encontrado', HttpStatus.NOT_FOUND);
-      }
+      this.resolveBackupPath(normalizedName);
 
       await this.ensureRestoreNotLocked();
 
@@ -259,6 +265,36 @@ export class BackupService {
     if (runningRestore) {
       throw new HttpException('Existe restore em andamento.', HttpStatus.CONFLICT);
     }
+
+    const runningBackup = await this.prisma.backupLog.findFirst({
+      where: { operationType: 'BACKUP', status: 'STARTED' },
+    });
+    if (runningBackup) {
+      throw new HttpException('Existe backup em andamento. Restore bloqueado.', HttpStatus.CONFLICT);
+    }
+  }
+
+  private async ensureBackupNotLocked(): Promise<void> {
+    const runningUpdate = await (this.prisma as any).updateLog.findFirst({
+      where: { status: 'STARTED' },
+    });
+    if (runningUpdate) {
+      throw new HttpException('Existe update em andamento. Backup bloqueado.', HttpStatus.CONFLICT);
+    }
+
+    const runningRestore = await (this.prisma as any).backupRestoreLog.findFirst({
+      where: { status: 'STARTED' },
+    });
+    if (runningRestore) {
+      throw new HttpException('Existe restore em andamento. Backup bloqueado.', HttpStatus.CONFLICT);
+    }
+
+    const runningBackup = await this.prisma.backupLog.findFirst({
+      where: { operationType: 'BACKUP', status: 'STARTED' },
+    });
+    if (runningBackup) {
+      throw new HttpException('Existe backup em andamento.', HttpStatus.CONFLICT);
+    }
   }
 
   /**
@@ -268,6 +304,16 @@ export class BackupService {
     if (!fs.existsSync(this.tempDir)) {
       fs.mkdirSync(this.tempDir, { recursive: true });
       this.logger.log(`Diretório de backups criado: ${this.tempDir}`);
+    }
+  }
+
+  private assertBackupsDirWritable(): void {
+    try {
+      fs.accessSync(this.tempDir, fs.constants.W_OK);
+    } catch (error: any) {
+      throw new Error(
+        `Diretorio de backup sem permissao de escrita (${this.tempDir}): ${error?.message || String(error)}`,
+      );
     }
   }
 
@@ -296,6 +342,9 @@ export class BackupService {
         throw new Error('UserId é obrigatório para criar backup');
       }
 
+
+      this.assertBackupsDirWritable();
+      await this.ensureBackupNotLocked();
       // Extrair credenciais do DATABASE_URL
       const dbConfig = this.parseDatabaseUrl();
       
@@ -1123,8 +1172,9 @@ export class BackupService {
       for (const file of files) {
         const filePath = path.join(this.tempDir, file);
         const stats = fs.statSync(filePath);
+        const isBackupFile = file.endsWith('.dump') || file.endsWith('.backup') || file.endsWith('.sql');
 
-        if (stats.isFile() && stats.mtime < cutoffTime) {
+        if (stats.isFile() && isBackupFile && stats.mtime < cutoffTime) {
           fs.unlinkSync(filePath);
           deletedCount++;
           this.logger.log(`Arquivo temporário removido: ${file}`);

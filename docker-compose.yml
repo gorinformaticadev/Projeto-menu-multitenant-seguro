@@ -65,6 +65,7 @@ services:
       - redis
     volumes:
       - uploads:/app/uploads
+      - backups:/app/apps/backend/backups
     networks:
       - multitenant-network
     healthcheck:
@@ -115,6 +116,8 @@ volumes:
   redis_data:
     driver: local
   uploads:
+    driver: local
+  backups:
     driver: local
 
 networks:

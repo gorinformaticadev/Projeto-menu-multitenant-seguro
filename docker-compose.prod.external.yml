@@ -58,6 +58,7 @@ services:
       - REDIS_PORT=6379
     volumes:
       - ./uploads:/app/uploads
+      - backups:/app/apps/backend/backups
     networks:
       - app-network
     depends_on:
@@ -105,6 +106,7 @@ services:
 volumes:
   postgres_data_prod:
   redis_data_prod:
+  backups:
 
 
 networks:

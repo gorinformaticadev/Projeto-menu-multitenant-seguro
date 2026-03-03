@@ -156,6 +156,21 @@ if [ -n "$TARGET_RELEASE_TAG" ]; then
   log "target release tag para backend apos restore: $TARGET_RELEASE_TAG"
 fi
 
+if [ ! -s "$backup_path_real" ]; then
+  log_err "arquivo de backup vazio ou invalido: $backup_name"
+  exit 1
+fi
+
+ext="$(printf '%s' "${backup_name##*.}" | tr '[:upper:]' '[:lower:]')"
+
+if [ "$ext" = "dump" ] || [ "$ext" = "backup" ]; then
+  log "validando integridade do dump antes do restore"
+  if ! cat "$backup_path_real" | compose exec -T db pg_restore --list >/dev/null; then
+    log_err "arquivo dump corrompido ou invalido; restore cancelado"
+    exit 1
+  fi
+fi
+
 safety_file="${backups_dir_real}/safety_pre_restore_$(date +%Y%m%d_%H%M%S).dump"
 log "criando backup de seguranca antes do restore: $(basename "$safety_file")"
 compose exec -T -e PGPASSWORD="$DB_PASSWORD" db pg_dump -U "$DB_USER" -d "$DB_NAME" -Fc > "$safety_file"
@@ -163,7 +178,6 @@ compose exec -T -e PGPASSWORD="$DB_PASSWORD" db pg_dump -U "$DB_USER" -d "$DB_NA
 log "parando backend"
 compose stop backend
 
-ext="${backup_name##*.}"
 case "$ext" in
   sql)
     log "restaurando arquivo SQL via psql"

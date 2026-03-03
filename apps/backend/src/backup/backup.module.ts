@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { BackupController } from './backup.controller';
+import { BackupCronService } from './backup-cron.service';
 import { BackupService } from './backup.service';
 import { SseJwtGuard } from './guards/sse-jwt.guard';
 import { PrismaModule } from '../core/prisma/prisma.module';
@@ -19,7 +20,7 @@ import { AuditModule } from '../audit/audit.module';
     }),
   ],
   controllers: [BackupController],
-  providers: [BackupService, SseJwtGuard],
+  providers: [BackupService, BackupCronService, SseJwtGuard],
   exports: [BackupService],
 })
 export class BackupModule {}

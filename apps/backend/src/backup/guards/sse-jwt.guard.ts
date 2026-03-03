@@ -1,50 +1,81 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
-/**
- * Guard customizado para autenticação JWT em endpoints SSE
- * Aceita token via query string: ?token=xxx
- */
 @Injectable()
 export class SseJwtGuard implements CanActivate {
-  constructor(private jwtService: JwtService) { }
+  private readonly logger = new Logger(SseJwtGuard.name);
+
+  constructor(private readonly jwtService: JwtService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-
-    // Extrair token da query string
-    const token = request.query?.token;
+    const token = this.extractToken(request);
 
     if (!token) {
-      console.warn('❌ [SseJwtGuard] Token não fornecido na query string');
-      throw new UnauthorizedException('Token não fornecido');
+      throw new UnauthorizedException('Token nao fornecido');
     }
 
     try {
-      // Verificar e decodificar token com ignoreExpiration temporariamente
       const payload = await this.jwtService.verifyAsync(token, {
         secret: process.env.JWT_SECRET,
-        ignoreExpiration: false, // Verificar expiração mas com timeout maior
+        ignoreExpiration: false,
       });
 
-      console.warn('✅ [SseJwtGuard] Token validado com sucesso para usuário:', payload.email);
-
-      // Anexar usuário ao request
       request.user = payload;
 
+      if (this.readQueryToken(request, 'downloadToken')) {
+        request.downloadTokenPayload = payload;
+      }
+
       return true;
-    } catch (error) {
-      console.error('❌ [SseJwtGuard] Erro na validação do token:', error.message);
-      // Não bloquear SSE por token expirado - permitir progresso
-      if (error.name === 'TokenExpiredError') {
-        console.warn('⚠️ [SseJwtGuard] Token expirado mas permitindo SSE para progresso');
-        // Decodificar sem verificar para obter dados do usuário
+    } catch (error: any) {
+      if (error?.name === 'TokenExpiredError' && this.isSseProgressRequest(request)) {
         const decoded = this.jwtService.decode(token);
+        if (!decoded || typeof decoded !== 'object') {
+          throw new UnauthorizedException('Token invalido');
+        }
+
         request.user = decoded;
+        this.logger.warn('Token expirado aceito apenas para stream de progresso SSE.');
         return true;
       }
-      throw new UnauthorizedException('Token inválido ou expirado');
+
+      throw new UnauthorizedException('Token invalido ou expirado');
     }
   }
-}
 
+  private extractToken(request: any): string | null {
+    const authHeader = request.headers?.authorization as string | undefined;
+    if (authHeader?.startsWith('Bearer ')) {
+      const bearerToken = authHeader.slice(7).trim();
+      if (bearerToken) {
+        return bearerToken;
+      }
+    }
+
+    const downloadToken = this.readQueryToken(request, 'downloadToken');
+    if (downloadToken) {
+      return downloadToken;
+    }
+
+    const queryToken = this.readQueryToken(request, 'token');
+    if (queryToken) {
+      return queryToken;
+    }
+
+    return null;
+  }
+
+  private readQueryToken(request: any, key: 'token' | 'downloadToken'): string | null {
+    const value = request.query?.[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+    return null;
+  }
+
+  private isSseProgressRequest(request: any): boolean {
+    const requestPath = String(request.path || request.url || '');
+    return requestPath.includes('/backup/progress/');
+  }
+}

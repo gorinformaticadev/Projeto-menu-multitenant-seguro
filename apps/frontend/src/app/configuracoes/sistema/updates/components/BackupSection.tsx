@@ -78,33 +78,22 @@ export function BackupSection({ onBackupComplete }: BackupSectionProps) {
    */
   const handleDownloadBackup = async (fileName: string) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api';
-      const downloadUrl = `${apiUrl}/backup/download-file/${encodeURIComponent(fileName)}`;
-      
-      // Usar fetch para baixar o arquivo
-      const response = await fetch(downloadUrl);
-      
-      if (!response.ok) {
-        throw new Error(`Erro ao baixar arquivo: ${response.statusText}`);
-      }
-      
-      // Converter resposta em blob
-      const blob = await response.blob();
-      
-      // Criar URL temporária do blob
+      const response = await api.get(`/backup/download-file/${encodeURIComponent(fileName)}`, {
+        responseType: 'blob',
+      });
+
+      const blob = response.data as Blob;
       const url = window.URL.createObjectURL(blob);
-      
-      // Criar link e simular clique
+
       const link = document.createElement('a');
       link.href = url;
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
-      
-      // Limpar
+
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       toast({
         title: 'Download concluído',
         description: `Arquivo baixado: ${fileName}`,
@@ -114,7 +103,7 @@ export function BackupSection({ onBackupComplete }: BackupSectionProps) {
       console.error('Erro ao fazer download:', error);
       toast({
         title: 'Erro no download',
-        description: 'Não foi possível baixar o arquivo. Tente novamente.',
+        description: 'Não foi possivel baixar o arquivo. Tente novamente.',
         variant: 'destructive',
       });
     }

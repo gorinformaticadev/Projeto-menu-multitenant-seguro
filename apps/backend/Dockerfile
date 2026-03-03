@@ -45,7 +45,7 @@ ENV APP_VERSION=$APP_VERSION
 ENV GIT_SHA=$GIT_SHA
 ENV BUILD_TIME=$BUILD_TIME
 
-RUN apk add --no-cache curl postgresql-client
+RUN apk add --no-cache curl postgresql-client su-exec
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nestjs
 
@@ -59,6 +59,5 @@ COPY --from=builder --chown=nestjs:nodejs /app/apps/backend/docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
 RUN mkdir -p /app/apps/backend/uploads /app/apps/backend/backups && chown -R nestjs:nodejs /app/apps/backend
 
-USER nestjs
 EXPOSE 4000
 CMD ["./docker-entrypoint.sh"]
