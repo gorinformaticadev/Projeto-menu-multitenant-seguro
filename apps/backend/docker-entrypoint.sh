@@ -64,13 +64,43 @@ else
   PRISMA_CMD="npx prisma"
 fi
 
-# Executa as migrations
-echo "Running prisma migrate deploy..."
-if ! $PRISMA_CMD migrate deploy --schema "$PRISMA_SCHEMA"; then
-  echo "ERROR: prisma migrate deploy failed. Aborting startup."
-  exit 1
+# Executa migrate deploy somente quando houver pendencias
+RUN_MIGRATE_DEPLOY=0
+if [ -d "$MIGRATIONS_DIR" ]; then
+  echo "Checking Prisma migration status..."
+  set +e
+  MIGRATION_STATUS_OUTPUT="$($PRISMA_CMD migrate status --schema "$PRISMA_SCHEMA" 2>&1)"
+  MIGRATION_STATUS_EXIT=$?
+  set -e
+
+  echo "$MIGRATION_STATUS_OUTPUT"
+  MIGRATION_STATUS_NORMALIZED=$(echo "$MIGRATION_STATUS_OUTPUT" | tr '[:upper:]' '[:lower:]')
+
+  if echo "$MIGRATION_STATUS_NORMALIZED" | grep -q "database schema is up to date"; then
+    echo "Migrations already up to date. Skipping migrate deploy."
+  elif echo "$MIGRATION_STATUS_NORMALIZED" | grep -q "have not yet been applied"; then
+    RUN_MIGRATE_DEPLOY=1
+  elif echo "$MIGRATION_STATUS_NORMALIZED" | grep -q "current database is not managed by prisma migrate"; then
+    RUN_MIGRATE_DEPLOY=1
+  elif [ "$MIGRATION_STATUS_EXIT" -eq 0 ]; then
+    # Fallback defensivo: status retornou sucesso, mas sem mensagem explicita.
+    RUN_MIGRATE_DEPLOY=1
+  else
+    echo "ERROR: could not safely determine migration status. Aborting startup."
+    exit 1
+  fi
+else
+  echo "Migrations skipped: $MIGRATIONS_DIR not found."
 fi
-echo "Migrations applied successfully."
+
+if [ "$RUN_MIGRATE_DEPLOY" -eq 1 ]; then
+  echo "Running prisma migrate deploy..."
+  if ! $PRISMA_CMD migrate deploy --schema "$PRISMA_SCHEMA"; then
+    echo "ERROR: prisma migrate deploy failed. Aborting startup."
+    exit 1
+  fi
+  echo "Migrations applied successfully."
+fi
 
 # Executa o seed versionado (apenas pendentes por padrao)
 SEED_FILE="./dist/prisma/seed.js"
@@ -79,11 +109,35 @@ SEED_FORCE="${SEED_FORCE:-false}"
 
 if [ "$SEED_ON_START" = "true" ]; then
   if [ -f "$SEED_FILE" ]; then
-    echo "Running application seed pipeline (deploy mode)..."
     if [ "$SEED_FORCE" = "true" ]; then
-      node "$SEED_FILE" deploy --force
+      echo "SEED_FORCE=true. Running application seed pipeline with --force..."
+      if ! node "$SEED_FILE" deploy --force; then
+        echo "ERROR: seed pipeline failed in force mode. Aborting startup."
+        exit 1
+      fi
     else
-      node "$SEED_FILE" deploy
+      echo "Checking pending seed modules..."
+      set +e
+      SEED_CHECK_OUTPUT="$(node "$SEED_FILE" check 2>&1)"
+      SEED_CHECK_EXIT=$?
+      set -e
+
+      echo "$SEED_CHECK_OUTPUT"
+
+      if [ "$SEED_CHECK_EXIT" -ne 0 ]; then
+        echo "ERROR: seed check failed. Aborting startup."
+        exit 1
+      fi
+
+      if echo "$SEED_CHECK_OUTPUT" | grep -q "SEED_STATUS=PENDING"; then
+        echo "Pending seeds detected. Running application seed pipeline (deploy mode)..."
+        if ! node "$SEED_FILE" deploy; then
+          echo "ERROR: seed pipeline failed. Aborting startup."
+          exit 1
+        fi
+      else
+        echo "Seed pipeline skipped: no pending seed modules."
+      fi
     fi
   else
     echo "Seed disabled: $SEED_FILE not found."

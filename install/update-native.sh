@@ -127,6 +127,14 @@ if ! pnpm exec prisma migrate deploy; then
   rollback_code
   exit 1
 fi
+
+log "Executando seed versionado (apenas pendentes)..."
+if ! node dist/prisma/seed.js deploy; then
+  log_err "Falha ao executar seed versionado."
+  cd "$PROJECT_ROOT"
+  rollback_code
+  exit 1
+fi
 cd "$PROJECT_ROOT"
 
 # --- 6. Reinicio dos Processos PM2 ---

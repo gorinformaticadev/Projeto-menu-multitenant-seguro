@@ -117,6 +117,15 @@ fi
 # Recria os containers com as imagens atualizadas
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --remove-orphans
 
+# Executa seed versionado (apenas pendentes) de forma explicita no fluxo de update
+echoblue "Executando seed versionado (apenas pendentes)..."
+if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" run --rm backend node dist/prisma/seed.js deploy; then
+    echogreen "Seed versionado concluido com sucesso."
+else
+    echored "Falha ao executar seed versionado durante o update."
+    exit 1
+fi
+
 # ===============================
 # Verifica saúde do backend
 # ===============================

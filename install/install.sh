@@ -447,6 +447,8 @@ native_create_app_envs() {
     upsert_env "REDIS_HOST" "127.0.0.1" "$backend_env"
     upsert_env "REDIS_PORT" "6379" "$backend_env"
     upsert_env "SEED_LOCK_ID" "${SEED_LOCK_ID:-87456321}" "$backend_env"
+    upsert_env "SEED_LOCK_WAIT_SECONDS" "${SEED_LOCK_WAIT_SECONDS:-90}" "$backend_env"
+    upsert_env "SEED_LOCK_RETRY_MS" "${SEED_LOCK_RETRY_MS:-2000}" "$backend_env"
     upsert_env "INSTALL_ADMIN_EMAIL" "${admin_email:-$email}" "$backend_env"
     upsert_env "INSTALL_ADMIN_PASSWORD" "$admin_pass" "$backend_env"
     upsert_env "NEXT_PUBLIC_API_URL" "https://${domain}/api" "$frontend_env"
@@ -1011,6 +1013,8 @@ run_install() {
     upsert_env "SEED_ON_START" "${SEED_ON_START:-true}"
     upsert_env "SEED_FORCE" "${SEED_FORCE:-false}"
     upsert_env "SEED_LOCK_ID" "${SEED_LOCK_ID:-87456321}"
+    upsert_env "SEED_LOCK_WAIT_SECONDS" "${SEED_LOCK_WAIT_SECONDS:-90}"
+    upsert_env "SEED_LOCK_RETRY_MS" "${SEED_LOCK_RETRY_MS:-2000}"
     upsert_env "NODE_ENV" "production"
     upsert_env "PORT" "4000"
     # Variáveis de instalação (documentação / uso futuro pelo backend)
@@ -1037,6 +1041,8 @@ run_install() {
         upsert_env "INSTALL_ADMIN_EMAIL" "${admin_email:-$email}" "$BACKEND_ENV"
         upsert_env "INSTALL_ADMIN_PASSWORD" "$admin_pass" "$BACKEND_ENV"
         upsert_env "SEED_LOCK_ID" "${SEED_LOCK_ID:-87456321}" "$BACKEND_ENV"
+        upsert_env "SEED_LOCK_WAIT_SECONDS" "${SEED_LOCK_WAIT_SECONDS:-90}" "$BACKEND_ENV"
+        upsert_env "SEED_LOCK_RETRY_MS" "${SEED_LOCK_RETRY_MS:-2000}" "$BACKEND_ENV"
     fi
     if [[ -f "$FRONTEND_EXAMPLE" ]]; then
         if [[ ! -f "$FRONTEND_ENV" ]]; then

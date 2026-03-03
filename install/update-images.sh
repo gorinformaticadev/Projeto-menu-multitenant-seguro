@@ -260,6 +260,9 @@ else
   log "service 'migrate' nao encontrado no compose (skip)"
 fi
 
+log "executando seed versionado (apenas pendentes)"
+compose run --rm backend node dist/prisma/seed.js deploy
+
 log "recriando containers frontend/backend"
 compose up -d --no-deps --force-recreate frontend backend
 

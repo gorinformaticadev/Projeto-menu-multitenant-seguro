@@ -1,17 +1,17 @@
 import { SeedModuleKey } from './seeds/types';
-import { runSeedPipeline } from './seeds/runner';
+import { hasPendingSeeds, runSeedPipeline } from './seeds/runner';
 
-const VALID_COMMANDS = new Set(['deploy', 'run']);
+const VALID_COMMANDS = new Set(['deploy', 'run', 'check']);
 const VALID_MODULES = new Set<SeedModuleKey>(['initial-tenants', 'default-users', 'system-config']);
 
 type ParsedArgs = {
-  command: 'deploy' | 'run';
+  command: 'deploy' | 'run' | 'check';
   force: boolean;
   modules: SeedModuleKey[];
 };
 
 function parseArgs(rawArgs: string[]): ParsedArgs {
-  let command: 'deploy' | 'run' = 'deploy';
+  let command: 'deploy' | 'run' | 'check' = 'deploy';
   const modules: SeedModuleKey[] = [];
   let force = false;
 
@@ -36,7 +36,7 @@ function parseArgs(rawArgs: string[]): ParsedArgs {
     }
 
     if (!arg.startsWith('-') && VALID_COMMANDS.has(arg)) {
-      command = arg as 'deploy' | 'run';
+      command = arg as 'deploy' | 'run' | 'check';
       continue;
     }
 
@@ -51,12 +51,18 @@ function parseArgs(rawArgs: string[]): ParsedArgs {
 }
 
 function printUsage(): void {
-  console.log('Uso: node dist/prisma/seed.js [deploy|run] [--module=<name>] [--force]');
+  console.log('Uso: node dist/prisma/seed.js [deploy|run|check] [--module=<name>] [--force]');
   console.log('Modulos validos: initial-tenants, default-users, system-config');
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+
+  if (args.command === 'check') {
+    const pending = await hasPendingSeeds(args.modules);
+    console.log(pending ? 'SEED_STATUS=PENDING' : 'SEED_STATUS=UPTODATE');
+    return;
+  }
 
   console.log('Iniciando pipeline de seed versionado...');
   console.log(`Comando: ${args.command}`);

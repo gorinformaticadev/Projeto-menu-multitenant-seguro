@@ -1,7 +1,7 @@
 import { PrismaClient, SeedRunStatus } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { seedRegistry } from './registry';
-import { SEED_ADVISORY_LOCK_ID } from './defaults';
+import { SEED_ADVISORY_LOCK_ID, SEED_LOCK_RETRY_MS, SEED_LOCK_WAIT_SECONDS } from './defaults';
 import {
   SeedModuleDefinition,
   SeedModuleKey,
@@ -155,6 +155,31 @@ export async function runSeedPipeline(options: SeedRunnerOptions = {}): Promise<
   }
 }
 
+export async function hasPendingSeeds(modules?: SeedModuleKey[]): Promise<boolean> {
+  const selectedModules = selectModules(modules);
+
+  try {
+    for (const moduleDef of selectedModules) {
+      const alreadyApplied = await prisma.seedHistory.findFirst({
+        where: {
+          module: moduleDef.key,
+          version: moduleDef.version,
+          status: { in: [SeedRunStatus.SUCCESS, SeedRunStatus.FORCED] },
+        },
+        select: { id: true },
+      });
+
+      if (!alreadyApplied) {
+        return true;
+      }
+    }
+
+    return false;
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
 function selectModules(modules?: SeedModuleKey[]): SeedModuleDefinition[] {
   if (!modules || modules.length === 0) {
     return seedRegistry;
@@ -173,10 +198,25 @@ function selectModules(modules?: SeedModuleKey[]): SeedModuleDefinition[] {
 }
 
 async function acquireSeedLock(): Promise<boolean> {
-  const rows = await prisma.$queryRaw<LockRow[]>`SELECT pg_try_advisory_lock(${SEED_ADVISORY_LOCK_ID}) AS locked`;
-  return rows[0]?.locked === true;
+  const timeoutMs = Math.max(1, SEED_LOCK_WAIT_SECONDS) * 1000;
+  const retryMs = Math.max(200, SEED_LOCK_RETRY_MS);
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const rows = await prisma.$queryRaw<LockRow[]>`SELECT pg_try_advisory_lock(${SEED_ADVISORY_LOCK_ID}) AS locked`;
+    if (rows[0]?.locked === true) {
+      return true;
+    }
+    await sleep(retryMs);
+  }
+
+  return false;
 }
 
 async function releaseSeedLock(): Promise<void> {
   await prisma.$executeRaw`SELECT pg_advisory_unlock(${SEED_ADVISORY_LOCK_ID})`;
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
 }
