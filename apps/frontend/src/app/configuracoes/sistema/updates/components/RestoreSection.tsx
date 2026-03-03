@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, CheckCircle, Database, RefreshCw, Upload, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RefreshCw, AlertTriangle, Database, CheckCircle, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 
@@ -14,32 +14,36 @@ interface RestoreSectionProps {
 }
 
 interface AvailableBackup {
+  id: string;
   fileName: string;
   fileSize: number;
   createdAt: string;
-  backupId?: string;
 }
 
-interface RestoreLogData {
+interface RestoreJobView {
   id: string;
-  status: 'STARTED' | 'SUCCESS' | 'FAILED';
-  fileName: string;
-  startedAt: string;
-  completedAt?: string;
-  stdout?: string;
-  stderr?: string;
-  errorMessage?: string;
+  status: string;
+  currentStep?: string;
+  progressPercent?: number;
+  fileName?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  error?: string;
 }
 
 export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
   const { toast } = useToast();
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const [availableBackups, setAvailableBackups] = useState<AvailableBackup[]>([]);
   const [loadingBackups, setLoadingBackups] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [loadingUpload, setLoadingUpload] = useState(false);
+  const [selectedBackupId, setSelectedBackupId] = useState('');
   const [selectedFileName, setSelectedFileName] = useState('');
   const [runMigrations, setRunMigrations] = useState(false);
   const [confirmationText, setConfirmationText] = useState('');
   const [loadingRestore, setLoadingRestore] = useState(false);
-  const [restoreLog, setRestoreLog] = useState<RestoreLogData | null>(null);
+  const [restoreJob, setRestoreJob] = useState<RestoreJobView | null>(null);
 
   const expectedConfirmation = useMemo(
     () => (selectedFileName ? `RESTORE ${selectedFileName}` : 'RESTORE'),
@@ -49,9 +53,18 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
   const loadAvailableBackups = useCallback(async () => {
     try {
       setLoadingBackups(true);
-      const response = await api.get('/api/backup/available');
-      setAvailableBackups(response.data.data || []);
-    } catch {
+      const response = await api.get('/backups?limit=200');
+      const artifacts = response.data?.data?.artifacts || [];
+      setAvailableBackups(
+        artifacts.map((artifact: any) => ({
+          id: artifact.id,
+          fileName: artifact.fileName,
+          fileSize: artifact.fileSize,
+          createdAt: artifact.createdAt,
+        })),
+      );
+    } catch (error) {
+      console.error('Erro ao carregar backups:', error);
       toast({
         title: 'Erro ao carregar backups',
         description: 'Nao foi possivel listar backups disponiveis',
@@ -63,52 +76,93 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
   }, [toast]);
 
   useEffect(() => {
-    loadAvailableBackups();
+    void loadAvailableBackups();
   }, [loadAvailableBackups]);
 
-  const pollRestoreLog = (logId: string) => {
-    const interval = setInterval(async () => {
-      try {
-        const response = await api.get(`/api/backup/restore-logs/${logId}`);
-        const data = response.data?.data as RestoreLogData;
-        setRestoreLog(data);
+  const pollJob = async (jobId: string) => {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < 60 * 60 * 1000) {
+      const response = await api.get(`/backups/jobs/${jobId}`);
+      const job = response.data?.data as RestoreJobView;
+      setRestoreJob(job);
 
-        if (data.status === 'SUCCESS' || data.status === 'FAILED') {
-          clearInterval(interval);
-          setLoadingRestore(false);
-
-          if (data.status === 'SUCCESS') {
-            toast({
-              title: 'Restore concluído',
-              description: `Banco restaurado com sucesso a partir de ${data.fileName}`,
-            });
-            onRestoreComplete?.();
-          } else {
-            toast({
-              title: 'Restore falhou',
-              description: data.errorMessage || 'Falha ao restaurar backup',
-              variant: 'destructive',
-            });
-          }
-        }
-      } catch {
-        clearInterval(interval);
-        setLoadingRestore(false);
+      if (job.status === 'SUCCESS') {
+        return job;
       }
-    }, 3000);
+      if (job.status === 'FAILED' || job.status === 'CANCELED') {
+        throw new Error(job.error || `Job finalizou com status ${job.status}`);
+      }
 
-    setTimeout(() => clearInterval(interval), 30 * 60 * 1000);
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+
+    throw new Error('Timeout ao aguardar restore');
+  };
+
+  const handleUploadBackup = async () => {
+    if (!uploadFile) {
+      toast({
+        title: 'Selecione um arquivo',
+        description: 'Escolha um backup .dump ou .backup para enviar',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', uploadFile);
+
+    try {
+      setLoadingUpload(true);
+      const response = await api.post('/backups/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      const artifactId = response.data?.data?.artifactId as string | undefined;
+      const fileName = response.data?.data?.fileName as string | undefined;
+
+      if (artifactId && fileName) {
+        setSelectedBackupId(artifactId);
+        setSelectedFileName(fileName);
+      }
+
+      setUploadFile(null);
+      if (uploadInputRef.current) {
+        uploadInputRef.current.value = '';
+      }
+
+      await loadAvailableBackups();
+
+      toast({
+        title: 'Backup enviado',
+        description: fileName ? `Arquivo ${fileName} pronto para restore` : 'Upload concluido',
+      });
+    } catch (error: unknown) {
+      toast({
+        title: 'Erro ao enviar backup',
+        description:
+          (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          'Nao foi possivel enviar o arquivo',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingUpload(false);
+    }
   };
 
   const handleRestore = async () => {
-    if (!selectedFileName) {
-      toast({ title: 'Selecione um backup', description: 'Escolha um arquivo para restaurar', variant: 'destructive' });
+    if (!selectedBackupId) {
+      toast({
+        title: 'Selecione um backup',
+        description: 'Escolha um arquivo para restaurar',
+        variant: 'destructive',
+      });
       return;
     }
 
     if (confirmationText !== expectedConfirmation) {
       toast({
-        title: 'Confirmação inválida',
+        title: 'Confirmação invalida',
         description: `Digite exatamente: ${expectedConfirmation}`,
         variant: 'destructive',
       });
@@ -117,29 +171,35 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
 
     try {
       setLoadingRestore(true);
-      setRestoreLog(null);
+      setRestoreJob(null);
 
-      const response = await api.post('/api/backup/restore', {
-        backupFile: selectedFileName,
+      const response = await api.post(`/backups/${encodeURIComponent(selectedBackupId)}/restore`, {
         runMigrations,
-        mode: 'restore-only',
+        forceCrossEnvironment: true,
+        reason: 'Restore solicitado na tela de configuracoes',
       });
 
-      const restoreLogId = response.data?.data?.restoreLogId;
-      if (!restoreLogId) {
-        throw new Error('restoreLogId não retornado');
+      const jobId = response.data?.data?.jobId as string | undefined;
+      if (!jobId) {
+        throw new Error('jobId nao retornado');
       }
 
-      pollRestoreLog(restoreLogId);
-    } catch (error: unknown) {
-      const message =
-        (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setLoadingRestore(false);
+      await pollJob(jobId);
       toast({
-        title: 'Erro ao iniciar restore',
-        description: message || 'Erro interno do servidor',
+        title: 'Restore concluido',
+        description: 'Banco restaurado com sucesso',
+      });
+      onRestoreComplete?.();
+    } catch (error: unknown) {
+      toast({
+        title: 'Restore falhou',
+        description:
+          (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          (error instanceof Error ? error.message : 'Erro interno do servidor'),
         variant: 'destructive',
       });
+    } finally {
+      setLoadingRestore(false);
     }
   };
 
@@ -150,9 +210,7 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
           <Database className="w-5 h-5" />
           Restaurar Banco por Backup
         </CardTitle>
-        <CardDescription>
-          Restaura o banco usando um arquivo já existente no servidor
-        </CardDescription>
+        <CardDescription>Restore assíncrono com validação e lock global</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-start gap-3 p-4 border border-red-200 bg-red-50 rounded-lg">
@@ -160,17 +218,48 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
           <div className="text-sm text-red-800">
             <p className="font-bold mb-1">Operação destrutiva</p>
             <ul className="list-disc list-inside space-y-1">
-              <li>Substitui dados atuais pelo backup selecionado</li>
-              <li>Bloqueia operação concorrente com update/restore</li>
-              <li>Exige SUPER_ADMIN autenticado</li>
+              <li>Cria staging + validação antes do cutover</li>
+              <li>Ativa modo manutenção durante o cutover</li>
+              <li>Apenas SUPER_ADMIN pode executar</li>
             </ul>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="backup-upload">Enviar backup para a plataforma</Label>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Input
+              id="backup-upload"
+              ref={uploadInputRef}
+              type="file"
+              accept=".dump,.backup"
+              onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+              disabled={loadingUpload || loadingRestore}
+            />
+            <Button
+              variant="outline"
+              onClick={handleUploadBackup}
+              disabled={!uploadFile || loadingUpload || loadingRestore}
+            >
+              {loadingUpload ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Enviar backup
+                </>
+              )}
+            </Button>
           </div>
         </div>
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label htmlFor="backup-select">Arquivo de backup</Label>
-            <Button variant="outline" size="sm" onClick={loadAvailableBackups} disabled={loadingBackups || loadingRestore}>
+            <Button variant="outline" size="sm" onClick={loadAvailableBackups} disabled={loadingBackups}>
               <RefreshCw className={`w-3 h-3 mr-1 ${loadingBackups ? 'animate-spin' : ''}`} />
               Atualizar lista
             </Button>
@@ -178,14 +267,18 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
           <select
             id="backup-select"
             className="w-full px-3 py-2 border rounded-md"
-            value={selectedFileName}
-            onChange={(e) => setSelectedFileName(e.target.value)}
-            disabled={loadingBackups || loadingRestore}
+            value={selectedBackupId}
+            onChange={(e) => {
+              const selected = availableBackups.find((item) => item.id === e.target.value);
+              setSelectedBackupId(e.target.value);
+              setSelectedFileName(selected?.fileName || '');
+            }}
+            disabled={loadingBackups || loadingRestore || loadingUpload}
           >
             <option value="">Selecione um backup...</option>
-            {availableBackups.map((b) => (
-              <option key={b.fileName} value={b.fileName}>
-                {b.fileName} ({(b.fileSize / 1024 / 1024).toFixed(2)} MB)
+            {availableBackups.map((backup) => (
+              <option key={backup.id} value={backup.id}>
+                {backup.fileName} ({(backup.fileSize / 1024 / 1024).toFixed(2)} MB)
               </option>
             ))}
           </select>
@@ -199,11 +292,11 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
             onChange={(e) => setRunMigrations(e.target.checked)}
             disabled={loadingRestore}
           />
-          <Label htmlFor="run-migrations">Executar migrate apos restore (se existir service migrate)</Label>
+          <Label htmlFor="run-migrations">Executar migrate deploy apos restore</Label>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="confirm-text">Confirmacao</Label>
+          <Label htmlFor="confirm-text">Confirmação</Label>
           <Input
             id="confirm-text"
             value={confirmationText}
@@ -211,12 +304,14 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
             placeholder={expectedConfirmation}
             disabled={loadingRestore}
           />
-          <p className="text-xs text-muted-foreground">Digite exatamente: <strong>{expectedConfirmation}</strong></p>
+          <p className="text-xs text-muted-foreground">
+            Digite exatamente: <strong>{expectedConfirmation}</strong>
+          </p>
         </div>
 
         <Button
           onClick={handleRestore}
-          disabled={loadingRestore || !selectedFileName || confirmationText !== expectedConfirmation}
+          disabled={loadingRestore || !selectedBackupId || confirmationText !== expectedConfirmation}
           className="bg-red-600 hover:bg-red-700"
         >
           {loadingRestore ? (
@@ -229,24 +324,22 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
           )}
         </Button>
 
-        {restoreLog && (
+        {restoreJob && (
           <div className="border rounded-lg p-4 space-y-2 bg-gray-50">
             <div className="flex items-center gap-2">
-              {restoreLog.status === 'SUCCESS' ? (
+              {restoreJob.status === 'SUCCESS' ? (
                 <CheckCircle className="w-4 h-4 text-green-600" />
-              ) : restoreLog.status === 'FAILED' ? (
+              ) : restoreJob.status === 'FAILED' || restoreJob.status === 'CANCELED' ? (
                 <XCircle className="w-4 h-4 text-red-600" />
               ) : (
                 <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />
               )}
-              <span className="font-medium">Status: {restoreLog.status}</span>
+              <span className="font-medium">
+                Status: {restoreJob.status} ({restoreJob.progressPercent ?? 0}%)
+              </span>
             </div>
-            <p className="text-sm"><strong>Arquivo:</strong> {restoreLog.fileName}</p>
-            <p className="text-sm"><strong>Inicio:</strong> {new Date(restoreLog.startedAt).toLocaleString('pt-BR')}</p>
-            {restoreLog.completedAt && (
-              <p className="text-sm"><strong>Fim:</strong> {new Date(restoreLog.completedAt).toLocaleString('pt-BR')}</p>
-            )}
-            {restoreLog.errorMessage && <p className="text-sm text-red-700"><strong>Erro:</strong> {restoreLog.errorMessage}</p>}
+            {restoreJob.currentStep && <p className="text-sm">Etapa: {restoreJob.currentStep}</p>}
+            {restoreJob.error && <p className="text-sm text-red-700">Erro: {restoreJob.error}</p>}
           </div>
         )}
       </CardContent>

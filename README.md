@@ -123,6 +123,7 @@ Scripts auxiliares:
 
 - `install/check.sh` -> valida ambiente
 - `install/restore-db.sh` -> restore banco
+- `install/restore-native.sh` -> restore banco em instalacao native (PM2)
 - `install/renew-cert.sh` -> renovar certificado
 
 ------------------------------------------------------------------------

@@ -57,6 +57,8 @@ model User {
   preferences              UserPreferences?
   backupLogs               BackupLog[]
   backupRestoreLogs        BackupRestoreLog[]
+  backupArtifacts          BackupArtifact[]
+  backupJobs               BackupJob[]          @relation("BackupJobCreatedBy")
   pushSubscriptions        PushSubscription[]
   seedHistory             SeedHistory[]
 
@@ -479,6 +481,25 @@ enum BackupStatus {
   CANCELLED
 }
 
+enum BackupArtifactSource {
+  BACKUP
+  UPLOAD
+  SAFETY
+}
+
+enum BackupJobType {
+  BACKUP
+  RESTORE
+}
+
+enum BackupJobStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELED
+}
+
 model BackupLog {
   id                String          @id @default(uuid())
   operationType     BackupOperation
@@ -519,6 +540,70 @@ model BackupRestoreLog {
   @@index([startedAt])
   @@index([executedBy])
   @@map("backup_restore_logs")
+}
+
+model BackupArtifact {
+  id               String               @id @default(uuid())
+  fileName         String
+  filePath         String
+  sizeBytes        BigInt
+  checksumSha256   String
+  source           BackupArtifactSource
+  metadata         Json?
+  createdAt        DateTime             @default(now())
+  deletedAt        DateTime?
+  createdByUserId  String?
+  createdByUser    User?                @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  jobs             BackupJob[]          @relation("BackupArtifactJobs")
+
+  @@index([source, createdAt])
+  @@index([createdByUserId])
+  @@index([deletedAt])
+  @@map("backup_artifacts")
+}
+
+model BackupJob {
+  id               String          @id @default(uuid())
+  type             BackupJobType
+  status           BackupJobStatus @default(PENDING)
+  artifactId       String?
+  fileName         String?
+  filePath         String?
+  sizeBytes        BigInt?
+  checksumSha256   String?
+  progressPercent  Int             @default(0)
+  currentStep      String?
+  metadata         Json?
+  logs             Json?
+  error            String?
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  cancelRequested  Boolean         @default(false)
+  createdByUserId  String?
+  createdByUser    User?           @relation("BackupJobCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  artifact         BackupArtifact? @relation("BackupArtifactJobs", fields: [artifactId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([type, status])
+  @@index([artifactId])
+  @@index([createdByUserId])
+  @@index([cancelRequested])
+  @@map("backup_jobs")
+}
+
+model BackupLease {
+  key           String        @id
+  holderJobId   String?
+  operationType BackupJobType?
+  acquiredAt    DateTime?
+  expiresAt     DateTime?
+  updatedAt     DateTime      @updatedAt
+  metadata      Json?
+
+  @@index([expiresAt])
+  @@map("backup_leases")
 }
 
 enum RestoreStatus {

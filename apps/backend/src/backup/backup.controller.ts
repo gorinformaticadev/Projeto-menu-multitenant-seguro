@@ -2,336 +2,290 @@ import {
   Body,
   Controller,
   Delete,
-  ForbiddenException,
   Get,
-  HttpException,
+  HttpCode,
   HttpStatus,
-  Logger,
-  MessageEvent,
   Param,
   Post,
   Query,
   Request,
   Res,
-  Sse,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Throttle } from '@nestjs/throttler';
+import { memoryStorage } from 'multer';
 import { Role } from '@prisma/client';
 import { Response } from 'express';
-import * as fs from 'fs';
-import * as path from 'path';
-import { Observable, Subject } from 'rxjs';
 import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { RestoreJobDto } from './dto/restore-job.dto';
 import { BackupService } from './backup.service';
-import { CreateBackupDto } from './dto/create-backup.dto';
-import { RestoreRequestDto } from './dto/restore-request.dto';
-import { SseJwtGuard } from './guards/sse-jwt.guard';
 
-@Controller('backup')
-export class BackupController {
-  private readonly logger = new Logger(BackupController.name);
-  private readonly progressSubjects = new Map<string, Subject<MessageEvent>>();
-  private static readonly DOWNLOAD_TOKEN_TTL = '10m' as const;
+const MAX_UPLOAD_SIZE = Number(process.env.BACKUP_MAX_SIZE || 2 * 1024 * 1024 * 1024);
 
-  constructor(
-    private readonly backupService: BackupService,
-    private readonly jwtService: JwtService,
-  ) {}
+function requestContext(req: any): { ipAddress?: string; userAgent?: string } {
+  return {
+    ipAddress: req.ip,
+    userAgent: req.headers?.['user-agent'],
+  };
+}
 
-  @Sse('progress/:sessionId')
-  @UseGuards(SseJwtGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN)
-  backupProgress(@Param('sessionId') sessionId: string): Observable<MessageEvent> {
-    let subject = this.progressSubjects.get(sessionId);
-    if (!subject) {
-      subject = new Subject<MessageEvent>();
-      this.progressSubjects.set(sessionId, subject);
-    }
-    return subject.asObservable();
-  }
+@Controller('backups')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.SUPER_ADMIN)
+export class BackupsController {
+  constructor(private readonly backupService: BackupService) {}
 
-  @Post('create')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN)
-  @Throttle({ default: { limit: 5, ttl: 3600000 } })
-  async createBackup(@Body() dto: CreateBackupDto, @Request() req) {
-    try {
-      const userId = req.user?.id || req.user?.sub;
-      if (!userId) {
-        throw new HttpException('Usuario nao autenticado', HttpStatus.UNAUTHORIZED);
-      }
-
-      const ipAddress = req.ip;
-      const sessionId = dto.sessionId || `session_${Date.now()}`;
-      if (!this.progressSubjects.has(sessionId)) {
-        this.progressSubjects.set(sessionId, new Subject<MessageEvent>());
-      }
-
-      const progressCallback = (message: string) => {
-        const subject = this.progressSubjects.get(sessionId);
-        if (subject) {
-          subject.next({ data: { message, timestamp: Date.now() } } as MessageEvent);
-        }
-      };
-
-      const result = await this.backupService.createBackup(dto, userId, ipAddress, progressCallback);
-
-      const subject = this.progressSubjects.get(sessionId);
-      if (subject) {
-        subject.next({ data: { message: 'Backup concluido', completed: true } } as MessageEvent);
-        subject.complete();
-        this.progressSubjects.delete(sessionId);
-      }
-
-      return { success: true, message: 'Backup criado com sucesso', data: { ...result, sessionId } };
-    } catch (error: any) {
-      throw new HttpException(
-        error.message || 'Erro ao criar backup',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
-
-  @Get('download/:backupId')
-  @UseGuards(SseJwtGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN)
-  async downloadBackup(@Param('backupId') backupId: string, @Request() req, @Res() res: Response) {
-    try {
-      const downloadPayload = req.downloadTokenPayload as { backupId?: string } | undefined;
-      if (downloadPayload?.backupId && downloadPayload.backupId !== backupId) {
-        throw new ForbiddenException('Token de download invalido para este backup');
-      }
-
-      const backupInfo = await this.backupService.getBackupInfo(backupId);
-      if (!backupInfo) {
-        throw new HttpException('Backup nao encontrado', HttpStatus.NOT_FOUND);
-      }
-
-      const filePath = this.backupService.resolveBackupPath(backupInfo.fileName);
-
-      res.setHeader('Content-Type', 'application/octet-stream');
-      res.setHeader('Content-Disposition', `attachment; filename="${backupInfo.fileName}"`);
-      res.setHeader('Content-Length', backupInfo.fileSize.toString());
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-      fs.createReadStream(filePath).pipe(res);
-    } catch (error: any) {
-      throw new HttpException(
-        error.message || 'Erro ao fazer download',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
-
-  @Get('download-token/:backupId')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN)
-  async issueDownloadToken(@Param('backupId') backupId: string, @Request() req) {
-    const backupInfo = await this.backupService.getBackupInfo(backupId);
-    if (!backupInfo) {
-      throw new HttpException('Backup nao encontrado', HttpStatus.NOT_FOUND);
-    }
-
+  @Post()
+  async createBackupJob(@Request() req) {
     const userId = req.user?.id || req.user?.sub;
-    if (!userId) {
-      throw new HttpException('Usuario nao autenticado', HttpStatus.UNAUTHORIZED);
-    }
+    const job = await this.backupService.createBackupJob(userId, requestContext(req));
+    return {
+      success: true,
+      message: 'Job de backup enfileirado',
+      data: {
+        jobId: job.id,
+        status: job.status,
+        type: job.type,
+      },
+    };
+  }
 
-    const role = req.user?.role || Role.SUPER_ADMIN;
-    const expiresIn = BackupController.DOWNLOAD_TOKEN_TTL as any;
-    const downloadToken = await this.jwtService.signAsync(
-      {
-        sub: userId,
-        role,
-        backupId,
-        type: 'backup-download',
+  @Get()
+  async listBackupsAndJobs(@Query('limit') limit?: string) {
+    const parsedLimit = Number(limit || 50);
+    const data = await this.backupService.listBackupsAndJobs(parsedLimit);
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  @Post('upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: {
+        fileSize: MAX_UPLOAD_SIZE,
+        files: 1,
       },
-      {
-        secret: process.env.JWT_SECRET,
-        expiresIn,
+    }),
+  )
+  async uploadBackup(@UploadedFile() file: Express.Multer.File, @Request() req) {
+    const userId = req.user?.id || req.user?.sub;
+    const artifact = await this.backupService.uploadBackup(file, userId, requestContext(req));
+    return {
+      success: true,
+      message: 'Upload concluido',
+      data: {
+        artifactId: artifact.id,
+        fileName: artifact.fileName,
+        fileSize: Number(artifact.sizeBytes),
+        checksumSha256: artifact.checksumSha256,
+        createdAt: artifact.createdAt,
       },
+    };
+  }
+
+  @Post(':id/restore')
+  async restoreExistingBackup(@Param('id') artifactId: string, @Body() dto: RestoreJobDto, @Request() req) {
+    const userId = req.user?.id || req.user?.sub;
+    const job = await this.backupService.queueRestoreFromArtifact(
+      artifactId,
+      userId,
+      dto || {},
+      requestContext(req),
     );
+    return {
+      success: true,
+      message: 'Job de restore enfileirado',
+      data: {
+        jobId: job.id,
+        status: job.status,
+      },
+    };
+  }
 
+  @Post('restore-from-upload/:uploadId')
+  async restoreFromUpload(@Param('uploadId') uploadId: string, @Body() dto: RestoreJobDto, @Request() req) {
+    const userId = req.user?.id || req.user?.sub;
+    const job = await this.backupService.queueRestoreFromUpload(
+      uploadId,
+      userId,
+      dto || {},
+      requestContext(req),
+    );
+    return {
+      success: true,
+      message: 'Job de restore enfileirado',
+      data: {
+        jobId: job.id,
+        status: job.status,
+      },
+    };
+  }
+
+  @Get('jobs/:jobId')
+  async getJobStatus(@Param('jobId') jobId: string) {
+    const job = await this.backupService.getJobStatus(jobId);
     return {
       success: true,
       data: {
-        backupId,
-        token: downloadToken,
-        expiresIn,
-        downloadUrl: `/api/backup/download/${backupId}?downloadToken=${encodeURIComponent(downloadToken)}`,
+        ...job,
+        sizeBytes: job.sizeBytes ? Number(job.sizeBytes) : null,
+      },
+    };
+  }
+
+  @Post('jobs/:jobId/cancel')
+  async cancelJob(@Param('jobId') jobId: string, @Request() req) {
+    const userId = req.user?.id || req.user?.sub;
+    const job = await this.backupService.cancelPendingJob(jobId, userId);
+    return {
+      success: true,
+      message: 'Job cancelado',
+      data: {
+        jobId: job.id,
+        status: job.status,
+      },
+    };
+  }
+
+  @Get(':id/download')
+  async downloadByArtifactId(@Param('id') artifactId: string, @Res() res: Response) {
+    const download = await this.backupService.resolveArtifactDownload(artifactId);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename=\"${download.fileName}\"`);
+    res.setHeader('Content-Length', String(download.size));
+    res.sendFile(download.filePath);
+  }
+
+  @Get('maintenance/state')
+  async maintenanceState() {
+    return {
+      success: true,
+      data: this.backupService.getMaintenanceState(),
+    };
+  }
+}
+
+@Controller('backup')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.SUPER_ADMIN)
+export class BackupLegacyController {
+  constructor(private readonly backupService: BackupService) {}
+
+  @Post('create')
+  async create(@Request() req) {
+    const userId = req.user?.id || req.user?.sub;
+    const job = await this.backupService.createBackupJob(userId, requestContext(req));
+    return {
+      success: true,
+      message: 'Backup enfileirado',
+      data: {
+        jobId: job.id,
+        status: job.status,
+      },
+    };
+  }
+
+  @Get('available')
+  async available() {
+    const artifacts = await this.backupService.listAvailableArtifacts(200);
+    return {
+      success: true,
+      data: artifacts.map((artifact) => ({
+        backupId: artifact.id,
+        fileName: artifact.fileName,
+        fileSize: Number(artifact.sizeBytes),
+        createdAt: artifact.createdAt,
+      })),
+    };
+  }
+
+  @Post('upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: {
+        fileSize: MAX_UPLOAD_SIZE,
+        files: 1,
+      },
+    }),
+  )
+  async upload(@UploadedFile() file: Express.Multer.File, @Request() req) {
+    const userId = req.user?.id || req.user?.sub;
+    const artifact = await this.backupService.uploadBackup(file, userId, requestContext(req));
+    return {
+      success: true,
+      message: 'Arquivo de backup enviado com sucesso',
+      data: {
+        artifactId: artifact.id,
+        fileName: artifact.fileName,
       },
     };
   }
 
   @Post('restore')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN)
-  @Throttle({ default: { limit: 10, ttl: 3600000 } })
-  async restoreBackup(@Body() dto: RestoreRequestDto, @Request() req) {
-    try {
-      const userId = req.user?.id || req.user?.sub;
-      if (!userId) {
-        throw new HttpException('Usuario nao autenticado', HttpStatus.UNAUTHORIZED);
-      }
-
-      const ipAddress = req.ip;
-      const userAgent = req.headers?.['user-agent'] as string | undefined;
-      const result = await this.backupService.restoreFromBackup(dto, userId, ipAddress, userAgent);
-      return { success: true, message: 'Restore executado com sucesso', data: result };
-    } catch (error: any) {
-      throw new HttpException(
-        error.message || 'Erro ao executar restore',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
-
-  @Get('restore-logs')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN)
-  async getRestoreLogs(@Query('limit') limit?: string) {
-    const limitNum = limit ? parseInt(limit, 10) : 50;
-    const data = await this.backupService.listRestoreLogs(limitNum);
-    return { success: true, data, total: data.length };
+  async restore(@Body() body: { backupFile: string } & RestoreJobDto, @Request() req) {
+    const userId = req.user?.id || req.user?.sub;
+    const artifact = await this.backupService.findArtifactByFileName(body.backupFile);
+    const job = await this.backupService.queueRestoreFromArtifact(
+      artifact.id,
+      userId,
+      body || {},
+      requestContext(req),
+    );
+    return {
+      success: true,
+      message: 'Restore enfileirado',
+      data: {
+        restoreLogId: job.id,
+      },
+    };
   }
 
   @Get('restore-logs/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN)
-  async getRestoreLog(@Param('id') id: string) {
-    const data = await this.backupService.getRestoreLog(id);
-    return { success: true, data };
-  }
-
-  @Post('validate')
-  @UseInterceptors(FileInterceptor('file'))
-  async validateBackup(@UploadedFile() file: Express.Multer.File) {
-    try {
-      if (!file) {
-        throw new HttpException('Arquivo nao fornecido', HttpStatus.BAD_REQUEST);
-      }
-
-      const validationResult = await this.backupService.validateBackupFile(file);
-      return { valid: validationResult.valid, fileInfo: validationResult.info };
-    } catch (error: any) {
-      throw new HttpException(
-        error.message || 'Erro ao validar arquivo',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
-
-  @Get('available')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN)
-  async getAvailableBackups() {
-    try {
-      const backups = await this.backupService.listAvailableBackups();
-      return {
-        success: true,
-        data: backups.map((backup) => ({
-          fileName: backup.fileName,
-          fileSize: backup.fileSize,
-          createdAt: backup.createdAt,
-          backupId: backup.backupId,
-        })),
-        total: backups.length,
-      };
-    } catch {
-      throw new HttpException('Erro ao listar backups', HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  @Get('download-file/:fileName')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN)
-  async downloadBackupFile(@Param('fileName') fileName: string, @Res() res: Response) {
-    try {
-      if (!/^[a-zA-Z0-9._-]+$/.test(fileName)) {
-        throw new HttpException('Nome de arquivo invalido', HttpStatus.BAD_REQUEST);
-      }
-
-      const normalizedName = path.basename(fileName);
-      if (normalizedName !== fileName) {
-        throw new HttpException('Nome de arquivo invalido', HttpStatus.BAD_REQUEST);
-      }
-
-      const filePath = this.backupService.resolveBackupPath(normalizedName);
-      const stats = fs.statSync(filePath);
-
-      res.setHeader('Content-Type', 'application/octet-stream');
-      res.setHeader('Content-Disposition', `attachment; filename="${normalizedName}"`);
-      res.setHeader('Content-Length', stats.size.toString());
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-
-      const fileStream = fs.createReadStream(filePath);
-      fileStream.on('error', (error) => {
-        this.logger.error(`Erro ao ler arquivo de backup: ${error.message}`);
-        if (!res.headersSent) {
-          res
-            .status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .json({ success: false, message: 'Erro ao ler arquivo de backup' });
-        }
-      });
-      fileStream.pipe(res);
-    } catch (error: any) {
-      this.logger.error(`Erro no download: ${error.message}`);
-      throw new HttpException(
-        error.message || 'Erro ao fazer download',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
-
-  @Delete('delete/:fileName')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN)
-  @Throttle({ default: { limit: 20, ttl: 3600000 } })
-  async deleteBackup(@Param('fileName') fileName: string, @Request() req) {
-    try {
-      const userId = req.user?.id || req.user?.sub;
-      if (!userId) {
-        throw new HttpException('Usuario nao autenticado', HttpStatus.UNAUTHORIZED);
-      }
-      const result = await this.backupService.deleteBackup(fileName, userId);
-      return { success: true, message: 'Backup apagado com sucesso', data: result };
-    } catch (error: any) {
-      this.logger.error(`Erro ao apagar backup: ${error.message}`);
-      throw new HttpException(
-        error.message || 'Erro ao apagar backup',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+  async restoreLog(@Param('id') jobId: string) {
+    const job = await this.backupService.getJobStatus(jobId);
+    return {
+      success: true,
+      data: {
+        id: job.id,
+        status: job.status,
+        fileName: job.fileName,
+        startedAt: job.startedAt || job.createdAt,
+        completedAt: job.finishedAt,
+        errorMessage: job.error,
+        logs: job.logs,
+      },
+    };
   }
 
   @Get('logs')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN)
-  async getLogs(
-    @Query('limit') limit?: string,
-    @Query('operationType') operationType?: 'BACKUP' | 'RESTORE',
-    @Query('status') status?: 'STARTED' | 'SUCCESS' | 'FAILED' | 'CANCELLED',
-  ) {
-    try {
-      const limitNum = limit ? parseInt(limit, 10) : 50;
-      if (limitNum > 200) {
-        throw new HttpException('Limite maximo de 200 registros', HttpStatus.BAD_REQUEST);
-      }
+  async logs(@Query('limit') limit?: string) {
+    const parsedLimit = Number(limit || 50);
+    const data = await this.backupService.listLegacyLogs(parsedLimit);
+    return { success: true, data };
+  }
 
-      const logs = await this.backupService.getBackupLogs(limitNum, operationType, status);
-      return { success: true, data: logs, total: logs.length };
-    } catch {
-      throw new HttpException('Erro ao buscar logs', HttpStatus.INTERNAL_SERVER_ERROR);
-    }
+  @Get('download-file/:fileName')
+  async downloadByFileName(@Param('fileName') fileName: string, @Res() res: Response) {
+    const download = await this.backupService.resolveArtifactByFileName(fileName);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename=\"${download.fileName}\"`);
+    res.setHeader('Content-Length', String(download.size));
+    res.sendFile(download.filePath);
+  }
+
+  @Delete('delete/:fileName')
+  @HttpCode(HttpStatus.OK)
+  async deleteBackup(@Param('fileName') fileName: string, @Request() req) {
+    const userId = req.user?.id || req.user?.sub;
+    await this.backupService.deleteArtifactByFileName(fileName, userId);
+    return { success: true, message: 'Backup apagado com sucesso' };
   }
 }

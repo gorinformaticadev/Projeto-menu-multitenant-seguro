@@ -265,8 +265,24 @@ export default function UpdatesPage() {
    */
   const loadBackupLogs = useCallback(async () => {
     try {
-      const response = await api.get('/api/backup/logs?limit=20');
-      setBackupLogs(response.data.data || []);
+      const response = await api.get('/api/backups?limit=20');
+      const jobs = response.data?.data?.jobs || [];
+      setBackupLogs(
+        jobs.map((job: any) => ({
+          id: job.id,
+          operationType: job.type,
+          status: job.status,
+          startedAt: job.startedAt || job.createdAt,
+          fileName: job.fileName,
+          fileSize: null,
+          durationSeconds:
+            job.startedAt && job.finishedAt
+              ? Math.floor((new Date(job.finishedAt).getTime() - new Date(job.startedAt).getTime()) / 1000)
+              : undefined,
+          executedBy: job.createdByUserId,
+          errorMessage: job.error,
+        })),
+      );
     } catch (error: unknown) {
       console.error('Erro ao carregar logs de backup:', error);
     }

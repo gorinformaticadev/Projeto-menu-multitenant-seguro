@@ -1,4 +1,4 @@
-﻿import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { CronService } from '@core/cron/cron.service';
 import { PrismaService } from '@core/prisma/prisma.service';
@@ -8,8 +8,7 @@ import { BackupService } from './backup.service';
 export class BackupCronService implements OnModuleInit {
   private readonly logger = new Logger(BackupCronService.name);
   private static readonly DEFAULT_BACKUP_CRON = '0 2 * * *';
-  private static readonly DEFAULT_CLEANUP_CRON = '30 2 * * *';
-  private static readonly DEFAULT_RETENTION_HOURS = 30 * 24;
+  private static readonly DEFAULT_RETENTION_CRON = '30 2 * * *';
 
   constructor(
     private readonly backupService: BackupService,
@@ -19,7 +18,7 @@ export class BackupCronService implements OnModuleInit {
 
   onModuleInit() {
     this.registerAutomaticBackupJob();
-    this.registerBackupCleanupJob();
+    this.registerRetentionJob();
   }
 
   private registerAutomaticBackupJob() {
@@ -27,33 +26,25 @@ export class BackupCronService implements OnModuleInit {
       'system.backup_auto_create',
       BackupCronService.DEFAULT_BACKUP_CRON,
       async () => {
-        const automationUser = await this.prisma.user.findFirst({
+        const superAdmin = await this.prisma.user.findFirst({
           where: { role: Role.SUPER_ADMIN },
           orderBy: { createdAt: 'asc' },
-          select: { id: true, email: true },
+          select: { id: true },
         });
 
-        if (!automationUser) {
-          this.logger.warn('Automatic backup skipped: no SUPER_ADMIN user found.');
+        if (!superAdmin) {
+          this.logger.warn('Backup automatico ignorado: nenhum SUPER_ADMIN disponivel');
           return;
         }
 
-        try {
-          await this.backupService.createBackup(
-            { includeMetadata: true, compressionLevel: 'default' },
-            automationUser.id,
-            '127.0.0.1',
-          );
-        } catch (error: any) {
-          this.logger.error(
-            `Automatic backup failed: ${error?.message || String(error)}`,
-            error?.stack,
-          );
-        }
+        await this.backupService.createBackupJob(superAdmin.id, {
+          ipAddress: '127.0.0.1',
+          userAgent: 'cron/system.backup_auto_create',
+        });
       },
       {
         name: 'Backup Automatico',
-        description: 'Cria backup automatico do banco de dados.',
+        description: 'Enfileira backup automatico do banco.',
         settingsUrl: '/configuracoes/sistema/cron',
         origin: 'core',
         editable: true,
@@ -61,16 +52,16 @@ export class BackupCronService implements OnModuleInit {
     );
   }
 
-  private registerBackupCleanupJob() {
+  private registerRetentionJob() {
     this.cronService.register(
-      'system.backup_cleanup',
-      BackupCronService.DEFAULT_CLEANUP_CRON,
+      'system.backup_retention',
+      BackupCronService.DEFAULT_RETENTION_CRON,
       async () => {
-        await this.backupService.cleanupOldBackups(BackupCronService.DEFAULT_RETENTION_HOURS);
+        await this.backupService.applyRetentionPolicy();
       },
       {
-        name: 'Limpeza de Backups',
-        description: 'Remove backups expirados com base na politica de retencao.',
+        name: 'Retencao de Backups',
+        description: 'Remove backups antigos conforme BACKUP_RETENTION_COUNT.',
         settingsUrl: '/configuracoes/sistema/cron',
         origin: 'core',
         editable: true,

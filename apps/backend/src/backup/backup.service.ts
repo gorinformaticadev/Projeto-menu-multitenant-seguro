@@ -1,1191 +1,1535 @@
-import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
-import { PrismaService } from '../core/prisma/prisma.service';
-import { AuditService } from '../audit/audit.service';
-import { spawn } from 'child_process';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
-import { createHash } from 'crypto';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  BackupArtifact,
+  BackupArtifactSource,
+  BackupJob,
+  BackupJobStatus,
+  BackupJobType,
+  Role,
+} from '@prisma/client';
+import { createHash, randomUUID } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { CreateBackupDto } from './dto/create-backup.dto';
-import { RestoreRequestDto } from './dto/restore-request.dto';
-import * as semver from 'semver';
+import { AuditService } from '../audit/audit.service';
+import { PrismaService } from '../core/prisma/prisma.service';
+import { BackupConfigService } from './backup-config.service';
+import { BackupProcessService } from './backup-process.service';
+import { BackupRuntimeStateService } from './backup-runtime-state.service';
+import { RestoreJobDto } from './dto/restore-job.dto';
 
-const execFileAsync = promisify(execFile);
+interface RequestContext {
+  ipAddress?: string;
+  userAgent?: string;
+}
 
-/**
- * Serviço responsável por operações de backup e restore do banco de dados
- */
+interface JobLogEntry {
+  at: string;
+  level: 'INFO' | 'WARN' | 'ERROR';
+  message: string;
+}
+
+export interface BackupListResponse {
+  artifacts: Array<{
+    id: string;
+    fileName: string;
+    fileSize: number;
+    source: BackupArtifactSource;
+    checksumSha256: string;
+    createdAt: Date;
+    metadata: Record<string, unknown> | null;
+  }>;
+  jobs: Array<{
+    id: string;
+    type: BackupJobType;
+    status: BackupJobStatus;
+    progressPercent: number;
+    currentStep: string | null;
+    fileName: string | null;
+    createdAt: Date;
+    startedAt: Date | null;
+    finishedAt: Date | null;
+    error: string | null;
+    createdByUserId: string | null;
+    artifactId: string | null;
+  }>;
+}
+
 @Injectable()
 export class BackupService {
   private readonly logger = new Logger(BackupService.name);
-  private readonly tempDir: string;
-  private readonly maxFileSize: number;
-  private readonly timeout: number;
+  private readonly archiveMagic = Buffer.from('PGDMP', 'ascii');
 
   constructor(
-    private prisma: PrismaService,
-    private auditService: AuditService,
-  ) {
-    // Usa um diretorio fixo para evitar divergencia entre Docker e nativo.
-    this.tempDir = path.join(process.cwd(), 'backups');
-    this.maxFileSize = parseInt(process.env.BACKUP_MAX_SIZE || '2147483648', 10); // 2GB
-    this.timeout = parseInt(process.env.BACKUP_TIMEOUT || '900', 10) * 1000; // 15 min em ms
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+    private readonly backupConfig: BackupConfigService,
+    private readonly processService: BackupProcessService,
+    private readonly runtimeState: BackupRuntimeStateService,
+  ) {}
 
-    // Criar diretório de backups se não existir
-    this.ensureTempDirExists();
-    this.assertBackupsDirWritable();
+  getUploadMaxSizeBytes(): number {
+    return this.backupConfig.getMaxUploadBytes();
   }
 
-  /**
-   * Retorna o diretório raiz onde os backups ficam armazenados.
-   */
-  getBackupsDir(): string {
-    return this.tempDir;
+  getBackupDir(): string {
+    return this.backupConfig.getBackupDir();
   }
 
-  resolveBackupPath(fileName: string): string {
-    const normalizedName = this.validateBackupFileName(fileName);
-    const absolutePath = path.resolve(path.join(this.tempDir, normalizedName));
-    if (!fs.existsSync(absolutePath)) {
-      throw new HttpException('Arquivo de backup nao encontrado', HttpStatus.NOT_FOUND);
-    }
-    return absolutePath;
+  getMaintenanceState() {
+    return this.runtimeState.getState();
   }
 
-  async restoreFromBackup(
-    dto: RestoreRequestDto,
+  async createBackupJob(userId: string, context: RequestContext): Promise<BackupJob> {
+    await this.assertOperatorAllowed(userId);
+    await this.assertNoRunningUpdate();
+
+    const job = await this.prisma.backupJob.create({
+      data: {
+        type: BackupJobType.BACKUP,
+        status: BackupJobStatus.PENDING,
+        progressPercent: 0,
+        currentStep: 'QUEUED',
+        createdByUserId: userId,
+        metadata: {
+          requestedBy: userId,
+          source: 'api',
+          executionMode: this.backupConfig.getExecutionMode(),
+        },
+        logs: [],
+      },
+    });
+
+    await this.auditService.log({
+      action: 'BACKUP_JOB_CREATED',
+      userId,
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+      details: { jobId: job.id, type: job.type },
+    });
+
+    return job;
+  }
+
+  async uploadBackup(
+    file: Express.Multer.File,
     userId: string,
-    ipAddress?: string,
-    userAgent?: string,
-  ): Promise<{ restoreLogId: string; fileName: string; message: string }> {
-    let restoreLog: any;
+    context: RequestContext,
+  ): Promise<BackupArtifact> {
+    await this.assertOperatorAllowed(userId);
 
-    try {
-      const normalizedName = this.validateBackupFileName(dto.backupFile);
-      this.resolveBackupPath(normalizedName);
-
-      await this.ensureRestoreNotLocked();
-
-      restoreLog = await (this.prisma as any).backupRestoreLog.create({
-        data: {
-          fileName: normalizedName,
-          status: 'STARTED',
-          executedBy: userId,
-          metadata: {
-            runMigrations: !!dto.runMigrations,
-            targetReleaseTag: dto.targetReleaseTag || null,
-            mode: dto.mode || 'restore-only',
-          },
-        },
-      });
-
-      await this.auditService.log({
-        action: 'BACKUP_RESTORE_STARTED',
-        userId,
-        ipAddress,
-        userAgent,
-        details: {
-          fileName: normalizedName,
-          restoreLogId: restoreLog.id,
-          runMigrations: !!dto.runMigrations,
-          targetReleaseTag: dto.targetReleaseTag || null,
-          mode: dto.mode || 'restore-only',
-        },
-      });
-
-      const settings: any = await (this.prisma as any).systemSettings.findFirst();
-      const composeFile = settings?.composeFile || 'docker-compose.prod.yml';
-      const envFile = settings?.envFile || 'install/.env.production';
-      this.validateRunnerAllowlist(composeFile, envFile);
-
-      const releaseTag = dto.targetReleaseTag ? semver.clean(dto.targetReleaseTag) : undefined;
-      if (dto.targetReleaseTag && !releaseTag) {
-        throw new HttpException('targetReleaseTag invalida', HttpStatus.BAD_REQUEST);
-      }
-
-      const scriptPath = path.join(process.cwd(), 'install', 'restore-db.sh');
-      if (!fs.existsSync(scriptPath)) {
-        throw new HttpException('Runner de restore nao encontrado (install/restore-db.sh)', HttpStatus.INTERNAL_SERVER_ERROR);
-      }
-
-      const { stdout, stderr } = await execFileAsync('bash', [scriptPath], {
-        cwd: process.cwd(),
-        timeout: 45 * 60 * 1000,
-        maxBuffer: 20 * 1024 * 1024,
-        env: {
-          ...process.env,
-          PROJECT_ROOT: process.cwd(),
-          COMPOSE_FILE: composeFile,
-          ENV_FILE: envFile,
-          BACKUPS_DIR: this.tempDir,
-          BACKUP_FILE: normalizedName,
-          RUN_MIGRATIONS: dto.runMigrations ? 'true' : 'false',
-          RESTORE_MODE: dto.mode || 'restore-only',
-          TARGET_RELEASE_TAG: releaseTag || '',
-          HEALTH_TIMEOUT: process.env.RESTORE_HEALTH_TIMEOUT || '180',
-        },
-      });
-
-      await (this.prisma as any).backupRestoreLog.update({
-        where: { id: restoreLog.id },
-        data: {
-          status: 'SUCCESS',
-          completedAt: new Date(),
-          stdout,
-          stderr,
-        },
-      });
-
-      await this.auditService.log({
-        action: 'BACKUP_RESTORE_SUCCESS',
-        userId,
-        ipAddress,
-        userAgent,
-        details: { fileName: normalizedName, restoreLogId: restoreLog.id },
-      });
-
-      return {
-        restoreLogId: restoreLog.id,
-        fileName: normalizedName,
-        message: 'Restore executado com sucesso',
-      };
-    } catch (error: any) {
-      const stdout = typeof error?.stdout === 'string' ? error.stdout : '';
-      const stderr = typeof error?.stderr === 'string' ? error.stderr : '';
-
-      if (restoreLog) {
-        await (this.prisma as any).backupRestoreLog.update({
-          where: { id: restoreLog.id },
-          data: {
-            status: 'FAILED',
-            completedAt: new Date(),
-            stdout,
-            stderr,
-            errorMessage: error.message || 'Erro no restore',
-          },
-        });
-
-        await this.auditService.log({
-          action: 'BACKUP_RESTORE_FAILED',
-          userId,
-          ipAddress,
-          userAgent,
-          details: {
-            fileName: dto.backupFile,
-            restoreLogId: restoreLog.id,
-            error: error.message || 'Erro no restore',
-          },
-        });
-      }
-
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        `Erro ao executar restore: ${error.message || 'erro desconhecido'}`,
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+    if (!file || !Buffer.isBuffer(file.buffer) || file.buffer.length === 0) {
+      throw new BadRequestException('Arquivo de backup vazio ou nao enviado');
     }
-  }
 
-  async listRestoreLogs(limit: number = 50): Promise<any[]> {
-    const logs = await (this.prisma as any).backupRestoreLog.findMany({
-      orderBy: { startedAt: 'desc' },
-      take: Math.min(limit, 200),
-      include: {
-        user: {
-          select: { id: true, name: true, email: true },
+    this.validateUploadedBackup(file);
+
+    const extension = path.extname(file.originalname || '').toLowerCase();
+    const generatedName = this.buildStoredFileName(`upload_${Date.now()}`, extension);
+    const filePath = this.resolveFilePath(generatedName);
+
+    fs.writeFileSync(filePath, file.buffer, { flag: 'wx' });
+    const checksumSha256 = this.calculateChecksumFromBuffer(file.buffer);
+
+    const artifact = await this.prisma.backupArtifact.create({
+      data: {
+        fileName: generatedName,
+        filePath,
+        sizeBytes: BigInt(file.size),
+        checksumSha256,
+        source: BackupArtifactSource.UPLOAD,
+        createdByUserId: userId,
+        metadata: {
+          originalName: file.originalname,
+          environmentScope: null,
+          executionMode: this.backupConfig.getExecutionMode(),
         },
       },
     });
 
-    return logs.map((log: any) => ({
-      id: log.id,
-      fileName: log.fileName,
-      status: log.status,
-      startedAt: log.startedAt,
-      completedAt: log.completedAt,
-      executedBy: log.user?.name || log.executedBy,
-      rollbackReason: log.rollbackReason,
-      errorMessage: log.errorMessage,
-    }));
+    await this.appendArtifactAudit('BACKUP_UPLOAD_STORED', artifact, userId, context);
+
+    return artifact;
   }
 
-  async getRestoreLog(logId: string): Promise<any> {
-    const log = await (this.prisma as any).backupRestoreLog.findUnique({
-      where: { id: logId },
-      include: { user: { select: { id: true, name: true, email: true } } },
-    });
-    if (!log) {
-      throw new HttpException('Log de restore nao encontrado', HttpStatus.NOT_FOUND);
-    }
-    return log;
-  }
-
-  private validateBackupFileName(fileName: string): string {
-    if (!/^[a-zA-Z0-9._-]+$/.test(fileName)) {
-      throw new HttpException('Nome de arquivo invalido', HttpStatus.BAD_REQUEST);
-    }
-    const normalizedName = path.basename(fileName);
-    if (normalizedName !== fileName) {
-      throw new HttpException('Nome de arquivo invalido', HttpStatus.BAD_REQUEST);
-    }
-    const backupsDir = path.resolve(this.tempDir);
-    const candidatePath = path.resolve(path.join(backupsDir, normalizedName));
-    if (!candidatePath.startsWith(backupsDir + path.sep)) {
-      throw new HttpException('Acesso a caminho invalido', HttpStatus.BAD_REQUEST);
-    }
-    return normalizedName;
-  }
-
-  private validateRunnerAllowlist(composeFile: string, envFile: string): void {
-    const allowedCompose = new Set(['docker-compose.prod.yml', 'docker-compose.prod.external.yml']);
-    const allowedEnv = new Set(['install/.env.production', '.env.production', '.env']);
-
-    if (!allowedCompose.has(composeFile)) {
-      throw new HttpException('composeFile nao permitido para restore', HttpStatus.BAD_REQUEST);
-    }
-    if (!allowedEnv.has(envFile)) {
-      throw new HttpException('envFile nao permitido para restore', HttpStatus.BAD_REQUEST);
-    }
-  }
-
-  private async ensureRestoreNotLocked(): Promise<void> {
-    const runningUpdate = await (this.prisma as any).updateLog.findFirst({
-      where: { status: 'STARTED' },
-    });
-    if (runningUpdate) {
-      throw new HttpException('Existe update em andamento. Restore bloqueado.', HttpStatus.CONFLICT);
-    }
-
-    const runningRestore = await (this.prisma as any).backupRestoreLog.findFirst({
-      where: { status: 'STARTED' },
-    });
-    if (runningRestore) {
-      throw new HttpException('Existe restore em andamento.', HttpStatus.CONFLICT);
-    }
-
-    const runningBackup = await this.prisma.backupLog.findFirst({
-      where: { operationType: 'BACKUP', status: 'STARTED' },
-    });
-    if (runningBackup) {
-      throw new HttpException('Existe backup em andamento. Restore bloqueado.', HttpStatus.CONFLICT);
-    }
-  }
-
-  private async ensureBackupNotLocked(): Promise<void> {
-    const runningUpdate = await (this.prisma as any).updateLog.findFirst({
-      where: { status: 'STARTED' },
-    });
-    if (runningUpdate) {
-      throw new HttpException('Existe update em andamento. Backup bloqueado.', HttpStatus.CONFLICT);
-    }
-
-    const runningRestore = await (this.prisma as any).backupRestoreLog.findFirst({
-      where: { status: 'STARTED' },
-    });
-    if (runningRestore) {
-      throw new HttpException('Existe restore em andamento. Backup bloqueado.', HttpStatus.CONFLICT);
-    }
-
-    const runningBackup = await this.prisma.backupLog.findFirst({
-      where: { operationType: 'BACKUP', status: 'STARTED' },
-    });
-    if (runningBackup) {
-      throw new HttpException('Existe backup em andamento.', HttpStatus.CONFLICT);
-    }
-  }
-
-  /**
-   * Garante que o diretório de backups existe
-   */
-  private ensureTempDirExists(): void {
-    if (!fs.existsSync(this.tempDir)) {
-      fs.mkdirSync(this.tempDir, { recursive: true });
-      this.logger.log(`Diretório de backups criado: ${this.tempDir}`);
-    }
-  }
-
-  private assertBackupsDirWritable(): void {
-    try {
-      fs.accessSync(this.tempDir, fs.constants.W_OK);
-    } catch (error: any) {
-      throw new Error(
-        `Diretorio de backup sem permissao de escrita (${this.tempDir}): ${error?.message || String(error)}`,
-      );
-    }
-  }
-
-  /**
-   * Cria backup completo do banco de dados
-   */
-  async createBackup(
-    dto: CreateBackupDto,
+  async queueRestoreFromArtifact(
+    artifactId: string,
     userId: string,
-    ipAddress?: string,
-    onProgress?: (message: string) => void,
-  ): Promise<{
-    backupId: string;
-    fileName: string;
-    fileSize: number;
-    checksum: string;
-    downloadUrl: string;
-    createdAt: Date;
-  }> {
-    const startTime = Date.now();
-    let backupLog: any;
+    restoreOptions: RestoreJobDto,
+    context: RequestContext,
+  ): Promise<BackupJob> {
+    await this.assertOperatorAllowed(userId);
+    await this.assertNoRunningUpdate();
 
-    try {
-      // Validar userId
-      if (!userId) {
-        throw new Error('UserId é obrigatório para criar backup');
-      }
+    const artifact = await this.getArtifactByIdOrThrow(artifactId);
+    this.assertArtifactUsableForRestore(artifact, restoreOptions);
 
-
-      this.assertBackupsDirWritable();
-      await this.ensureBackupNotLocked();
-      // Extrair credenciais do DATABASE_URL
-      const dbConfig = this.parseDatabaseUrl();
-      
-      // Gerar nome do arquivo com timestamp
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const fileName = `backup_${dbConfig.database}_${timestamp}.dump`;
-      const filePath = path.join(this.tempDir, fileName);
-
-      // Criar registro de log inicial
-      backupLog = await this.prisma.backupLog.create({
-        data: {
-          operationType: 'BACKUP',
-          status: 'STARTED',
-          fileName,
-          executedBy: userId,
-          ipAddress,
-          metadata: {
-            includeMetadata: dto.includeMetadata,
-            compressionLevel: dto.compressionLevel,
-          } as any,
+    const job = await this.prisma.backupJob.create({
+      data: {
+        type: BackupJobType.RESTORE,
+        status: BackupJobStatus.PENDING,
+        currentStep: 'QUEUED',
+        progressPercent: 0,
+        artifactId: artifact.id,
+        fileName: artifact.fileName,
+        filePath: artifact.filePath,
+        sizeBytes: artifact.sizeBytes,
+        checksumSha256: artifact.checksumSha256,
+        createdByUserId: userId,
+        metadata: {
+          runMigrations: !!restoreOptions.runMigrations,
+          forceCrossEnvironment: !!restoreOptions.forceCrossEnvironment,
+          allowUnsafeObjects: !!restoreOptions.allowUnsafeObjects,
+          reason: restoreOptions.reason || null,
+          environmentScope: this.backupConfig.getEnvironmentScope(),
         },
-      });
-
-      this.logger.log(`Iniciando backup: ${fileName}`);
-
-      // Enviar progresso inicial
-      if (onProgress) {
-        onProgress(`Iniciando backup do banco de dados ${dbConfig.database}...`);
-      }
-
-      // Registrar auditoria
-      await this.auditService.log({
-        action: 'BACKUP_STARTED',
-        userId,
-        ipAddress,
-        details: { fileName, backupId: backupLog.id },
-      });
-
-      // Executar pg_dump com logging de progresso
-      const args = this.getPgDumpArgs(dbConfig, filePath);
-      
-      this.logger.log('Executando pg_dump...');
-      if (onProgress) {
-        onProgress('Executando pg_dump - iniciando exportação...');
-      }
-
-      await this.executeCommand('pg_dump', args, this.timeout, (progress) => {
-        // Log do progresso para debug e envio para frontend
-        if (progress.trim()) {
-          this.logger.debug(`pg_dump: ${progress.trim()}`);
-          if (onProgress) {
-            onProgress(progress.trim());
-          }
-        }
-      }, dbConfig.password); // ✅ Passar senha para evitar prompt interativo
-
-      // Verificar se arquivo foi criado
-      if (!fs.existsSync(filePath)) {
-        throw new Error('Arquivo de backup não foi criado');
-      }
-
-      if (onProgress) {
-        onProgress('Backup exportado com sucesso, validando arquivo...');
-      }
-
-      // Obter tamanho do arquivo
-      const stats = fs.statSync(filePath);
-      const fileSize = stats.size;
-
-      // Validar tamanho
-      if (fileSize === 0) {
-        throw new Error('Arquivo de backup está vazio');
-      }
-
-      // Gerar checksum
-      if (onProgress) {
-        onProgress('Calculando checksum de integridade...');
-      }
-      const checksum = await this.calculateChecksum(filePath);
-
-      // Calcular duração
-      const durationSeconds = Math.floor((Date.now() - startTime) / 1000);
-
-      // Atualizar log de backup
-      await this.prisma.backupLog.update({
-        where: { id: backupLog.id },
-        data: {
-          status: 'SUCCESS',
-          fileSize: BigInt(fileSize),
-          completedAt: new Date(),
-          durationSeconds,
-          metadata: {
-            includeMetadata: dto.includeMetadata,
-            compressionLevel: dto.compressionLevel,
-            checksum,
-          } as any,
-        },
-      });
-
-      // Registrar auditoria de sucesso
-      await this.auditService.log({
-        action: 'BACKUP_SUCCESS',
-        userId,
-        ipAddress,
-        details: { fileName, backupId: backupLog.id, fileSize, durationSeconds },
-      });
-
-      this.logger.log(`Backup criado com sucesso: ${fileName} (${fileSize} bytes)`);
-
-      if (onProgress) {
-        onProgress(`Backup finalizado: ${fileName} (${(fileSize / 1024 / 1024).toFixed(2)} MB)`);
-      }
-
-      return {
-        backupId: backupLog.id,
-        fileName,
-        fileSize,
-        checksum,
-        downloadUrl: `/api/backup/download/${backupLog.id}`,
-        createdAt: new Date(),
-      };
-
-    } catch (error) {
-      this.logger.error(`Erro ao criar backup: ${error.message}`, error.stack);
-
-      // Atualizar log com erro
-      if (backupLog) {
-        await this.prisma.backupLog.update({
-          where: { id: backupLog.id },
-          data: {
-            status: 'FAILED',
-            completedAt: new Date(),
-            errorMessage: error.message,
-            durationSeconds: Math.floor((Date.now() - startTime) / 1000),
-          },
-        });
-
-        // Registrar auditoria de falha
-        await this.auditService.log({
-          action: 'BACKUP_FAILED',
-          userId,
-          ipAddress,
-          details: { error: error.message, backupId: backupLog.id },
-        });
-      }
-
-      throw new HttpException(
-        `Erro ao criar backup: ${error.message}`,
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
-
-  /**
-   * Faz parse da URL de conexão do banco de dados
-   */
-  private parseDatabaseUrl(): {
-    host: string;
-    port: string;
-    user: string;
-    password: string;
-    database: string;
-  } {
-    const databaseUrl = process.env.DATABASE_URL;
-    if (!databaseUrl) {
-      throw new Error('DATABASE_URL não configurada');
-    }
-
-    try {
-      // Formato: postgresql://user:password@host:port/database
-      const url = new URL(databaseUrl);
-      
-      return {
-        host: url.hostname,
-        port: url.port || '5432',
-        user: url.username,
-        password: url.password,
-        database: url.pathname.slice(1), // Remove a barra inicial
-      };
-    } catch (error) {
-      throw new Error(`Erro ao fazer parse de DATABASE_URL: ${error.message}`);
-    }
-  }
-
-  /**
-   * Obtém argumentos para pg_dump
-   */
-  private getPgDumpArgs(
-    dbConfig: ReturnType<typeof this.parseDatabaseUrl>,
-    filePath: string,
-  ): string[] {
-    return [
-      `--host=${dbConfig.host}`,
-      `--port=${dbConfig.port}`,
-      `--username=${dbConfig.user}`,
-      `--dbname=${dbConfig.database}`,
-      '--format=custom',
-      '--verbose',
-      `--file=${filePath}`,
-    ];
-  }
-
-  /**
-   * Obtém argumentos para pg_restore
-   */
-  private getPgRestoreArgs(
-    dbConfig: ReturnType<typeof this.parseDatabaseUrl>,
-    filePath: string,
-  ): string[] {
-    return [
-      `--host=${dbConfig.host}`,
-      `--port=${dbConfig.port}`,
-      `--username=${dbConfig.user}`,
-      `--dbname=${dbConfig.database}`,
-      '--clean',
-      '--if-exists',
-      '--no-owner',
-      '--no-acl',
-      '--verbose',
-      filePath,
-    ];
-  }
-
-  /**
-   * Executa comando shell com timeout e callback de progresso de forma segura
-   */
-  private async executeCommand(
-    command: string,
-    args: string[],
-    timeoutMs: number,
-    onProgress?: (data: string) => void,
-    password?: string,
-  ): Promise<{ stdout: string; stderr: string }> {
-    return new Promise((resolve, reject) => {
-      const env = { ...process.env };
-      if (password) {
-        env.PGPASSWORD = password;
-      }
-
-      const childProcess = spawn(command, args, { env });
-
-      let stdout = '';
-      let stderr = '';
-
-      const timeout = setTimeout(() => {
-        childProcess.kill();
-        reject(new Error(`Comando ${command} excedeu o tempo limite de ${timeoutMs}ms`));
-      }, timeoutMs);
-
-      if (childProcess.stdout) {
-        childProcess.stdout.on('data', (data) => {
-          stdout += data.toString();
-          if (onProgress) onProgress(data.toString());
-        });
-      }
-
-      if (childProcess.stderr) {
-        childProcess.stderr.on('data', (data) => {
-          stderr += data.toString();
-          if (onProgress) onProgress(data.toString());
-          this.logger.debug(`[${command}]: ${data.toString().trim()}`);
-        });
-      }
-
-      childProcess.on('close', (code) => {
-        clearTimeout(timeout);
-        if (code === 0) {
-          resolve({ stdout, stderr });
-        } else {
-          reject(new Error(`Comando ${command} falhou com código ${code}: ${stderr}`));
-        }
-      });
-
-      childProcess.on('error', (error) => {
-        clearTimeout(timeout);
-        reject(error);
-      });
-    });
-  }
-
-  /**
-   * Calcula checksum SHA256 de um arquivo
-   */
-  private async calculateChecksum(filePath: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const hash = createHash('sha256');
-      const stream = fs.createReadStream(filePath);
-
-      stream.on('data', (data) => hash.update(data));
-      stream.on('end', () => resolve(hash.digest('hex')));
-      stream.on('error', reject);
-    });
-  }
-
-  /**
-   * Obtém caminho do arquivo de backup
-   */
-  getBackupFilePath(backupId: string): string {
-    // Buscar no banco de dados
-    return path.join(this.tempDir, backupId);
-  }
-
-  /**
-   * Lista todos os arquivos de backup disponíveis no diretório
-   */
-  async listAvailableBackups(): Promise<Array<{
-    fileName: string;
-    filePath: string;
-    fileSize: number;
-    createdAt: Date;
-    backupId?: string;
-  }>> {
-    try {
-      const files = fs.readdirSync(this.tempDir);
-      const backupFiles = files.filter(file => 
-        file.endsWith('.dump') || file.endsWith('.sql') || file.endsWith('.backup')
-      );
-
-      const backups = backupFiles.map(fileName => {
-        const filePath = path.join(this.tempDir, fileName);
-        const stats = fs.statSync(filePath);
-        
-        return {
-          fileName,
-          filePath,
-          fileSize: stats.size,
-          createdAt: stats.mtime,
-        };
-      });
-
-      // Buscar informações do banco de dados para arquivos correspondentes
-      const backupsWithInfo = await Promise.all(
-        backups.map(async (backup) => {
-          const dbBackup = await this.prisma.backupLog.findFirst({
-            where: {
-              fileName: backup.fileName,
-              operationType: 'BACKUP',
-            },
-            orderBy: { startedAt: 'desc' },
-          });
-
-          return {
-            ...backup,
-            backupId: dbBackup?.id,
-          };
-        })
-      );
-
-      // Ordenar por data de criação (mais recentes primeiro)
-      return backupsWithInfo.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    } catch (error) {
-      this.logger.error(`Erro ao listar backups: ${error.message}`);
-      return [];
-    }
-  }
-
-  /**
-   * Retorna histórico de operações de backup/restore
-   */
-  async getBackupLogs(
-    limit: number = 50,
-    operationType?: 'BACKUP' | 'RESTORE',
-    status?: 'STARTED' | 'SUCCESS' | 'FAILED' | 'CANCELLED',
-  ): Promise<any[]> {
-    const logs = await this.prisma.backupLog.findMany({
-      where: {
-        ...(operationType && { operationType }),
-        ...(status && { status }),
-      },
-      orderBy: { startedAt: 'desc' },
-      take: Math.min(limit, 200),
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
+        logs: [],
       },
     });
 
-    return logs.map(log => ({
-      id: log.id,
-      operationType: log.operationType,
-      status: log.status,
-      fileName: log.fileName,
-      fileSize: log.fileSize ? Number(log.fileSize) : null,
-      startedAt: log.startedAt,
-      completedAt: log.completedAt,
-      durationSeconds: log.durationSeconds,
-      executedBy: log.user?.name || 'Desconhecido',
-      errorMessage: log.errorMessage,
-    }));
-  }
-
-  /**
-   * Obtém informações de um backup específico
-   */
-  async getBackupInfo(backupId: string): Promise<any> {
-    const backup = await this.prisma.backupLog.findUnique({
-      where: { id: backupId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
+    await this.auditService.log({
+      action: 'RESTORE_JOB_CREATED',
+      userId,
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+      details: { jobId: job.id, artifactId: artifact.id, fileName: artifact.fileName },
     });
 
-    if (!backup) {
-      return null;
+    return job;
+  }
+
+  async queueRestoreFromUpload(
+    uploadId: string,
+    userId: string,
+    restoreOptions: RestoreJobDto,
+    context: RequestContext,
+  ): Promise<BackupJob> {
+    const artifact = await this.getArtifactByIdOrThrow(uploadId);
+    if (artifact.source !== BackupArtifactSource.UPLOAD) {
+      throw new BadRequestException('O artefato informado nao e um upload de backup');
     }
+    return this.queueRestoreFromArtifact(uploadId, userId, restoreOptions, context);
+  }
+
+  async listBackupsAndJobs(limit = 50): Promise<BackupListResponse> {
+    const safeLimit = Math.max(1, Math.min(limit, 200));
+
+    const [artifacts, jobs] = await Promise.all([
+      this.prisma.backupArtifact.findMany({
+        where: { deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: safeLimit,
+      }),
+      this.prisma.backupJob.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: safeLimit,
+      }),
+    ]);
 
     return {
-      id: backup.id,
-      fileName: backup.fileName,
-      fileSize: backup.fileSize ? Number(backup.fileSize) : 0,
-      status: backup.status,
-      createdAt: backup.startedAt,
-      executedBy: backup.user?.name,
+      artifacts: artifacts.map((artifact) => ({
+        id: artifact.id,
+        fileName: artifact.fileName,
+        fileSize: Number(artifact.sizeBytes),
+        source: artifact.source,
+        checksumSha256: artifact.checksumSha256,
+        createdAt: artifact.createdAt,
+        metadata: this.toJsonRecord(artifact.metadata),
+      })),
+      jobs: jobs.map((job) => ({
+        id: job.id,
+        type: job.type,
+        status: job.status,
+        progressPercent: job.progressPercent,
+        currentStep: job.currentStep,
+        fileName: job.fileName,
+        createdAt: job.createdAt,
+        startedAt: job.startedAt,
+        finishedAt: job.finishedAt,
+        error: job.error,
+        createdByUserId: job.createdByUserId,
+        artifactId: job.artifactId,
+      })),
     };
   }
 
-  /**
-   * Valida arquivo de backup antes de restaurar
-   */
-  async validateBackupFile(file: Express.Multer.File): Promise<{
-    valid: boolean;
-    info?: any;
-    error?: string;
-  }> {
-    try {
-      // Validar extensão
-      const validExtensions = ['.sql', '.dump', '.backup'];
-      const ext = path.extname(file.originalname).toLowerCase();
-      
-      if (!validExtensions.includes(ext)) {
-        return {
-          valid: false,
-          error: 'Formato de arquivo inválido. Use .sql, .dump ou .backup',
-        };
-      }
+  async listAvailableArtifacts(limit = 100): Promise<BackupArtifact[]> {
+    return await this.prisma.backupArtifact.findMany({
+      where: { deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+      take: Math.max(1, Math.min(limit, 200)),
+    });
+  }
 
-      // Validar tamanho
-      if (file.size > this.maxFileSize) {
-        return {
-          valid: false,
-          error: `Arquivo muito grande. Tamanho máximo: ${this.maxFileSize / 1024 / 1024 / 1024}GB`,
-        };
-      }
+  async getJobStatus(jobId: string): Promise<BackupJob> {
+    const job = await this.prisma.backupJob.findUnique({ where: { id: jobId } });
+    if (!job) {
+      throw new NotFoundException('Job nao encontrado');
+    }
+    return job;
+  }
 
-      if (file.size === 0) {
-        return {
-          valid: false,
-          error: 'Arquivo vazio',
-        };
-      }
+  async cancelPendingJob(jobId: string, userId: string): Promise<BackupJob> {
+    await this.assertOperatorAllowed(userId);
 
-      // Detectar formato do arquivo
-      let isValid = false;
-      let detectedFormat = 'UNKNOWN';
+    const job = await this.prisma.backupJob.findUnique({ where: { id: jobId } });
+    if (!job) {
+      throw new NotFoundException('Job nao encontrado');
+    }
 
-      // Verificar se é formato custom/binário do PostgreSQL
-      // Formato custom do pg_dump começa com "PGDMP" (magic number)
-      if (ext === '.dump' || ext === '.backup') {
-        // Ler primeiros 5 bytes para verificar magic number
-        const header = file.buffer.toString('ascii', 0, Math.min(5, file.size));
-        
-        if (header === 'PGDMP') {
-          this.logger.log('✅ Arquivo identificado como PostgreSQL custom format (binário)');
-          isValid = true;
-          detectedFormat = 'CUSTOM';
-        } else {
-          // Tentar ler como texto (pode ser dump em formato plain)
-          try {
-            const content = file.buffer.toString('utf8', 0, Math.min(1000, file.size));
-            const isPgDump = content.includes('PostgreSQL') || 
-                            content.includes('pg_dump') ||
-                            content.includes('CREATE TABLE') ||
-                            content.includes('COPY ');
-            
-            if (isPgDump) {
-              this.logger.log('✅ Arquivo identificado como PostgreSQL plain format (texto)');
-              isValid = true;
-              detectedFormat = 'PLAIN';
-            }
-          } catch {
-            this.logger.warn('Não foi possível ler arquivo como texto');
-          }
-        }
-      } 
-      // Arquivos .sql devem ser texto puro
-      else if (ext === '.sql') {
-        try {
-          const content = file.buffer.toString('utf8', 0, Math.min(1000, file.size));
-          const isPgDump = content.includes('PostgreSQL') || 
-                          content.includes('pg_dump') ||
-                          content.includes('CREATE TABLE') ||
-                          content.includes('INSERT INTO') ||
-                          content.includes('COPY ');
-          
-          if (isPgDump) {
-            this.logger.log('✅ Arquivo SQL identificado como backup PostgreSQL');
-            isValid = true;
-            detectedFormat = 'SQL';
-          }
-        } catch (err) {
-          this.logger.error('Erro ao ler arquivo SQL', err);
-        }
-      }
+    if (job.status === BackupJobStatus.SUCCESS || job.status === BackupJobStatus.FAILED) {
+      throw new ConflictException('Job finalizado e nao pode ser cancelado');
+    }
 
-      if (!isValid) {
-        return {
-          valid: false,
-          error: 'Arquivo não parece ser um backup PostgreSQL válido. Verifique o formato.',
-        };
-      }
+    const updated = await this.prisma.backupJob.update({
+      where: { id: jobId },
+      data: {
+        status: BackupJobStatus.CANCELED,
+        cancelRequested: true,
+        finishedAt: new Date(),
+        currentStep: 'CANCELED',
+      },
+    });
 
-      return {
-        valid: true,
-        info: {
-          format: detectedFormat,
-          extension: ext.replace('.', '').toUpperCase(),
-          size: file.size,
-          fileName: file.originalname,
-        },
-      };
-    } catch (error) {
-      this.logger.error(`Erro ao validar arquivo: ${error.message}`);
-      return {
-        valid: false,
-        error: `Erro na validação: ${error.message}`,
-      };
+    await this.appendJobLog(jobId, 'WARN', 'Job cancelado pelo operador');
+    return updated;
+  }
+
+  async deleteArtifactByFileName(fileName: string, userId: string): Promise<void> {
+    await this.assertOperatorAllowed(userId);
+
+    const artifact = await this.prisma.backupArtifact.findFirst({
+      where: { fileName, deletedAt: null },
+    });
+
+    if (!artifact) {
+      throw new NotFoundException('Backup nao encontrado');
+    }
+
+    const activeJob = await this.prisma.backupJob.findFirst({
+      where: {
+        artifactId: artifact.id,
+        status: { in: [BackupJobStatus.PENDING, BackupJobStatus.RUNNING] },
+      },
+    });
+
+    if (activeJob) {
+      throw new ConflictException('Existe job ativo utilizando este backup');
+    }
+
+    this.deleteFileIfExists(artifact.filePath);
+
+    await this.prisma.backupArtifact.update({
+      where: { id: artifact.id },
+      data: { deletedAt: new Date() },
+    });
+  }
+
+  async resolveArtifactDownload(
+    artifactId: string,
+  ): Promise<{ fileName: string; filePath: string; size: number }> {
+    const artifact = await this.getArtifactByIdOrThrow(artifactId);
+    if (artifact.deletedAt) {
+      throw new NotFoundException('Backup removido');
+    }
+    this.assertSafeFilePath(artifact.filePath);
+    if (!fs.existsSync(artifact.filePath)) {
+      throw new NotFoundException('Arquivo de backup nao encontrado no disco');
+    }
+
+    const stats = fs.statSync(artifact.filePath);
+    return {
+      fileName: artifact.fileName,
+      filePath: artifact.filePath,
+      size: stats.size,
+    };
+  }
+
+  async resolveArtifactByFileName(
+    fileName: string,
+  ): Promise<{ fileName: string; filePath: string; size: number }> {
+    const safeName = this.normalizeFileName(fileName);
+    const artifact = await this.prisma.backupArtifact.findFirst({
+      where: { fileName: safeName, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!artifact) {
+      throw new NotFoundException('Backup nao encontrado');
+    }
+    return this.resolveArtifactDownload(artifact.id);
+  }
+
+  async findArtifactByFileName(fileName: string): Promise<BackupArtifact> {
+    const safeName = this.normalizeFileName(fileName);
+    const artifact = await this.prisma.backupArtifact.findFirst({
+      where: { fileName: safeName, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!artifact) {
+      throw new NotFoundException('Backup nao encontrado');
+    }
+    return artifact;
+  }
+
+  async listLegacyLogs(limit = 50): Promise<any[]> {
+    const safeLimit = Math.max(1, Math.min(limit, 200));
+    const jobs = await this.prisma.backupJob.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: safeLimit,
+    });
+
+    return jobs.map((job) => ({
+      id: job.id,
+      operationType: job.type,
+      status: job.status,
+      fileName: job.fileName,
+      fileSize: job.sizeBytes ? Number(job.sizeBytes) : null,
+      startedAt: job.startedAt || job.createdAt,
+      completedAt: job.finishedAt,
+      durationSeconds:
+        job.startedAt && job.finishedAt
+          ? Math.max(0, Math.floor((job.finishedAt.getTime() - job.startedAt.getTime()) / 1000))
+          : null,
+      executedBy: job.createdByUserId || 'system',
+      errorMessage: job.error,
+    }));
+  }
+
+  async claimNextPendingJob(): Promise<BackupJob | null> {
+    const pending = await this.prisma.backupJob.findFirst({
+      where: {
+        status: BackupJobStatus.PENDING,
+        cancelRequested: false,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (!pending) {
+      return null;
+    }
+
+    const claim = await this.prisma.backupJob.updateMany({
+      where: {
+        id: pending.id,
+        status: BackupJobStatus.PENDING,
+        cancelRequested: false,
+      },
+      data: {
+        status: BackupJobStatus.RUNNING,
+        startedAt: new Date(),
+        currentStep: 'CLAIMED',
+      },
+    });
+
+    if (claim.count !== 1) {
+      return null;
+    }
+
+    return this.prisma.backupJob.findUnique({ where: { id: pending.id } });
+  }
+
+  async returnJobToPending(jobId: string, reason: string): Promise<void> {
+    await this.prisma.backupJob.update({
+      where: { id: jobId },
+      data: {
+        status: BackupJobStatus.PENDING,
+        currentStep: 'WAITING_LOCK',
+      },
+    });
+
+    await this.appendJobLog(jobId, 'INFO', reason);
+  }
+
+  async markJobSuccess(jobId: string, details: Partial<BackupJob> = {}): Promise<void> {
+    await this.prisma.backupJob.update({
+      where: { id: jobId },
+      data: {
+        status: BackupJobStatus.SUCCESS,
+        progressPercent: 100,
+        currentStep: 'COMPLETED',
+        finishedAt: new Date(),
+        ...details,
+      },
+    });
+  }
+
+  async markJobFailed(jobId: string, error: unknown): Promise<void> {
+    const message = this.errorMessage(error);
+    await this.prisma.backupJob.update({
+      where: { id: jobId },
+      data: {
+        status: BackupJobStatus.FAILED,
+        finishedAt: new Date(),
+        currentStep: 'FAILED',
+        error: message,
+      },
+    });
+
+    await this.appendJobLog(jobId, 'ERROR', message);
+    await this.notifyFailure(jobId, message);
+  }
+
+  async markJobCanceled(jobId: string, reason: string): Promise<void> {
+    await this.prisma.backupJob.update({
+      where: { id: jobId },
+      data: {
+        status: BackupJobStatus.CANCELED,
+        finishedAt: new Date(),
+        currentStep: 'CANCELED',
+        error: reason,
+      },
+    });
+
+    await this.appendJobLog(jobId, 'WARN', reason);
+  }
+
+  async heartbeat(jobId: string): Promise<void> {
+    await this.prisma.backupJob.update({
+      where: { id: jobId },
+      data: { updatedAt: new Date() },
+    });
+  }
+
+  async updateJobProgress(
+    jobId: string,
+    step: string,
+    progressPercent: number,
+    message?: string,
+    level: JobLogEntry['level'] = 'INFO',
+  ): Promise<void> {
+    await this.prisma.backupJob.update({
+      where: { id: jobId },
+      data: {
+        currentStep: step,
+        progressPercent: Math.max(0, Math.min(100, Math.round(progressPercent))),
+      },
+    });
+
+    if (message) {
+      await this.appendJobLog(jobId, level, message);
     }
   }
 
-  /**
-   * Restaura banco de dados a partir de arquivo de backup
-   */
-  async restoreBackup(
-    file: Express.Multer.File,
-    userId: string,
-    ipAddress?: string,
-  ): Promise<{
-    restoreId: string;
-    fileName: string;
-    durationSeconds: number;
-    completedAt: Date;
-  }> {
-    const startTime = Date.now();
-    let restoreLog: any;
-    let backupSafetyFile: string | null = null;
+  async executeJob(jobId: string): Promise<void> {
+    const job = await this.prisma.backupJob.findUnique({
+      where: { id: jobId },
+      include: { artifact: true },
+    });
+
+    if (!job) {
+      throw new NotFoundException('Job nao encontrado para execucao');
+    }
+
+    if (job.cancelRequested || job.status === BackupJobStatus.CANCELED) {
+      await this.markJobCanceled(job.id, 'Job cancelado antes da execucao');
+      return;
+    }
+
+    if (job.type === BackupJobType.BACKUP) {
+      await this.runBackupJob(job);
+      return;
+    }
+
+    await this.runRestoreJob(job);
+  }
+
+  async appendJobLog(jobId: string, level: JobLogEntry['level'], message: string): Promise<void> {
+    const job = await this.prisma.backupJob.findUnique({
+      where: { id: jobId },
+      select: { logs: true },
+    });
+
+    const currentLogs = this.parseLogs(job?.logs);
+    currentLogs.push({
+      at: new Date().toISOString(),
+      level,
+      message: message.slice(0, 4000),
+    });
+
+    const trimmed = currentLogs.slice(-400);
+
+    await this.prisma.backupJob.update({
+      where: { id: jobId },
+      data: {
+        logs: trimmed as any,
+      },
+    });
+  }
+
+  private async tryAppendJobLog(jobId: string, level: JobLogEntry['level'], message: string): Promise<void> {
+    try {
+      await this.appendJobLog(jobId, level, message);
+    } catch (error) {
+      this.logger.warn(`Falha ao registrar log do job ${jobId}: ${String(error)}`);
+    }
+  }
+
+  async applyRetentionPolicy(): Promise<void> {
+    const retention = this.backupConfig.getRetentionCount();
+    const artifacts = await this.prisma.backupArtifact.findMany({
+      where: {
+        source: BackupArtifactSource.BACKUP,
+        deletedAt: null,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const stale = artifacts.slice(retention);
+    for (const artifact of stale) {
+      const inUse = await this.prisma.backupJob.findFirst({
+        where: {
+          artifactId: artifact.id,
+          status: { in: [BackupJobStatus.PENDING, BackupJobStatus.RUNNING] },
+        },
+      });
+
+      if (inUse) {
+        continue;
+      }
+
+      this.deleteFileIfExists(artifact.filePath);
+      await this.prisma.backupArtifact.update({
+        where: { id: artifact.id },
+        data: { deletedAt: new Date() },
+      });
+    }
+  }
+
+  private async runBackupJob(job: BackupJob): Promise<void> {
+    await this.assertNoRunningUpdate();
+
+    const db = this.backupConfig.getDatabaseConfig();
+    const extension = '.dump';
+    const fileName = this.buildStoredFileName(`backup_${Date.now()}`, extension);
+    const filePath = this.resolveFilePath(fileName);
+
+    await this.updateJobProgress(job.id, 'BACKUP_PREPARING', 5, 'Preparando comando pg_dump');
+
+    const args = [
+      '--format=custom',
+      '--compress=6',
+      '--no-owner',
+      '--no-privileges',
+      '--verbose',
+      '--host',
+      db.host,
+      '--port',
+      String(db.port),
+      '--username',
+      db.user,
+      '--dbname',
+      db.database,
+      '--file',
+      filePath,
+      '--lock-wait-timeout=30000',
+    ];
+
+    const env = this.buildCommandEnv(db.password);
+
+    await this.updateJobProgress(job.id, 'BACKUP_RUNNING', 35, 'Executando pg_dump');
+
+    await this.processService.runCommand({
+      command: this.backupConfig.getBinary('pg_dump'),
+      args,
+      env,
+      timeoutMs: this.backupConfig.getJobTimeoutMs(),
+      cwd: this.backupConfig.getProjectRoot(),
+      onStderrLine: async (line) => {
+        if (/dumping|reading|finished/i.test(line)) {
+          await this.appendJobLog(job.id, 'INFO', line);
+        }
+      },
+    });
+
+    if (!fs.existsSync(filePath)) {
+      throw new Error('Arquivo de backup nao foi criado');
+    }
+
+    const size = fs.statSync(filePath).size;
+    if (size <= 0) {
+      throw new Error('Arquivo de backup gerado sem conteudo');
+    }
+
+    await this.updateJobProgress(job.id, 'BACKUP_CHECKSUM', 80, 'Calculando checksum SHA256');
+    const checksum = await this.calculateChecksumFromFile(filePath);
+
+    const artifact = await this.prisma.backupArtifact.create({
+      data: {
+        fileName,
+        filePath,
+        sizeBytes: BigInt(size),
+        checksumSha256: checksum,
+        source: BackupArtifactSource.BACKUP,
+        createdByUserId: job.createdByUserId,
+        metadata: {
+          environmentScope: this.backupConfig.getEnvironmentScope(),
+          executionMode: this.backupConfig.getExecutionMode(),
+        },
+      },
+    });
+
+    await this.markJobSuccess(job.id, {
+      artifactId: artifact.id,
+      fileName,
+      filePath,
+      sizeBytes: BigInt(size),
+      checksumSha256: checksum,
+    });
+
+    await this.appendJobLog(job.id, 'INFO', `Backup concluido: ${fileName}`);
+
+    await this.auditService.log({
+      action: 'BACKUP_JOB_SUCCESS',
+      userId: job.createdByUserId || undefined,
+      details: {
+        jobId: job.id,
+        artifactId: artifact.id,
+        fileName,
+        fileSize: size,
+      },
+    });
+
+    await this.applyRetentionPolicy();
+  }
+
+  private async runRestoreJob(
+    job: BackupJob & {
+      artifact?: BackupArtifact | null;
+    },
+  ): Promise<void> {
+    await this.assertNoRunningUpdate();
+
+    const artifact = job.artifact || (job.artifactId ? await this.getArtifactByIdOrThrow(job.artifactId) : null);
+    if (!artifact) {
+      throw new Error('Artefato de restore nao encontrado');
+    }
+
+    this.assertSafeFilePath(artifact.filePath);
+    if (!fs.existsSync(artifact.filePath)) {
+      throw new Error('Arquivo de restore nao encontrado no disco');
+    }
+
+    await this.updateJobProgress(job.id, 'RESTORE_VALIDATING_FILE', 10, 'Validando integridade do arquivo');
+
+    const checksum = await this.calculateChecksumFromFile(artifact.filePath);
+    if (checksum !== artifact.checksumSha256) {
+      throw new Error('Checksum do arquivo diverge do checksum registrado');
+    }
+
+    await this.validateDumpArchiveSignatureFromFile(artifact.filePath);
+
+    const db = this.backupConfig.getDatabaseConfig();
+    const stagingDatabase = this.backupConfig.buildStagingDatabaseName(job.id);
+    const metadata = this.toJsonRecord(job.metadata);
+
+    await this.updateJobProgress(job.id, 'RESTORE_STAGE_DB_PREPARE', 20, 'Preparando banco staging');
+    await this.recreateDatabase(stagingDatabase, db.password);
+
+    const restoreListPath = await this.buildFilteredRestoreList({
+      dumpPath: artifact.filePath,
+      jobId: job.id,
+      password: db.password,
+      artifactSource: artifact.source,
+      allowUnsafeObjects: metadata?.allowUnsafeObjects === true,
+    });
+
+    let rollbackRestoreListPath: string | undefined;
 
     try {
-      // Validar userId
-      if (!userId) {
-        throw new Error('UserId é obrigatório para executar restore');
+      await this.updateJobProgress(job.id, 'RESTORE_STAGE_DB_LOAD', 40, 'Restaurando dump no banco staging');
+      await this.executePgRestore({
+        dbName: stagingDatabase,
+        dumpPath: artifact.filePath,
+        listFilePath: restoreListPath,
+        password: db.password,
+        onLine: async (line) => {
+          if (/processing item|creating|loading data|setting|finished/i.test(line)) {
+            await this.appendJobLog(job.id, 'INFO', line);
+          }
+        },
+      });
+
+      await this.updateJobProgress(job.id, 'RESTORE_STAGE_DB_VALIDATE', 55, 'Validando banco staging');
+      await this.validateStagingDatabase(stagingDatabase, db.password);
+
+      await this.updateJobProgress(job.id, 'RESTORE_SAFETY_BACKUP', 70, 'Criando backup de seguranca pre-restore');
+      const safety = await this.createSafetyBackup(job, db.password);
+      rollbackRestoreListPath = await this.buildFilteredRestoreList({
+        dumpPath: safety.filePath,
+        jobId: `${job.id}_rollback`,
+        password: db.password,
+        artifactSource: safety.source,
+        allowUnsafeObjects: true,
+      });
+
+      await this.updateJobProgress(job.id, 'RESTORE_ENTER_MAINTENANCE', 80, 'Ativando modo manutencao');
+      this.runtimeState.enableMaintenance(job.id, 'restore-cutover');
+
+      try {
+        const cutoverTimeoutMs = Math.min(
+          this.backupConfig.getJobTimeoutMs(),
+          this.backupConfig.getRestoreMaintenanceWindowSeconds() * 1000,
+        );
+
+        await this.updateJobProgress(job.id, 'RESTORE_CUTOVER', 90, 'Aplicando restore no banco principal');
+        try {
+          await this.executePgRestore({
+            dbName: db.database,
+            dumpPath: artifact.filePath,
+            listFilePath: restoreListPath,
+            password: db.password,
+            timeoutMs: cutoverTimeoutMs,
+            onLine: async (line) => {
+              if (/processing item|creating|loading data|setting|finished/i.test(line)) {
+                await this.tryAppendJobLog(job.id, 'INFO', line);
+              }
+            },
+          });
+        } catch (cutoverError) {
+          await this.tryAppendJobLog(job.id, 'ERROR', `Falha no cutover: ${this.errorMessage(cutoverError)}`);
+          await this.tryAppendJobLog(job.id, 'WARN', 'Iniciando rollback automatico com safety backup');
+
+          let rollbackError: unknown = null;
+          try {
+            await this.executePgRestore({
+              dbName: db.database,
+              dumpPath: safety.filePath,
+              listFilePath: rollbackRestoreListPath,
+              password: db.password,
+              timeoutMs: cutoverTimeoutMs,
+              onLine: async (line) => {
+                if (/processing item|creating|loading data|setting|finished/i.test(line)) {
+                  await this.tryAppendJobLog(job.id, 'INFO', `[rollback] ${line}`);
+                }
+              },
+            });
+            await this.tryAppendJobLog(job.id, 'INFO', 'Rollback automatico concluido com sucesso');
+          } catch (error) {
+            rollbackError = error;
+            await this.tryAppendJobLog(
+              job.id,
+              'ERROR',
+              `Rollback automatico falhou: ${this.errorMessage(rollbackError)}`,
+            );
+          }
+
+          let reconnectError: unknown = null;
+          try {
+            await this.ensurePrismaConnectionHealthy();
+          } catch (error) {
+            reconnectError = error;
+            await this.tryAppendJobLog(job.id, 'ERROR', `Falha ao recuperar conexao Prisma: ${this.errorMessage(error)}`);
+          }
+
+          throw this.wrapRestoreCutoverError(cutoverError, rollbackError, reconnectError);
+        }
+
+        await this.ensurePrismaConnectionHealthy();
+      } finally {
+        this.runtimeState.disableMaintenance(job.id);
       }
 
-      // Validar arquivo primeiro
-      const validation = await this.validateBackupFile(file);
-      if (!validation.valid) {
-        throw new Error(validation.error || 'Arquivo inválido');
+      if (metadata?.runMigrations === true) {
+        await this.updateJobProgress(job.id, 'RESTORE_MIGRATIONS', 95, 'Executando migrate deploy');
+        await this.runPostRestoreMigrations(db.password);
       }
 
-      // Extrair credenciais do DATABASE_URL
-      const dbConfig = this.parseDatabaseUrl();
+      await this.updateJobProgress(job.id, 'RESTORE_CLEANUP', 98, 'Limpando banco staging');
+      await this.dropDatabase(stagingDatabase, db.password);
 
-      // Salvar arquivo temporariamente
-      const tempFileName = `restore_${Date.now()}_${file.originalname}`;
-      const tempFilePath = path.join(this.tempDir, tempFileName);
-      fs.writeFileSync(tempFilePath, file.buffer);
+      await this.markJobSuccess(job.id, {
+        fileName: artifact.fileName,
+        filePath: artifact.filePath,
+        sizeBytes: artifact.sizeBytes,
+        checksumSha256: artifact.checksumSha256,
+        metadata: {
+          ...(this.toJsonRecord(job.metadata) || {}),
+          safetyBackupArtifactId: safety.id,
+          stagingDatabase,
+        } as any,
+      });
 
-      // Criar registro de log inicial
-      restoreLog = await this.prisma.backupLog.create({
+      await this.auditService.log({
+        action: 'RESTORE_JOB_SUCCESS',
+        userId: job.createdByUserId || undefined,
+        details: {
+          jobId: job.id,
+          artifactId: artifact.id,
+          fileName: artifact.fileName,
+          stagingDatabase,
+          safetyBackupArtifactId: safety.id,
+        },
+      });
+    } finally {
+      this.runtimeState.disableMaintenance(job.id);
+      if (restoreListPath) {
+        this.deleteFileIfExists(restoreListPath);
+      }
+      if (rollbackRestoreListPath) {
+        this.deleteFileIfExists(rollbackRestoreListPath);
+      }
+      await this.dropDatabase(stagingDatabase, db.password, true);
+    }
+  }
+
+  private async createSafetyBackup(job: BackupJob, password: string): Promise<BackupArtifact> {
+    const db = this.backupConfig.getDatabaseConfig();
+    const fileName = this.buildStoredFileName(`safety_pre_restore_${Date.now()}`, '.dump');
+    const filePath = this.resolveFilePath(fileName);
+
+    const args = [
+      '--format=custom',
+      '--compress=6',
+      '--no-owner',
+      '--no-privileges',
+      '--host',
+      db.host,
+      '--port',
+      String(db.port),
+      '--username',
+      db.user,
+      '--dbname',
+      db.database,
+      '--file',
+      filePath,
+    ];
+
+    await this.processService.runCommand({
+      command: this.backupConfig.getBinary('pg_dump'),
+      args,
+      env: this.buildCommandEnv(password),
+      timeoutMs: this.backupConfig.getJobTimeoutMs(),
+      cwd: this.backupConfig.getProjectRoot(),
+    });
+
+    const stats = fs.statSync(filePath);
+    const checksumSha256 = await this.calculateChecksumFromFile(filePath);
+
+    return await this.prisma.backupArtifact.create({
+      data: {
+        fileName,
+        filePath,
+        sizeBytes: BigInt(stats.size),
+        checksumSha256,
+        source: BackupArtifactSource.SAFETY,
+        createdByUserId: job.createdByUserId,
+        metadata: {
+          sourceJobId: job.id,
+          createdAt: new Date().toISOString(),
+        },
+      },
+    });
+  }
+
+  private async executePgRestore(params: {
+    dbName: string;
+    dumpPath: string;
+    listFilePath?: string;
+    password: string;
+    timeoutMs?: number;
+    onLine?: (line: string) => Promise<void>;
+  }): Promise<void> {
+    const db = this.backupConfig.getDatabaseConfig();
+
+    const args = [
+      '--verbose',
+      '--clean',
+      '--if-exists',
+      '--no-owner',
+      '--no-privileges',
+      '--exit-on-error',
+      '--host',
+      db.host,
+      '--port',
+      String(db.port),
+      '--username',
+      db.user,
+      '--dbname',
+      params.dbName,
+    ];
+
+    if (params.listFilePath) {
+      args.push('--use-list', params.listFilePath);
+    }
+
+    args.push(params.dumpPath);
+
+    await this.processService.runCommand({
+      command: this.backupConfig.getBinary('pg_restore'),
+      args,
+      env: this.buildCommandEnv(params.password),
+      timeoutMs: params.timeoutMs || this.backupConfig.getJobTimeoutMs(),
+      cwd: this.backupConfig.getProjectRoot(),
+      onStderrLine: (line) => {
+        void params.onLine?.(line);
+      },
+      onStdoutLine: (line) => {
+        void params.onLine?.(line);
+      },
+    });
+  }
+
+  private async validateStagingDatabase(database: string, password: string): Promise<void> {
+    const db = this.backupConfig.getDatabaseConfig();
+    const args = [
+      '--host',
+      db.host,
+      '--port',
+      String(db.port),
+      '--username',
+      db.user,
+      '--dbname',
+      database,
+      '--tuples-only',
+      '--no-align',
+      '--command',
+      "SELECT count(*)::int FROM information_schema.tables WHERE table_schema='public';",
+    ];
+
+    const result = await this.processService.runCommand({
+      command: this.backupConfig.getBinary('psql'),
+      args,
+      env: this.buildCommandEnv(password),
+      timeoutMs: Math.min(this.backupConfig.getJobTimeoutMs(), 120000),
+      cwd: this.backupConfig.getProjectRoot(),
+    });
+
+    const parsedCount = Number((result.stdout || '').trim());
+    if (!Number.isFinite(parsedCount) || parsedCount <= 0) {
+      throw new Error('Banco staging restaurado sem tabelas no schema public');
+    }
+  }
+
+  private async recreateDatabase(database: string, password: string): Promise<void> {
+    await this.dropDatabase(database, password, true);
+
+    const db = this.backupConfig.getDatabaseConfig();
+    const args = [
+      '--host',
+      db.host,
+      '--port',
+      String(db.port),
+      '--username',
+      db.user,
+      database,
+    ];
+
+    await this.processService.runCommand({
+      command: this.backupConfig.getBinary('createdb'),
+      args,
+      env: this.buildCommandEnv(password),
+      timeoutMs: Math.min(this.backupConfig.getJobTimeoutMs(), 180000),
+      cwd: this.backupConfig.getProjectRoot(),
+    });
+  }
+
+  private async dropDatabase(database: string, password: string, ignoreMissing = false): Promise<void> {
+    const db = this.backupConfig.getDatabaseConfig();
+    const args = [
+      '--if-exists',
+      '--host',
+      db.host,
+      '--port',
+      String(db.port),
+      '--username',
+      db.user,
+      database,
+    ];
+
+    try {
+      await this.processService.runCommand({
+        command: this.backupConfig.getBinary('dropdb'),
+        args,
+        env: this.buildCommandEnv(password),
+        timeoutMs: Math.min(this.backupConfig.getJobTimeoutMs(), 180000),
+        cwd: this.backupConfig.getProjectRoot(),
+      });
+    } catch (error) {
+      if (ignoreMissing) {
+        return;
+      }
+      throw error;
+    }
+  }
+
+  private async runPostRestoreMigrations(password: string): Promise<void> {
+    const databaseUrl = process.env.DATABASE_URL || '';
+    if (!databaseUrl) {
+      throw new Error('DATABASE_URL nao definida para migrate pos-restore');
+    }
+
+    const env = {
+      ...process.env,
+      DATABASE_URL: databaseUrl,
+      PGPASSWORD: password,
+    };
+
+    await this.processService.runCommand({
+      command: this.backupConfig.getBinary('pnpm'),
+      args: ['-C', this.backupConfig.getBackendDir(), 'exec', 'prisma', 'migrate', 'deploy'],
+      env,
+      timeoutMs: this.backupConfig.getJobTimeoutMs(),
+      cwd: this.backupConfig.getProjectRoot(),
+    });
+  }
+
+  private async buildFilteredRestoreList(params: {
+    dumpPath: string;
+    jobId: string;
+    password: string;
+    artifactSource: BackupArtifactSource;
+    allowUnsafeObjects: boolean;
+  }): Promise<string | undefined> {
+    const { dumpPath, jobId, password, artifactSource, allowUnsafeObjects } = params;
+    const protectedTables = this.backupConfig.getProtectedTablesForRestore();
+    const strictUploadInspection =
+      artifactSource === BackupArtifactSource.UPLOAD && this.backupConfig.isStrictUploadRestoreInspectionEnabled();
+
+    if (protectedTables.length === 0 && !strictUploadInspection) {
+      return undefined;
+    }
+
+    const result = await this.processService.runCommand({
+      command: this.backupConfig.getBinary('pg_restore'),
+      args: ['--list', dumpPath],
+      env: this.buildCommandEnv(password),
+      timeoutMs: Math.min(this.backupConfig.getJobTimeoutMs(), 300000),
+      cwd: this.backupConfig.getProjectRoot(),
+    });
+
+    const lines = result.stdout.split(/\r?\n/);
+    if (strictUploadInspection && !allowUnsafeObjects) {
+      const blockedEntries = this.findBlockedEntriesFromRestoreList(
+        lines,
+        this.backupConfig.getUploadRestoreBlockedObjectTypes(),
+      );
+
+      if (blockedEntries.length > 0) {
+        const sample = blockedEntries.slice(0, 5).join(' | ');
+        throw new BadRequestException(
+          `Dump de upload bloqueado por conter objetos potencialmente perigosos (${blockedEntries.length} ocorrencias).` +
+            ` Exemplo: ${sample}. Use allowUnsafeObjects=true apenas apos revisao manual.`,
+        );
+      }
+    }
+
+    if (strictUploadInspection && allowUnsafeObjects) {
+      await this.tryAppendJobLog(
+        jobId,
+        'WARN',
+        'Restore de upload com allowUnsafeObjects=true (aprovacao manual assumida pelo operador)',
+      );
+    }
+
+    if (protectedTables.length === 0) {
+      return undefined;
+    }
+
+    const escapedPatterns = protectedTables.map((table) => table.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const matcher = new RegExp(`\\b(${escapedPatterns.join('|')})\\b`, 'i');
+
+    const filtered = lines
+      .map((line) => {
+        if (!line.trim()) {
+          return line;
+        }
+        if (line.trim().startsWith(';')) {
+          return line;
+        }
+
+        return matcher.test(line) ? `; ${line}` : line;
+      })
+      .join('\n');
+
+    const listPath = this.resolveFilePath(`restore_list_${jobId}.txt`);
+    fs.writeFileSync(listPath, filtered, { encoding: 'utf8', flag: 'w' });
+
+    await this.tryAppendJobLog(
+      jobId,
+      'INFO',
+      `Lista de restore gerada com protecao para tabelas: ${protectedTables.join(', ')}`,
+    );
+
+    return listPath;
+  }
+
+  private findBlockedEntriesFromRestoreList(lines: string[], blockedTypes: string[]): string[] {
+    const normalizedTypes = blockedTypes
+      .map((value) => value.trim().toUpperCase())
+      .filter((value) => value.length > 0)
+      .sort((a, b) => b.length - a.length);
+
+    if (normalizedTypes.length === 0) {
+      return [];
+    }
+
+    const matches: string[] = [];
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith(';')) {
+        continue;
+      }
+
+      const normalized = trimmed.replace(/\s+/g, ' ').toUpperCase();
+      const descriptor = normalized.replace(/^\d+;\s+\d+\s+\d+\s+/, '');
+      if (descriptor === normalized) {
+        continue;
+      }
+
+      const blockedType = normalizedTypes.find((type) => descriptor === type || descriptor.startsWith(`${type} `));
+      if (!blockedType) {
+        continue;
+      }
+
+      matches.push(`${blockedType}: ${trimmed.slice(0, 180)}`);
+    }
+
+    return matches;
+  }
+
+  private validateUploadedBackup(file: Express.Multer.File): void {
+    const extension = path.extname(file.originalname || '').toLowerCase();
+    const allowedExtensions = this.backupConfig.getAllowedExtensions();
+
+    if (!allowedExtensions.includes(extension)) {
+      throw new BadRequestException(`Extensao invalida. Use: ${allowedExtensions.join(', ')}`);
+    }
+
+    const maxSize = this.backupConfig.getMaxUploadBytes();
+    if (file.size > maxSize) {
+      throw new BadRequestException(`Arquivo excede limite maximo de ${maxSize} bytes`);
+    }
+
+    if (file.buffer.length < this.archiveMagic.length) {
+      throw new BadRequestException('Arquivo dump invalido ou incompleto');
+    }
+
+    if (!file.buffer.subarray(0, this.archiveMagic.length).equals(this.archiveMagic)) {
+      throw new BadRequestException('Assinatura do arquivo invalida. Esperado formato custom do pg_dump');
+    }
+
+    if (/[\\/]/.test(file.originalname || '')) {
+      throw new BadRequestException('Nome de arquivo suspeito');
+    }
+  }
+
+  private async validateDumpArchiveSignatureFromFile(filePath: string): Promise<void> {
+    const handle = fs.openSync(filePath, 'r');
+    try {
+      const header = Buffer.alloc(this.archiveMagic.length);
+      fs.readSync(handle, header, 0, this.archiveMagic.length, 0);
+      if (!header.equals(this.archiveMagic)) {
+        throw new Error('Arquivo nao possui assinatura PGDMP valida');
+      }
+    } finally {
+      fs.closeSync(handle);
+    }
+  }
+
+  private buildStoredFileName(prefix: string, extension: string): string {
+    const safePrefix = prefix
+      .normalize('NFKD')
+      .replace(/[^\x00-\x7F]/g, '')
+      .replace(/[^a-zA-Z0-9._-]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^[_\-.]+|[_\-.]+$/g, '')
+      .toLowerCase()
+      .slice(0, 80);
+
+    const base = safePrefix || 'backup';
+    const random = randomUUID().replace(/-/g, '').slice(0, 8);
+    const fileName = `${base}_${random}${extension}`;
+    return this.normalizeFileName(fileName);
+  }
+
+  private resolveFilePath(fileName: string): string {
+    const normalized = this.normalizeFileName(fileName);
+    const fullPath = path.resolve(path.join(this.backupConfig.getBackupDir(), normalized));
+    this.assertSafeFilePath(fullPath);
+    return fullPath;
+  }
+
+  private normalizeFileName(fileName: string): string {
+    const normalized = path.basename((fileName || '').trim());
+    if (!normalized || !/^[a-zA-Z0-9._-]+$/.test(normalized)) {
+      throw new BadRequestException('Nome de arquivo invalido');
+    }
+    return normalized;
+  }
+
+  private assertSafeFilePath(filePath: string): void {
+    const baseDir = path.resolve(this.backupConfig.getBackupDir());
+    const fullPath = path.resolve(filePath);
+    if (!fullPath.startsWith(`${baseDir}${path.sep}`) && fullPath !== baseDir) {
+      throw new BadRequestException('Caminho de arquivo invalido');
+    }
+  }
+
+  private calculateChecksumFromBuffer(buffer: Buffer): string {
+    return createHash('sha256').update(buffer).digest('hex');
+  }
+
+  private async calculateChecksumFromFile(filePath: string): Promise<string> {
+    return await new Promise<string>((resolve, reject) => {
+      const hash = createHash('sha256');
+      const stream = fs.createReadStream(filePath);
+      stream.on('data', (chunk) => hash.update(chunk));
+      stream.on('error', reject);
+      stream.on('end', () => resolve(hash.digest('hex')));
+    });
+  }
+
+  private buildCommandEnv(password: string): NodeJS.ProcessEnv {
+    return {
+      ...process.env,
+      PGPASSWORD: password,
+    };
+  }
+
+  private toJsonRecord(value: unknown): Record<string, unknown> | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return null;
+    }
+    return value as Record<string, unknown>;
+  }
+
+  private parseLogs(value: unknown): JobLogEntry[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .filter((entry) => typeof entry === 'object' && entry !== null)
+      .map((entry) => {
+        const item = entry as Partial<JobLogEntry>;
+        return {
+          at: typeof item.at === 'string' ? item.at : new Date().toISOString(),
+          level:
+            item.level === 'WARN' || item.level === 'ERROR' || item.level === 'INFO'
+              ? item.level
+              : 'INFO',
+          message: typeof item.message === 'string' ? item.message : '',
+        };
+      })
+      .filter((entry) => entry.message.length > 0);
+  }
+
+  private errorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      const commandResult = (error as any).result;
+      if (commandResult?.stderr) {
+        return String(commandResult.stderr).slice(-4000);
+      }
+      return error.message;
+    }
+    return String(error);
+  }
+
+  private wrapRestoreCutoverError(cutoverError: unknown, rollbackError: unknown, reconnectError: unknown): Error {
+    const cutoverMessage = this.errorMessage(cutoverError);
+    if (!rollbackError && !reconnectError) {
+      return new Error(
+        `Restore no banco principal falhou, mas rollback automatico foi aplicado. Erro original: ${cutoverMessage}`,
+      );
+    }
+
+    if (!rollbackError && reconnectError) {
+      const reconnectMessage = this.errorMessage(reconnectError);
+      return new Error(
+        `Restore no banco principal falhou, rollback automatico foi aplicado, ` +
+          `mas a reconexao do backend com o banco falhou. Cutover: ${cutoverMessage}. Reconnect: ${reconnectMessage}`,
+      );
+    }
+
+    const rollbackMessage = this.errorMessage(rollbackError);
+    return new Error(
+      `Restore no banco principal falhou e rollback automatico tambem falhou. ` +
+        `Cutover: ${cutoverMessage}. Rollback: ${rollbackMessage}`,
+    );
+  }
+
+  private async ensurePrismaConnectionHealthy(): Promise<void> {
+    const attempts = this.backupConfig.getRestoreReconnectAttempts();
+    const delayMs = this.backupConfig.getRestoreReconnectDelayMs();
+    let lastError: unknown = null;
+
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        await this.prisma.$queryRaw`SELECT 1`;
+        return;
+      } catch (error) {
+        lastError = error;
+        this.logger.warn(`Tentativa ${attempt}/${attempts} de reconexao do Prisma apos restore falhou`);
+      }
+
+      try {
+        await this.prisma.$disconnect();
+      } catch {}
+      try {
+        await this.prisma.$connect();
+      } catch (error) {
+        lastError = error;
+      }
+
+      if (attempt < attempts) {
+        await this.wait(delayMs);
+      }
+    }
+
+    throw new Error(`Falha ao recuperar conexao Prisma apos restore: ${this.errorMessage(lastError)}`);
+  }
+
+  private async notifyFailure(jobId: string, message: string): Promise<void> {
+    try {
+      const job = await this.prisma.backupJob.findUnique({
+        where: { id: jobId },
+        select: {
+          id: true,
+          type: true,
+          artifactId: true,
+          fileName: true,
+          createdByUserId: true,
+        },
+      });
+
+      await this.prisma.notification.create({
         data: {
-          operationType: 'RESTORE',
-          status: 'STARTED',
-          fileName: file.originalname,
-          fileSize: BigInt(file.size),
-          executedBy: userId,
-          ipAddress,
-          metadata: {
-            originalFileName: file.originalname,
-            fileSize: file.size,
+          title: 'Falha em job de backup/restore',
+          message: `Job ${jobId} finalizou com erro. Consulte logs de backup para detalhes.`,
+          severity: 'critical',
+          audience: 'super_admin',
+          source: 'backup',
+          userId: null,
+          tenantId: null,
+          read: false,
+          data: {
+            jobId,
+            type: job?.type || null,
+            artifactId: job?.artifactId || null,
+            fileName: job?.fileName || null,
+            error: message.slice(0, 1000),
           } as any,
         },
       });
 
-      this.logger.log(`Iniciando restore: ${file.originalname}`);
-
-      // Registrar auditoria
       await this.auditService.log({
-        action: 'RESTORE_STARTED',
-        userId,
-        ipAddress,
-        details: { fileName: file.originalname, restoreId: restoreLog.id },
+        action: 'BACKUP_JOB_FAILURE_ALERTED',
+        userId: job?.createdByUserId || undefined,
+        details: {
+          jobId,
+          type: job?.type || null,
+        },
       });
-
-      // Criar backup de segurança antes do restore
-      this.logger.log('Criando backup de segurança...');
-      const safetyBackupName = `safety_backup_${Date.now()}.dump`;
-      backupSafetyFile = path.join(this.tempDir, safetyBackupName);
-      
-      const safetyArgs = this.getPgDumpArgs(dbConfig, backupSafetyFile);
-      await this.executeCommand('pg_dump', safetyArgs, this.timeout, null, dbConfig.password);
-      this.logger.log('Backup de segurança criado');
-
-      // Executar pg_restore
-      this.logger.log('Executando restore...');
-      const restoreArgs = this.getPgRestoreArgs(dbConfig, tempFilePath);
-      await this.executeCommand('pg_restore', restoreArgs, this.timeout, (progress) => {
-        // Log do progresso para debug
-        if (progress.trim()) {
-          this.logger.debug(`pg_restore: ${progress.trim()}`);
-        }
-      }, dbConfig.password);
-
-      // Calcular duração
-      const durationSeconds = Math.floor((Date.now() - startTime) / 1000);
-
-      // Atualizar log de restore com proteção contra deleção pelo --clean
-      try {
-        await this.prisma.backupLog.update({
-          where: { id: restoreLog.id },
-          data: {
-            status: 'SUCCESS',
-            completedAt: new Date(),
-            durationSeconds,
-          },
-        });
-      } catch (updateError) {
-        // Se o log foi deletado pelo pg_restore --clean, criar novo
-        this.logger.warn(`Log foi deletado durante restore, recriando: ${updateError.message}`);
-        try {
-          restoreLog = await this.prisma.backupLog.create({
-            data: {
-              operationType: 'RESTORE',
-              status: 'SUCCESS',
-              fileName: file.originalname,
-              fileSize: BigInt(file.size),
-              executedBy: userId,
-              ipAddress,
-              startedAt: new Date(startTime),
-              completedAt: new Date(),
-              durationSeconds,
-              metadata: {
-                originalFileName: file.originalname,
-                fileSize: file.size,
-                recreated: true, // Indica que foi recriado
-              } as any,
-            },
-          });
-        } catch (createError) {
-          this.logger.error(`Erro ao recriar log: ${createError.message}`);
-          // Continua mesmo se não conseguir criar o log
-        }
-      }
-
-      // Registrar auditoria de sucesso
-      await this.auditService.log({
-        action: 'RESTORE_SUCCESS',
-        userId,
-        ipAddress,
-        details: { fileName: file.originalname, restoreId: restoreLog.id, durationSeconds },
-      });
-
-      this.logger.log(`Restore concluído com sucesso: ${file.originalname}`);
-
-      // Limpar arquivos temporários
-      if (fs.existsSync(tempFilePath)) {
-        fs.unlinkSync(tempFilePath);
-      }
-      if (backupSafetyFile && fs.existsSync(backupSafetyFile)) {
-        // Manter backup de segurança por algumas horas
-        setTimeout(() => {
-          if (fs.existsSync(backupSafetyFile)) {
-            fs.unlinkSync(backupSafetyFile);
-          }
-        }, 3 * 60 * 60 * 1000); // 3 horas
-      }
-
-      return {
-        restoreId: restoreLog.id,
-        fileName: file.originalname,
-        durationSeconds,
-        completedAt: new Date(),
-      };
-
     } catch (error) {
-      this.logger.error(`Erro ao executar restore: ${error.message}`, error.stack);
-
-      // Atualizar ou criar log com erro
-      try {
-        if (restoreLog?.id) {
-          // Tentar atualizar o log existente
-          try {
-            await this.prisma.backupLog.update({
-              where: { id: restoreLog.id },
-              data: {
-                status: 'FAILED',
-                completedAt: new Date(),
-                errorMessage: error.message,
-                durationSeconds: Math.floor((Date.now() - startTime) / 1000),
-              },
-            });
-          } catch (updateError) {
-            // Se o update falhar (registro não encontrado), criar um novo
-            this.logger.warn(`Log não encontrado, criando novo: ${updateError.message}`);
-            await this.prisma.backupLog.create({
-              data: {
-                operationType: 'RESTORE',
-                status: 'FAILED',
-                fileName: file?.originalname || 'unknown',
-                fileSize: BigInt(file?.size || 0),
-                executedBy: userId,
-                ipAddress,
-                completedAt: new Date(),
-                errorMessage: error.message,
-                durationSeconds: Math.floor((Date.now() - startTime) / 1000),
-              },
-            });
-          }
-
-          // Registrar auditoria de falha
-          await this.auditService.log({
-            action: 'RESTORE_FAILED',
-            userId,
-            ipAddress,
-            details: { error: error.message, restoreId: restoreLog.id },
-          });
-        }
-      } catch (logError) {
-        this.logger.error(`Erro ao registrar falha no log: ${logError.message}`);
-      }
-
-      throw new Error(`Erro ao executar restore: ${error.message}`);
+      this.logger.warn(`Falha ao emitir alerta de erro para job ${jobId}: ${String(error)}`);
     }
   }
 
-  /**
-   * Constrói comando pg_restore
-   */
-  private buildPgRestoreCommand(
-    dbConfig: ReturnType<typeof this.parseDatabaseUrl>,
-    filePath: string,
-  ): string {
-    // --clean remove objetos antes de recriar
-    // --if-exists usa IF EXISTS ao remover objetos
-    // --no-owner não tenta recriar ownership
-    // --no-acl não restaura privilégios de acesso
-    return `pg_restore --host=${dbConfig.host} --port=${dbConfig.port} --username=${dbConfig.user} --dbname=${dbConfig.database} --clean --if-exists --no-owner --no-acl --verbose "${filePath}"`;
+  private async wait(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  /**
-   * Apaga um arquivo de backup
-   */
-  async deleteBackup(
-    fileName: string,
+  private async appendArtifactAudit(
+    action: string,
+    artifact: BackupArtifact,
     userId: string,
-  ): Promise<{ fileName: string; deleted: boolean }> {
-    try {
-      // Validar nome do arquivo (segurança)
-      if (!fileName || fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
-        throw new HttpException(
-          'Nome de arquivo inválido',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
+    context: RequestContext,
+  ): Promise<void> {
+    await this.auditService.log({
+      action,
+      userId,
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+      details: {
+        artifactId: artifact.id,
+        fileName: artifact.fileName,
+        fileSize: Number(artifact.sizeBytes),
+        checksumSha256: artifact.checksumSha256,
+      },
+    });
+  }
 
-      const filePath = path.join(this.tempDir, fileName);
+  private async assertOperatorAllowed(userId: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        role: true,
+        tenantId: true,
+        tenant: {
+          select: {
+            isMasterTenant: true,
+          },
+        },
+      },
+    });
 
-      // Verificar se arquivo existe
-      if (!fs.existsSync(filePath)) {
-        throw new HttpException(
-          'Arquivo de backup não encontrado',
-          HttpStatus.NOT_FOUND,
-        );
-      }
+    if (!user) {
+      throw new ForbiddenException('Usuario nao encontrado para operacao de backup');
+    }
 
-      // Apagar arquivo do sistema de arquivos
-      fs.unlinkSync(filePath);
+    if (user.role !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException('Apenas SUPER_ADMIN pode operar backup/restore');
+    }
 
-      this.logger.log(`Backup apagado: ${fileName} por usuário ${userId}`);
+    if (user.tenantId && user.tenant && !user.tenant.isMasterTenant) {
+      throw new ForbiddenException('SUPER_ADMIN de tenant nao-master nao pode executar restore global');
+    }
+  }
 
-      // Registrar auditoria
-      await this.auditService.log({
-        action: 'BACKUP_DELETED',
-        userId,
-        details: { fileName },
-      });
+  private async assertNoRunningUpdate(): Promise<void> {
+    const update = await this.prisma.updateLog.findFirst({
+      where: { status: 'STARTED' },
+      select: { id: true },
+    });
 
-      return {
-        fileName,
-        deleted: true,
-      };
-    } catch (error) {
-      this.logger.error(`Erro ao apagar backup: ${error.message}`);
-      
-      if (error instanceof HttpException) {
-        throw error;
-      }
+    if (update) {
+      throw new ConflictException('Existe update em andamento; backup/restore bloqueado');
+    }
+  }
 
-      throw new HttpException(
-        `Erro ao apagar backup: ${error.message}`,
-        HttpStatus.INTERNAL_SERVER_ERROR,
+  private async getArtifactByIdOrThrow(artifactId: string): Promise<BackupArtifact> {
+    const artifact = await this.prisma.backupArtifact.findUnique({ where: { id: artifactId } });
+    if (!artifact || artifact.deletedAt) {
+      throw new NotFoundException('Backup/artefato nao encontrado');
+    }
+    return artifact;
+  }
+
+  private assertArtifactUsableForRestore(artifact: BackupArtifact, restoreOptions: RestoreJobDto): void {
+    this.assertSafeFilePath(artifact.filePath);
+
+    const metadata = this.toJsonRecord(artifact.metadata);
+    const artifactScope = typeof metadata?.environmentScope === 'string' ? metadata.environmentScope : null;
+    const currentScope = this.backupConfig.getEnvironmentScope();
+
+    if (artifactScope && artifactScope !== currentScope && !restoreOptions.forceCrossEnvironment) {
+      throw new ConflictException(
+        'Backup pertence a outro escopo de ambiente. Requer forceCrossEnvironment=true para continuar.',
+      );
+    }
+
+    if (!artifactScope && artifact.source === BackupArtifactSource.UPLOAD && !restoreOptions.forceCrossEnvironment) {
+      throw new ConflictException(
+        'Upload sem escopo conhecido. Requer forceCrossEnvironment=true para confirmar restore.',
       );
     }
   }
 
-  /**
-   * Limpa arquivos temporários antigos
-   */
-  async cleanupOldBackups(retentionHours: number = 1): Promise<void> {
-    const cutoffTime = new Date(Date.now() - retentionHours * 60 * 60 * 1000);
-
+  private deleteFileIfExists(filePath: string): void {
     try {
-      const files = fs.readdirSync(this.tempDir);
-      let deletedCount = 0;
-
-      for (const file of files) {
-        const filePath = path.join(this.tempDir, file);
-        const stats = fs.statSync(filePath);
-        const isBackupFile = file.endsWith('.dump') || file.endsWith('.backup') || file.endsWith('.sql');
-
-        if (stats.isFile() && isBackupFile && stats.mtime < cutoffTime) {
-          fs.unlinkSync(filePath);
-          deletedCount++;
-          this.logger.log(`Arquivo temporário removido: ${file}`);
-        }
-      }
-
-      if (deletedCount > 0) {
-        this.logger.log(`Limpeza concluída: ${deletedCount} arquivo(s) removido(s)`);
+      this.assertSafeFilePath(filePath);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
       }
     } catch (error) {
-      this.logger.error(`Erro ao limpar arquivos temporários: ${error.message}`);
+      this.logger.warn(`Falha ao remover arquivo ${filePath}: ${String(error)}`);
     }
   }
 }
