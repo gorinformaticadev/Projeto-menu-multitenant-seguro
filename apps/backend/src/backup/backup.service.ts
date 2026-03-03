@@ -1020,13 +1020,24 @@ export class BackupService {
       database,
     ];
 
-    await this.processService.runCommand({
-      command: this.backupConfig.getBinary('createdb'),
-      args,
-      env: this.buildCommandEnv(password),
-      timeoutMs: Math.min(this.backupConfig.getJobTimeoutMs(), 180000),
-      cwd: this.backupConfig.getProjectRoot(),
-    });
+    try {
+      await this.processService.runCommand({
+        command: this.backupConfig.getBinary('createdb'),
+        args,
+        env: this.buildCommandEnv(password),
+        timeoutMs: Math.min(this.backupConfig.getJobTimeoutMs(), 180000),
+        cwd: this.backupConfig.getProjectRoot(),
+      });
+    } catch (error) {
+      const message = this.errorMessage(error);
+      if (/permission denied to create database/i.test(message)) {
+        throw new Error(
+          `Usuario do DATABASE_URL sem permissao CREATEDB. ` +
+            `Conceda no PostgreSQL: ALTER ROLE "${db.user}" CREATEDB;`,
+        );
+      }
+      throw error;
+    }
   }
 
   private async dropDatabase(database: string, password: string, ignoreMissing = false): Promise<void> {
