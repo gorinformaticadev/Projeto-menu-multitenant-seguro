@@ -162,6 +162,134 @@ bash install/restore-db.sh
 
 -----------------------------------------------------------------------
 
+## Restore em Staging (Opcao A) - Runbook Minimo
+
+### 1) Pre-check
+
+```bash
+# Containers principais (Docker)
+docker compose ps db redis backend
+
+# Endpoint interno: token e allowlist
+test -n "$BACKUP_INTERNAL_API_TOKEN" && echo "token: OK" || echo "token: MISSING"
+echo "BACKUP_INTERNAL_ALLOWED_CIDRS=$BACKUP_INTERNAL_ALLOWED_CIDRS"
+echo "BACKUP_INTERNAL_TRUST_PROXY=$BACKUP_INTERNAL_TRUST_PROXY"
+```
+
+### 2) Aplicar migracoes antes do deploy
+
+```bash
+# Native
+pnpm -C apps/backend exec prisma migrate deploy --schema prisma/schema.prisma
+
+# Docker
+docker compose exec backend pnpm exec prisma migrate deploy --schema prisma/schema.prisma
+```
+
+### 3) Validar endpoint interno (payload allowlisted)
+
+```bash
+export BACKEND_INTERNAL_URL="http://127.0.0.1:4000/api"
+export BACKUP_FILE="backup_smoke.dump"
+
+curl -sS -X POST "$BACKEND_INTERNAL_URL/backups/internal/restore-by-file" \
+  -H "Content-Type: application/json" \
+  -H "x-backup-internal-token: $BACKUP_INTERNAL_API_TOKEN" \
+  --data "{\"backupFile\":\"$BACKUP_FILE\",\"runMigrations\":false,\"reason\":\"staging-smoke\"}"
+```
+
+Polling do job:
+
+```bash
+export JOB_ID="<job-id-retornado-no-post>"
+curl -sS "$BACKEND_INTERNAL_URL/backups/internal/jobs/$JOB_ID" \
+  -H "x-backup-internal-token: $BACKUP_INTERNAL_API_TOKEN"
+```
+
+### 4) Restore pequeno de prova (com promocao)
+
+1. Enfileire restore de um dump pequeno conhecido.
+2. Faça polling ate `status=SUCCESS`.
+3. Evidencie timestamps (`createdAt`, `startedAt`, `finishedAt`) e `currentStep`.
+4. Valide health:
+
+```bash
+curl -sS http://127.0.0.1:4000/api/health
+```
+
+### 5) Testes obrigatorios A-F em staging (Postgres real)
+
+1. **Teste A - Restore grande + promocao**
+Comando:
+```bash
+curl -sS -X POST "$BACKEND_INTERNAL_URL/backups/internal/restore-by-file" \
+  -H "Content-Type: application/json" \
+  -H "x-backup-internal-token: $BACKUP_INTERNAL_API_TOKEN" \
+  --data "{\"backupFile\":\"backup_grande.dump\",\"runMigrations\":false,\"reason\":\"teste-A\"}"
+```
+Evidencia: job `SUCCESS`, duracao (`finishedAt-startedAt`) e health `ok`.
+
+2. **Teste B - Promocao com sessao pendurada**
+Comando (manter sessao ativa):
+```bash
+docker compose exec db psql -U "$DB_USER" -d "$DB_NAME" -c "SELECT pg_backend_pid(); SELECT pg_sleep(600);"
+```
+Em paralelo, rode restore. Evidencia: promocao conclui (ou falha controlada) sem estado quebrado.
+
+3. **Teste C - Crash entre renames**
+Simulacao:
+```bash
+# durante o cutover em staging
+docker compose kill -s SIGKILL backend
+docker compose up -d backend
+```
+Evidencia: logs com reconciler (`caso C`) e recuperacao para estado consistente.
+
+4. **Teste D - Reconnect Prisma falhando**
+Simulacao (janela do pos-promote):
+```bash
+docker pause multitenant-postgres
+sleep 70
+docker unpause multitenant-postgres
+```
+Evidencia: retries ate timeout, job `FAILED` com mensagem curta e maintenance mantida.
+
+5. **Teste E - 2 restores simultaneos**
+Comandos:
+```bash
+curl -sS -X POST "$BACKEND_INTERNAL_URL/backups/internal/restore-by-file" \
+  -H "Content-Type: application/json" \
+  -H "x-backup-internal-token: $BACKUP_INTERNAL_API_TOKEN" \
+  --data '{"backupFile":"backup_smoke_1.dump","runMigrations":false,"reason":"teste-E1"}'
+
+curl -sS -X POST "$BACKEND_INTERNAL_URL/backups/internal/restore-by-file" \
+  -H "Content-Type: application/json" \
+  -H "x-backup-internal-token: $BACKUP_INTERNAL_API_TOKEN" \
+  --data '{"backupFile":"backup_smoke_2.dump","runMigrations":false,"reason":"teste-E2"}'
+```
+Evidencia: segundo job em `WAITING_LOCK`, `lockAttempts` incrementando e `nextRunAt` futuro (consultar tabela `backup_jobs` no Postgres).
+
+6. **Teste F - Dump invalido / objeto perigoso**
+Comandos:
+```bash
+# F1 - dump invalido (assinatura incorreta)
+printf 'NOT_A_PG_DUMP' > /tmp/invalid.dump
+curl -sS -X POST "http://127.0.0.1:4000/api/backups/upload" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -F "file=@/tmp/invalid.dump"
+
+# F2 - dump com objeto perigoso (FUNCTION) em ambiente de laboratorio
+docker compose exec db psql -U "$DB_USER" -d "$DB_NAME" -c "CREATE OR REPLACE FUNCTION public.fn_danger() RETURNS int LANGUAGE sql AS $$ SELECT 1 $$;"
+docker compose exec db pg_dump -U "$DB_USER" -d "$DB_NAME" -Fc -f /tmp/danger.dump
+docker cp multitenant-postgres:/tmp/danger.dump /tmp/danger.dump
+curl -sS -X POST "http://127.0.0.1:4000/api/backups/upload" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -F "file=@/tmp/danger.dump"
+```
+Evidencia: bloqueio por padrao com erro operacional curto no restore (sem `allowUnsafeObjects`).
+
+-----------------------------------------------------------------------
+
 ## Reset Completo do Ambiente
 
 Por seguranca, este README **nao** inclui sequencia destrutiva automatica de reset (ex.: `git reset --hard`, purge completo de Docker, remocao forcada de diretorios).

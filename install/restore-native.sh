@@ -5,9 +5,7 @@ BACKUP_FILE="${BACKUP_FILE:-}"
 BACKEND_INTERNAL_URL="${BACKEND_INTERNAL_URL:-http://127.0.0.1:4000/api}"
 BACKUP_INTERNAL_API_TOKEN="${BACKUP_INTERNAL_API_TOKEN:-}"
 RUN_MIGRATIONS="${RUN_MIGRATIONS:-false}"
-FORCE_CROSS_ENVIRONMENT="${FORCE_CROSS_ENVIRONMENT:-false}"
-ALLOW_UNSAFE_OBJECTS="${ALLOW_UNSAFE_OBJECTS:-false}"
-RESTORE_REASON="${RESTORE_REASON:-manual-wrapper-restore-native.sh}"
+RESTORE_REASON="${RESTORE_REASON:-restore via wrapper script}"
 POLL_INTERVAL_SECONDS="${POLL_INTERVAL_SECONDS:-5}"
 POLL_TIMEOUT_SECONDS="${POLL_TIMEOUT_SECONDS:-7200}"
 
@@ -73,12 +71,10 @@ if ! printf '%s' "$backup_name" | grep -Eq '^[a-zA-Z0-9._-]+$'; then
 fi
 
 run_migrations_bool="$(normalize_bool "$RUN_MIGRATIONS")"
-force_cross_bool="$(normalize_bool "$FORCE_CROSS_ENVIRONMENT")"
-allow_unsafe_bool="$(normalize_bool "$ALLOW_UNSAFE_OBJECTS")"
 reason_escaped="$(json_escape "$RESTORE_REASON")"
 backup_escaped="$(json_escape "$backup_name")"
 
-payload="{\"backupFile\":\"${backup_escaped}\",\"runMigrations\":${run_migrations_bool},\"forceCrossEnvironment\":${force_cross_bool},\"allowUnsafeObjects\":${allow_unsafe_bool},\"reason\":\"${reason_escaped}\"}"
+payload="{\"backupFile\":\"${backup_escaped}\",\"runMigrations\":${run_migrations_bool},\"reason\":\"${reason_escaped}\"}"
 
 log "iniciando job de restore via API interna"
 create_response="$(curl -sS -X POST "${BACKEND_INTERNAL_URL}/backups/internal/restore-by-file" \

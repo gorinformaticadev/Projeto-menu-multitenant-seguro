@@ -19,7 +19,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AuditService } from '../audit/audit.service';
 import { CronService } from '../core/cron/cron.service';
-import { PrismaService } from '../core/prisma/prisma.service';
+import { PrismaReconnectFailed, PrismaService } from '../core/prisma/prisma.service';
 import { BackupConfigService } from './backup-config.service';
 import { BackupProcessService } from './backup-process.service';
 import { BackupRuntimeStateService } from './backup-runtime-state.service';
@@ -34,6 +34,13 @@ interface JobLogEntry {
   at: string;
   level: 'INFO' | 'WARN' | 'ERROR';
   message: string;
+}
+
+class PromotionReconcileFailed extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PromotionReconcileFailed';
+  }
 }
 
 export interface BackupListResponse {
@@ -414,10 +421,12 @@ export class BackupService {
   }
 
   async claimNextPendingJob(): Promise<BackupJob | null> {
+    const now = new Date();
     const pending = await this.prisma.backupJob.findFirst({
       where: {
         status: BackupJobStatus.PENDING,
         cancelRequested: false,
+        OR: [{ nextRunAt: null }, { nextRunAt: { lte: now } }],
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -436,6 +445,7 @@ export class BackupService {
         status: BackupJobStatus.RUNNING,
         startedAt: new Date(),
         currentStep: 'CLAIMED',
+        nextRunAt: null,
       },
     });
 
@@ -447,15 +457,55 @@ export class BackupService {
   }
 
   async returnJobToPending(jobId: string, reason: string): Promise<void> {
+    const maxAttempts = this.backupConfig.getLockMaxAttempts();
+    const updatedAttempt = await this.prisma.backupJob.update({
+      where: { id: jobId },
+      data: {
+        lockAttempts: {
+          increment: 1,
+        },
+      },
+      select: {
+        lockAttempts: true,
+      },
+    });
+
+    const attempt = updatedAttempt.lockAttempts;
+    if (attempt >= maxAttempts) {
+      const message = `Nao foi possivel adquirir lock global apos ${attempt} tentativas. Tente novamente.`;
+      await this.prisma.backupJob.update({
+        where: { id: jobId },
+        data: {
+          status: BackupJobStatus.FAILED,
+          finishedAt: new Date(),
+          currentStep: 'FAILED',
+          error: message,
+          nextRunAt: null,
+        },
+      });
+
+      await this.appendJobLog(jobId, 'ERROR', message);
+      await this.notifyFailure(jobId, message);
+      return;
+    }
+
+    const delayMs = this.calculateLockBackoffDelayMs(attempt);
+    const nextRunAt = new Date(Date.now() + delayMs);
+
     await this.prisma.backupJob.update({
       where: { id: jobId },
       data: {
         status: BackupJobStatus.PENDING,
         currentStep: 'WAITING_LOCK',
+        nextRunAt,
       },
     });
 
-    await this.appendJobLog(jobId, 'INFO', reason);
+    await this.appendJobLog(
+      jobId,
+      'INFO',
+      `${reason}. Tentativa de lock ${attempt}/${maxAttempts}. Reagendado em ${delayMs}ms.`,
+    );
   }
 
   async markJobSuccess(jobId: string, details: Partial<BackupJob> = {}): Promise<void> {
@@ -756,6 +806,7 @@ export class BackupService {
     let rollbackRestoreListPath: string | undefined;
     let safetyArtifact: BackupArtifact | null = null;
     let maintenanceEnabled = false;
+    let keepMaintenanceEnabled = false;
     let promoted = false;
     let rollbackPromotionApplied = false;
 
@@ -803,17 +854,51 @@ export class BackupService {
         this.backupConfig.getRestoreMaintenanceWindowSeconds() * 1000,
       );
 
-      await this.promoteStagingDatabase({
-        activeDatabase,
-        stagingDatabase,
-        rollbackDatabase,
-        password: db.password,
-        timeoutMs: cutoverTimeoutMs,
-      });
+      await this.updateJobProgress(
+        job.id,
+        'RECONCILE_PROMOTION_STATE',
+        88,
+        'Reconciliando estado de promocao para recuperacao pos-crash',
+      );
+      try {
+        await this.promoteStagingDatabase({
+          activeDatabase,
+          stagingDatabase,
+          rollbackDatabase,
+          password: db.password,
+          timeoutMs: cutoverTimeoutMs,
+        });
+      } catch (promoteError) {
+        if (promoteError instanceof PromotionReconcileFailed) {
+          keepMaintenanceEnabled = true;
+          this.runtimeState.enableMaintenance(job.id, 'restore-reconcile-failed');
+          await this.tryAppendJobLog(
+            job.id,
+            'ERROR',
+            'Estado invalido de promocao detectado. Mantendo manutencao.',
+          );
+        }
+        throw promoteError;
+      }
       promoted = true;
       this.backupConfig.setActiveDatabaseName(activeDatabase);
 
-      await this.prisma.resumeAfterCutover();
+      try {
+        await this.prisma.resumeAfterCutover();
+      } catch (resumeError) {
+        if (resumeError instanceof PrismaReconnectFailed) {
+          keepMaintenanceEnabled = true;
+          this.runtimeState.enableMaintenance(job.id, 'restore-reconnect-failed');
+          await this.tryAppendJobLog(
+            job.id,
+            'ERROR',
+            'Falha ao reconectar DB apos promocao. Mantendo manutencao.',
+          );
+          throw new Error('Falha ao reconectar DB apos promocao. Mantendo manutencao.');
+        }
+
+        throw resumeError;
+      }
       await this.updateJobProgress(job.id, 'RESTORE_SMOKE_TEST', 93, 'Executando smoke test pos-promocao');
       await this.ensurePrismaConnectionHealthy();
       await this.validatePromotedDatabase();
@@ -857,7 +942,7 @@ export class BackupService {
     } catch (error) {
       let rollbackError: unknown = null;
 
-      if (promoted) {
+      if (promoted && !keepMaintenanceEnabled) {
         try {
           await this.rollbackPromotion({
             activeDatabase,
@@ -894,17 +979,26 @@ export class BackupService {
         try {
           await this.prisma.resumeAfterCutover();
         } catch (resumeError) {
+          if (maintenanceEnabled) {
+            keepMaintenanceEnabled = true;
+            this.runtimeState.enableMaintenance(job.id, 'restore-reconnect-failed');
+            await this.tryAppendJobLog(
+              job.id,
+              'ERROR',
+              'Falha ao reconectar DB apos cutover. Mantendo manutencao.',
+            );
+          }
           this.logger.error(
             `Falha ao recuperar conexao Prisma apos cutover do job ${job.id}: ${this.errorMessage(resumeError)}`,
           );
         }
       }
 
-      if (this.cronService.isMaintenancePaused()) {
+      if (this.cronService.isMaintenancePaused() && !keepMaintenanceEnabled) {
         this.cronService.resumeAllAfterMaintenance();
       }
 
-      if (maintenanceEnabled) {
+      if (maintenanceEnabled && !keepMaintenanceEnabled) {
         this.runtimeState.disableMaintenance(job.id);
       }
       if (restoreListPath) {
@@ -1139,6 +1233,21 @@ export class BackupService {
     const activeDatabase = this.assertDatabaseIdentifier(params.activeDatabase, 'activeDatabase');
     const stagingDatabase = this.assertDatabaseIdentifier(params.stagingDatabase, 'stagingDatabase');
     const rollbackDatabase = this.assertDatabaseIdentifier(params.rollbackDatabase, 'rollbackDatabase');
+    const reconcileCase = await this.reconcilePromotionState(
+      activeDatabase,
+      stagingDatabase,
+      rollbackDatabase,
+      params.password,
+      params.timeoutMs,
+    );
+
+    if (reconcileCase === 'C' || reconcileCase === 'D') {
+      return;
+    }
+
+    if (reconcileCase === 'A') {
+      throw new PromotionReconcileFailed('Banco staging nao encontrado para promocao apos reconciler');
+    }
 
     await this.terminateDatabaseConnections(
       [activeDatabase, stagingDatabase, rollbackDatabase],
@@ -1188,6 +1297,105 @@ export class BackupService {
 
       throw error;
     }
+  }
+
+  private async reconcilePromotionState(
+    activeDatabase: string,
+    stagingDatabase: string,
+    rollbackDatabase: string,
+    password: string,
+    timeoutMs: number,
+  ): Promise<'A' | 'B' | 'C' | 'D'> {
+    const active = this.assertDatabaseIdentifier(activeDatabase, 'activeDatabase');
+    const staging = this.assertDatabaseIdentifier(stagingDatabase, 'stagingDatabase');
+    const rollback = this.assertDatabaseIdentifier(rollbackDatabase, 'rollbackDatabase');
+    const inList = [active, staging, rollback].map((name) => `'${this.escapeSqlLiteral(name)}'`).join(', ');
+
+    const catalogOutput = await this.runPsqlCommand({
+      database: 'postgres',
+      password,
+      sql: `COPY (SELECT datname FROM pg_database WHERE datname IN (${inList}) ORDER BY datname) TO STDOUT;`,
+      timeoutMs,
+    });
+
+    const present = this.parseExistingDatabasesFromCatalogOutput(catalogOutput, [active, staging, rollback]);
+    const hasActive = present.has(active);
+    const hasStaging = present.has(staging);
+    const hasRollback = present.has(rollback);
+
+    // A) Normal: active exists and staging does not exist.
+    if (hasActive && !hasStaging && !hasRollback) {
+      this.logger.log(`Reconcile de promocao: caso A (active=${active})`);
+      return 'A';
+    }
+
+    // B) Pre-promote: active + staging exist.
+    if (hasActive && hasStaging && !hasRollback) {
+      this.logger.log(`Reconcile de promocao: caso B (active + staging presentes)`);
+      return 'B';
+    }
+
+    // C) Crash between renames: active missing, rollback + staging exist.
+    if (!hasActive && hasStaging && hasRollback) {
+      this.logger.warn(`Reconcile de promocao: caso C detectado; aplicando rename staging -> active`);
+      await this.terminateDatabaseConnections([active, staging, rollback], password, timeoutMs);
+      await this.runPsqlCommand({
+        database: 'postgres',
+        password,
+        sql:
+          `ALTER DATABASE ${this.quoteDatabaseIdentifier(staging)} ` +
+          `RENAME TO ${this.quoteDatabaseIdentifier(active)};`,
+        timeoutMs,
+      });
+      return 'C';
+    }
+
+    // D) Promotion already applied: active + rollback exist, staging missing.
+    if (hasActive && !hasStaging && hasRollback) {
+      this.logger.log(`Reconcile de promocao: caso D (promocao ja aplicada)`);
+      return 'D';
+    }
+
+    // E) Invalid states must fail closed.
+    this.logger.error(
+      `Reconcile de promocao: caso E invalido (active=${hasActive}, staging=${hasStaging}, rollback=${hasRollback})`,
+    );
+    throw new PromotionReconcileFailed('Estado invalido de promocao detectado no reconciler. Mantendo manutencao.');
+  }
+
+  private parseExistingDatabasesFromCatalogOutput(output: string, expectedDatabases: string[]): Set<string> {
+    const expected = new Set(expectedDatabases);
+    const present = new Set<string>();
+    const lines = String(output || '').split(/\r?\n/);
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        continue;
+      }
+      if (
+        /^COPY\s+\d+$/i.test(trimmed) ||
+        /^datname$/i.test(trimmed) ||
+        /^-+$/.test(trimmed) ||
+        /^\(\d+\s+rows?\)$/i.test(trimmed)
+      ) {
+        continue;
+      }
+
+      if (expected.has(trimmed)) {
+        present.add(trimmed);
+        continue;
+      }
+
+      const tokens = trimmed.split(/[\s|]+/).filter((token) => token.length > 0);
+      for (const token of tokens) {
+        if (expected.has(token)) {
+          present.add(token);
+        }
+      }
+    }
+
+    return present;
   }
 
   private async rollbackPromotion(params: {
@@ -1700,6 +1908,15 @@ export class BackupService {
 
   private async wait(ms: number): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private calculateLockBackoffDelayMs(attempt: number): number {
+    const baseMs = this.backupConfig.getLockBackoffBaseMs();
+    const maxMs = this.backupConfig.getLockBackoffMaxMs();
+    const exponent = Math.max(0, Math.min(30, attempt - 1));
+    const coreDelay = Math.min(maxMs, baseMs * 2 ** exponent);
+    const jitter = Math.floor(Math.random() * 301);
+    return coreDelay + jitter;
   }
 
   private async appendArtifactAudit(

@@ -137,4 +137,194 @@ describe('BackupService', () => {
       expect.stringContaining('allowUnsafeObjects=true'),
     );
   });
+
+  it('reconcile caso C renomeia staging para active', async () => {
+    const service = Object.create(BackupService.prototype) as BackupService;
+    (service as any).logger = {
+      log: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    };
+
+    const runPsqlCommand = jest
+      .spyOn(service as any, 'runPsqlCommand')
+      .mockResolvedValueOnce('restore_stage_job\nmenu_rollback_job\nCOPY 2\n')
+      .mockResolvedValueOnce('');
+    const terminateSpy = jest
+      .spyOn(service as any, 'terminateDatabaseConnections')
+      .mockResolvedValue(undefined);
+
+    const result = await (service as any).reconcilePromotionState(
+      'menu_active',
+      'restore_stage_job',
+      'menu_rollback_job',
+      'secret',
+      30_000,
+    );
+
+    expect(result).toBe('C');
+    expect(terminateSpy).toHaveBeenCalledWith(
+      ['menu_active', 'restore_stage_job', 'menu_rollback_job'],
+      'secret',
+      30_000,
+    );
+    expect(runPsqlCommand).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        database: 'postgres',
+        sql: expect.stringContaining('ALTER DATABASE "restore_stage_job" RENAME TO "menu_active"'),
+      }),
+    );
+  });
+
+  it('reconcile caso A nao executa rename', async () => {
+    const service = Object.create(BackupService.prototype) as BackupService;
+    (service as any).logger = {
+      log: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    };
+
+    const runPsqlCommand = jest
+      .spyOn(service as any, 'runPsqlCommand')
+      .mockResolvedValue('menu_active\nCOPY 1\n');
+    const terminateSpy = jest
+      .spyOn(service as any, 'terminateDatabaseConnections')
+      .mockResolvedValue(undefined);
+
+    const result = await (service as any).reconcilePromotionState(
+      'menu_active',
+      'restore_stage_job',
+      'menu_rollback_job',
+      'secret',
+      30_000,
+    );
+
+    expect(result).toBe('A');
+    expect(terminateSpy).not.toHaveBeenCalled();
+    expect(runPsqlCommand).toHaveBeenCalledTimes(1);
+  });
+
+  it('reconcile caso E lanca erro operacional', async () => {
+    const service = Object.create(BackupService.prototype) as BackupService;
+    (service as any).logger = {
+      log: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    };
+
+    jest.spyOn(service as any, 'runPsqlCommand').mockResolvedValue('restore_stage_job\nCOPY 1\n');
+
+    await expect(
+      (service as any).reconcilePromotionState(
+        'menu_active',
+        'restore_stage_job',
+        'menu_rollback_job',
+        'secret',
+        30_000,
+      ),
+    ).rejects.toThrow('Estado invalido de promocao detectado no reconciler');
+  });
+
+  it('lock falha 1x e reagenda job com attempts=1 e nextRunAt', async () => {
+    const service = Object.create(BackupService.prototype) as BackupService;
+    const now = new Date('2026-03-04T18:00:00.000Z');
+    const nowMs = now.getTime();
+    const updateMock = jest
+      .fn()
+      .mockResolvedValueOnce({ lockAttempts: 1 })
+      .mockResolvedValueOnce({ id: 'job-1' });
+
+    (service as any).backupConfig = {
+      getLockMaxAttempts: () => 30,
+      getLockBackoffBaseMs: () => 1000,
+      getLockBackoffMaxMs: () => 30000,
+    };
+    (service as any).prisma = {
+      backupJob: {
+        update: updateMock,
+      },
+    };
+
+    const appendSpy = jest.spyOn(service as any, 'appendJobLog').mockResolvedValue(undefined);
+    const notifySpy = jest.spyOn(service as any, 'notifyFailure').mockResolvedValue(undefined);
+    const dateSpy = jest.spyOn(Date, 'now').mockReturnValue(nowMs);
+    const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
+
+    await (service as any).returnJobToPending('job-1', 'lock global ocupado');
+
+    expect(updateMock).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        where: { id: 'job-1' },
+        data: { lockAttempts: { increment: 1 } },
+      }),
+    );
+    expect(updateMock).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: { id: 'job-1' },
+        data: expect.objectContaining({
+          status: 'PENDING',
+          currentStep: 'WAITING_LOCK',
+          nextRunAt: new Date(nowMs + 1000),
+        }),
+      }),
+    );
+    expect(appendSpy).toHaveBeenCalledWith(
+      'job-1',
+      'INFO',
+      expect.stringContaining('Tentativa de lock 1/30'),
+    );
+    expect(notifySpy).not.toHaveBeenCalled();
+
+    dateSpy.mockRestore();
+    randomSpy.mockRestore();
+  });
+
+  it('lock falha ate o maximo e job vira FAILED', async () => {
+    const service = Object.create(BackupService.prototype) as BackupService;
+    const updateMock = jest
+      .fn()
+      .mockResolvedValueOnce({ lockAttempts: 3 })
+      .mockResolvedValueOnce({ id: 'job-2' });
+
+    (service as any).backupConfig = {
+      getLockMaxAttempts: () => 3,
+      getLockBackoffBaseMs: () => 1000,
+      getLockBackoffMaxMs: () => 30000,
+    };
+    (service as any).prisma = {
+      backupJob: {
+        update: updateMock,
+      },
+    };
+
+    const appendSpy = jest.spyOn(service as any, 'appendJobLog').mockResolvedValue(undefined);
+    const notifySpy = jest.spyOn(service as any, 'notifyFailure').mockResolvedValue(undefined);
+
+    await (service as any).returnJobToPending('job-2', 'lock global ocupado');
+
+    expect(updateMock).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: { id: 'job-2' },
+        data: expect.objectContaining({
+          status: 'FAILED',
+          currentStep: 'FAILED',
+          error: 'Nao foi possivel adquirir lock global apos 3 tentativas. Tente novamente.',
+          nextRunAt: null,
+        }),
+      }),
+    );
+    expect(appendSpy).toHaveBeenCalledWith(
+      'job-2',
+      'ERROR',
+      'Nao foi possivel adquirir lock global apos 3 tentativas. Tente novamente.',
+    );
+    expect(notifySpy).toHaveBeenCalledWith(
+      'job-2',
+      'Nao foi possivel adquirir lock global apos 3 tentativas. Tente novamente.',
+    );
+  });
 });

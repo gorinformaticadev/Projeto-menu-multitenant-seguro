@@ -68,6 +68,18 @@ export class BackupConfigService {
     return this.readPositiveInt('BACKUP_QUEUE_POLL_MS', 2000);
   }
 
+  getLockBackoffBaseMs(): number {
+    return this.readPositiveInt('BACKUP_LOCK_BACKOFF_BASE_MS', 1000);
+  }
+
+  getLockBackoffMaxMs(): number {
+    return this.readPositiveInt('BACKUP_LOCK_BACKOFF_MAX_MS', 30000);
+  }
+
+  getLockMaxAttempts(): number {
+    return this.readPositiveInt('BACKUP_LOCK_MAX_ATTEMPTS', 30);
+  }
+
   getAllowedExtensions(): string[] {
     return ['.dump', '.backup'];
   }

@@ -108,3 +108,38 @@ Persistencia
 - `X-Forwarded-For` e ignorado por padrao e so entra no calculo quando
   `BACKUP_INTERNAL_TRUST_PROXY=true` e o proxy remoto estiver em
   `BACKUP_INTERNAL_TRUSTED_PROXY_CIDRS`.
+
+## Envs P0 (staging/prod)
+- `BACKUP_INTERNAL_API_TOKEN` (obrigatorio para endpoint interno)
+- `BACKUP_INTERNAL_ALLOWED_CIDRS` (default recomendado: `127.0.0.1/32,::1/128`)
+- `BACKUP_INTERNAL_TRUST_PROXY` (default `false`; ligar somente com proxy interno confiavel)
+- `PRISMA_RECONNECT_TIMEOUT_MS` (default `60000`)
+- `PRISMA_RECONNECT_BACKOFF_MS` (default `1000`)
+- `BACKUP_LOCK_BACKOFF_BASE_MS` (default `1000`)
+- `BACKUP_LOCK_BACKOFF_MAX_MS` (default `30000`)
+- `BACKUP_LOCK_MAX_ATTEMPTS` (default `30`)
+
+## Runbook minimo - Restore em Staging (Opcao A)
+1. Pre-check:
+   - DB/Redis saudaveis (`docker compose ps` ou checks equivalentes).
+   - `BACKUP_INTERNAL_API_TOKEN` setado.
+   - CIDR allowlist validada (`BACKUP_INTERNAL_ALLOWED_CIDRS`).
+2. Aplicar migracoes antes do deploy:
+   - `pnpm -C apps/backend exec prisma migrate deploy --schema prisma/schema.prisma`
+   - ou `docker compose exec backend pnpm exec prisma migrate deploy --schema prisma/schema.prisma`
+3. Validar endpoint interno:
+   - `POST /api/backups/internal/restore-by-file` com payload permitido:
+     `backupFile`, `runMigrations`, `reason`.
+   - `GET /api/backups/internal/jobs/:jobId` para polling.
+4. Restore pequeno de prova:
+   - disparar job, acompanhar ate `SUCCESS`, validar `/api/health`.
+
+## Testes A-F obrigatorios para GO
+1. A: restore grande + promocao + smoke test.
+2. B: promocao com sessao `psql` pendurada (verificar terminate de conexoes).
+3. C: falha/crash entre renames (verificar reconciler caso C).
+4. D: falha de reconnect Prisma pos-cutover (retry/backoff + maintenance ON).
+5. E: 2 restores simultaneos (lock global, backoff, `nextRunAt`, sem loop infinito).
+6. F: dump invalido/objeto perigoso (bloqueio por padrao e erro operacional curto).
+
+Observacao: comandos operacionais completos estao no `README.md` (secao "Restore em Staging (Opcao A) - Runbook Minimo").

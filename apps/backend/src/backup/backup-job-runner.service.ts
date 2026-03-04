@@ -62,6 +62,7 @@ export class BackupJobRunnerService implements OnModuleInit, OnModuleDestroy {
           job.id,
           'Job retornou para fila porque outro backup/restore detem o lock global',
         );
+        this.logger.warn(`Job ${job.id} reagendado por indisponibilidade do lock global`);
         return;
       }
 

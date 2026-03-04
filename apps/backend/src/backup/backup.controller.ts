@@ -335,13 +335,12 @@ export class BackupInternalController {
         id: job.id,
         type: job.type,
         status: job.status,
+        failed: job.status === 'FAILED',
         currentStep: job.currentStep,
         progressPercent: job.progressPercent,
         createdAt: job.createdAt,
         startedAt: job.startedAt,
         finishedAt: job.finishedAt,
-        error: job.error,
-        logs: job.logs,
       },
     };
   }
