@@ -1,20 +1,22 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { AuditModule } from '../audit/audit.module';
+import { CronModule } from '../core/cron/cron.module';
 import { PrismaModule } from '../core/prisma/prisma.module';
 import { BackupConfigService } from './backup-config.service';
-import { BackupsController, BackupLegacyController } from './backup.controller';
+import { BackupInternalController, BackupsController, BackupLegacyController } from './backup.controller';
 import { BackupCronService } from './backup-cron.service';
 import { BackupJobRunnerService } from './backup-job-runner.service';
 import { BackupLockService } from './backup-lock.service';
 import { BackupProcessService } from './backup-process.service';
 import { BackupRuntimeStateService } from './backup-runtime-state.service';
 import { BackupService } from './backup.service';
+import { BackupInternalGuard } from './guards/backup-internal.guard';
 import { BackupMaintenanceGuard } from './guards/backup-maintenance.guard';
 
 @Module({
-  imports: [PrismaModule, AuditModule],
-  controllers: [BackupsController, BackupLegacyController],
+  imports: [PrismaModule, AuditModule, CronModule],
+  controllers: [BackupsController, BackupLegacyController, BackupInternalController],
   providers: [
     BackupConfigService,
     BackupProcessService,
@@ -23,6 +25,7 @@ import { BackupMaintenanceGuard } from './guards/backup-maintenance.guard';
     BackupService,
     BackupJobRunnerService,
     BackupCronService,
+    BackupInternalGuard,
     {
       provide: APP_GUARD,
       useClass: BackupMaintenanceGuard,

@@ -1,34 +1,43 @@
 # Backup & Restore (NestJS) - Arquitetura
 
 ## Contexto atual
-- Operações antigas estavam em `/api/backup/*` e dependiam de scripts externos `install/restore-*.sh`.
-- Restore síncrono podia travar fluxo HTTP e afetar disponibilidade.
-- Era necessário mover orquestração para backend, manter backend vivo e adicionar histórico/lock/job assíncrono.
+- Operacoes antigas estavam em `/api/backup/*` e dependiam de scripts externos `install/restore-*.sh`.
+- Restore sincrono podia travar fluxo HTTP e afetar disponibilidade.
+- Era necessario mover orquestracao para backend, manter backend vivo e adicionar historico/lock/job assincrono.
 
-## Opções de fila consideradas
+## Opcoes de fila consideradas
 1. BullMQ (Redis):
-   - Prós: retries avançados, prioridade, observabilidade pronta, múltiplos workers.
-   - Contras: dependência adicional e acoplamento forte com Redis para restore crítico.
-2. Fila em banco (padrão adotado):
-   - Prós: sem nova dependência, estado transacional junto ao histórico (`backup_jobs`), rollout simples.
+   - Pros: retries avancados, prioridade, observabilidade pronta, multiplos workers.
+   - Contras: dependencia adicional e acoplamento forte com Redis para restore critico.
+2. Fila em banco (padrao adotado):
+   - Pros: sem nova dependencia, estado transacional junto ao historico (`backup_jobs`), rollout simples.
    - Contras: throughput menor e menos recursos nativos de retry.
 
 Fallback recomendado: se o volume de jobs crescer muito, migrar runner para BullMQ mantendo contrato HTTP e tabelas de auditoria.
 
-## Estratégia de restore adotada
-Híbrida: **staging database + cutover controlado no banco principal**.
+## Estrategia de restore adotada
+Opcao A: **staging database + promocao/swap**.
 
 Fluxo:
-1. Validar arquivo e checksum.
-2. Restaurar dump em database staging isolado.
-3. Validar staging (sanity check de tabelas).
-4. Criar safety backup do banco atual.
-5. Ativar modo manutenção (backend vivo, healthcheck ok).
-6. Aplicar restore no banco principal.
-7. Opcional: `prisma migrate deploy`.
-8. Desativar manutenção e limpar staging.
+1. Validar arquivo, assinatura e checksum.
+2. Gerar `pg_restore --list` e bloquear objetos perigosos por padrao (override manual com `allowUnsafeObjects=true`).
+3. Restaurar dump em database staging isolado.
+4. Validar staging (conectividade + tabelas minimas + integridade).
+5. Criar safety backup do banco ativo.
+6. Ativar modo manutencao (backend vivo, healthcheck ok).
+7. Pausar schedulers/cron e fazer quiesce real do Prisma (`disconnect`).
+8. Promover staging por rename/swap de databases (sem restore destrutivo no DB principal).
+9. Reconectar Prisma, executar smoke tests e opcionalmente `prisma migrate deploy`.
+10. Desativar manutencao e retomar cron.
 
-Motivo: reduz risco de aplicar dump corrompido direto em produção e evita derrubar processo do backend.
+Rollback de promocao:
+- Mantem referencia do DB anterior (`rollbackDatabase`).
+- Se smoke/promo falhar, reverte rename para voltar rapidamente ao DB anterior.
+
+## Active database e DSN
+- O backend usa `activeDatabaseName` para compor DSN operacional (`buildDatabaseUrl`).
+- Estado `activeDatabaseName` e persistido em arquivo local (`active-db-state.json`) no diretorio de backup.
+- Em runtime de cutover por swap, o nome ativo permanece estavel para o app, com reconnect controlado do Prisma.
 
 ## Diagrama textual
 ```text
@@ -44,8 +53,9 @@ BackupsController
       -> BackupLockService (lease global com TTL)
       -> BackupProcessService (spawn pg_dump/pg_restore/psql sem shell)
       -> BackupRuntimeStateService (modo manutencao)
+      -> CronService (pause/resume de schedulers no cutover)
 
-Persistência
+Persistencia
   - backup_artifacts (metadados do arquivo)
   - backup_jobs      (status e progresso)
   - backup_leases    (lock global backup/restore)
@@ -63,26 +73,38 @@ Persistência
 - `BackupLease`
   - `key`, `holderJobId`, `operationType`, `acquiredAt`, `expiresAt`, `metadata`
 
-## Invariantes de segurança aplicadas
+## Invariantes de seguranca aplicadas
 - Apenas `SUPER_ADMIN` pode executar endpoints (`JwtAuthGuard` + `RolesGuard`).
-- Validação adicional: SUPER_ADMIN de tenant não-master é bloqueado para restore global.
+- Validacao adicional: SUPER_ADMIN de tenant nao-master e bloqueado para restore global.
 - Upload aceita apenas `.dump/.backup` com assinatura `PGDMP`.
 - Nome/caminho sanitizado (sem path traversal).
-- Sem execução arbitrária: comandos via `spawn(command, args)` sem shell.
-- Senha não é logada (uso de `PGPASSWORD` no env do processo).
-- Lock global impede backup e restore simultâneos.
-- Modo manutenção durante cutover evita tráfego concorrente de rotas de negócio.
+- Sem execucao arbitraria: comandos via `spawn(command, args)` sem shell.
+- Senha nao e logada (uso de `PGPASSWORD` no env do processo).
+- Lock global impede backup e restore simultaneos.
+- Modo manutencao durante cutover evita trafego concorrente de rotas de negocio.
+- Prisma entra em quiesce antes da promocao (pool fechado).
 
-## Plano de migração gradual (substituir install/native.sh)
-1. Fase 1 (compatibilidade): manter endpoints antigos `/api/backup/*` como bridge para novo serviço.
+## Scripts operacionais legados
+`install/restore-db.sh` e `install/restore-native.sh` foram mantidos como wrappers:
+- chamam API interna localhost (`/api/backups/internal/restore-by-file`)
+- fazem polling de status (`/api/backups/internal/jobs/:jobId`)
+- nao executam `pg_restore` direto no DB principal.
+
+## Plano de migracao gradual
+1. Fase 1 (compatibilidade): manter endpoints antigos `/api/backup/*` como bridge para novo servico.
 2. Fase 2: frontend migrado para `/api/backups/*` e polling de jobs.
-3. Fase 3: remover dependência operacional de `install/restore-native.sh` para restore.
-4. Fase 4: opcionalmente descontinuar endpoints legados e scripts de restore manual.
+3. Fase 3: wrappers legados passam a ser apenas clientes da API interna.
+4. Fase 4: opcionalmente descontinuar endpoints legados `/api/backup/*`.
 
 ## Checklist de confiabilidade
-- Timeout configurável (`BACKUP_JOB_TIMEOUT_SECONDS`).
+- Timeout configuravel (`BACKUP_JOB_TIMEOUT_SECONDS`).
 - Lock/lease com TTL (`BACKUP_LEASE_SECONDS`) e heartbeat.
 - Logs persistidos por job (`backup_jobs.logs`).
-- Retenção configurável (`BACKUP_RETENTION_COUNT`).
-- Safety backup antes de cutover.
-- Estado de manutenção exposto via `/api/backups/maintenance/state`.
+- Retencao configuravel (`BACKUP_RETENTION_COUNT`).
+- Safety backup antes de promocao.
+- Estado de manutencao exposto via `/api/backups/maintenance/state`.
+- Endpoints internos de operacao com token (`BACKUP_INTERNAL_API_TOKEN`).
+- Guard interno valida origem por `socket.remoteAddress` + CIDR allowlist (`BACKUP_INTERNAL_ALLOWED_CIDRS`).
+- `X-Forwarded-For` e ignorado por padrao e so entra no calculo quando
+  `BACKUP_INTERNAL_TRUST_PROXY=true` e o proxy remoto estiver em
+  `BACKUP_INTERNAL_TRUSTED_PROXY_CIDRS`.

@@ -13,6 +13,7 @@ import {
   UploadedFile,
   UseGuards,
   UseInterceptors,
+  ValidationPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -21,8 +22,10 @@ import { Response } from 'express';
 import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { InternalRestoreByFileRequestDto } from './dto/internal-restore-job.dto';
 import { RestoreJobDto } from './dto/restore-job.dto';
 import { BackupService } from './backup.service';
+import { BackupInternalGuard } from './guards/backup-internal.guard';
 
 const MAX_UPLOAD_SIZE = Number(process.env.BACKUP_MAX_SIZE || 2 * 1024 * 1024 * 1024);
 
@@ -287,5 +290,59 @@ export class BackupLegacyController {
     const userId = req.user?.id || req.user?.sub;
     await this.backupService.deleteArtifactByFileName(fileName, userId);
     return { success: true, message: 'Backup apagado com sucesso' };
+  }
+}
+
+@Controller('backups/internal')
+@UseGuards(BackupInternalGuard)
+export class BackupInternalController {
+  constructor(private readonly backupService: BackupService) {}
+
+  @Post('restore-by-file')
+  async restoreByFile(
+    @Body(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    )
+    body: InternalRestoreByFileRequestDto,
+    @Request() req,
+  ) {
+    const options = {
+      runMigrations: body.runMigrations ?? false,
+      reason: body.reason,
+    };
+
+    const job = await this.backupService.queueInternalRestoreByFileName(body.backupFile, options, requestContext(req));
+    return {
+      success: true,
+      message: 'Job de restore interno enfileirado',
+      data: {
+        jobId: job.id,
+        status: job.status,
+      },
+    };
+  }
+
+  @Get('jobs/:jobId')
+  async internalJobStatus(@Param('jobId') jobId: string) {
+    const job = await this.backupService.getJobStatus(jobId);
+    return {
+      success: true,
+      data: {
+        id: job.id,
+        type: job.type,
+        status: job.status,
+        currentStep: job.currentStep,
+        progressPercent: job.progressPercent,
+        createdAt: job.createdAt,
+        startedAt: job.startedAt,
+        finishedAt: job.finishedAt,
+        error: job.error,
+        logs: job.logs,
+      },
+    };
   }
 }

@@ -1,215 +1,149 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
-COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
-ENV_FILE="${ENV_FILE:-install/.env.production}"
-BACKUPS_DIR="${BACKUPS_DIR:-${PROJECT_ROOT}/backups}"
 BACKUP_FILE="${BACKUP_FILE:-}"
+BACKEND_INTERNAL_URL="${BACKEND_INTERNAL_URL:-http://127.0.0.1:4000/api}"
+BACKUP_INTERNAL_API_TOKEN="${BACKUP_INTERNAL_API_TOKEN:-}"
 RUN_MIGRATIONS="${RUN_MIGRATIONS:-false}"
-RESTORE_MODE="${RESTORE_MODE:-restore-only}"
-TARGET_RELEASE_TAG="${TARGET_RELEASE_TAG:-}"
-HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-120}"
+FORCE_CROSS_ENVIRONMENT="${FORCE_CROSS_ENVIRONMENT:-false}"
+ALLOW_UNSAFE_OBJECTS="${ALLOW_UNSAFE_OBJECTS:-false}"
+RESTORE_REASON="${RESTORE_REASON:-manual-wrapper-restore-db.sh}"
+POLL_INTERVAL_SECONDS="${POLL_INTERVAL_SECONDS:-5}"
+POLL_TIMEOUT_SECONDS="${POLL_TIMEOUT_SECONDS:-7200}"
 
 log() {
-  echo "[restore] $*"
+  echo "[restore-wrapper-docker] $*"
 }
 
 log_err() {
-  echo "[restore] ERROR: $*" >&2
+  echo "[restore-wrapper-docker] ERROR: $*" >&2
 }
 
-compose() {
-  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
-}
-
-wait_for_backend_healthy() {
-  local timeout="$1"
-  local start_ts now_ts elapsed cid health_status
-
-  start_ts="$(date +%s)"
-  while true; do
-    cid="$(compose ps -q backend | head -n 1)"
-    if [ -z "$cid" ]; then
-      log_err "container backend nao encontrado"
-      return 1
-    fi
-
-    health_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$cid" 2>/dev/null || echo 'inspect-error')"
-    case "$health_status" in
-      healthy)
-        log "backend esta HEALTHY"
-        return 0
-        ;;
-      starting)
-        ;;
-      no-healthcheck)
-        log_err "backend sem healthcheck. Adicione healthcheck no compose."
-        return 1
-        ;;
-      unhealthy|inspect-error)
-        log_err "backend em estado invalido: $health_status"
-        return 1
-        ;;
-      *)
-        log "aguardando health backend: $health_status"
-        ;;
-    esac
-
-    now_ts="$(date +%s)"
-    elapsed=$((now_ts - start_ts))
-    if [ "$elapsed" -ge "$timeout" ]; then
-      log_err "timeout aguardando backend healthy (${timeout}s)"
-      return 1
-    fi
-
-    sleep 5
-  done
-}
-
-if ! docker compose version >/dev/null 2>&1; then
-  log_err "docker compose v2 nao disponivel"
-  exit 1
-fi
-
-case "$COMPOSE_FILE" in
-  docker-compose.prod.yml|docker-compose.prod.external.yml) ;;
-  *)
-    log_err "compose file nao permitido: $COMPOSE_FILE"
+require_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    log_err "comando obrigatorio nao encontrado: $1"
     exit 1
-    ;;
-esac
+  fi
+}
 
-case "$ENV_FILE" in
-  install/.env.production|.env.production|.env) ;;
-  *)
-    log_err "env file nao permitido: $ENV_FILE"
-    exit 1
-    ;;
-esac
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+extract_json_string() {
+  local key="$1"
+  sed -n "s/.*\"${key}\":\"\([^\"]*\)\".*/\1/p" | head -n 1
+}
+
+extract_json_number() {
+  local key="$1"
+  sed -n "s/.*\"${key}\":\([0-9][0-9]*\).*/\1/p" | head -n 1
+}
+
+normalize_bool() {
+  local value
+  value="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  case "$value" in
+    1|true|yes|on) echo "true" ;;
+    *) echo "false" ;;
+  esac
+}
+
+require_cmd curl
 
 if [ -z "$BACKUP_FILE" ]; then
   log_err "BACKUP_FILE nao informado"
   exit 1
 fi
 
+if [ -z "$BACKUP_INTERNAL_API_TOKEN" ]; then
+  log_err "BACKUP_INTERNAL_API_TOKEN nao informado"
+  exit 1
+fi
+
 backup_name="$(basename "$BACKUP_FILE")"
 if [ "$backup_name" != "$BACKUP_FILE" ]; then
-  log_err "nome de arquivo invalido"
+  log_err "BACKUP_FILE deve conter apenas nome de arquivo (sem caminho)"
   exit 1
 fi
 
-if ! echo "$backup_name" | grep -Eq '^[a-zA-Z0-9._-]+$'; then
-  log_err "nome de arquivo invalido"
+if ! printf '%s' "$backup_name" | grep -Eq '^[a-zA-Z0-9._-]+$'; then
+  log_err "nome de backup invalido: $backup_name"
   exit 1
 fi
 
-cd "$PROJECT_ROOT"
+run_migrations_bool="$(normalize_bool "$RUN_MIGRATIONS")"
+force_cross_bool="$(normalize_bool "$FORCE_CROSS_ENVIRONMENT")"
+allow_unsafe_bool="$(normalize_bool "$ALLOW_UNSAFE_OBJECTS")"
+reason_escaped="$(json_escape "$RESTORE_REASON")"
+backup_escaped="$(json_escape "$backup_name")"
 
-if [ ! -f "$ENV_FILE" ]; then
-  log_err "arquivo env nao encontrado: $ENV_FILE"
+payload="{\"backupFile\":\"${backup_escaped}\",\"runMigrations\":${run_migrations_bool},\"forceCrossEnvironment\":${force_cross_bool},\"allowUnsafeObjects\":${allow_unsafe_bool},\"reason\":\"${reason_escaped}\"}"
+
+log "iniciando job de restore via API interna"
+create_response="$(curl -sS -X POST "${BACKEND_INTERNAL_URL}/backups/internal/restore-by-file" \
+  -H "Content-Type: application/json" \
+  -H "x-backup-internal-token: ${BACKUP_INTERNAL_API_TOKEN}" \
+  --data "$payload")"
+
+if ! printf '%s' "$create_response" | grep -q '"success":true'; then
+  log_err "falha ao criar job de restore"
+  log_err "$create_response"
   exit 1
 fi
 
-if [ ! -f "$COMPOSE_FILE" ]; then
-  log_err "arquivo compose nao encontrado: $COMPOSE_FILE"
+job_id="$(printf '%s' "$create_response" | extract_json_string "jobId")"
+if [ -z "$job_id" ]; then
+  log_err "nao foi possivel extrair jobId da resposta"
+  log_err "$create_response"
   exit 1
 fi
 
-backups_dir_real="$(cd "$BACKUPS_DIR" && pwd)"
-backup_path_real="$(cd "$BACKUPS_DIR" && cd "$(dirname "$backup_name")" && pwd)/$(basename "$backup_name")"
+log "job enfileirado: $job_id"
 
-if [[ "$backup_path_real" != "$backups_dir_real"/* ]]; then
-  log_err "arquivo fora do diretorio de backups"
-  exit 1
-fi
+start_ts="$(date +%s)"
+last_status=""
 
-if [ ! -f "$backup_path_real" ]; then
-  log_err "backup nao encontrado: $backup_name"
-  exit 1
-fi
+while true; do
+  status_response="$(curl -sS "${BACKEND_INTERNAL_URL}/backups/internal/jobs/${job_id}" \
+    -H "x-backup-internal-token: ${BACKUP_INTERNAL_API_TOKEN}")"
 
-case "$RESTORE_MODE" in
-  restore-only|drop-and-restore) ;;
-  *)
-    log_err "RESTORE_MODE invalido: $RESTORE_MODE"
-    exit 1
-    ;;
-esac
-
-set -a
-# shellcheck disable=SC1090
-. "$ENV_FILE"
-set +a
-
-DB_USER="${DB_USER:-}"
-DB_NAME="${DB_NAME:-}"
-DB_PASSWORD="${DB_PASSWORD:-}"
-
-if [ -z "$DB_USER" ] || [ -z "$DB_NAME" ] || [ -z "$DB_PASSWORD" ]; then
-  log_err "DB_USER/DB_NAME/DB_PASSWORD precisam estar definidos no env"
-  exit 1
-fi
-
-if [ -n "$TARGET_RELEASE_TAG" ]; then
-  export RELEASE_TAG="$TARGET_RELEASE_TAG"
-  log "target release tag para backend apos restore: $TARGET_RELEASE_TAG"
-fi
-
-if [ ! -s "$backup_path_real" ]; then
-  log_err "arquivo de backup vazio ou invalido: $backup_name"
-  exit 1
-fi
-
-ext="$(printf '%s' "${backup_name##*.}" | tr '[:upper:]' '[:lower:]')"
-
-if [ "$ext" = "dump" ] || [ "$ext" = "backup" ]; then
-  log "validando integridade do dump antes do restore"
-  if ! cat "$backup_path_real" | compose exec -T db pg_restore --list >/dev/null; then
-    log_err "arquivo dump corrompido ou invalido; restore cancelado"
+  if ! printf '%s' "$status_response" | grep -q '"success":true'; then
+    log_err "falha ao consultar status do job ${job_id}"
+    log_err "$status_response"
     exit 1
   fi
-fi
 
-safety_file="${backups_dir_real}/safety_pre_restore_$(date +%Y%m%d_%H%M%S).dump"
-log "criando backup de seguranca antes do restore: $(basename "$safety_file")"
-compose exec -T -e PGPASSWORD="$DB_PASSWORD" db pg_dump -U "$DB_USER" -d "$DB_NAME" -Fc > "$safety_file"
+  status="$(printf '%s' "$status_response" | extract_json_string "status")"
+  step="$(printf '%s' "$status_response" | extract_json_string "currentStep")"
+  progress="$(printf '%s' "$status_response" | extract_json_number "progressPercent")"
+  error_message="$(printf '%s' "$status_response" | extract_json_string "error")"
 
-log "parando backend"
-compose stop backend
+  if [ "$status" != "$last_status" ] || [ -n "$step" ]; then
+    log "job=${job_id} status=${status:-unknown} step=${step:-n/a} progress=${progress:-0}%"
+    last_status="$status"
+  fi
 
-case "$ext" in
-  sql)
-    log "restaurando arquivo SQL via psql"
-    if [ "$RESTORE_MODE" = "drop-and-restore" ]; then
-      log "modo drop-and-restore: resetando schema public"
-      compose exec -T -e PGPASSWORD="$DB_PASSWORD" db psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"
-    fi
-    cat "$backup_path_real" | compose exec -T -e PGPASSWORD="$DB_PASSWORD" db psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME"
-    ;;
-  dump|backup)
-    log "restaurando arquivo dump via pg_restore"
-    if [ "$RESTORE_MODE" = "drop-and-restore" ]; then
-      cat "$backup_path_real" | compose exec -T -e PGPASSWORD="$DB_PASSWORD" db pg_restore -v --clean --if-exists --no-owner --no-acl -U "$DB_USER" -d "$DB_NAME"
-    else
-      cat "$backup_path_real" | compose exec -T -e PGPASSWORD="$DB_PASSWORD" db pg_restore -v --no-owner --no-acl -U "$DB_USER" -d "$DB_NAME"
-    fi
-    ;;
-  *)
-    log_err "extensao nao suportada: .$ext"
+  case "$status" in
+    SUCCESS)
+      log "restore finalizado com sucesso"
+      exit 0
+      ;;
+    FAILED|CANCELED)
+      log_err "restore finalizado com falha (status=${status})"
+      if [ -n "$error_message" ]; then
+        log_err "erro: $error_message"
+      fi
+      exit 1
+      ;;
+  esac
+
+  now_ts="$(date +%s)"
+  elapsed="$((now_ts - start_ts))"
+  if [ "$elapsed" -ge "$POLL_TIMEOUT_SECONDS" ]; then
+    log_err "timeout aguardando conclusao do job (${POLL_TIMEOUT_SECONDS}s)"
     exit 1
-    ;;
-esac
+  fi
 
-log "subindo backend"
-compose up -d backend
-wait_for_backend_healthy "$HEALTH_TIMEOUT"
-
-if [ "$RUN_MIGRATIONS" = "true" ] && compose config --services | grep -qx "migrate"; then
-  log "executando migrate pos-restore"
-  compose run --rm migrate
-elif [ "$RUN_MIGRATIONS" = "true" ]; then
-  log "service migrate nao encontrado (skip)"
-fi
-
-log "restore concluido com sucesso"
+  sleep "$POLL_INTERVAL_SECONDS"
+done

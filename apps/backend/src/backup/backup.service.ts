@@ -18,6 +18,7 @@ import { createHash, randomUUID } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AuditService } from '../audit/audit.service';
+import { CronService } from '../core/cron/cron.service';
 import { PrismaService } from '../core/prisma/prisma.service';
 import { BackupConfigService } from './backup-config.service';
 import { BackupProcessService } from './backup-process.service';
@@ -69,6 +70,7 @@ export class BackupService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly cronService: CronService,
     private readonly backupConfig: BackupConfigService,
     private readonly processService: BackupProcessService,
     private readonly runtimeState: BackupRuntimeStateService,
@@ -215,6 +217,16 @@ export class BackupService {
       throw new BadRequestException('O artefato informado nao e um upload de backup');
     }
     return this.queueRestoreFromArtifact(uploadId, userId, restoreOptions, context);
+  }
+
+  async queueInternalRestoreByFileName(
+    fileName: string,
+    restoreOptions: RestoreJobDto,
+    context: RequestContext,
+  ): Promise<BackupJob> {
+    const operatorId = await this.resolveInternalRestoreOperatorId();
+    const artifact = await this.findArtifactByFileName(fileName);
+    return this.queueRestoreFromArtifact(artifact.id, operatorId, restoreOptions, context);
   }
 
   async listBackupsAndJobs(limit = 50): Promise<BackupListResponse> {
@@ -604,7 +616,7 @@ export class BackupService {
   private async runBackupJob(job: BackupJob): Promise<void> {
     await this.assertNoRunningUpdate();
 
-    const db = this.backupConfig.getDatabaseConfig();
+    const db = this.backupConfig.getDatabaseConfig({ useActiveDatabase: true });
     const extension = '.dump';
     const fileName = this.buildStoredFileName(`backup_${Date.now()}`, extension);
     const filePath = this.resolveFilePath(fileName);
@@ -725,7 +737,9 @@ export class BackupService {
     await this.validateDumpArchiveSignatureFromFile(artifact.filePath);
 
     const db = this.backupConfig.getDatabaseConfig();
+    const activeDatabase = this.backupConfig.getActiveDatabaseName();
     const stagingDatabase = this.backupConfig.buildStagingDatabaseName(job.id);
+    const rollbackDatabase = this.backupConfig.buildRollbackDatabaseName(activeDatabase, job.id);
     const metadata = this.toJsonRecord(job.metadata);
 
     await this.updateJobProgress(job.id, 'RESTORE_STAGE_DB_PREPARE', 20, 'Preparando banco staging');
@@ -740,6 +754,10 @@ export class BackupService {
     });
 
     let rollbackRestoreListPath: string | undefined;
+    let safetyArtifact: BackupArtifact | null = null;
+    let maintenanceEnabled = false;
+    let promoted = false;
+    let rollbackPromotionApplied = false;
 
     try {
       await this.updateJobProgress(job.id, 'RESTORE_STAGE_DB_LOAD', 40, 'Restaurando dump no banco staging');
@@ -759,89 +777,54 @@ export class BackupService {
       await this.validateStagingDatabase(stagingDatabase, db.password);
 
       await this.updateJobProgress(job.id, 'RESTORE_SAFETY_BACKUP', 70, 'Criando backup de seguranca pre-restore');
-      const safety = await this.createSafetyBackup(job, db.password);
+      safetyArtifact = await this.createSafetyBackup(job, db.password);
       rollbackRestoreListPath = await this.buildFilteredRestoreList({
-        dumpPath: safety.filePath,
+        dumpPath: safetyArtifact.filePath,
         jobId: `${job.id}_rollback`,
         password: db.password,
-        artifactSource: safety.source,
+        artifactSource: safetyArtifact.source,
         allowUnsafeObjects: true,
       });
 
-      await this.updateJobProgress(job.id, 'RESTORE_ENTER_MAINTENANCE', 80, 'Ativando modo manutencao');
+      await this.updateJobProgress(job.id, 'RESTORE_ENTER_MAINTENANCE', 80, 'Ativando modo manutencao e pausando schedulers');
       this.runtimeState.enableMaintenance(job.id, 'restore-cutover');
+      maintenanceEnabled = true;
+      this.cronService.pauseAllForMaintenance();
+      await this.updateJobProgress(
+        job.id,
+        'RESTORE_QUIESCE',
+        84,
+        'Drenando conexoes Prisma e bloqueando reconexao durante cutover',
+      );
+      await this.prisma.quiesceForCutover();
 
-      try {
-        const cutoverTimeoutMs = Math.min(
-          this.backupConfig.getJobTimeoutMs(),
-          this.backupConfig.getRestoreMaintenanceWindowSeconds() * 1000,
-        );
+      const cutoverTimeoutMs = Math.min(
+        this.backupConfig.getJobTimeoutMs(),
+        this.backupConfig.getRestoreMaintenanceWindowSeconds() * 1000,
+      );
 
-        await this.updateJobProgress(job.id, 'RESTORE_CUTOVER', 90, 'Aplicando restore no banco principal');
-        try {
-          await this.executePgRestore({
-            dbName: db.database,
-            dumpPath: artifact.filePath,
-            listFilePath: restoreListPath,
-            password: db.password,
-            timeoutMs: cutoverTimeoutMs,
-            onLine: async (line) => {
-              if (/processing item|creating|loading data|setting|finished/i.test(line)) {
-                await this.tryAppendJobLog(job.id, 'INFO', line);
-              }
-            },
-          });
-        } catch (cutoverError) {
-          await this.tryAppendJobLog(job.id, 'ERROR', `Falha no cutover: ${this.errorMessage(cutoverError)}`);
-          await this.tryAppendJobLog(job.id, 'WARN', 'Iniciando rollback automatico com safety backup');
+      await this.promoteStagingDatabase({
+        activeDatabase,
+        stagingDatabase,
+        rollbackDatabase,
+        password: db.password,
+        timeoutMs: cutoverTimeoutMs,
+      });
+      promoted = true;
+      this.backupConfig.setActiveDatabaseName(activeDatabase);
 
-          let rollbackError: unknown = null;
-          try {
-            await this.executePgRestore({
-              dbName: db.database,
-              dumpPath: safety.filePath,
-              listFilePath: rollbackRestoreListPath,
-              password: db.password,
-              timeoutMs: cutoverTimeoutMs,
-              onLine: async (line) => {
-                if (/processing item|creating|loading data|setting|finished/i.test(line)) {
-                  await this.tryAppendJobLog(job.id, 'INFO', `[rollback] ${line}`);
-                }
-              },
-            });
-            await this.tryAppendJobLog(job.id, 'INFO', 'Rollback automatico concluido com sucesso');
-          } catch (error) {
-            rollbackError = error;
-            await this.tryAppendJobLog(
-              job.id,
-              'ERROR',
-              `Rollback automatico falhou: ${this.errorMessage(rollbackError)}`,
-            );
-          }
-
-          let reconnectError: unknown = null;
-          try {
-            await this.ensurePrismaConnectionHealthy();
-          } catch (error) {
-            reconnectError = error;
-            await this.tryAppendJobLog(job.id, 'ERROR', `Falha ao recuperar conexao Prisma: ${this.errorMessage(error)}`);
-          }
-
-          throw this.wrapRestoreCutoverError(cutoverError, rollbackError, reconnectError);
-        }
-
-        await this.ensurePrismaConnectionHealthy();
-      } finally {
-        this.runtimeState.disableMaintenance(job.id);
-      }
+      await this.prisma.resumeAfterCutover();
+      await this.updateJobProgress(job.id, 'RESTORE_SMOKE_TEST', 93, 'Executando smoke test pos-promocao');
+      await this.ensurePrismaConnectionHealthy();
+      await this.validatePromotedDatabase();
 
       if (metadata?.runMigrations === true) {
         await this.updateJobProgress(job.id, 'RESTORE_MIGRATIONS', 95, 'Executando migrate deploy');
         await this.runPostRestoreMigrations(db.password);
+        await this.ensurePrismaConnectionHealthy();
       }
 
-      await this.updateJobProgress(job.id, 'RESTORE_CLEANUP', 98, 'Limpando banco staging');
-      await this.dropDatabase(stagingDatabase, db.password);
+      await this.updateJobProgress(job.id, 'RESTORE_CLEANUP', 98, 'Finalizando restore e registrando auditoria');
 
       await this.markJobSuccess(job.id, {
         fileName: artifact.fileName,
@@ -850,8 +833,11 @@ export class BackupService {
         checksumSha256: artifact.checksumSha256,
         metadata: {
           ...(this.toJsonRecord(job.metadata) || {}),
-          safetyBackupArtifactId: safety.id,
+          safetyBackupArtifactId: safetyArtifact?.id || null,
           stagingDatabase,
+          activeDatabase,
+          rollbackDatabase,
+          promotedAt: new Date().toISOString(),
         } as any,
       });
 
@@ -862,12 +848,65 @@ export class BackupService {
           jobId: job.id,
           artifactId: artifact.id,
           fileName: artifact.fileName,
+          activeDatabase,
           stagingDatabase,
-          safetyBackupArtifactId: safety.id,
+          rollbackDatabase,
+          safetyBackupArtifactId: safetyArtifact?.id || null,
         },
       });
+    } catch (error) {
+      let rollbackError: unknown = null;
+
+      if (promoted) {
+        try {
+          await this.rollbackPromotion({
+            activeDatabase,
+            rollbackDatabase,
+            password: db.password,
+            timeoutMs: Math.min(
+              this.backupConfig.getJobTimeoutMs(),
+              this.backupConfig.getRestoreMaintenanceWindowSeconds() * 1000,
+            ),
+          });
+          rollbackPromotionApplied = true;
+        } catch (promoteRollbackError) {
+          rollbackError = promoteRollbackError;
+        }
+      }
+
+      if (rollbackError) {
+        throw new Error(
+          `Falha no restore apos promocao e rollback de promocao tambem falhou. ` +
+            `Erro restore: ${this.errorMessage(error)}. Erro rollback: ${this.errorMessage(rollbackError)}`,
+        );
+      }
+
+      if (promoted && rollbackPromotionApplied) {
+        throw new Error(
+          `Restore falhou apos promocao, mas rollback da promocao foi aplicado com sucesso. ` +
+            `Erro original: ${this.errorMessage(error)}`,
+        );
+      }
+
+      throw error;
     } finally {
-      this.runtimeState.disableMaintenance(job.id);
+      if (this.prisma.isCutoverBlocked()) {
+        try {
+          await this.prisma.resumeAfterCutover();
+        } catch (resumeError) {
+          this.logger.error(
+            `Falha ao recuperar conexao Prisma apos cutover do job ${job.id}: ${this.errorMessage(resumeError)}`,
+          );
+        }
+      }
+
+      if (this.cronService.isMaintenancePaused()) {
+        this.cronService.resumeAllAfterMaintenance();
+      }
+
+      if (maintenanceEnabled) {
+        this.runtimeState.disableMaintenance(job.id);
+      }
       if (restoreListPath) {
         this.deleteFileIfExists(restoreListPath);
       }
@@ -879,7 +918,7 @@ export class BackupService {
   }
 
   private async createSafetyBackup(job: BackupJob, password: string): Promise<BackupArtifact> {
-    const db = this.backupConfig.getDatabaseConfig();
+    const db = this.backupConfig.getDatabaseConfig({ useActiveDatabase: true });
     const fileName = this.buildStoredFileName(`safety_pre_restore_${Date.now()}`, '.dump');
     const filePath = this.resolveFilePath(fileName);
 
@@ -976,33 +1015,54 @@ export class BackupService {
   }
 
   private async validateStagingDatabase(database: string, password: string): Promise<void> {
-    const db = this.backupConfig.getDatabaseConfig();
-    const args = [
-      '--host',
-      db.host,
-      '--port',
-      String(db.port),
-      '--username',
-      db.user,
-      '--dbname',
+    await this.runPsqlScalarQuery({
       database,
-      '--tuples-only',
-      '--no-align',
-      '--command',
-      "SELECT count(*)::int FROM information_schema.tables WHERE table_schema='public';",
-    ];
-
-    const result = await this.processService.runCommand({
-      command: this.backupConfig.getBinary('psql'),
-      args,
-      env: this.buildCommandEnv(password),
+      password,
+      sql: 'SELECT 1',
       timeoutMs: Math.min(this.backupConfig.getJobTimeoutMs(), 120000),
-      cwd: this.backupConfig.getProjectRoot(),
     });
 
-    const parsedCount = Number((result.stdout || '').trim());
+    const tableCountRaw = await this.runPsqlScalarQuery({
+      database,
+      password,
+      sql: "SELECT count(*)::int FROM information_schema.tables WHERE table_schema='public';",
+      timeoutMs: Math.min(this.backupConfig.getJobTimeoutMs(), 120000),
+    });
+    const parsedCount = Number(tableCountRaw);
     if (!Number.isFinite(parsedCount) || parsedCount <= 0) {
       throw new Error('Banco staging restaurado sem tabelas no schema public');
+    }
+
+    const requiredTables = this.backupConfig.getRequiredTablesForRestoreValidation();
+    if (requiredTables.length === 0) {
+      return;
+    }
+
+    const normalizedRequired = requiredTables.map((table) => table.trim().toLowerCase()).filter(Boolean);
+    if (normalizedRequired.length === 0) {
+      return;
+    }
+
+    const expectedListSql = normalizedRequired.map((table) => `'${this.escapeSqlLiteral(table)}'`).join(', ');
+    const existingRaw = await this.runPsqlScalarQuery({
+      database,
+      password,
+      sql:
+        `SELECT array_to_string(array_agg(lower(table_name) ORDER BY lower(table_name)), ',') ` +
+        `FROM information_schema.tables ` +
+        `WHERE table_schema='public' AND lower(table_name) = ANY(ARRAY[${expectedListSql}]);`,
+      timeoutMs: Math.min(this.backupConfig.getJobTimeoutMs(), 120000),
+    });
+
+    const existingSet = new Set(
+      String(existingRaw || '')
+        .split(',')
+        .map((value) => value.trim().toLowerCase())
+        .filter(Boolean),
+    );
+    const missing = normalizedRequired.filter((table) => !existingSet.has(table));
+    if (missing.length > 0) {
+      throw new Error(`Banco staging nao contem tabelas obrigatorias: ${missing.join(', ')}`);
     }
   }
 
@@ -1069,8 +1129,209 @@ export class BackupService {
     }
   }
 
+  private async promoteStagingDatabase(params: {
+    activeDatabase: string;
+    stagingDatabase: string;
+    rollbackDatabase: string;
+    password: string;
+    timeoutMs: number;
+  }): Promise<void> {
+    const activeDatabase = this.assertDatabaseIdentifier(params.activeDatabase, 'activeDatabase');
+    const stagingDatabase = this.assertDatabaseIdentifier(params.stagingDatabase, 'stagingDatabase');
+    const rollbackDatabase = this.assertDatabaseIdentifier(params.rollbackDatabase, 'rollbackDatabase');
+
+    await this.terminateDatabaseConnections(
+      [activeDatabase, stagingDatabase, rollbackDatabase],
+      params.password,
+      params.timeoutMs,
+    );
+    await this.runPsqlCommand({
+      database: 'postgres',
+      password: params.password,
+      sql: `DROP DATABASE IF EXISTS ${this.quoteDatabaseIdentifier(rollbackDatabase)};`,
+      timeoutMs: params.timeoutMs,
+    });
+    await this.runPsqlCommand({
+      database: 'postgres',
+      password: params.password,
+      sql:
+        `ALTER DATABASE ${this.quoteDatabaseIdentifier(activeDatabase)} ` +
+        `RENAME TO ${this.quoteDatabaseIdentifier(rollbackDatabase)};`,
+      timeoutMs: params.timeoutMs,
+    });
+
+    try {
+      await this.runPsqlCommand({
+        database: 'postgres',
+        password: params.password,
+        sql:
+          `ALTER DATABASE ${this.quoteDatabaseIdentifier(stagingDatabase)} ` +
+          `RENAME TO ${this.quoteDatabaseIdentifier(activeDatabase)};`,
+        timeoutMs: params.timeoutMs,
+      });
+    } catch (error) {
+      try {
+        await this.runPsqlCommand({
+          database: 'postgres',
+          password: params.password,
+          sql:
+            `ALTER DATABASE ${this.quoteDatabaseIdentifier(rollbackDatabase)} ` +
+            `RENAME TO ${this.quoteDatabaseIdentifier(activeDatabase)};`,
+          timeoutMs: params.timeoutMs,
+        });
+      } catch (rollbackRenameError) {
+        throw new Error(
+          `Falha ao promover staging e falha ao reverter rename inicial. ` +
+            `Promocao: ${this.errorMessage(error)}. Reversao: ${this.errorMessage(rollbackRenameError)}`,
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  private async rollbackPromotion(params: {
+    activeDatabase: string;
+    rollbackDatabase: string;
+    password: string;
+    timeoutMs: number;
+  }): Promise<void> {
+    const activeDatabase = this.assertDatabaseIdentifier(params.activeDatabase, 'activeDatabase');
+    const rollbackDatabase = this.assertDatabaseIdentifier(params.rollbackDatabase, 'rollbackDatabase');
+
+    if (!this.prisma.isCutoverBlocked()) {
+      await this.prisma.quiesceForCutover();
+    }
+
+    const failedPromotedDatabase = this.backupConfig.buildRollbackDatabaseName(activeDatabase, randomUUID());
+
+    await this.terminateDatabaseConnections([activeDatabase, rollbackDatabase], params.password, params.timeoutMs);
+
+    await this.runPsqlCommand({
+      database: 'postgres',
+      password: params.password,
+      sql:
+        `ALTER DATABASE ${this.quoteDatabaseIdentifier(activeDatabase)} ` +
+        `RENAME TO ${this.quoteDatabaseIdentifier(failedPromotedDatabase)};`,
+      timeoutMs: params.timeoutMs,
+    });
+    await this.runPsqlCommand({
+      database: 'postgres',
+      password: params.password,
+      sql:
+        `ALTER DATABASE ${this.quoteDatabaseIdentifier(rollbackDatabase)} ` +
+        `RENAME TO ${this.quoteDatabaseIdentifier(activeDatabase)};`,
+      timeoutMs: params.timeoutMs,
+    });
+
+    this.backupConfig.setActiveDatabaseName(activeDatabase);
+    await this.prisma.resumeAfterCutover();
+  }
+
+  private async validatePromotedDatabase(): Promise<void> {
+    const db = this.backupConfig.getDatabaseConfig({ useActiveDatabase: true });
+    const requiredTables = this.backupConfig.getRequiredTablesForRestoreValidation();
+    await this.validateStagingDatabase(db.database, db.password);
+
+    if (requiredTables.includes('_prisma_migrations')) {
+      try {
+        await this.prisma.$queryRawUnsafe('SELECT 1 FROM "_prisma_migrations" LIMIT 1');
+      } catch (error) {
+        throw new Error(`Smoke test de migrations falhou no banco promovido: ${this.errorMessage(error)}`);
+      }
+    }
+  }
+
+  private async runPsqlCommand(params: {
+    database: string;
+    password: string;
+    sql: string;
+    timeoutMs: number;
+  }): Promise<string> {
+    const db = this.backupConfig.getDatabaseConfig();
+    const result = await this.processService.runCommand({
+      command: this.backupConfig.getBinary('psql'),
+      args: [
+        '--host',
+        db.host,
+        '--port',
+        String(db.port),
+        '--username',
+        db.user,
+        '--dbname',
+        this.assertDatabaseIdentifier(params.database, 'database'),
+        '--set',
+        'ON_ERROR_STOP=on',
+        '--command',
+        params.sql,
+      ],
+      env: this.buildCommandEnv(params.password),
+      timeoutMs: params.timeoutMs,
+      cwd: this.backupConfig.getProjectRoot(),
+    });
+
+    return (result.stdout || '').trim();
+  }
+
+  private async runPsqlScalarQuery(params: {
+    database: string;
+    password: string;
+    sql: string;
+    timeoutMs: number;
+  }): Promise<string> {
+    const db = this.backupConfig.getDatabaseConfig();
+    const result = await this.processService.runCommand({
+      command: this.backupConfig.getBinary('psql'),
+      args: [
+        '--host',
+        db.host,
+        '--port',
+        String(db.port),
+        '--username',
+        db.user,
+        '--dbname',
+        this.assertDatabaseIdentifier(params.database, 'database'),
+        '--set',
+        'ON_ERROR_STOP=on',
+        '--tuples-only',
+        '--no-align',
+        '--command',
+        params.sql,
+      ],
+      env: this.buildCommandEnv(params.password),
+      timeoutMs: params.timeoutMs,
+      cwd: this.backupConfig.getProjectRoot(),
+    });
+
+    return (result.stdout || '').trim();
+  }
+
+  private async terminateDatabaseConnections(databases: string[], password: string, timeoutMs: number): Promise<void> {
+    const validNames = Array.from(
+      new Set(
+        databases
+          .map((dbName) => this.assertDatabaseIdentifier(dbName, 'database'))
+          .filter((dbName) => dbName !== 'postgres'),
+      ),
+    );
+
+    if (validNames.length === 0) {
+      return;
+    }
+
+    const inList = validNames.map((name) => `'${this.escapeSqlLiteral(name)}'`).join(', ');
+    await this.runPsqlCommand({
+      database: 'postgres',
+      password,
+      sql:
+        `SELECT pg_terminate_backend(pid) FROM pg_stat_activity ` +
+        `WHERE datname IN (${inList}) AND pid <> pg_backend_pid();`,
+      timeoutMs,
+    });
+  }
+
   private async runPostRestoreMigrations(password: string): Promise<void> {
-    const databaseUrl = process.env.DATABASE_URL || '';
+    const databaseUrl = this.backupConfig.buildDatabaseUrl(this.backupConfig.getActiveDatabaseName());
     if (!databaseUrl) {
       throw new Error('DATABASE_URL nao definida para migrate pos-restore');
     }
@@ -1101,8 +1362,9 @@ export class BackupService {
     const protectedTables = this.backupConfig.getProtectedTablesForRestore();
     const strictUploadInspection =
       artifactSource === BackupArtifactSource.UPLOAD && this.backupConfig.isStrictUploadRestoreInspectionEnabled();
+    const dangerousObjectInspection = this.backupConfig.isDangerousObjectInspectionEnabled() || strictUploadInspection;
 
-    if (protectedTables.length === 0 && !strictUploadInspection) {
+    if (protectedTables.length === 0 && !dangerousObjectInspection) {
       return undefined;
     }
 
@@ -1115,7 +1377,7 @@ export class BackupService {
     });
 
     const lines = result.stdout.split(/\r?\n/);
-    if (strictUploadInspection && !allowUnsafeObjects) {
+    if (dangerousObjectInspection && !allowUnsafeObjects) {
       const blockedEntries = this.findBlockedEntriesFromRestoreList(
         lines,
         this.backupConfig.getUploadRestoreBlockedObjectTypes(),
@@ -1130,11 +1392,11 @@ export class BackupService {
       }
     }
 
-    if (strictUploadInspection && allowUnsafeObjects) {
+    if (dangerousObjectInspection && allowUnsafeObjects) {
       await this.tryAppendJobLog(
         jobId,
         'WARN',
-        'Restore de upload com allowUnsafeObjects=true (aprovacao manual assumida pelo operador)',
+        `Restore com allowUnsafeObjects=true (aprovacao manual assumida pelo operador; source=${artifactSource})`,
       );
     }
 
@@ -1282,6 +1544,23 @@ export class BackupService {
     }
   }
 
+  private assertDatabaseIdentifier(value: string, fieldName: string): string {
+    const normalized = String(value || '').trim();
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(normalized)) {
+      throw new BadRequestException(`${fieldName} invalido para identificador de database`);
+    }
+    return normalized;
+  }
+
+  private quoteDatabaseIdentifier(value: string): string {
+    const normalized = this.assertDatabaseIdentifier(value, 'database');
+    return `"${normalized}"`;
+  }
+
+  private escapeSqlLiteral(value: string): string {
+    return String(value).replace(/'/g, "''");
+  }
+
   private calculateChecksumFromBuffer(buffer: Buffer): string {
     return createHash('sha256').update(buffer).digest('hex');
   }
@@ -1340,29 +1619,6 @@ export class BackupService {
       return error.message;
     }
     return String(error);
-  }
-
-  private wrapRestoreCutoverError(cutoverError: unknown, rollbackError: unknown, reconnectError: unknown): Error {
-    const cutoverMessage = this.errorMessage(cutoverError);
-    if (!rollbackError && !reconnectError) {
-      return new Error(
-        `Restore no banco principal falhou, mas rollback automatico foi aplicado. Erro original: ${cutoverMessage}`,
-      );
-    }
-
-    if (!rollbackError && reconnectError) {
-      const reconnectMessage = this.errorMessage(reconnectError);
-      return new Error(
-        `Restore no banco principal falhou, rollback automatico foi aplicado, ` +
-          `mas a reconexao do backend com o banco falhou. Cutover: ${cutoverMessage}. Reconnect: ${reconnectMessage}`,
-      );
-    }
-
-    const rollbackMessage = this.errorMessage(rollbackError);
-    return new Error(
-      `Restore no banco principal falhou e rollback automatico tambem falhou. ` +
-        `Cutover: ${cutoverMessage}. Rollback: ${rollbackMessage}`,
-    );
   }
 
   private async ensurePrismaConnectionHealthy(): Promise<void> {
@@ -1492,6 +1748,23 @@ export class BackupService {
     if (user.tenantId && user.tenant && !user.tenant.isMasterTenant) {
       throw new ForbiddenException('SUPER_ADMIN de tenant nao-master nao pode executar restore global');
     }
+  }
+
+  private async resolveInternalRestoreOperatorId(): Promise<string> {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        role: Role.SUPER_ADMIN,
+        OR: [{ tenantId: null }, { tenant: { isMasterTenant: true } }],
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+
+    if (!user) {
+      throw new ConflictException('Nenhum SUPER_ADMIN elegivel encontrado para restore interno');
+    }
+
+    return user.id;
   }
 
   private async assertNoRunningUpdate(): Promise<void> {

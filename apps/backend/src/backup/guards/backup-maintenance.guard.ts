@@ -37,6 +37,7 @@ export class BackupMaintenanceGuard implements CanActivate {
     return (
       path.startsWith('/api/health') ||
       path.startsWith('/api/backups/jobs/') ||
+      path.startsWith('/api/backups/internal/jobs/') ||
       path.startsWith('/api/backups/maintenance') ||
       path.startsWith('/api/backup/restore-logs/')
     );

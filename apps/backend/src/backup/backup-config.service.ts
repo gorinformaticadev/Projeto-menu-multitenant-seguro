@@ -18,14 +18,18 @@ export class BackupConfigService {
   private readonly projectRoot: string;
   private readonly backupDir: string;
   private readonly executionMode: 'docker' | 'native';
+  private readonly databaseUrl: string;
   private readonly databaseConfig: BackupDatabaseConfig;
+  private readonly activeDbStateFile: string;
 
   constructor(private readonly configService: ConfigService) {
     this.projectRoot = this.resolveProjectRoot();
     this.backupDir = this.resolveBackupDir();
     this.executionMode = this.resolveExecutionMode();
-    this.databaseConfig = this.parseDatabaseUrl();
+    this.databaseUrl = this.readDatabaseUrl();
+    this.databaseConfig = this.parseDatabaseUrl(this.databaseUrl);
     this.ensureBackupDir();
+    this.activeDbStateFile = this.resolveActiveDatabaseStateFile();
   }
 
   getProjectRoot(): string {
@@ -86,8 +90,12 @@ export class BackupConfigService {
       .filter((value) => value.length > 0);
   }
 
-  getDatabaseConfig(): BackupDatabaseConfig {
-    return this.databaseConfig;
+  getDatabaseConfig(options?: { useActiveDatabase?: boolean }): BackupDatabaseConfig {
+    const database = options?.useActiveDatabase ? this.getActiveDatabaseName() : this.databaseConfig.database;
+    return {
+      ...this.databaseConfig,
+      database,
+    };
   }
 
   getEnvironmentScope(): string {
@@ -142,6 +150,90 @@ export class BackupConfigService {
 
   getRestoreReconnectDelayMs(): number {
     return this.readPositiveInt('BACKUP_RESTORE_RECONNECT_DELAY_MS', 2000);
+  }
+
+  getRequiredTablesForRestoreValidation(): string[] {
+    const raw = (this.configService.get<string>('BACKUP_RESTORE_REQUIRED_TABLES') || '').trim();
+    if (!raw) {
+      return ['_prisma_migrations'];
+    }
+
+    return raw
+      .split(',')
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0);
+  }
+
+  isDangerousObjectInspectionEnabled(): boolean {
+    return this.readBoolean('BACKUP_RESTORE_BLOCK_DANGEROUS_OBJECTS', true);
+  }
+
+  getActiveDatabaseStateFile(): string {
+    return this.activeDbStateFile;
+  }
+
+  getActiveDatabaseName(): string {
+    const envOverride = (this.configService.get<string>('BACKUP_ACTIVE_DATABASE_NAME') || '').trim();
+    if (envOverride) {
+      return this.normalizeDatabaseIdentifier(envOverride, 'BACKUP_ACTIVE_DATABASE_NAME');
+    }
+
+    const fromFile = this.readActiveDatabaseNameFromFile();
+    if (fromFile) {
+      return fromFile;
+    }
+
+    return this.databaseConfig.database;
+  }
+
+  setActiveDatabaseName(databaseName: string): void {
+    const normalized = this.normalizeDatabaseIdentifier(databaseName, 'activeDatabaseName');
+    const payload = {
+      activeDatabaseName: normalized,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const parentDir = path.dirname(this.activeDbStateFile);
+    if (!fs.existsSync(parentDir)) {
+      fs.mkdirSync(parentDir, { recursive: true });
+    }
+
+    fs.writeFileSync(this.activeDbStateFile, JSON.stringify(payload, null, 2), {
+      encoding: 'utf8',
+      flag: 'w',
+      mode: 0o600,
+    });
+  }
+
+  clearActiveDatabaseName(): void {
+    if (fs.existsSync(this.activeDbStateFile)) {
+      fs.unlinkSync(this.activeDbStateFile);
+    }
+  }
+
+  buildDatabaseUrl(databaseName?: string): string {
+    const targetDatabase = this.normalizeDatabaseIdentifier(
+      databaseName || this.getActiveDatabaseName(),
+      'databaseName',
+    );
+
+    const parsed = new URL(this.databaseUrl);
+    parsed.pathname = `/${targetDatabase}`;
+    return parsed.toString();
+  }
+
+  buildRollbackDatabaseName(activeDatabaseName: string, jobId: string): string {
+    const base = this.normalizeDatabaseIdentifier(activeDatabaseName, 'activeDatabaseName').toLowerCase();
+    const safeJobId = jobId.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().slice(0, 8) || 'job';
+    const ts = Date.now().toString(36);
+    let candidate = `${base}_rollback_${ts}_${safeJobId}`.toLowerCase();
+    if (candidate.length > 63) {
+      candidate = candidate.slice(0, 63);
+    }
+    if (!this.isValidDatabaseIdentifier(candidate)) {
+      throw new Error('Falha ao montar nome de database para rollback');
+    }
+    return candidate;
   }
 
   buildStagingDatabaseName(jobId: string): string {
@@ -241,12 +333,15 @@ export class BackupConfigService {
     return 'native';
   }
 
-  private parseDatabaseUrl(): BackupDatabaseConfig {
+  private readDatabaseUrl(): string {
     const databaseUrl = (this.configService.get<string>('DATABASE_URL') || '').trim();
     if (!databaseUrl) {
       throw new Error('DATABASE_URL nao configurada para o subsistema de backup/restore');
     }
+    return databaseUrl;
+  }
 
+  private parseDatabaseUrl(databaseUrl: string): BackupDatabaseConfig {
     let parsed: URL;
     try {
       parsed = new URL(databaseUrl);
@@ -267,6 +362,19 @@ export class BackupConfigService {
       database,
       sslMode: parsed.searchParams.get('sslmode') || undefined,
     };
+  }
+
+  private resolveActiveDatabaseStateFile(): string {
+    const configured = (this.configService.get<string>('BACKUP_ACTIVE_DB_STATE_FILE') || '').trim();
+    if (!configured) {
+      return path.join(this.backupDir, 'active-db-state.json');
+    }
+
+    if (path.isAbsolute(configured)) {
+      return configured;
+    }
+
+    return path.resolve(this.projectRoot, configured);
   }
 
   private ensureBackupDir(): void {
@@ -297,5 +405,35 @@ export class BackupConfigService {
       return false;
     }
     return fallback;
+  }
+
+  private readActiveDatabaseNameFromFile(): string | null {
+    if (!fs.existsSync(this.activeDbStateFile)) {
+      return null;
+    }
+
+    try {
+      const raw = fs.readFileSync(this.activeDbStateFile, 'utf8');
+      const parsed = JSON.parse(raw) as { activeDatabaseName?: unknown };
+      if (typeof parsed.activeDatabaseName !== 'string' || !parsed.activeDatabaseName.trim()) {
+        return null;
+      }
+      return this.normalizeDatabaseIdentifier(parsed.activeDatabaseName, 'activeDatabaseName');
+    } catch (error) {
+      this.logger.warn(`Falha ao ler estado do activeDatabaseName: ${String(error)}`);
+      return null;
+    }
+  }
+
+  private normalizeDatabaseIdentifier(value: string, fieldName: string): string {
+    const normalized = value.trim();
+    if (!this.isValidDatabaseIdentifier(normalized)) {
+      throw new Error(`${fieldName} invalido para identificador de database PostgreSQL`);
+    }
+    return normalized;
+  }
+
+  private isValidDatabaseIdentifier(value: string): boolean {
+    return /^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(value);
   }
 }

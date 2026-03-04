@@ -26,6 +26,8 @@ type JobWrapper = {
 export class CronService implements OnModuleInit {
   private readonly logger = new Logger(CronService.name);
   private readonly jobs = new Map<string, JobWrapper>();
+  private maintenancePaused = false;
+  private pausedCronJobs = new Set<string>();
 
   constructor(
     private readonly schedulerRegistry: SchedulerRegistry,
@@ -177,6 +179,11 @@ export class CronService implements OnModuleInit {
     identificador: string,
   ): CronJob {
     const job = new CronJob(schedule, async () => {
+      if (this.maintenancePaused) {
+        this.logger.log(`Job ${key} pausado por maintenance mode de restore`);
+        return;
+      }
+
       const current = await this.prisma.cronSchedule.findUnique({
         where: { modulo_identificador: { modulo, identificador } },
       });
@@ -366,5 +373,55 @@ export class CronService implements OnModuleInit {
         await this.toggle(key, false);
       }
     }
+  }
+
+  pauseAllForMaintenance(): void {
+    if (this.maintenancePaused) {
+      return;
+    }
+
+    this.maintenancePaused = true;
+    this.pausedCronJobs.clear();
+    const cronJobs = this.schedulerRegistry.getCronJobs();
+
+    for (const [name, job] of cronJobs) {
+      try {
+        const isActive = (job as any).running === true;
+        if (isActive) {
+          job.stop();
+          this.pausedCronJobs.add(name);
+        }
+      } catch (error) {
+        this.logger.warn(`Falha ao pausar cron ${name}: ${String(error)}`);
+      }
+    }
+
+    this.logger.log(`Cron jobs pausados para maintenance: ${this.pausedCronJobs.size}`);
+  }
+
+  resumeAllAfterMaintenance(): void {
+    const toResume = Array.from(this.pausedCronJobs.values());
+    const cronJobs = this.schedulerRegistry.getCronJobs();
+
+    for (const name of toResume) {
+      const job = cronJobs.get(name);
+      if (!job) {
+        continue;
+      }
+
+      try {
+        job.start();
+      } catch (error) {
+        this.logger.warn(`Falha ao retomar cron ${name}: ${String(error)}`);
+      }
+    }
+
+    this.pausedCronJobs.clear();
+    this.maintenancePaused = false;
+    this.logger.log('Cron jobs retomados apos maintenance');
+  }
+
+  isMaintenancePaused(): boolean {
+    return this.maintenancePaused;
   }
 }

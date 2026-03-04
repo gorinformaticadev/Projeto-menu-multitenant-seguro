@@ -122,11 +122,45 @@ sudo bash install/uninstall.sh
 Scripts auxiliares:
 
 - `install/check.sh` -> valida ambiente
-- `install/restore-db.sh` -> restore banco
-- `install/restore-native.sh` -> restore banco em instalacao native (PM2)
+- `install/restore-db.sh` -> wrapper de restore via API interna (Docker)
+- `install/restore-native.sh` -> wrapper de restore via API interna (instalacao native/PM2)
 - `install/renew-cert.sh` -> renovar certificado
 
 ------------------------------------------------------------------------
+
+## Restore Operacional (API oficial)
+
+Fluxo oficial de restore:
+
+1. Restore do dump em `staging database`
+2. Validacao de integridade/schema
+3. Maintenance mode + quiesce (cron pausado e Prisma desconectado)
+4. Promocao por swap/rename (`staging -> ativa`)
+5. Smoke test + opcional `prisma migrate deploy`
+6. Maintenance OFF + cron retomado
+
+Wrappers manuais (`install/restore-db.sh` e `install/restore-native.sh`) **nao executam pg_restore direto no banco principal**.
+Eles apenas chamam a API interna localhost e fazem polling do job.
+
+Variaveis minimas para wrappers:
+
+```bash
+export BACKUP_INTERNAL_API_TOKEN="<token interno>"
+export BACKUP_FILE="nome_do_backup.dump"
+```
+
+Opcional:
+
+```bash
+export BACKEND_INTERNAL_URL="http://127.0.0.1:4000/api"
+export BACKUP_INTERNAL_TRUST_PROXY=false
+export BACKUP_INTERNAL_ALLOWED_CIDRS="127.0.0.1/32,::1/128"
+export BACKUP_INTERNAL_TRUSTED_PROXY_CIDRS="10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+export RUN_MIGRATIONS=true
+bash install/restore-db.sh
+```
+
+-----------------------------------------------------------------------
 
 ## Reset Completo do Ambiente
 
