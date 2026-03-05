@@ -9,9 +9,12 @@ export class MaintenanceController {
   @Public()
   @Get('state')
   async getState() {
+    const state = await this.maintenanceModeService.getState();
     return {
-      success: true,
-      data: await this.maintenanceModeService.getState(),
+      enabled: state.enabled,
+      reason: state.reason,
+      startedAt: state.startedAt,
+      etaSeconds: state.etaSeconds,
     };
   }
 }

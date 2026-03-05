@@ -53,7 +53,7 @@ export class MaintenanceModeGuard implements CanActivate {
   }
 
   private isWhitelistedPath(method: string, requestPath: string): boolean {
-    if (method === 'GET' && this.matchesPath(requestPath, '/api/health')) {
+    if ((method === 'GET' || method === 'HEAD') && this.matchesPath(requestPath, '/api/health')) {
       return true;
     }
 
@@ -207,3 +207,5 @@ export class MaintenanceModeGuard implements CanActivate {
     return allowedRoles.includes(role);
   }
 }
+
+

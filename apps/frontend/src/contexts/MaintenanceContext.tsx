@@ -112,8 +112,8 @@ export function MaintenanceProvider({ children }: { children: React.ReactNode })
         throw new Error(`HTTP ${response.status}`);
       }
 
-      const payload = (await response.json()) as { data?: Partial<MaintenanceState> };
-      const normalized = normalizeState(payload?.data);
+      const payload = (await response.json()) as { data?: Partial<MaintenanceState> } & Partial<MaintenanceState>;
+      const normalized = normalizeState(payload?.data ?? payload);
       applyState(normalized);
     } catch {
       // Keep last known state; maintenance endpoint must stay lightweight and resilient.
@@ -173,3 +173,4 @@ export function useMaintenance() {
   }
   return context;
 }
+
