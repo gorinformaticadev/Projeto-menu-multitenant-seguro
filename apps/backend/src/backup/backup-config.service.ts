@@ -20,6 +20,7 @@ export class BackupConfigService {
   private readonly executionMode: 'docker' | 'native';
   private readonly databaseUrl: string;
   private readonly databaseConfig: BackupDatabaseConfig;
+  private readonly adminDatabaseConfig?: BackupDatabaseConfig;
   private readonly activeDbStateFile: string;
 
   constructor(private readonly configService: ConfigService) {
@@ -28,6 +29,7 @@ export class BackupConfigService {
     this.executionMode = this.resolveExecutionMode();
     this.databaseUrl = this.readDatabaseUrl();
     this.databaseConfig = this.parseDatabaseUrl(this.databaseUrl);
+    this.adminDatabaseConfig = this.readAdminDatabaseConfig();
     this.ensureBackupDir();
     this.activeDbStateFile = this.resolveActiveDatabaseStateFile();
   }
@@ -102,12 +104,18 @@ export class BackupConfigService {
       .filter((value) => value.length > 0);
   }
 
-  getDatabaseConfig(options?: { useActiveDatabase?: boolean }): BackupDatabaseConfig {
-    const database = options?.useActiveDatabase ? this.getActiveDatabaseName() : this.databaseConfig.database;
+  getDatabaseConfig(options?: { useActiveDatabase?: boolean; useAdmin?: boolean }): BackupDatabaseConfig {
+    const baseConfig =
+      options?.useAdmin && this.adminDatabaseConfig ? this.adminDatabaseConfig : this.databaseConfig;
+    const database = options?.useActiveDatabase ? this.getActiveDatabaseName() : baseConfig.database;
     return {
-      ...this.databaseConfig,
+      ...baseConfig,
       database,
     };
+  }
+
+  isDatabaseAdminConfigured(): boolean {
+    return Boolean(this.adminDatabaseConfig);
   }
 
   getEnvironmentScope(): string {
@@ -351,6 +359,23 @@ export class BackupConfigService {
       throw new Error('DATABASE_URL nao configurada para o subsistema de backup/restore');
     }
     return databaseUrl;
+  }
+
+  private readAdminDatabaseConfig(): BackupDatabaseConfig | undefined {
+    const adminDatabaseUrl =
+      (this.configService.get<string>('BACKUP_ADMIN_DATABASE_URL') || '').trim() ||
+      (this.configService.get<string>('BACKUP_DATABASE_ADMIN_URL') || '').trim();
+
+    if (!adminDatabaseUrl) {
+      return undefined;
+    }
+
+    try {
+      return this.parseDatabaseUrl(adminDatabaseUrl);
+    } catch (error) {
+      this.logger.warn(`BACKUP_ADMIN_DATABASE_URL invalida. Fallback para DATABASE_URL. Detalhe: ${String(error)}`);
+      return undefined;
+    }
   }
 
   private parseDatabaseUrl(databaseUrl: string): BackupDatabaseConfig {

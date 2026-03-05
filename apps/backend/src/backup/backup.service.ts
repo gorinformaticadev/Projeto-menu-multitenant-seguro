@@ -1164,30 +1164,42 @@ export class BackupService {
     await this.dropDatabase(database, password, true);
 
     const db = this.backupConfig.getDatabaseConfig();
+    const commandDb = this.backupConfig.getDatabaseConfig({ useAdmin: true });
+    const commandPassword = this.backupConfig.isDatabaseAdminConfigured() ? commandDb.password : password;
     const args = [
       '--host',
-      db.host,
+      commandDb.host,
       '--port',
-      String(db.port),
+      String(commandDb.port),
       '--username',
-      db.user,
-      database,
+      commandDb.user,
     ];
+    if (this.backupConfig.isDatabaseAdminConfigured() && commandDb.user !== db.user) {
+      args.push('--owner', db.user);
+    }
+    args.push(database);
 
     try {
       await this.processService.runCommand({
         command: this.backupConfig.getBinary('createdb'),
         args,
-        env: this.buildCommandEnv(password),
+        env: this.buildCommandEnv(commandPassword),
         timeoutMs: Math.min(this.backupConfig.getJobTimeoutMs(), 180000),
         cwd: this.backupConfig.getProjectRoot(),
       });
     } catch (error) {
       const message = this.errorMessage(error);
       if (/permission denied to create database/i.test(message)) {
+        if (this.backupConfig.isDatabaseAdminConfigured()) {
+          throw new Error(
+            `Usuario administrativo de BACKUP_ADMIN_DATABASE_URL sem permissao CREATEDB. ` +
+              `Conceda no PostgreSQL: ALTER ROLE "${commandDb.user}" CREATEDB;`,
+          );
+        }
         throw new Error(
           `Usuario do DATABASE_URL sem permissao CREATEDB. ` +
-            `Conceda no PostgreSQL: ALTER ROLE "${db.user}" CREATEDB;`,
+            `Conceda no PostgreSQL: ALTER ROLE "${db.user}" CREATEDB; ` +
+            `ou configure BACKUP_ADMIN_DATABASE_URL com usuario administrativo.`,
         );
       }
       throw error;
@@ -1195,7 +1207,8 @@ export class BackupService {
   }
 
   private async dropDatabase(database: string, password: string, ignoreMissing = false): Promise<void> {
-    const db = this.backupConfig.getDatabaseConfig();
+    const db = this.backupConfig.getDatabaseConfig({ useAdmin: true });
+    const commandPassword = this.backupConfig.isDatabaseAdminConfigured() ? db.password : password;
     const args = [
       '--if-exists',
       '--host',
@@ -1211,7 +1224,7 @@ export class BackupService {
       await this.processService.runCommand({
         command: this.backupConfig.getBinary('dropdb'),
         args,
-        env: this.buildCommandEnv(password),
+        env: this.buildCommandEnv(commandPassword),
         timeoutMs: Math.min(this.backupConfig.getJobTimeoutMs(), 180000),
         cwd: this.backupConfig.getProjectRoot(),
       });

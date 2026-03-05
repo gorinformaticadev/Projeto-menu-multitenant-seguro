@@ -203,6 +203,32 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
     }
   };
 
+  const normalizedRestoreStatus = (restoreJob?.status || '').toUpperCase();
+  const restoreStatusUi =
+    normalizedRestoreStatus === 'SUCCESS'
+      ? {
+          container: 'border-emerald-200 bg-emerald-50',
+          text: 'text-emerald-900',
+          icon: 'text-emerald-600',
+          step: 'text-emerald-800',
+          error: 'text-emerald-800',
+        }
+      : normalizedRestoreStatus === 'FAILED' || normalizedRestoreStatus === 'CANCELED'
+        ? {
+            container: 'border-red-200 bg-red-50',
+            text: 'text-red-900',
+            icon: 'text-red-600',
+            step: 'text-red-800',
+            error: 'text-red-800',
+          }
+        : {
+            container: 'border-blue-200 bg-blue-50',
+            text: 'text-blue-900',
+            icon: 'text-blue-600',
+            step: 'text-blue-800',
+            error: 'text-blue-800',
+          };
+
   return (
     <Card>
       <CardHeader>
@@ -325,21 +351,21 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
         </Button>
 
         {restoreJob && (
-          <div className="border rounded-lg p-4 space-y-2 bg-gray-50">
+          <div className={`border rounded-lg p-4 space-y-2 ${restoreStatusUi.container}`}>
             <div className="flex items-center gap-2">
               {restoreJob.status === 'SUCCESS' ? (
-                <CheckCircle className="w-4 h-4 text-green-600" />
+                <CheckCircle className={`w-4 h-4 ${restoreStatusUi.icon}`} />
               ) : restoreJob.status === 'FAILED' || restoreJob.status === 'CANCELED' ? (
-                <XCircle className="w-4 h-4 text-red-600" />
+                <XCircle className={`w-4 h-4 ${restoreStatusUi.icon}`} />
               ) : (
-                <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />
+                <RefreshCw className={`w-4 h-4 animate-spin ${restoreStatusUi.icon}`} />
               )}
-              <span className="font-medium">
+              <span className={`font-medium ${restoreStatusUi.text}`}>
                 Status: {restoreJob.status} ({restoreJob.progressPercent ?? 0}%)
               </span>
             </div>
-            {restoreJob.currentStep && <p className="text-sm">Etapa: {restoreJob.currentStep}</p>}
-            {restoreJob.error && <p className="text-sm text-red-700">Erro: {restoreJob.error}</p>}
+            {restoreJob.currentStep && <p className={`text-sm ${restoreStatusUi.step}`}>Etapa: {restoreJob.currentStep}</p>}
+            {restoreJob.error && <p className={`text-sm ${restoreStatusUi.error}`}>Erro: {restoreJob.error}</p>}
           </div>
         )}
       </CardContent>
