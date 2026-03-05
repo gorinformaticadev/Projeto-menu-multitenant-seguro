@@ -12,7 +12,7 @@ import { MaintenanceProvider } from "@/contexts/MaintenanceContext";
 import { MaintenanceBanner } from "@/components/MaintenanceBanner";
 
 export const metadata: Metadata = {
-  title: "Sistema Multitenant", // Ser· atualizado dinamicamente pelo DynamicTitle
+  title: "Sistema Multitenant", // Ser√° atualizado dinamicamente pelo DynamicTitle
   description: "Sistema com isolamento de dados e controle de acesso",
   icons: {
     icon: [

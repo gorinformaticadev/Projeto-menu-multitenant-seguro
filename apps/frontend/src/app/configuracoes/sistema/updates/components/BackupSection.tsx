@@ -250,7 +250,7 @@ export function BackupSection({
                   <div>
                     <p className="text-sm font-medium">{backup.fileName}</p>
                     <p className="text-xs text-gray-500">
-                      {(backup.fileSize / 1024 / 1024).toFixed(2)} MB {' '}•{' '}
+                      {(backup.fileSize / 1024 / 1024).toFixed(2)} MB {' '}â€¢{' '}
                       {new Date(backup.createdAt).toLocaleString('pt-BR')}
                     </p>
                   </div>
