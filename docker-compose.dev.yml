@@ -24,6 +24,7 @@ services:
       - "4000:4000"
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/multitenant_db?schema=public
+      - BACKUP_ADMIN_DATABASE_URL=${BACKUP_ADMIN_DATABASE_URL:-}
       - JWT_SECRET=supersecretkey_dev_12345678901234567890123456789012
       - FRONTEND_URL=http://localhost:5000
       - NODE_ENV=development

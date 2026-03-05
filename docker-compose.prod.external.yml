@@ -44,6 +44,7 @@ services:
       - GIT_SHA=${GIT_SHA:-unknown}
       - BUILD_TIME=${BUILD_TIME:-unknown}
       - DATABASE_URL=${DATABASE_URL:-postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-multitenant}}
+      - BACKUP_ADMIN_DATABASE_URL=${BACKUP_ADMIN_DATABASE_URL:-}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET not set}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY not set}
       - FRONTEND_URL=https://${DOMAIN:-localhost}
