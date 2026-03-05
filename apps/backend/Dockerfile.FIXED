@@ -56,7 +56,7 @@ RUN chmod +x ./docker-entrypoint.sh
 # CORREÇÃO: Criar diretórios com permissões corretas ANTES de trocar para usuário nestjs
 # O código tenta criar /app/src/modules, mas o correto seria /app/modules (fora de src)
 # Criamos ambos para garantir compatibilidade
-RUN mkdir -p /app/uploads/logos /app/backups /app/modules /app/src/modules && \
+RUN mkdir -p /app/uploads /app/backups /app/modules /app/src/modules && \
     chown -R nestjs:nodejs /app/uploads /app/backups /app/modules /app/src
 
 USER nestjs

@@ -3,6 +3,7 @@ import { extname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ensureDirectory, resolveCanonicalPaths } from '@core/common/paths/paths.service';
 
 /**
  * Assinaturas de arquivos válidas (magic numbers)
@@ -64,7 +65,7 @@ export function getSecureMulterConfig(configService: ConfigService) {
       destination: (req, file, callback) => {
         // O destino será definido dinamicamente pelo service
         // Aqui apenas retornamos um caminho temporário
-        callback(null, './uploads/temp');
+        callback(null, ensureDirectory(resolveCanonicalPaths().tempDir));
       },
       filename: (req, file, callback) => {
         // Gerar nome único com UUID
