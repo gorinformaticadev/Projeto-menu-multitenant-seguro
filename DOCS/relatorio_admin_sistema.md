@@ -1,89 +1,190 @@
-# Relatorio Administrativo - Update/Rollback Atomico (Native)
+# Relatorio Administrativo - Update/Rollback Atomico + Observabilidade via Painel
 
-## Objetivo aplicado
+## Escopo aplicado
 
-Foi implementado o fluxo atomico para instalacao nativa (PM2), com separacao entre codigo por release e estado persistente:
+Foi consolidado o contrato de update nativo com foco em:
 
-- `BASE_DIR/releases/<versao>`
-- `BASE_DIR/shared`
-- `BASE_DIR/current` (symlink para release ativa)
-- `BASE_DIR/previous` (symlink para release anterior)
+- fluxo atomico `releases/current/shared`
+- estado de update rastreavel para a UI
+- logs persistentes para acompanhamento em tempo real
+- lock concorrente com erro padronizado
+- rollback automatico e rollback manual via endpoint admin
 
-Com isso, o update deixa de fazer checkout in-place e passa a trabalhar em release limpa, com troca atomica de symlink e rollback rapido.
+## Estrutura de deploy (nativo)
 
-## Scripts entregues
+- `BASE_DIR/releases/<version>`: codigo por release (imutavel)
+- `BASE_DIR/shared`: estado persistente
+- `BASE_DIR/current`: symlink da release ativa
+- `BASE_DIR/previous`: symlink da release anterior
 
-- `install/update-native.sh`
-  - Fluxo padrao: atomico (`releases/current/shared`)
-  - Compatibilidade: `--legacy-inplace`
-  - Lock concorrente via `shared/locks/update.lock` (`flock`)
-  - Backup obrigatorio pre-swap (DB + uploads + env snapshot)
-  - Healthcheck pos-swap
-  - Rollback automatico com marcador de log: `ROLLBACK_COMPLETED`
-  - Retencao de releases ao final
+Dados persistentes em `shared`:
 
-- `install/rollback-native.sh`
-  - Rollback manual para `previous` (padrao) ou release especifica
-  - `--list` para listar releases
-  - Reinicio PM2 + healthcheck
-  - Reversao automatica se o rollback manual falhar no healthcheck
+- `shared/.env`
+- `shared/uploads`
+- `shared/backups`
+- `shared/logs/update.log`
+- `shared/update-state.json`
+- `shared/locks/update.lock`
 
-- `install/release-retention.sh`
-  - Mantem `current` e `previous`
-  - Mantem os ultimos `N` releases (default `5`)
-  - Remove releases antigas restantes
+## Script principal
 
-## Estrutura e paths canonicos
+Arquivo: `install/update-native.sh`
 
-No startup do update atomico, o script garante:
+### Garantias principais
 
-- `UPLOADS_DIR=${BASE_DIR}/shared/uploads`
-- `BACKUP_DIR=${BASE_DIR}/shared/backups`
-- `APP_BASE_DIR=${BASE_DIR}`
+- lock via `flock` em `shared/locks/update.lock`
+- backup obrigatorio pre-swap
+- swap atomico de `current`
+- healthcheck pos-swap
+- rollback automatico em falha de healthcheck
+- retencao de releases
 
-Esses valores sao persistidos em `shared/.env`.
+### Arquivo de estado (fonte de verdade)
 
-No release alvo, o script cria links para `shared`:
+Path:
 
-- `release/.env -> shared/.env`
-- `release/apps/backend/.env -> shared/.env`
-- `release/uploads -> shared/uploads`
-- `release/backups -> shared/backups`
-- `release/apps/frontend/.env.local -> shared/.env.frontend.local` (quando existir)
+- `${APP_BASE_DIR}/shared/update-state.json`
 
-## Fluxo update atomico (resumo)
+Contrato:
 
-1. Resolve `BASE_DIR` e adquire lock.
-2. Faz bootstrap automatico de instalacao legacy para estrutura de releases, quando necessario.
-3. Resolve/cria release alvo (`tarball GitHub` preferencial, fallback para `git clone`).
-4. Gera `VERSION` e `BUILD_INFO.json` no release.
-5. Faz build/migrations/seed no release alvo sem derrubar producao.
-6. Executa backup obrigatorio pre-swap:
-   - `database.dump` (pg_dump)
-   - `uploads.tar.gz`
-   - `.env.snapshot`
-   - `manifest.json`
-7. Atualiza symlinks (`previous` e `current`) de forma atomica.
-8. Reinicia PM2 apontando para `BASE_DIR/current`.
-9. Executa healthcheck de backend/frontend.
-10. Em falha: rollback automatico para `previous`, reinicio e log `ROLLBACK_COMPLETED`.
-11. Aplica retencao de releases.
+```json
+{
+  "status": "idle|running|success|failed|rolled_back",
+  "startedAt": "ISO|null",
+  "finishedAt": "ISO|null",
+  "fromVersion": "vX|unknown",
+  "toVersion": "vY|unknown",
+  "step": "string",
+  "progress": 0,
+  "lock": false,
+  "lastError": "string|null",
+  "rollback": {
+    "attempted": false,
+    "completed": false,
+    "reason": "string|null"
+  }
+}
+```
 
-## Fluxo rollback manual (resumo)
+Observacoes:
 
-1. `bash install/rollback-native.sh --list` para visualizar releases.
-2. `bash install/rollback-native.sh --to previous` (padrao) ou `--to <release>`.
-3. Script troca `current`, reinicia PM2 e valida healthcheck.
-4. Se healthcheck falhar, o script reverte o rollback para a release anterior.
+- JSON sempre valido (escrita atomica com arquivo temporario + rename).
+- update em execucao fica com `status=running` e `lock=true`.
+- sucesso seta `status=success`.
+- falha com rollback automatico bem-sucedido seta `status=rolled_back`.
 
-## Compatibilidade com painel administrativo
+### Log persistente
 
-- O endpoint atual continua chamando `install/update-native.sh`.
-- Logs de etapas permanecem claros no stdout/stderr (`STEP x/10` + mensagens de erro).
-- `ROLLBACK_COMPLETED` continua sendo emitido para o backend detectar rollback automatico.
+Path:
 
-## Observacoes operacionais
+- `${APP_BASE_DIR}/shared/logs/update.log`
 
-- O modelo funciona sem depender de `.git` no diretorio ativo (usa tarball por padrao quando possivel).
-- `shared` preserva dados de cliente entre versoes.
-- Lock evita updates concorrentes.
+Formato:
+
+- `[ISO_TIMESTAMP] [step] mensagem`
+
+Rotacao:
+
+- limite de 5MB por arquivo
+- mantem ate 10 arquivos (`update.log`, `update.log.1`, ...)
+
+### Exit codes padronizados
+
+- `0`: success
+- `10`: lock already held
+- `20`: backup failed
+- `30`: download/checkout failed
+- `40`: build/migrations failed
+- `50`: healthcheck failed + rollback succeeded
+- `60`: healthcheck failed + rollback failed
+
+## Endpoints admin do painel
+
+Protecao:
+
+- `JwtAuthGuard + RolesGuard`
+- apenas `ADMIN` e `SUPER_ADMIN`
+
+Rotas:
+
+- `POST /api/system/update/run`
+  - inicia update assincrono (retorna `operationId`)
+  - bloqueia `--legacy-inplace` por default (libera apenas com `UPDATE_ALLOW_LEGACY_INPLACE_API=true`)
+- `GET /api/system/update/status`
+  - retorna `update-state.json` + metadados de operacao ativa
+- `GET /api/system/update/log?tail=200`
+  - retorna ultimas N linhas de `shared/logs/update.log` (1..2000)
+- `POST /api/system/update/rollback`
+  - executa `install/rollback-native.sh` (assincrono, com `operationId`)
+- `GET /api/system/update/releases`
+  - lista releases e indica `current/previous`
+
+Contrato de concorrencia:
+
+- se houver operacao em andamento, retorna `409 Conflict` com estado atual.
+
+## Execucao via backend
+
+Servico: `SystemUpdateAdminService`
+
+Padrao de execucao:
+
+- `spawn('bash', [script, ...args])`
+- `cwd = APP_BASE_DIR`
+- env herdado +:
+  - `APP_BASE_DIR`
+  - `UPLOADS_DIR=${APP_BASE_DIR}/shared/uploads`
+  - `BACKUP_DIR=${APP_BASE_DIR}/shared/backups`
+
+Observabilidade:
+
+- stdout/stderr do processo sao registrados no logger do backend
+- rollback manual tambem atualiza `update-state.json`
+- rollback manual tambem append no `update.log`
+
+## Rollback manual
+
+Script: `install/rollback-native.sh`
+
+Uso:
+
+- `bash install/rollback-native.sh --list`
+- `bash install/rollback-native.sh --to previous`
+- `bash install/rollback-native.sh --to <release>`
+
+Comportamento:
+
+- lock compartilhado com update
+- restart de backend/frontend via PM2
+- healthcheck pos-rollback
+
+## Integracao PM2/systemd (sempre em current)
+
+O restart nativo usa sempre `BASE_DIR/current` como raiz do codigo.
+
+Recomendacao para systemd (quando aplicavel):
+
+- `WorkingDirectory=${APP_BASE_DIR}/current/apps/backend`
+- `ExecStart=node ${APP_BASE_DIR}/current/apps/backend/dist/main.js`
+
+Recomendacao para PM2:
+
+- processos devem apontar para `${APP_BASE_DIR}/current/...`
+- nunca fixar caminho de release especifica
+
+## Healthcheck padrao
+
+Endpoint esperado:
+
+- `GET /api/health` com retorno HTTP `200`
+
+Uso no update:
+
+- healthcheck backend e frontend com timeout/tentativas
+- falha no healthcheck apos swap dispara rollback automatico
+
+## Compatibilidade
+
+- update in-place legado ainda existe no script via `--legacy-inplace`
+- modo legado nao e exposto por default no painel
+- fluxo principal do painel permanece no modelo atomico

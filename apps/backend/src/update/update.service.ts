@@ -49,25 +49,25 @@ export class UpdateService implements OnModuleInit {
       const settings = await this.getSystemSettings();
 
       if (settings.appVersion !== realVersion) {
-        this.logger.log(`Sincronizando vers√£o: Banco(${settings.appVersion}) -> Arquivos(${realVersion})`);
+        this.logger.log(`Sincronizando vers„o: Banco(${settings.appVersion}) -> Arquivos(${realVersion})`);
         await this.updateSystemSettings({
           appVersion: realVersion,
           updateAvailable: false,
         });
       }
     } catch (error) {
-      this.logger.error('Falha ao sincronizar vers√£o do sistema no startup:', error);
+      this.logger.error('Falha ao sincronizar vers„o do sistema no startup:', error);
     }
   }
 
   async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: string }> {
     let decryptedTokenForSanitizer = '';
     try {
-      this.logger.log('Iniciando verifica√ß√£o de atualiza√ß√µes...');
+      this.logger.log('Iniciando verificaÁ„o de atualizaÁıes...');
       const settings = await this.getSystemSettings();
 
       if (!settings.gitUsername || !settings.gitRepository) {
-        this.logger.warn('Configura√ß√µes do Git n√£o encontradas');
+        this.logger.warn('ConfiguraÁıes do Git n„o encontradas');
         return { updateAvailable: false };
       }
 
@@ -86,7 +86,7 @@ export class UpdateService implements OnModuleInit {
       const uniqueCleanTags = Array.from(new Set(cleanTags)).sort((a, b) => semver.rcompare(a, b));
 
       if (uniqueCleanTags.length === 0) {
-        this.logger.warn('Nenhuma tag v√°lida encontrada no reposit√≥rio');
+        this.logger.warn('Nenhuma tag v·lida encontrada no repositÛrio');
         return { updateAvailable: false };
       }
 
@@ -108,8 +108,8 @@ export class UpdateService implements OnModuleInit {
         String(parsedError.stderr || parsedError.message || ''),
         decryptedTokenForSanitizer,
       );
-      this.logger.error(`Erro ao verificar atualiza√ß√µes. detalhe=${detail}`);
-      throw new HttpException('Erro ao verificar atualiza√ß√µes', HttpStatus.INTERNAL_SERVER_ERROR);
+      this.logger.error(`Erro ao verificar atualizaÁıes. detalhe=${detail}`);
+      throw new HttpException('Erro ao verificar atualizaÁıes', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -142,13 +142,13 @@ export class UpdateService implements OnModuleInit {
             },
           });
         } else {
-          throw new HttpException('J√° existe uma atualiza√ß√£o em andamento', HttpStatus.CONFLICT);
+          throw new HttpException('J· existe uma atualizaÁ„o em andamento', HttpStatus.CONFLICT);
         }
       }
 
       const normalizedCleanVersion = semver.clean(updateData.version);
       if (!normalizedCleanVersion) {
-        throw new HttpException('Vers√£o inv√°lida', HttpStatus.BAD_REQUEST);
+        throw new HttpException('Vers„o inv·lida', HttpStatus.BAD_REQUEST);
       }
       const normalizedVersion = this.formatVersion(normalizedCleanVersion);
       requestedVersion = normalizedVersion;
@@ -169,7 +169,7 @@ export class UpdateService implements OnModuleInit {
             duration: 0,
             executionLogs: JSON.stringify({
               idempotent: true,
-              message: `Vers√£o ${normalizedVersion} j√° aplicada (atual: ${currentVersion})`,
+              message: `Vers„o ${normalizedVersion} j· aplicada (atual: ${currentVersion})`,
             }),
           },
         });
@@ -186,7 +186,7 @@ export class UpdateService implements OnModuleInit {
         return {
           success: true,
           logId: updateLog.id,
-          message: `Vers√£o ${normalizedVersion} j√° est√° aplicada. Nenhum redeploy executado.`,
+          message: `Vers„o ${normalizedVersion} j· est· aplicada. Nenhum redeploy executado.`,
         };
       }
 
@@ -220,7 +220,7 @@ export class UpdateService implements OnModuleInit {
       const combinedOutput = `${deployResult.stdout || ''}\n${deployResult.stderr || ''}`;
       if (combinedOutput.includes('ROLLBACK_COMPLETED')) {
         const rollbackError = this.asUpdateExecutionError(
-          new Error('Deploy reportou rollback autom√°tico; vers√£o anterior foi mantida'),
+          new Error('Deploy reportou rollback autom·tico; vers„o anterior foi mantida'),
         );
         rollbackError.stdout = deployResult.stdout || '';
         rollbackError.stderr = deployResult.stderr || '';
@@ -258,17 +258,17 @@ export class UpdateService implements OnModuleInit {
       return {
         success: true,
         logId: updateLog.id,
-        message: `Atualiza√ß√£o para ${normalizedVersion} conclu√≠da com sucesso`,
+        message: `AtualizaÁ„o para ${normalizedVersion} concluÌda com sucesso`,
       };
     } catch (error: unknown) {
       const parsedError = this.asUpdateExecutionError(error);
       const stdoutRaw = typeof parsedError.stdout === 'string' ? parsedError.stdout : '';
       const stderrRaw = typeof parsedError.stderr === 'string' ? parsedError.stderr : '';
-      const errorMessageRaw = String(parsedError.message || 'Erro desconhecido durante atualiza√ß√£o');
+      const errorMessageRaw = String(parsedError.message || 'Erro desconhecido durante atualizaÁ„o');
       const stdout = this.sanitizeGitError(stdoutRaw);
       const stderr = this.sanitizeGitError(stderrRaw);
       const errorMessage = this.sanitizeGitError(errorMessageRaw);
-      this.logger.error(`Erro durante atualiza√ß√£o: ${errorMessage}`);
+      this.logger.error(`Erro durante atualizaÁ„o: ${errorMessage}`);
       const combinedErrorOutput = `${stdout}\n${stderr}\n${errorMessage}`;
       const exitCode = Number(parsedError.code ?? parsedError.exitCode ?? -1);
       const rollbackDetected =
@@ -303,8 +303,8 @@ export class UpdateService implements OnModuleInit {
 
       throw new HttpException(
         rollbackDetected
-          ? `Erro durante atualiza√ß√£o: ${errorMessage}. Rollback autom√°tico executado.`
-          : `Erro durante atualiza√ß√£o: ${errorMessage}`,
+          ? `Erro durante atualizaÁ„o: ${errorMessage}. Rollback autom·tico executado.`
+          : `Erro durante atualizaÁ„o: ${errorMessage}`,
         parsedError.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -370,7 +370,7 @@ export class UpdateService implements OnModuleInit {
       if (config.releaseTag) {
         const normalized = semver.clean(config.releaseTag);
         if (!normalized) {
-          throw new HttpException('releaseTag inv√°lida', HttpStatus.BAD_REQUEST);
+          throw new HttpException('releaseTag inv·lida', HttpStatus.BAD_REQUEST);
         }
         updateData.releaseTag = this.formatVersion(normalized);
       }
@@ -392,13 +392,13 @@ export class UpdateService implements OnModuleInit {
         details: { configFields: Object.keys(config) },
       });
 
-      return { success: true, message: 'Configura√ß√µes atualizadas com sucesso' };
+      return { success: true, message: 'ConfiguraÁıes atualizadas com sucesso' };
     } catch (error) {
-      this.logger.error('Erro ao atualizar configura√ß√µes:', error);
+      this.logger.error('Erro ao atualizar configuraÁıes:', error);
       if (error instanceof HttpException) {
         throw error;
       }
-      throw new HttpException('Erro ao atualizar configura√ß√µes', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException('Erro ao atualizar configuraÁıes', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -424,7 +424,7 @@ export class UpdateService implements OnModuleInit {
   async getUpdateLogDetails(logId: string): Promise<UpdateLog> {
     const log = await this.prisma.updateLog.findUnique({ where: { id: logId } });
     if (!log) {
-      throw new HttpException('Log n√£o encontrado', HttpStatus.NOT_FOUND);
+      throw new HttpException('Log n„o encontrado', HttpStatus.NOT_FOUND);
     }
     return log;
   }
@@ -461,7 +461,7 @@ export class UpdateService implements OnModuleInit {
     const root = this.getProjectRoot();
     const scriptPath = path.join(root, 'install', 'update-images.sh');
     if (!fs.existsSync(scriptPath)) {
-      throw new HttpException('Runner de deploy n√£o encontrado (install/update-images.sh)', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException('Runner de deploy n„o encontrado (install/update-images.sh)', HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     const composeFile = settings.composeFile || 'docker-compose.prod.yml';
@@ -471,10 +471,10 @@ export class UpdateService implements OnModuleInit {
     const allowedEnv = new Set(['install/.env.production', '.env.production', '.env']);
 
     if (!allowedCompose.has(composeFile)) {
-      throw new HttpException('composeFile n√£o permitido para deploy', HttpStatus.BAD_REQUEST);
+      throw new HttpException('composeFile n„o permitido para deploy', HttpStatus.BAD_REQUEST);
     }
     if (!allowedEnv.has(envFile)) {
-      throw new HttpException('envFile n√£o permitido para deploy', HttpStatus.BAD_REQUEST);
+      throw new HttpException('envFile n„o permitido para deploy', HttpStatus.BAD_REQUEST);
     }
 
     const env = {
@@ -498,7 +498,7 @@ export class UpdateService implements OnModuleInit {
     const root = this.getProjectRoot();
     const scriptPath = path.join(root, 'install', 'update-native.sh');
     if (!fs.existsSync(scriptPath)) {
-      throw new HttpException('Runner de deploy nativo n√£o encontrado (install/update-native.sh)', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException('Runner de deploy nativo n„o encontrado (install/update-native.sh)', HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     const hasRepoConfig = !!(settings.gitUsername && settings.gitRepository);
@@ -545,7 +545,7 @@ export class UpdateService implements OnModuleInit {
         }
       }
     } catch (error) {
-      this.logger.warn(`Falha ao detectar modo de instala√ß√£o automaticamente: ${String(error)}`);
+      this.logger.warn(`Falha ao detectar modo de instalaÁ„o automaticamente: ${String(error)}`);
     }
 
     return 'native';
@@ -599,11 +599,11 @@ export class UpdateService implements OnModuleInit {
     const isWeak = !key || key.length < 32 || key === 'default-key-change-in-production';
 
     if (isProd && isWeak) {
-      throw new Error('ENCRYPTION_KEY ausente ou fraca para ambiente de produ√ß√£o');
+      throw new Error('ENCRYPTION_KEY ausente ou fraca para ambiente de produÁ„o');
     }
 
     if (isWeak) {
-      this.logger.warn('ENCRYPTION_KEY fraca/ausente fora de produ√ß√£o. Usando deriva√ß√£o tempor√°ria.');
+      this.logger.warn('ENCRYPTION_KEY fraca/ausente fora de produÁ„o. Usando derivaÁ„o tempor·ria.');
     }
 
     const source = key || 'development-only-insecure-key';
@@ -613,7 +613,7 @@ export class UpdateService implements OnModuleInit {
   private decryptTokenLegacyCbc(encryptedToken: string): string {
     const [ivHex, encrypted] = encryptedToken.split(':');
     if (!ivHex || !encrypted) {
-      throw new Error('Token criptografado inv√°lido');
+      throw new Error('Token criptografado inv·lido');
     }
     const iv = Buffer.from(ivHex, 'hex');
     const legacyKeyRaw = (this.encryptionKeyRaw || 'development-only-insecure-key').slice(0, 32).padEnd(32, '0');
@@ -696,7 +696,7 @@ export class UpdateService implements OnModuleInit {
         String(parsedError.stderr || parsedError.message || ''),
         decryptedToken,
       );
-      this.logger.warn(`Falha ao usar gitToken; tentando reposit√≥rio sem autentica√ß√£o. detalhe=${sanitizedStderr}`);
+      this.logger.warn(`Falha ao usar gitToken; tentando repositÛrio sem autenticaÁ„o. detalhe=${sanitizedStderr}`);
       const { stdout } = await this.execFileAsync('git', ['ls-remote', '--tags', repoUrl], options);
       return stdout;
     }

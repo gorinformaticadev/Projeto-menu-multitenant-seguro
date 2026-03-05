@@ -8,7 +8,14 @@
 #   BASE_DIR/current  -> release ativo
 #   BASE_DIR/previous -> release anterior
 #
-# Suporta modo legado in-place com --legacy-inplace (default OFF).
+# Exit codes padronizados:
+#   0  success
+#   10 lock already held
+#   20 backup failed
+#   30 download/checkout failed
+#   40 build/migrations failed
+#   50 healthcheck failed + rollback succeeded
+#   60 healthcheck failed + rollback failed
 # =============================================================================
 
 set -euo pipefail
@@ -26,6 +33,14 @@ HEALTH_INTERVAL="${HEALTH_INTERVAL:-5}"
 RELEASES_TO_KEEP="${RELEASES_TO_KEEP:-5}"
 LEGACY_INPLACE="false"
 
+EXIT_SUCCESS=0
+EXIT_LOCK_HELD=10
+EXIT_BACKUP_FAILED=20
+EXIT_DOWNLOAD_FAILED=30
+EXIT_BUILD_FAILED=40
+EXIT_HEALTH_ROLLBACK_OK=50
+EXIT_HEALTH_ROLLBACK_FAILED=60
+
 BASE_DIR=""
 RELEASES_DIR=""
 SHARED_DIR=""
@@ -33,20 +48,45 @@ CURRENT_LINK=""
 PREVIOUS_LINK=""
 LOCK_FILE=""
 LOCK_FD=99
+LOCK_ACQUIRED="false"
+
+STATE_FILE=""
+UPDATE_LOG_FILE=""
+STATE_INITIALIZED="false"
+STATE_FINALIZED="false"
+
+CURRENT_STEP="init"
+STATE_STATUS="idle"
+STATE_STARTED_AT=""
+STATE_FINISHED_AT=""
+STATE_FROM_VERSION="unknown"
+STATE_TO_VERSION="unknown"
+STATE_STEP="init"
+STATE_PROGRESS=0
+STATE_LOCK="false"
+STATE_LAST_ERROR=""
+ROLLBACK_ATTEMPTED="false"
+ROLLBACK_COMPLETED="false"
+ROLLBACK_REASON=""
 
 RESOLVED_APP_VERSION="unknown"
 RESOLVED_GIT_SHA="unknown"
 RESOLVED_BUILD_TIME="unknown"
 RESOLVED_BRANCH=""
+
 BACKEND_PROC=""
 FRONTEND_PROC=""
 
+now_iso() {
+  date -u +%Y-%m-%dT%H:%M:%SZ
+}
+
 log() {
-  echo "[native-deploy] $(date '+%Y-%m-%d %H:%M:%S') $*"
+  echo "[$(now_iso)] [${CURRENT_STEP}] $*"
 }
 
 log_err() {
-  echo "[native-deploy] ERROR: $*" >&2
+  echo "[$(now_iso)] [${CURRENT_STEP}] ERROR: $*" >&2
 }
 
 usage() {
@@ -66,8 +106,18 @@ json_escape() {
   local value="$1"
   value="${value//\\/\\\\}"
   value="${value//\"/\\\"}"
-  value="${value//$'\n'/}"
+  value="${value//$'\n'/ }"
+  value="${value//$'\r'/ }"
   echo "$value"
+}
+
+json_or_null() {
+  local value="${1:-}"
+  if [[ -z "$value" ]]; then
+    echo "null"
+  else
+    echo "\"$(json_escape "$value")\""
+  fi
 }
 
 sanitize_release_name() {
@@ -81,12 +131,138 @@ sanitize_release_name() {
   echo "$value"
 }
 
+write_state_file() {
+  if [[ "$STATE_INITIALIZED" != "true" ]] || [[ -z "$STATE_FILE" ]]; then
+    return 0
+  fi
+
+  local tmp_file
+  tmp_file="${STATE_FILE}.tmp.$$"
+  cat > "$tmp_file" <<EOF
+{
+  "status": "$(json_escape "$STATE_STATUS")",
+  "startedAt": $(json_or_null "$STATE_STARTED_AT"),
+  "finishedAt": $(json_or_null "$STATE_FINISHED_AT"),
+  "fromVersion": "$(json_escape "$STATE_FROM_VERSION")",
+  "toVersion": "$(json_escape "$STATE_TO_VERSION")",
+  "step": "$(json_escape "$STATE_STEP")",
+  "progress": ${STATE_PROGRESS},
+  "lock": ${STATE_LOCK},
+  "lastError": $(json_or_null "$STATE_LAST_ERROR"),
+  "rollback": {
+    "attempted": ${ROLLBACK_ATTEMPTED},
+    "completed": ${ROLLBACK_COMPLETED},
+    "reason": $(json_or_null "$ROLLBACK_REASON")
+  }
+}
+EOF
+  mv -f "$tmp_file" "$STATE_FILE"
+}
+
+set_step() {
+  local step="$1"
+  local progress="$2"
+  CURRENT_STEP="$step"
+  STATE_STEP="$step"
+  STATE_PROGRESS="$progress"
+  write_state_file
+}
+
+start_state() {
+  STATE_INITIALIZED="true"
+  STATE_STATUS="running"
+  STATE_STARTED_AT="$(now_iso)"
+  STATE_FINISHED_AT=""
+  STATE_FROM_VERSION="unknown"
+  STATE_TO_VERSION="$TARGET_TAG"
+  STATE_STEP="starting"
+  CURRENT_STEP="starting"
+  STATE_PROGRESS=1
+  STATE_LOCK="true"
+  STATE_LAST_ERROR=""
+  ROLLBACK_ATTEMPTED="false"
+  ROLLBACK_COMPLETED="false"
+  ROLLBACK_REASON=""
+  write_state_file
+}
+
+finish_success() {
+  STATE_STATUS="success"
+  STATE_FINISHED_AT="$(now_iso)"
+  STATE_PROGRESS=100
+  STATE_LOCK="false"
+  STATE_LAST_ERROR=""
+  STATE_FINALIZED="true"
+  set_step "completed" 100
+  write_state_file
+}
+
+finish_failed() {
+  local code="$1"
+  local message="$2"
+  STATE_STATUS="failed"
+  STATE_FINISHED_AT="$(now_iso)"
+  STATE_LOCK="false"
+  STATE_LAST_ERROR="$message"
+  STATE_FINALIZED="true"
+  write_state_file
+  log_err "${message} (exit_code=${code})"
+}
+
+finish_rolled_back() {
+  local message="$1"
+  STATE_STATUS="rolled_back"
+  STATE_FINISHED_AT="$(now_iso)"
+  STATE_PROGRESS=100
+  STATE_LOCK="false"
+  STATE_LAST_ERROR="$message"
+  STATE_FINALIZED="true"
+  set_step "rollback" 100
+  write_state_file
+}
+
+fail_and_exit() {
+  local code="$1"
+  local message="$2"
+  if [[ "$STATE_INITIALIZED" == "true" ]]; then
+    finish_failed "$code" "$message"
+  else
+    log_err "${message} (exit_code=${code})"
+  fi
+  exit "$code"
+}
+
 ensure_command() {
   local cmd="$1"
+  local code="${2:-$EXIT_BUILD_FAILED}"
   if ! command -v "$cmd" >/dev/null 2>&1; then
-    log_err "Comando obrigatorio nao encontrado: $cmd"
-    exit 1
+    fail_and_exit "$code" "Comando obrigatorio nao encontrado: $cmd"
   fi
+}
+
+rotate_update_log() {
+  local max_size=$((5 * 1024 * 1024))
+  local max_files=10
+  local file="$UPDATE_LOG_FILE"
+
+  mkdir -p "$(dirname "$file")"
+  if [[ ! -f "$file" ]]; then
+    return 0
+  fi
+
+  local size=0
+  size="$(wc -c < "$file" 2>/dev/null || echo 0)"
+  if (( size < max_size )); then
+    return 0
+  fi
+
+  local i=0
+  for ((i=max_files-1; i>=1; i--)); do
+    if [[ -f "${file}.${i}" ]]; then
+      mv -f "${file}.${i}" "${file}.$((i + 1))"
+    fi
+  done
+  mv -f "$file" "${file}.1"
 }
 
 normalize_repo_web_url() {
@@ -97,6 +273,56 @@ normalize_repo_web_url() {
     normalized="https://github.com/${BASH_REMATCH[1]}"
   fi
   echo "$normalized"
+}
+
+resolve_base_dir() {
+  local candidate="${APP_BASE_DIR}"
+  if [[ -z "$candidate" ]]; then
+    candidate="$PROJECT_ROOT"
+    if [[ "$(basename "$candidate")" == "current" ]]; then
+      candidate="$(dirname "$candidate")"
+    elif [[ "$(basename "$(dirname "$candidate")")" == "releases" ]]; then
+      candidate="$(dirname "$(dirname "$candidate")")"
+    fi
+  fi
+
+  BASE_DIR="$(cd "$candidate" && pwd)"
+  RELEASES_DIR="$BASE_DIR/releases"
+  SHARED_DIR="$BASE_DIR/shared"
+  CURRENT_LINK="$BASE_DIR/current"
+  PREVIOUS_LINK="$BASE_DIR/previous"
+  LOCK_FILE="$SHARED_DIR/locks/update.lock"
+  STATE_FILE="$SHARED_DIR/update-state.json"
+  UPDATE_LOG_FILE="$SHARED_DIR/logs/update.log"
+}
+
+prepare_base_layout() {
+  mkdir -p "$RELEASES_DIR" "$SHARED_DIR/uploads" "$SHARED_DIR/backups" "$SHARED_DIR/logs" "$SHARED_DIR/locks"
+}
+
+initialize_logging_and_state() {
+  rotate_update_log
+  exec > >(tee -a "$UPDATE_LOG_FILE") 2>&1
+}
+
+acquire_lock() {
+  eval "exec ${LOCK_FD}>\"${LOCK_FILE}\""
+  if ! flock -n "$LOCK_FD"; then
+    log_err "Update em andamento. Lock ativo em $LOCK_FILE"
+    exit "$EXIT_LOCK_HELD"
+  fi
+
+  LOCK_ACQUIRED="true"
+  STATE_LOCK="true"
+  write_state_file
+}
+
+release_lock() {
+  if [[ "$LOCK_ACQUIRED" == "true" ]]; then
+    flock -u "$LOCK_FD" || true
+    eval "exec ${LOCK_FD}>&-"
+    LOCK_ACQUIRED="false"
+  fi
 }
 
 get_link_target() {
@@ -114,6 +340,7 @@ update_env_file() {
   local file="$3"
   local escaped_key
   escaped_key="$(printf '%s\n' "$key" | sed 's/[][\/.^$*]/\\&/g')"
+
   if grep -qE "^${escaped_key}=" "$file" 2>/dev/null; then
     sed -i "s|^${escaped_key}=.*|${key}=${value}|g" "$file"
   else
@@ -121,26 +348,13 @@ update_env_file() {
   fi
 }
 
-resolve_base_dir() {
-  local candidate="${APP_BASE_DIR}"
-  if [[ -z "$candidate" ]]; then
-    candidate="$PROJECT_ROOT"
-    if [[ "$(basename "$candidate")" == "current" ]]; then
-      candidate="$(dirname "$candidate")"
-    elif [[ "$(basename "$(dirname "$candidate")")" == "releases" ]]; then
-      candidate="$(dirname "$(dirname "$candidate")")"
-    fi
-  fi
-  BASE_DIR="$(cd "$candidate" && pwd)"
-  RELEASES_DIR="$BASE_DIR/releases"
-  SHARED_DIR="$BASE_DIR/shared"
-  CURRENT_LINK="$BASE_DIR/current"
-  PREVIOUS_LINK="$BASE_DIR/previous"
-  LOCK_FILE="$SHARED_DIR/locks/update.lock"
-}
-
-prepare_base_layout() {
-  mkdir -p "$RELEASES_DIR" "$SHARED_DIR/uploads" "$SHARED_DIR/backups" "$SHARED_DIR/logs" "$SHARED_DIR/locks"
+validate_release_dir() {
+  local release_dir="$1"
+  [[ -f "$release_dir/pnpm-workspace.yaml" ]] &&
+  [[ -f "$release_dir/package.json" ]] &&
+  [[ -d "$release_dir/apps/backend" ]] &&
+  [[ -d "$release_dir/apps/frontend" ]] &&
+  [[ -d "$release_dir/install" ]]
 }
 
 bootstrap_legacy_layout_if_needed() {
@@ -150,22 +364,23 @@ bootstrap_legacy_layout_if_needed() {
 
   if [[ -e "$CURRENT_LINK" && ! -L "$CURRENT_LINK" ]]; then
     log_err "Caminho $CURRENT_LINK existe mas nao eh symlink. Ajuste manual necessario."
-    exit 1
+    return 1
   fi
 
   if [[ ! -d "$PROJECT_ROOT/apps/backend" ]]; then
     log_err "Nao foi possivel detectar raiz legacy para bootstrap (apps/backend ausente em $PROJECT_ROOT)."
-    exit 1
+    return 1
   fi
 
   local detected_version="legacy-$(date -u +%Y%m%dT%H%M%SZ)"
   if [[ -f "$PROJECT_ROOT/VERSION" ]]; then
-    local file_version
+    local file_version=""
     file_version="$(head -n1 "$PROJECT_ROOT/VERSION" | tr -d '\r' || true)"
     if [[ -n "$file_version" ]]; then
       detected_version="$file_version"
     fi
   fi
+
   local bootstrap_release="$RELEASES_DIR/$(sanitize_release_name "$detected_version")"
   log "Bootstrap da estrutura atomica: criando release base em $bootstrap_release"
 
@@ -190,6 +405,7 @@ bootstrap_legacy_layout_if_needed() {
 
   ln -sfn "$bootstrap_release" "$CURRENT_LINK"
   log "Bootstrap concluido. current -> $bootstrap_release"
+  return 0
 }
 
 ensure_shared_env() {
@@ -203,6 +419,7 @@ ensure_shared_env() {
     "$CURRENT_LINK/apps/backend/.env"
     "$CURRENT_LINK/.env"
   )
+
   local candidate=""
   for candidate in "${candidates[@]}"; do
     if [[ -f "$candidate" ]]; then
@@ -213,7 +430,7 @@ ensure_shared_env() {
   done
 
   log_err "shared/.env nao encontrado e nenhum .env legado disponivel para migracao."
-  exit 1
+  return 1
 }
 
 ensure_shared_frontend_env() {
@@ -225,6 +442,7 @@ ensure_shared_frontend_env() {
     "$PROJECT_ROOT/apps/frontend/.env.local"
     "$CURRENT_LINK/apps/frontend/.env.local"
   )
+
   local candidate=""
   for candidate in "${candidates[@]}"; do
     if [[ -f "$candidate" ]]; then
@@ -232,29 +450,7 @@ ensure_shared_frontend_env() {
       return 0
     fi
   done
-}
-
-acquire_lock() {
-  eval "exec ${LOCK_FD}>\"${LOCK_FILE}\""
-  if ! flock -n "$LOCK_FD"; then
-    log_err "Update em andamento. Lock ativo em $LOCK_FILE"
-    exit 1
-  fi
-  printf '%s\n' "$$" 1>&"$LOCK_FD" || true
-}
-
-release_lock() {
-  flock -u "$LOCK_FD" || true
-  eval "exec ${LOCK_FD}>&-"
-}
-
-validate_release_dir() {
-  local release_dir="$1"
-  [[ -f "$release_dir/pnpm-workspace.yaml" ]] &&
-  [[ -f "$release_dir/package.json" ]] &&
-  [[ -d "$release_dir/apps/backend" ]] &&
-  [[ -d "$release_dir/apps/frontend" ]] &&
-  [[ -d "$release_dir/install" ]]
+  return 0
 }
 
 download_release_tarball() {
@@ -262,16 +458,20 @@ download_release_tarball() {
   local release_dir="$2"
   local repo_web_url
   repo_web_url="$(normalize_repo_web_url "$GIT_REPO_URL")"
+
   if [[ ! "$repo_web_url" =~ ^https://github.com/.+/.+$ ]]; then
     return 1
   fi
 
-  ensure_command curl
-  ensure_command tar
+  ensure_command curl "$EXIT_DOWNLOAD_FAILED"
+  ensure_command tar "$EXIT_DOWNLOAD_FAILED"
+
   local tarball_url="${repo_web_url}/archive/refs/tags/${target_tag}.tar.gz"
-  local tmp_dir
+  local tmp_dir=""
+  local archive_file=""
+  local extracted_dir=""
   tmp_dir="$(mktemp -d)"
-  local archive_file="${tmp_dir}/release.tar.gz"
+  archive_file="${tmp_dir}/release.tar.gz"
 
   log "Baixando release tarball: ${tarball_url}"
   if [[ -n "$GIT_AUTH_HEADER" ]]; then
@@ -281,7 +481,6 @@ download_release_tarball() {
   fi
 
   tar -xzf "$archive_file" -C "$tmp_dir"
-  local extracted_dir
   extracted_dir="$(find "$tmp_dir" -mindepth 1 -maxdepth 1 -type d | head -n1)"
   if [[ -z "$extracted_dir" ]]; then
     log_err "Falha ao extrair tarball da release."
@@ -297,6 +496,7 @@ download_release_tarball() {
     mkdir -p "$release_dir"
     cp -a "$extracted_dir/." "$release_dir/"
   fi
+
   rm -rf "$tmp_dir"
   return 0
 }
@@ -304,11 +504,13 @@ download_release_tarball() {
 download_release_git_clone() {
   local target_tag="$1"
   local release_dir="$2"
-  ensure_command git
+  ensure_command git "$EXIT_DOWNLOAD_FAILED"
+
   if [[ -z "$GIT_REPO_URL" ]]; then
     log_err "GIT_REPO_URL nao informado e tarball indisponivel."
-    exit 1
+    return 1
   fi
+
   log "Tarball indisponivel. Fazendo git clone da tag ${target_tag}..."
   if [[ -n "$GIT_AUTH_HEADER" ]]; then
     git -c "http.extraHeader=${GIT_AUTH_HEADER}" clone --depth 1 --branch "$target_tag" "$GIT_REPO_URL" "$release_dir"
@@ -320,13 +522,14 @@ download_release_git_clone() {
 ensure_release_code() {
   local target_tag="$1"
   local release_dir="$2"
+
   if [[ -d "$release_dir" ]]; then
     if validate_release_dir "$release_dir"; then
       log "Release ${target_tag} ja existe em ${release_dir}. Reutilizando."
       return 0
     fi
     log_err "Release existente em ${release_dir} esta inconsistente."
-    exit 1
+    return 1
   fi
 
   if [[ -n "$GIT_REPO_URL" ]] && download_release_tarball "$target_tag" "$release_dir"; then
@@ -337,33 +540,34 @@ ensure_release_code() {
 
   if ! validate_release_dir "$release_dir"; then
     log_err "Release ${target_tag} baixada sem estrutura valida."
-    exit 1
+    return 1
   fi
+  return 0
 }
 
 resolve_build_metadata() {
   local release_dir="$1"
-  RESOLVED_BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  RESOLVED_BUILD_TIME="$(now_iso)"
   RESOLVED_APP_VERSION="${APP_VERSION:-$TARGET_TAG}"
   RESOLVED_GIT_SHA="${BUILD_COMMIT_SHA:-unknown}"
   RESOLVED_BRANCH="${BUILD_BRANCH:-}"
 
   if [[ -f "$release_dir/VERSION" ]]; then
-    local existing_version
+    local existing_version=""
     existing_version="$(head -n1 "$release_dir/VERSION" | tr -d '\r' || true)"
-    if [[ -n "$existing_version" ]] && [[ "${APP_VERSION:-}" == "" ]]; then
+    if [[ -n "$existing_version" ]] && [[ -z "${APP_VERSION:-}" ]]; then
       RESOLVED_APP_VERSION="$existing_version"
     fi
   fi
 
   if [[ -d "$release_dir/.git" ]] && command -v git >/dev/null 2>&1; then
-    local full_sha
+    local full_sha=""
+    local branch_name=""
     full_sha="$(git -C "$release_dir" rev-parse HEAD 2>/dev/null || true)"
+    branch_name="$(git -C "$release_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
     if [[ -n "$full_sha" ]]; then
       RESOLVED_GIT_SHA="$full_sha"
     fi
-    local branch_name
-    branch_name="$(git -C "$release_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
     if [[ -n "$branch_name" ]]; then
       RESOLVED_BRANCH="$branch_name"
     fi
@@ -372,10 +576,10 @@ resolve_build_metadata() {
 
 write_build_metadata_files() {
   local target_dir="$1"
-  local version_json
-  local sha_json
-  local build_json
-  local branch_json
+  local version_json=""
+  local sha_json=""
+  local build_json=""
+  local branch_json=""
   version_json="$(json_escape "$RESOLVED_APP_VERSION")"
   sha_json="$(json_escape "$RESOLVED_GIT_SHA")"
   build_json="$(json_escape "$RESOLVED_BUILD_TIME")"
@@ -444,7 +648,8 @@ wait_for_http_ok() {
   local url="$1"
   local timeout="$2"
   local label="$3"
-  local started_at
+  local started_at=0
+  local now=0
   started_at="$(date +%s)"
 
   while true; do
@@ -452,7 +657,7 @@ wait_for_http_ok() {
       log "${label} OK: ${url}"
       return 0
     fi
-    local now
+
     now="$(date +%s)"
     if (( now - started_at >= timeout )); then
       log_err "Timeout no healthcheck de ${label}: ${url}"
@@ -476,16 +681,20 @@ run_healthchecks() {
 prepare_release_build() {
   local release_dir="$1"
   log "Preparando release (deps/build/migrate/seed): $release_dir"
+
   (
     cd "$release_dir"
     pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
     pnpm --filter backend build
+
     (
       cd apps/backend
       pnpm exec prisma generate
       pnpm exec tsc prisma/seed.ts --outDir dist/prisma --skipLibCheck --module commonjs --target ES2021 --esModuleInterop --resolveJsonModule
     )
+
     pnpm --filter frontend build
+
     (
       cd apps/backend
       set -a
@@ -501,22 +710,23 @@ prepare_release_build() {
 create_pre_swap_backup() {
   local from_version="$1"
   local to_version="$2"
-  ensure_command tar
-  ensure_command pg_dump
+  ensure_command tar "$EXIT_BACKUP_FAILED"
+  ensure_command pg_dump "$EXIT_BACKUP_FAILED"
 
   load_runtime_env_from_shared
   if [[ -z "${DATABASE_URL:-}" ]]; then
     log_err "DATABASE_URL ausente no shared/.env. Backup obrigatorio falhou."
-    exit 1
+    return 1
   fi
 
-  local stamp
+  local stamp=""
+  local from_safe=""
+  local to_safe=""
+  local backup_dir=""
   stamp="$(date -u +%Y%m%dT%H%M%SZ)"
-  local from_safe
-  local to_safe
   from_safe="$(sanitize_release_name "$from_version")"
   to_safe="$(sanitize_release_name "$to_version")"
-  local backup_dir="$SHARED_DIR/backups/${stamp}_${from_safe}_to_${to_safe}"
+  backup_dir="$SHARED_DIR/backups/${stamp}_${from_safe}_to_${to_safe}"
   mkdir -p "$backup_dir"
 
   log "Gerando backup pre-swap em $backup_dir"
@@ -527,10 +737,12 @@ create_pre_swap_backup() {
   printf '{\n  "fromVersion": "%s",\n  "toVersion": "%s",\n  "createdAt": "%s",\n  "dbDumpPath": "%s",\n  "uploadsArchivePath": "%s",\n  "envSnapshotPath": "%s"\n}\n' \
     "$(json_escape "$from_version")" \
     "$(json_escape "$to_version")" \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    "$(now_iso)" \
     "$(json_escape "$backup_dir/database.dump")" \
     "$(json_escape "$backup_dir/uploads.tar.gz")" \
     "$(json_escape "$backup_dir/.env.snapshot")" > "$backup_dir/manifest.json"
+
+  return 0
 }
 
 run_release_retention() {
@@ -545,30 +757,51 @@ run_release_retention() {
 
 rollback_after_failed_health() {
   local previous_target="$1"
+  ROLLBACK_ATTEMPTED="true"
+  ROLLBACK_REASON="healthcheck failed after swap"
+  set_step "rollback" 95
+  write_state_file
+
   if [[ -z "$previous_target" ]] || [[ ! -d "$previous_target" ]]; then
     log_err "Rollback automatico indisponivel (previous invalido)."
+    ROLLBACK_COMPLETED="false"
+    write_state_file
     return 1
   fi
 
   log "Healthcheck falhou. Aplicando rollback para $previous_target"
   ln -sfn "$previous_target" "$CURRENT_LINK"
-  restart_pm2_processes "$CURRENT_LINK"
+  if ! restart_pm2_processes "$CURRENT_LINK"; then
+    log_err "Falha ao reiniciar PM2 durante rollback automatico."
+    ROLLBACK_COMPLETED="false"
+    write_state_file
+    return 1
+  fi
+
   if ! run_healthchecks; then
     log_err "Rollback aplicado, mas healthcheck ainda falhando."
+    ROLLBACK_COMPLETED="false"
+    write_state_file
+    return 1
   fi
+
+  ROLLBACK_COMPLETED="true"
+  write_state_file
   log "ROLLBACK_COMPLETED: rollback automatico concluido"
   return 0
 }
 
 run_legacy_inplace() {
-  ensure_command git
-  ensure_command pnpm
-  ensure_command pm2
+  ensure_command git "$EXIT_DOWNLOAD_FAILED"
+  ensure_command pnpm "$EXIT_BUILD_FAILED"
+  ensure_command pm2 "$EXIT_BUILD_FAILED"
+
   if [[ -z "$GIT_REPO_URL" ]]; then
     log_err "Modo --legacy-inplace requer GIT_REPO_URL."
-    exit 1
+    return 1
   fi
 
+  set_step "legacy-inplace" 20
   log "Executando modo legado in-place para ${TARGET_TAG}"
   (
     cd "$PROJECT_ROOT"
@@ -580,9 +813,13 @@ run_legacy_inplace() {
     git checkout "$TARGET_TAG"
     resolve_build_metadata "$PROJECT_ROOT"
     write_build_metadata_files "$PROJECT_ROOT"
+
+    set_step "legacy-build" 50
     pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
     pnpm --filter backend build
     pnpm --filter frontend build
+
+    set_step "legacy-migrate" 70
     (
       cd apps/backend
       pnpm exec prisma migrate deploy --schema prisma/schema.prisma
@@ -592,8 +829,9 @@ run_legacy_inplace() {
 
   BACKEND_PROC="$(discover_pm2_name backend)"
   FRONTEND_PROC="$(discover_pm2_name frontend)"
+  set_step "legacy-restart" 90
   restart_pm2_processes "$PROJECT_ROOT"
-  log "Modo legado concluido com sucesso."
+  return 0
 }
 
 parse_args() {
@@ -624,28 +862,65 @@ parse_args() {
   done
 }
 
-main() {
-  parse_args "$@"
+on_exit() {
+  local exit_code="$1"
+  local had_lock="$LOCK_ACQUIRED"
 
-  ensure_command flock
-  ensure_command curl
-  ensure_command pnpm
-  ensure_command pm2
-
-  if [[ "$LEGACY_INPLACE" == "true" ]]; then
-    run_legacy_inplace
-    return 0
+  if [[ "$LOCK_ACQUIRED" == "true" ]]; then
+    release_lock
   fi
 
+  if [[ "$STATE_INITIALIZED" == "true" ]]; then
+    STATE_LOCK="false"
+    if [[ "$exit_code" -ne 0 ]] && [[ "$STATE_FINALIZED" != "true" ]] && [[ "$had_lock" == "true" ]]; then
+      STATE_STATUS="failed"
+      STATE_FINISHED_AT="$(now_iso)"
+      STATE_LAST_ERROR="${STATE_LAST_ERROR:-Unexpected update termination}"
+      write_state_file
+    else
+      write_state_file
+    fi
+  fi
+}
+
+main() {
+  parse_args "$@"
   resolve_base_dir
   prepare_base_layout
+  initialize_logging_and_state
+
+  trap 'on_exit $?' EXIT
+
+  ensure_command flock "$EXIT_BUILD_FAILED"
+  ensure_command curl "$EXIT_BUILD_FAILED"
+  ensure_command pnpm "$EXIT_BUILD_FAILED"
+  ensure_command pm2 "$EXIT_BUILD_FAILED"
+
+  set_step "lock" 2
   acquire_lock
-  trap release_lock EXIT
+  start_state
+  set_step "lock" 2
 
   log "STEP 1/10 - Atualizacao atomica iniciada (tag=${TARGET_TAG}, base=${BASE_DIR})"
 
-  bootstrap_legacy_layout_if_needed
-  ensure_shared_env
+  if [[ "$LEGACY_INPLACE" == "true" ]]; then
+    if ! run_legacy_inplace; then
+      fail_and_exit "$EXIT_BUILD_FAILED" "Falha no modo legacy-inplace."
+    fi
+    finish_success
+    log "Atualizacao legacy concluida com sucesso."
+    exit "$EXIT_SUCCESS"
+  fi
+
+  set_step "bootstrap" 5
+  if ! bootstrap_legacy_layout_if_needed; then
+    fail_and_exit "$EXIT_DOWNLOAD_FAILED" "Falha ao preparar layout de releases/current/shared."
+  fi
+
+  set_step "shared-env" 10
+  if ! ensure_shared_env; then
+    fail_and_exit "$EXIT_BUILD_FAILED" "Falha ao preparar shared/.env."
+  fi
   ensure_shared_frontend_env
 
   export APP_BASE_DIR="$BASE_DIR"
@@ -655,68 +930,92 @@ main() {
   update_env_file "UPLOADS_DIR" "$SHARED_DIR/uploads" "$SHARED_DIR/.env"
   update_env_file "BACKUP_DIR" "$SHARED_DIR/backups" "$SHARED_DIR/.env"
 
-  local target_release_name
+  local target_release_name=""
+  local release_dir=""
   target_release_name="$(sanitize_release_name "$TARGET_TAG")"
-  local release_dir="$RELEASES_DIR/$target_release_name"
+  release_dir="$RELEASES_DIR/$target_release_name"
 
   log "STEP 2/10 - Preparando release em $release_dir"
-  ensure_release_code "$TARGET_TAG" "$release_dir"
+  set_step "prepare-release" 20
+  if ! ensure_release_code "$TARGET_TAG" "$release_dir"; then
+    fail_and_exit "$EXIT_DOWNLOAD_FAILED" "Falha ao obter codigo da release ${TARGET_TAG}."
+  fi
   resolve_build_metadata "$release_dir"
   write_build_metadata_files "$release_dir"
   link_shared_into_release "$release_dir"
 
-  log "STEP 3/10 - Build/migrate da release alvo"
-  prepare_release_build "$release_dir"
+  STATE_TO_VERSION="$RESOLVED_APP_VERSION"
+  write_state_file
 
-  local current_target
-  current_target="$(get_link_target "$CURRENT_LINK")"
+  log "STEP 3/10 - Build/migrate da release alvo"
+  set_step "build-migrate" 45
+  if ! prepare_release_build "$release_dir"; then
+    fail_and_exit "$EXIT_BUILD_FAILED" "Falha na etapa de build/migrations."
+  fi
+
+  local current_target=""
   local from_version="unknown"
+  current_target="$(get_link_target "$CURRENT_LINK")"
   if [[ -n "$current_target" ]] && [[ -f "$current_target/VERSION" ]]; then
     from_version="$(head -n1 "$current_target/VERSION" | tr -d '\r' || echo unknown)"
   elif [[ -n "$current_target" ]]; then
     from_version="$(basename "$current_target")"
   fi
+  STATE_FROM_VERSION="$from_version"
+  write_state_file
 
   local to_version="$RESOLVED_APP_VERSION"
   if [[ -z "$to_version" ]]; then
     to_version="$TARGET_TAG"
   fi
+  STATE_TO_VERSION="$to_version"
+  write_state_file
 
   log "STEP 4/10 - Backup obrigatorio pre-swap"
-  create_pre_swap_backup "$from_version" "$to_version"
+  set_step "backup" 60
+  if ! create_pre_swap_backup "$from_version" "$to_version"; then
+    fail_and_exit "$EXIT_BACKUP_FAILED" "Falha ao gerar backup pre-swap."
+  fi
 
   BACKEND_PROC="$(discover_pm2_name backend)"
   FRONTEND_PROC="$(discover_pm2_name frontend)"
 
-  local previous_target
+  local previous_target=""
   previous_target="$current_target"
   if [[ -n "$current_target" ]]; then
     ln -sfn "$current_target" "$PREVIOUS_LINK"
   fi
 
-  if [[ "$current_target" == "$release_dir" ]]; then
-    log "STEP 5/10 - Release alvo ja esta ativa em current. Reiniciando servicos."
-  else
-    log "STEP 5/10 - Swap atomico de symlink current"
-    ln -sfn "$release_dir" "$CURRENT_LINK"
-  fi
+  log "STEP 5/10 - Swap atomico de symlink current"
+  set_step "swap" 70
+  ln -sfn "$release_dir" "$CURRENT_LINK"
 
   log "STEP 6/10 - Reiniciando servicos PM2"
-  restart_pm2_processes "$CURRENT_LINK"
+  set_step "restart-services" 80
+  if ! restart_pm2_processes "$CURRENT_LINK"; then
+    fail_and_exit "$EXIT_BUILD_FAILED" "Falha ao reiniciar servicos PM2."
+  fi
 
   log "STEP 7/10 - Executando healthchecks"
+  set_step "healthcheck" 90
   if ! run_healthchecks; then
     if rollback_after_failed_health "$previous_target"; then
-      exit 2
+      finish_rolled_back "Healthcheck falhou apos swap. Rollback automatico aplicado."
+      exit "$EXIT_HEALTH_ROLLBACK_OK"
     fi
-    exit 1
+    finish_failed "$EXIT_HEALTH_ROLLBACK_FAILED" "Healthcheck falhou e rollback automatico nao concluiu."
+    exit "$EXIT_HEALTH_ROLLBACK_FAILED"
   fi
 
   log "STEP 8/10 - Executando retencao de releases"
+  set_step "retention" 95
   run_release_retention
 
+  set_step "finalizing" 99
+  finish_success
   log "STEP 9/10 - Versao ativa: ${to_version} | current -> $(get_link_target "$CURRENT_LINK")"
   log "STEP 10/10 - Update atomico concluido com sucesso"
+  exit "$EXIT_SUCCESS"
 }
 
 main "$@"
