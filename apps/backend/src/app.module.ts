@@ -3,7 +3,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from "@nestjs/throttler";
 import { SecurityThrottlerGuard } from "./common/guards/security-throttler.guard";
-import { ServeStaticModule } from '@nestjs/serve-static';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { PrismaModule } from './core/prisma/prisma.module';
@@ -11,14 +10,13 @@ import { AuthModule } from './auth/auth.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 import { UsersModule } from './users/users.module';
-import { SecurityConfigModule } from './security-config/security-config.module';
-import { EmailConfigModule } from './security-config/email-config.module';
+import { SecurityConfigModule } from '@core/security-config/security-config.module';
+import { EmailConfigModule } from '@core/security-config/email-config.module';
 import { AuditModule } from './audit/audit.module';
 import { ValidatorsModule } from './common/validators/validators.module';
 import { HttpsRedirectMiddleware } from './common/middleware/https-redirect.middleware';
 import { SentryModule } from './common/services/sentry.module';
 import { CommonModule } from './common/common.module';
-import { TokenCleanupService } from './common/services/token-cleanup.service';
 import { UpdateModule } from './update/update.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SecureFilesModule } from './core/secure-files/secure-files.module';
@@ -29,6 +27,8 @@ import { CronModule } from './core/cron/cron.module';
 import { BackupModule } from './backup/backup.module';
 import { HealthModule } from './health/health.module';
 import { RedisThrottlerStorage } from './common/services/redis-throttler.storage';
+import { PathsModule } from './core/common/paths/paths.module';
+import { MaintenanceModule } from './maintenance/maintenance.module';
 
 @Module({
   imports: [
@@ -38,11 +38,7 @@ import { RedisThrottlerStorage } from './common/services/redis-throttler.storage
     // Módulo de agendamento para tarefas cron
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
-    ServeStaticModule.forRoot({
-      rootPath: '/app/uploads',
-      serveRoot: '/api/uploads',
-      exclude: ['/api/(?!uploads).*'],
-    }),
+    PathsModule,
     SentryModule,
     CommonModule,
     // ============================================
@@ -84,6 +80,7 @@ import { RedisThrottlerStorage } from './common/services/redis-throttler.storage
     NotificationsModule, // Novo sistema Socket.IO apenas
     WhatsAppModule,
     SecureFilesModule, // Módulo de uploads sensíveis
+    MaintenanceModule,
     CronModule,
     HealthModule,
   ],
@@ -102,8 +99,6 @@ import { RedisThrottlerStorage } from './common/services/redis-throttler.storage
     //   provide: APP_GUARD,
     //   useClass: CsrfGuard,
     // },
-    // Serviço de limpeza de tokens
-    TokenCleanupService,
   ],
 })
 export class AppModule implements NestModule {

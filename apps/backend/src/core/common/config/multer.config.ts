@@ -2,6 +2,7 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { BadRequestException } from '@nestjs/common';
+import { resolveLogosDirPath } from '../paths/paths.service';
 
 // Assinaturas de arquivos válidas (magic numbers)
 const FILE_SIGNATURES = {
@@ -25,7 +26,7 @@ export function validateFileSignature(buffer: Buffer, mimetype: string): boolean
 }
 
 // Configurações dinâmicas a partir de variáveis de ambiente
-const getLogosUploadDir = () => process.env.LOGOS_UPLOAD_DIR || './uploads/logos';
+const getLogosUploadDir = () => resolveLogosDirPath();
 const getMaxLogoFileSize = () => parseInt(process.env.MAX_LOGO_FILE_SIZE || '5242880', 10);
 const getAllowedLogoMimeTypes = () => (
   process.env.ALLOWED_LOGO_MIME_TYPES || 'image/jpeg,image/png,image/webp,image/gif'

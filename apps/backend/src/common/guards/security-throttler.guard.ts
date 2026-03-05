@@ -10,7 +10,7 @@ import {
 } from '@nestjs/throttler';
 import { Reflector } from '@nestjs/core';
 import { createHash } from 'crypto';
-import { SecurityConfigService } from '../../security-config/security-config.service';
+import { SecurityConfigService } from '@core/security-config/security-config.service';
 import { AuditService } from '../../audit/audit.service';
 import { RateLimitMetricsService } from '../services/rate-limit-metrics.service';
 

@@ -61,12 +61,14 @@ services:
       - INSTALL_ADMIN_PASSWORD=${INSTALL_ADMIN_PASSWORD}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - UPLOADS_DIR=/app/uploads
+      - BACKUP_DIR=/app/backups
     depends_on:
       - db
       - redis
     volumes:
       - uploads:/app/uploads
-      - backups:/app/apps/backend/backups
+      - backups:/app/backups
     networks:
       - multitenant-network
     healthcheck:

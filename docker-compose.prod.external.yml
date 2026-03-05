@@ -51,9 +51,11 @@ services:
       - SEED_LOCK_RETRY_MS=${SEED_LOCK_RETRY_MS:-2000}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - UPLOADS_DIR=/app/uploads
+      - BACKUP_DIR=/app/backups
     volumes:
-      - ./uploads:/app/uploads
-      - backups:/app/apps/backend/backups
+      - uploads:/app/uploads
+      - backups:/app/backups
     networks:
       - app-network
     depends_on:
@@ -101,6 +103,7 @@ services:
 volumes:
   postgres_data_prod:
   redis_data_prod:
+  uploads:
   backups:
 
 

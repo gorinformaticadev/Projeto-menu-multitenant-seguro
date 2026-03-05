@@ -1,139 +1,88 @@
- import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '@core/prisma/prisma.service';
 
-/**
- * Serviço de limpeza de tokens expirados
- * 
- * Executa tarefas de manutenção periódicas para:
- * - Remover refresh tokens expirados do banco de dados
- * - Limpar sessões antigas
- * - Otimizar armazenamento
- */
 @Injectable()
 export class TokenCleanupService {
   private readonly logger = new Logger(TokenCleanupService.name);
+  private readonly lockId = Number(process.env.TOKEN_CLEANUP_LOCK_ID || 98542173);
+  private readonly advisoryLockEnabled =
+    String(process.env.TOKEN_CLEANUP_USE_ADVISORY_LOCK || 'true').toLowerCase() !== 'false';
 
-  constructor(private prisma: PrismaService) {
-      // Empty implementation
-    }
+  constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Limpa tokens expirados a cada 6 horas
-   * 
-   * Executa automaticamente usando cron job
-   */
   @Cron(CronExpression.EVERY_6_HOURS, {
     name: 'cleanup-expired-tokens',
   })
-  async cleanupExpiredTokens() {
-    this.logger.log('Iniciando limpeza de refresh tokens expirados...');
+  async cleanupExpiredTokens(): Promise<void> {
+    const lockAcquired = await this.tryAcquireAdvisoryLock();
+    if (!lockAcquired) {
+      this.logger.log('Token cleanup skipped: lock is held by another instance.');
+      return;
+    }
 
+    this.logger.log('Starting cleanup of expired refresh tokens...');
     try {
       const result = await this.prisma.refreshToken.deleteMany({
         where: {
-          expiresAt: {
-            lt: new Date(), // Tokens que expiraram (menor que data atual)
-          },
+          expiresAt: { lt: new Date() },
         },
       });
 
-      this.logger.log(`Limpeza concluída: ${result.count} tokens removidos`);
+      this.logger.log(`Token cleanup completed: ${result.count} rows removed.`);
     } catch (error) {
-      this.logger.error('Erro ao limpar tokens expirados:', error);
+      this.logger.error('Error during expired token cleanup.', error as Error);
+    } finally {
+      await this.releaseAdvisoryLock();
     }
   }
 
-  /**
-   * Limpa tokens antigos manualmente (método público para admin)
-   * 
-   * @param olderThanDays - Remove tokens mais antigos que X dias
-   * @returns Número de tokens removidos
-   */
-  async cleanupOldTokens(olderThanDays: number = 30): Promise<number> {
-    this.logger.log(`Limpando tokens mais antigos que ${olderThanDays} dias...`);
+  async cleanupOldTokens(olderThanDays = 30): Promise<number> {
+    this.logger.log(`Cleaning tokens older than ${olderThanDays} days...`);
 
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
 
-    try {
-      const result = await this.prisma.refreshToken.deleteMany({
-        where: {
-          OR: [
-            // Tokens expirados
-            {
-              expiresAt: {
-                lt: new Date(),
-              },
-            },
-            // Tokens muito antigos (mesmo se não expirados)
-            {
-              createdAt: {
-                lt: cutoffDate,
-              },
-            },
-          ],
-        },
-      });
+    const result = await this.prisma.refreshToken.deleteMany({
+      where: {
+        OR: [
+          { expiresAt: { lt: new Date() } },
+          { createdAt: { lt: cutoffDate } },
+        ],
+      },
+    });
 
-      this.logger.log(`${result.count} tokens removidos`);
-      return result.count;
-    } catch (error) {
-      this.logger.error('Erro ao limpar tokens antigos:', error);
-      throw error;
-    }
+    this.logger.log(`${result.count} old tokens removed.`);
+    return result.count;
   }
 
-  /**
-   * Limpa todos os refresh tokens de um usuário específico
-   * Útil para forçar logout em todos os dispositivos
-   * 
-   * @param userId - ID do usuário
-   * @returns Número de tokens removidos
-   */
   async revokeAllUserTokens(userId: string): Promise<number> {
-    this.logger.log(`Revogando todos os tokens do usuário ${userId}...`);
+    this.logger.log(`Revoking all tokens for user ${userId}...`);
 
-    try {
-      const result = await this.prisma.refreshToken.deleteMany({
-        where: {
-          userId,
-        },
-      });
+    const result = await this.prisma.refreshToken.deleteMany({
+      where: { userId },
+    });
 
-      this.logger.log(`${result.count} tokens revogados`);
-      return result.count;
-    } catch (error) {
-      this.logger.error('Erro ao revogar tokens do usuário:', error);
-      throw error;
-    }
+    this.logger.log(`${result.count} tokens revoked.`);
+    return result.count;
   }
 
-  /**
-   * Obtém estatísticas sobre tokens
-   * 
-   * @returns Estatísticas de tokens
-   */
-  async getTokenStats() {
+  async getTokenStats(): Promise<{
+    total: number;
+    expired: number;
+    active: number;
+    expirationRate: string;
+  }> {
     const [total, expired, active] = await Promise.all([
-      // Total de tokens
       this.prisma.refreshToken.count(),
-      
-      // Tokens expirados
       this.prisma.refreshToken.count({
         where: {
-          expiresAt: {
-            lt: new Date(),
-          },
+          expiresAt: { lt: new Date() },
         },
       }),
-      
-      // Tokens ativos
       this.prisma.refreshToken.count({
         where: {
-          expiresAt: {
-            gte: new Date(),
-          },
+          expiresAt: { gte: new Date() },
         },
       }),
     ]);
@@ -142,7 +91,35 @@ export class TokenCleanupService {
       total,
       expired,
       active,
-      expirationRate: total > 0 ? ((expired / total) * 100).toFixed(2) + '%' : '0%',
+      expirationRate: total > 0 ? `${((expired / total) * 100).toFixed(2)}%` : '0%',
     };
+  }
+
+  private async tryAcquireAdvisoryLock(): Promise<boolean> {
+    if (!this.advisoryLockEnabled) {
+      return true;
+    }
+
+    try {
+      const result = await this.prisma.$queryRaw<Array<{ acquired: boolean }>>`
+        SELECT pg_try_advisory_lock(${this.lockId}) AS acquired
+      `;
+      return result?.[0]?.acquired === true;
+    } catch (error) {
+      this.logger.warn(`Failed to acquire token cleanup advisory lock: ${String(error)}`);
+      return false;
+    }
+  }
+
+  private async releaseAdvisoryLock(): Promise<void> {
+    if (!this.advisoryLockEnabled) {
+      return;
+    }
+
+    try {
+      await this.prisma.$executeRaw`SELECT pg_advisory_unlock(${this.lockId})`;
+    } catch (error) {
+      this.logger.warn(`Failed to release token cleanup advisory lock: ${String(error)}`);
+    }
   }
 }

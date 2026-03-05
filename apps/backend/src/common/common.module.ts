@@ -14,9 +14,10 @@ import { eventBus } from '@core/events/EventBus';
 import { ModuleInstallerController } from '@core/module-installer.controller';
 import { ModuleInstallerService } from '@core/module-installer.service';
 import { SystemVersionService } from './services/system-version.service';
+import { PathsModule } from '@core/common/paths/paths.module';
 
 @Module({
-  imports: [PrismaModule, SecurityConfigModule, NotificationsModule, AuditModule],
+  imports: [PrismaModule, SecurityConfigModule, NotificationsModule, AuditModule, PathsModule],
   controllers: [CspReportController, SystemVersionController, UserModulesController, ModuleInstallerController],
   providers: [
     PlatformInitService,

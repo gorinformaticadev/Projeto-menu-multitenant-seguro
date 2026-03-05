@@ -26,6 +26,7 @@ import { InternalRestoreByFileRequestDto } from './dto/internal-restore-job.dto'
 import { RestoreJobDto } from './dto/restore-job.dto';
 import { BackupService } from './backup.service';
 import { BackupInternalGuard } from './guards/backup-internal.guard';
+import { LegacyBackupDeprecationInterceptor } from './interceptors/legacy-backup-deprecation.interceptor';
 
 const MAX_UPLOAD_SIZE = Number(process.env.BACKUP_MAX_SIZE || 2 * 1024 * 1024 * 1024);
 
@@ -176,6 +177,7 @@ export class BackupsController {
 }
 
 @Controller('backup')
+@UseInterceptors(LegacyBackupDeprecationInterceptor)
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.SUPER_ADMIN)
 export class BackupLegacyController {

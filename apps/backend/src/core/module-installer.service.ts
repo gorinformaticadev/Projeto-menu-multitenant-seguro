@@ -9,6 +9,7 @@ import { ModuleJsonValidator, ModuleJson } from './validators/module-json.valida
 import { ModuleStructureValidator, ModuleStructureResult } from './validators/module-structure.validator';
 import { ModuleDatabaseExecutorService } from './services/module-database-executor.service';
 import { AuditService } from '../audit/audit.service';
+import { PathsService } from './common/paths/paths.service';
 
 /**
  * Serviço de Instalação de Módulos - DISTRIBUTED
@@ -25,7 +26,7 @@ export class ModuleInstallerService {
     // Caminhos definidos conforme especificação do monorepo
     private readonly backendModulesPath = path.resolve(process.cwd(), 'src', 'modules');
     private readonly frontendBase = path.resolve(process.cwd(), '..', 'frontend', 'src', 'app', 'modules');
-    private readonly uploadsPath = path.resolve(process.cwd(), 'uploads', 'modules');
+    private readonly uploadsPath: string;
     private readonly allowedTextExtensions = new Set(['.json', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.css', '.scss', '.md', '.txt', '.sql', '.yml', '.yaml']);
     private readonly allowedBinaryExtensions = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico']);
 
@@ -33,8 +34,10 @@ export class ModuleInstallerService {
         private readonly prisma: PrismaService,
         private readonly notificationService: NotificationService,
         private readonly dbExecutor: ModuleDatabaseExecutorService,
-        private readonly auditService: AuditService
+        private readonly auditService: AuditService,
+        private readonly pathsService: PathsService
     ) {
+        this.uploadsPath = path.resolve(this.pathsService.getUploadsDir(), 'modules');
         this.ensureDirectories();
     }
 
@@ -860,6 +863,3 @@ export class ModuleInstallerService {
         if (!fs.existsSync(this.uploadsPath)) fs.mkdirSync(this.uploadsPath, { recursive: true });
     }
 }
-
-
-

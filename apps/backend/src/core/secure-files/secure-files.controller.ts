@@ -20,10 +20,10 @@ import { SecureFileAccessGuard } from './guards/secure-file-access.guard';
 import { SecureFilesService } from './secure-files.service';
 import { UploadFileDto } from './dto/upload-file.dto';
 import { FileQueryDto } from './dto/file-query.dto';
-import { ConfigService } from '@nestjs/config';
 import { diskStorage } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import { extname } from 'path';
+import { ensureDirectory, resolveCanonicalPaths } from '@core/common/paths/paths.service';
 
 /**
  * Controller para gerenciamento de arquivos sensíveis
@@ -34,7 +34,6 @@ import { extname } from 'path';
 export class SecureFilesController {
   constructor(
     private readonly secureFilesService: SecureFilesService,
-    private readonly configService: ConfigService,
   ) { }
 
   /**
@@ -45,7 +44,10 @@ export class SecureFilesController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: './uploads/temp',
+        destination: (_req, _file, callback) => {
+          const tempDir = ensureDirectory(resolveCanonicalPaths().tempDir);
+          callback(null, tempDir);
+        },
         filename: (req, file, cb) => {
           const ext = extname(file.originalname);
           cb(null, `${uuidv4()}${ext}`);

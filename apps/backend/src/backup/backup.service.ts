@@ -18,6 +18,7 @@ import { createHash, randomUUID } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AuditService } from '../audit/audit.service';
+import { PathsService } from '../core/common/paths/paths.service';
 import { CronService } from '../core/cron/cron.service';
 import { PrismaReconnectFailed, PrismaService } from '../core/prisma/prisma.service';
 import { BackupConfigService } from './backup-config.service';
@@ -81,6 +82,7 @@ export class BackupService {
     private readonly backupConfig: BackupConfigService,
     private readonly processService: BackupProcessService,
     private readonly runtimeState: BackupRuntimeStateService,
+    private readonly pathsService: PathsService,
   ) {}
 
   getUploadMaxSizeBytes(): number {
@@ -734,6 +736,8 @@ export class BackupService {
 
     await this.updateJobProgress(job.id, 'BACKUP_CHECKSUM', 80, 'Calculando checksum SHA256');
     const checksum = await this.calculateChecksumFromFile(filePath);
+    await this.updateJobProgress(job.id, 'BACKUP_ASSETS', 90, 'Gerando snapshot de uploads e .env');
+    const assets = await this.createBackupAssets(fileName);
 
     const artifact = await this.prisma.backupArtifact.create({
       data: {
@@ -744,6 +748,10 @@ export class BackupService {
         source: BackupArtifactSource.BACKUP,
         createdByUserId: job.createdByUserId,
         metadata: {
+          version: process.env.APP_VERSION || 'unknown',
+          dbDumpPath: filePath,
+          uploadsArchivePath: assets.uploadsArchivePath,
+          envSnapshotPath: assets.envSnapshotPath,
           environmentScope: this.backupConfig.getEnvironmentScope(),
           executionMode: this.backupConfig.getExecutionMode(),
         },
@@ -929,6 +937,14 @@ export class BackupService {
         await this.ensurePrismaConnectionHealthy();
       }
 
+      await this.updateJobProgress(
+        job.id,
+        'RESTORE_UPLOADS',
+        96,
+        'Restaurando uploads para o diretorio canonico',
+      );
+      const restoredUploadsPath = await this.restoreUploadsFromArtifactMetadata(artifact, job.id);
+
       await this.updateJobProgress(job.id, 'RESTORE_CLEANUP', 98, 'Finalizando restore e registrando auditoria');
 
       await this.markJobSuccess(job.id, {
@@ -942,6 +958,7 @@ export class BackupService {
           stagingDatabase,
           activeDatabase,
           rollbackDatabase,
+          restoredUploadsPath,
           promotedAt: new Date().toISOString(),
         } as any,
       });
@@ -1078,6 +1095,143 @@ export class BackupService {
         },
       },
     });
+  }
+
+  private async createBackupAssets(
+    dbDumpFileName: string,
+  ): Promise<{ uploadsArchivePath: string | null; envSnapshotPath: string | null }> {
+    const baseName = dbDumpFileName.replace(/\.[^.]+$/, '');
+    const uploadsArchivePath = await this.createUploadsSnapshot(baseName);
+    const envSnapshotPath = this.createEnvSnapshot(baseName);
+
+    return {
+      uploadsArchivePath,
+      envSnapshotPath,
+    };
+  }
+
+  private async createUploadsSnapshot(baseName: string): Promise<string | null> {
+    const uploadsSource = this.pathsService.getUploadsDir();
+    if (!fs.existsSync(uploadsSource)) {
+      return null;
+    }
+
+    const hasAnyFile = fs.readdirSync(uploadsSource).length > 0;
+    if (!hasAnyFile) {
+      return null;
+    }
+
+    const archivePath = this.resolveFilePath(`${baseName}_uploads.tar.gz`);
+
+    try {
+      await this.processService.runCommand({
+        command: 'tar',
+        args: ['-czf', archivePath, '-C', uploadsSource, '.'],
+        env: { ...process.env },
+        timeoutMs: this.backupConfig.getJobTimeoutMs(),
+        cwd: this.backupConfig.getProjectRoot(),
+      });
+      return archivePath;
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao gerar tar de uploads. Usando snapshot em pasta. Detalhe: ${this.errorMessage(error)}`,
+      );
+
+      const snapshotDir = this.resolveFilePath(`${baseName}_uploads_snapshot`);
+      if (!fs.existsSync(snapshotDir)) {
+        fs.mkdirSync(snapshotDir, { recursive: true });
+      }
+      this.copyDirectoryContents(uploadsSource, snapshotDir);
+      return snapshotDir;
+    }
+  }
+
+  private createEnvSnapshot(baseName: string): string | null {
+    const envPath = this.resolveEnvironmentFilePath();
+    if (!envPath) {
+      return null;
+    }
+
+    const snapshotPath = this.resolveFilePath(`${baseName}_env.snapshot`);
+    fs.copyFileSync(envPath, snapshotPath);
+    return snapshotPath;
+  }
+
+  private resolveEnvironmentFilePath(): string | null {
+    const explicitEnv = (process.env.BACKUP_ENV_FILE || '').trim();
+    const candidates = [
+      explicitEnv,
+      path.join(this.backupConfig.getProjectRoot(), 'install', '.env.production'),
+      path.join(this.backupConfig.getProjectRoot(), '.env.production'),
+      path.join(this.backupConfig.getProjectRoot(), '.env'),
+      path.join(this.backupConfig.getBackendDir(), '.env'),
+    ].filter((candidate) => !!candidate) as string[];
+
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+
+    return null;
+  }
+
+  private async restoreUploadsFromArtifactMetadata(
+    artifact: BackupArtifact,
+    jobId: string,
+  ): Promise<string | null> {
+    const metadata = this.toJsonRecord(artifact.metadata);
+    const uploadsArchivePath =
+      typeof metadata?.uploadsArchivePath === 'string' ? metadata.uploadsArchivePath : null;
+    if (!uploadsArchivePath) {
+      return null;
+    }
+
+    this.assertSafeFilePath(uploadsArchivePath);
+    if (!fs.existsSync(uploadsArchivePath)) {
+      throw new Error(
+        `Arquivo de uploads informado no backup nao encontrado: ${uploadsArchivePath}`,
+      );
+    }
+
+    const uploadsDir = this.pathsService.ensureDir(this.pathsService.getUploadsDir());
+    fs.accessSync(uploadsDir, fs.constants.R_OK | fs.constants.W_OK);
+
+    if (fs.statSync(uploadsArchivePath).isDirectory()) {
+      this.copyDirectoryContents(uploadsArchivePath, uploadsDir);
+    } else if (/\.tar\.gz$|\.tgz$/i.test(uploadsArchivePath)) {
+      await this.processService.runCommand({
+        command: 'tar',
+        args: ['-xzf', uploadsArchivePath, '-C', uploadsDir],
+        env: { ...process.env },
+        timeoutMs: this.backupConfig.getJobTimeoutMs(),
+        cwd: this.backupConfig.getProjectRoot(),
+      });
+    } else {
+      throw new Error(`Formato de snapshot de uploads nao suportado: ${uploadsArchivePath}`);
+    }
+
+    await this.appendJobLog(jobId, 'INFO', `Uploads restaurados em ${uploadsDir}`);
+    return uploadsDir;
+  }
+
+  private copyDirectoryContents(sourceDir: string, targetDir: string): void {
+    if (!fs.existsSync(sourceDir)) {
+      return;
+    }
+
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+
+    for (const entry of fs.readdirSync(sourceDir)) {
+      const sourcePath = path.join(sourceDir, entry);
+      const targetPath = path.join(targetDir, entry);
+      fs.cpSync(sourcePath, targetPath, {
+        recursive: true,
+        force: true,
+      });
+    }
   }
 
   private async executePgRestore(params: {

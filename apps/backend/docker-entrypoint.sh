@@ -7,8 +7,8 @@ set -e
 
 PRISMA_SCHEMA="./prisma/schema.prisma"
 MIGRATIONS_DIR="./prisma/migrations"
-BACKUP_DIR="${BACKUP_DIR:-/app/apps/backend/backups}"
-UPLOAD_DIR="${UPLOAD_DIR:-/app/apps/backend/uploads}"
+BACKUP_DIR="${BACKUP_DIR:-/app/backups}"
+UPLOAD_DIR="${UPLOAD_DIR:-${UPLOADS_DIR:-/app/uploads}}"
 
 if [ -z "${DATABASE_URL:-}" ]; then
   echo "ERROR: DATABASE_URL is not configured."

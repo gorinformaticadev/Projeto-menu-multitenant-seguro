@@ -249,7 +249,7 @@ native_system_permissions_and_project() {
     log_info "Etapa 2/23: ajustando permissoes e preparando projeto..."
     as_root "mkdir -p '${app_dir}'"
     if command -v rsync &>/dev/null; then
-        as_root "rsync -a --delete --exclude '.git' --exclude 'node_modules' --exclude 'apps/backend/node_modules' --exclude 'apps/frontend/node_modules' --exclude 'apps/backend/backups' '${PROJECT_ROOT}/' '${app_dir}/'"
+        as_root "rsync -a --delete --exclude '.git' --exclude 'node_modules' --exclude 'apps/backend/node_modules' --exclude 'apps/frontend/node_modules' --exclude 'apps/backend/backups' --exclude 'backups' --exclude 'uploads' '${PROJECT_ROOT}/' '${app_dir}/'"
     else
         as_root "cp -a '${PROJECT_ROOT}/.' '${app_dir}/'"
     fi

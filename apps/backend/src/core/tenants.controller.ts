@@ -14,6 +14,7 @@ import { SkipTenantIsolation } from '@core/common/decorators/skip-tenant-isolati
 import { Public } from '@core/common/decorators/public.decorator';
 import { Role } from '@prisma/client';
 import { multerConfig } from '@core/common/config/multer.config';
+import { resolveLogosDirPath } from '@core/common/paths/paths.service';
 
 type TenantRequest = ExpressRequest & {
   user: {
@@ -52,7 +53,7 @@ export class TenantsController {
 
     try {
       // Ler os primeiros bytes do arquivo
-      const filePath = path.join(process.cwd(), 'uploads', 'logos', file.filename);
+      const filePath = path.join(resolveLogosDirPath(), file.filename);
       const buffer = fs.readFileSync(filePath);
 
       const signature = this.FILE_SIGNATURES[file.mimetype];
@@ -293,3 +294,4 @@ export class TenantsController {
     return this.tenantsService.configureTenantModule(id, moduleName, config);
   }
 }
+

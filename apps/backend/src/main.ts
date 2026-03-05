@@ -2,13 +2,13 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { join } from 'path';
 import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
 import { SentryService } from './common/services/sentry.service';
 import { SentryExceptionFilter } from './common/filters/sentry-exception.filter';
 import { validateSecurityConfig } from './common/utils/security.utils';
 import { SecretManagerService } from './common/services/secret-manager.nest.service';
+import { PathsService } from './core/common/paths/paths.service';
 
 async function bootstrap() {
   const requireSecretManager = process.env.REQUIRE_SECRET_MANAGER === 'true';
@@ -190,54 +190,44 @@ async function bootstrap() {
     // Empty implementation
   }
 
-  // Servir arquivos estáticos (logos)
-  // Usa process.cwd() que sempre aponta para a raiz do projeto
-  const uploadsPath = join(process.cwd(), 'uploads');
+  // Serve static uploads for both legacy and API-prefixed paths.
+  const pathsService = app.get(PathsService);
+  const uploadsPath = pathsService.getUploadsDir();
+  const setUploadsHeaders = (res: any, filePath: string) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    const isLogoFile = filePath.includes('logos/');
+
+    if (isLogoFile) {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+    } else {
+      const staticAllowedOrigins = [
+        process.env.FRONTEND_URL || 'http://localhost:5000',
+        'http://127.0.0.1:5000',
+        'http://localhost:5000',
+        'http://localhost:3000',
+      ].filter(Boolean);
+
+      const origin = res.req.headers.origin;
+      if (origin && staticAllowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+      }
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    }
+
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+  };
+
   app.useStaticAssets(uploadsPath, {
     prefix: '/uploads',
-    setHeaders: (res, filePath) => {
-      // Headers de segurança para arquivos estáticos
-      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-
-      // Detecta se é um arquivo de logo
-      const isLogoFile = filePath.includes('logos/');
-
-      if (isLogoFile) {
-        // CORS permissivo para logos (recursos públicos visuais)
-        // Logos não contêm informações sensíveis e precisam ser acessíveis
-        // Tags <img> frequentemente não enviam header 'origin'
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-        // Cache mais longo para logos (mudam raramente)
-        res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache por 24 horas
-
-        if (!isProduction) {
-          // Empty implementation
-        }
-      } else {
-        // CORS restritivo para outros arquivos estáticos
-        const allowedOrigins = [
-          process.env.FRONTEND_URL || 'http://localhost:5000',
-          'http://127.0.0.1:5000',
-          'http://localhost:5000',
-          'http://localhost:3000'
-        ].filter(Boolean);
-
-        const origin = res.req.headers.origin;
-        if (origin && allowedOrigins.includes(origin)) {
-          res.setHeader('Access-Control-Allow-Origin', origin);
-        }
-
-        // Cache padrão para outros arquivos
-        res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache por 1 hora
-      }
-
-      // Headers de segurança comuns a todos os arquivos
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-      res.setHeader('X-Frame-Options', 'DENY');
-    },
+    setHeaders: setUploadsHeaders,
+  });
+  app.useStaticAssets(uploadsPath, {
+    prefix: '/api/uploads',
+    setHeaders: setUploadsHeaders,
   });
 
   // ============================================
@@ -286,4 +276,3 @@ async function bootstrap() {
   console.warn(`🛡️  Headers de segurança ativados (Helmet)`);
 }
 bootstrap();
-

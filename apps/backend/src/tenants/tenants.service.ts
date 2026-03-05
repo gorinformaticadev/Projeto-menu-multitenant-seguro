@@ -1,17 +1,21 @@
 import { Injectable, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
+import { PathsService } from '@core/common/paths/paths.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import * as bcrypt from 'bcrypt';
 import { access, unlink } from 'fs/promises';
-import { basename, join, resolve } from 'path';
+import { basename, join } from 'path';
 
 @Injectable()
 export class TenantsService {
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private readonly pathsService: PathsService,
+  ) { }
 
   private getLogosUploadDir(): string {
-    return resolve(process.cwd(), process.env.LOGOS_UPLOAD_DIR || './uploads/logos');
+    return this.pathsService.ensureDir(this.pathsService.getLogosDir());
   }
 
   private getSafeLogoFilename(logoUrl?: string | null): string | null {
@@ -227,7 +231,7 @@ export class TenantsService {
     // Remove o logo antigo se existir
     if (tenant.logoUrl) {
       try {
-        const oldLogoPath = join(process.cwd(), 'uploads', 'logos', tenant.logoUrl);
+        const oldLogoPath = join(this.getLogosUploadDir(), tenant.logoUrl);
         await unlink(oldLogoPath);
       } catch {
         // Ignora erro se o arquivo não existir
@@ -250,7 +254,7 @@ export class TenantsService {
 
     // Remove o arquivo físico
     try {
-      const logoPath = join(process.cwd(), 'uploads', 'logos', tenant.logoUrl);
+      const logoPath = join(this.getLogosUploadDir(), tenant.logoUrl);
       await unlink(logoPath);
     } catch {
       // Ignora erro se o arquivo não existir
@@ -285,7 +289,7 @@ export class TenantsService {
     // Remove o logo se existir
     if (tenant.logoUrl) {
       try {
-        const logoPath = join(process.cwd(), 'uploads', 'logos', tenant.logoUrl);
+        const logoPath = join(this.getLogosUploadDir(), tenant.logoUrl);
         await unlink(logoPath);
       } catch {
         // Ignora erro se o arquivo não existir
@@ -388,4 +392,3 @@ export class TenantsService {
     throw new BadRequestException('Use o novo sistema de módulos');
   }
 }
-

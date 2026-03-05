@@ -162,6 +162,21 @@ export GIT_SHA="${RESOLVED_GIT_SHA}"
 export BUILD_TIME="${RESOLVED_BUILD_TIME}"
 log "Metadata de versao: APP_VERSION=$APP_VERSION GIT_SHA=$GIT_SHA BUILD_TIME=$BUILD_TIME"
 
+# --- 2.1 Migracao idempotente de uploads para path canonico ---
+MIGRATE_UPLOADS_SCRIPT=""
+if [ -f "$PROJECT_ROOT/Scripts/migrate-uploads.sh" ]; then
+  MIGRATE_UPLOADS_SCRIPT="$PROJECT_ROOT/Scripts/migrate-uploads.sh"
+elif [ -f "$PROJECT_ROOT/scripts/migrate-uploads.sh" ]; then
+  MIGRATE_UPLOADS_SCRIPT="$PROJECT_ROOT/scripts/migrate-uploads.sh"
+fi
+
+if [ -n "$MIGRATE_UPLOADS_SCRIPT" ]; then
+  log "Executando migracao de uploads para diretorio canonico..."
+  bash "$MIGRATE_UPLOADS_SCRIPT"
+else
+  log "Aviso: script de migracao de uploads nao encontrado (Scripts/ ou scripts/)."
+fi
+
 # --- 3. Instalacao de Dependencias ---
 log "Instalando dependencias via pnpm..."
 if ! pnpm install --frozen-lockfile; then

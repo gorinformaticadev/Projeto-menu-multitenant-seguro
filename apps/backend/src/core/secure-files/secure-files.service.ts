@@ -5,8 +5,8 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@core/prisma/prisma.service';
+import { PathsService } from '@core/common/paths/paths.service';
 import { createReadStream, promises as fsPromises } from 'fs';
 import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
@@ -24,18 +24,17 @@ import {
 export class SecureFilesService {
   private readonly logger = new Logger(SecureFilesService.name);
   private readonly uploadsRoot: string;
+  private readonly tempDir: string;
   private readonly secureDir: string;
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly configService: ConfigService,
+    private readonly pathsService: PathsService,
   ) {
     // Configurar paths dinâmicos (Docker-ready)
-    this.uploadsRoot = join(
-      process.cwd(),
-      this.configService.get<string>('UPLOADS_ROOT', 'uploads'),
-    );
-    this.secureDir = join(this.uploadsRoot, 'secure');
+    this.uploadsRoot = this.pathsService.ensureDir(this.pathsService.getUploadsDir());
+    this.tempDir = this.pathsService.ensureDir(this.pathsService.getTempDir());
+    this.secureDir = this.pathsService.ensureDir(this.pathsService.getSecureDir());
   }
 
   /**

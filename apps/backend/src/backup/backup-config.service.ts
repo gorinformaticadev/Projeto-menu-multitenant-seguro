@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PathsService } from '@core/common/paths/paths.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -23,7 +24,10 @@ export class BackupConfigService {
   private readonly adminDatabaseConfig?: BackupDatabaseConfig;
   private readonly activeDbStateFile: string;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly pathsService: PathsService,
+  ) {
     this.projectRoot = this.resolveProjectRoot();
     this.backupDir = this.resolveBackupDir();
     this.executionMode = this.resolveExecutionMode();
@@ -48,6 +52,10 @@ export class BackupConfigService {
 
   getBackupDir(): string {
     return this.backupDir;
+  }
+
+  getUploadsDir(): string {
+    return this.pathsService.getUploadsDir();
   }
 
   getMaxUploadBytes(): number {
@@ -288,22 +296,7 @@ export class BackupConfigService {
   }
 
   private resolveProjectRoot(): string {
-    const candidates = [
-      process.cwd(),
-      path.resolve(process.cwd(), '..'),
-      path.resolve(process.cwd(), '..', '..'),
-      path.resolve(__dirname, '..', '..', '..'),
-      path.resolve(__dirname, '..', '..', '..', '..'),
-      path.resolve(__dirname, '..', '..', '..', '..', '..'),
-    ];
-
-    for (const candidate of candidates) {
-      if (fs.existsSync(path.join(candidate, 'apps', 'backend'))) {
-        return candidate;
-      }
-    }
-
-    return process.cwd();
+    return this.pathsService.getProjectRoot();
   }
 
   private resolveBackupDir(): string {
@@ -312,17 +305,7 @@ export class BackupConfigService {
       return path.resolve(configured);
     }
 
-    const dockerDefault = '/app/apps/backend/backups';
-    if (fs.existsSync(dockerDefault)) {
-      return dockerDefault;
-    }
-
-    const projectDefault = path.join(this.projectRoot, 'apps', 'backend', 'backups');
-    if (fs.existsSync(path.dirname(projectDefault))) {
-      return projectDefault;
-    }
-
-    return path.resolve(process.cwd(), 'backups');
+    return this.pathsService.getBackupsDir();
   }
 
   private resolveExecutionMode(): 'docker' | 'native' {
