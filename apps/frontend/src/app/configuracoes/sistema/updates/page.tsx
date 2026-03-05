@@ -22,6 +22,8 @@ import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { BackupSection } from './components/BackupSection';
 import { RestoreSection } from './components/RestoreSection';
+import { useSystemVersion } from '@/hooks/useSystemVersion';
+import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * Página de Gerenciamento do Sistema de Atualizações
@@ -100,8 +102,24 @@ function getApiErrorMessage(error: unknown): string {
   );
 }
 
+function formatBuildDate(value?: string): string {
+  if (!value) {
+    return 'N/A';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 'N/A';
+  }
+
+  return date.toLocaleString('pt-BR');
+}
+
 export default function UpdatesPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { version, versionInfo, loading: versionLoading, refreshVersion } = useSystemVersion();
+  const canShowVersionSource = user?.role === 'SUPER_ADMIN' || process.env.NODE_ENV !== 'production';
 
   // Estados
   const [status, setStatus] = useState<UpdateStatus | null>(null);
@@ -293,7 +311,8 @@ export default function UpdatesPage() {
     loadStatus();
     loadLogs();
     loadBackupLogs();
-  }, [loadStatus, loadLogs, loadBackupLogs]);
+    refreshVersion();
+  }, [loadStatus, loadLogs, loadBackupLogs, refreshVersion]);
 
   /**
    * Testa conectividade com repositório
@@ -364,8 +383,10 @@ export default function UpdatesPage() {
         </div>
 
         <Button
-          onClick={loadStatus}
-          disabled={loading.status}
+          onClick={async () => {
+            await Promise.all([loadStatus(), refreshVersion()]);
+          }}
+          disabled={loading.status || versionLoading}
           variant="outline"
         >
           <RefreshCw className={`w-4 h-4 mr-2 ${loading.status ? 'animate-spin' : ''}`} />
@@ -423,7 +444,7 @@ export default function UpdatesPage() {
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Versão Atual</Label>
                       <div className="text-2xl font-bold text-blue-600">
-                        {status.currentVersion}
+                        {versionLoading ? 'carregando...' : version}
                       </div>
                     </div>
 
@@ -471,6 +492,27 @@ export default function UpdatesPage() {
                         )}
                       </div>
                     </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Commit</Label>
+                      <div className="text-sm font-mono break-all text-muted-foreground">
+                        {versionInfo.commitSha || 'N/A'}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Data do Build</Label>
+                      <div className="text-sm text-muted-foreground">
+                        {formatBuildDate(versionInfo.buildDate)}
+                      </div>
+                    </div>
+
+                    {canShowVersionSource && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Origem da Versão</Label>
+                        <div className="text-sm font-mono text-muted-foreground">{versionInfo.source}</div>
+                      </div>
+                    )}
                   </div>
                 )}
 

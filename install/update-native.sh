@@ -12,6 +12,10 @@ PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 RELEASE_TAG="${RELEASE_TAG:-latest}"
 GIT_REPO_URL="${GIT_REPO_URL:-}"
 GIT_AUTH_HEADER="${GIT_AUTH_HEADER:-}"
+RESOLVED_APP_VERSION="unknown"
+RESOLVED_GIT_SHA="unknown"
+RESOLVED_BUILD_TIME="unknown"
+RESOLVED_BRANCH=""
 
 log() {
   echo "[native-deploy] $(date '+%Y-%m-%d %H:%M:%S') $*"
@@ -19,6 +23,62 @@ log() {
 
 log_err() {
   echo "[native-deploy] ERROR: $*" >&2
+}
+
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/}"
+  echo "$value"
+}
+
+resolve_build_metadata() {
+  local repo_dir="$1"
+  RESOLVED_BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  RESOLVED_APP_VERSION="unknown"
+  RESOLVED_GIT_SHA="unknown"
+  RESOLVED_BRANCH=""
+
+  if [[ ! -d "$repo_dir/.git" ]]; then
+    return 0
+  fi
+
+  local full_sha=""
+  local short_sha=""
+  local exact_tag=""
+  full_sha="$(git -C "$repo_dir" rev-parse HEAD 2>/dev/null || true)"
+  short_sha="$(git -C "$repo_dir" rev-parse --short HEAD 2>/dev/null || true)"
+  exact_tag="$(git -C "$repo_dir" describe --tags --exact-match 2>/dev/null || true)"
+  RESOLVED_GIT_SHA="${full_sha:-unknown}"
+  RESOLVED_BRANCH="$(git -C "$repo_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+
+  if [[ -n "$exact_tag" ]]; then
+    RESOLVED_APP_VERSION="$exact_tag"
+  elif [[ -n "$short_sha" ]]; then
+    RESOLVED_APP_VERSION="dev+${short_sha}"
+  fi
+}
+
+write_build_metadata_files() {
+  local target_dir="$1"
+  local version_json
+  local sha_json
+  local build_json
+  local branch_json
+  version_json="$(json_escape "$RESOLVED_APP_VERSION")"
+  sha_json="$(json_escape "$RESOLVED_GIT_SHA")"
+  build_json="$(json_escape "$RESOLVED_BUILD_TIME")"
+  branch_json="$(json_escape "$RESOLVED_BRANCH")"
+
+  printf '%s\n' "${RESOLVED_APP_VERSION:-unknown}" > "$target_dir/VERSION"
+  if [[ -n "$RESOLVED_BRANCH" ]]; then
+    printf '{\n  "version": "%s",\n  "commitSha": "%s",\n  "buildDate": "%s",\n  "branch": "%s"\n}\n' \
+      "$version_json" "$sha_json" "$build_json" "$branch_json" > "$target_dir/BUILD_INFO.json"
+  else
+    printf '{\n  "version": "%s",\n  "commitSha": "%s",\n  "buildDate": "%s"\n}\n' \
+      "$version_json" "$sha_json" "$build_json" > "$target_dir/BUILD_INFO.json"
+  fi
 }
 
 git_exec() {
@@ -94,6 +154,13 @@ if ! git checkout "$RELEASE_TAG"; then
   log_err "Falha ao mudar para a versao $RELEASE_TAG"
   exit 1
 fi
+
+resolve_build_metadata "$PROJECT_ROOT"
+write_build_metadata_files "$PROJECT_ROOT"
+export APP_VERSION="${RESOLVED_APP_VERSION}"
+export GIT_SHA="${RESOLVED_GIT_SHA}"
+export BUILD_TIME="${RESOLVED_BUILD_TIME}"
+log "Metadata de versao: APP_VERSION=$APP_VERSION GIT_SHA=$GIT_SHA BUILD_TIME=$BUILD_TIME"
 
 # --- 3. Instalacao de Dependencias ---
 log "Instalando dependencias via pnpm..."

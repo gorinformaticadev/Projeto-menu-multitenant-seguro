@@ -256,6 +256,13 @@ native_system_permissions_and_project() {
     as_root "chown -R ${NATIVE_SYSTEM_USER}:${NATIVE_SYSTEM_USER} '${NATIVE_BASE_DIR}'"
 }
 
+native_write_version_metadata() {
+    local app_dir="$1"
+    resolve_build_metadata "$PROJECT_ROOT"
+    write_build_metadata_files "$app_dir"
+    as_root "chown ${NATIVE_SYSTEM_USER}:${NATIVE_SYSTEM_USER} '${app_dir}/VERSION' '${app_dir}/BUILD_INFO.json' 2>/dev/null || true"
+}
+
 native_system_update() {
     log_info "Etapa 3/23: atualizando sistema e portas..."
     as_root "apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && apt-get autoremove -y"
@@ -552,6 +559,7 @@ run_install_native() {
 
     native_system_create_user "$admin_pass"
     native_system_permissions_and_project "$app_dir"
+    native_write_version_metadata "$app_dir"
     native_system_update
     native_firewall_install
     native_set_timezone
@@ -618,6 +626,73 @@ upsert_env() {
         mv "$tmpfile" "$file"
     else
         echo "${key}=${value}" >> "$file"
+    fi
+}
+
+RESOLVED_APP_VERSION="unknown"
+RESOLVED_GIT_SHA="unknown"
+RESOLVED_BUILD_TIME="unknown"
+RESOLVED_BRANCH=""
+
+json_escape() {
+    local value="$1"
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    value="${value//$'\n'/}"
+    echo "$value"
+}
+
+resolve_build_metadata() {
+    local repo_dir="${1:-$PROJECT_ROOT}"
+    RESOLVED_BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    RESOLVED_APP_VERSION="unknown"
+    RESOLVED_GIT_SHA="unknown"
+    RESOLVED_BRANCH=""
+
+    if [[ ! -d "$repo_dir/.git" ]]; then
+        return 0
+    fi
+
+    local full_sha=""
+    local short_sha=""
+    local exact_tag=""
+    full_sha="$(git -C "$repo_dir" rev-parse HEAD 2>/dev/null || true)"
+    short_sha="$(git -C "$repo_dir" rev-parse --short HEAD 2>/dev/null || true)"
+    exact_tag="$(git -C "$repo_dir" describe --tags --exact-match 2>/dev/null || true)"
+    RESOLVED_GIT_SHA="${full_sha:-unknown}"
+    RESOLVED_BRANCH="$(git -C "$repo_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+
+    if [[ -n "$exact_tag" ]]; then
+        RESOLVED_APP_VERSION="$exact_tag"
+    elif [[ -n "$short_sha" ]]; then
+        RESOLVED_APP_VERSION="dev+${short_sha}"
+    fi
+}
+
+write_build_metadata_files() {
+    local target_dir="$1"
+    local version_value="${2:-$RESOLVED_APP_VERSION}"
+    local sha_value="${3:-$RESOLVED_GIT_SHA}"
+    local build_time_value="${4:-$RESOLVED_BUILD_TIME}"
+    local branch_value="${5:-$RESOLVED_BRANCH}"
+    local version_json
+    local sha_json
+    local build_json
+    local branch_json
+    version_json="$(json_escape "$version_value")"
+    sha_json="$(json_escape "$sha_value")"
+    build_json="$(json_escape "$build_time_value")"
+    branch_json="$(json_escape "$branch_value")"
+
+    mkdir -p "$target_dir"
+    printf '%s\n' "${version_value:-unknown}" > "$target_dir/VERSION"
+
+    if [[ -n "$branch_value" ]]; then
+        printf '{\n  "version": "%s",\n  "commitSha": "%s",\n  "buildDate": "%s",\n  "branch": "%s"\n}\n' \
+            "$version_json" "$sha_json" "$build_json" "$branch_json" > "$target_dir/BUILD_INFO.json"
+    else
+        printf '{\n  "version": "%s",\n  "commitSha": "%s",\n  "buildDate": "%s"\n}\n' \
+            "$version_json" "$sha_json" "$build_json" > "$target_dir/BUILD_INFO.json"
     fi
 }
 
@@ -772,6 +847,7 @@ run_update_native() {
         selected_count=$((selected_count + 1))
         log_info "Executando update Native da instancia: $instance_name"
         native_system_permissions_and_project "$instance_dir"
+        native_write_version_metadata "$instance_dir"
         native_install_project_dependencies "$instance_dir"
         native_build_apps "$instance_dir"
         native_migrate_and_seed "$instance_dir"
@@ -988,6 +1064,23 @@ run_install() {
         db_host_env="127.0.0.1"
     fi
 
+    resolve_build_metadata "$PROJECT_ROOT"
+    local app_version_value="${APP_VERSION:-}"
+    if [[ -z "$app_version_value" ]]; then
+        if [[ -n "$image_tag" && "$image_tag" != "latest" ]]; then
+            app_version_value="$image_tag"
+        else
+            app_version_value="$RESOLVED_APP_VERSION"
+        fi
+    fi
+    app_version_value="${app_version_value:-unknown}"
+    local git_sha_value="${GIT_SHA:-$RESOLVED_GIT_SHA}"
+    local build_time_value="${BUILD_TIME:-$RESOLVED_BUILD_TIME}"
+    APP_VERSION="$app_version_value"
+    GIT_SHA="$git_sha_value"
+    BUILD_TIME="$build_time_value"
+    write_build_metadata_files "$PROJECT_ROOT" "$app_version_value" "$git_sha_value" "$build_time_value" "$RESOLVED_BRANCH"
+
     log_info "Configurando .env..."
     upsert_env "DOMAIN" "$domain"
     upsert_env "LETSENCRYPT_EMAIL" "$email"
@@ -997,9 +1090,9 @@ run_install() {
     upsert_env "IMAGE_OWNER" "$image_owner"
     upsert_env "IMAGE_REPO" "$image_repo"
     upsert_env "IMAGE_TAG" "$image_tag"
-    upsert_env "APP_VERSION" "$image_tag"
-    upsert_env "GIT_SHA" "${GIT_SHA:-unknown}"
-    upsert_env "BUILD_TIME" "${BUILD_TIME:-unknown}"
+    upsert_env "APP_VERSION" "$app_version_value"
+    upsert_env "GIT_SHA" "$git_sha_value"
+    upsert_env "BUILD_TIME" "$build_time_value"
     upsert_env "LOCAL_BUILD_ONLY" "$local_build_only"
     upsert_env "FRONTEND_URL" "https://$domain"
     upsert_env "NEXT_PUBLIC_API_URL" "https://$domain/api"
@@ -1207,9 +1300,6 @@ run_update() {
     upsert_env "IMAGE_OWNER" "$IMAGE_OWNER" "$ENV_PRODUCTION"
     upsert_env "IMAGE_REPO" "$IMAGE_REPO" "$ENV_PRODUCTION"
     upsert_env "IMAGE_TAG" "$IMAGE_TAG" "$ENV_PRODUCTION"
-    upsert_env "APP_VERSION" "${APP_VERSION:-$IMAGE_TAG}" "$ENV_PRODUCTION"
-    upsert_env "GIT_SHA" "${GIT_SHA:-unknown}" "$ENV_PRODUCTION"
-    upsert_env "BUILD_TIME" "${BUILD_TIME:-unknown}" "$ENV_PRODUCTION"
     upsert_env "LOCAL_BUILD_ONLY" "$LOCAL_BUILD_ONLY" "$ENV_PRODUCTION"
     upsert_env "REQUIRE_SECRET_MANAGER" "${REQUIRE_SECRET_MANAGER:-false}" "$ENV_PRODUCTION"
 
@@ -1223,6 +1313,26 @@ run_update() {
         fi
         git pull origin "$branch" || true
     fi
+
+    resolve_build_metadata "$PROJECT_ROOT"
+    local app_version_value="${APP_VERSION:-}"
+    if [[ -z "$app_version_value" || "$app_version_value" == "latest" ]]; then
+        if [[ -n "$IMAGE_TAG" && "$IMAGE_TAG" != "latest" ]]; then
+            app_version_value="$IMAGE_TAG"
+        else
+            app_version_value="$RESOLVED_APP_VERSION"
+        fi
+    fi
+    app_version_value="${app_version_value:-unknown}"
+    local git_sha_value="${GIT_SHA:-$RESOLVED_GIT_SHA}"
+    local build_time_value="${BUILD_TIME:-$RESOLVED_BUILD_TIME}"
+    APP_VERSION="$app_version_value"
+    GIT_SHA="$git_sha_value"
+    BUILD_TIME="$build_time_value"
+    upsert_env "APP_VERSION" "$app_version_value" "$ENV_PRODUCTION"
+    upsert_env "GIT_SHA" "$git_sha_value" "$ENV_PRODUCTION"
+    upsert_env "BUILD_TIME" "$build_time_value" "$ENV_PRODUCTION"
+    write_build_metadata_files "$PROJECT_ROOT" "$app_version_value" "$git_sha_value" "$build_time_value" "$RESOLVED_BRANCH"
 
     if detect_docker_installation; then
         docker_detected="true"

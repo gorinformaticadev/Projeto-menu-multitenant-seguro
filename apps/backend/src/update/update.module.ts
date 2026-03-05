@@ -4,6 +4,7 @@ import { UpdateService } from './update.service';
 import { UpdateCronService } from './update-cron.service';
 import { PrismaModule } from '@core/prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
+import { CommonModule } from '../common/common.module';
 
 /**
  * Módulo do Sistema de Atualizações
@@ -16,7 +17,7 @@ import { AuditModule } from '../audit/audit.module';
  * - Interface REST para administradores
  */
 @Module({
-  imports: [PrismaModule, AuditModule],
+  imports: [PrismaModule, AuditModule, CommonModule],
   controllers: [UpdateController],
   providers: [UpdateService, UpdateCronService],
   exports: [UpdateService],

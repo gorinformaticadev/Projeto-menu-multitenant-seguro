@@ -9,7 +9,7 @@ import * as crypto from 'crypto';
 import * as path from 'path';
 import * as fs from 'fs';
 import { Prisma, SystemSettings, UpdateLog } from '@prisma/client';
-import { resolveAppVersionTag } from '../common/utils/app-version.util';
+import { SystemVersionService } from '@common/services/system-version.service';
 
 type UpdateExecutionResult = { stdout: string; stderr: string };
 type UpdateLogListItem = Pick<
@@ -29,15 +29,14 @@ export class UpdateService implements OnModuleInit {
   private readonly logger = new Logger(UpdateService.name);
   private readonly encryptionKeyRaw = process.env.ENCRYPTION_KEY || '';
   private readonly encryptionKey: Buffer;
-  private readonly localAppVersionTag: string;
   private readonly execFileAsync = promisify(execFile);
 
   constructor(
     private prisma: PrismaService,
     private auditService: AuditService,
+    private readonly systemVersionService: SystemVersionService,
   ) {
     this.encryptionKey = this.resolveEncryptionKey();
-    this.localAppVersionTag = resolveAppVersionTag();
   }
 
   async onModuleInit() {
@@ -46,7 +45,7 @@ export class UpdateService implements OnModuleInit {
 
   private async syncSystemVersionWithFilesystem() {
     try {
-      const realVersion = resolveAppVersionTag();
+      const realVersion = this.getRuntimeVersionInfo().version;
       const settings = await this.getSystemSettings();
 
       if (settings.appVersion !== realVersion) {
@@ -93,7 +92,7 @@ export class UpdateService implements OnModuleInit {
 
       const latestClean = uniqueCleanTags[0];
       const latestVersion = this.formatVersion(latestClean);
-      const currentClean = semver.clean(settings.appVersion || this.localAppVersionTag) || semver.clean(this.localAppVersionTag) || '0.0.0';
+      const currentClean = this.getComparableVersion(this.getRuntimeVersionInfo().version);
       const updateAvailable = semver.gt(latestClean, currentClean);
 
       await this.updateSystemSettings({
@@ -155,7 +154,7 @@ export class UpdateService implements OnModuleInit {
       requestedVersion = normalizedVersion;
 
       const settings = await this.getSystemSettings();
-      const currentVersion = semver.clean(settings.appVersion || this.localAppVersionTag) || semver.clean(this.localAppVersionTag) || '0.0.0';
+      const currentVersion = this.getComparableVersion(this.getRuntimeVersionInfo().version);
 
       if (!semver.gt(normalizedCleanVersion, currentVersion)) {
         updateLog = await this.prisma.updateLog.create({
@@ -313,8 +312,9 @@ export class UpdateService implements OnModuleInit {
 
   async getUpdateStatus(): Promise<UpdateStatusDto> {
     const settings = await this.getSystemSettings();
+    const runtimeVersion = this.getRuntimeVersionInfo().version;
     return {
-      currentVersion: this.formatVersion(settings.appVersion || this.localAppVersionTag),
+      currentVersion: this.formatVersion(runtimeVersion),
       availableVersion: settings.availableVersion ? this.formatVersion(settings.availableVersion) : undefined,
       updateAvailable: settings.updateAvailable || false,
       lastCheck: settings.lastUpdateCheck || undefined,
@@ -400,7 +400,7 @@ export class UpdateService implements OnModuleInit {
     if (!settings) {
       settings = await this.prisma.systemSettings.create({
         data: {
-          appVersion: this.localAppVersionTag,
+          appVersion: this.getRuntimeVersionInfo().version,
           packageManager: 'docker',
           updateCheckEnabled: true,
           gitReleaseBranch: 'main',
@@ -590,8 +590,41 @@ export class UpdateService implements OnModuleInit {
   }
 
   private formatVersion(version: string): string {
-    const clean = semver.clean(version);
-    return clean ? `v${clean}` : version;
+    const value = String(version || '').trim();
+    if (!value) {
+      return 'unknown';
+    }
+    if (value.startsWith('v')) {
+      return value;
+    }
+    if (semver.valid(value)) {
+      return `v${value}`;
+    }
+    return value;
+  }
+
+  private getRuntimeVersionInfo() {
+    return this.systemVersionService.getVersionInfo();
+  }
+
+  private getComparableVersion(version: string): string {
+    const value = String(version || '').trim();
+    if (!value) {
+      return '0.0.0';
+    }
+
+    const valid = semver.valid(value);
+    if (valid) {
+      return valid;
+    }
+
+    const clean = semver.clean(value);
+    if (clean) {
+      return clean;
+    }
+
+    const coerced = semver.coerce(value);
+    return coerced?.version || '0.0.0';
   }
 
   private buildPublicGitRepoUrl(settings: SystemSettings): string {

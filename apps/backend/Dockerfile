@@ -44,6 +44,8 @@ ARG BUILD_TIME=unknown
 ENV APP_VERSION=$APP_VERSION
 ENV GIT_SHA=$GIT_SHA
 ENV BUILD_TIME=$BUILD_TIME
+RUN printf "%s\n" "$APP_VERSION" > /app/VERSION \
+ && printf "{\n  \"version\": \"%s\",\n  \"commitSha\": \"%s\",\n  \"buildDate\": \"%s\"\n}\n" "$APP_VERSION" "$GIT_SHA" "$BUILD_TIME" > /app/BUILD_INFO.json
 
 RUN apk add --no-cache curl postgresql-client su-exec
 RUN addgroup --system --gid 1001 nodejs

@@ -15,6 +15,76 @@ echogreen() {
     echo -ne "\033[42m\033[30m\033[1m  $1  \033[0m\n"
 }
 
+json_escape() {
+    local value="$1"
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    value="${value//$'\n'/}"
+    echo "$value"
+}
+
+resolve_build_metadata() {
+    local repo_dir="$1"
+    BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    APP_VERSION="unknown"
+    GIT_SHA="unknown"
+    BUILD_BRANCH=""
+
+    if [[ ! -d "$repo_dir/.git" ]]; then
+        return 0
+    fi
+
+    local full_sha
+    local short_sha
+    local exact_tag
+    full_sha="$(git -C "$repo_dir" rev-parse HEAD 2>/dev/null || true)"
+    short_sha="$(git -C "$repo_dir" rev-parse --short HEAD 2>/dev/null || true)"
+    exact_tag="$(git -C "$repo_dir" describe --tags --exact-match 2>/dev/null || true)"
+    GIT_SHA="${full_sha:-unknown}"
+    BUILD_BRANCH="$(git -C "$repo_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+
+    if [[ -n "$exact_tag" ]]; then
+        APP_VERSION="$exact_tag"
+    elif [[ -n "$short_sha" ]]; then
+        APP_VERSION="dev+${short_sha}"
+    fi
+}
+
+write_build_metadata_files() {
+    local target_dir="$1"
+    local version_json
+    local sha_json
+    local build_json
+    local branch_json
+    version_json="$(json_escape "$APP_VERSION")"
+    sha_json="$(json_escape "$GIT_SHA")"
+    build_json="$(json_escape "$BUILD_TIME")"
+    branch_json="$(json_escape "$BUILD_BRANCH")"
+
+    printf '%s\n' "${APP_VERSION:-unknown}" > "$target_dir/VERSION"
+    if [[ -n "$BUILD_BRANCH" ]]; then
+        printf '{\n  "version": "%s",\n  "commitSha": "%s",\n  "buildDate": "%s",\n  "branch": "%s"\n}\n' \
+            "$version_json" "$sha_json" "$build_json" "$branch_json" > "$target_dir/BUILD_INFO.json"
+    else
+        printf '{\n  "version": "%s",\n  "commitSha": "%s",\n  "buildDate": "%s"\n}\n' \
+            "$version_json" "$sha_json" "$build_json" > "$target_dir/BUILD_INFO.json"
+    fi
+}
+
+upsert_env_value() {
+    local key="$1"
+    local value="$2"
+    local file="$3"
+    if [[ ! -f "$file" ]]; then
+        return 0
+    fi
+    if grep -q "^${key}=" "$file"; then
+        sed -i "s|^${key}=.*|${key}=${value}|" "$file"
+    else
+        echo "${key}=${value}" >> "$file"
+    fi
+}
+
 # ===============================
 # Checagens iniciais
 # ===============================
@@ -81,6 +151,8 @@ fi
 # ===============================
 git checkout "$SELECTED_BRANCH"
 git pull origin "$SELECTED_BRANCH"
+resolve_build_metadata "$INSTALL_DIR"
+write_build_metadata_files "$INSTALL_DIR"
 
 # ===============================
 # Atualiza containers
@@ -100,6 +172,9 @@ elif [ -f ".env.production" ]; then
 fi
 
 echoblue "Usando $COMPOSE_FILE com $ENV_FILE"
+upsert_env_value "APP_VERSION" "${APP_VERSION:-unknown}" "$ENV_FILE"
+upsert_env_value "GIT_SHA" "${GIT_SHA:-unknown}" "$ENV_FILE"
+upsert_env_value "BUILD_TIME" "${BUILD_TIME:-unknown}" "$ENV_FILE"
 
 # ===============================
 # Atualiza containers Docker

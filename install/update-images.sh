@@ -29,6 +29,38 @@ log_err() {
   echo "[deploy] ERROR: $*" >&2
 }
 
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/}"
+  echo "$value"
+}
+
+write_build_metadata_files() {
+  local version_value="$1"
+  local sha_value="$2"
+  local build_time_value="$3"
+  local branch_value="$4"
+  local version_json
+  local sha_json
+  local build_json
+  local branch_json
+  version_json="$(json_escape "$version_value")"
+  sha_json="$(json_escape "$sha_value")"
+  build_json="$(json_escape "$build_time_value")"
+  branch_json="$(json_escape "$branch_value")"
+
+  printf '%s\n' "${version_value:-unknown}" > "$PROJECT_ROOT/VERSION"
+  if [[ -n "$branch_value" ]]; then
+    printf '{\n  "version": "%s",\n  "commitSha": "%s",\n  "buildDate": "%s",\n  "branch": "%s"\n}\n' \
+      "$version_json" "$sha_json" "$build_json" "$branch_json" > "$PROJECT_ROOT/BUILD_INFO.json"
+  else
+    printf '{\n  "version": "%s",\n  "commitSha": "%s",\n  "buildDate": "%s"\n}\n' \
+      "$version_json" "$sha_json" "$build_json" > "$PROJECT_ROOT/BUILD_INFO.json"
+  fi
+}
+
 compose() {
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
 }
@@ -240,6 +272,31 @@ export RELEASE_TAG
 export APP_VERSION="${APP_VERSION:-$RELEASE_TAG}"
 export GIT_SHA="${GIT_SHA:-unknown}"
 export BUILD_TIME="${BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+
+if [[ "$APP_VERSION" == "latest" ]]; then
+  if [[ -d "$PROJECT_ROOT/.git" ]]; then
+    exact_tag="$(git -C "$PROJECT_ROOT" describe --tags --exact-match 2>/dev/null || true)"
+    short_sha="$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null || true)"
+    if [[ -n "$exact_tag" ]]; then
+      APP_VERSION="$exact_tag"
+    elif [[ -n "$short_sha" ]]; then
+      APP_VERSION="dev+${short_sha}"
+    else
+      APP_VERSION="unknown"
+    fi
+  else
+    APP_VERSION="unknown"
+  fi
+fi
+
+if [[ "$GIT_SHA" == "unknown" ]] && [[ -d "$PROJECT_ROOT/.git" ]]; then
+  GIT_SHA="$(git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
+fi
+BUILD_BRANCH=""
+if [[ -d "$PROJECT_ROOT/.git" ]]; then
+  BUILD_BRANCH="$(git -C "$PROJECT_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+fi
+write_build_metadata_files "$APP_VERSION" "$GIT_SHA" "$BUILD_TIME" "$BUILD_BRANCH"
 
 log "versao alvo (RELEASE_TAG): $RELEASE_TAG"
 log "metadata runtime: APP_VERSION=$APP_VERSION GIT_SHA=$GIT_SHA BUILD_TIME=$BUILD_TIME"

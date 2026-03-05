@@ -491,7 +491,7 @@ export function TopBar() {
                     <Info className="h-4 w-4 text-gray-500 dark:text-muted-foreground" />
                     <div>
                       <span className="text-xs text-gray-600 dark:text-muted-foreground">Versão do Sistema</span>
-                      <div className="text-xs font-mono font-medium text-gray-800 dark:text-foreground">v{systemVersion}</div>
+                      <div className="text-xs font-mono font-medium text-gray-800 dark:text-foreground">{systemVersion}</div>
                     </div>
                   </a>
                 ) : (
@@ -499,7 +499,7 @@ export function TopBar() {
                     <Info className="h-4 w-4 text-gray-400 dark:text-slate-600" />
                     <div>
                       <span className="text-xs">Versão do Sistema</span>
-                      <div className="text-xs font-mono font-medium text-gray-700 dark:text-gray-300">v{systemVersion}</div>
+                      <div className="text-xs font-mono font-medium text-gray-700 dark:text-gray-300">{systemVersion}</div>
                     </div>
                   </div>
                 )}
