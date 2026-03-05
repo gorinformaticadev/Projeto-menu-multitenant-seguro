@@ -29,6 +29,7 @@ import { HealthModule } from './health/health.module';
 import { RedisThrottlerStorage } from './common/services/redis-throttler.storage';
 import { PathsModule } from './core/common/paths/paths.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
+import { MaintenanceModeGuard } from './maintenance/maintenance-mode.guard';
 
 @Module({
   imports: [
@@ -89,6 +90,11 @@ import { MaintenanceModule } from './maintenance/maintenance.module';
       provide: APP_INTERCEPTOR,
       useClass: TenantInterceptor,
     },
+    // Maintenance Mode Global
+    {
+      provide: APP_GUARD,
+      useClass: MaintenanceModeGuard,
+    },
     // Rate Limiting Global
     {
       provide: APP_GUARD,
@@ -126,3 +132,4 @@ export class AppModule implements NestModule {
 }
 
 // Forced restart trigger
+

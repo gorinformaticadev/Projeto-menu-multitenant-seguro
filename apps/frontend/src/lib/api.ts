@@ -3,6 +3,16 @@ import axios, { InternalAxiosRequestConfig } from "axios";
 interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
 }
+interface MaintenanceModePayload {
+  error?: string;
+  message?: string;
+  reason?: string;
+  etaSeconds?: number | null;
+  startedAt?: string | null;
+}
+
+const MAINTENANCE_STORAGE_KEY = '__maintenance_state';
+const MAINTENANCE_EVENT_ACTIVE = 'maintenance-mode';
 
 const normalizeApiUrl = (value?: string): string => {
   const raw = (value || "/api").trim();
@@ -50,6 +60,26 @@ const processQueue = (error: unknown, token: string | null = null) => {
   });
 
   failedQueue = [];
+};
+
+
+const normalizeMaintenancePayload = (data: MaintenanceModePayload) => ({
+  enabled: true,
+  reason: data.reason || data.message || 'Atualizacao em andamento',
+  startedAt: data.startedAt || null,
+  etaSeconds: Number.isFinite(Number(data.etaSeconds)) ? Number(data.etaSeconds) : null,
+  allowedRoles: ['SUPER_ADMIN'],
+  bypassHeader: 'X-Maintenance-Bypass',
+});
+
+const publishMaintenanceState = (payload: MaintenanceModePayload) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const normalized = normalizeMaintenancePayload(payload);
+  window.sessionStorage.setItem(MAINTENANCE_STORAGE_KEY, JSON.stringify(normalized));
+  window.dispatchEvent(new CustomEvent(MAINTENANCE_EVENT_ACTIVE, { detail: normalized }));
 };
 
 // Funções para gerenciamento seguro de tokens
@@ -177,6 +207,14 @@ api.interceptors.response.use(
 
     const originalRequest = error.config as CustomAxiosRequestConfig;
     const axiosError = error;
+    const maintenancePayload = axiosError.response?.data as MaintenanceModePayload | undefined;
+    if (
+      axiosError.response?.status === 503 &&
+      String(maintenancePayload?.error || '').trim().toUpperCase() === 'MAINTENANCE_MODE'
+    ) {
+      publishMaintenanceState(maintenancePayload || {});
+      return Promise.reject(error);
+    }
 
     // Erros que devem causar logout imediato
     const shouldLogout =
@@ -271,3 +309,6 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+
+

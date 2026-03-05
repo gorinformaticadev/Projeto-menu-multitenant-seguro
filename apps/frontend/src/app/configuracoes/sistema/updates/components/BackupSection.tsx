@@ -9,6 +9,8 @@ import api from '@/lib/api';
 
 interface BackupSectionProps {
   onBackupComplete?: () => void;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 interface AvailableBackup {
@@ -22,7 +24,11 @@ interface JobLogEntry {
   message?: string;
 }
 
-export function BackupSection({ onBackupComplete }: BackupSectionProps) {
+export function BackupSection({
+  onBackupComplete,
+  disabled = false,
+  disabledReason,
+}: BackupSectionProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState('');
@@ -173,6 +179,15 @@ export function BackupSection({ onBackupComplete }: BackupSectionProps) {
         <CardDescription>Exportar snapshot completo de todos os dados do sistema</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {disabled && (
+          <div className="flex items-start gap-3 p-4 border border-amber-200 bg-amber-50 rounded-lg">
+            <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-amber-800">
+              {disabledReason || 'Acoes de backup estao bloqueadas enquanto o sistema esta em manutencao.'}
+            </div>
+          </div>
+        )}
+
         <div className="flex items-start gap-3 p-4 border border-blue-200 bg-blue-50 rounded-lg">
           <AlertCircle className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-blue-800">
@@ -180,12 +195,12 @@ export function BackupSection({ onBackupComplete }: BackupSectionProps) {
             <ul className="list-disc list-inside space-y-1">
               <li>Formato PostgreSQL custom (.dump/.backup)</li>
               <li>Retencao automatica dos arquivos antigos</li>
-              <li>Execucao assíncrona com status e logs</li>
+              <li>Execucao assincrona com status e logs</li>
             </ul>
           </div>
         </div>
 
-        <Button onClick={handleCreateBackup} disabled={loading} className="bg-blue-600 hover:bg-blue-700">
+        <Button onClick={handleCreateBackup} disabled={loading || disabled} className="bg-blue-600 hover:bg-blue-700">
           {loading ? (
             <>
               <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -214,10 +229,10 @@ export function BackupSection({ onBackupComplete }: BackupSectionProps) {
         <div className="mt-6 pt-6 border-t border-gray-200">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-sm font-semibold text-gray-900">Backups Disponíveis</h3>
+              <h3 className="text-sm font-semibold text-gray-900">Backups Disponiveis</h3>
               <p className="text-xs text-gray-500 mt-1">Arquivos salvos no servidor</p>
             </div>
-            <Button onClick={loadAvailableBackups} disabled={loadingBackups} variant="outline" size="sm">
+            <Button onClick={loadAvailableBackups} disabled={loadingBackups || disabled} variant="outline" size="sm">
               <RefreshCw className={`w-3 h-3 mr-1 ${loadingBackups ? 'animate-spin' : ''}`} />
               Atualizar
             </Button>
@@ -235,16 +250,16 @@ export function BackupSection({ onBackupComplete }: BackupSectionProps) {
                   <div>
                     <p className="text-sm font-medium">{backup.fileName}</p>
                     <p className="text-xs text-gray-500">
-                      {(backup.fileSize / 1024 / 1024).toFixed(2)} MB •{' '}
+                      {(backup.fileSize / 1024 / 1024).toFixed(2)} MB {' '}�{' '}
                       {new Date(backup.createdAt).toLocaleString('pt-BR')}
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleDownloadBackup(backup)}>
+                    <Button variant="outline" size="sm" onClick={() => handleDownloadBackup(backup)} disabled={disabled}>
                       <Download className="w-3 h-3 mr-1" />
                       Baixar
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleDeleteBackup(backup)}>
+                    <Button variant="outline" size="sm" onClick={() => handleDeleteBackup(backup)} disabled={disabled}>
                       <Trash2 className="w-3 h-3 mr-1" />
                       Apagar
                     </Button>

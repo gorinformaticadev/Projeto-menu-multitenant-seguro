@@ -11,6 +11,8 @@ import api from '@/lib/api';
 
 interface RestoreSectionProps {
   onRestoreComplete?: () => void;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 interface AvailableBackup {
@@ -31,7 +33,11 @@ interface RestoreJobView {
   error?: string;
 }
 
-export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
+export function RestoreSection({
+  onRestoreComplete,
+  disabled = false,
+  disabledReason,
+}: RestoreSectionProps) {
   const { toast } = useToast();
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const [availableBackups, setAvailableBackups] = useState<AvailableBackup[]>([]);
@@ -162,7 +168,7 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
 
     if (confirmationText !== expectedConfirmation) {
       toast({
-        title: 'Confirmação invalida',
+        title: 'Confirmacao invalida',
         description: `Digite exatamente: ${expectedConfirmation}`,
         variant: 'destructive',
       });
@@ -236,16 +242,25 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
           <Database className="w-5 h-5" />
           Restaurar Banco por Backup
         </CardTitle>
-        <CardDescription>Restore assíncrono com validação e lock global</CardDescription>
+        <CardDescription>Restore assincrono com validacao e lock global</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {disabled && (
+          <div className="flex items-start gap-3 p-4 border border-amber-200 bg-amber-50 rounded-lg">
+            <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-amber-800">
+              {disabledReason || 'Acoes de restore estao bloqueadas enquanto o sistema esta em manutencao.'}
+            </div>
+          </div>
+        )}
+
         <div className="flex items-start gap-3 p-4 border border-red-200 bg-red-50 rounded-lg">
           <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-red-800">
-            <p className="font-bold mb-1">Operação destrutiva</p>
+            <p className="font-bold mb-1">Operacao destrutiva</p>
             <ul className="list-disc list-inside space-y-1">
-              <li>Cria staging + validação antes do cutover</li>
-              <li>Ativa modo manutenção durante o cutover</li>
+              <li>Cria staging + validacao antes do cutover</li>
+              <li>Ativa modo manutencao durante o cutover</li>
               <li>Apenas SUPER_ADMIN pode executar</li>
             </ul>
           </div>
@@ -260,12 +275,12 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
               type="file"
               accept=".dump,.backup"
               onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-              disabled={loadingUpload || loadingRestore}
+              disabled={loadingUpload || loadingRestore || disabled}
             />
             <Button
               variant="outline"
               onClick={handleUploadBackup}
-              disabled={!uploadFile || loadingUpload || loadingRestore}
+              disabled={!uploadFile || loadingUpload || loadingRestore || disabled}
             >
               {loadingUpload ? (
                 <>
@@ -285,7 +300,7 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label htmlFor="backup-select">Arquivo de backup</Label>
-            <Button variant="outline" size="sm" onClick={loadAvailableBackups} disabled={loadingBackups}>
+            <Button variant="outline" size="sm" onClick={loadAvailableBackups} disabled={loadingBackups || disabled}>
               <RefreshCw className={`w-3 h-3 mr-1 ${loadingBackups ? 'animate-spin' : ''}`} />
               Atualizar lista
             </Button>
@@ -299,7 +314,7 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
               setSelectedBackupId(e.target.value);
               setSelectedFileName(selected?.fileName || '');
             }}
-            disabled={loadingBackups || loadingRestore || loadingUpload}
+            disabled={loadingBackups || loadingRestore || loadingUpload || disabled}
           >
             <option value="">Selecione um backup...</option>
             {availableBackups.map((backup) => (
@@ -316,19 +331,19 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
             type="checkbox"
             checked={runMigrations}
             onChange={(e) => setRunMigrations(e.target.checked)}
-            disabled={loadingRestore}
+            disabled={loadingRestore || disabled}
           />
           <Label htmlFor="run-migrations">Executar migrate deploy apos restore</Label>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="confirm-text">Confirmação</Label>
+          <Label htmlFor="confirm-text">Confirmacao</Label>
           <Input
             id="confirm-text"
             value={confirmationText}
             onChange={(e) => setConfirmationText(e.target.value)}
             placeholder={expectedConfirmation}
-            disabled={loadingRestore}
+            disabled={loadingRestore || disabled}
           />
           <p className="text-xs text-muted-foreground">
             Digite exatamente: <strong>{expectedConfirmation}</strong>
@@ -337,7 +352,7 @@ export function RestoreSection({ onRestoreComplete }: RestoreSectionProps) {
 
         <Button
           onClick={handleRestore}
-          disabled={loadingRestore || !selectedBackupId || confirmationText !== expectedConfirmation}
+          disabled={loadingRestore || !selectedBackupId || confirmationText !== expectedConfirmation || disabled}
           className="bg-red-600 hover:bg-red-700"
         >
           {loadingRestore ? (

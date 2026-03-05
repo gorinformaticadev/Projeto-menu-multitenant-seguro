@@ -8,9 +8,11 @@ import { AppLayout } from "@/components/AppLayout";
 import { NotificationProvider } from "@/providers/NotificationProvider";
 import { InactivityLogout } from "@/components/InactivityLogout";
 import { ThemeProvider } from "@/providers/ThemeProvider";
+import { MaintenanceProvider } from "@/contexts/MaintenanceContext";
+import { MaintenanceBanner } from "@/components/MaintenanceBanner";
 
 export const metadata: Metadata = {
-  title: "Sistema Multitenant", // SerÃ¡ atualizado dinamicamente pelo DynamicTitle
+  title: "Sistema Multitenant", // Será atualizado dinamicamente pelo DynamicTitle
   description: "Sistema com isolamento de dados e controle de acesso",
   icons: {
     icon: [
@@ -46,22 +48,25 @@ export default function RootLayout({
       >
         <PlatformConfigProvider>
           <AuthProvider>
-            <SecurityConfigProvider>
-              <NotificationProvider>
-                <ThemeProvider
-                  attribute="class"
-                  defaultTheme="light"
-                  enableSystem
-                  disableTransitionOnChange
-                >
-                  <InactivityLogout />
-                  <AppLayout>
-                    {children}
-                  </AppLayout>
-                  <Toaster />
-                </ThemeProvider>
-              </NotificationProvider>
-            </SecurityConfigProvider>
+            <MaintenanceProvider>
+              <SecurityConfigProvider>
+                <NotificationProvider>
+                  <ThemeProvider
+                    attribute="class"
+                    defaultTheme="light"
+                    enableSystem
+                    disableTransitionOnChange
+                  >
+                    <MaintenanceBanner />
+                    <InactivityLogout />
+                    <AppLayout>
+                      {children}
+                    </AppLayout>
+                    <Toaster />
+                  </ThemeProvider>
+                </NotificationProvider>
+              </SecurityConfigProvider>
+            </MaintenanceProvider>
           </AuthProvider>
         </PlatformConfigProvider>
       </body>

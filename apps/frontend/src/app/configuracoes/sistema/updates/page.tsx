@@ -24,6 +24,7 @@ import { BackupSection } from './components/BackupSection';
 import { RestoreSection } from './components/RestoreSection';
 import { useSystemVersion } from '@/hooks/useSystemVersion';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMaintenance } from '@/contexts/MaintenanceContext';
 
 /**
  * Página de Gerenciamento do Sistema de Atualizações
@@ -128,7 +129,9 @@ export default function UpdatesPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { version, versionInfo, loading: versionLoading, refreshVersion } = useSystemVersion();
+  const { state: maintenanceState, isMaintenanceActive } = useMaintenance();
   const canShowVersionSource = user?.role === 'SUPER_ADMIN' || process.env.NODE_ENV !== 'production';
+  const maintenanceReason = maintenanceState.reason || 'Atualizacao em andamento';
 
   // Estados
   const [status, setStatus] = useState<UpdateStatus | null>(null);
@@ -441,6 +444,15 @@ export default function UpdatesPage() {
         </Button>
       </div>
 
+
+      {isMaintenanceActive && (
+        <div className="flex items-start gap-3 p-4 border border-amber-200 bg-amber-50 rounded-lg">
+          <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-amber-800">
+            Sistema em manutencao: {maintenanceReason}. Acoes criticas estao temporariamente bloqueadas.
+          </div>
+        </div>
+      )}
       <div className="space-y-6">
         {/* Navegação por botões */}
         <div className="flex gap-2 border-b pb-4">
@@ -603,7 +615,7 @@ export default function UpdatesPage() {
             <div className="flex gap-4">
               <Button
                 onClick={checkForUpdates}
-                disabled={loading.check || !status?.isConfigured}
+                disabled={loading.check || !status?.isConfigured || isMaintenanceActive}
                 variant="outline"
               >
                 <RefreshCw className={`w-4 h-4 mr-2 ${loading.check ? 'animate-spin' : ''}`} />
@@ -613,7 +625,7 @@ export default function UpdatesPage() {
               {status?.updateAvailable && (
                 <Button
                   onClick={() => setShowUpdateConfirm(true)}
-                  disabled={loading.update}
+                  disabled={loading.update || isMaintenanceActive}
                   className="bg-green-600 hover:bg-green-700"
                 >
                   <Download className="w-4 h-4 mr-2" />
@@ -644,7 +656,7 @@ export default function UpdatesPage() {
                     <div className="flex gap-2 pt-2">
                       <Button
                         onClick={executeUpdate}
-                        disabled={loading.update}
+                        disabled={loading.update || isMaintenanceActive}
                         size="sm"
                         className="bg-green-600 hover:bg-green-700"
                       >
@@ -753,7 +765,7 @@ export default function UpdatesPage() {
                 <div className="flex gap-4 pt-4">
                   <Button
                     onClick={saveConfig}
-                    disabled={loading.config}
+                    disabled={loading.config || isMaintenanceActive}
                   >
                     {loading.config ? (
                       <>
@@ -768,7 +780,7 @@ export default function UpdatesPage() {
                   <Button
                     onClick={testConnection}
                     variant="outline"
-                    disabled={!config.gitUsername || !config.gitRepository}
+                    disabled={!config.gitUsername || !config.gitRepository || isMaintenanceActive}
                   >
                     Testar Conexão
                   </Button>
@@ -782,10 +794,10 @@ export default function UpdatesPage() {
         {activeTab === 'backup' && (
           <div className="space-y-6">
             {/* Seção de Backup */}
-            <BackupSection onBackupComplete={loadBackupLogs} />
+            <BackupSection onBackupComplete={loadBackupLogs} disabled={isMaintenanceActive} disabledReason={maintenanceReason} />
 
             {/* Seção de Restore */}
-            <RestoreSection onRestoreComplete={loadBackupLogs} />
+            <RestoreSection onRestoreComplete={loadBackupLogs} disabled={isMaintenanceActive} disabledReason={maintenanceReason} />
 
             {/* Histórico de Backups */}
             <Card>
@@ -958,7 +970,7 @@ export default function UpdatesPage() {
                 <div className="flex gap-4 pt-4">
                   <Button
                     onClick={saveConfig}
-                    disabled={loading.config}
+                    disabled={loading.config || isMaintenanceActive}
                   >
                     {loading.config ? (
                       <>
@@ -973,7 +985,7 @@ export default function UpdatesPage() {
                   <Button
                     onClick={testConnection}
                     variant="outline"
-                    disabled={!config.gitUsername || !config.gitRepository}
+                    disabled={!config.gitUsername || !config.gitRepository || isMaintenanceActive}
                   >
                     Testar Conexão
                   </Button>
@@ -1064,3 +1076,4 @@ export default function UpdatesPage() {
     </div>
   );
 }
+

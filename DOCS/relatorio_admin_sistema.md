@@ -188,3 +188,99 @@ Uso no update:
 - update in-place legado ainda existe no script via `--legacy-inplace`
 - modo legado nao e exposto por default no painel
 - fluxo principal do painel permanece no modelo atomico
+
+## Modo Manutencao (maintenance mode)
+
+Fonte de verdade:
+
+- `${APP_BASE_DIR}/shared/maintenance.json`
+
+Contrato do arquivo:
+
+```json
+{
+  "enabled": true,
+  "reason": "Updating from vX to vY",
+  "startedAt": "2026-03-05T12:34:56Z",
+  "etaSeconds": 300,
+  "allowedRoles": ["SUPER_ADMIN"],
+  "bypassHeader": "X-Maintenance-Bypass"
+}
+```
+
+Implementacao backend:
+
+- `MaintenanceModeService`
+  - le/escreve `maintenance.json` com escrita atomica
+  - fallback seguro para estado desativado quando arquivo nao existe
+- `MaintenanceModeGuard` (global em `APP_GUARD`)
+  - bloqueia rotas quando `enabled=true`
+  - retorna `503` com payload padrao:
+
+```json
+{
+  "error": "MAINTENANCE_MODE",
+  "message": "Sistema em manutencao. Tente novamente em alguns minutos.",
+  "reason": "...",
+  "etaSeconds": 300
+}
+```
+
+Whitelist durante manutencao:
+
+- `GET /api/health`
+- `GET /api/system/maintenance/state`
+- `GET /api/system/version`
+- `GET /api/system/update/status`
+- `GET /api/system/update/log`
+- `GET /api/system/update/releases`
+- `POST /api/system/update/run`
+- `POST /api/system/update/rollback`
+- `POST /api/auth/login`
+- `POST /api/auth/login-2fa`
+- `POST /api/auth/refresh`
+- `GET /api/tenants/public/*`
+
+Bypass administrativo:
+
+- exige header configurado em `maintenance.json` (default `X-Maintenance-Bypass`)
+- exige token correto em `MAINTENANCE_BYPASS_TOKEN`
+- exige role presente em `allowedRoles` (default `SUPER_ADMIN`)
+
+Endpoint de estado:
+
+- `GET /api/system/maintenance/state`
+  - resposta: `{ success: true, data: MaintenanceState }`
+
+## Integracao do update com maintenance mode
+
+No `install/update-native.sh`:
+
+- `maintenance_on` antes de migrations
+- migrations executam com manutencao ativa
+- em sucesso completo (swap + restart + healthcheck): `maintenance_off`
+- em falhas: manutencao permanece ativa para proteger integridade ate intervencao
+
+Estados relevantes no update:
+
+- `step=maintenance_on`
+- `step=migrations`
+- `step=maintenance_off`
+
+## Frontend (painel)
+
+Comportamento implementado:
+
+- contexto global `MaintenanceProvider` consulta `GET /api/system/maintenance/state` em polling
+- interceptor Axios captura `503 + error=MAINTENANCE_MODE` e publica estado para UI
+- banner global de manutencao em todas as telas (`MaintenanceBanner`)
+- aba de updates mostra aviso de manutencao e bloqueia acoes criticas:
+  - verificar atualizacoes
+  - executar atualizacao
+  - salvar configuracoes de update
+  - testar conexao
+  - backup e restore (acoes operacionais)
+
+Observacao:
+
+- monitoramento continua disponivel via status/logs de update.

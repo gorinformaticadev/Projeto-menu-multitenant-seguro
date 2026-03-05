@@ -31,6 +31,7 @@ GIT_AUTH_HEADER="${GIT_AUTH_HEADER:-}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-120}"
 HEALTH_INTERVAL="${HEALTH_INTERVAL:-5}"
 RELEASES_TO_KEEP="${RELEASES_TO_KEEP:-5}"
+MAINTENANCE_ETA_SECONDS="${MAINTENANCE_ETA_SECONDS:-300}"
 LEGACY_INPLACE="false"
 
 EXIT_SUCCESS=0
@@ -52,6 +53,7 @@ LOCK_ACQUIRED="false"
 
 STATE_FILE=""
 UPDATE_LOG_FILE=""
+MAINTENANCE_FILE=""
 STATE_INITIALIZED="false"
 STATE_FINALIZED="false"
 
@@ -68,6 +70,8 @@ STATE_LAST_ERROR=""
 ROLLBACK_ATTEMPTED="false"
 ROLLBACK_COMPLETED="false"
 ROLLBACK_REASON=""
+MAINTENANCE_ACTIVE="false"
+MAINTENANCE_STARTED_AT=""
 
 RESOLVED_APP_VERSION="unknown"
 RESOLVED_GIT_SHA="unknown"
@@ -120,6 +124,68 @@ json_or_null() {
   fi
 }
 
+write_maintenance_file() {
+  local enabled="$1"
+  local reason="${2:-}"
+  local eta_seconds="${3:-$MAINTENANCE_ETA_SECONDS}"
+
+  if ! [[ "$eta_seconds" =~ ^[0-9]+$ ]]; then
+    eta_seconds="$MAINTENANCE_ETA_SECONDS"
+  fi
+  if ! [[ "$eta_seconds" =~ ^[0-9]+$ ]]; then
+    eta_seconds="300"
+  fi
+
+  if [[ -z "$MAINTENANCE_FILE" ]]; then
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$MAINTENANCE_FILE")"
+
+  if [[ "$enabled" == "true" ]] && [[ -z "$MAINTENANCE_STARTED_AT" ]]; then
+    MAINTENANCE_STARTED_AT="$(now_iso)"
+  fi
+
+  if [[ "$enabled" != "true" ]]; then
+    MAINTENANCE_STARTED_AT=""
+  fi
+
+  local tmp_file="${MAINTENANCE_FILE}.tmp.$$"
+  cat > "$tmp_file" <<EOF
+{
+  "enabled": ${enabled},
+  "reason": $(json_or_null "$reason"),
+  "startedAt": $(json_or_null "$MAINTENANCE_STARTED_AT"),
+  "etaSeconds": ${eta_seconds},
+  "allowedRoles": ["SUPER_ADMIN"],
+  "bypassHeader": "X-Maintenance-Bypass"
+}
+EOF
+  mv -f "$tmp_file" "$MAINTENANCE_FILE"
+}
+
+enable_maintenance_mode() {
+  local reason="$1"
+  local eta_seconds="${2:-$MAINTENANCE_ETA_SECONDS}"
+  MAINTENANCE_ACTIVE="true"
+  write_maintenance_file "true" "$reason" "$eta_seconds"
+  log "Maintenance mode ativado. reason=${reason}"
+}
+
+disable_maintenance_mode() {
+  local reason="${1:-Update concluido com sucesso}"
+  MAINTENANCE_ACTIVE="false"
+  write_maintenance_file "false" "$reason" "0"
+  log "Maintenance mode desativado. reason=${reason}"
+}
+
+ensure_maintenance_on_failure() {
+  local reason="$1"
+  if [[ "$MAINTENANCE_ACTIVE" == "true" ]]; then
+    write_maintenance_file "true" "$reason" "$MAINTENANCE_ETA_SECONDS"
+    log_err "Maintenance mode mantido ativo apos falha: ${reason}"
+  fi
+}
 sanitize_release_name() {
   local value="$1"
   value="${value//\//_}"
@@ -294,6 +360,7 @@ resolve_base_dir() {
   LOCK_FILE="$SHARED_DIR/locks/update.lock"
   STATE_FILE="$SHARED_DIR/update-state.json"
   UPDATE_LOG_FILE="$SHARED_DIR/logs/update.log"
+  MAINTENANCE_FILE="$SHARED_DIR/maintenance.json"
 }
 
 prepare_base_layout() {
@@ -680,7 +747,7 @@ run_healthchecks() {
 
 prepare_release_build() {
   local release_dir="$1"
-  log "Preparando release (deps/build/migrate/seed): $release_dir"
+  log "Preparando release (deps/build/frontend/prisma-generate): $release_dir"
 
   (
     cd "$release_dir"
@@ -694,16 +761,21 @@ prepare_release_build() {
     )
 
     pnpm --filter frontend build
+  )
+}
 
-    (
-      cd apps/backend
-      set -a
-      # shellcheck disable=SC1091
-      source ./.env
-      set +a
-      pnpm exec prisma migrate deploy --schema prisma/schema.prisma
-      node dist/prisma/seed.js deploy
-    )
+run_release_migrations() {
+  local release_dir="$1"
+  log "Executando migrations com maintenance ativo: $release_dir"
+
+  (
+    cd "$release_dir/apps/backend"
+    set -a
+    # shellcheck disable=SC1091
+    source ./.env
+    set +a
+    pnpm exec prisma migrate deploy --schema prisma/schema.prisma
+    node dist/prisma/seed.js deploy
   )
 }
 
@@ -870,6 +942,10 @@ on_exit() {
     release_lock
   fi
 
+  if [[ "$exit_code" -ne 0 ]] && [[ "$had_lock" == "true" ]]; then
+    ensure_maintenance_on_failure "Update crashed; intervention required. ${STATE_LAST_ERROR:-Unexpected failure during update.}"
+  fi
+
   if [[ "$STATE_INITIALIZED" == "true" ]]; then
     STATE_LOCK="false"
     if [[ "$exit_code" -ne 0 ]] && [[ "$STATE_FINALIZED" != "true" ]] && [[ "$had_lock" == "true" ]]; then
@@ -901,7 +977,7 @@ main() {
   start_state
   set_step "lock" 2
 
-  log "STEP 1/10 - Atualizacao atomica iniciada (tag=${TARGET_TAG}, base=${BASE_DIR})"
+  log "STEP 1/12 - Atualizacao atomica iniciada (tag=${TARGET_TAG}, base=${BASE_DIR})"
 
   if [[ "$LEGACY_INPLACE" == "true" ]]; then
     if ! run_legacy_inplace; then
@@ -935,7 +1011,7 @@ main() {
   target_release_name="$(sanitize_release_name "$TARGET_TAG")"
   release_dir="$RELEASES_DIR/$target_release_name"
 
-  log "STEP 2/10 - Preparando release em $release_dir"
+  log "STEP 2/12 - Preparando release em $release_dir"
   set_step "prepare-release" 20
   if ! ensure_release_code "$TARGET_TAG" "$release_dir"; then
     fail_and_exit "$EXIT_DOWNLOAD_FAILED" "Falha ao obter codigo da release ${TARGET_TAG}."
@@ -947,10 +1023,10 @@ main() {
   STATE_TO_VERSION="$RESOLVED_APP_VERSION"
   write_state_file
 
-  log "STEP 3/10 - Build/migrate da release alvo"
-  set_step "build-migrate" 45
+  log "STEP 3/12 - Build da release alvo (sem downtime)"
+  set_step "build" 45
   if ! prepare_release_build "$release_dir"; then
-    fail_and_exit "$EXIT_BUILD_FAILED" "Falha na etapa de build/migrations."
+    fail_and_exit "$EXIT_BUILD_FAILED" "Falha na etapa de build da release."
   fi
 
   local current_target=""
@@ -971,10 +1047,20 @@ main() {
   STATE_TO_VERSION="$to_version"
   write_state_file
 
-  log "STEP 4/10 - Backup obrigatorio pre-swap"
-  set_step "backup" 60
+  log "STEP 4/12 - Backup obrigatorio pre-swap"
+  set_step "backup" 58
   if ! create_pre_swap_backup "$from_version" "$to_version"; then
     fail_and_exit "$EXIT_BACKUP_FAILED" "Falha ao gerar backup pre-swap."
+  fi
+
+  log "STEP 5/12 - Ativando maintenance mode"
+  set_step "maintenance_on" 62
+  enable_maintenance_mode "Updating from ${from_version} to ${to_version}" "$MAINTENANCE_ETA_SECONDS"
+
+  log "STEP 6/12 - Executando migrations com downtime controlado"
+  set_step "migrations" 68
+  if ! run_release_migrations "$release_dir"; then
+    fail_and_exit "$EXIT_BUILD_FAILED" "Falha na etapa de migrations/seed."
   fi
 
   BACKEND_PROC="$(discover_pm2_name backend)"
@@ -986,17 +1072,17 @@ main() {
     ln -sfn "$current_target" "$PREVIOUS_LINK"
   fi
 
-  log "STEP 5/10 - Swap atomico de symlink current"
-  set_step "swap" 70
+  log "STEP 7/12 - Swap atomico de symlink current"
+  set_step "swap" 75
   ln -sfn "$release_dir" "$CURRENT_LINK"
 
-  log "STEP 6/10 - Reiniciando servicos PM2"
-  set_step "restart-services" 80
+  log "STEP 8/12 - Reiniciando servicos PM2"
+  set_step "restart-services" 82
   if ! restart_pm2_processes "$CURRENT_LINK"; then
     fail_and_exit "$EXIT_BUILD_FAILED" "Falha ao reiniciar servicos PM2."
   fi
 
-  log "STEP 7/10 - Executando healthchecks"
+  log "STEP 9/12 - Executando healthchecks"
   set_step "healthcheck" 90
   if ! run_healthchecks; then
     if rollback_after_failed_health "$previous_target"; then
@@ -1007,15 +1093,20 @@ main() {
     exit "$EXIT_HEALTH_ROLLBACK_FAILED"
   fi
 
-  log "STEP 8/10 - Executando retencao de releases"
+  log "STEP 10/12 - Desativando maintenance mode"
+  set_step "maintenance_off" 93
+  disable_maintenance_mode "Update concluido com sucesso para ${to_version}"
+
+  log "STEP 11/12 - Executando retencao de releases"
   set_step "retention" 95
   run_release_retention
 
   set_step "finalizing" 99
   finish_success
-  log "STEP 9/10 - Versao ativa: ${to_version} | current -> $(get_link_target "$CURRENT_LINK")"
-  log "STEP 10/10 - Update atomico concluido com sucesso"
+  log "STEP 12/12 - Versao ativa: ${to_version} | current -> $(get_link_target "$CURRENT_LINK")"
+  log "Update atomico concluido com sucesso"
   exit "$EXIT_SUCCESS"
 }
 
 main "$@"
+
