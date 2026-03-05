@@ -6,6 +6,7 @@ import { Observable } from 'rxjs';
 export class LegacyBackupDeprecationInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const response = context.switchToHttp().getResponse<Response>();
+    response.setHeader('X-API-Deprecated', 'true');
     response.setHeader('Deprecation', 'true');
     response.setHeader('Link', '</api/backups>; rel="successor-version"');
     response.setHeader('Warning', '299 - "Deprecated endpoint. Use /api/backups/*"');

@@ -38,6 +38,7 @@ export class SecureFileAccessGuard implements CanActivate {
       select: {
         id: true,
         tenantId: true,
+        moduleName: true,
         deletedAt: true,
       },
     });
@@ -54,6 +55,29 @@ export class SecureFileAccessGuard implements CanActivate {
     // Validar que arquivo não está deletado
     if (file.deletedAt) {
       throw new NotFoundException('Arquivo foi deletado');
+    }
+
+    const moduleRecord = await this.prisma.module.findUnique({
+      where: { slug: file.moduleName },
+      select: { id: true },
+    });
+
+    if (!moduleRecord) {
+      throw new ForbiddenException('Modulo associado ao arquivo nao existe');
+    }
+
+    const tenantModule = await this.prisma.moduleTenant.findUnique({
+      where: {
+        moduleId_tenantId: {
+          moduleId: moduleRecord.id,
+          tenantId: user.tenantId,
+        },
+      },
+      select: { enabled: true },
+    });
+
+    if (!tenantModule?.enabled) {
+      throw new ForbiddenException('Modulo nao habilitado para este tenant');
     }
 
     return true;

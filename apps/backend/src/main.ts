@@ -190,44 +190,34 @@ async function bootstrap() {
     // Empty implementation
   }
 
-  // Serve static uploads for both legacy and API-prefixed paths.
+  // Serve only public logos. Sensitive and temp directories are never exposed as static assets.
   const pathsService = app.get(PathsService);
-  const uploadsPath = pathsService.getUploadsDir();
-  const setUploadsHeaders = (res: any, filePath: string) => {
+  const logosPath = pathsService.getLogosDir();
+  const setLogosHeaders = (res: any) => {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    const isLogoFile = filePath.includes('logos/');
-
-    if (isLogoFile) {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-      res.setHeader('Cache-Control', 'public, max-age=86400');
-    } else {
-      const staticAllowedOrigins = [
-        process.env.FRONTEND_URL || 'http://localhost:5000',
-        'http://127.0.0.1:5000',
-        'http://localhost:5000',
-        'http://localhost:3000',
-      ].filter(Boolean);
-
-      const origin = res.req.headers.origin;
-      if (origin && staticAllowedOrigins.includes(origin)) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-      }
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-    }
-
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
   };
 
-  app.useStaticAssets(uploadsPath, {
-    prefix: '/uploads',
-    setHeaders: setUploadsHeaders,
+  app.useStaticAssets(logosPath, {
+    prefix: '/logos',
+    setHeaders: setLogosHeaders,
   });
-  app.useStaticAssets(uploadsPath, {
-    prefix: '/api/uploads',
-    setHeaders: setUploadsHeaders,
+  app.useStaticAssets(logosPath, {
+    prefix: '/api/logos',
+    setHeaders: setLogosHeaders,
+  });
+  app.useStaticAssets(logosPath, {
+    prefix: '/uploads/logos',
+    setHeaders: setLogosHeaders,
+  });
+  app.useStaticAssets(logosPath, {
+    prefix: '/api/uploads/logos',
+    setHeaders: setLogosHeaders,
   });
 
   // ============================================
@@ -250,7 +240,15 @@ async function bootstrap() {
     origin: allowedOrigins.length > 0 ? allowedOrigins : '*',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    exposedHeaders: ['Content-Type', 'Content-Length', 'X-Total-Count'],
+    exposedHeaders: [
+      'Content-Type',
+      'Content-Length',
+      'X-Total-Count',
+      'X-API-Deprecated',
+      'Deprecation',
+      'Link',
+      'Warning',
+    ],
     maxAge: parseInt(process.env.CORS_MAX_AGE) || 86400, // Cache preflight por 24h
   });
 

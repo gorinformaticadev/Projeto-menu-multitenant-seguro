@@ -1,24 +1,22 @@
 import {
-  Injectable,
   BadRequestException,
-  NotFoundException,
+  ForbiddenException,
+  Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { PathsService } from '@core/common/paths/paths.service';
 import { createReadStream, promises as fsPromises } from 'fs';
-import { join } from 'path';
+import { resolve, sep } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import {
-  SecureFileUploadResponse,
   SecureFileMetadata,
   SecureFileStream,
+  SecureFileUploadResponse,
 } from './interfaces/secure-file.interface';
-import {
-  validateFileSignature,
-  sanitizeFileName,
-} from './config/secure-multer.config';
+import { sanitizeFileName, validateFileSignature } from './config/secure-multer.config';
 
 @Injectable()
 export class SecureFilesService {
@@ -31,15 +29,11 @@ export class SecureFilesService {
     private readonly prisma: PrismaService,
     private readonly pathsService: PathsService,
   ) {
-    // Configurar paths dinâmicos (Docker-ready)
     this.uploadsRoot = this.pathsService.ensureDir(this.pathsService.getUploadsDir());
     this.tempDir = this.pathsService.ensureDir(this.pathsService.getTempDir());
     this.secureDir = this.pathsService.ensureDir(this.pathsService.getSecureDir());
   }
 
-  /**
-   * Realiza upload de arquivo sensível
-   */
   async uploadFile(
     file: Express.Multer.File,
     tenantId: string,
@@ -48,39 +42,34 @@ export class SecureFilesService {
     userId: string,
     metadata?: string,
   ): Promise<SecureFileUploadResponse> {
-    this.logger.log(
-      `Iniciando upload: tenant=${tenantId}, module=${moduleName}, type=${documentType}`,
-    );
+    this.logger.log(`Starting secure upload: tenant=${tenantId}, module=${moduleName}, type=${documentType}`);
 
     try {
-      // 1. Validar assinatura do arquivo
       await this.validateFileContent(file);
 
-      // 2. Sanitizar nome original
+      const safeTenantId = this.validatePathSegment(tenantId, 'tenantId');
+      const safeModuleName = this.validatePathSegment(moduleName, 'moduleName');
+      const safeDocumentType = this.validatePathSegment(documentType, 'documentType');
+      await this.assertTenantModuleAccess(safeTenantId, safeModuleName, 'write');
+
       const sanitizedName = sanitizeFileName(file.originalname);
+      const safeExtension = this.extractSafeExtension(file.originalname);
+      const storedName = `${uuidv4()}.${safeExtension}`;
 
-      // 3. Gerar nome único para armazenamento
-      const extension = file.originalname.split('.').pop();
-      const storedName = `${uuidv4()}.${extension}`;
-
-      // 4. Criar diretório dinâmico
       const filePath = await this.createSecureDirectory(
-        tenantId,
-        moduleName,
-        documentType,
+        safeTenantId,
+        safeModuleName,
+        safeDocumentType,
         storedName,
       );
-
-      // 5. Mover arquivo para destino final
       await fsPromises.rename(file.path, filePath);
 
-      // 6. Registrar metadata no banco
       const secureFile = await this.prisma.secureFile.create({
         data: {
           id: uuidv4(),
-          tenantId,
-          moduleName,
-          documentType,
+          tenantId: safeTenantId,
+          moduleName: safeModuleName,
+          documentType: safeDocumentType,
           originalName: sanitizedName,
           storedName,
           mimeType: file.mimetype,
@@ -90,13 +79,10 @@ export class SecureFilesService {
         },
       });
 
-      this.logger.log(`Upload concluído: fileId=${secureFile.id}`);
-
-      // 7. Registrar em auditoria
-      await this.logAuditEvent('SECURE_FILE_UPLOADED', userId, tenantId, {
+      await this.logAuditEvent('SECURE_FILE_UPLOADED', userId, safeTenantId, {
         fileId: secureFile.id,
-        moduleName,
-        documentType,
+        moduleName: safeModuleName,
+        documentType: safeDocumentType,
         sizeBytes: file.size,
       });
 
@@ -105,58 +91,52 @@ export class SecureFilesService {
         originalName: sanitizedName,
         sizeBytes: file.size,
         uploadedAt: secureFile.uploadedAt,
-        moduleName,
-        documentType,
+        moduleName: safeModuleName,
+        documentType: safeDocumentType,
       };
     } catch (error) {
-      this.logger.error(`Erro no upload: ${error.message}`, error.stack);
+      this.logger.error(`Secure upload failed: ${error.message}`, error.stack);
 
-      // Tentar deletar arquivo se foi criado
       if (file.path) {
         try {
           await fsPromises.unlink(file.path);
         } catch {
-          this.logger.warn(`Não foi possível deletar arquivo temporário: ${file.path}`);
+          this.logger.warn(`Failed to delete temporary file: ${file.path}`);
         }
       }
 
-      throw new InternalServerErrorException(
-        'Erro ao processar upload. Tente novamente.',
-      );
+      if (
+        error instanceof BadRequestException ||
+        error instanceof ForbiddenException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException('Failed to process secure upload.');
     }
   }
 
-  /**
-   * Obtém stream do arquivo para download/visualização
-   */
-  async getFileStream(
-    fileId: string,
-    userId: string,
-    tenantId: string,
-  ): Promise<SecureFileStream> {
-    // 1. Buscar metadata do arquivo
+  async getFileStream(fileId: string, userId: string, tenantId: string): Promise<SecureFileStream> {
     const file = await this.prisma.secureFile.findUnique({
       where: { id: fileId },
     });
 
     if (!file) {
-      throw new NotFoundException('Arquivo não encontrado');
+      throw new NotFoundException('File not found');
     }
 
-    // 2. Validar que arquivo pertence ao tenant
     if (file.tenantId !== tenantId) {
-      this.logger.warn(
-        `Tentativa de acesso cross-tenant: user=${userId}, file=${fileId}`,
-      );
-      throw new NotFoundException('Arquivo não encontrado');
+      this.logger.warn(`Cross-tenant secure file access denied: user=${userId}, file=${fileId}`);
+      throw new NotFoundException('File not found');
     }
 
-    // 3. Verificar se arquivo foi deletado (soft delete)
     if (file.deletedAt) {
-      throw new NotFoundException('Arquivo foi deletado');
+      throw new NotFoundException('File has been deleted');
     }
 
-    // 4. Construir path do arquivo
+    await this.assertTenantModuleAccess(file.tenantId, file.moduleName, 'read');
+
     const filePath = this.getFilePath(
       file.tenantId,
       file.moduleName,
@@ -164,36 +144,28 @@ export class SecureFilesService {
       file.storedName,
     );
 
-    // 5. Verificar se arquivo existe fisicamente
     try {
       await fsPromises.access(filePath);
     } catch {
-      this.logger.error(`Arquivo físico não encontrado: ${filePath}`);
-      throw new NotFoundException('Arquivo corrompido ou não encontrado');
+      this.logger.error(`Secure file missing on disk: ${filePath}`);
+      throw new NotFoundException('File not found on disk');
     }
 
-    // 6. Atualizar estatísticas de acesso
     await this.prisma.secureFile.update({
       where: { id: fileId },
       data: {
         lastAccessedAt: new Date(),
-        accessCount: {
-          increment: 1,
-        },
+        accessCount: { increment: 1 },
       },
     });
 
-    // 7. Registrar acesso em auditoria
     await this.logAuditEvent('SECURE_FILE_ACCESSED', userId, tenantId, {
       fileId,
       moduleName: file.moduleName,
       documentType: file.documentType,
     });
 
-    // 8. Obter stats do arquivo para Content-Length
     const stats = await fsPromises.stat(filePath);
-
-    // 9. Criar stream
     const stream = createReadStream(filePath);
 
     return {
@@ -207,28 +179,24 @@ export class SecureFilesService {
     };
   }
 
-  /**
-   * Obtém metadata do arquivo
-   */
-  async getFileMetadata(
-    fileId: string,
-    tenantId: string,
-  ): Promise<SecureFileMetadata> {
+  async getFileMetadata(fileId: string, tenantId: string): Promise<SecureFileMetadata> {
     const file = await this.prisma.secureFile.findUnique({
       where: { id: fileId },
     });
 
     if (!file) {
-      throw new NotFoundException('Arquivo não encontrado');
+      throw new NotFoundException('File not found');
     }
 
     if (file.tenantId !== tenantId) {
-      throw new NotFoundException('Arquivo não encontrado');
+      throw new NotFoundException('File not found');
     }
 
     if (file.deletedAt) {
-      throw new NotFoundException('Arquivo foi deletado');
+      throw new NotFoundException('File has been deleted');
     }
+
+    await this.assertTenantModuleAccess(file.tenantId, file.moduleName, 'read');
 
     return {
       fileId: file.id,
@@ -241,67 +209,61 @@ export class SecureFilesService {
     };
   }
 
-  /**
-   * Deleta arquivo (soft delete)
-   */
-  async deleteFile(
-    fileId: string,
-    userId: string,
-    tenantId: string,
-  ): Promise<void> {
+  async deleteFile(fileId: string, userId: string, tenantId: string): Promise<void> {
     const file = await this.prisma.secureFile.findUnique({
       where: { id: fileId },
     });
 
     if (!file) {
-      throw new NotFoundException('Arquivo não encontrado');
+      throw new NotFoundException('File not found');
     }
 
     if (file.tenantId !== tenantId) {
-      throw new NotFoundException('Arquivo não encontrado');
+      throw new NotFoundException('File not found');
     }
 
     if (file.deletedAt) {
-      throw new BadRequestException('Arquivo já foi deletado');
+      throw new BadRequestException('File has already been deleted');
     }
 
-    // Soft delete
+    await this.assertTenantModuleAccess(file.tenantId, file.moduleName, 'read');
+
     await this.prisma.secureFile.update({
       where: { id: fileId },
-      data: {
-        deletedAt: new Date(),
-      },
+      data: { deletedAt: new Date() },
     });
 
-    // Registrar em auditoria
     await this.logAuditEvent('SECURE_FILE_DELETED', userId, tenantId, {
       fileId,
       moduleName: file.moduleName,
       documentType: file.documentType,
     });
-
-    this.logger.log(`Arquivo deletado (soft): fileId=${fileId}`);
   }
 
-  /**
-   * Lista arquivos do tenant com filtros opcionais
-   */
-  async listFiles(
-    tenantId: string,
-    moduleName?: string,
-    documentType?: string,
-  ) {
-    const where: any = {
-      tenantId,
-      deletedAt: null, // Apenas arquivos não deletados
-    };
+  async listFiles(tenantId: string, moduleName?: string, documentType?: string) {
+    const safeTenantId = this.validatePathSegment(tenantId, 'tenantId');
+    const safeModuleName = moduleName
+      ? this.validatePathSegment(moduleName, 'moduleName')
+      : undefined;
+    const safeDocumentType = documentType
+      ? this.validatePathSegment(documentType, 'documentType')
+      : undefined;
 
-    if (moduleName) {
-      where.moduleName = moduleName;
+    if (safeModuleName) {
+      await this.assertTenantModuleAccess(safeTenantId, safeModuleName, 'read');
     }
 
-    if (documentType) {
-      where.documentType = documentType;
+    const where: any = {
+      tenantId: safeTenantId,
+      deletedAt: null,
+    };
+
+    if (safeModuleName) {
+      where.moduleName = safeModuleName;
+    }
+
+    if (safeDocumentType) {
+      where.documentType = safeDocumentType;
     }
 
     const files = await this.prisma.secureFile.findMany({
@@ -317,9 +279,7 @@ export class SecureFilesService {
         lastAccessedAt: true,
         accessCount: true,
       },
-      orderBy: {
-        uploadedAt: 'desc',
-      },
+      orderBy: { uploadedAt: 'desc' },
     });
 
     return files.map((file) => ({
@@ -328,16 +288,13 @@ export class SecureFilesService {
     }));
   }
 
-  /**
-   * Cria diretório seguro dinamicamente
-   */
   private async createSecureDirectory(
     tenantId: string,
     moduleName: string,
     documentType: string,
     fileName: string,
   ): Promise<string> {
-    const directoryPath = join(
+    const directoryPath = this.safeJoinWithinBase(
       this.secureDir,
       'tenants',
       tenantId,
@@ -346,22 +303,17 @@ export class SecureFilesService {
       documentType,
     );
 
-    // Criar diretório recursivamente se não existir
     await fsPromises.mkdir(directoryPath, { recursive: true });
-
-    return join(directoryPath, fileName);
+    return this.safeJoinWithinBase(directoryPath, fileName);
   }
 
-  /**
-   * Obtém path do arquivo
-   */
   private getFilePath(
     tenantId: string,
     moduleName: string,
     documentType: string,
     fileName: string,
   ): string {
-    return join(
+    return this.safeJoinWithinBase(
       this.secureDir,
       'tenants',
       tenantId,
@@ -372,34 +324,96 @@ export class SecureFilesService {
     );
   }
 
-  /**
-   * Valida conteúdo do arquivo (assinatura)
-   */
-  private async validateFileContent(file: Express.Multer.File): Promise<void> {
-    // Ler primeiros bytes do arquivo
-    const buffer = await fsPromises.readFile(file.path);
-
-    // Validar assinatura
-    if (!validateFileSignature(buffer, file.mimetype)) {
-      // Deletar arquivo inválido
-      await fsPromises.unlink(file.path);
-      throw new BadRequestException(
-        'Assinatura de arquivo inválida. O arquivo pode estar corrompido.',
-      );
+  private validatePathSegment(value: string, fieldName: string): string {
+    const normalized = String(value || '').trim();
+    if (!normalized) {
+      throw new BadRequestException(`${fieldName} is invalid`);
     }
 
-    // Validar tamanho mínimo (evitar arquivos vazios ou muito pequenos)
-    if (buffer.length < 100) {
-      await fsPromises.unlink(file.path);
-      throw new BadRequestException(
-        'Arquivo muito pequeno ou corrompido',
+    if (
+      normalized.includes('..') ||
+      normalized.includes('/') ||
+      normalized.includes('\\') ||
+      normalized.includes('\0')
+    ) {
+      throw new ForbiddenException('Path traversal detected');
+    }
+
+    return normalized;
+  }
+
+  private safeJoinWithinBase(basePath: string, ...segments: string[]): string {
+    const normalizedBase = resolve(basePath);
+    const safeSegments = segments.map((segment, index) =>
+      this.validatePathSegment(segment, `path_segment_${index}`),
+    );
+    const resolvedPath = resolve(normalizedBase, ...safeSegments);
+
+    if (resolvedPath !== normalizedBase && !resolvedPath.startsWith(`${normalizedBase}${sep}`)) {
+      throw new ForbiddenException('Path traversal detected');
+    }
+
+    return resolvedPath;
+  }
+
+  private extractSafeExtension(fileName: string): string {
+    const rawExtension = String(fileName || '')
+      .split('.')
+      .pop()
+      ?.trim()
+      .toLowerCase();
+    const sanitized = sanitizeFileName(rawExtension || 'bin').replace(/^\.+/, '');
+    return sanitized || 'bin';
+  }
+
+  private async assertTenantModuleAccess(
+    tenantId: string,
+    moduleName: string,
+    mode: 'read' | 'write',
+  ): Promise<void> {
+    const safeTenantId = this.validatePathSegment(tenantId, 'tenantId');
+    const safeModuleName = this.validatePathSegment(moduleName, 'moduleName');
+    const moduleRecord = await this.prisma.module.findUnique({
+      where: { slug: safeModuleName },
+      select: { id: true },
+    });
+
+    if (!moduleRecord) {
+      this.logger.warn(
+        `Secure file access denied due to unknown module. tenant=${safeTenantId} module=${safeModuleName} mode=${mode}`,
       );
+      throw new ForbiddenException(`Module ${safeModuleName} not found`);
+    }
+
+    const tenantModule = await this.prisma.moduleTenant.findUnique({
+      where: {
+        moduleId_tenantId: {
+          moduleId: moduleRecord.id,
+          tenantId: safeTenantId,
+        },
+      },
+      select: { enabled: true },
+    });
+
+    if (!tenantModule?.enabled) {
+      throw new ForbiddenException(`Module ${safeModuleName} is not enabled for this tenant`);
     }
   }
 
-  /**
-   * Registra evento de auditoria
-   */
+  private async validateFileContent(file: Express.Multer.File): Promise<void> {
+    const buffer = await fsPromises.readFile(file.path);
+
+    if (!validateFileSignature(buffer, file.mimetype)) {
+      await fsPromises.unlink(file.path);
+      throw new BadRequestException('Invalid file signature');
+    }
+
+    if (buffer.length < 100) {
+      await fsPromises.unlink(file.path);
+      throw new BadRequestException('File is too small or corrupted');
+    }
+  }
+
   private async logAuditEvent(
     action: string,
     userId: string,
@@ -416,8 +430,7 @@ export class SecureFilesService {
         },
       });
     } catch (error) {
-      this.logger.warn(`Falha ao registrar auditoria: ${error.message}`);
-      // Não falhar a operação principal por falha na auditoria
+      this.logger.warn(`Failed to write secure-file audit event: ${error.message}`);
     }
   }
 }
