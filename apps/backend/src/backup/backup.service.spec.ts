@@ -1,3 +1,6 @@
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { BackupArtifactSource } from '@prisma/client';
 import { BackupService } from './backup.service';
 
@@ -136,6 +139,50 @@ describe('BackupService', () => {
       'WARN',
       expect.stringContaining('allowUnsafeObjects=true'),
     );
+  });
+
+  it('filtra tabela protegida e objetos derivados no restore list', async () => {
+    const service = Object.create(BackupService.prototype) as BackupService;
+    const restoreListContent = [
+      '3558; 1259 17331 TABLE public.backup_artifacts us_28whapichat',
+      '3559; 1259 17332 INDEX backup_artifacts_createdByUserId_idx us_28whapichat',
+      '3560; 1259 17333 INDEX users_email_key us_28whapichat',
+    ].join('\n');
+    const listFilePath = path.join(os.tmpdir(), `restore_list_test_${Date.now()}.txt`);
+
+    (service as any).backupConfig = {
+      getProtectedTablesForRestore: () => ['backup_artifacts'],
+      isStrictUploadRestoreInspectionEnabled: () => false,
+      isDangerousObjectInspectionEnabled: () => false,
+      getUploadRestoreBlockedObjectTypes: () => [],
+      getBinary: () => 'pg_restore',
+      getJobTimeoutMs: () => 2000,
+      getProjectRoot: () => process.cwd(),
+    };
+    (service as any).processService = {
+      runCommand: jest.fn().mockResolvedValue({
+        stdout: restoreListContent,
+      }),
+    };
+
+    jest.spyOn(service as any, 'resolveFilePath').mockReturnValue(listFilePath);
+    jest.spyOn(service as any, 'tryAppendJobLog').mockResolvedValue(undefined);
+
+    const generatedPath = await (service as any).buildFilteredRestoreList({
+      dumpPath: '/tmp/restore.dump',
+      jobId: 'job-protected',
+      password: 'secret',
+      artifactSource: BackupArtifactSource.BACKUP,
+      allowUnsafeObjects: false,
+    });
+
+    expect(generatedPath).toBe(listFilePath);
+    const generatedLines = fs.readFileSync(listFilePath, 'utf8').split(/\r?\n/);
+    expect(generatedLines[0]?.startsWith('; ')).toBe(true);
+    expect(generatedLines[1]?.startsWith('; ')).toBe(true);
+    expect(generatedLines[2]?.startsWith('; ')).toBe(false);
+
+    fs.unlinkSync(listFilePath);
   });
 
   it('reconcile caso C renomeia staging para active', async () => {

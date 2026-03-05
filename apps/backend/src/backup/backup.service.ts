@@ -1625,8 +1625,12 @@ export class BackupService {
       return undefined;
     }
 
-    const escapedPatterns = protectedTables.map((table) => table.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-    const matcher = new RegExp(`\\b(${escapedPatterns.join('|')})\\b`, 'i');
+    const protectedTableMatchers = protectedTables.map((table) => {
+      const escaped = table.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Match table names as lexical units (schema/object names, index prefixes, constraints, etc).
+      // We intentionally treat "_" as a separator to catch derived names like "<table>_...".
+      return new RegExp(`(^|[^a-zA-Z0-9])${escaped}([^a-zA-Z0-9]|$)`, 'i');
+    });
 
     const filtered = lines
       .map((line) => {
@@ -1637,7 +1641,7 @@ export class BackupService {
           return line;
         }
 
-        return matcher.test(line) ? `; ${line}` : line;
+        return protectedTableMatchers.some((matcher) => matcher.test(line)) ? `; ${line}` : line;
       })
       .join('\n');
 
@@ -1835,7 +1839,10 @@ export class BackupService {
     if (error instanceof Error) {
       const commandResult = (error as any).result;
       if (commandResult?.stderr) {
-        return String(commandResult.stderr).slice(-4000);
+        const stderr = String(commandResult.stderr);
+        const tail = stderr.slice(-4000);
+        const normalizedTail = tail.includes('\n') ? tail.slice(tail.indexOf('\n') + 1) : tail;
+        return normalizedTail.trim() || stderr.trim() || error.message;
       }
       return error.message;
     }
