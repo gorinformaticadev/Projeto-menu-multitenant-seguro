@@ -895,6 +895,13 @@ export class BackupService {
       }
       promoted = true;
       this.backupConfig.setActiveDatabaseName(activeDatabase);
+      await this.restoreProtectedTablesFromRollback({
+        rollbackDatabase,
+        targetDatabase: activeDatabase,
+        password: db.password,
+        jobId: job.id,
+        timeoutMs: cutoverTimeoutMs,
+      });
 
       try {
         await this.prisma.resumeAfterCutover();
@@ -1119,6 +1126,104 @@ export class BackupService {
         void params.onLine?.(line);
       },
     });
+  }
+
+  private async restoreProtectedTablesFromRollback(params: {
+    rollbackDatabase: string;
+    targetDatabase: string;
+    password: string;
+    jobId: string;
+    timeoutMs: number;
+  }): Promise<void> {
+    const configuredTables = this.backupConfig
+      .getProtectedTablesForRestore()
+      .map((table) => table.trim().toLowerCase())
+      .filter((table) => table.length > 0)
+      .map((table) => this.assertTableIdentifier(table));
+    const protectedTables = Array.from(new Set(configuredTables));
+
+    if (protectedTables.length === 0) {
+      return;
+    }
+
+    const expectedListSql = protectedTables.map((table) => `'${this.escapeSqlLiteral(table)}'`).join(', ');
+    const existingRaw = await this.runPsqlScalarQuery({
+      database: params.rollbackDatabase,
+      password: params.password,
+      sql:
+        `SELECT array_to_string(array_agg(lower(table_name) ORDER BY lower(table_name)), ',') ` +
+        `FROM information_schema.tables ` +
+        `WHERE table_schema='public' AND lower(table_name) = ANY(ARRAY[${expectedListSql}]);`,
+      timeoutMs: Math.min(params.timeoutMs, 120000),
+    });
+    const existingProtectedTables = String(existingRaw || '')
+      .split(',')
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean)
+      .map((table) => this.assertTableIdentifier(table));
+
+    if (existingProtectedTables.length === 0) {
+      await this.tryAppendJobLog(
+        params.jobId,
+        'WARN',
+        `Nenhuma tabela protegida encontrada em ${params.rollbackDatabase}; seguindo sem merge de controle.`,
+      );
+      return;
+    }
+
+    if (!existingProtectedTables.includes('backup_jobs')) {
+      throw new Error(
+        `Tabela de controle "backup_jobs" ausente em ${params.rollbackDatabase}. ` +
+          `Nao e seguro concluir o cutover sem metadados de jobs de backup/restore.`,
+      );
+    }
+
+    const snapshotPath = this.resolveFilePath(`restore_protected_${params.jobId}_${Date.now()}.dump`);
+    const db = this.backupConfig.getDatabaseConfig();
+
+    const dumpArgs = [
+      '--format=custom',
+      '--no-owner',
+      '--no-privileges',
+      '--host',
+      db.host,
+      '--port',
+      String(db.port),
+      '--username',
+      db.user,
+      '--dbname',
+      params.rollbackDatabase,
+      '--file',
+      snapshotPath,
+    ];
+    for (const table of existingProtectedTables) {
+      dumpArgs.push('--table', `public.${table}`);
+    }
+
+    try {
+      await this.processService.runCommand({
+        command: this.backupConfig.getBinary('pg_dump'),
+        args: dumpArgs,
+        env: this.buildCommandEnv(params.password),
+        timeoutMs: params.timeoutMs,
+        cwd: this.backupConfig.getProjectRoot(),
+      });
+
+      await this.executePgRestore({
+        dbName: params.targetDatabase,
+        dumpPath: snapshotPath,
+        password: params.password,
+        timeoutMs: params.timeoutMs,
+      });
+
+      await this.tryAppendJobLog(
+        params.jobId,
+        'INFO',
+        `Tabelas protegidas reaplicadas apos cutover: ${existingProtectedTables.join(', ')}`,
+      );
+    } finally {
+      this.deleteFileIfExists(snapshotPath);
+    }
   }
 
   private async validateStagingDatabase(database: string, password: string): Promise<void> {
@@ -1786,6 +1891,14 @@ export class BackupService {
     const normalized = String(value || '').trim();
     if (!/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(normalized)) {
       throw new BadRequestException(`${fieldName} invalido para identificador de database`);
+    }
+    return normalized;
+  }
+
+  private assertTableIdentifier(value: string): string {
+    const normalized = String(value || '').trim();
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(normalized)) {
+      throw new BadRequestException('table invalida para identificador PostgreSQL');
     }
     return normalized;
   }
