@@ -68,6 +68,15 @@ interface UpdateConfig {
   updateCheckEnabled: boolean;
 }
 
+interface UpdateConfigResponse {
+  gitUsername?: string;
+  gitRepository?: string;
+  gitReleaseBranch?: string;
+  packageManager?: string;
+  updateCheckEnabled?: boolean;
+  hasGitToken?: boolean;
+}
+
 interface BackupLog {
   id: string;
   operationType: string;
@@ -144,6 +153,7 @@ export default function UpdatesPage() {
   const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState('status');
   const [backupLogs, setBackupLogs] = useState<BackupLog[]>([]);
+  const [hasSavedGitToken, setHasSavedGitToken] = useState(false);
 
 
 
@@ -166,6 +176,29 @@ export default function UpdatesPage() {
       setLoading(prev => ({ ...prev, status: false }));
     }
   }, [toast]);
+
+  /**
+   * Carrega configurações salvas do sistema
+   */
+  const loadConfig = useCallback(async () => {
+    try {
+      const response = await api.get('/api/update/config');
+      const data = (response.data || {}) as UpdateConfigResponse;
+
+      setConfig(prev => ({
+        ...prev,
+        gitUsername: data.gitUsername || '',
+        gitRepository: data.gitRepository || '',
+        gitReleaseBranch: data.gitReleaseBranch || 'main',
+        packageManager: data.packageManager || 'npm',
+        updateCheckEnabled: data.updateCheckEnabled ?? true,
+        gitToken: '',
+      }));
+      setHasSavedGitToken(!!data.hasGitToken);
+    } catch (error: unknown) {
+      console.error('Erro ao carregar configurações de update:', error);
+    }
+  }, []);
 
   /**
    * Força verificação de novas versões
@@ -239,7 +272,19 @@ export default function UpdatesPage() {
     try {
       setLoading(prev => ({ ...prev, config: true }));
 
-      const response = await api.put('/api/update/config', config);
+      const payload: Partial<UpdateConfig> = {
+        gitUsername: config.gitUsername,
+        gitRepository: config.gitRepository,
+        gitReleaseBranch: config.gitReleaseBranch,
+        packageManager: config.packageManager,
+        updateCheckEnabled: config.updateCheckEnabled,
+      };
+
+      if (config.gitToken.trim()) {
+        payload.gitToken = config.gitToken.trim();
+      }
+
+      const response = await api.put('/api/update/config', payload);
 
       toast({
         title: 'Configurações salvas',
@@ -247,7 +292,8 @@ export default function UpdatesPage() {
         variant: 'default',
       });
 
-      await loadStatus();
+      setConfig(prev => ({ ...prev, gitToken: '' }));
+      await Promise.all([loadStatus(), loadConfig()]);
     } catch (error: unknown) {
       toast({
         title: 'Erro ao salvar configurações',
@@ -309,10 +355,11 @@ export default function UpdatesPage() {
   // Carregar dados iniciais
   useEffect(() => {
     loadStatus();
+    loadConfig();
     loadLogs();
     loadBackupLogs();
     refreshVersion();
-  }, [loadStatus, loadLogs, loadBackupLogs, refreshVersion]);
+  }, [loadStatus, loadConfig, loadLogs, loadBackupLogs, refreshVersion]);
 
   /**
    * Testa conectividade com repositório
@@ -625,8 +672,8 @@ export default function UpdatesPage() {
           </div>
         )}
 
-        {/* Aba Configurações */}
-        {activeTab === 'config' && (
+        {/* Aba Configurações (bloco legado oculto) */}
+        {false && activeTab === 'config' && (
           <div className="space-y-6">
             <Card>
               <CardContent className="space-y-4 pt-6">
@@ -658,7 +705,7 @@ export default function UpdatesPage() {
                       type="password"
                       value={config.gitToken}
                       onChange={(e) => setConfig(prev => ({ ...prev, gitToken: e.target.value }))}
-                      placeholder="Token GitHub (opcional para repos públicos)"
+                      placeholder={hasSavedGitToken ? 'Token já salvo. Preencha apenas para trocar.' : 'Token GitHub (opcional para repos públicos)'}
                     />
                   </div>
 
@@ -680,6 +727,7 @@ export default function UpdatesPage() {
                       onChange={(e) => setConfig(prev => ({ ...prev, packageManager: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
+                      <option value="docker">docker</option>
                       <option value="npm">npm</option>
                       <option value="pnpm">pnpm</option>
                       <option value="yarn">yarn</option>
@@ -862,7 +910,7 @@ export default function UpdatesPage() {
                       type="password"
                       value={config.gitToken}
                       onChange={(e) => setConfig(prev => ({ ...prev, gitToken: e.target.value }))}
-                      placeholder="Token GitHub (opcional para repos públicos)"
+                      placeholder={hasSavedGitToken ? 'Token já salvo. Preencha apenas para trocar.' : 'Token GitHub (opcional para repos públicos)'}
                     />
                   </div>
 
@@ -884,6 +932,7 @@ export default function UpdatesPage() {
                       onChange={(e) => setConfig(prev => ({ ...prev, packageManager: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
+                      <option value="docker">docker</option>
                       <option value="npm">npm</option>
                       <option value="pnpm">pnpm</option>
                       <option value="yarn">yarn</option>

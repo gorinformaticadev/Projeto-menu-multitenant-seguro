@@ -42,6 +42,17 @@ export class UpdateController {
     }
   }
 
+  @Get('config')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  async getConfig() {
+    try {
+      return await this.updateService.getUpdateConfig();
+    } catch (error) {
+      this.rethrowPreservingHttp(error, 'Erro ao buscar configurações');
+    }
+  }
+
   @Get('check')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)

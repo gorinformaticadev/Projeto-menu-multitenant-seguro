@@ -324,11 +324,46 @@ export class UpdateService implements OnModuleInit {
     };
   }
 
+  async getUpdateConfig(): Promise<{
+    gitUsername: string;
+    gitRepository: string;
+    gitReleaseBranch: string;
+    packageManager: string;
+    updateCheckEnabled: boolean;
+    hasGitToken: boolean;
+  }> {
+    const settings = await this.getSystemSettings();
+    return {
+      gitUsername: settings.gitUsername || '',
+      gitRepository: settings.gitRepository || '',
+      gitReleaseBranch: settings.gitReleaseBranch || 'main',
+      packageManager: settings.packageManager || 'docker',
+      updateCheckEnabled: settings.updateCheckEnabled ?? true,
+      hasGitToken: !!settings.gitToken,
+    };
+  }
+
   async updateConfig(config: UpdateConfigDto, updatedBy: string): Promise<{ success: boolean; message: string }> {
     try {
-      const updateData: Prisma.SystemSettingsUncheckedUpdateInput = { ...config, updatedBy };
+      const updateData: Prisma.SystemSettingsUncheckedUpdateInput = { updatedBy };
 
-      if (config.gitToken) {
+      if (typeof config.gitUsername === 'string') {
+        updateData.gitUsername = config.gitUsername;
+      }
+      if (typeof config.gitRepository === 'string') {
+        updateData.gitRepository = config.gitRepository;
+      }
+      if (typeof config.gitReleaseBranch === 'string') {
+        updateData.gitReleaseBranch = config.gitReleaseBranch;
+      }
+      if (typeof config.packageManager === 'string') {
+        updateData.packageManager = config.packageManager;
+      }
+      if (typeof config.updateCheckEnabled === 'boolean') {
+        updateData.updateCheckEnabled = config.updateCheckEnabled;
+      }
+
+      if (typeof config.gitToken === 'string' && config.gitToken.trim().length > 0) {
         updateData.gitToken = this.encryptToken(config.gitToken);
       }
 
