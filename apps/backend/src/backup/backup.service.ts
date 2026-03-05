@@ -509,28 +509,32 @@ export class BackupService {
   }
 
   async markJobSuccess(jobId: string, details: Partial<BackupJob> = {}): Promise<void> {
-    await this.prisma.backupJob.update({
-      where: { id: jobId },
-      data: {
-        status: BackupJobStatus.SUCCESS,
-        progressPercent: 100,
-        currentStep: 'COMPLETED',
-        finishedAt: new Date(),
-        ...details,
-      },
+    await this.withPrismaConnectionRetry('markJobSuccess', async () => {
+      await this.prisma.backupJob.update({
+        where: { id: jobId },
+        data: {
+          status: BackupJobStatus.SUCCESS,
+          progressPercent: 100,
+          currentStep: 'COMPLETED',
+          finishedAt: new Date(),
+          ...details,
+        },
+      });
     });
   }
 
   async markJobFailed(jobId: string, error: unknown): Promise<void> {
     const message = this.errorMessage(error);
-    await this.prisma.backupJob.update({
-      where: { id: jobId },
-      data: {
-        status: BackupJobStatus.FAILED,
-        finishedAt: new Date(),
-        currentStep: 'FAILED',
-        error: message,
-      },
+    await this.withPrismaConnectionRetry('markJobFailed', async () => {
+      await this.prisma.backupJob.update({
+        where: { id: jobId },
+        data: {
+          status: BackupJobStatus.FAILED,
+          finishedAt: new Date(),
+          currentStep: 'FAILED',
+          error: message,
+        },
+      });
     });
 
     await this.appendJobLog(jobId, 'ERROR', message);
@@ -538,23 +542,27 @@ export class BackupService {
   }
 
   async markJobCanceled(jobId: string, reason: string): Promise<void> {
-    await this.prisma.backupJob.update({
-      where: { id: jobId },
-      data: {
-        status: BackupJobStatus.CANCELED,
-        finishedAt: new Date(),
-        currentStep: 'CANCELED',
-        error: reason,
-      },
+    await this.withPrismaConnectionRetry('markJobCanceled', async () => {
+      await this.prisma.backupJob.update({
+        where: { id: jobId },
+        data: {
+          status: BackupJobStatus.CANCELED,
+          finishedAt: new Date(),
+          currentStep: 'CANCELED',
+          error: reason,
+        },
+      });
     });
 
     await this.appendJobLog(jobId, 'WARN', reason);
   }
 
   async heartbeat(jobId: string): Promise<void> {
-    await this.prisma.backupJob.update({
-      where: { id: jobId },
-      data: { updatedAt: new Date() },
+    await this.withPrismaConnectionRetry('heartbeat', async () => {
+      await this.prisma.backupJob.update({
+        where: { id: jobId },
+        data: { updatedAt: new Date() },
+      });
     });
   }
 
@@ -565,12 +573,14 @@ export class BackupService {
     message?: string,
     level: JobLogEntry['level'] = 'INFO',
   ): Promise<void> {
-    await this.prisma.backupJob.update({
-      where: { id: jobId },
-      data: {
-        currentStep: step,
-        progressPercent: Math.max(0, Math.min(100, Math.round(progressPercent))),
-      },
+    await this.withPrismaConnectionRetry('updateJobProgress', async () => {
+      await this.prisma.backupJob.update({
+        where: { id: jobId },
+        data: {
+          currentStep: step,
+          progressPercent: Math.max(0, Math.min(100, Math.round(progressPercent))),
+        },
+      });
     });
 
     if (message) {
@@ -602,9 +612,11 @@ export class BackupService {
   }
 
   async appendJobLog(jobId: string, level: JobLogEntry['level'], message: string): Promise<void> {
-    const job = await this.prisma.backupJob.findUnique({
-      where: { id: jobId },
-      select: { logs: true },
+    const job = await this.withPrismaConnectionRetry('appendJobLog.find', async () => {
+      return await this.prisma.backupJob.findUnique({
+        where: { id: jobId },
+        select: { logs: true },
+      });
     });
 
     const currentLogs = this.parseLogs(job?.logs);
@@ -616,11 +628,13 @@ export class BackupService {
 
     const trimmed = currentLogs.slice(-400);
 
-    await this.prisma.backupJob.update({
-      where: { id: jobId },
-      data: {
-        logs: trimmed as any,
-      },
+    await this.withPrismaConnectionRetry('appendJobLog.update', async () => {
+      await this.prisma.backupJob.update({
+        where: { id: jobId },
+        data: {
+          logs: trimmed as any,
+        },
+      });
     });
   }
 
@@ -847,18 +861,17 @@ export class BackupService {
         84,
         'Drenando conexoes Prisma e bloqueando reconexao durante cutover',
       );
-      await this.prisma.quiesceForCutover();
-
-      const cutoverTimeoutMs = Math.min(
-        this.backupConfig.getJobTimeoutMs(),
-        this.backupConfig.getRestoreMaintenanceWindowSeconds() * 1000,
-      );
-
       await this.updateJobProgress(
         job.id,
         'RECONCILE_PROMOTION_STATE',
         88,
         'Reconciliando estado de promocao para recuperacao pos-crash',
+      );
+      await this.prisma.quiesceForCutover();
+
+      const cutoverTimeoutMs = Math.min(
+        this.backupConfig.getJobTimeoutMs(),
+        this.backupConfig.getRestoreMaintenanceWindowSeconds() * 1000,
       );
       try {
         await this.promoteStagingDatabase({
@@ -899,8 +912,8 @@ export class BackupService {
 
         throw resumeError;
       }
-      await this.updateJobProgress(job.id, 'RESTORE_SMOKE_TEST', 93, 'Executando smoke test pos-promocao');
       await this.ensurePrismaConnectionHealthy();
+      await this.updateJobProgress(job.id, 'RESTORE_SMOKE_TEST', 93, 'Executando smoke test pos-promocao');
       await this.validatePromotedDatabase();
 
       if (metadata?.runMigrations === true) {
@@ -1833,6 +1846,68 @@ export class BackupService {
         };
       })
       .filter((entry) => entry.message.length > 0);
+  }
+
+  private async withPrismaConnectionRetry<T>(operation: string, action: () => Promise<T>): Promise<T> {
+    const maxAttempts = 3;
+    let lastError: unknown = null;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await action();
+      } catch (error) {
+        lastError = error;
+        if (
+          this.prisma.isCutoverBlocked() ||
+          !this.isRetryablePrismaConnectionError(error) ||
+          attempt >= maxAttempts
+        ) {
+          throw error;
+        }
+
+        this.logger.warn(
+          `Operacao Prisma "${operation}" falhou por conexao (tentativa ${attempt}/${maxAttempts}). Recriando conexao...`,
+        );
+        await this.tryRecoverPrismaConnection();
+        await this.wait(250 * attempt);
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  }
+
+  private isRetryablePrismaConnectionError(error: unknown): boolean {
+    const code = typeof (error as any)?.code === 'string' ? String((error as any).code).toUpperCase() : '';
+    if (code === 'P1001' || code === 'P1017') {
+      return true;
+    }
+
+    const message = this.errorMessage(error).toLowerCase();
+    return (
+      message.includes('server has closed the connection') ||
+      message.includes('the database server closed the connection') ||
+      message.includes('connection terminated unexpectedly') ||
+      message.includes('connection closed') ||
+      message.includes('already disconnected') ||
+      message.includes("can't reach database server") ||
+      message.includes('prisma client is already disconnected')
+    );
+  }
+
+  private async tryRecoverPrismaConnection(): Promise<void> {
+    try {
+      await this.prisma.$disconnect();
+    } catch {}
+
+    if (this.prisma.isCutoverBlocked()) {
+      return;
+    }
+
+    try {
+      await this.prisma.$connect();
+    } catch (error) {
+      this.logger.warn(`Falha ao recriar conexao Prisma: ${this.errorMessage(error)}`);
+    }
   }
 
   private errorMessage(error: unknown): string {
