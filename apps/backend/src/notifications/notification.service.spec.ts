@@ -70,13 +70,84 @@ describe('NotificationService system notifications', () => {
     });
   });
 
-  it('ignores non-allowlisted action to avoid noisy notifications', async () => {
+  it('creates persisted notification for BACKUP_FAILED', async () => {
     const service = createService();
+    const createdAt = new Date('2026-03-06T12:10:00.000Z');
+    prismaMock.notification.create.mockResolvedValue({
+      id: 'notif-backup-failed',
+      type: 'SYSTEM_ALERT',
+      severity: 'warning',
+      title: 'Backup falhou',
+      body: 'O backup do sistema falhou e precisa de verificacao.',
+      message: 'O backup do sistema falhou e precisa de verificacao.',
+      data: { action: 'BACKUP_FAILED', source: 'cron' },
+      createdAt,
+      isRead: false,
+      readAt: null,
+      targetRole: 'SUPER_ADMIN',
+      audience: 'super_admin',
+    });
 
     const result = await service.emitSystemAlert({
       action: 'BACKUP_FAILED',
       severity: 'critical',
-      body: 'backup failed',
+      body: 'O backup do sistema falhou e precisa de verificacao.',
+      data: { source: 'cron' },
+    });
+
+    expect(prismaMock.notification.create).toHaveBeenCalledTimes(1);
+    const payload = prismaMock.notification.create.mock.calls[0][0].data;
+    expect(payload.severity).toBe('warning');
+    expect(payload.title).toBe('Backup falhou');
+    expect(result).toMatchObject({
+      id: 'notif-backup-failed',
+      severity: 'warning',
+      isRead: false,
+    });
+  });
+
+  it('creates persisted notification for RESTORE_COMPLETED as critical', async () => {
+    const service = createService();
+    const createdAt = new Date('2026-03-06T12:20:00.000Z');
+    prismaMock.notification.create.mockResolvedValue({
+      id: 'notif-restore-completed',
+      type: 'SYSTEM_ALERT',
+      severity: 'critical',
+      title: 'Restauracao concluida',
+      body: 'A restauracao do sistema foi concluida com sucesso.',
+      message: 'A restauracao do sistema foi concluida com sucesso.',
+      data: { action: 'RESTORE_COMPLETED' },
+      createdAt,
+      isRead: false,
+      readAt: null,
+      targetRole: 'SUPER_ADMIN',
+      audience: 'super_admin',
+    });
+
+    const result = await service.emitSystemAlert({
+      action: 'RESTORE_COMPLETED',
+      severity: 'critical',
+      body: 'A restauracao do sistema foi concluida com sucesso.',
+    });
+
+    expect(prismaMock.notification.create).toHaveBeenCalledTimes(1);
+    const payload = prismaMock.notification.create.mock.calls[0][0].data;
+    expect(payload.severity).toBe('critical');
+    expect(payload.title).toBe('Restauracao concluida');
+    expect(result).toMatchObject({
+      id: 'notif-restore-completed',
+      severity: 'critical',
+      isRead: false,
+    });
+  });
+
+  it('ignores non-allowlisted action to avoid noisy notifications', async () => {
+    const service = createService();
+
+    const result = await service.emitSystemAlert({
+      action: 'BACKUP_COMPLETED',
+      severity: 'info',
+      body: 'backup concluido',
     });
 
     expect(result).toBeNull();

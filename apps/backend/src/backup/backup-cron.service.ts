@@ -40,6 +40,7 @@ export class BackupCronService implements OnModuleInit {
         await this.backupService.createBackupJob(superAdmin.id, {
           ipAddress: '127.0.0.1',
           userAgent: 'cron/system.backup_auto_create',
+          source: 'cron',
         });
       },
       {

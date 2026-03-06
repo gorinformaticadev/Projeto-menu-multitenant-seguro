@@ -374,4 +374,144 @@ describe('BackupService', () => {
       'Nao foi possivel adquirir lock global apos 3 tentativas. Tente novamente.',
     );
   });
+
+  it('sanitizeErrorForMetadata remove headers sensiveis, paths absolutos e stack trace bruto', () => {
+    const service = Object.create(BackupService.prototype) as BackupService;
+
+    const sanitized = (service as any).sanitizeErrorForMetadata(
+      [
+        'Falha no restore authorization=Bearer super-token, cookie=session=abc123; x-maintenance-bypass=bypass-secret; arquivo=/opt/app/shared/.env.snapshot',
+        'at RestoreService.apply (/opt/app/releases/current/dist/restore.js:120:55)',
+        'at Object.run (C:\\app\\secret\\restore.ts:32:7)',
+      ].join('\n'),
+    );
+
+    expect(sanitized).not.toMatch(/authorization|cookie|x-maintenance-bypass/i);
+    expect(sanitized).not.toContain('super-token');
+    expect(sanitized).not.toContain('abc123');
+    expect(sanitized).not.toContain('bypass-secret');
+    expect(sanitized).not.toContain('/opt/app');
+    expect(sanitized).not.toContain('C:\\app\\secret');
+    expect(sanitized).toContain('[path-redacted]');
+    expect(sanitized).toContain('[stack-redacted]');
+  });
+
+  it('sanitizeErrorForMetadata colapsa stack trace em linha unica', () => {
+    const service = Object.create(BackupService.prototype) as BackupService;
+
+    const sanitized = (service as any).sanitizeErrorForMetadata(
+      'Falha no restore com token=abc at RestoreService.apply (/opt/app/current/restore.ts:22:10)',
+    );
+
+    expect(sanitized).toContain('[stack-redacted]');
+    expect(sanitized).not.toContain('/opt/app/current/restore.ts');
+    expect(sanitized).not.toContain('token=abc');
+  });
+
+  it('notifyFailure gera BACKUP_FAILED com metadata sanitizado e notificacao persistida', async () => {
+    const service = Object.create(BackupService.prototype) as BackupService;
+    const auditLog = jest.fn().mockResolvedValue(null);
+    const emitSystemAlert = jest.fn().mockResolvedValue(null);
+
+    (service as any).prisma = {
+      backupJob: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'job-backup-1',
+          type: 'BACKUP',
+          artifactId: null,
+          metadata: {
+            source: 'cron',
+            backupType: 'database_full',
+          },
+          createdByUserId: 'user-1',
+          startedAt: new Date('2026-03-06T10:00:00.000Z'),
+        }),
+      },
+    };
+    (service as any).auditService = { log: auditLog };
+    (service as any).notificationService = { emitSystemAlert };
+    jest.spyOn(service as any, 'resolveAuditActor').mockResolvedValue({
+      userId: 'user-1',
+      role: 'SUPER_ADMIN',
+    });
+
+    await (service as any).notifyFailure(
+      'job-backup-1',
+      'Falha token=abc no arquivo /opt/app/shared/.env.snapshot',
+    );
+
+    expect(auditLog).toHaveBeenCalledTimes(1);
+    expect(auditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'BACKUP_FAILED',
+        severity: 'warning',
+        metadata: expect.objectContaining({
+          source: 'cron',
+          jobId: 'job-backup-1',
+          backupType: 'database_full',
+          lastError: expect.stringContaining('[redacted]'),
+        }),
+      }),
+    );
+    expect(emitSystemAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'BACKUP_FAILED',
+        title: 'Backup falhou',
+        body: 'O backup do sistema falhou e precisa de verificacao.',
+      }),
+    );
+  });
+
+  it('notifyFailure gera RESTORE_FAILED com restoreId/backupId e notificacao critica', async () => {
+    const service = Object.create(BackupService.prototype) as BackupService;
+    const auditLog = jest.fn().mockResolvedValue(null);
+    const emitSystemAlert = jest.fn().mockResolvedValue(null);
+
+    (service as any).prisma = {
+      backupJob: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'job-restore-1',
+          type: 'RESTORE',
+          artifactId: 'artifact-1',
+          metadata: {
+            source: 'wrapper',
+          },
+          createdByUserId: 'user-2',
+          startedAt: new Date('2026-03-06T10:00:00.000Z'),
+        }),
+      },
+    };
+    (service as any).auditService = { log: auditLog };
+    (service as any).notificationService = { emitSystemAlert };
+    jest.spyOn(service as any, 'resolveAuditActor').mockResolvedValue({
+      userId: 'user-2',
+      role: 'SUPER_ADMIN',
+    });
+
+    await (service as any).notifyFailure(
+      'job-restore-1',
+      'Erro no restore com authorization=Bearer abc',
+    );
+
+    expect(auditLog).toHaveBeenCalledTimes(1);
+    expect(auditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'RESTORE_FAILED',
+        severity: 'critical',
+        metadata: expect.objectContaining({
+          source: 'wrapper',
+          restoreId: 'job-restore-1',
+          backupId: 'artifact-1',
+          lastError: expect.stringContaining('[redacted'),
+        }),
+      }),
+    );
+    expect(emitSystemAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'RESTORE_FAILED',
+        title: 'Restauracao falhou',
+        body: 'A restauracao do sistema falhou e pode exigir intervencao.',
+      }),
+    );
+  });
 });

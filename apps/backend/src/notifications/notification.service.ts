@@ -95,6 +95,22 @@ const SYSTEM_ALERT_RULES: Record<string, { severity: SystemNotificationSeverity;
     severity: 'critical',
     title: 'Bypass de manutencao utilizado',
   },
+  BACKUP_FAILED: {
+    severity: 'warning',
+    title: 'Backup falhou',
+  },
+  RESTORE_STARTED: {
+    severity: 'critical',
+    title: 'Restauracao iniciada',
+  },
+  RESTORE_COMPLETED: {
+    severity: 'critical',
+    title: 'Restauracao concluida',
+  },
+  RESTORE_FAILED: {
+    severity: 'critical',
+    title: 'Restauracao falhou',
+  },
 };
 
 @Injectable()

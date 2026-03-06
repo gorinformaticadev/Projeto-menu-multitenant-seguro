@@ -437,7 +437,65 @@ Rotas:
 - WebSocket
 - polling/frontend realtime
 - inbox/bell/toast em tempo real
-- notificacoes de backup/restore
+- notificacoes de backup/restore (implementadas na Etapa 4)
+
+## Etapa 4 - Auditoria + Notifications para Backup/Restore (sem realtime)
+
+### Auditoria persistente (AuditLog)
+
+Eventos adicionados para operacoes de backup/restore:
+
+Backup:
+
+- `BACKUP_STARTED` (`info`)
+- `BACKUP_COMPLETED` (`info`)
+- `BACKUP_FAILED` (`warning`)
+
+Restore:
+
+- `RESTORE_STARTED` (`critical`)
+- `RESTORE_COMPLETED` (`critical`)
+- `RESTORE_FAILED` (`critical`)
+
+Metadata principal padronizado:
+
+- backup: `source`, `jobId`, `backupType`, `retentionPolicy`, `durationSeconds`
+- backup concluido: `artifactId`, `dbDumpCaptured`, `uploadsArchiveCaptured`, `envSnapshotCaptured`
+- restore: `source`, `restoreId`, `backupId`, `artifactIds`, `durationSeconds`
+- falhas: `lastError` sanitizado (sem token/cookie/headers sensiveis/path absoluto sensivel)
+
+### Notifications persistidas (SUPER_ADMIN)
+
+Allowlist desta etapa para inbox administrativa:
+
+- `BACKUP_FAILED`
+- `RESTORE_STARTED`
+- `RESTORE_COMPLETED`
+- `RESTORE_FAILED`
+
+Sem ruido adicional:
+
+- `BACKUP_STARTED` e `BACKUP_COMPLETED` nao geram notificacao persistida.
+
+Mensagens humanas padronizadas:
+
+- `BACKUP_FAILED`: `Backup falhou` / `O backup do sistema falhou e precisa de verificacao.`
+- `RESTORE_STARTED`: `Restauracao iniciada` / `Uma restauracao do sistema foi iniciada.`
+- `RESTORE_COMPLETED`: `Restauracao concluida` / `A restauracao do sistema foi concluida com sucesso.`
+- `RESTORE_FAILED`: `Restauracao falhou` / `A restauracao do sistema falhou e pode exigir intervencao.`
+
+### Endpoints reaproveitados (sem novos contratos)
+
+- `GET /api/system/audit`
+- `GET /api/system/audit/:id`
+- `GET /api/system/notifications`
+- `GET /api/system/notifications/unread-count`
+- `POST /api/system/notifications/:id/read`
+- `POST /api/system/notifications/read-all`
+
+Observacao:
+
+- a inbox existente do `SUPER_ADMIN` (polling) passa a exibir os eventos novos sem alteracao estrutural de UI.
 
 ## Etapa 1 - AuditLog persistente (update + maintenance)
 
@@ -487,9 +545,9 @@ Observacoes:
   - paginacao: `page`, `limit` (default `20`, maximo `100`)
   - filtros: `action`, `severity`, `actorUserId`, `from`, `to`
   - ordenacao: `createdAt desc`
-  - escopo disciplinado desta etapa: apenas acoes `UPDATE_*` e `MAINTENANCE_*`
+  - escopo administrativo atual: acoes `UPDATE_*`, `MAINTENANCE_*`, `BACKUP_*`, `RESTORE_*`
 - `GET /api/system/audit/:id`
-  - retorna apenas registros de `UPDATE_*` e `MAINTENANCE_*`
+  - retorna apenas registros administrativos (`UPDATE_*`, `MAINTENANCE_*`, `BACKUP_*`, `RESTORE_*`)
 
 Protecao:
 

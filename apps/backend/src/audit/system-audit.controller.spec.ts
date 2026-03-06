@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { ROLES_KEY } from '@core/common/decorators/roles.decorator';
 import { SystemAuditController } from './system-audit.controller';
+import { SYSTEM_AUDIT_ACTION_PREFIXES } from './system-audit.constants';
 
 describe('SystemAuditController', () => {
   const auditServiceMock = {
@@ -47,7 +48,7 @@ describe('SystemAuditController', () => {
       page: 1,
       limit: 10,
       action: 'UPDATE_FAILED',
-      allowedActionPrefixes: ['UPDATE_', 'MAINTENANCE_'],
+      allowedActionPrefixes: [...SYSTEM_AUDIT_ACTION_PREFIXES],
       severity: 'critical',
       actorUserId: 'user-1',
     });
@@ -74,5 +75,15 @@ describe('SystemAuditController', () => {
 
     expect(auditServiceMock.findOne).toHaveBeenCalledWith('audit-2');
     expect(result).toBeNull();
+  });
+
+  it('returns backup/restore actions on detail endpoint', async () => {
+    const controller = createController();
+    auditServiceMock.findOne.mockResolvedValue({ id: 'audit-3', action: 'RESTORE_FAILED' });
+
+    const result = await controller.findOne('audit-3');
+
+    expect(auditServiceMock.findOne).toHaveBeenCalledWith('audit-3');
+    expect(result).toEqual({ id: 'audit-3', action: 'RESTORE_FAILED' });
   });
 });

@@ -41,7 +41,11 @@ export class BackupsController {
   @Post()
   async createBackupJob(@Request() req) {
     const userId = req.user?.id || req.user?.sub;
-    const job = await this.backupService.createBackupJob(userId, { ipAddress: extractRequestContext(req).ip || undefined, userAgent: extractRequestContext(req).userAgent || undefined });
+    const job = await this.backupService.createBackupJob(userId, {
+      ipAddress: extractRequestContext(req).ip || undefined,
+      userAgent: extractRequestContext(req).userAgent || undefined,
+      source: 'panel',
+    });
     return {
       success: true,
       message: 'Job de backup enfileirado',
@@ -96,7 +100,11 @@ export class BackupsController {
       artifactId,
       userId,
       dto || {},
-      { ipAddress: extractRequestContext(req).ip || undefined, userAgent: extractRequestContext(req).userAgent || undefined },
+      {
+        ipAddress: extractRequestContext(req).ip || undefined,
+        userAgent: extractRequestContext(req).userAgent || undefined,
+        source: 'panel',
+      },
     );
     return {
       success: true,
@@ -115,7 +123,11 @@ export class BackupsController {
       uploadId,
       userId,
       dto || {},
-      { ipAddress: extractRequestContext(req).ip || undefined, userAgent: extractRequestContext(req).userAgent || undefined },
+      {
+        ipAddress: extractRequestContext(req).ip || undefined,
+        userAgent: extractRequestContext(req).userAgent || undefined,
+        source: 'panel',
+      },
     );
     return {
       success: true,
@@ -181,7 +193,11 @@ export class BackupLegacyController {
   @Post('create')
   async create(@Request() req) {
     const userId = req.user?.id || req.user?.sub;
-    const job = await this.backupService.createBackupJob(userId, { ipAddress: extractRequestContext(req).ip || undefined, userAgent: extractRequestContext(req).userAgent || undefined });
+    const job = await this.backupService.createBackupJob(userId, {
+      ipAddress: extractRequestContext(req).ip || undefined,
+      userAgent: extractRequestContext(req).userAgent || undefined,
+      source: 'panel',
+    });
     return {
       success: true,
       message: 'Backup enfileirado',
@@ -237,7 +253,11 @@ export class BackupLegacyController {
       artifact.id,
       userId,
       body || {},
-      { ipAddress: extractRequestContext(req).ip || undefined, userAgent: extractRequestContext(req).userAgent || undefined },
+      {
+        ipAddress: extractRequestContext(req).ip || undefined,
+        userAgent: extractRequestContext(req).userAgent || undefined,
+        source: 'panel',
+      },
     );
     return {
       success: true,
@@ -342,4 +362,3 @@ export class BackupInternalController {
     };
   }
 }
-

@@ -30,6 +30,7 @@ import { RestoreJobDto } from './dto/restore-job.dto';
 interface RequestContext {
   ipAddress?: string;
   userAgent?: string;
+  source?: BackupOperationSource;
 }
 
 interface JobLogEntry {
@@ -37,6 +38,8 @@ interface JobLogEntry {
   level: 'INFO' | 'WARN' | 'ERROR';
   message: string;
 }
+
+type BackupOperationSource = 'panel' | 'cron' | 'system' | 'wrapper';
 
 class PromotionReconcileFailed extends Error {
   constructor(message: string) {
@@ -102,6 +105,7 @@ export class BackupService {
   async createBackupJob(userId: string, context: RequestContext): Promise<BackupJob> {
     await this.assertOperatorAllowed(userId);
     await this.assertNoRunningUpdate();
+    const source = this.resolveOperationSource(context, 'system');
 
     const job = await this.prisma.backupJob.create({
       data: {
@@ -112,7 +116,9 @@ export class BackupService {
         createdByUserId: userId,
         metadata: {
           requestedBy: userId,
-          source: 'api',
+          source,
+          backupType: 'database_full',
+          retentionPolicy: this.backupConfig.getRetentionCount(),
           executionMode: this.backupConfig.getExecutionMode(),
         },
         logs: [],
@@ -179,6 +185,7 @@ export class BackupService {
   ): Promise<BackupJob> {
     await this.assertOperatorAllowed(userId);
     await this.assertNoRunningUpdate();
+    const source = this.resolveOperationSource(context, 'panel');
 
     const artifact = await this.getArtifactByIdOrThrow(artifactId);
     this.assertArtifactUsableForRestore(artifact, restoreOptions);
@@ -196,6 +203,7 @@ export class BackupService {
         checksumSha256: artifact.checksumSha256,
         createdByUserId: userId,
         metadata: {
+          source,
           runMigrations: !!restoreOptions.runMigrations,
           forceCrossEnvironment: !!restoreOptions.forceCrossEnvironment,
           allowUnsafeObjects: !!restoreOptions.allowUnsafeObjects,
@@ -237,7 +245,10 @@ export class BackupService {
   ): Promise<BackupJob> {
     const operatorId = await this.resolveInternalRestoreOperatorId();
     const artifact = await this.findArtifactByFileName(fileName);
-    return this.queueRestoreFromArtifact(artifact.id, operatorId, restoreOptions, context);
+    return this.queueRestoreFromArtifact(artifact.id, operatorId, restoreOptions, {
+      ...context,
+      source: 'wrapper',
+    });
   }
 
   async listBackupsAndJobs(limit = 50): Promise<BackupListResponse> {
@@ -686,6 +697,10 @@ export class BackupService {
 
     const actor = await this.resolveAuditActor(job.createdByUserId);
     const startedAt = job.startedAt || new Date();
+    const jobMetadata = this.toJsonRecord(job.metadata);
+    const source = this.resolveOperationSourceFromMetadata(jobMetadata, 'system');
+    const backupType = this.readStringMetadata(jobMetadata, 'backupType') || 'database_full';
+    const retentionPolicy = this.readNumberMetadata(jobMetadata, 'retentionPolicy');
 
     await this.auditService.log({
       action: 'BACKUP_STARTED',
@@ -693,8 +708,10 @@ export class BackupService {
       message: `Backup iniciado (job ${job.id})`,
       actor,
       metadata: {
+        source,
         jobId: job.id,
-        type: job.type,
+        backupType,
+        retentionPolicy,
       },
     });
 
@@ -790,11 +807,15 @@ export class BackupService {
       message: `Backup concluido com sucesso (job ${job.id})`,
       actor,
       metadata: {
+        source,
         jobId: job.id,
+        backupType,
+        retentionPolicy,
         artifactId: artifact.id,
-        fileName,
-        fileSize: size,
         durationSeconds: this.calculateDurationSeconds(startedAt),
+        dbDumpCaptured: true,
+        uploadsArchiveCaptured: Boolean(assets.uploadsArchivePath),
+        envSnapshotCaptured: Boolean(assets.envSnapshotPath),
       },
     });
 
@@ -834,12 +855,14 @@ export class BackupService {
     const metadata = this.toJsonRecord(job.metadata);
     const actor = await this.resolveAuditActor(job.createdByUserId);
     const startedAt = job.startedAt || new Date();
+    const source = this.resolveOperationSourceFromMetadata(metadata, 'panel');
 
     const restoreStartMetadata = {
-      jobId: job.id,
-      artifactId: artifact.id,
-      fileName: artifact.fileName,
-      source: artifact.source,
+      source,
+      restoreId: job.id,
+      backupId: artifact.id,
+      artifactIds: [artifact.id],
+      artifactSource: artifact.source,
     };
 
     await this.auditService.log({
@@ -853,8 +876,8 @@ export class BackupService {
     await this.notificationService.emitSystemAlert({
       action: 'RESTORE_STARTED',
       severity: 'critical',
-      title: 'Restore iniciado',
-      body: `Restore iniciado para backup ${artifact.fileName}.`,
+      title: 'Restauracao iniciada',
+      body: 'Uma restauracao do sistema foi iniciada.',
       data: restoreStartMetadata,
       module: 'backup',
     });
@@ -1009,13 +1032,13 @@ export class BackupService {
       });
 
       const restoreCompletedMetadata = {
-        jobId: job.id,
-        artifactId: artifact.id,
-        fileName: artifact.fileName,
-        activeDatabase,
-        stagingDatabase,
-        rollbackDatabase,
-        safetyBackupArtifactId: safetyArtifact?.id || null,
+        source,
+        restoreId: job.id,
+        backupId: artifact.id,
+        artifactIds: {
+          backupArtifactId: artifact.id,
+          safetyBackupArtifactId: safetyArtifact?.id || null,
+        },
         durationSeconds: this.calculateDurationSeconds(startedAt),
       };
 
@@ -1030,8 +1053,8 @@ export class BackupService {
       await this.notificationService.emitSystemAlert({
         action: 'RESTORE_COMPLETED',
         severity: 'critical',
-        title: 'Restore concluido',
-        body: `Restore concluido para backup ${artifact.fileName}.`,
+        title: 'Restauracao concluida',
+        body: 'A restauracao do sistema foi concluida com sucesso.',
         data: restoreCompletedMetadata,
         module: 'backup',
       });
@@ -2322,6 +2345,136 @@ export class BackupService {
     return Math.max(0, Math.round((finishedMs - startedMs) / 1000));
   }
 
+  private resolveOperationSource(
+    context?: RequestContext,
+    fallback: BackupOperationSource = 'panel',
+  ): BackupOperationSource {
+    const explicit = this.normalizeOperationSource(context?.source);
+    if (explicit) {
+      return explicit;
+    }
+
+    const userAgent = String(context?.userAgent || '')
+      .trim()
+      .toLowerCase();
+
+    if (!userAgent) {
+      return fallback;
+    }
+
+    if (userAgent.includes('cron/')) {
+      return 'cron';
+    }
+
+    if (userAgent.includes('wrapper') || userAgent.includes('restore-native') || userAgent.includes('internal')) {
+      return 'wrapper';
+    }
+
+    if (userAgent.includes('system/')) {
+      return 'system';
+    }
+
+    if (
+      userAgent.includes('mozilla') ||
+      userAgent.includes('chrome') ||
+      userAgent.includes('safari') ||
+      userAgent.includes('firefox') ||
+      userAgent.includes('edg/')
+    ) {
+      return 'panel';
+    }
+
+    return fallback;
+  }
+
+  private resolveOperationSourceFromMetadata(
+    metadata: Record<string, unknown> | null,
+    fallback: BackupOperationSource,
+  ): BackupOperationSource {
+    return this.resolveOperationSource(
+      {
+        source: this.normalizeOperationSource(metadata?.source),
+      },
+      fallback,
+    );
+  }
+
+  private normalizeOperationSource(input: unknown): BackupOperationSource | null {
+    const value = String(input || '')
+      .trim()
+      .toLowerCase();
+    if (value === 'panel' || value === 'cron' || value === 'system' || value === 'wrapper') {
+      return value;
+    }
+
+    return null;
+  }
+
+  private readStringMetadata(metadata: Record<string, unknown> | null, key: string): string | null {
+    const value = metadata?.[key];
+    if (typeof value !== 'string') {
+      return null;
+    }
+
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  private readNumberMetadata(metadata: Record<string, unknown> | null, key: string): number | null {
+    const value = metadata?.[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+
+    return null;
+  }
+
+  private sanitizeErrorForMetadata(message: string): string {
+    let sanitized = String(message || '').trim();
+    if (!sanitized) {
+      return 'Erro desconhecido';
+    }
+
+    sanitized = sanitized.replace(
+      /\b(authorization|proxy-authorization|cookie|set-cookie|x-maintenance-bypass)\b\s*[:=]\s*([^\n,;]+)/gi,
+      '[redacted-header]',
+    );
+    sanitized = sanitized.replace(/\b(Bearer)\s+[A-Za-z0-9\-._~+/=]+/gi, '$1 [redacted]');
+    sanitized = sanitized.replace(
+      /\b(authorization|proxy-authorization|token|secret|password|passwd|api[-_]?key|x-api-key|x-maintenance-bypass|cookie|set-cookie)\b\s*[:=]\s*([^\s,;]+)/gi,
+      '$1=[redacted]',
+    );
+    sanitized = sanitized.replace(/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, '[redacted-jwt]');
+    sanitized = sanitized.replace(
+      /((?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|redis):\/\/[^:\s/]+:)([^@\s/]+)@/gi,
+      '$1[redacted]@',
+    );
+    sanitized = sanitized.replace(/([A-Za-z]:)?[\\/](?:[^\\/\s'"`]+[\\/])*[^\\/\s'"`]+/g, '[path-redacted]');
+    const inlineStackMatch = sanitized.match(
+      /^(.*?)(?:\s+at\s+[^\n]+(?:\[path-redacted\]|:[0-9]+:[0-9]+).*)$/i,
+    );
+    if (inlineStackMatch) {
+      const firstLine = (inlineStackMatch[1] || '').trim();
+      sanitized = `${firstLine || 'Erro desconhecido'} [stack-redacted]`;
+    }
+
+    if (/\n/.test(sanitized)) {
+      const normalizedLines = sanitized
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+
+      const firstLine = normalizedLines[0] || 'Erro desconhecido';
+      const hasStackTrace = normalizedLines
+        .slice(1)
+        .some((line) => /^at\s+/i.test(line) || /:[0-9]+:[0-9]+/.test(line));
+
+      sanitized = hasStackTrace ? `${firstLine} [stack-redacted]` : normalizedLines.join(' | ');
+    }
+
+    return sanitized.length > 1000 ? `${sanitized.slice(0, 997)}...` : sanitized;
+  }
+
   private async notifyFailure(jobId: string, message: string): Promise<void> {
     try {
       const job = await this.prisma.backupJob.findUnique({
@@ -2330,7 +2483,7 @@ export class BackupService {
           id: true,
           type: true,
           artifactId: true,
-          fileName: true,
+          metadata: true,
           createdByUserId: true,
           startedAt: true,
         },
@@ -2341,20 +2494,30 @@ export class BackupService {
       const action = isRestore ? 'RESTORE_FAILED' : 'BACKUP_FAILED';
       const severity: 'warning' | 'critical' = isRestore ? 'critical' : 'warning';
       const normalizedError = String(message || 'Falha em job de backup/restore').slice(0, 1000);
+      const sanitizedError = this.sanitizeErrorForMetadata(normalizedError);
+      const metadata = this.toJsonRecord(job?.metadata);
+      const source = this.resolveOperationSourceFromMetadata(metadata, isRestore ? 'panel' : 'system');
 
-      const eventMetadata = {
-        jobId,
-        type: job?.type || null,
-        artifactId: job?.artifactId || null,
-        fileName: job?.fileName || null,
-        durationSeconds: this.calculateDurationSeconds(job?.startedAt || null),
-        lastError: normalizedError,
-      };
+      const eventMetadata = isRestore
+        ? {
+            source,
+            restoreId: jobId,
+            backupId: job?.artifactId || null,
+            durationSeconds: this.calculateDurationSeconds(job?.startedAt || null),
+            lastError: sanitizedError,
+          }
+        : {
+            source,
+            jobId,
+            backupType: this.readStringMetadata(metadata, 'backupType') || 'database_full',
+            durationSeconds: this.calculateDurationSeconds(job?.startedAt || null),
+            lastError: sanitizedError,
+          };
 
       await this.auditService.log({
         action,
         severity,
-        message: normalizedError,
+        message: sanitizedError,
         actor,
         metadata: eventMetadata,
       });
@@ -2362,10 +2525,10 @@ export class BackupService {
       await this.notificationService.emitSystemAlert({
         action,
         severity,
-        title: isRestore ? 'Restore falhou' : 'Backup falhou',
+        title: isRestore ? 'Restauracao falhou' : 'Backup falhou',
         body: isRestore
-          ? `Restore falhou no job ${jobId}. Consulte os logs para detalhes.`
-          : `Backup falhou no job ${jobId}. Consulte os logs para detalhes.`,
+          ? 'A restauracao do sistema falhou e pode exigir intervencao.'
+          : 'O backup do sistema falhou e precisa de verificacao.',
         data: eventMetadata,
         module: 'backup',
       });
