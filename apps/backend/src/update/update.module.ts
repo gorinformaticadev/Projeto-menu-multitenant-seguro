@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { UpdateController } from './update.controller';
 import { UpdateService } from './update.service';
 import { UpdateCronService } from './update-cron.service';
@@ -8,6 +8,7 @@ import { PrismaModule } from '@core/prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
 import { CommonModule } from '../common/common.module';
 import { PathsModule } from '@core/common/paths/paths.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 /**
  * Módulo do Sistema de Atualizações
@@ -20,7 +21,7 @@ import { PathsModule } from '@core/common/paths/paths.module';
  * - Interface REST para administradores
  */
 @Module({
-  imports: [PrismaModule, AuditModule, CommonModule, PathsModule],
+  imports: [PrismaModule, AuditModule, CommonModule, PathsModule, NotificationsModule],
   controllers: [UpdateController, SystemUpdateController],
   providers: [UpdateService, UpdateCronService, SystemUpdateAdminService],
   exports: [UpdateService, SystemUpdateAdminService],
@@ -28,3 +29,4 @@ import { PathsModule } from '@core/common/paths/paths.module';
 export class UpdateModule {
   // Empty implementation
 }
+

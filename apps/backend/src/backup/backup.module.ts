@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { AuditModule } from '../audit/audit.module';
 import { CronModule } from '../core/cron/cron.module';
 import { PathsModule } from '../core/common/paths/paths.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { PrismaModule } from '../core/prisma/prisma.module';
 import { BackupConfigService } from './backup-config.service';
 import { BackupInternalController, BackupsController, BackupLegacyController } from './backup.controller';
@@ -17,7 +18,7 @@ import { BackupMaintenanceGuard } from './guards/backup-maintenance.guard';
 import { LegacyBackupDeprecationInterceptor } from './interceptors/legacy-backup-deprecation.interceptor';
 
 @Module({
-  imports: [PrismaModule, AuditModule, CronModule, PathsModule],
+  imports: [PrismaModule, AuditModule, CronModule, PathsModule, NotificationsModule],
   controllers: [BackupsController, BackupLegacyController, BackupInternalController],
   providers: [
     BackupConfigService,

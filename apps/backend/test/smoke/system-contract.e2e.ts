@@ -1,4 +1,4 @@
-import {
+﻿import {
   CanActivate,
   Controller,
   ExecutionContext,
@@ -24,6 +24,9 @@ import { JwtAuthGuard } from '../../src/core/common/guards/jwt-auth.guard';
 import { IS_PUBLIC_KEY } from '../../src/core/decorators/public.decorator';
 import { SystemUpdateController } from '../../src/update/system-update.controller';
 import { SystemUpdateAdminService } from '../../src/update/system-update-admin.service';
+import { NotificationService } from '../../src/notifications/notification.service';
+import { SystemNotificationsController } from '../../src/notifications/system-notifications.controller';
+import { NotificationsSseJwtGuard } from '../../src/notifications/guards/notifications-sse-jwt.guard';
 
 const DEFAULT_MAINTENANCE_STATE: MaintenanceState = {
   enabled: false,
@@ -59,6 +62,27 @@ const UPDATE_STATUS_RESPONSE = {
   statePath: '/tmp/update-state.json',
 };
 
+const SYSTEM_NOTIFICATIONS_FIXTURE = {
+  notifications: [
+    {
+      id: 'notif-1',
+      type: 'SYSTEM_ALERT',
+      severity: 'critical',
+      title: 'Update falhou',
+      body: 'Falha no update da versao v1.2.3',
+      data: { action: 'UPDATE_FAILED' },
+      createdAt: new Date('2026-03-05T22:00:00Z'),
+      isRead: false,
+      readAt: null,
+    },
+  ],
+  total: 1,
+  unreadCount: 1,
+  page: 1,
+  limit: 20,
+  hasMore: false,
+};
+
 let maintenanceState = { ...DEFAULT_MAINTENANCE_STATE };
 
 const maintenanceModeServiceMock = {
@@ -71,6 +95,16 @@ const systemUpdateAdminServiceMock = {
   listReleases: jest.fn(),
   runUpdate: jest.fn(),
   runRollback: jest.fn(),
+};
+
+const notificationServiceMock = {
+  listSystemNotifications: jest.fn(async () => ({ ...SYSTEM_NOTIFICATIONS_FIXTURE })),
+  markSystemNotificationAsRead: jest.fn(async (id: string) => ({
+    ...SYSTEM_NOTIFICATIONS_FIXTURE.notifications[0],
+    id,
+    isRead: true,
+    readAt: new Date('2026-03-05T22:05:00Z'),
+  })),
 };
 
 @Injectable()
@@ -117,6 +151,7 @@ class DummyTenantsController {
     HealthController,
     MaintenanceController,
     SystemUpdateController,
+    SystemNotificationsController,
   ],
   providers: [
     Reflector,
@@ -134,6 +169,10 @@ class DummyTenantsController {
       provide: SystemUpdateAdminService,
       useValue: systemUpdateAdminServiceMock,
     },
+    {
+      provide: NotificationService,
+      useValue: notificationServiceMock,
+    },
   ],
 })
 class SmokeContractTestModule {}
@@ -147,6 +186,8 @@ describe('System contract smoke', () => {
     })
       .overrideGuard(JwtAuthGuard)
       .useClass(MockJwtAuthGuard)
+      .overrideGuard(NotificationsSseJwtGuard)
+      .useValue({ canActivate: () => true })
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -161,10 +202,17 @@ describe('System contract smoke', () => {
     systemUpdateAdminServiceMock.getStatus.mockResolvedValue({
       ...UPDATE_STATUS_RESPONSE,
     });
+    notificationServiceMock.listSystemNotifications.mockClear();
+    notificationServiceMock.listSystemNotifications.mockResolvedValue({
+      ...SYSTEM_NOTIFICATIONS_FIXTURE,
+    });
+    notificationServiceMock.markSystemNotificationAsRead.mockClear();
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   });
 
   it('GET /api/health returns 200', async () => {
@@ -212,7 +260,33 @@ describe('System contract smoke', () => {
     expect(systemUpdateAdminServiceMock.getStatus).toHaveBeenCalledTimes(1);
   });
 
-  it('maintenance guard returns 503 for regular routes and still allows health and update status', async () => {
+  it('GET /api/system/notifications enforces auth and returns super-admin payload', async () => {
+    await request(app.getHttpServer()).get('/api/system/notifications').expect(401);
+
+    const response = await request(app.getHttpServer())
+      .get('/api/system/notifications')
+      .set('Authorization', 'Bearer smoke-admin-token')
+      .expect(200);
+
+    expect(response.body.notifications).toHaveLength(1);
+    expect(response.body.unreadCount).toBe(1);
+    expect(response.body.notifications[0].severity).toBe('critical');
+    expect(notificationServiceMock.listSystemNotifications).toHaveBeenCalledTimes(1);
+  });
+
+  it('POST /api/system/notifications/:id/read marks notification as read', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/system/notifications/notif-1/read')
+      .set('Authorization', 'Bearer smoke-admin-token')
+      .expect(201);
+
+    expect(response.body.success).toBe(true);
+    expect(response.body.notification.id).toBe('notif-1');
+    expect(response.body.notification.isRead).toBe(true);
+    expect(notificationServiceMock.markSystemNotificationAsRead).toHaveBeenCalledWith('notif-1');
+  });
+
+  it('maintenance guard returns 503 for regular routes and still allows health, update status and notifications', async () => {
     maintenanceState = {
       enabled: true,
       reason: 'upgrade in progress',
@@ -231,6 +305,11 @@ describe('System contract smoke', () => {
 
     await request(app.getHttpServer())
       .get('/api/system/update/status')
+      .set('Authorization', 'Bearer smoke-admin-token')
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .get('/api/system/notifications')
       .set('Authorization', 'Bearer smoke-admin-token')
       .expect(200);
   });

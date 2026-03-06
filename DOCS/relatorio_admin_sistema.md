@@ -365,3 +365,124 @@ Resultado esperado:
 - nenhum merge ocorre sem CI verde nos 4 gates
 - ao menos 1 review aprovado e obrigatorio
 - branch protegida contra force-push e merge desatualizado
+## Auditoria e Notificacoes para SUPER_ADMIN
+
+### Persistencia (Prisma)
+
+`AuditLog` foi expandido para suportar auditoria operacional com:
+
+- `severity` (`info|warning|critical`)
+- `message` humano curto
+- ator (`actorUserId`, `actorEmail`, `actorRole`)
+- contexto de request (`ip`, `userAgent`)
+- `metadata` JSON sanitizado
+
+`Notification` foi expandido para notificacoes de sistema com:
+
+- `type` (ex.: `SYSTEM_ALERT`)
+- `severity` (`info|warning|critical`)
+- `title` + `body`
+- alvo por `targetRole` (`SUPER_ADMIN`) ou `targetUserId`
+- leitura (`isRead`, `readAt`)
+
+Migration aplicada:
+
+- `apps/backend/prisma/migrations/20260306093000_add_audit_notification_governance_fields/migration.sql`
+
+### Politica de severidade e ruido
+
+Regras aplicadas:
+
+- toda operacao relevante sempre gera `AuditLog`
+- notificacao em tempo real/persistida segue allowlist de operacoes criticas/operacionais
+- payloads passam por sanitizacao (sem tokens/segredos/paths completos)
+
+Allowlist de notificacoes:
+
+- `UPDATE_STARTED`
+- `UPDATE_COMPLETED`
+- `UPDATE_FAILED`
+- `UPDATE_ROLLED_BACK_AUTO`
+- `UPDATE_ROLLBACK_MANUAL`
+- `MAINTENANCE_ENABLED`
+- `BACKUP_FAILED`
+- `RESTORE_STARTED`
+- `RESTORE_COMPLETED`
+- `RESTORE_FAILED`
+
+### Acoes instrumentadas
+
+Update/Rollback:
+
+- `UPDATE_RUN_REQUESTED` (audit)
+- `UPDATE_STARTED` (audit + notify)
+- `UPDATE_COMPLETED` (audit + notify)
+- `UPDATE_FAILED` (audit + notify)
+- `UPDATE_ROLLED_BACK_AUTO` (audit + notify)
+- `UPDATE_ROLLBACK_MANUAL` (audit + notify)
+
+Maintenance:
+
+- `MAINTENANCE_ENABLED` (audit + notify)
+- `MAINTENANCE_DISABLED` (audit)
+
+Backup/Restore:
+
+- `BACKUP_STARTED` (audit)
+- `BACKUP_COMPLETED` (audit)
+- `BACKUP_FAILED` (audit + notify)
+- `RESTORE_STARTED` (audit + notify)
+- `RESTORE_COMPLETED` (audit + notify)
+- `RESTORE_FAILED` (audit + notify)
+
+### Contrato HTTP de notificacoes de sistema
+
+Protecao:
+
+- `JwtAuthGuard + RolesGuard`
+- apenas `SUPER_ADMIN`
+
+Rotas:
+
+- `GET /api/system/notifications`
+  - pagina notificacoes de sistema
+  - query: `page`, `limit`, `unreadOnly`
+- `POST /api/system/notifications/:id/read`
+  - marca notificacao como lida
+- `GET /api/system/notifications/stream`
+  - SSE para eventos em tempo real (`event: system_alert`)
+
+Exemplo de evento SSE:
+
+```text
+event: system_alert
+data: {"id":"...","type":"SYSTEM_ALERT","severity":"critical","title":"...","body":"...","data":{...},"createdAt":"...","isRead":false,"readAt":null}
+```
+
+### Maintenance mode e notificacoes
+
+Durante maintenance mode, rotas de notificacao de sistema ficam liberadas para monitoramento administrativo:
+
+- `GET /api/system/notifications*`
+- `POST /api/system/notifications/:id/read`
+
+### Frontend (SUPER_ADMIN)
+
+TopBar passou a usar canal dedicado de notificacoes de sistema para `SUPER_ADMIN`:
+
+- SSE em `/api/system/notifications/stream`
+- fallback polling a cada 30s em `/api/system/notifications`
+- contador de nao lidas + inbox/dropdown
+- marcar como lida
+- toast imediato para eventos `critical`
+
+### Cobertura de smoke tests
+
+`apps/backend/test/smoke/system-contract.e2e.ts` cobre:
+
+- `GET /api/health`
+- `GET /api/system/maintenance/state`
+- `GET /api/system/update/status` (auth)
+- `GET /api/system/notifications` (auth)
+- `POST /api/system/notifications/:id/read` (auth)
+- guard de maintenance bloqueando rota comum e preservando health/update status/notifications

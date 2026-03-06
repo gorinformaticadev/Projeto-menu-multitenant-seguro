@@ -1,4 +1,4 @@
-import {
+﻿import {
   Body,
   Controller,
   Get,
@@ -19,6 +19,7 @@ import {
   SystemUpdateLogQueryDto,
 } from './dto/system-update-admin.dto';
 import { SystemUpdateAdminService } from './system-update-admin.service';
+import { extractRequestContext } from '../common/interceptors/request-context.interceptor';
 
 @Controller('system/update')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -40,8 +41,10 @@ export class SystemUpdateController {
         version: body.version,
         legacyInplace: body.legacyInplace,
         userId: req.user?.sub || req.user?.id,
-        ipAddress: req.ip,
-        userAgent: req.headers?.['user-agent'],
+        userEmail: req.user?.email,
+        userRole: req.user?.role,
+        ipAddress: extractRequestContext(req).ip || undefined,
+        userAgent: extractRequestContext(req).userAgent || undefined,
       });
     } catch (error) {
       this.rethrowPreservingHttp(error, 'Erro ao iniciar update');
@@ -74,8 +77,10 @@ export class SystemUpdateController {
       return await this.systemUpdateAdminService.runRollback({
         target: body.target,
         userId: req.user?.sub || req.user?.id,
-        ipAddress: req.ip,
-        userAgent: req.headers?.['user-agent'],
+        userEmail: req.user?.email,
+        userRole: req.user?.role,
+        ipAddress: extractRequestContext(req).ip || undefined,
+        userAgent: extractRequestContext(req).userAgent || undefined,
       });
     } catch (error) {
       this.rethrowPreservingHttp(error, 'Erro ao iniciar rollback');
@@ -91,3 +96,5 @@ export class SystemUpdateController {
     }
   }
 }
+
+

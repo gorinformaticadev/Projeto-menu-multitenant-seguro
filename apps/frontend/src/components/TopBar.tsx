@@ -10,6 +10,7 @@ import { Bell, Search, User, LogOut, Info } from "lucide-react";
 import api from "@/lib/api";
 import { ModuleRegistryUserMenu } from "./ModuleRegistryUserMenu";
 import { useNotificationContext } from '@/providers/NotificationProvider';
+import { useSystemAdminNotifications } from '@/hooks/useSystemAdminNotifications';
 import { AlertTriangle, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
 import { Notification } from '@/types/notifications';
 import { ThemeToggle } from "./ThemeToggle";
@@ -26,15 +27,33 @@ export function TopBar() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false); // Adicionado estado
 
-  // Hook do sistema de notificações
-  const {
-    notifications,
-    unreadCount,
-    isConnected,
-    connectionError,
-    markAsRead,
-    markAllAsRead
-  } = useNotificationContext();
+  const notificationContext = useNotificationContext();
+  const systemAdminNotifications = useSystemAdminNotifications();
+
+  const notifications =
+    user?.role === 'SUPER_ADMIN'
+      ? systemAdminNotifications.notifications
+      : notificationContext.notifications;
+  const unreadCount =
+    user?.role === 'SUPER_ADMIN'
+      ? systemAdminNotifications.unreadCount
+      : notificationContext.unreadCount;
+  const isConnected =
+    user?.role === 'SUPER_ADMIN'
+      ? systemAdminNotifications.isConnected
+      : notificationContext.isConnected;
+  const connectionError =
+    user?.role === 'SUPER_ADMIN'
+      ? systemAdminNotifications.connectionError
+      : notificationContext.connectionError;
+  const markAsRead =
+    user?.role === 'SUPER_ADMIN'
+      ? systemAdminNotifications.markAsRead
+      : notificationContext.markAsRead;
+  const markAllAsRead =
+    user?.role === 'SUPER_ADMIN'
+      ? systemAdminNotifications.markAllAsRead
+      : notificationContext.markAllAsRead;
 
   // Hook para fechar menu ao clicar fora
   const userMenuRef = useClickOutside<HTMLDivElement>(() => {
@@ -74,11 +93,11 @@ export function TopBar() {
         }
       })
       .catch(error => {
-        console.error("❌ Erro ao buscar master logo:", error);
+        console.error("Erro ao buscar master logo:", error);
       });
   }, []);
 
-  // Busca logo do tenant do usuário logado
+  // Busca logo do tenant do usuario logado
   useEffect(() => {
     async function fetchUserTenantLogo() {
       if (user?.tenantId) {
@@ -155,7 +174,7 @@ export function TopBar() {
     const now = new Date();
     const date = new Date(dateInput);
 
-    if (isNaN(date.getTime())) return 'data inválida';
+    if (isNaN(date.getTime())) return 'data invalida';
 
     const diff = now.getTime() - date.getTime();
     const minutes = Math.floor(diff / 60000);
@@ -163,18 +182,18 @@ export function TopBar() {
     const days = Math.floor(diff / 86400000);
 
     if (minutes < 1) return 'agora';
-    if (minutes < 60) return `há ${minutes}min`;
-    if (hours < 24) return `há ${hours}h`;
-    return `há ${days}d`;
+    if (minutes < 60) return `ha ${minutes}min`;
+    if (hours < 24) return `ha ${hours}h`;
+    return `ha ${days}d`;
   };
 
   const handleNotificationClick = async (notification: Notification) => {
     if (!notification.read) {
-      markAsRead(notification.id);
+      await Promise.resolve(markAsRead(notification.id));
     }
   };
 
-  // Ícone de seta para voltar (usado na busca mobile)
+  // Icone de seta para voltar (usado na busca mobile)
   const ArrowLeftIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>
   );
@@ -231,9 +250,9 @@ export function TopBar() {
           <GlobalSearch />
         </div>
 
-        {/* Ações do Usuário (Direita) */}
+        {/* Acoes do Usuario (Direita) */}
         <div className="flex items-center gap-1 md:gap-2">
-          {/* Botão de Busca Mobile */}
+          {/* Botao de Busca Mobile */}
           <Button
             variant="ghost"
             size="icon"
@@ -243,7 +262,7 @@ export function TopBar() {
             <Search className="h-5 w-5" />
           </Button>
 
-          {/* Notificações */}
+          {/* Notificacoes */}
           <div className="relative" ref={notificationsRef}>
             <Button
               variant="ghost"
@@ -259,13 +278,13 @@ export function TopBar() {
               )}
             </Button>
 
-            {/* Dropdown de Notificações */}
+            {/* Dropdown de Notificacoes */}
             {showNotifications && (
               <div className="fixed top-[4.25rem] left-2 right-2 w-auto max-w-none bg-white dark:bg-popover rounded-lg shadow-lg dark:shadow-shadow-dark border border-gray-200 dark:border-border z-50 md:absolute md:top-auto md:left-auto md:right-0 md:mt-2 md:w-96">
                 {/* Header */}
                 <div className="px-4 py-3 border-b border-gray-200 dark:border-border flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-foreground">Notificações</h3>
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-foreground">Notificacoes</h3>
                     {unreadCount > 0 && (
                       <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 text-xs rounded-full font-medium">
                         {unreadCount} nova{unreadCount !== 1 ? 's' : ''}
@@ -286,12 +305,12 @@ export function TopBar() {
                   </div>
                 )}
 
-                {/* Conteúdo */}
+                {/* Conteudo */}
                 {notifications.length === 0 ? (
                   <div className="px-4 py-8 text-center">
                     <Bell className="h-8 w-8 text-gray-300 dark:text-slate-600 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500 dark:text-muted-foreground">Sem notificações</p>
-                    <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">Você está em dia!</p>
+                    <p className="text-sm text-gray-500 dark:text-muted-foreground">Sem notificacoes</p>
+                    <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">Voce esta em dia!</p>
                   </div>
                 ) : (
                   <div className="max-h-[60vh] overflow-y-auto custom-scrollbar md:max-h-96">
@@ -307,7 +326,7 @@ export function TopBar() {
                           onClick={() => handleNotificationClick(notification)}
                         >
                           <div className="flex items-start gap-3">
-                            {/* Ícone e indicador de não lida */}
+                            {/* Icone e indicador de nao lida */}
                             <div className="flex-shrink-0 relative">
                               <Icon className={`h-4 w-4 mt-1 ${notification.type === 'error' ? 'text-red-600 dark:text-red-400' :
                                 notification.type === 'warning' ? 'text-yellow-600 dark:text-yellow-400' :
@@ -319,7 +338,7 @@ export function TopBar() {
                               )}
                             </div>
 
-                            {/* Conteúdo */}
+                            {/* Conteudo */}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start justify-between gap-2">
                                 <p className={`text-sm truncate ${isUnread ? 'font-semibold text-gray-900 dark:text-foreground' : 'font-medium text-gray-700 dark:text-muted-foreground'
@@ -385,14 +404,14 @@ export function TopBar() {
             )}
           </div>
 
-          {/* Menu do Usuário */}
+          {/* Menu do Usuario */}
           <div className="relative" ref={userMenuRef}>
             <Button
               variant="ghost"
               className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-accent transition-colors p-1 md:px-3 md:py-2 rounded-full md:rounded-md"
               onClick={() => setShowUserMenu(!showUserMenu)}
             >
-              {/* Logo do Tenant do Usuário */}
+              {/* Logo do Tenant do Usuario */}
               {userTenantLogo ? (
                 <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 dark:bg-secondary border border-gray-200 dark:border-border">
                   <Image
@@ -477,20 +496,20 @@ export function TopBar() {
                   Meu Perfil
                 </a>
 
-                {/* Itens do Menu do Usuário (Module Registry) */}
+                {/* Itens do Menu do Usuario (Module Registry) */}
                 <ModuleRegistryUserMenu onItemClick={() => setShowUserMenu(false)} />
 
-                {/* Versão do Sistema */}
+                {/* Versao do Sistema */}
                 {user?.role === "SUPER_ADMIN" ? (
                   <a
                     href="/configuracoes/sistema/updates"
                     onClick={() => setShowUserMenu(false)}
                     className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-foreground hover:bg-gray-100 dark:hover:bg-accent flex items-center gap-2 transition-colors"
-                    title="Clique para gerenciar atualizações"
+                    title="Clique para gerenciar atualizacoes"
                   >
                     <Info className="h-4 w-4 text-gray-500 dark:text-muted-foreground" />
                     <div>
-                      <span className="text-xs text-gray-600 dark:text-muted-foreground">Versão do Sistema</span>
+                      <span className="text-xs text-gray-600 dark:text-muted-foreground">Versao do Sistema</span>
                       <div className="text-xs font-mono font-medium text-gray-800 dark:text-foreground">{systemVersion}</div>
                     </div>
                   </a>
@@ -498,7 +517,7 @@ export function TopBar() {
                   <div className="px-4 py-2 text-left text-sm text-gray-500 dark:text-muted-foreground flex items-center gap-2 cursor-default">
                     <Info className="h-4 w-4 text-gray-400 dark:text-slate-600" />
                     <div>
-                      <span className="text-xs">Versão do Sistema</span>
+                      <span className="text-xs">Versao do Sistema</span>
                       <div className="text-xs font-mono font-medium text-gray-700 dark:text-gray-300">{systemVersion}</div>
                     </div>
                   </div>

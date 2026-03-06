@@ -128,17 +128,26 @@ model BlacklistedToken {
 }
 
 model AuditLog {
-  id        String   @id @default(uuid())
-  action    String
-  userId    String?
-  tenantId  String?
-  ipAddress String?
-  userAgent String?
-  details   String?
-  createdAt DateTime @default(now())
-  user      User?    @relation(fields: [userId], references: [id])
+  id          String   @id @default(uuid())
+  action      String
+  severity    String   @default("info")
+  message     String   @default("")
+  userId      String?
+  actorUserId String?
+  actorEmail  String?
+  actorRole   String?
+  tenantId    String?
+  ip          String?
+  ipAddress   String?
+  userAgent   String?
+  details     String?
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  user        User?    @relation(fields: [userId], references: [id])
 
   @@index([userId])
+  @@index([actorUserId])
+  @@index([severity])
   @@index([tenantId])
   @@index([action])
   @@index([createdAt])
@@ -335,28 +344,36 @@ model ModuleMigration {
 }
 
 model Notification {
-  id        String    @id @default(uuid())
-  title     String
-  message   String
-  severity  String
-  audience  String
-  source    String
-  module    String?
-  tenantId  String?
-  userId    String?
-  context   String?
-  data      Json      @default("{}")
-  read      Boolean   @default(false)
-  readAt    DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id           String    @id @default(uuid())
+  type         String    @default("SYSTEM_ALERT")
+  severity     String
+  title        String
+  body         String?
+  message      String
+  data         Json      @default("{}")
+  targetRole   String?   @default("SUPER_ADMIN")
+  targetUserId String?
+  isRead       Boolean   @default(false)
+  read         Boolean   @default(false)
+  readAt       DateTime?
+  audience     String
+  source       String
+  module       String?
+  tenantId     String?
+  userId       String?
+  context      String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@index([tenantId])
   @@index([userId])
+  @@index([targetUserId])
+  @@index([targetRole])
   @@index([audience])
   @@index([severity])
   @@index([source])
   @@index([module])
+  @@index([isRead])
   @@index([read])
   @@index([createdAt])
   @@index([tenantId, audience, read])
@@ -623,3 +640,4 @@ enum SeedRunStatus {
   SKIPPED
   FORCED
 }
+

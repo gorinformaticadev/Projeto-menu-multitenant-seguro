@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { StringValue } from 'ms';
@@ -6,6 +6,8 @@ import { NotificationService } from './notification.service';
 import { NotificationGateway } from './notification.gateway';
 import { PushNotificationService } from './push-notification.service';
 import { NotificationsController } from './notifications.controller';
+import { SystemNotificationsController } from './system-notifications.controller';
+import { NotificationsSseJwtGuard } from './guards/notifications-sse-jwt.guard';
 import { PrismaModule } from '@core/prisma/prisma.module';
 
 @Module({
@@ -20,7 +22,7 @@ import { PrismaModule } from '@core/prisma/prisma.module';
         return {
           secret: configService.get<string>('JWT_SECRET'),
           signOptions: {
-            // Garantir que o expiresIn seja compatível com a tipagem do NestJS 11 (number | StringValue)
+            // Garantir que o expiresIn seja compatÃ­vel com a tipagem do NestJS 11 (number | StringValue)
             expiresIn: /^\d+$/.test(expiresIn) ? Number(expiresIn) : (expiresIn as StringValue),
           },
         };
@@ -28,8 +30,9 @@ import { PrismaModule } from '@core/prisma/prisma.module';
       inject: [ConfigService],
     }),
   ],
-  controllers: [NotificationsController],
-  providers: [NotificationService, NotificationGateway, PushNotificationService],
+  controllers: [NotificationsController, SystemNotificationsController],
+  providers: [NotificationService, NotificationGateway, PushNotificationService, NotificationsSseJwtGuard],
   exports: [NotificationService, NotificationGateway, PushNotificationService],
 })
 export class NotificationsModule {}
+

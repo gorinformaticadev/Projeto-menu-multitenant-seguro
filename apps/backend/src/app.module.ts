@@ -1,4 +1,4 @@
-import { Module, NestModule, MiddlewareConsumer, DynamicModule } from '@nestjs/common';
+﻿import { Module, NestModule, MiddlewareConsumer, DynamicModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from "@nestjs/throttler";
@@ -9,6 +9,7 @@ import { PrismaModule } from './core/prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
+import { RequestContextInterceptor } from './common/interceptors/request-context.interceptor';
 import { UsersModule } from './users/users.module';
 import { SecurityConfigModule } from '@core/security-config/security-config.module';
 import { EmailConfigModule } from '@core/security-config/email-config.module';
@@ -88,6 +89,10 @@ import { MaintenanceModeGuard } from './maintenance/maintenance-mode.guard';
   providers: [
     {
       provide: APP_INTERCEPTOR,
+      useClass: RequestContextInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
       useClass: TenantInterceptor,
     },
     // Maintenance Mode Global
@@ -132,4 +137,6 @@ export class AppModule implements NestModule {
 }
 
 // Forced restart trigger
+
+
 

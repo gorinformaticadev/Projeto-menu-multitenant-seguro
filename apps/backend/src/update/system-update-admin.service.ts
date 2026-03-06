@@ -1,9 +1,10 @@
-import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
+﻿import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import * as fs from 'fs';
 import * as fsp from 'fs/promises';
 import * as path from 'path';
 import { AuditService } from '../audit/audit.service';
+import { NotificationService } from '../notifications/notification.service';
 import { PathsService } from '@core/common/paths/paths.service';
 
 type UpdateStateStatus = 'idle' | 'running' | 'success' | 'failed' | 'rolled_back';
@@ -32,6 +33,8 @@ type RunOperationRequest = {
   target?: string;
   legacyInplace?: boolean;
   userId: string;
+  userEmail?: string;
+  userRole?: string;
   ipAddress?: string;
   userAgent?: string;
 };
@@ -74,6 +77,7 @@ export class SystemUpdateAdminService {
   constructor(
     private readonly pathsService: PathsService,
     private readonly auditService: AuditService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   async runUpdate(request: RunOperationRequest): Promise<{
@@ -110,22 +114,45 @@ export class SystemUpdateAdminService {
     const child = this.spawnOperation('update', operationId, 'bash', args, runtime);
 
     await this.auditService.log({
-      action: 'SYSTEM_UPDATE_RUN_REQUESTED',
-      userId: request.userId,
+      action: 'UPDATE_RUN_REQUESTED',
+      severity: 'info',
+      message: `Solicitacao de update para versao ${version}`,
+      actor: {
+        userId: request.userId,
+        email: request.userEmail,
+        role: request.userRole,
+      },
+      requestCtx: {
+        ip: request.ipAddress,
+        userAgent: request.userAgent,
+      },
       tenantId: null,
-      ipAddress: request.ipAddress,
-      userAgent: request.userAgent,
-      details: {
+      metadata: {
         operationId,
-        version,
+        fromVersion: null,
+        toVersion: version,
         legacyInplace: !!request.legacyInplace,
       },
+    });
+
+    await this.notificationService.emitSystemAlert({
+      action: 'UPDATE_STARTED',
+      severity: 'warning',
+      title: 'Update iniciado',
+      body: `Update iniciado para versao ${version}.`,
+      data: {
+        operationId,
+        toVersion: version,
+      },
+      module: 'update',
     });
 
     this.attachProcessListeners(child, runtime, {
       operationId,
       operationType: 'update',
       requestedBy: request.userId,
+      requestedByEmail: request.userEmail,
+      requestedByRole: request.userRole,
       requestedVersion: version,
       ipAddress: request.ipAddress,
       userAgent: request.userAgent,
@@ -157,14 +184,22 @@ export class SystemUpdateAdminService {
     const child = this.spawnOperation('rollback', operationId, 'bash', args, runtime);
 
     await this.auditService.log({
-      action: 'SYSTEM_UPDATE_ROLLBACK_REQUESTED',
-      userId: request.userId,
+      action: 'UPDATE_ROLLBACK_REQUESTED',
+      severity: 'warning',
+      message: `Solicitacao de rollback para target ${target}`,
+      actor: {
+        userId: request.userId,
+        email: request.userEmail,
+        role: request.userRole,
+      },
+      requestCtx: {
+        ip: request.ipAddress,
+        userAgent: request.userAgent,
+      },
       tenantId: null,
-      ipAddress: request.ipAddress,
-      userAgent: request.userAgent,
-      details: {
+      metadata: {
         operationId,
-        target,
+        toVersion: target,
       },
     });
 
@@ -172,6 +207,8 @@ export class SystemUpdateAdminService {
       operationId,
       operationType: 'rollback',
       requestedBy: request.userId,
+      requestedByEmail: request.userEmail,
+      requestedByRole: request.userRole,
       requestedVersion: target,
       ipAddress: request.ipAddress,
       userAgent: request.userAgent,
@@ -446,11 +483,20 @@ export class SystemUpdateAdminService {
       operationId: string;
       operationType: UpdateOperationType;
       requestedBy: string;
+      requestedByEmail?: string;
+      requestedByRole?: string;
       requestedVersion: string;
       ipAddress?: string;
       userAgent?: string;
     },
   ): void {
+    const baseMetadata = {
+      operationId: meta.operationId,
+      operationType: meta.operationType,
+      fromVersion: null,
+      toVersion: meta.requestedVersion,
+    };
+
     child.stdout.on('data', (chunk) => {
       const output = chunk.toString().trim();
       if (output) {
@@ -472,32 +518,58 @@ export class SystemUpdateAdminService {
     });
 
     child.on('error', async (error) => {
+      const errorMessage = String(error);
       if (meta.operationType === 'rollback') {
-        await this.writeRollbackFailedState(runtime, `Falha ao executar rollback: ${String(error)}`);
-        await this.appendLog(runtime.logPath, 'rollback', `ERROR: Falha ao executar rollback: ${String(error)}`);
+        await this.writeRollbackFailedState(runtime, `Falha ao executar rollback: ${errorMessage}`);
+        await this.appendLog(runtime.logPath, 'rollback', `ERROR: Falha ao executar rollback: ${errorMessage}`);
       }
+
       this.logger.error(
-        `[${meta.operationType}] erro ao executar script (operationId=${meta.operationId}): ${String(error)}`,
+        `[${meta.operationType}] erro ao executar script (operationId=${meta.operationId}): ${errorMessage}`,
       );
+
+      const eventMetadata = {
+        ...baseMetadata,
+        exitCode: null,
+        hint: null,
+        stateStatus: 'failed',
+        stateStep: meta.operationType,
+        stateLastError: errorMessage,
+      };
+
       await this.auditService.log({
-        action: 'SYSTEM_UPDATE_OPERATION_FAILED',
-        userId: meta.requestedBy,
-        tenantId: null,
-        ipAddress: meta.ipAddress,
-        userAgent: meta.userAgent,
-        details: {
-          operationId: meta.operationId,
-          operationType: meta.operationType,
-          versionOrTarget: meta.requestedVersion,
-          error: String(error),
+        action: 'UPDATE_FAILED',
+        severity: 'critical',
+        message: `Falha ao executar ${meta.operationType}`,
+        actor: {
+          userId: meta.requestedBy,
+          email: meta.requestedByEmail,
+          role: meta.requestedByRole,
         },
+        requestCtx: {
+          ip: meta.ipAddress,
+          userAgent: meta.userAgent,
+        },
+        tenantId: null,
+        metadata: eventMetadata,
       });
+
+      await this.notificationService.emitSystemAlert({
+        action: 'UPDATE_FAILED',
+        severity: 'critical',
+        title: 'Update falhou',
+        body: `Falha ao executar ${meta.operationType}.`,
+        data: eventMetadata,
+        module: 'update',
+      });
+
       this.clearActiveOperation();
     });
 
     child.on('close', async (code) => {
       const exitCode = Number(code ?? -1);
       const hint = this.mapExitCodeToHint(exitCode);
+
       if (meta.operationType === 'rollback') {
         if (exitCode === 0) {
           await this.writeRollbackSuccessState(runtime, meta.requestedVersion);
@@ -508,6 +580,7 @@ export class SystemUpdateAdminService {
           await this.appendLog(runtime.logPath, 'rollback', `ERROR: ${errorMsg}`);
         }
       }
+
       const state = await this.readState(runtime.statePath);
 
       if (exitCode === 0) {
@@ -522,22 +595,65 @@ export class SystemUpdateAdminService {
         );
       }
 
+      let action = 'UPDATE_FAILED';
+      let severity: 'warning' | 'critical' = 'critical';
+      let title = 'Update falhou';
+      let message = 'Falha durante update';
+
+      if (meta.operationType === 'rollback') {
+        if (exitCode === 0) {
+          action = 'UPDATE_ROLLBACK_MANUAL';
+          title = 'Rollback manual concluido';
+          message = `Rollback manual concluido para target ${meta.requestedVersion}.`;
+        } else {
+          action = 'UPDATE_FAILED';
+          title = 'Rollback manual falhou';
+          message = `Rollback manual falhou para target ${meta.requestedVersion}.`;
+        }
+      } else if (exitCode === 0 && state.status === 'rolled_back') {
+        action = 'UPDATE_ROLLED_BACK_AUTO';
+        title = 'Rollback automatico executado';
+        message = 'Update terminou com rollback automatico para preservar versao anterior.';
+      } else if (exitCode === 0) {
+        action = 'UPDATE_COMPLETED';
+        severity = 'warning';
+        title = 'Update concluido';
+        message = `Update concluido para versao ${meta.requestedVersion}.`;
+      }
+
+      const eventMetadata = {
+        ...baseMetadata,
+        exitCode,
+        hint,
+        stateStatus: state.status,
+        stateStep: state.step,
+        stateLastError: state.lastError,
+      };
+
       await this.auditService.log({
-        action: exitCode === 0 ? 'SYSTEM_UPDATE_OPERATION_SUCCESS' : 'SYSTEM_UPDATE_OPERATION_FAILED',
-        userId: meta.requestedBy,
-        tenantId: null,
-        ipAddress: meta.ipAddress,
-        userAgent: meta.userAgent,
-        details: {
-          operationId: meta.operationId,
-          operationType: meta.operationType,
-          versionOrTarget: meta.requestedVersion,
-          exitCode,
-          hint,
-          stateStatus: state.status,
-          stateStep: state.step,
-          stateLastError: state.lastError,
+        action,
+        severity,
+        message,
+        actor: {
+          userId: meta.requestedBy,
+          email: meta.requestedByEmail,
+          role: meta.requestedByRole,
         },
+        requestCtx: {
+          ip: meta.ipAddress,
+          userAgent: meta.userAgent,
+        },
+        tenantId: null,
+        metadata: eventMetadata,
+      });
+
+      await this.notificationService.emitSystemAlert({
+        action,
+        severity,
+        title,
+        body: message,
+        data: eventMetadata,
+        module: 'update',
       });
 
       this.clearActiveOperation();
@@ -778,3 +894,6 @@ export class SystemUpdateAdminService {
     }
   }
 }
+
+
+

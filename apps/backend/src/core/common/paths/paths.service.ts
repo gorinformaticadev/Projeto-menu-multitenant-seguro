@@ -67,6 +67,15 @@ function resolveProjectRootFromDir(baseDir: string): string {
   return path.resolve(baseDir, '../../../../../../');
 }
 
+function normalizeForPathComparison(value: string): string {
+  return value.replace(/\\/g, '/').trim().replace(/\/+$/, '').toLowerCase();
+}
+
+function isLegacyRootLogosDir(value: string): boolean {
+  const normalized = normalizeForPathComparison(value);
+  return normalized === '/logos';
+}
+
 export function resolveCanonicalPaths(options?: {
   projectRoot?: string;
   uploadsDir?: string;
@@ -88,10 +97,14 @@ export function resolveCanonicalPaths(options?: {
     (process.env.BACKUP_DIR || '').trim() ||
     (docker ? '/app/backups' : path.join(projectRoot, 'backups'));
 
-  const rawLogos =
+  const configuredLogosDir =
     options?.logosDir ||
-    (process.env.LOGOS_UPLOAD_DIR || '').trim() ||
-    path.join(rawUploads, 'logos');
+    (process.env.LOGOS_UPLOAD_DIR || '').trim();
+
+  const rawLogos =
+    configuredLogosDir && isLegacyRootLogosDir(configuredLogosDir)
+      ? path.join(rawUploads, 'logos')
+      : configuredLogosDir || path.join(rawUploads, 'logos');
 
   const uploadsDir = path.resolve(rawUploads);
   const backupsDir = path.resolve(rawBackups);

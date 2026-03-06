@@ -1,4 +1,4 @@
-import {
+﻿import {
   Body,
   Controller,
   Delete,
@@ -27,15 +27,10 @@ import { RestoreJobDto } from './dto/restore-job.dto';
 import { BackupService } from './backup.service';
 import { BackupInternalGuard } from './guards/backup-internal.guard';
 import { LegacyBackupDeprecationInterceptor } from './interceptors/legacy-backup-deprecation.interceptor';
+import { extractRequestContext } from '../common/interceptors/request-context.interceptor';
 
 const MAX_UPLOAD_SIZE = Number(process.env.BACKUP_MAX_SIZE || 2 * 1024 * 1024 * 1024);
 
-function requestContext(req: any): { ipAddress?: string; userAgent?: string } {
-  return {
-    ipAddress: req.ip,
-    userAgent: req.headers?.['user-agent'],
-  };
-}
 
 @Controller('backups')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -46,7 +41,7 @@ export class BackupsController {
   @Post()
   async createBackupJob(@Request() req) {
     const userId = req.user?.id || req.user?.sub;
-    const job = await this.backupService.createBackupJob(userId, requestContext(req));
+    const job = await this.backupService.createBackupJob(userId, { ipAddress: extractRequestContext(req).ip || undefined, userAgent: extractRequestContext(req).userAgent || undefined });
     return {
       success: true,
       message: 'Job de backup enfileirado',
@@ -80,7 +75,7 @@ export class BackupsController {
   )
   async uploadBackup(@UploadedFile() file: Express.Multer.File, @Request() req) {
     const userId = req.user?.id || req.user?.sub;
-    const artifact = await this.backupService.uploadBackup(file, userId, requestContext(req));
+    const artifact = await this.backupService.uploadBackup(file, userId, { ipAddress: extractRequestContext(req).ip || undefined, userAgent: extractRequestContext(req).userAgent || undefined });
     return {
       success: true,
       message: 'Upload concluido',
@@ -101,7 +96,7 @@ export class BackupsController {
       artifactId,
       userId,
       dto || {},
-      requestContext(req),
+      { ipAddress: extractRequestContext(req).ip || undefined, userAgent: extractRequestContext(req).userAgent || undefined },
     );
     return {
       success: true,
@@ -120,7 +115,7 @@ export class BackupsController {
       uploadId,
       userId,
       dto || {},
-      requestContext(req),
+      { ipAddress: extractRequestContext(req).ip || undefined, userAgent: extractRequestContext(req).userAgent || undefined },
     );
     return {
       success: true,
@@ -186,7 +181,7 @@ export class BackupLegacyController {
   @Post('create')
   async create(@Request() req) {
     const userId = req.user?.id || req.user?.sub;
-    const job = await this.backupService.createBackupJob(userId, requestContext(req));
+    const job = await this.backupService.createBackupJob(userId, { ipAddress: extractRequestContext(req).ip || undefined, userAgent: extractRequestContext(req).userAgent || undefined });
     return {
       success: true,
       message: 'Backup enfileirado',
@@ -223,7 +218,7 @@ export class BackupLegacyController {
   )
   async upload(@UploadedFile() file: Express.Multer.File, @Request() req) {
     const userId = req.user?.id || req.user?.sub;
-    const artifact = await this.backupService.uploadBackup(file, userId, requestContext(req));
+    const artifact = await this.backupService.uploadBackup(file, userId, { ipAddress: extractRequestContext(req).ip || undefined, userAgent: extractRequestContext(req).userAgent || undefined });
     return {
       success: true,
       message: 'Arquivo de backup enviado com sucesso',
@@ -242,7 +237,7 @@ export class BackupLegacyController {
       artifact.id,
       userId,
       body || {},
-      requestContext(req),
+      { ipAddress: extractRequestContext(req).ip || undefined, userAgent: extractRequestContext(req).userAgent || undefined },
     );
     return {
       success: true,
@@ -317,7 +312,7 @@ export class BackupInternalController {
       reason: body.reason,
     };
 
-    const job = await this.backupService.queueInternalRestoreByFileName(body.backupFile, options, requestContext(req));
+    const job = await this.backupService.queueInternalRestoreByFileName(body.backupFile, options, { ipAddress: extractRequestContext(req).ip || undefined, userAgent: extractRequestContext(req).userAgent || undefined });
     return {
       success: true,
       message: 'Job de restore interno enfileirado',
@@ -347,3 +342,4 @@ export class BackupInternalController {
     };
   }
 }
+

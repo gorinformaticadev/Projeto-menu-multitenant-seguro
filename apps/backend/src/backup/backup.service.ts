@@ -18,6 +18,7 @@ import { createHash, randomUUID } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AuditService } from '../audit/audit.service';
+import { NotificationService } from '../notifications/notification.service';
 import { PathsService } from '../core/common/paths/paths.service';
 import { CronService } from '../core/cron/cron.service';
 import { PrismaReconnectFailed, PrismaService } from '../core/prisma/prisma.service';
@@ -78,6 +79,7 @@ export class BackupService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly notificationService: NotificationService,
     private readonly cronService: CronService,
     private readonly backupConfig: BackupConfigService,
     private readonly processService: BackupProcessService,
@@ -682,6 +684,20 @@ export class BackupService {
   private async runBackupJob(job: BackupJob): Promise<void> {
     await this.assertNoRunningUpdate();
 
+    const actor = await this.resolveAuditActor(job.createdByUserId);
+    const startedAt = job.startedAt || new Date();
+
+    await this.auditService.log({
+      action: 'BACKUP_STARTED',
+      severity: 'info',
+      message: `Backup iniciado (job ${job.id})`,
+      actor,
+      metadata: {
+        jobId: job.id,
+        type: job.type,
+      },
+    });
+
     const db = this.backupConfig.getDatabaseConfig({ useActiveDatabase: true });
     const extension = '.dump';
     const fileName = this.buildStoredFileName(`backup_${Date.now()}`, extension);
@@ -769,13 +785,16 @@ export class BackupService {
     await this.appendJobLog(job.id, 'INFO', `Backup concluido: ${fileName}`);
 
     await this.auditService.log({
-      action: 'BACKUP_JOB_SUCCESS',
-      userId: job.createdByUserId || undefined,
-      details: {
+      action: 'BACKUP_COMPLETED',
+      severity: 'info',
+      message: `Backup concluido com sucesso (job ${job.id})`,
+      actor,
+      metadata: {
         jobId: job.id,
         artifactId: artifact.id,
         fileName,
         fileSize: size,
+        durationSeconds: this.calculateDurationSeconds(startedAt),
       },
     });
 
@@ -813,6 +832,32 @@ export class BackupService {
     const stagingDatabase = this.backupConfig.buildStagingDatabaseName(job.id);
     const rollbackDatabase = this.backupConfig.buildRollbackDatabaseName(activeDatabase, job.id);
     const metadata = this.toJsonRecord(job.metadata);
+    const actor = await this.resolveAuditActor(job.createdByUserId);
+    const startedAt = job.startedAt || new Date();
+
+    const restoreStartMetadata = {
+      jobId: job.id,
+      artifactId: artifact.id,
+      fileName: artifact.fileName,
+      source: artifact.source,
+    };
+
+    await this.auditService.log({
+      action: 'RESTORE_STARTED',
+      severity: 'critical',
+      message: `Restore iniciado (job ${job.id})`,
+      actor,
+      metadata: restoreStartMetadata,
+    });
+
+    await this.notificationService.emitSystemAlert({
+      action: 'RESTORE_STARTED',
+      severity: 'critical',
+      title: 'Restore iniciado',
+      body: `Restore iniciado para backup ${artifact.fileName}.`,
+      data: restoreStartMetadata,
+      module: 'backup',
+    });
 
     await this.updateJobProgress(job.id, 'RESTORE_STAGE_DB_PREPARE', 20, 'Preparando banco staging');
     await this.recreateDatabase(stagingDatabase, db.password);
@@ -963,18 +1008,32 @@ export class BackupService {
         } as any,
       });
 
+      const restoreCompletedMetadata = {
+        jobId: job.id,
+        artifactId: artifact.id,
+        fileName: artifact.fileName,
+        activeDatabase,
+        stagingDatabase,
+        rollbackDatabase,
+        safetyBackupArtifactId: safetyArtifact?.id || null,
+        durationSeconds: this.calculateDurationSeconds(startedAt),
+      };
+
       await this.auditService.log({
-        action: 'RESTORE_JOB_SUCCESS',
-        userId: job.createdByUserId || undefined,
-        details: {
-          jobId: job.id,
-          artifactId: artifact.id,
-          fileName: artifact.fileName,
-          activeDatabase,
-          stagingDatabase,
-          rollbackDatabase,
-          safetyBackupArtifactId: safetyArtifact?.id || null,
-        },
+        action: 'RESTORE_COMPLETED',
+        severity: 'critical',
+        message: `Restore concluido com sucesso (job ${job.id})`,
+        actor,
+        metadata: restoreCompletedMetadata,
+      });
+
+      await this.notificationService.emitSystemAlert({
+        action: 'RESTORE_COMPLETED',
+        severity: 'critical',
+        title: 'Restore concluido',
+        body: `Restore concluido para backup ${artifact.fileName}.`,
+        data: restoreCompletedMetadata,
+        module: 'backup',
       });
     } catch (error) {
       let rollbackError: unknown = null;
@@ -2222,6 +2281,47 @@ export class BackupService {
     throw new Error(`Falha ao recuperar conexao Prisma apos restore: ${this.errorMessage(lastError)}`);
   }
 
+  private async resolveAuditActor(userId?: string | null): Promise<{ userId?: string; email?: string; role?: string } | undefined> {
+    const normalizedUserId = String(userId || '').trim();
+    if (!normalizedUserId) {
+      return undefined;
+    }
+
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: normalizedUserId },
+        select: { id: true, email: true, role: true },
+      });
+
+      if (!user) {
+        return { userId: normalizedUserId };
+      }
+
+      return {
+        userId: user.id,
+        email: user.email || undefined,
+        role: user.role || undefined,
+      };
+    } catch {
+      return { userId: normalizedUserId };
+    }
+  }
+
+  private calculateDurationSeconds(startedAt?: Date | null, finishedAt: Date = new Date()): number | null {
+    if (!startedAt) {
+      return null;
+    }
+
+    const startedMs = startedAt.getTime();
+    const finishedMs = finishedAt.getTime();
+
+    if (!Number.isFinite(startedMs) || !Number.isFinite(finishedMs) || finishedMs < startedMs) {
+      return null;
+    }
+
+    return Math.max(0, Math.round((finishedMs - startedMs) / 1000));
+  }
+
   private async notifyFailure(jobId: string, message: string): Promise<void> {
     try {
       const job = await this.prisma.backupJob.findUnique({
@@ -2232,36 +2332,42 @@ export class BackupService {
           artifactId: true,
           fileName: true,
           createdByUserId: true,
+          startedAt: true,
         },
       });
 
-      await this.prisma.notification.create({
-        data: {
-          title: 'Falha em job de backup/restore',
-          message: `Job ${jobId} finalizou com erro. Consulte logs de backup para detalhes.`,
-          severity: 'critical',
-          audience: 'super_admin',
-          source: 'backup',
-          userId: null,
-          tenantId: null,
-          read: false,
-          data: {
-            jobId,
-            type: job?.type || null,
-            artifactId: job?.artifactId || null,
-            fileName: job?.fileName || null,
-            error: message.slice(0, 1000),
-          } as any,
-        },
-      });
+      const actor = await this.resolveAuditActor(job?.createdByUserId);
+      const isRestore = job?.type === BackupJobType.RESTORE;
+      const action = isRestore ? 'RESTORE_FAILED' : 'BACKUP_FAILED';
+      const severity: 'warning' | 'critical' = isRestore ? 'critical' : 'warning';
+      const normalizedError = String(message || 'Falha em job de backup/restore').slice(0, 1000);
+
+      const eventMetadata = {
+        jobId,
+        type: job?.type || null,
+        artifactId: job?.artifactId || null,
+        fileName: job?.fileName || null,
+        durationSeconds: this.calculateDurationSeconds(job?.startedAt || null),
+        lastError: normalizedError,
+      };
 
       await this.auditService.log({
-        action: 'BACKUP_JOB_FAILURE_ALERTED',
-        userId: job?.createdByUserId || undefined,
-        details: {
-          jobId,
-          type: job?.type || null,
-        },
+        action,
+        severity,
+        message: normalizedError,
+        actor,
+        metadata: eventMetadata,
+      });
+
+      await this.notificationService.emitSystemAlert({
+        action,
+        severity,
+        title: isRestore ? 'Restore falhou' : 'Backup falhou',
+        body: isRestore
+          ? `Restore falhou no job ${jobId}. Consulte os logs para detalhes.`
+          : `Backup falhou no job ${jobId}. Consulte os logs para detalhes.`,
+        data: eventMetadata,
+        module: 'backup',
       });
     } catch (error) {
       this.logger.warn(`Falha ao emitir alerta de erro para job ${jobId}: ${String(error)}`);

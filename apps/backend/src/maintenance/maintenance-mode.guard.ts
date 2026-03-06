@@ -5,18 +5,19 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { MaintenanceModeService, MaintenanceState } from './maintenance-mode.service';
 
-const jwt: {
-  verify: (token: string, secret: string) => any;
-} = require('jsonwebtoken');
 
 @Injectable()
 export class MaintenanceModeGuard implements CanActivate {
   private readonly logger = new Logger(MaintenanceModeGuard.name);
 
-  constructor(private readonly maintenanceModeService: MaintenanceModeService) {}
+  constructor(
+    private readonly maintenanceModeService: MaintenanceModeService,
+    private readonly jwtService: JwtService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     if (context.getType() !== 'http') {
@@ -85,6 +86,13 @@ export class MaintenanceModeGuard implements CanActivate {
       return true;
     }
 
+    if (
+      (method === 'GET' || method === 'POST') &&
+      this.matchesPath(requestPath, '/api/system/notifications')
+    ) {
+      return true;
+    }
+
     if (method === 'POST' && this.matchesPath(requestPath, '/api/auth/login')) {
       return true;
     }
@@ -136,7 +144,9 @@ export class MaintenanceModeGuard implements CanActivate {
     }
 
     try {
-      const payload = jwt.verify(token, jwtSecret) as { role?: string };
+      const payload = this.jwtService.verify<{ role?: string }>(token, {
+        secret: jwtSecret,
+      });
       const role = String(payload?.role || '').trim().toUpperCase();
       return this.hasBypassRole(role, allowedRoles);
     } catch {

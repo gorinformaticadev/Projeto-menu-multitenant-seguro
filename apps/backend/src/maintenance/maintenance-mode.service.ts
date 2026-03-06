@@ -1,8 +1,10 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+﻿import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as fs from 'fs';
 import * as fsp from 'fs/promises';
 import * as path from 'path';
 import { PathsService } from '@core/common/paths/paths.service';
+import { AuditActor, AuditRequestContext, AuditService } from '../audit/audit.service';
+import { NotificationService } from '../notifications/notification.service';
 
 export type MaintenanceState = {
   enabled: boolean;
@@ -11,6 +13,12 @@ export type MaintenanceState = {
   etaSeconds: number | null;
   allowedRoles: string[];
   bypassHeader: string;
+};
+
+export type MaintenanceWriteContext = {
+  actor?: AuditActor;
+  requestCtx?: AuditRequestContext;
+  metadata?: Record<string, unknown>;
 };
 
 const DEFAULT_MAINTENANCE_STATE: MaintenanceState = {
@@ -26,7 +34,11 @@ const DEFAULT_MAINTENANCE_STATE: MaintenanceState = {
 export class MaintenanceModeService implements OnModuleInit {
   private readonly logger = new Logger(MaintenanceModeService.name);
 
-  constructor(private readonly pathsService: PathsService) {}
+  constructor(
+    private readonly pathsService: PathsService,
+    private readonly auditService: AuditService,
+    private readonly notificationService: NotificationService,
+  ) {}
 
   onModuleInit(): void {
     this.logger.log(`MAINTENANCE_FILE=${this.getMaintenanceFilePath()}`);
@@ -71,7 +83,8 @@ export class MaintenanceModeService implements OnModuleInit {
     return state.enabled;
   }
 
-  async writeState(state: MaintenanceState): Promise<void> {
+  async writeState(state: MaintenanceState, context: MaintenanceWriteContext = {}): Promise<void> {
+    const previousState = await this.getState();
     const filePath = this.getMaintenanceFilePath();
     await this.ensureDir(path.dirname(filePath));
 
@@ -87,6 +100,77 @@ export class MaintenanceModeService implements OnModuleInit {
     const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
     await fsp.writeFile(tmpPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
     await fsp.rename(tmpPath, filePath);
+
+    await this.emitTransitionEvents(previousState, payload, context);
+  }
+
+  private async emitTransitionEvents(
+    previousState: MaintenanceState,
+    currentState: MaintenanceState,
+    context: MaintenanceWriteContext,
+  ): Promise<void> {
+    if (previousState.enabled === currentState.enabled) {
+      return;
+    }
+
+    const metadata = this.buildTransitionMetadata(previousState, currentState, context.metadata);
+
+    try {
+      if (currentState.enabled) {
+        await this.auditService.log({
+          action: 'MAINTENANCE_ENABLED',
+          severity: 'warning',
+          message: `Modo manutencao ativado${currentState.reason ? `: ${currentState.reason}` : ''}`,
+          actor: context.actor,
+          requestCtx: context.requestCtx,
+          metadata,
+        });
+
+        await this.notificationService.emitSystemAlert({
+          action: 'MAINTENANCE_ENABLED',
+          severity: 'warning',
+          title: 'Modo manutencao ativado',
+          body: currentState.reason
+            ? `Motivo: ${currentState.reason}`
+            : 'Modo manutencao ativado por operador.',
+          data: metadata,
+          module: 'maintenance',
+        });
+
+        return;
+      }
+
+      await this.auditService.log({
+        action: 'MAINTENANCE_DISABLED',
+        severity: 'info',
+        message: 'Modo manutencao desativado',
+        actor: context.actor,
+        requestCtx: context.requestCtx,
+        metadata,
+      });
+    } catch (error) {
+      this.logger.warn(`Falha ao registrar auditoria de manutencao: ${String(error)}`);
+    }
+  }
+
+  private buildTransitionMetadata(
+    previousState: MaintenanceState,
+    currentState: MaintenanceState,
+    inputMetadata?: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const metadata: Record<string, unknown> = {
+      previousEnabled: previousState.enabled,
+      enabled: currentState.enabled,
+      reason: currentState.reason,
+      etaSeconds: currentState.etaSeconds,
+      startedAt: currentState.startedAt,
+    };
+
+    if (inputMetadata && typeof inputMetadata === 'object' && !Array.isArray(inputMetadata)) {
+      Object.assign(metadata, inputMetadata);
+    }
+
+    return metadata;
   }
 
   private resolveBaseDir(): string {
