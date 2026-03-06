@@ -1,6 +1,7 @@
 ﻿import {
   Controller,
   Get,
+  Header,
   MessageEvent,
   Param,
   Post,
@@ -10,7 +11,7 @@
   UseGuards,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
-import { Observable, map } from 'rxjs';
+import { Observable, map, merge, timer } from 'rxjs';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
@@ -52,6 +53,8 @@ export class SystemNotificationsController {
   }
 
   @Sse('stream')
+  @Header('Cache-Control', 'no-cache, no-transform')
+  @Header('X-Accel-Buffering', 'no')
   @UseGuards(NotificationsSseJwtGuard, RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   stream(@Request() req: any): Observable<MessageEvent> {
@@ -67,11 +70,21 @@ export class SystemNotificationsController {
       });
     }
 
-    return this.notificationService.getSystemAlertStream().pipe(
+    const alerts$ = this.notificationService.getSystemAlertStream().pipe(
       map((notification) => ({
         type: 'system_alert',
         data: notification,
       })),
     );
+
+    // Keep the SSE connection alive behind reverse proxies with low idle timeouts.
+    const heartbeat$ = timer(0, 25000).pipe(
+      map(() => ({
+        type: 'heartbeat',
+        data: { ts: new Date().toISOString() },
+      })),
+    );
+
+    return merge(heartbeat$, alerts$);
   }
 }
