@@ -497,6 +497,93 @@ Observacao:
 
 - a inbox existente do `SUPER_ADMIN` (polling) passa a exibir os eventos novos sem alteracao estrutural de UI.
 
+## Etapa 5 - Inbox operacional SUPER_ADMIN (UX sem realtime)
+
+Evolucao da inbox administrativa mantendo o contrato existente de backend e polling de `30s`.
+
+### Melhorias de UX na lista
+
+- destaque visual por severidade:
+  - `critical`: realce forte
+  - `warning`: realce moderado
+  - `info`: realce discreto
+- diferenca clara entre item lido e nao lido
+- exibicao de resumo operacional por item:
+  - titulo
+  - mensagem
+  - severidade
+  - categoria
+  - acao (`UPDATE_*`, `MAINTENANCE_*`, `BACKUP_*`, `RESTORE_*`)
+  - data/hora relativa
+
+### Filtros disponiveis na inbox (client-side)
+
+- leitura: `Todas`, `Nao lidas`, `Lidas`
+- severidade: `Todas`, `Criticas`, `Warnings`, `Informativas`
+- categoria: `Todas`, `Update`, `Maintenance`, `Backup`, `Restore`
+
+Mapeamento de categoria por prefixo de acao:
+
+- `UPDATE_*` -> `Update`
+- `MAINTENANCE_*` -> `Maintenance`
+- `BACKUP_*` -> `Backup`
+- `RESTORE_*` -> `Restore`
+
+### Detalhe expandido seguro
+
+Ao clicar no item:
+
+- abre detalhe inline
+- item nao lido e marcado como lido automaticamente
+- permanece acao manual de `Marcar lida`
+
+Renderer de metadata restrito a campos conhecidos (sem JSON bruto), por exemplo:
+
+- `fromVersion`, `toVersion`, `targetVersion`
+- `source`, `durationSeconds`, `etaSeconds`, `exitCode`
+- `rollbackAttempted`, `rollbackCompleted`
+- `backupId`, `restoreId`, `jobId`, `artifactId`
+- `backupType`, `retentionPolicy`, `reason`
+
+Campos desconhecidos sao ignorados na UI.
+
+### Links contextuais por categoria operacional
+
+- `UPDATE_*` -> `Abrir atualizacoes`
+- `BACKUP_*` / `RESTORE_*` -> `Abrir backups`
+- `MAINTENANCE_*` -> `Abrir sistema`
+
+Rotas reaproveitadas (sem deep links complexos):
+
+- `/configuracoes/sistema/updates?tab=status` (update/maintenance)
+- `/configuracoes/sistema/updates?tab=backup` (backup/restore)
+
+### Estados de tela
+
+- vazio sem dados: `Nenhuma notificacao do sistema.`
+- vazio com filtro: `Nenhuma notificacao encontrada para os filtros aplicados.`
+- erro: `Nao foi possivel carregar notificacoes.`
+
+### Testes frontend (minimos)
+
+Cobertura adicionada para:
+
+- filtro por leitura/severidade/categoria (utils)
+- destaque de item `critical`
+- clique para abrir detalhe
+- link contextual por tipo
+- `markAsRead` com detalhe aberto
+
+### Fora de escopo mantido nesta etapa
+
+- SSE
+- WebSocket
+- polling adaptativo
+- busca textual
+- paginacao infinita
+- exportacao de notificacoes
+- notificacoes para perfis fora de `SUPER_ADMIN`
+
 ## Etapa 1 - AuditLog persistente (update + maintenance)
 
 ### Modelo persistente

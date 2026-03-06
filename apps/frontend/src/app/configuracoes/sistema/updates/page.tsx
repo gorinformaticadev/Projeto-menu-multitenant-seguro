@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -126,6 +127,7 @@ function formatBuildDate(value?: string): string {
 }
 
 export default function UpdatesPage() {
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const { user } = useAuth();
   const { version, versionInfo, loading: versionLoading, refreshVersion } = useSystemVersion();
@@ -157,6 +159,13 @@ export default function UpdatesPage() {
   const [activeTab, setActiveTab] = useState('status');
   const [backupLogs, setBackupLogs] = useState<BackupLog[]>([]);
   const [hasSavedGitToken, setHasSavedGitToken] = useState(false);
+
+  useEffect(() => {
+    const requestedTab = (searchParams.get('tab') || '').trim().toLowerCase();
+    if (requestedTab === 'status' || requestedTab === 'config' || requestedTab === 'backup' || requestedTab === 'history') {
+      setActiveTab(requestedTab);
+    }
+  }, [searchParams]);
 
 
 
@@ -1076,4 +1085,3 @@ export default function UpdatesPage() {
     </div>
   );
 }
-
