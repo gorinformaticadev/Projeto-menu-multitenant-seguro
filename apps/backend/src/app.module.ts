@@ -98,7 +98,7 @@ import { MaintenanceModeGuard } from './maintenance/maintenance-mode.guard';
     // Maintenance Mode Global
     {
       provide: APP_GUARD,
-      useClass: MaintenanceModeGuard,
+      useExisting: MaintenanceModeGuard,
     },
     // Rate Limiting Global
     {
