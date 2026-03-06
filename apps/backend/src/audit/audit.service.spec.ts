@@ -93,8 +93,110 @@ describe('AuditService rate limit observability', () => {
       },
     });
     expect(result.data[0].details).toEqual({
-      path: '[path-redacted]/.env',
+      path: '[path-redacted]',
     });
+  });
+
+  it('applies default and maximum limit on findAll pagination', async () => {
+    const service = createService();
+    prismaMock.auditLog.findMany.mockResolvedValue([]);
+    prismaMock.auditLog.count.mockResolvedValue(0);
+
+    const first = await service.findAll({
+      page: 1,
+    });
+    const firstCallArgs = prismaMock.auditLog.findMany.mock.calls[0][0];
+
+    expect(firstCallArgs.take).toBe(20);
+    expect(first.meta.limit).toBe(20);
+
+    const second = await service.findAll({
+      page: 1,
+      limit: 100000,
+    });
+    const secondCallArgs = prismaMock.auditLog.findMany.mock.calls[1][0];
+
+    expect(secondCallArgs.take).toBe(100);
+    expect(second.meta.limit).toBe(100);
+  });
+
+  it('sanitizes deep metadata and error payloads with sensitive fragments', async () => {
+    const service = createService();
+    const createdAt = new Date('2026-03-06T12:00:00.000Z');
+
+    prismaMock.auditLog.findMany.mockResolvedValueOnce([
+      {
+        id: 'audit-2',
+        action: 'UPDATE_FAILED',
+        severity: 'critical',
+        actorUserId: 'user-1',
+        metadata: {
+          envSnapshotPath: '/opt/app/shared/.env.snapshot',
+          headers: {
+            authorization: 'Bearer abc.def.ghi',
+            'x-api-key': 'api-key-secret',
+            'content-type': 'application/json',
+          },
+          nested: {
+            lastError:
+              'Database failed token=abc DATABASE_URL=postgres://user:pass@db.local:5432/app path=/opt/app/shared/.env.snapshot',
+          },
+        },
+        details: JSON.stringify({
+          secretsPath: '/etc/secrets/app.key',
+          safePath: '/var/log/app/update.log',
+          stderr: 'authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.abc.def',
+        }),
+        createdAt,
+        user: null,
+      },
+    ]);
+    prismaMock.auditLog.count.mockResolvedValueOnce(1);
+
+    const result = await service.findAll({
+      page: 1,
+      limit: 10,
+      action: 'UPDATE_FAILED',
+    });
+
+    expect(result.data[0].metadata).toMatchObject({
+      envSnapshotCaptured: true,
+      headers: {
+        authorization: '[redacted]',
+        'x-api-key': '[redacted]',
+        'content-type': 'application/json',
+      },
+    });
+    expect(String(result.data[0].metadata.nested.lastError)).toBe('[redacted]');
+    expect(result.data[0].details).toMatchObject({
+      secretsPath: '[redacted]',
+      safePath: '[path-redacted]/update.log',
+    });
+    expect(String(result.data[0].details.stderr)).toContain('[redacted]');
+    expect(String(result.data[0].details.stderr)).not.toContain('eyJ');
+  });
+
+  it('returns empty list when action filter is outside allowed prefixes', async () => {
+    const service = createService();
+
+    const result = await service.findAll({
+      page: 1,
+      limit: 10,
+      action: 'AUTH_LOGIN_SUCCESS',
+      allowedActionPrefixes: ['UPDATE_', 'MAINTENANCE_'],
+    });
+
+    expect(result).toEqual({
+      data: [],
+      meta: {
+        total: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 0,
+      },
+    });
+    expect(prismaMock.auditLog.findMany).not.toHaveBeenCalled();
+    expect(prismaMock.auditLog.count).not.toHaveBeenCalled();
   });
 
   it('returns blocked events filtered by tenant and parses details payload', async () => {

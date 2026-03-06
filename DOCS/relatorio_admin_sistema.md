@@ -532,10 +532,12 @@ Observacoes:
 ### Endpoints administrativos de auditoria
 
 - `GET /api/system/audit`
-  - paginacao: `page`, `limit`
+  - paginacao: `page`, `limit` (default `20`, maximo `100`)
   - filtros: `action`, `severity`, `actorUserId`, `from`, `to`
   - ordenacao: `createdAt desc`
+  - escopo disciplinado desta etapa: apenas acoes `UPDATE_*` e `MAINTENANCE_*`
 - `GET /api/system/audit/:id`
+  - retorna apenas registros de `UPDATE_*` e `MAINTENANCE_*`
 
 Protecao:
 
@@ -545,7 +547,7 @@ Protecao:
 ### Resiliencia e seguranca
 
 - falha ao persistir auditoria nao derruba operacao principal (fail-safe).
-- sanitizacao de payload remove segredos e paths sensiveis.
+- sanitizacao de payload remove segredos, headers sensiveis, paths sensiveis e conteudo bruto com credenciais/token.
 - retorno de `metadata` em listagem/detalhe tambem e sanitizado.
 
 ### Fora do escopo desta etapa

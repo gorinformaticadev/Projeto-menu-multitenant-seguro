@@ -5,6 +5,8 @@ import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { AuditService } from './audit.service';
 
+const SYSTEM_AUDIT_PREFIXES = ['UPDATE_', 'MAINTENANCE_'];
+
 @Controller('system/audit')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN, Role.SUPER_ADMIN)
@@ -25,6 +27,7 @@ export class SystemAuditController {
       page: this.parsePositiveInt(page),
       limit: this.parsePositiveInt(limit),
       action,
+      allowedActionPrefixes: SYSTEM_AUDIT_PREFIXES,
       severity,
       actorUserId,
       from: this.parseDate(from),
@@ -34,7 +37,12 @@ export class SystemAuditController {
 
   @Get(':id')
   async findOne(@Param('id') id: string) {
-    return this.auditService.findOne(id);
+    const log = await this.auditService.findOne(id);
+    if (!log || typeof log.action !== 'string') {
+      return null;
+    }
+
+    return this.isSystemAuditAction(log.action) ? log : null;
   }
 
   private parsePositiveInt(value?: string): number | undefined {
@@ -61,5 +69,10 @@ export class SystemAuditController {
     }
 
     return parsed;
+  }
+
+  private isSystemAuditAction(action: string): boolean {
+    const normalized = action.trim().toUpperCase();
+    return SYSTEM_AUDIT_PREFIXES.some((prefix) => normalized.startsWith(prefix));
   }
 }

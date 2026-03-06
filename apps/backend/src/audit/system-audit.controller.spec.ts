@@ -47,6 +47,7 @@ describe('SystemAuditController', () => {
       page: 1,
       limit: 10,
       action: 'UPDATE_FAILED',
+      allowedActionPrefixes: ['UPDATE_', 'MAINTENANCE_'],
       severity: 'critical',
       actorUserId: 'user-1',
     });
@@ -57,11 +58,21 @@ describe('SystemAuditController', () => {
 
   it('delegates detail query by id', async () => {
     const controller = createController();
-    auditServiceMock.findOne.mockResolvedValue({ id: 'audit-1' });
+    auditServiceMock.findOne.mockResolvedValue({ id: 'audit-1', action: 'UPDATE_FAILED' });
 
     const result = await controller.findOne('audit-1');
 
     expect(auditServiceMock.findOne).toHaveBeenCalledWith('audit-1');
-    expect(result).toEqual({ id: 'audit-1' });
+    expect(result).toEqual({ id: 'audit-1', action: 'UPDATE_FAILED' });
+  });
+
+  it('returns null for non-system actions on detail endpoint', async () => {
+    const controller = createController();
+    auditServiceMock.findOne.mockResolvedValue({ id: 'audit-2', action: 'AUTH_LOGIN_SUCCESS' });
+
+    const result = await controller.findOne('audit-2');
+
+    expect(auditServiceMock.findOne).toHaveBeenCalledWith('audit-2');
+    expect(result).toBeNull();
   });
 });

@@ -33,6 +33,7 @@ export interface AuditLogListParams {
   page?: number;
   limit?: number;
   action?: string;
+  allowedActionPrefixes?: string[];
   severity?: string;
   actorUserId?: string;
   userId?: string;
@@ -97,14 +98,28 @@ export class AuditService {
    */
   async findAll(params: AuditLogListParams) {
     const page = this.clamp(this.toPositiveInt(params.page, 1), 1, 100000);
-    const limit = this.clamp(this.toPositiveInt(params.limit, 50), 1, 200);
+    const limit = this.clamp(this.toPositiveInt(params.limit, 20), 1, 100);
     const skip = (page - 1) * limit;
 
     const where: any = {};
+    const allowedActionPrefixes = this.normalizeActionPrefixes(params.allowedActionPrefixes);
 
     const action = this.normalizeString(params.action);
+    if (action && allowedActionPrefixes.length > 0 && !allowedActionPrefixes.some((prefix) => action.toUpperCase().startsWith(prefix))) {
+      return this.emptyList(page, limit);
+    }
+
     if (action) {
       where.action = action.toUpperCase();
+    }
+
+    if (allowedActionPrefixes.length > 0) {
+      where.AND = where.AND || [];
+      where.AND.push({
+        OR: allowedActionPrefixes.map((prefix) => ({
+          action: { startsWith: prefix },
+        })),
+      });
     }
 
     const severity = this.normalizeSeverityFilter(params.severity);
@@ -163,6 +178,18 @@ export class AuditService {
         page,
         limit,
         totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  private emptyList(page: number, limit: number) {
+    return {
+      data: [],
+      meta: {
+        total: 0,
+        page,
+        limit,
+        totalPages: 0,
       },
     };
   }
@@ -330,6 +357,18 @@ export class AuditService {
     return 'info';
   }
 
+  private normalizeActionPrefixes(input?: string[]): string[] {
+    if (!Array.isArray(input) || input.length === 0) {
+      return [];
+    }
+
+    const normalized = input
+      .map((prefix) => String(prefix || '').trim().toUpperCase())
+      .filter((prefix) => prefix.length > 0);
+
+    return [...new Set(normalized)];
+  }
+
   private normalizeSeverityFilter(input?: string): AuditSeverity | null {
     if (!input) {
       return null;
@@ -386,8 +425,18 @@ export class AuditService {
     if (typeof value === 'object') {
       const result: Record<string, unknown> = {};
       for (const [entryKey, entryValue] of Object.entries(value as Record<string, unknown>)) {
+        if (this.shouldStoreAsCaptureFlag(entryKey, entryValue)) {
+          result[this.toCapturedFlagKey(entryKey)] = true;
+          continue;
+        }
+
         if (this.isSensitiveKey(entryKey)) {
           result[entryKey] = '[redacted]';
+          continue;
+        }
+
+        if (this.isHeadersKey(entryKey) && entryValue && typeof entryValue === 'object' && !Array.isArray(entryValue)) {
+          result[entryKey] = this.sanitizeHeaders(entryValue as Record<string, unknown>, depth + 1);
           continue;
         }
 
@@ -402,22 +451,29 @@ export class AuditService {
         return '';
       }
 
-      if (this.isSensitiveValue(trimmed)) {
+      if (this.isSensitiveValue(trimmed, key)) {
         return '[redacted]';
       }
 
-      if (key && this.isPathKey(key) && (trimmed.includes('/') || trimmed.includes('\\'))) {
-        return this.sanitizePath(trimmed);
+      let sanitized = this.redactSensitiveFragments(trimmed);
+
+      if (key && this.isPathKey(key) && this.looksLikePath(sanitized)) {
+        if (this.isSensitivePathKey(key) || this.looksSensitivePath(sanitized)) {
+          return '[path-redacted]';
+        }
+        return this.sanitizePath(sanitized);
       }
 
-      return trimmed.length > 1000 ? `${trimmed.slice(0, 997)}...` : trimmed;
+      sanitized = this.looksSensitivePath(sanitized) ? '[path-redacted]' : sanitized;
+
+      return sanitized.length > 1000 ? `${sanitized.slice(0, 997)}...` : sanitized;
     }
 
     return value;
   }
 
   private isSensitiveKey(key: string): boolean {
-    return /(token|secret|password|authorization|cookie|api[-_]?key|private[-_]?key|database[_-]?url|connection)/i.test(
+    return /(token|secret|password|authorization|cookie|api[-_]?key|private[-_]?key|database[_-]?url|connection|set-cookie|x-auth|x-access-token)/i.test(
       key,
     );
   }
@@ -426,12 +482,20 @@ export class AuditService {
     return /(path|file|directory|dir|env)/i.test(key);
   }
 
-  private isSensitiveValue(value: string): boolean {
+  private isSensitiveValue(value: string, key: string | null): boolean {
     if (/^-----BEGIN [A-Z ]+-----/.test(value)) {
       return true;
     }
 
-    if (/\b(BEARER|TOKEN|PASSWORD|SECRET|API_KEY|DATABASE_URL)\b/i.test(value)) {
+    if (key && this.isSensitiveHeaderName(key)) {
+      return true;
+    }
+
+    if (/^eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}$/.test(value)) {
+      return true;
+    }
+
+    if (/(postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|redis):\/\/[^:\s/]+:[^@\s/]+@/i.test(value)) {
       return true;
     }
 
@@ -446,6 +510,81 @@ export class AuditService {
     }
 
     return `[path-redacted]/${segments[segments.length - 1]}`;
+  }
+
+  private sanitizeHeaders(headers: Record<string, unknown>, depth: number): Record<string, unknown> {
+    const sanitized: Record<string, unknown> = {};
+
+    for (const [headerName, headerValue] of Object.entries(headers)) {
+      if (this.isSensitiveHeaderName(headerName)) {
+        sanitized[headerName] = '[redacted]';
+        continue;
+      }
+
+      sanitized[headerName] = this.sanitizeValue(headerValue, depth + 1, headerName);
+    }
+
+    return sanitized;
+  }
+
+  private isHeadersKey(key: string): boolean {
+    return /(headers|requestheaders|responseheaders)/i.test(key);
+  }
+
+  private isSensitiveHeaderName(headerName: string): boolean {
+    return /^(authorization|proxy-authorization|cookie|set-cookie|x-api-key|x-auth-token|x-access-token|x-refresh-token|x-csrf-token|x-xsrf-token)$/i.test(
+      headerName.trim(),
+    );
+  }
+
+  private isSensitivePathKey(key: string): boolean {
+    return /(env|secret|credential|private|token|key|snapshot|pem|p12|pfx)/i.test(key);
+  }
+
+  private looksLikePath(value: string): boolean {
+    return /[\\/]/.test(value);
+  }
+
+  private looksSensitivePath(value: string): boolean {
+    return /(^|[\\/])\.env([./\\]|$)|([\\/])(secrets?|credentials?|private|keys?|\.ssh)([\\/]|$)|id_rsa|\.pem\b|\.p12\b|\.pfx\b|\.key\b/i.test(
+      value,
+    );
+  }
+
+  private shouldStoreAsCaptureFlag(key: string, value: unknown): boolean {
+    if (typeof value !== 'string') {
+      return false;
+    }
+
+    if (!this.looksLikePath(value.trim())) {
+      return false;
+    }
+
+    return /(env.*snapshot.*(path|file)|snapshot.*env.*(path|file)|envSnapshotPath)/i.test(key);
+  }
+
+  private toCapturedFlagKey(key: string): string {
+    const base = key.replace(/(file(path)?|path|directory|dir)$/i, '');
+    const normalizedBase = base.trim() || key;
+    return /captured$/i.test(normalizedBase) ? normalizedBase : `${normalizedBase}Captured`;
+  }
+
+  private redactSensitiveFragments(value: string): string {
+    let sanitized = value;
+
+    sanitized = sanitized.replace(/\b(Bearer)\s+[A-Za-z0-9\-._~+/=]+/gi, '$1 [redacted]');
+    sanitized = sanitized.replace(
+      /\b(authorization|proxy-authorization|token|secret|password|passwd|api[-_]?key|x-api-key|cookie|set-cookie|database_url)\b\s*[:=]\s*([^\s,;]+)/gi,
+      '$1=[redacted]',
+    );
+    sanitized = sanitized.replace(/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, '[redacted-jwt]');
+    sanitized = sanitized.replace(
+      /((?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|redis):\/\/[^:\s/]+:)([^@\s/]+)@/gi,
+      '$1[redacted]@',
+    );
+    sanitized = sanitized.replace(/([A-Za-z]:)?[\\/][^\s'"`]*\.env(?:\.[^\s'"`]*)?/gi, '[path-redacted]');
+
+    return sanitized;
   }
 
   private parseDetails(value: string | null) {
