@@ -31,6 +31,7 @@ import { RedisThrottlerStorage } from './common/services/redis-throttler.storage
 import { PathsModule } from './core/common/paths/paths.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { MaintenanceModeGuard } from './maintenance/maintenance-mode.guard';
+import { SystemDataRetentionModule } from './retention/system-data-retention.module';
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { MaintenanceModeGuard } from './maintenance/maintenance-mode.guard';
     UpdateModule,
     BackupModule,
     NotificationsModule, // Novo sistema Socket.IO apenas
+    SystemDataRetentionModule,
     WhatsAppModule,
     SecureFilesModule, // Módulo de uploads sensíveis
     MaintenanceModule,
@@ -137,6 +139,5 @@ export class AppModule implements NestModule {
 }
 
 // Forced restart trigger
-
 
 

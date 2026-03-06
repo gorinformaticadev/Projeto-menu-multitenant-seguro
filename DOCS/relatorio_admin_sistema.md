@@ -584,6 +584,78 @@ Cobertura adicionada para:
 - exportacao de notificacoes
 - notificacoes para perfis fora de `SUPER_ADMIN`
 
+## Etapa 6 - Retencao e housekeeping de AuditLog + Notification
+
+Implementacao de politica de retencao automatica para conter crescimento das tabelas operacionais sem perder dados recentes.
+
+### Politica de retencao
+
+- `AuditLog`: manter `180` dias (padrao)
+- `Notification`:
+  - lidas: manter `30` dias (padrao)
+  - nao lidas: nao apagar automaticamente
+
+Configuracao via ambiente:
+
+- `AUDIT_LOG_RETENTION_DAYS` (default `180`)
+- `NOTIFICATION_READ_RETENTION_DAYS` (default `30`)
+- `SYSTEM_RETENTION_DELETE_LIMIT` (default `5000` por execucao/tabela)
+
+### Housekeeping (backend)
+
+Servico dedicado:
+
+- `SystemDataRetentionService`
+  - `cleanupAuditLogs()`
+  - `cleanupNotifications()`
+  - `runRetentionCleanup()`
+
+Regras aplicadas:
+
+- Audit:
+  - remove `audit_logs` com `createdAt < cutoff`
+- Notification:
+  - remove `notifications` com `isRead = true` e:
+    - `readAt < cutoff`, ou
+    - `readAt is null` + `createdAt < cutoff` (fallback legado)
+
+Comportamento fail-safe:
+
+- erro na limpeza nao derruba aplicacao
+- erro e logado internamente e o fluxo segue
+- auditoria de housekeeping so e registrada quando ocorre falha:
+  - `SYSTEM_DATA_RETENTION_FAILED` (`warning`)
+
+Protecao contra limpeza massiva acidental:
+
+- a exclusao e feita por lote com teto por execucao (`SYSTEM_RETENTION_DELETE_LIMIT`)
+- housekeeping usa `findMany` (ids mais antigos) + `deleteMany` em lote
+- quando o teto e atingido, o restante segue para execucoes futuras
+
+### Agendamento automatico (cron)
+
+Job diario registrado no scheduler dinamico:
+
+- chave: `system.system_data_retention`
+- nome: `system_data_retention`
+- schedule: `30 3 * * *` (03:30)
+- origem: `core`
+
+Nao gera auditoria de sucesso diario para evitar ruido.
+
+### Endpoint administrativo (execucao manual)
+
+- `POST /api/system/retention/run`
+- protecao: `JwtAuthGuard + RolesGuard`
+- role: `SUPER_ADMIN`
+
+Resposta:
+
+- `deletedAuditLogs`
+- `deletedNotifications`
+- `auditCutoff` (ISO)
+- `notificationCutoff` (ISO)
+
 ## Etapa 1 - AuditLog persistente (update + maintenance)
 
 ### Modelo persistente

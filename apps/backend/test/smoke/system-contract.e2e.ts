@@ -29,6 +29,8 @@ import { NotificationService } from '../../src/notifications/notification.servic
 import { SystemNotificationsController } from '../../src/notifications/system-notifications.controller';
 import { AuditService } from '../../src/audit/audit.service';
 import { SystemAuditController } from '../../src/audit/system-audit.controller';
+import { SystemDataRetentionController } from '../../src/retention/system-data-retention.controller';
+import { SystemDataRetentionService } from '../../src/retention/system-data-retention.service';
 
 const DEFAULT_MAINTENANCE_STATE: MaintenanceState = {
   enabled: false,
@@ -138,6 +140,18 @@ const auditServiceMock = {
   log: jest.fn(async () => null),
 };
 
+const retentionServiceMock = {
+  runRetentionCleanup: jest.fn(async () => ({
+    deletedAuditLogs: 8,
+    deletedNotifications: 3,
+    auditCutoff: new Date('2025-09-08T03:30:00Z'),
+    notificationCutoff: new Date('2026-02-06T03:30:00Z'),
+    auditRetentionDays: 180,
+    notificationRetentionDays: 30,
+    errors: [],
+  })),
+};
+
 @Injectable()
 class MockJwtAuthGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
@@ -184,6 +198,7 @@ class DummyTenantsController {
     SystemUpdateController,
     SystemNotificationsController,
     SystemAuditController,
+    SystemDataRetentionController,
   ],
   providers: [
     Reflector,
@@ -208,6 +223,10 @@ class DummyTenantsController {
     {
       provide: AuditService,
       useValue: auditServiceMock,
+    },
+    {
+      provide: SystemDataRetentionService,
+      useValue: retentionServiceMock,
     },
     {
       provide: JwtService,
@@ -252,6 +271,7 @@ describe('System contract smoke', () => {
     auditServiceMock.findAll.mockClear();
     auditServiceMock.findOne.mockClear();
     auditServiceMock.log.mockClear();
+    retentionServiceMock.runRetentionCleanup.mockClear();
   });
 
   afterAll(async () => {
@@ -375,6 +395,23 @@ describe('System contract smoke', () => {
     expect(response.body.data).toHaveLength(1);
     expect(response.body.data[0].action).toBe('UPDATE_STARTED');
     expect(auditServiceMock.findAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('POST /api/system/retention/run executes manual retention for SUPER_ADMIN', async () => {
+    await request(app.getHttpServer()).post('/api/system/retention/run').expect(401);
+
+    const response = await request(app.getHttpServer())
+      .post('/api/system/retention/run')
+      .set('Authorization', 'Bearer smoke-admin-token')
+      .expect(201);
+
+    expect(response.body).toEqual({
+      deletedAuditLogs: 8,
+      deletedNotifications: 3,
+      auditCutoff: '2025-09-08T03:30:00.000Z',
+      notificationCutoff: '2026-02-06T03:30:00.000Z',
+    });
+    expect(retentionServiceMock.runRetentionCleanup).toHaveBeenCalledWith('manual');
   });
 
   it('maintenance guard returns 503 for regular routes and still allows health, update status and notifications', async () => {
