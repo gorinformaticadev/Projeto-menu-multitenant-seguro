@@ -486,3 +486,70 @@ TopBar passou a usar canal dedicado de notificacoes de sistema para `SUPER_ADMIN
 - `GET /api/system/notifications` (auth)
 - `POST /api/system/notifications/:id/read` (auth)
 - guard de maintenance bloqueando rota comum e preservando health/update status/notifications
+
+## Etapa 1 - AuditLog persistente (update + maintenance)
+
+### Modelo persistente
+
+Tabela `audit_logs` (Prisma `AuditLog`) com trilha estruturada para operacoes sensiveis:
+
+- `id`, `createdAt`, `action`, `severity`, `message`
+- contexto de ator: `actorUserId`, `actorEmail`, `actorRole`
+- contexto de request: `ip`, `userAgent`
+- `tenantId`
+- `metadata` (JSON sanitizado)
+
+Indices ativos para consulta administrativa:
+
+- `createdAt`
+- `action`
+- `severity`
+- `actorUserId`
+
+### Eventos auditados nesta etapa
+
+Update:
+
+- `UPDATE_RUN_REQUESTED` (`info`)
+- `UPDATE_STARTED` (`warning`)
+- `UPDATE_COMPLETED` (`warning`)
+- `UPDATE_FAILED` (`critical`)
+- `UPDATE_ROLLBACK_MANUAL` (`critical`)
+- `UPDATE_ROLLED_BACK_AUTO` (`critical`)
+
+Maintenance:
+
+- `MAINTENANCE_ENABLED` (`warning`)
+- `MAINTENANCE_DISABLED` (`info`)
+- `MAINTENANCE_BYPASS_USED` (`critical`)
+
+Observacoes:
+
+- `metadata` de update inclui `fromVersion`, `toVersion`, `durationSeconds`, `exitCode` e estado de rollback quando aplicavel.
+- `metadata` de maintenance inclui `reason`, `etaSeconds` e `source` (`admin` ou `update-script`).
+- uso de bypass token por `SUPER_ADMIN` gera auditoria critica com `route` e `method`.
+
+### Endpoints administrativos de auditoria
+
+- `GET /api/system/audit`
+  - paginacao: `page`, `limit`
+  - filtros: `action`, `severity`, `actorUserId`, `from`, `to`
+  - ordenacao: `createdAt desc`
+- `GET /api/system/audit/:id`
+
+Protecao:
+
+- `JwtAuthGuard + RolesGuard`
+- perfis permitidos: `ADMIN`, `SUPER_ADMIN`
+
+### Resiliencia e seguranca
+
+- falha ao persistir auditoria nao derruba operacao principal (fail-safe).
+- sanitizacao de payload remove segredos e paths sensiveis.
+- retorno de `metadata` em listagem/detalhe tambem e sanitizado.
+
+### Fora do escopo desta etapa
+
+- notificacoes realtime/inbox
+- SSE/WebSocket adicionais
+- frontend dedicado para auditoria

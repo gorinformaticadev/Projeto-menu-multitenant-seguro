@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { AuditController } from './audit.controller';
+import { SystemAuditController } from './system-audit.controller';
 import { AuditService } from './audit.service';
 import { PrismaModule } from '@core/prisma/prisma.module';
 import { RateLimitMetricsService } from '../common/services/rate-limit-metrics.service';
 
 @Module({
   imports: [PrismaModule],
-  controllers: [AuditController],
+  controllers: [AuditController, SystemAuditController],
   providers: [AuditService, RateLimitMetricsService],
   exports: [AuditService, RateLimitMetricsService],
 })

@@ -113,7 +113,12 @@ export class MaintenanceModeService implements OnModuleInit {
       return;
     }
 
-    const metadata = this.buildTransitionMetadata(previousState, currentState, context.metadata);
+    const metadata = this.buildTransitionMetadata(
+      previousState,
+      currentState,
+      context.metadata,
+      context.actor,
+    );
 
     try {
       if (currentState.enabled) {
@@ -157,13 +162,16 @@ export class MaintenanceModeService implements OnModuleInit {
     previousState: MaintenanceState,
     currentState: MaintenanceState,
     inputMetadata?: Record<string, unknown>,
+    actor?: AuditActor,
   ): Record<string, unknown> {
+    const source = this.resolveTransitionSource(inputMetadata, actor);
     const metadata: Record<string, unknown> = {
       previousEnabled: previousState.enabled,
       enabled: currentState.enabled,
       reason: currentState.reason,
       etaSeconds: currentState.etaSeconds,
       startedAt: currentState.startedAt,
+      source,
     };
 
     if (inputMetadata && typeof inputMetadata === 'object' && !Array.isArray(inputMetadata)) {
@@ -171,6 +179,22 @@ export class MaintenanceModeService implements OnModuleInit {
     }
 
     return metadata;
+  }
+
+  private resolveTransitionSource(
+    inputMetadata?: Record<string, unknown>,
+    actor?: AuditActor,
+  ): 'admin' | 'update-script' | 'system' {
+    const explicit = String(inputMetadata?.source || '').trim().toLowerCase();
+    if (explicit === 'admin' || explicit === 'update-script' || explicit === 'system') {
+      return explicit;
+    }
+
+    if (actor?.userId || actor?.email) {
+      return 'admin';
+    }
+
+    return 'update-script';
   }
 
   private resolveBaseDir(): string {

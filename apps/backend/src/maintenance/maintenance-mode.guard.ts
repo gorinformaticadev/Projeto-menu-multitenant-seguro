@@ -8,6 +8,8 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { MaintenanceModeService, MaintenanceState } from './maintenance-mode.service';
+import { AuditService } from '../audit/audit.service';
+import { extractAuditContext } from '../audit/audit-request-context.util';
 
 
 @Injectable()
@@ -17,6 +19,7 @@ export class MaintenanceModeGuard implements CanActivate {
   constructor(
     private readonly maintenanceModeService: MaintenanceModeService,
     private readonly jwtService: JwtService,
+    private readonly auditService: AuditService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -41,7 +44,7 @@ export class MaintenanceModeGuard implements CanActivate {
       return true;
     }
 
-    if (this.canBypass(request, maintenance)) {
+    if (await this.canBypass(request, maintenance, method, requestPath)) {
       return true;
     }
 
@@ -112,7 +115,12 @@ export class MaintenanceModeGuard implements CanActivate {
     return false;
   }
 
-  private canBypass(request: Request, maintenance: MaintenanceState): boolean {
+  private async canBypass(
+    request: Request,
+    maintenance: MaintenanceState,
+    method: string,
+    requestPath: string,
+  ): Promise<boolean> {
     const expectedBypassToken = String(process.env.MAINTENANCE_BYPASS_TOKEN || '').trim();
     if (!expectedBypassToken) {
       return false;
@@ -129,6 +137,7 @@ export class MaintenanceModeGuard implements CanActivate {
 
     const roleFromRequest = String((request as any)?.user?.role || '').trim().toUpperCase();
     if (this.hasBypassRole(roleFromRequest, allowedRoles)) {
+      await this.logBypassUsage(request, method, requestPath, (request as any)?.user);
       return true;
     }
 
@@ -148,7 +157,12 @@ export class MaintenanceModeGuard implements CanActivate {
         secret: jwtSecret,
       });
       const role = String(payload?.role || '').trim().toUpperCase();
-      return this.hasBypassRole(role, allowedRoles);
+      if (!this.hasBypassRole(role, allowedRoles)) {
+        return false;
+      }
+
+      await this.logBypassUsage(request, method, requestPath, payload);
+      return true;
     } catch {
       return false;
     }
@@ -216,6 +230,42 @@ export class MaintenanceModeGuard implements CanActivate {
     }
     return allowedRoles.includes(role);
   }
+
+  private async logBypassUsage(
+    request: Request,
+    method: string,
+    requestPath: string,
+    userPayload: any,
+  ): Promise<void> {
+    const role = String(userPayload?.role || '').trim().toUpperCase();
+    if (role !== 'SUPER_ADMIN') {
+      return;
+    }
+
+    const { actor, requestCtx, tenantId } = extractAuditContext({
+      headers: request.headers,
+      ip: (request as any).ip,
+      socket: (request as any).socket,
+      user: {
+        id: userPayload?.id || userPayload?.sub,
+        sub: userPayload?.sub || userPayload?.id,
+        email: userPayload?.email,
+        role,
+        tenantId: userPayload?.tenantId,
+      },
+    });
+
+    await this.auditService.log({
+      action: 'MAINTENANCE_BYPASS_USED',
+      severity: 'critical',
+      message: `Bypass de manutencao usado por SUPER_ADMIN em ${method} ${requestPath}`,
+      actor,
+      requestCtx,
+      tenantId: tenantId || undefined,
+      metadata: {
+        route: requestPath,
+        method,
+      },
+    });
+  }
 }
-
-

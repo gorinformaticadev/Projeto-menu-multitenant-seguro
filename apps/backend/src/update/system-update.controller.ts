@@ -19,7 +19,7 @@ import {
   SystemUpdateLogQueryDto,
 } from './dto/system-update-admin.dto';
 import { SystemUpdateAdminService } from './system-update-admin.service';
-import { extractRequestContext } from '../common/interceptors/request-context.interceptor';
+import { extractAuditContext } from '../audit/audit-request-context.util';
 
 @Controller('system/update')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -36,15 +36,18 @@ export class SystemUpdateController {
 
   @Post('run')
   async run(@Body() body: RunSystemUpdateDto, @Request() req: any) {
+    const { actor, requestCtx } = extractAuditContext(req);
+    const userId = actor.userId || 'unknown';
+
     try {
       return await this.systemUpdateAdminService.runUpdate({
         version: body.version,
         legacyInplace: body.legacyInplace,
-        userId: req.user?.sub || req.user?.id,
-        userEmail: req.user?.email,
-        userRole: req.user?.role,
-        ipAddress: extractRequestContext(req).ip || undefined,
-        userAgent: extractRequestContext(req).userAgent || undefined,
+        userId,
+        userEmail: actor.email,
+        userRole: actor.role,
+        ipAddress: requestCtx.ip || undefined,
+        userAgent: requestCtx.userAgent || undefined,
       });
     } catch (error) {
       this.rethrowPreservingHttp(error, 'Erro ao iniciar update');
@@ -73,14 +76,17 @@ export class SystemUpdateController {
 
   @Post('rollback')
   async rollback(@Body() body: RunSystemRollbackDto, @Request() req: any) {
+    const { actor, requestCtx } = extractAuditContext(req);
+    const userId = actor.userId || 'unknown';
+
     try {
       return await this.systemUpdateAdminService.runRollback({
         target: body.target,
-        userId: req.user?.sub || req.user?.id,
-        userEmail: req.user?.email,
-        userRole: req.user?.role,
-        ipAddress: extractRequestContext(req).ip || undefined,
-        userAgent: extractRequestContext(req).userAgent || undefined,
+        userId,
+        userEmail: actor.email,
+        userRole: actor.role,
+        ipAddress: requestCtx.ip || undefined,
+        userAgent: requestCtx.userAgent || undefined,
       });
     } catch (error) {
       this.rethrowPreservingHttp(error, 'Erro ao iniciar rollback');
@@ -96,5 +102,4 @@ export class SystemUpdateController {
     }
   }
 }
-
 

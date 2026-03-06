@@ -3,6 +3,7 @@ import { AuditService } from './audit.service';
 describe('AuditService rate limit observability', () => {
   const prismaMock = {
     auditLog: {
+      create: jest.fn(),
       findMany: jest.fn(),
       count: jest.fn(),
     },
@@ -35,6 +36,65 @@ describe('AuditService rate limit observability', () => {
       top: 5,
     });
     expect(result).toEqual(expected);
+  });
+
+  it('does not throw when audit persistence fails', async () => {
+    const service = createService();
+    prismaMock.auditLog.create.mockRejectedValueOnce(new Error('db unavailable'));
+
+    await expect(
+      service.log({
+        action: 'UPDATE_STARTED',
+        severity: 'warning',
+        message: 'update started',
+        metadata: { token: 'secret-token' },
+      }),
+    ).resolves.toBeNull();
+  });
+
+  it('filters by actor and severity and returns sanitized metadata', async () => {
+    const service = createService();
+    const createdAt = new Date('2026-03-06T12:00:00.000Z');
+
+    prismaMock.auditLog.findMany.mockResolvedValueOnce([
+      {
+        id: 'audit-1',
+        action: 'UPDATE_FAILED',
+        severity: 'critical',
+        actorUserId: 'user-1',
+        metadata: {
+          token: 'super-secret',
+          nested: {
+            password: '123456',
+          },
+        },
+        details: JSON.stringify({ path: '/var/app/shared/.env' }),
+        createdAt,
+        user: null,
+      },
+    ]);
+    prismaMock.auditLog.count.mockResolvedValueOnce(1);
+
+    const result = await service.findAll({
+      page: 1,
+      limit: 10,
+      severity: 'critical',
+      actorUserId: 'user-1',
+    });
+
+    const findManyArgs = prismaMock.auditLog.findMany.mock.calls[0][0];
+    expect(findManyArgs.where.severity).toBe('critical');
+    expect(findManyArgs.where.OR).toEqual([{ actorUserId: 'user-1' }, { userId: 'user-1' }]);
+
+    expect(result.data[0].metadata).toEqual({
+      token: '[redacted]',
+      nested: {
+        password: '[redacted]',
+      },
+    });
+    expect(result.data[0].details).toEqual({
+      path: '[path-redacted]/.env',
+    });
   });
 
   it('returns blocked events filtered by tenant and parses details payload', async () => {

@@ -94,6 +94,7 @@ export class SystemUpdateAdminService {
     this.ensureNativeMode();
     this.ensureScriptExists(runtime.updateScriptPath, 'update-native.sh');
     await this.assertNoRunningOperation(runtime, true);
+    const fromVersion = await this.resolveCurrentVersion(runtime.baseDir);
 
     if (request.legacyInplace) {
       const allowLegacyApi = process.env.UPDATE_ALLOW_LEGACY_INPLACE_API === 'true';
@@ -129,9 +130,32 @@ export class SystemUpdateAdminService {
       tenantId: null,
       metadata: {
         operationId,
-        fromVersion: null,
+        fromVersion,
         toVersion: version,
+        source: 'panel',
         legacyInplace: !!request.legacyInplace,
+      },
+    });
+
+    await this.auditService.log({
+      action: 'UPDATE_STARTED',
+      severity: 'warning',
+      message: `Update iniciado para versao ${version}`,
+      actor: {
+        userId: request.userId,
+        email: request.userEmail,
+        role: request.userRole,
+      },
+      requestCtx: {
+        ip: request.ipAddress,
+        userAgent: request.userAgent,
+      },
+      tenantId: null,
+      metadata: {
+        operationId,
+        fromVersion,
+        toVersion: version,
+        source: 'panel',
       },
     });
 
@@ -153,9 +177,11 @@ export class SystemUpdateAdminService {
       requestedBy: request.userId,
       requestedByEmail: request.userEmail,
       requestedByRole: request.userRole,
+      requestedFromVersion: fromVersion,
       requestedVersion: version,
       ipAddress: request.ipAddress,
       userAgent: request.userAgent,
+      requestedAt: this.nowIso(),
     });
 
     return {
@@ -180,12 +206,13 @@ export class SystemUpdateAdminService {
     await this.appendLog(runtime.logPath, 'rollback', `Rollback solicitado para target ${target}.`);
 
     const operationId = this.createOperationId('rollback');
+    const fromVersion = await this.resolveCurrentVersion(runtime.baseDir);
     const args = [runtime.rollbackScriptPath, '--to', target];
     const child = this.spawnOperation('rollback', operationId, 'bash', args, runtime);
 
     await this.auditService.log({
-      action: 'UPDATE_ROLLBACK_REQUESTED',
-      severity: 'warning',
+      action: 'UPDATE_ROLLBACK_MANUAL',
+      severity: 'critical',
       message: `Solicitacao de rollback para target ${target}`,
       actor: {
         userId: request.userId,
@@ -199,6 +226,9 @@ export class SystemUpdateAdminService {
       tenantId: null,
       metadata: {
         operationId,
+        source: 'panel',
+        targetVersion: target,
+        fromVersion,
         toVersion: target,
       },
     });
@@ -209,9 +239,11 @@ export class SystemUpdateAdminService {
       requestedBy: request.userId,
       requestedByEmail: request.userEmail,
       requestedByRole: request.userRole,
+      requestedFromVersion: fromVersion,
       requestedVersion: target,
       ipAddress: request.ipAddress,
       userAgent: request.userAgent,
+      requestedAt: this.nowIso(),
     });
 
     return {
@@ -485,16 +517,19 @@ export class SystemUpdateAdminService {
       requestedBy: string;
       requestedByEmail?: string;
       requestedByRole?: string;
+      requestedFromVersion?: string;
       requestedVersion: string;
       ipAddress?: string;
       userAgent?: string;
+      requestedAt: string;
     },
   ): void {
     const baseMetadata = {
       operationId: meta.operationId,
       operationType: meta.operationType,
-      fromVersion: null,
+      fromVersion: meta.requestedFromVersion || null,
       toVersion: meta.requestedVersion,
+      source: 'panel',
     };
 
     child.stdout.on('data', (chunk) => {
@@ -532,9 +567,12 @@ export class SystemUpdateAdminService {
         ...baseMetadata,
         exitCode: null,
         hint: null,
+        durationSeconds: this.computeDurationSeconds(meta.requestedAt, this.nowIso()),
         stateStatus: 'failed',
         stateStep: meta.operationType,
-        stateLastError: errorMessage,
+        lastError: this.sanitizeAuditError(errorMessage),
+        rollbackAttempted: false,
+        rollbackCompleted: false,
       };
 
       await this.auditService.log({
@@ -623,11 +661,16 @@ export class SystemUpdateAdminService {
 
       const eventMetadata = {
         ...baseMetadata,
+        fromVersion: state.fromVersion || baseMetadata.fromVersion,
+        toVersion: state.toVersion || baseMetadata.toVersion,
         exitCode,
         hint,
+        durationSeconds: this.computeDurationSeconds(state.startedAt || meta.requestedAt, this.nowIso()),
         stateStatus: state.status,
         stateStep: state.step,
-        stateLastError: state.lastError,
+        lastError: this.sanitizeAuditError(state.lastError),
+        rollbackAttempted: Boolean(state.rollback?.attempted),
+        rollbackCompleted: Boolean(state.rollback?.completed),
       };
 
       await this.auditService.log({
@@ -873,6 +916,28 @@ export class SystemUpdateAdminService {
     return path.basename(currentPath) || 'unknown';
   }
 
+  private computeDurationSeconds(startedAt: string | null, finishedAt: string | null): number | null {
+    const started = startedAt ? new Date(startedAt).getTime() : Number.NaN;
+    const finished = finishedAt ? new Date(finishedAt).getTime() : Number.NaN;
+    if (!Number.isFinite(started) || !Number.isFinite(finished) || finished < started) {
+      return null;
+    }
+    return Math.floor((finished - started) / 1000);
+  }
+
+  private sanitizeAuditError(value: string | null): string | null {
+    const normalized = String(value || '').trim();
+    if (!normalized) {
+      return null;
+    }
+
+    const withoutSecrets = normalized
+      .replace(/(token|secret|password|authorization|api[_-]?key|database[_-]?url)\s*[:=]\s*[^,\s]+/gi, '$1=[redacted]')
+      .replace(/bearer\s+[-a-z0-9._]+/gi, 'bearer [redacted]');
+
+    return withoutSecrets.length > 600 ? `${withoutSecrets.slice(0, 597)}...` : withoutSecrets;
+  }
+
   private mapExitCodeToHint(exitCode: number): string {
     switch (exitCode) {
       case 0:
@@ -894,6 +959,3 @@ export class SystemUpdateAdminService {
     }
   }
 }
-
-
-

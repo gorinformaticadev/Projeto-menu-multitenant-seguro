@@ -1,4 +1,4 @@
-﻿import { Injectable } from '@nestjs/common';
+﻿import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { RateLimitMetricsService, RateLimitStatsParams } from '../common/services/rate-limit-metrics.service';
 
@@ -29,17 +29,34 @@ export interface AuditLogData {
   metadata?: Record<string, unknown>;
 }
 
+export interface AuditLogListParams {
+  page?: number;
+  limit?: number;
+  action?: string;
+  severity?: string;
+  actorUserId?: string;
+  userId?: string;
+  tenantId?: string;
+  from?: Date;
+  to?: Date;
+  startDate?: Date;
+  endDate?: Date;
+}
+
 @Injectable()
 export class AuditService {
+  private readonly logger = new Logger(AuditService.name);
+
   constructor(
     private prisma: PrismaService,
     private readonly rateLimitMetricsService: RateLimitMetricsService,
-  ) { }
+  ) {}
 
   /**
    * Cria log de auditoria estruturado (retrocompativel com payload legado).
    */
   async log(data: AuditLogData) {
+    const action = this.normalizeAction(data.action);
     const actorUserId = this.normalizeString(data.actor?.userId || data.userId);
     const actorEmail = this.normalizeString(data.actor?.email);
     const actorRole = this.normalizeString(data.actor?.role);
@@ -49,64 +66,71 @@ export class AuditService {
     const severity = this.normalizeSeverity(data.severity);
     const metadata = this.sanitizeMetadata(data.metadata || data.details || {});
     const details = Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null;
-    const message = this.normalizeMessage(data.message, data.action);
+    const message = this.normalizeMessage(data.message, action);
 
-    return this.prisma.auditLog.create({
-      data: {
-        action: data.action,
-        severity,
-        message,
-        userId: actorUserId,
-        actorUserId,
-        actorEmail,
-        actorRole,
-        tenantId,
-        ip,
-        ipAddress: ip,
-        userAgent,
-        details,
-        metadata: metadata as any,
-      },
-    });
+    try {
+      return await this.prisma.auditLog.create({
+        data: {
+          action,
+          severity,
+          message,
+          userId: actorUserId,
+          actorUserId,
+          actorEmail,
+          actorRole,
+          tenantId,
+          ip,
+          ipAddress: ip,
+          userAgent,
+          details,
+          metadata: metadata as any,
+        },
+      });
+    } catch (error) {
+      this.logger.error(`Falha ao persistir auditoria action=${action}: ${String(error)}`);
+      return null;
+    }
   }
 
   /**
-   * Buscar logs com filtros e paginação
+   * Buscar logs com filtros e paginacao
    */
-  async findAll(params: {
-    page?: number;
-    limit?: number;
-    action?: string;
-    userId?: string;
-    tenantId?: string;
-    startDate?: Date;
-    endDate?: Date;
-  }) {
-    const page = params.page || 1;
-    const limit = params.limit || 50;
+  async findAll(params: AuditLogListParams) {
+    const page = this.clamp(this.toPositiveInt(params.page, 1), 1, 100000);
+    const limit = this.clamp(this.toPositiveInt(params.limit, 50), 1, 200);
     const skip = (page - 1) * limit;
 
     const where: any = {};
 
-    if (params.action) {
-      where.action = params.action;
+    const action = this.normalizeString(params.action);
+    if (action) {
+      where.action = action.toUpperCase();
     }
 
-    if (params.userId) {
-      where.userId = params.userId;
+    const severity = this.normalizeSeverityFilter(params.severity);
+    if (severity) {
+      where.severity = severity;
     }
 
-    if (params.tenantId) {
-      where.tenantId = params.tenantId;
+    const actorUserId = this.normalizeString(params.actorUserId || params.userId);
+    if (actorUserId) {
+      where.OR = [{ actorUserId }, { userId: actorUserId }];
     }
 
-    if (params.startDate || params.endDate) {
+    const tenantId = this.normalizeString(params.tenantId);
+    if (tenantId) {
+      where.tenantId = tenantId;
+    }
+
+    const from = params.from || params.startDate;
+    const to = params.to || params.endDate;
+    if (from || to) {
       where.createdAt = {};
-      if (params.startDate) {
-        where.createdAt.gte = params.startDate;
+      if (from) {
+        where.createdAt.gte = from;
       }
-      if (params.endDate) {
-        where.createdAt.lte = params.endDate;
+      if (to) {
+        where.createdAt.lte = to;
       }
     }
 
@@ -133,7 +157,7 @@ export class AuditService {
     ]);
 
     return {
-      data: logs,
+      data: logs.map((log) => this.sanitizeAuditLogRow(log)),
       meta: {
         total,
         page,
@@ -147,7 +171,7 @@ export class AuditService {
    * Buscar log por ID
    */
   async findOne(id: string) {
-    return this.prisma.auditLog.findUnique({
+    const log = await this.prisma.auditLog.findUnique({
       where: { id },
       include: {
         user: {
@@ -160,10 +184,12 @@ export class AuditService {
         },
       },
     });
+
+    return log ? this.sanitizeAuditLogRow(log) : null;
   }
 
   /**
-   * Estatísticas de logs
+   * Estatisticas de logs
    */
   async getStats(params: { startDate?: Date; endDate?: Date; tenantId?: string }) {
     const where: any = {};
@@ -304,6 +330,24 @@ export class AuditService {
     return 'info';
   }
 
+  private normalizeSeverityFilter(input?: string): AuditSeverity | null {
+    if (!input) {
+      return null;
+    }
+
+    const value = String(input || '').trim().toLowerCase();
+    if (value === 'info' || value === 'warning' || value === 'warn' || value === 'critical') {
+      return this.normalizeSeverity(value);
+    }
+
+    return null;
+  }
+
+  private normalizeAction(input: string): string {
+    const normalized = String(input || '').trim().toUpperCase();
+    return normalized || 'AUDIT_EVENT';
+  }
+
   private normalizeMessage(input: string | undefined, action: string): string {
     const normalized = String(input || '').trim();
     return normalized.length > 0 ? normalized.slice(0, 300) : action.slice(0, 300);
@@ -403,6 +447,7 @@ export class AuditService {
 
     return `[path-redacted]/${segments[segments.length - 1]}`;
   }
+
   private parseDetails(value: string | null) {
     if (!value) {
       return null;
@@ -424,6 +469,44 @@ export class AuditService {
 
   private clamp(value: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, value));
+  }
+
+  private sanitizeAuditLogRow(log: any) {
+    const parsedDetails = this.parseDetails(typeof log.details === 'string' ? log.details : null);
+    const metadataInput = this.normalizeMetadataInput(log.metadata);
+
+    return {
+      ...log,
+      details:
+        parsedDetails && typeof parsedDetails === 'object' && !Array.isArray(parsedDetails)
+          ? this.sanitizeMetadata(parsedDetails as Record<string, unknown>)
+          : parsedDetails,
+      metadata: this.sanitizeMetadata(metadataInput),
+    };
+  }
+
+  private normalizeMetadataInput(value: unknown): Record<string, unknown> {
+    if (!value) {
+      return {};
+    }
+
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          return parsed as Record<string, unknown>;
+        }
+      } catch {
+        return {};
+      }
+      return {};
+    }
+
+    if (typeof value === 'object' && !Array.isArray(value)) {
+      return value as Record<string, unknown>;
+    }
+
+    return {};
   }
 }
 

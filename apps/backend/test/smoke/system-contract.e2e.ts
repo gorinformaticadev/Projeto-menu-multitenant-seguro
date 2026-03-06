@@ -11,6 +11,7 @@
 import { APP_GUARD, Reflector } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { Role } from '@prisma/client';
+import { JwtService } from '@nestjs/jwt';
 import request = require('supertest');
 import { HealthController } from '../../src/health/health.controller';
 import {
@@ -27,6 +28,8 @@ import { SystemUpdateAdminService } from '../../src/update/system-update-admin.s
 import { NotificationService } from '../../src/notifications/notification.service';
 import { SystemNotificationsController } from '../../src/notifications/system-notifications.controller';
 import { NotificationsSseJwtGuard } from '../../src/notifications/guards/notifications-sse-jwt.guard';
+import { AuditService } from '../../src/audit/audit.service';
+import { SystemAuditController } from '../../src/audit/system-audit.controller';
 
 const DEFAULT_MAINTENANCE_STATE: MaintenanceState = {
   enabled: false,
@@ -107,6 +110,33 @@ const notificationServiceMock = {
   })),
 };
 
+const auditServiceMock = {
+  findAll: jest.fn(async () => ({
+    data: [
+      {
+        id: 'audit-1',
+        action: 'UPDATE_STARTED',
+        severity: 'warning',
+        message: 'Update iniciado',
+        actorUserId: 'smoke-admin',
+        metadata: { source: 'panel' },
+        createdAt: new Date('2026-03-06T10:00:00Z'),
+      },
+    ],
+    meta: { total: 1, page: 1, limit: 20, totalPages: 1 },
+  })),
+  findOne: jest.fn(async (id: string) => ({
+    id,
+    action: 'UPDATE_STARTED',
+    severity: 'warning',
+    message: 'Update iniciado',
+    actorUserId: 'smoke-admin',
+    metadata: { source: 'panel' },
+    createdAt: new Date('2026-03-06T10:00:00Z'),
+  })),
+  log: jest.fn(async () => null),
+};
+
 @Injectable()
 class MockJwtAuthGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
@@ -152,6 +182,7 @@ class DummyTenantsController {
     MaintenanceController,
     SystemUpdateController,
     SystemNotificationsController,
+    SystemAuditController,
   ],
   providers: [
     Reflector,
@@ -172,6 +203,16 @@ class DummyTenantsController {
     {
       provide: NotificationService,
       useValue: notificationServiceMock,
+    },
+    {
+      provide: AuditService,
+      useValue: auditServiceMock,
+    },
+    {
+      provide: JwtService,
+      useValue: {
+        verify: jest.fn(() => ({ role: Role.SUPER_ADMIN })),
+      },
     },
   ],
 })
@@ -207,6 +248,9 @@ describe('System contract smoke', () => {
       ...SYSTEM_NOTIFICATIONS_FIXTURE,
     });
     notificationServiceMock.markSystemNotificationAsRead.mockClear();
+    auditServiceMock.findAll.mockClear();
+    auditServiceMock.findOne.mockClear();
+    auditServiceMock.log.mockClear();
   });
 
   afterAll(async () => {
@@ -284,6 +328,19 @@ describe('System contract smoke', () => {
     expect(response.body.notification.id).toBe('notif-1');
     expect(response.body.notification.isRead).toBe(true);
     expect(notificationServiceMock.markSystemNotificationAsRead).toHaveBeenCalledWith('notif-1');
+  });
+
+  it('GET /api/system/audit enforces auth and returns audit payload for admin', async () => {
+    await request(app.getHttpServer()).get('/api/system/audit').expect(401);
+
+    const response = await request(app.getHttpServer())
+      .get('/api/system/audit')
+      .set('Authorization', 'Bearer smoke-admin-token')
+      .expect(200);
+
+    expect(response.body.data).toHaveLength(1);
+    expect(response.body.data[0].action).toBe('UPDATE_STARTED');
+    expect(auditServiceMock.findAll).toHaveBeenCalledTimes(1);
   });
 
   it('maintenance guard returns 503 for regular routes and still allows health, update status and notifications', async () => {
