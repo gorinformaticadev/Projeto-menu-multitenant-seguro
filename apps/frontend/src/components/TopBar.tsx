@@ -6,16 +6,14 @@ import { usePlatformName } from "@/hooks/usePlatformConfig";
 import { useSystemVersion } from "@/hooks/useSystemVersion";
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { Button } from "./ui/button";
-import { Bell, Search, User, LogOut, Info } from "lucide-react";
+import { Search, User, LogOut, Info } from "lucide-react";
 import api from "@/lib/api";
 import { ModuleRegistryUserMenu } from "./ModuleRegistryUserMenu";
-import { useNotificationContext } from '@/providers/NotificationProvider';
-import { useSystemAdminNotifications } from '@/hooks/useSystemAdminNotifications';
-import { AlertTriangle, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
-import { Notification } from '@/types/notifications';
 import { ThemeToggle } from "./ThemeToggle";
 import Image from "next/image";
 import { GlobalSearch } from "./GlobalSearch";
+import { SystemNotificationsBell } from "@/components/system-notifications/SystemNotificationsBell";
+import { SystemNotificationsDrawer } from "@/components/system-notifications/SystemNotificationsDrawer";
 
 export function TopBar() {
   const { user, logout } = useAuth();
@@ -24,44 +22,11 @@ export function TopBar() {
   const [masterLogo, setMasterLogo] = useState<string | null>(null);
   const [userTenantLogo, setUserTenantLogo] = useState<string | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false); // Adicionado estado
-
-  const notificationContext = useNotificationContext();
-  const systemAdminNotifications = useSystemAdminNotifications();
-
-  const notifications =
-    user?.role === 'SUPER_ADMIN'
-      ? systemAdminNotifications.notifications
-      : notificationContext.notifications;
-  const unreadCount =
-    user?.role === 'SUPER_ADMIN'
-      ? systemAdminNotifications.unreadCount
-      : notificationContext.unreadCount;
-  const isConnected =
-    user?.role === 'SUPER_ADMIN'
-      ? systemAdminNotifications.isConnected
-      : notificationContext.isConnected;
-  const connectionError =
-    user?.role === 'SUPER_ADMIN'
-      ? systemAdminNotifications.connectionError
-      : notificationContext.connectionError;
-  const markAsRead =
-    user?.role === 'SUPER_ADMIN'
-      ? systemAdminNotifications.markAsRead
-      : notificationContext.markAsRead;
-  const markAllAsRead =
-    user?.role === 'SUPER_ADMIN'
-      ? systemAdminNotifications.markAllAsRead
-      : notificationContext.markAllAsRead;
 
   // Hook para fechar menu ao clicar fora
   const userMenuRef = useClickOutside<HTMLDivElement>(() => {
     setShowUserMenu(false);
-  });
-
-  const notificationsRef = useClickOutside<HTMLDivElement>(() => {
-    setShowNotifications(false);
   });
 
   // Busca logo da empresa master (para o header)
@@ -161,38 +126,6 @@ export function TopBar() {
     setUserTenantLogo(null);
   };
 
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'warning': return AlertTriangle;
-      case 'error': return AlertCircle;
-      case 'success': return CheckCircle;
-      default: return Info;
-    }
-  };
-
-  const formatNotificationTime = (dateInput: Date | string) => {
-    const now = new Date();
-    const date = new Date(dateInput);
-
-    if (isNaN(date.getTime())) return 'data invalida';
-
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return 'agora';
-    if (minutes < 60) return `ha ${minutes}min`;
-    if (hours < 24) return `ha ${hours}h`;
-    return `ha ${days}d`;
-  };
-
-  const handleNotificationClick = async (notification: Notification) => {
-    if (!notification.read) {
-      await Promise.resolve(markAsRead(notification.id));
-    }
-  };
-
   // Icone de seta para voltar (usado na busca mobile)
   const ArrowLeftIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>
@@ -262,147 +195,12 @@ export function TopBar() {
             <Search className="h-5 w-5" />
           </Button>
 
-          {/* Notificacoes */}
-          <div className="relative" ref={notificationsRef}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative text-gray-600 dark:text-muted-foreground hover:bg-gray-100 dark:hover:bg-accent"
-              onClick={() => setShowNotifications(!showNotifications)}
-            >
-              <Bell className="h-5 w-5" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium px-1 shadow-sm">
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </span>
-              )}
-            </Button>
-
-            {/* Dropdown de Notificacoes */}
-            {showNotifications && (
-              <div className="fixed top-[4.25rem] left-2 right-2 w-auto max-w-none bg-white dark:bg-popover rounded-lg shadow-lg dark:shadow-shadow-dark border border-gray-200 dark:border-border z-50 md:absolute md:top-auto md:left-auto md:right-0 md:mt-2 md:w-96">
-                {/* Header */}
-                <div className="px-4 py-3 border-b border-gray-200 dark:border-border flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-foreground">Notificacoes</h3>
-                    {unreadCount > 0 && (
-                      <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 text-xs rounded-full font-medium">
-                        {unreadCount} nova{unreadCount !== 1 ? 's' : ''}
-                      </span>
-                    )}
-                    {!isConnected && (
-                      <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 text-xs rounded-full font-medium">
-                        Desconectado
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Erro */}
-                {connectionError && (
-                  <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-900/30">
-                    <p className="text-xs text-red-600 dark:text-red-400">{connectionError}</p>
-                  </div>
-                )}
-
-                {/* Conteudo */}
-                {notifications.length === 0 ? (
-                  <div className="px-4 py-8 text-center">
-                    <Bell className="h-8 w-8 text-gray-300 dark:text-slate-600 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500 dark:text-muted-foreground">Sem notificacoes</p>
-                    <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">Voce esta em dia!</p>
-                  </div>
-                ) : (
-                  <div className="max-h-[60vh] overflow-y-auto custom-scrollbar md:max-h-96">
-                    {notifications.map((notification) => {
-                      const Icon = getNotificationIcon(notification.type);
-                      const isUnread = !notification.read;
-
-                      return (
-                        <div
-                          key={notification.id}
-                          className={`px-4 py-3 border-b border-gray-100 dark:border-border last:border-b-0 cursor-pointer transition-colors ${isUnread ? 'bg-blue-50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-muted/50'
-                            }`}
-                          onClick={() => handleNotificationClick(notification)}
-                        >
-                          <div className="flex items-start gap-3">
-                            {/* Icone e indicador de nao lida */}
-                            <div className="flex-shrink-0 relative">
-                              <Icon className={`h-4 w-4 mt-1 ${notification.type === 'error' ? 'text-red-600 dark:text-red-400' :
-                                notification.type === 'warning' ? 'text-yellow-600 dark:text-yellow-400' :
-                                  notification.type === 'success' ? 'text-green-600 dark:text-green-400' :
-                                    'text-blue-600 dark:text-blue-400'
-                                }`} />
-                              {isUnread && (
-                                <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"></div>
-                              )}
-                            </div>
-
-                            {/* Conteudo */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <p className={`text-sm truncate ${isUnread ? 'font-semibold text-gray-900 dark:text-foreground' : 'font-medium text-gray-700 dark:text-muted-foreground'
-                                  }`}>
-                                  {notification.title}
-                                </p>
-
-                                {/* Badge de tipo */}
-                                {notification.type !== 'info' && (
-                                  <span className={`px-2 py-1 text-xs rounded-full font-medium flex-shrink-0 ${notification.type === 'error' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' :
-                                    notification.type === 'warning' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' :
-                                      notification.type === 'success' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
-                                        'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
-                                    }`}>
-                                    {notification.type === 'error' ? 'Erro' :
-                                      notification.type === 'warning' ? 'Aviso' :
-                                        notification.type === 'success' ? 'Sucesso' : 'Info'}
-                                  </span>
-                                )}
-                              </div>
-
-                              <p className="text-xs text-gray-500 dark:text-muted-foreground/80 mt-1 line-clamp-2">
-                                {notification.description}
-                              </p>
-
-                              <div className="flex items-center justify-between mt-2">
-                                <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-slate-500">
-                                  <span>{formatNotificationTime(notification.createdAt)}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Footer */}
-                <div className="px-4 py-3 border-t border-gray-200 dark:border-border flex items-center justify-between bg-gray-50 dark:bg-muted/30 rounded-b-lg">
-                  {notifications.length > 0 && (
-                    <button
-                      onClick={async () => {
-                        await markAllAsRead();
-                      }}
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium transition-colors"
-                      disabled={unreadCount === 0}
-                    >
-                      Marcar todas como lidas
-                    </button>
-                  )}
-
-                  <a
-                    href="/notifications"
-                    onClick={() => setShowNotifications(false)}
-                    className="text-xs text-gray-600 dark:text-muted-foreground hover:text-gray-900 dark:hover:text-foreground font-medium flex items-center gap-1 transition-colors"
-                  >
-                    Ver todas
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                </div>
-              </div>
-            )}
-          </div>
+          {user?.role === "SUPER_ADMIN" && (
+            <>
+              <SystemNotificationsBell />
+              <SystemNotificationsDrawer />
+            </>
+          )}
 
           {/* Menu do Usuario */}
           <div className="relative" ref={userMenuRef}>

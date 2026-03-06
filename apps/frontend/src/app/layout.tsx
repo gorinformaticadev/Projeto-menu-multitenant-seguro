@@ -10,6 +10,7 @@ import { InactivityLogout } from "@/components/InactivityLogout";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { MaintenanceProvider } from "@/contexts/MaintenanceContext";
 import { MaintenanceBanner } from "@/components/MaintenanceBanner";
+import { SystemNotificationsProvider } from "@/contexts/SystemNotificationsContext";
 
 export const metadata: Metadata = {
   title: "Sistema Multitenant", // Será atualizado dinamicamente pelo DynamicTitle
@@ -51,19 +52,21 @@ export default function RootLayout({
             <MaintenanceProvider>
               <SecurityConfigProvider>
                 <NotificationProvider>
-                  <ThemeProvider
-                    attribute="class"
-                    defaultTheme="light"
-                    enableSystem
-                    disableTransitionOnChange
-                  >
-                    <MaintenanceBanner />
-                    <InactivityLogout />
-                    <AppLayout>
-                      {children}
-                    </AppLayout>
-                    <Toaster />
-                  </ThemeProvider>
+                  <SystemNotificationsProvider>
+                    <ThemeProvider
+                      attribute="class"
+                      defaultTheme="light"
+                      enableSystem
+                      disableTransitionOnChange
+                    >
+                      <MaintenanceBanner />
+                      <InactivityLogout />
+                      <AppLayout>
+                        {children}
+                      </AppLayout>
+                      <Toaster />
+                    </ThemeProvider>
+                  </SystemNotificationsProvider>
                 </NotificationProvider>
               </SecurityConfigProvider>
             </MaintenanceProvider>
