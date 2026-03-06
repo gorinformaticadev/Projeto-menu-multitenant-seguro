@@ -56,6 +56,7 @@
     "react-day-picker": "^9.14.0",
     "react-dom": "19.2.3",
     "react-grid-layout": "^2.2.2",
+    "recharts": "^3.8.0",
     "rrule": "^2.8.1",
     "socket.io-client": "^4.8.3",
     "styled-jsx": "^5.1.7",

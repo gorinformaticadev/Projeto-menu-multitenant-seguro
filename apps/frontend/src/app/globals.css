@@ -172,14 +172,69 @@
   transition: box-shadow 160ms ease, transform 160ms ease;
 }
 
+.operational-dashboard-grid.is-editing .react-grid-item {
+  cursor: default;
+}
+
+.operational-dashboard-grid.is-editing .react-grid-item > div {
+  height: 100%;
+}
+
+.operational-dashboard-grid.is-editing .react-grid-item .dashboard-drag-handle {
+  cursor: grab;
+}
+
+.operational-dashboard-grid.is-editing .react-grid-item .dashboard-drag-handle:active {
+  cursor: grabbing;
+}
+
+.operational-dashboard-grid.is-editing .react-grid-item:not(.react-draggable-dragging) {
+  filter: saturate(1.02);
+}
+
 .operational-dashboard-grid .react-grid-item.react-grid-placeholder {
   background: linear-gradient(120deg, rgb(99 102 241 / 0.18), rgb(14 165 233 / 0.2));
   border-radius: 0.75rem;
   border: 1px dashed rgb(59 130 246 / 0.45);
 }
 
+.operational-dashboard-grid.is-editing .react-grid-item.react-grid-placeholder {
+  background: linear-gradient(120deg, rgb(37 99 235 / 0.18), rgb(59 130 246 / 0.26));
+  border-color: rgb(37 99 235 / 0.55);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12);
+}
+
 .operational-dashboard-grid .react-grid-item.react-draggable-dragging {
   z-index: 30;
   opacity: 0.92;
   transform: scale(1.01);
+}
+
+.operational-dashboard-grid.is-editing .react-grid-item.react-draggable-dragging {
+  z-index: 40;
+  opacity: 0.98;
+  transform: scale(1.015);
+}
+
+.operational-dashboard-grid .react-grid-item > div {
+  height: 100%;
+}
+
+.operational-dashboard-grid .react-grid-item .react-resizable-handle {
+  right: 0.65rem;
+  bottom: 0.65rem;
+  height: 1rem;
+  width: 1rem;
+  opacity: 0;
+  border-right: 2px solid rgb(148 163 184 / 0.65);
+  border-bottom: 2px solid rgb(148 163 184 / 0.65);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.operational-dashboard-grid.is-editing .react-grid-item .react-resizable-handle {
+  opacity: 0.95;
+}
+
+.operational-dashboard-grid.is-editing .react-grid-item:hover .react-resizable-handle {
+  transform: scale(1.08);
 }

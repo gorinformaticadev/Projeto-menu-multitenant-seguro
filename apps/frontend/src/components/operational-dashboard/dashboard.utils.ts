@@ -14,6 +14,35 @@ export type DashboardMetric = {
 
 export type DashboardRole = "SUPER_ADMIN" | "ADMIN" | "USER" | "CLIENT";
 
+type DashboardBreakpoint = "lg" | "md" | "sm";
+type LayoutEntry = Record<string, number | string>;
+type LayoutPreset = {
+  w: number;
+  h: number;
+  minW?: number;
+  minH?: number;
+  maxW?: number;
+  maxH?: number;
+};
+
+export const dashboardGridBreakpoints = {
+  lg: 1280,
+  md: 900,
+  sm: 0,
+} as const;
+
+export const dashboardGridCols = {
+  lg: 8,
+  md: 6,
+  sm: 2,
+} as const;
+
+export const dashboardGridRowHeight = 104;
+
+const analyticsWidgetIds = new Set(["api", "cpu", "memory", "disk", "security", "errors"]);
+
+const tallWidgetIds = new Set(["backup"]);
+
 export function formatBytes(value: unknown): string {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric < 0) {
@@ -138,7 +167,7 @@ export function normalizeLayoutForWidgets(
 
   const source = rawLayout as Record<string, unknown>;
   const normalized: Record<string, Array<Record<string, number | string>>> = {};
-  const breakpoints = ["lg", "md", "sm"];
+  const breakpoints: DashboardBreakpoint[] = ["lg", "md", "sm"];
 
   for (const breakpoint of breakpoints) {
     const candidate = source[breakpoint];
@@ -151,63 +180,231 @@ export function normalizeLayoutForWidgets(
       .filter((item) => item && typeof item === "object" && !Array.isArray(item))
       .map((item, index) => {
         const row = item as Record<string, unknown>;
-        const i = String(row.i || widgetIds[index] || "").trim();
-        const x = Number(row.x);
-        const y = Number(row.y);
-        const w = Number(row.w);
-        const h = Number(row.h);
-
-        return {
-          i,
-          x: Number.isFinite(x) ? x : 0,
-          y: Number.isFinite(y) ? y : index,
-          w: Number.isFinite(w) && w > 0 ? w : 1,
-          h: Number.isFinite(h) && h > 0 ? h : 1,
-          minW: 1,
-          minH: 1,
-        };
+        return normalizeLayoutItem(
+          row,
+          String(row.i || widgetIds[index] || "").trim(),
+          breakpoint,
+        );
       })
       .filter((item) => widgetIds.includes(String(item.i)));
 
-    const merged = mergeLayoutWithWidgetIds(sanitized, widgetIds, breakpoint === "lg" ? 4 : breakpoint === "md" ? 2 : 1);
-    normalized[breakpoint] = merged;
+    normalized[breakpoint] = mergeLayoutWithWidgetIds(sanitized, widgetIds, breakpoint);
   }
 
   return normalized;
 }
 
-function buildDefaultLayout(widgetIds: string[]): Record<string, Array<Record<string, number | string>>> {
+function buildDefaultLayout(
+  widgetIds: string[],
+): Record<DashboardBreakpoint, Array<Record<string, number | string>>> {
   return {
-    lg: mergeLayoutWithWidgetIds([], widgetIds, 4),
-    md: mergeLayoutWithWidgetIds([], widgetIds, 2),
-    sm: mergeLayoutWithWidgetIds([], widgetIds, 1),
+    lg: mergeLayoutWithWidgetIds([], widgetIds, "lg"),
+    md: mergeLayoutWithWidgetIds([], widgetIds, "md"),
+    sm: mergeLayoutWithWidgetIds([], widgetIds, "sm"),
   };
 }
 
 function mergeLayoutWithWidgetIds(
-  items: Array<Record<string, number | string>>,
+  items: LayoutEntry[],
   widgetIds: string[],
-  columns: number,
-): Array<Record<string, number | string>> {
-  const used = new Set(items.map((item) => String(item.i)));
-  const merged = [...items];
+  breakpoint: DashboardBreakpoint,
+): LayoutEntry[] {
+  const columns = dashboardGridCols[breakpoint];
+  const merged: LayoutEntry[] = [];
+  const used = new Set<string>();
+  const orderedItems = [...items].sort((left, right) => {
+    const byRow = Number(left.y) - Number(right.y);
+    if (byRow !== 0) {
+      return byRow;
+    }
+    return Number(left.x) - Number(right.x);
+  });
+
+  for (const item of orderedItems) {
+    const id = String(item.i || "").trim();
+    if (!id || used.has(id) || !widgetIds.includes(id)) {
+      continue;
+    }
+
+    const normalized = normalizeLayoutItem(item, id, breakpoint);
+    const preferredX = clampValue(Number(normalized.x), 0, Math.max(0, columns - Number(normalized.w)));
+    const preferredY = Math.max(0, Number(normalized.y));
+    const spot = findAvailableSpot(
+      merged,
+      Number(normalized.w),
+      Number(normalized.h),
+      columns,
+      preferredX,
+      preferredY,
+    );
+
+    merged.push({
+      ...normalized,
+      x: spot.x,
+      y: spot.y,
+    });
+    used.add(id);
+  }
 
   for (const id of widgetIds) {
     if (used.has(id)) {
       continue;
     }
 
-    const index = merged.length;
+    const preset = getWidgetLayoutPreset(id, breakpoint);
+    const spot = findAvailableSpot(merged, preset.w, preset.h, columns);
     merged.push({
       i: id,
-      x: index % columns,
-      y: Math.floor(index / columns),
-      w: 1,
-      h: 1,
-      minW: 1,
-      minH: 1,
+      x: spot.x,
+      y: spot.y,
+      ...preset,
     });
   }
 
   return merged;
+}
+
+function normalizeLayoutItem(
+  item: LayoutEntry | Record<string, unknown>,
+  id: string,
+  breakpoint: DashboardBreakpoint,
+): LayoutEntry {
+  const columns = dashboardGridCols[breakpoint];
+  const preset = getWidgetLayoutPreset(id, breakpoint);
+  const rawMinW = clampOptional(Number(item.minW), 1, columns);
+  const rawMaxW = clampOptional(Number(item.maxW), 1, columns);
+  const minW = Math.min(rawMinW ?? preset.minW ?? preset.w, rawMaxW ?? columns);
+  const maxW = Math.max(rawMaxW ?? preset.maxW ?? columns, minW);
+  const w = clampValue(Number(item.w), minW, Math.min(maxW, columns));
+  const minH = Math.max(1, clampOptional(Number(item.minH), 1, 12) ?? preset.minH ?? preset.h);
+  const maxH = Math.max(clampOptional(Number(item.maxH), minH, 12) ?? preset.maxH ?? 12, minH);
+  const h = clampValue(Number(item.h), minH, maxH);
+
+  return {
+    i: id,
+    x: clampValue(Number(item.x), 0, Math.max(0, columns - w)),
+    y: Math.max(0, Number.isFinite(Number(item.y)) ? Math.floor(Number(item.y)) : 0),
+    w,
+    h,
+    minW,
+    minH,
+    ...(maxW < columns ? { maxW } : {}),
+    ...(maxH < 12 ? { maxH } : {}),
+  };
+}
+
+function getWidgetLayoutPreset(id: string, breakpoint: DashboardBreakpoint): LayoutPreset {
+  const columns = dashboardGridCols[breakpoint];
+
+  if (analyticsWidgetIds.has(id)) {
+    if (breakpoint === "lg") {
+      return clampPreset({ w: 4, h: 2, minW: 3, minH: 2, maxW: 5, maxH: 3 }, columns);
+    }
+
+    if (breakpoint === "md") {
+      return clampPreset({ w: 3, h: 2, minW: 2, minH: 2, maxW: 4, maxH: 3 }, columns);
+    }
+
+    return clampPreset({ w: columns, h: 2, minW: Math.min(2, columns), minH: 2 }, columns);
+  }
+
+  if (tallWidgetIds.has(id)) {
+    if (breakpoint === "lg") {
+      return clampPreset({ w: 4, h: 2, minW: 3, minH: 2, maxW: 5, maxH: 3 }, columns);
+    }
+
+    if (breakpoint === "md") {
+      return clampPreset({ w: 3, h: 2, minW: 2, minH: 2, maxW: 4, maxH: 3 }, columns);
+    }
+
+    return clampPreset({ w: columns, h: 2, minW: Math.min(2, columns), minH: 2 }, columns);
+  }
+
+  if (breakpoint === "sm") {
+    return clampPreset({ w: 2, h: 1, minW: 1, minH: 1, maxW: 2, maxH: 2 }, columns);
+  }
+
+  return clampPreset({ w: 2, h: 1, minW: 1, minH: 1, maxW: 3, maxH: 2 }, columns);
+}
+
+function clampPreset(preset: LayoutPreset, columns: number): LayoutPreset {
+  const minW = clampValue(preset.minW ?? 1, 1, columns);
+  const maxW = Math.max(clampOptional(preset.maxW, minW, columns) ?? columns, minW);
+  const minH = Math.max(1, clampOptional(preset.minH, 1, 12) ?? 1);
+  const maxH = Math.max(clampOptional(preset.maxH, minH, 12) ?? 12, minH);
+
+  return {
+    w: clampValue(preset.w, minW, Math.min(columns, maxW)),
+    h: clampValue(preset.h, minH, maxH),
+    minW,
+    minH,
+    ...(maxW < columns ? { maxW } : {}),
+    ...(maxH < 12 ? { maxH } : {}),
+  };
+}
+
+function findAvailableSpot(
+  items: LayoutEntry[],
+  width: number,
+  height: number,
+  columns: number,
+  preferredX = 0,
+  preferredY = 0,
+): { x: number; y: number } {
+  const safeWidth = clampValue(width, 1, columns);
+  const safeHeight = Math.max(1, Math.floor(height));
+  const maxY = items.reduce((max, item) => Math.max(max, Number(item.y) + Number(item.h)), 0);
+  const searchLimit = Math.max(maxY + 8, 24);
+
+  if (fitsAtPosition(items, preferredX, preferredY, safeWidth, safeHeight, columns)) {
+    return { x: preferredX, y: preferredY };
+  }
+
+  for (let y = 0; y <= searchLimit; y += 1) {
+    for (let x = 0; x <= columns - safeWidth; x += 1) {
+      if (fitsAtPosition(items, x, y, safeWidth, safeHeight, columns)) {
+        return { x, y };
+      }
+    }
+  }
+
+  return { x: 0, y: maxY };
+}
+
+function fitsAtPosition(
+  items: LayoutEntry[],
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  columns: number,
+): boolean {
+  if (x < 0 || y < 0 || x + width > columns) {
+    return false;
+  }
+
+  return items.every((item) => {
+    const left = Number(item.x);
+    const top = Number(item.y);
+    const right = left + Number(item.w);
+    const bottom = top + Number(item.h);
+
+    return x + width <= left || x >= right || y + height <= top || y >= bottom;
+  });
+}
+
+function clampValue(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+
+  return Math.min(Math.max(Math.floor(value), min), max);
+}
+
+function clampOptional(value: number, min: number, max: number): number | undefined {
+  if (!Number.isFinite(value)) {
+    return undefined;
+  }
+
+  return clampValue(value, min, max);
 }

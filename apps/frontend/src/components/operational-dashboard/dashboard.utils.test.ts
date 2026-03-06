@@ -38,4 +38,24 @@ describe("dashboard.utils", () => {
       expect.arrayContaining(["version", "uptime", "api"]),
     );
   });
+
+  it("uses larger presets for analytic widgets in the default desktop layout", () => {
+    const normalized = normalizeLayoutForWidgets({}, ["version", "api"]);
+    const apiItem = normalized.lg.find((item) => item.i === "api");
+
+    expect(apiItem).toMatchObject({
+      w: 4,
+      h: 2,
+    });
+  });
+
+  it("keeps analytic widgets compact on medium layouts", () => {
+    const normalized = normalizeLayoutForWidgets({}, ["version", "api"]);
+    const apiItem = normalized.md.find((item) => item.i === "api");
+
+    expect(apiItem).toMatchObject({
+      w: 3,
+      h: 2,
+    });
+  });
 });

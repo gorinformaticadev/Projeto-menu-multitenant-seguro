@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "./Sidebar";
@@ -18,6 +19,22 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   // Páginas onde o sidebar e topbar NÃO devem aparecer
   const publicPages = ["/", "/login", "/esqueci-senha", "/redefinir-senha"];
   const isPublicPage = publicPages.includes(pathname);
+
+  useEffect(() => {
+    const shouldLockDocumentScroll = !loading && !isPublicPage && Boolean(user);
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtmlOverflow = html.style.overflow;
+    const previousBodyOverflow = body.style.overflow;
+
+    html.style.overflow = shouldLockDocumentScroll ? "hidden" : previousHtmlOverflow;
+    body.style.overflow = shouldLockDocumentScroll ? "hidden" : previousBodyOverflow;
+
+    return () => {
+      html.style.overflow = previousHtmlOverflow;
+      body.style.overflow = previousBodyOverflow;
+    };
+  }, [isPublicPage, loading, user]);
 
   // Se está carregando ou é página pública, não mostra sidebar nem topbar
   if (loading || isPublicPage || !user) {
@@ -56,11 +73,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <TopBar />
 
         {/* Layout com Sidebar e Conteúdo */}
-        <div className="flex w-full pt-16 pb-16 md:pb-0">
-          <aside className="hidden md:flex flex-shrink-0 h-[calc(100vh-4rem)]">
+        <div className="flex h-full min-h-0 w-full overflow-hidden pt-16 pb-16 md:pb-0">
+          <aside className="hidden h-full min-h-0 flex-shrink-0 md:flex">
             <Sidebar />
           </aside>
-          <main className="flex-1 overflow-y-auto bg-background p-0">
+          <main className="min-h-0 flex-1 overflow-y-auto bg-background p-0">
             {children}
           </main>
         </div>

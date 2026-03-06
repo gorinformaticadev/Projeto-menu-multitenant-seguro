@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "react-grid-layout/css/styles.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SecurityConfigProvider } from "@/contexts/SecurityConfigContext";
 import { PlatformConfigProvider } from "@/contexts/PlatformConfigContext";
