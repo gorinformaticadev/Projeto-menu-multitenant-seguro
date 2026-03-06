@@ -126,7 +126,7 @@ export class NotificationsController {
    */
   @Patch(':id/read')
   async markAsRead(@Param('id') id: string, @Request() req) {
-    const notification = await this.notificationService.markAsRead(id, req.user);
+    const notification = await this.notificationService.markUserNotificationAsRead(id, req.user);
 
     if (notification) {
       // Emite evento via Socket.IO

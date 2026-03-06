@@ -12,6 +12,9 @@ describe('MaintenanceModeGuard', () => {
   const auditServiceMock = {
     log: jest.fn(),
   };
+  const notificationServiceMock = {
+    emitSystemAlert: jest.fn(),
+  };
 
   let previousBypassToken: string | undefined;
   let previousJwtSecret: string | undefined;
@@ -21,6 +24,7 @@ describe('MaintenanceModeGuard', () => {
       maintenanceModeServiceMock as any,
       jwtServiceMock as unknown as JwtService,
       auditServiceMock as any,
+      notificationServiceMock as any,
     );
 
   const createContext = (request: any): ExecutionContext =>
@@ -94,6 +98,12 @@ describe('MaintenanceModeGuard', () => {
           route: '/api/private/resource',
           method: 'GET',
         }),
+      }),
+    );
+    expect(notificationServiceMock.emitSystemAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'MAINTENANCE_BYPASS_USED',
+        severity: 'critical',
       }),
     );
   });

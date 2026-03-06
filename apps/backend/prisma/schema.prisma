@@ -378,6 +378,8 @@ model Notification {
   @@index([createdAt])
   @@index([tenantId, audience, read])
   @@index([userId, read])
+  @@index([targetRole, isRead, createdAt])
+  @@index([targetUserId, isRead, createdAt])
   @@map("notifications")
 }
 
@@ -640,4 +642,3 @@ enum SeedRunStatus {
   SKIPPED
   FORCED
 }
-

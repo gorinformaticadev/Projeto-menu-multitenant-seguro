@@ -27,6 +27,33 @@ export interface EmitSystemAlertInput {
   targetUserId?: string | null;
 }
 
+export interface CreateSystemNotificationInput {
+  severity: SystemNotificationSeverity | string;
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+  targetRole?: string | null;
+  targetUserId?: string | null;
+  type?: string;
+}
+
+export interface SystemNotificationListParams {
+  page?: number;
+  limit?: number;
+  isRead?: boolean;
+  unreadOnly?: boolean;
+  severity?: SystemNotificationSeverity | string;
+  targetRole?: string;
+  targetUserId?: string;
+}
+
+export interface NotificationActorScope {
+  userId?: string;
+  role?: string;
+  targetRole?: string;
+  targetUserId?: string;
+}
+
 export interface SystemNotificationDto {
   id: string;
   type: string;
@@ -39,18 +66,36 @@ export interface SystemNotificationDto {
   readAt: Date | null;
 }
 
-const SYSTEM_ALERT_ACTION_ALLOWLIST = new Set([
-  'UPDATE_STARTED',
-  'UPDATE_COMPLETED',
-  'UPDATE_FAILED',
-  'UPDATE_ROLLED_BACK_AUTO',
-  'UPDATE_ROLLBACK_MANUAL',
-  'MAINTENANCE_ENABLED',
-  'BACKUP_FAILED',
-  'RESTORE_STARTED',
-  'RESTORE_COMPLETED',
-  'RESTORE_FAILED',
-]);
+const SYSTEM_ALERT_RULES: Record<string, { severity: SystemNotificationSeverity; title: string }> = {
+  UPDATE_STARTED: {
+    severity: 'warning',
+    title: 'Atualizacao iniciada',
+  },
+  UPDATE_COMPLETED: {
+    severity: 'warning',
+    title: 'Atualizacao concluida',
+  },
+  UPDATE_FAILED: {
+    severity: 'critical',
+    title: 'Atualizacao falhou',
+  },
+  UPDATE_ROLLED_BACK_AUTO: {
+    severity: 'critical',
+    title: 'Rollback automatico executado',
+  },
+  UPDATE_ROLLBACK_MANUAL: {
+    severity: 'critical',
+    title: 'Rollback manual executado',
+  },
+  MAINTENANCE_ENABLED: {
+    severity: 'warning',
+    title: 'Modo manutencao ativado',
+  },
+  MAINTENANCE_BYPASS_USED: {
+    severity: 'critical',
+    title: 'Bypass de manutencao utilizado',
+  },
+};
 
 @Injectable()
 export class NotificationService {
@@ -67,53 +112,81 @@ export class NotificationService {
 
   async emitSystemAlert(input: EmitSystemAlertInput): Promise<SystemNotificationDto | null> {
     const action = this.normalizeAction(input.action);
-    const severity = this.normalizeSeverity(input.severity);
-
-    if (!this.shouldEmitSystemAlert(action, severity)) {
+    const actionRule = SYSTEM_ALERT_RULES[action];
+    if (!actionRule) {
       return null;
     }
 
-    const title = this.normalizeText(input.title || this.buildSystemAlertTitle(action), 140);
+    const severity = actionRule.severity;
+    const title = this.normalizeText(input.title || actionRule.title || this.buildSystemAlertTitle(action), 140);
     const body = this.normalizeText(input.body || input.message || title, 500);
     const targetRole = this.normalizeText(input.targetRole || 'SUPER_ADMIN', 40);
     const targetUserId = this.normalizeText(input.targetUserId || undefined, 80);
-    const moduleName = this.normalizeText(input.module || undefined, 80);
+    const moduleName = this.normalizeText(input.module || 'system', 80);
     const payloadData = this.sanitizeData({
       action,
+      module: moduleName,
       ...(input.data || {}),
     });
 
-    const notification = await this.prisma.notification.create({
-      data: {
-        type: 'SYSTEM_ALERT',
-        severity,
-        title,
-        body,
-        message: body,
-        data: payloadData as any,
-        targetRole,
-        targetUserId,
-        isRead: false,
-        read: false,
-        readAt: null,
-        audience: 'super_admin',
-        source: 'system',
-        module: moduleName,
-        tenantId: null,
-        userId: targetUserId,
-      },
+    return this.createSystemNotification({
+      severity,
+      title,
+      body,
+      data: payloadData,
+      targetRole,
+      targetUserId,
+      type: 'SYSTEM_ALERT',
     });
-
-    const dto = this.toSystemNotificationDto(notification);
-    this.systemAlertsSubject.next(dto);
-    return dto;
   }
 
-  async listSystemNotifications(params: {
-    page?: number;
-    limit?: number;
-    unreadOnly?: boolean;
-  }): Promise<{
+  async createSystemNotification(input: CreateSystemNotificationInput): Promise<SystemNotificationDto | null> {
+    const severity = this.normalizeSeverity(input.severity);
+    const title = this.normalizeText(input.title, 140);
+    const body = this.normalizeText(input.body, 500);
+    const targetRole = this.normalizeText(input.targetRole || 'SUPER_ADMIN', 40);
+    const targetUserId = this.normalizeText(input.targetUserId || undefined, 80);
+    const type = this.normalizeText(input.type || 'SYSTEM_ALERT', 40);
+    const data = this.sanitizeData(input.data || {});
+
+    if (!title || !body) {
+      return null;
+    }
+
+    try {
+      const notification = await this.prisma.notification.create({
+        data: {
+          type,
+          severity,
+          title,
+          body,
+          message: body,
+          data: data as any,
+          targetRole,
+          targetUserId,
+          isRead: false,
+          read: false,
+          readAt: null,
+          audience: targetUserId ? 'user' : 'super_admin',
+          source: 'system',
+          module: 'system',
+          tenantId: null,
+          userId: targetUserId,
+        },
+      });
+
+      const dto = this.toSystemNotificationDto(notification);
+      this.systemAlertsSubject.next(dto);
+      return dto;
+    } catch (error) {
+      this.logger.error(`Falha ao persistir notificacao de sistema: ${String(error)}`);
+      return null;
+    }
+  }
+
+  async list(
+    params: SystemNotificationListParams = {},
+  ): Promise<{
     notifications: SystemNotificationDto[];
     total: number;
     unreadCount: number;
@@ -124,20 +197,11 @@ export class NotificationService {
     const page = this.clampNumber(params.page, 1, 100000, 1);
     const limit = this.clampNumber(params.limit, 1, 100, 20);
     const skip = (page - 1) * limit;
-
-    const where: any = {
-      AND: [
-        {
-          OR: [{ targetRole: 'SUPER_ADMIN' }, { audience: 'super_admin' }],
-        },
-      ],
+    const where = this.buildSystemListWhere(params);
+    const unreadWhere = {
+      ...where,
+      isRead: false,
     };
-
-    if (params.unreadOnly) {
-      where.AND.push({
-        OR: [{ read: false }, { isRead: false }],
-      });
-    }
 
     const [rows, total, unreadCount] = await Promise.all([
       this.prisma.notification.findMany({
@@ -147,12 +211,7 @@ export class NotificationService {
         take: limit,
       }),
       this.prisma.notification.count({ where }),
-      this.prisma.notification.count({
-        where: {
-          ...where,
-          AND: [...where.AND, { OR: [{ read: false }, { isRead: false }] }],
-        },
-      }),
+      this.prisma.notification.count({ where: unreadWhere }),
     ]);
 
     return {
@@ -165,12 +224,30 @@ export class NotificationService {
     };
   }
 
-  async markSystemNotificationAsRead(id: string): Promise<SystemNotificationDto | null> {
+  async listSystemNotifications(params: SystemNotificationListParams = {}): Promise<{
+    notifications: SystemNotificationDto[];
+    total: number;
+    unreadCount: number;
+    page: number;
+    limit: number;
+    hasMore: boolean;
+  }> {
+    return this.list(params);
+  }
+
+  async markAsRead(id: string, actor?: NotificationActorScope): Promise<SystemNotificationDto | null> {
     const notificationId = this.normalizeText(id, 80);
+    const scope = this.resolveSystemScope(actor);
+    if (!notificationId) {
+      return null;
+    }
 
     try {
-      const row = await this.prisma.notification.update({
-        where: { id: notificationId },
+      const updated = await this.prisma.notification.updateMany({
+        where: {
+          id: notificationId,
+          ...scope,
+        },
         data: {
           read: true,
           isRead: true,
@@ -178,14 +255,76 @@ export class NotificationService {
         },
       });
 
-      if (!this.isSystemNotificationRecord(row)) {
+      if (updated.count === 0) {
+        return null;
+      }
+
+      const row = await this.prisma.notification.findUnique({
+        where: { id: notificationId },
+      });
+
+      if (!row || !this.isSystemNotificationRecord(row)) {
         return null;
       }
 
       return this.toSystemNotificationDto(row);
-    } catch {
+    } catch (error) {
+      this.logger.error(`Falha ao marcar notificacao como lida id=${notificationId}: ${String(error)}`);
       return null;
     }
+  }
+
+  async markSystemNotificationAsRead(
+    id: string,
+    actor?: NotificationActorScope,
+  ): Promise<SystemNotificationDto | null> {
+    return this.markAsRead(id, actor);
+  }
+
+  async markAllSystemNotificationsAsRead(actor?: NotificationActorScope): Promise<number> {
+    const scope = this.resolveSystemScope(actor);
+
+    try {
+      const result = await this.prisma.notification.updateMany({
+        where: {
+          ...scope,
+          isRead: false,
+        },
+        data: {
+          read: true,
+          isRead: true,
+          readAt: new Date(),
+        },
+      });
+
+      return result.count;
+    } catch (error) {
+      this.logger.error(`Falha ao marcar notificacoes como lidas: ${String(error)}`);
+      return 0;
+    }
+  }
+
+  async getUnreadSystemNotificationsCount(scope?: {
+    targetRole?: string;
+    targetUserId?: string;
+  }): Promise<number> {
+    const where = this.buildSystemScopeWhere(scope);
+
+    try {
+      return await this.prisma.notification.count({
+        where: {
+          ...where,
+          isRead: false,
+        },
+      });
+    } catch (error) {
+      this.logger.error(`Falha ao contar notificacoes nao lidas: ${String(error)}`);
+      return 0;
+    }
+  }
+
+  async getUnreadCount(scope?: { targetRole?: string; targetUserId?: string }): Promise<number> {
+    return this.getUnreadSystemNotificationsCount(scope);
   }
 
   /**
@@ -280,7 +419,7 @@ export class NotificationService {
   /**
    * Marca notificacao como lida
    */
-  async markAsRead(id: string, user: unknown): Promise<Notification | null> {
+  async markUserNotificationAsRead(id: string, user: unknown): Promise<Notification | null> {
     const where = {
       id,
       ...this.buildWhereClause(user),
@@ -585,12 +724,76 @@ export class NotificationService {
     return normalized || 'SYSTEM_ALERT';
   }
 
-  private shouldEmitSystemAlert(action: string, severity: SystemNotificationSeverity): boolean {
-    if (severity === 'critical') {
-      return true;
+  private buildSystemListWhere(params: SystemNotificationListParams): any {
+    const where: any = this.buildSystemScopeWhere({
+      targetRole: params.targetRole,
+      targetUserId: params.targetUserId,
+    });
+
+    const severity = this.normalizeSeverityFilter(params.severity);
+    if (severity) {
+      where.severity = severity;
     }
 
-    return SYSTEM_ALERT_ACTION_ALLOWLIST.has(action);
+    const shouldFilterUnread = Boolean(params.unreadOnly);
+    if (params.isRead === true || params.isRead === false) {
+      where.isRead = params.isRead;
+    } else if (shouldFilterUnread) {
+      where.isRead = false;
+    }
+
+    return where;
+  }
+
+  private resolveSystemScope(actor?: NotificationActorScope): any {
+    if (!actor) {
+      return this.buildSystemScopeWhere({ targetRole: 'SUPER_ADMIN' });
+    }
+
+    const role = String(actor.role || actor.targetRole || '').trim().toUpperCase();
+    if (role && role !== 'SUPER_ADMIN') {
+      return { id: '__forbidden__' };
+    }
+
+    return this.buildSystemScopeWhere({
+      targetRole: role || 'SUPER_ADMIN',
+      targetUserId: actor.userId || actor.targetUserId,
+    });
+  }
+
+  private buildSystemScopeWhere(scope?: { targetRole?: string; targetUserId?: string }): any {
+    const targetRole = String(this.normalizeText(scope?.targetRole || 'SUPER_ADMIN', 40) || '').toUpperCase();
+    const targetUserId = this.normalizeText(scope?.targetUserId || undefined, 80);
+    const or: any[] = [];
+
+    if (targetRole) {
+      or.push({ targetRole });
+    }
+    if (targetUserId) {
+      or.push({ targetUserId });
+    }
+    if (targetRole === 'SUPER_ADMIN') {
+      or.push({ audience: 'super_admin' });
+    }
+
+    if (or.length === 0) {
+      return { targetRole: 'SUPER_ADMIN' };
+    }
+
+    return { OR: or };
+  }
+
+  private normalizeSeverityFilter(input?: string): SystemNotificationSeverity | null {
+    if (!input) {
+      return null;
+    }
+
+    const value = String(input || '').trim().toLowerCase();
+    if (value === 'info' || value === 'warning' || value === 'warn' || value === 'critical') {
+      return this.normalizeSeverity(value);
+    }
+
+    return null;
   }
 
   private buildSystemAlertTitle(action: string): string {
@@ -651,8 +854,18 @@ export class NotificationService {
     if (typeof value === 'object') {
       const output: Record<string, unknown> = {};
       for (const [childKey, childValue] of Object.entries(value as Record<string, unknown>)) {
+        if (this.shouldStoreAsCaptureFlag(childKey, childValue)) {
+          output[this.toCapturedFlagKey(childKey)] = true;
+          continue;
+        }
+
         if (this.isSensitiveKey(childKey)) {
           output[childKey] = '[redacted]';
+          continue;
+        }
+
+        if (this.isHeadersKey(childKey) && childValue && typeof childValue === 'object' && !Array.isArray(childValue)) {
+          output[childKey] = this.sanitizeHeaders(childValue as Record<string, unknown>, depth + 1);
           continue;
         }
 
@@ -667,32 +880,46 @@ export class NotificationService {
         return '';
       }
 
-      if (this.isSensitiveValue(trimmed)) {
+      if (this.isSensitiveValue(trimmed, key)) {
         return '[redacted]';
       }
 
-      if (key && /(path|file|directory|dir|env)/i.test(key) && (trimmed.includes('/') || trimmed.includes('\\'))) {
-        return this.sanitizePath(trimmed);
+      let sanitized = this.redactSensitiveFragments(trimmed);
+
+      if (key && /(path|file|directory|dir|env)/i.test(key) && this.looksLikePath(sanitized)) {
+        if (this.isSensitivePathKey(key) || this.looksSensitivePath(sanitized)) {
+          return '[path-redacted]';
+        }
+        return this.sanitizePath(sanitized);
       }
 
-      return trimmed.length > 2000 ? `${trimmed.slice(0, 1997)}...` : trimmed;
+      sanitized = this.looksSensitivePath(sanitized) ? '[path-redacted]' : sanitized;
+      return sanitized.length > 2000 ? `${sanitized.slice(0, 1997)}...` : sanitized;
     }
 
     return value;
   }
 
   private isSensitiveKey(key: string): boolean {
-    return /(token|secret|password|authorization|cookie|api[-_]?key|private[-_]?key|database[_-]?url|connection)/i.test(
+    return /(token|secret|password|authorization|cookie|api[-_]?key|private[-_]?key|database[_-]?url|connection|set-cookie|x-auth|x-access-token|x-maintenance-bypass)/i.test(
       key,
     );
   }
 
-  private isSensitiveValue(value: string): boolean {
+  private isSensitiveValue(value: string, key: string | null): boolean {
     if (/^-----BEGIN [A-Z ]+-----/.test(value)) {
       return true;
     }
 
-    if (/\b(BEARER|TOKEN|PASSWORD|SECRET|API_KEY|DATABASE_URL)\b/i.test(value)) {
+    if (key && this.isSensitiveHeaderName(key)) {
+      return true;
+    }
+
+    if (/^eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}$/.test(value)) {
+      return true;
+    }
+
+    if (/(postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|redis):\/\/[^:\s/]+:[^@\s/]+@/i.test(value)) {
       return true;
     }
 
@@ -707,6 +934,81 @@ export class NotificationService {
     }
 
     return `[path-redacted]/${parts[parts.length - 1]}`;
+  }
+
+  private sanitizeHeaders(headers: Record<string, unknown>, depth: number): Record<string, unknown> {
+    const sanitized: Record<string, unknown> = {};
+
+    for (const [headerName, headerValue] of Object.entries(headers)) {
+      if (this.isSensitiveHeaderName(headerName)) {
+        sanitized[headerName] = '[redacted]';
+        continue;
+      }
+
+      sanitized[headerName] = this.sanitizeValue(headerValue, depth + 1, headerName);
+    }
+
+    return sanitized;
+  }
+
+  private isHeadersKey(key: string): boolean {
+    return /(headers|requestheaders|responseheaders)/i.test(key);
+  }
+
+  private isSensitiveHeaderName(headerName: string): boolean {
+    return /^(authorization|proxy-authorization|cookie|set-cookie|x-api-key|x-auth-token|x-access-token|x-refresh-token|x-csrf-token|x-xsrf-token|x-maintenance-bypass)$/i.test(
+      headerName.trim(),
+    );
+  }
+
+  private isSensitivePathKey(key: string): boolean {
+    return /(env|secret|credential|private|token|key|snapshot|pem|p12|pfx)/i.test(key);
+  }
+
+  private looksLikePath(value: string): boolean {
+    return /[\\/]/.test(value);
+  }
+
+  private looksSensitivePath(value: string): boolean {
+    return /(^|[\\/])\.env([./\\]|$)|([\\/])(secrets?|credentials?|private|keys?|\.ssh)([\\/]|$)|id_rsa|\.pem\b|\.p12\b|\.pfx\b|\.key\b/i.test(
+      value,
+    );
+  }
+
+  private shouldStoreAsCaptureFlag(key: string, value: unknown): boolean {
+    if (typeof value !== 'string') {
+      return false;
+    }
+
+    if (!this.looksLikePath(value.trim())) {
+      return false;
+    }
+
+    return /(env.*snapshot.*(path|file)|snapshot.*env.*(path|file)|envSnapshotPath)/i.test(key);
+  }
+
+  private toCapturedFlagKey(key: string): string {
+    const base = key.replace(/(file(path)?|path|directory|dir)$/i, '');
+    const normalizedBase = base.trim() || key;
+    return /captured$/i.test(normalizedBase) ? normalizedBase : `${normalizedBase}Captured`;
+  }
+
+  private redactSensitiveFragments(value: string): string {
+    let sanitized = value;
+
+    sanitized = sanitized.replace(/\b(Bearer)\s+[A-Za-z0-9\-._~+/=]+/gi, '$1 [redacted]');
+    sanitized = sanitized.replace(
+      /\b(authorization|proxy-authorization|token|secret|password|passwd|api[-_]?key|x-api-key|x-maintenance-bypass|cookie|set-cookie|database_url)\b\s*[:=]\s*([^\s,;]+)/gi,
+      '$1=[redacted]',
+    );
+    sanitized = sanitized.replace(/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, '[redacted-jwt]');
+    sanitized = sanitized.replace(
+      /((?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|redis):\/\/[^:\s/]+:)([^@\s/]+)@/gi,
+      '$1[redacted]@',
+    );
+    sanitized = sanitized.replace(/([A-Za-z]:)?[\\/][^\s'"`]*\.env(?:\.[^\s'"`]*)?/gi, '[path-redacted]');
+
+    return sanitized;
   }
 
   private parseMetadata(data: unknown): Record<string, any> {

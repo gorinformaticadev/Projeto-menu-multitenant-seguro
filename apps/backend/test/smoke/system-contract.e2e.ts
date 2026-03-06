@@ -27,7 +27,6 @@ import { SystemUpdateController } from '../../src/update/system-update.controlle
 import { SystemUpdateAdminService } from '../../src/update/system-update-admin.service';
 import { NotificationService } from '../../src/notifications/notification.service';
 import { SystemNotificationsController } from '../../src/notifications/system-notifications.controller';
-import { NotificationsSseJwtGuard } from '../../src/notifications/guards/notifications-sse-jwt.guard';
 import { AuditService } from '../../src/audit/audit.service';
 import { SystemAuditController } from '../../src/audit/system-audit.controller';
 
@@ -101,13 +100,15 @@ const systemUpdateAdminServiceMock = {
 };
 
 const notificationServiceMock = {
-  listSystemNotifications: jest.fn(async () => ({ ...SYSTEM_NOTIFICATIONS_FIXTURE })),
+  list: jest.fn(async () => ({ ...SYSTEM_NOTIFICATIONS_FIXTURE })),
+  getUnreadCount: jest.fn(async () => SYSTEM_NOTIFICATIONS_FIXTURE.unreadCount),
   markSystemNotificationAsRead: jest.fn(async (id: string) => ({
     ...SYSTEM_NOTIFICATIONS_FIXTURE.notifications[0],
     id,
     isRead: true,
     readAt: new Date('2026-03-05T22:05:00Z'),
   })),
+  markAllSystemNotificationsAsRead: jest.fn(async () => SYSTEM_NOTIFICATIONS_FIXTURE.unreadCount),
 };
 
 const auditServiceMock = {
@@ -227,8 +228,6 @@ describe('System contract smoke', () => {
     })
       .overrideGuard(JwtAuthGuard)
       .useClass(MockJwtAuthGuard)
-      .overrideGuard(NotificationsSseJwtGuard)
-      .useValue({ canActivate: () => true })
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -243,11 +242,13 @@ describe('System contract smoke', () => {
     systemUpdateAdminServiceMock.getStatus.mockResolvedValue({
       ...UPDATE_STATUS_RESPONSE,
     });
-    notificationServiceMock.listSystemNotifications.mockClear();
-    notificationServiceMock.listSystemNotifications.mockResolvedValue({
+    notificationServiceMock.list.mockClear();
+    notificationServiceMock.list.mockResolvedValue({
       ...SYSTEM_NOTIFICATIONS_FIXTURE,
     });
+    notificationServiceMock.getUnreadCount.mockClear();
     notificationServiceMock.markSystemNotificationAsRead.mockClear();
+    notificationServiceMock.markAllSystemNotificationsAsRead.mockClear();
     auditServiceMock.findAll.mockClear();
     auditServiceMock.findOne.mockClear();
     auditServiceMock.log.mockClear();
@@ -315,7 +316,19 @@ describe('System contract smoke', () => {
     expect(response.body.notifications).toHaveLength(1);
     expect(response.body.unreadCount).toBe(1);
     expect(response.body.notifications[0].severity).toBe('critical');
-    expect(notificationServiceMock.listSystemNotifications).toHaveBeenCalledTimes(1);
+    expect(notificationServiceMock.list).toHaveBeenCalledTimes(1);
+  });
+
+  it('GET /api/system/notifications/unread-count returns unread count', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/system/notifications/unread-count')
+      .set('Authorization', 'Bearer smoke-admin-token')
+      .expect(200);
+
+    expect(response.body).toEqual({ count: 1 });
+    expect(notificationServiceMock.getUnreadCount).toHaveBeenCalledWith({
+      targetRole: 'SUPER_ADMIN',
+    });
   });
 
   it('POST /api/system/notifications/:id/read marks notification as read', async () => {
@@ -327,7 +340,28 @@ describe('System contract smoke', () => {
     expect(response.body.success).toBe(true);
     expect(response.body.notification.id).toBe('notif-1');
     expect(response.body.notification.isRead).toBe(true);
-    expect(notificationServiceMock.markSystemNotificationAsRead).toHaveBeenCalledWith('notif-1');
+    expect(notificationServiceMock.markSystemNotificationAsRead).toHaveBeenCalledWith(
+      'notif-1',
+      expect.objectContaining({
+        role: Role.SUPER_ADMIN,
+        targetRole: 'SUPER_ADMIN',
+      }),
+    );
+  });
+
+  it('POST /api/system/notifications/read-all marks all notifications as read', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/system/notifications/read-all')
+      .set('Authorization', 'Bearer smoke-admin-token')
+      .expect(201);
+
+    expect(response.body).toEqual({ success: true, count: 1 });
+    expect(notificationServiceMock.markAllSystemNotificationsAsRead).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: Role.SUPER_ADMIN,
+        targetRole: 'SUPER_ADMIN',
+      }),
+    );
   });
 
   it('GET /api/system/audit enforces auth and returns audit payload for admin', async () => {

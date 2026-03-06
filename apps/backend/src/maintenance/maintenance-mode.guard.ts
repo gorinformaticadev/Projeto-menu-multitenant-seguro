@@ -10,6 +10,7 @@ import { Request } from 'express';
 import { MaintenanceModeService, MaintenanceState } from './maintenance-mode.service';
 import { AuditService } from '../audit/audit.service';
 import { extractAuditContext } from '../audit/audit-request-context.util';
+import { NotificationService } from '../notifications/notification.service';
 
 
 @Injectable()
@@ -20,6 +21,7 @@ export class MaintenanceModeGuard implements CanActivate {
     private readonly maintenanceModeService: MaintenanceModeService,
     private readonly jwtService: JwtService,
     private readonly auditService: AuditService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -266,6 +268,18 @@ export class MaintenanceModeGuard implements CanActivate {
         route: requestPath,
         method,
       },
+    });
+
+    await this.notificationService.emitSystemAlert({
+      action: 'MAINTENANCE_BYPASS_USED',
+      severity: 'critical',
+      title: 'Bypass de manutencao utilizado',
+      body: `SUPER_ADMIN utilizou bypass de manutencao em ${method} ${requestPath}.`,
+      data: {
+        route: requestPath,
+        method,
+      },
+      module: 'maintenance',
     });
   }
 }

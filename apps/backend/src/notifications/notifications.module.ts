@@ -7,7 +7,6 @@ import { NotificationGateway } from './notification.gateway';
 import { PushNotificationService } from './push-notification.service';
 import { NotificationsController } from './notifications.controller';
 import { SystemNotificationsController } from './system-notifications.controller';
-import { NotificationsSseJwtGuard } from './guards/notifications-sse-jwt.guard';
 import { PrismaModule } from '@core/prisma/prisma.module';
 
 @Module({
@@ -31,8 +30,7 @@ import { PrismaModule } from '@core/prisma/prisma.module';
     }),
   ],
   controllers: [NotificationsController, SystemNotificationsController],
-  providers: [NotificationService, NotificationGateway, PushNotificationService, NotificationsSseJwtGuard],
+  providers: [NotificationService, NotificationGateway, PushNotificationService],
   exports: [NotificationService, NotificationGateway, PushNotificationService],
 })
 export class NotificationsModule {}
-

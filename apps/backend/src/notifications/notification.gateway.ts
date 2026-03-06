@@ -257,7 +257,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     @MessageBody() data: { id: string }
   ) {
     try {
-      const notification = await this.notificationService.markAsRead(data.id, client.user);
+      const notification = await this.notificationService.markUserNotificationAsRead(data.id, client.user);
       
       if (notification) {
         // Emitir para o usuário que a notificação foi lida
@@ -539,4 +539,3 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     return this.validateTokenForConnection(token);
   }
 }
-

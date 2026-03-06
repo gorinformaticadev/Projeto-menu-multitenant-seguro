@@ -1,90 +1,116 @@
-﻿import {
-  Controller,
-  Get,
-  Header,
-  MessageEvent,
-  Param,
-  Post,
-  Query,
-  Request,
-  Sse,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Param, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
-import { Observable, map, merge, timer } from 'rxjs';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { NotificationService } from './notification.service';
-import { NotificationsSseJwtGuard } from './guards/notifications-sse-jwt.guard';
+import {
+  ListSystemNotificationsQueryDto,
+  ReadAllSystemNotificationsDto,
+  SystemNotificationSeverityFilter,
+} from './dto/system-notifications.dto';
 
 @Controller('system/notifications')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.SUPER_ADMIN)
 export class SystemNotificationsController {
   constructor(private readonly notificationService: NotificationService) {}
 
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN)
-  async list(
-    @Query('page') pageRaw?: string,
-    @Query('limit') limitRaw?: string,
-    @Query('unreadOnly') unreadOnlyRaw?: string,
-  ) {
-    const page = Number.parseInt(String(pageRaw || ''), 10);
-    const limit = Number.parseInt(String(limitRaw || ''), 10);
-    const unreadOnly = ['1', 'true', 'yes'].includes(String(unreadOnlyRaw || '').toLowerCase());
+  async list(@Query() query: ListSystemNotificationsQueryDto) {
+    const page = this.parsePositiveInt(query.page);
+    const limit = this.parsePositiveInt(query.limit);
+    const isRead = this.parseBooleanQuery(query.isRead);
+    const unreadOnly = this.parseBooleanQuery(query.unreadOnly);
+    const severity = this.parseSeverity(query.severity);
 
-    return this.notificationService.listSystemNotifications({
-      page: Number.isFinite(page) ? page : undefined,
-      limit: Number.isFinite(limit) ? limit : undefined,
+    return this.notificationService.list({
+      page,
+      limit,
+      isRead,
       unreadOnly,
+      severity,
+      targetRole: 'SUPER_ADMIN',
     });
   }
 
+  @Get('unread-count')
+  async unreadCount() {
+    const count = await this.notificationService.getUnreadCount({
+      targetRole: 'SUPER_ADMIN',
+    });
+
+    return { count };
+  }
+
   @Post(':id/read')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN)
-  async markRead(@Param('id') id: string) {
-    const notification = await this.notificationService.markSystemNotificationAsRead(id);
+  async markRead(@Param('id') id: string, @Request() req: any) {
+    const notification = await this.notificationService.markSystemNotificationAsRead(id, {
+      userId: req?.user?.id || req?.user?.sub,
+      role: req?.user?.role,
+      targetRole: 'SUPER_ADMIN',
+    });
+
     return {
       success: !!notification,
       notification,
     };
   }
 
-  @Sse('stream')
-  @Header('Cache-Control', 'no-cache, no-transform')
-  @Header('X-Accel-Buffering', 'no')
-  @UseGuards(NotificationsSseJwtGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN)
-  stream(@Request() req: any): Observable<MessageEvent> {
-    const authHeader = String(req.headers?.authorization || '');
-    const tokenFromHeader = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-    const tokenFromQuery = String(req.query?.token || '').trim();
-    const token = tokenFromHeader || tokenFromQuery;
+  @Post('read-all')
+  async markAllRead(@Request() req: any, @Query() query: ReadAllSystemNotificationsDto) {
+    const count = await this.notificationService.markAllSystemNotificationsAsRead({
+      userId: query?.targetUserId || req?.user?.id || req?.user?.sub,
+      role: req?.user?.role,
+      targetRole: query?.targetRole || 'SUPER_ADMIN',
+      targetUserId: query?.targetUserId,
+    });
 
-    if (!token) {
-      return new Observable<MessageEvent>((subscriber) => {
-        subscriber.next({ type: 'system_alert', data: { error: 'token_required' } });
-        subscriber.complete();
-      });
+    return {
+      success: true,
+      count,
+    };
+  }
+
+  private parsePositiveInt(value?: string): number | undefined {
+    if (!value) {
+      return undefined;
     }
 
-    const alerts$ = this.notificationService.getSystemAlertStream().pipe(
-      map((notification) => ({
-        type: 'system_alert',
-        data: notification,
-      })),
-    );
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return undefined;
+    }
 
-    // Keep the SSE connection alive behind reverse proxies with low idle timeouts.
-    const heartbeat$ = timer(0, 25000).pipe(
-      map(() => ({
-        type: 'heartbeat',
-        data: { ts: new Date().toISOString() },
-      })),
-    );
+    return parsed;
+  }
 
-    return merge(heartbeat$, alerts$);
+  private parseBooleanQuery(value?: string): boolean | undefined {
+    if (!value) {
+      return undefined;
+    }
+
+    const normalized = String(value).trim().toLowerCase();
+    if (['1', 'true', 'yes'].includes(normalized)) {
+      return true;
+    }
+    if (['0', 'false', 'no'].includes(normalized)) {
+      return false;
+    }
+
+    return undefined;
+  }
+
+  private parseSeverity(value?: string): SystemNotificationSeverityFilter | undefined {
+    if (!value) {
+      return undefined;
+    }
+
+    const normalized = String(value).trim().toLowerCase();
+    if (normalized === 'info' || normalized === 'warning' || normalized === 'critical') {
+      return normalized;
+    }
+
+    return undefined;
   }
 }
