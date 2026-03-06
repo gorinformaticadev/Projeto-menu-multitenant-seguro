@@ -685,7 +685,7 @@ export default function UpdatesPage() {
         )}
 
         {/* Aba Configurações (bloco legado oculto) */}
-        {false && activeTab === 'config' && (
+        {activeTab === '__legacy_config_hidden__' && (
           <div className="space-y-6">
             <Card>
               <CardContent className="space-y-4 pt-6">

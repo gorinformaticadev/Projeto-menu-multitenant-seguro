@@ -284,3 +284,84 @@ Comportamento implementado:
 Observacao:
 
 - monitoramento continua disponivel via status/logs de update.
+
+## CI local e smoke tests
+
+Workflow CI adicionado:
+
+- `backend-build`
+- `frontend-build`
+- `scripts-check`
+- `smoke-tests`
+
+Validacoes executadas no pipeline:
+
+- backend: `pnpm -C apps/backend exec prisma generate`, `build`, `test`, `lint`
+- frontend: `pnpm -C apps/frontend build`, `lint`
+- scripts criticos: `chmod +x`, `bash -n`, `shellcheck`
+- contrato HTTP: smoke tests sem executar update real
+
+Scripts validados no CI:
+
+- `install/update-native.sh`
+- `install/rollback-native.sh`
+- `install/release-retention.sh`
+- `install/restore-native.sh`
+- `install/restore-db.sh`
+- `install/update-images.sh`
+- `Scripts/migrate-uploads.sh`
+
+Como rodar localmente:
+
+- `pnpm install`
+- `pnpm -C apps/backend exec prisma generate`
+- `pnpm -C apps/backend build`
+- `pnpm -C apps/backend test`
+- `pnpm -C apps/backend lint`
+- `pnpm -C apps/frontend build`
+- `pnpm -C apps/frontend lint`
+- `pnpm -C apps/backend test:smoke`
+- `bash -n install/update-native.sh`
+- `bash -n install/rollback-native.sh`
+- `bash -n install/release-retention.sh`
+- `bash -n install/restore-native.sh`
+- `bash -n install/restore-db.sh`
+- `bash -n install/update-images.sh`
+- `bash -n Scripts/migrate-uploads.sh`
+- `shellcheck -x -e SC1090,SC1091 install/update-native.sh install/rollback-native.sh install/release-retention.sh install/restore-native.sh install/restore-db.sh install/update-images.sh Scripts/migrate-uploads.sh`
+
+Contrato coberto pelo smoke:
+
+- `GET /api/health` retorna `200`
+- `GET /api/system/maintenance/state` retorna `200` e payload sanitizado com `enabled` boolean
+- `GET /api/system/update/status` exige autenticacao e retorna `200` com auth mockada
+- `MaintenanceModeGuard` retorna `503` para rota protegida comum e preserva acesso a `GET /api/health`
+## Governanca de merge (Branch Protection)
+
+Objetivo:
+
+- impedir merge sem validacao automatica
+- garantir revisao humana minima
+- evitar historico forcado em branch protegida
+
+Configuracao recomendada no GitHub (para main e develop):
+
+1. Acesse Settings -> Branches -> Add branch protection rule.
+2. Em Branch name pattern, configure a regra para a branch alvo (ex.: main; repetir para develop se aplicavel).
+3. Ative Require a pull request before merging.
+4. Defina Required approvals como 1.
+5. Ative Require status checks to pass before merging.
+6. Marque como checks obrigatorios:
+   - backend-build
+   - frontend-build
+   - scripts-check
+   - smoke-tests
+7. Ative Require branches to be up to date before merging.
+8. Em Restrict who can push to matching branches, mantenha force-push bloqueado (Do not allow bypassing the above settings e sem permissao de force push).
+9. Salve a regra e teste abrindo um PR sem passar os checks para confirmar bloqueio.
+
+Resultado esperado:
+
+- nenhum merge ocorre sem CI verde nos 4 gates
+- ao menos 1 review aprovado e obrigatorio
+- branch protegida contra force-push e merge desatualizado

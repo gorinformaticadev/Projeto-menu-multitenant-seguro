@@ -1,9 +1,21 @@
-﻿# Sistema Menu Multitenant Seguro
+# Sistema Menu Multitenant Seguro
+
+[![CI/CD Pipeline](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/actions/workflows/ci-cd.yml)
 
 Plataforma SaaS multitenant orientada a isolamento de dados, seguranca operacional e implantacao simplificada via Docker. Projetado para operacao continua em producao com arquitetura modular pronta para evolucao funcional.
 
 ------------------------------------------------------------------------
 
+## Quality Gates
+
+Os merges devem passar obrigatoriamente pelos seguintes jobs de CI:
+
+- backend-build
+- frontend-build
+- scripts-check
+- smoke-tests
+
+------------------------------------------------------------------------
 ## Visao Geral
 
 Este repositorio entrega uma stack completa para aplicacoes SaaS multitenant:
@@ -80,14 +92,14 @@ sudo bash install/install.sh install
 
 ------------------------------------------------------------------------
 
-## Manuais de Instalação Detalhados
+## Manuais de InstalaÃ§Ã£o Detalhados
 
-Para procedimentos passo a passo específicos, consulte os manuais abaixo:
+Para procedimentos passo a passo especÃ­ficos, consulte os manuais abaixo:
 
-- **[Instalação Docker - Desenvolvimento](DOCS/manual-instalacao/INSTALL_DOCKER_DEV.md)**: Guia para rodar o ambiente de desenvolvimento localmente.
-- **[Instalação Docker - Local (Prod)](DOCS/manual-instalacao/INSTALL_DOCKER_LOCAL.md)**: Guia para rodar/testar o build de produção localmente.
-- **[Instalação VPS - Produção](DOCS/manual-instalacao/INSTALL_VPS_PROD.md)**: Procedimento oficial para deploy em servidor VPS de Produção.
-- **[Instalação VPS - Dev/Staging](DOCS/manual-instalacao/INSTALL_VPS_DEV.md)**: Procedimento para deploy em servidor VPS de Desenvolvimento/Homologação.
+- **[InstalaÃ§Ã£o Docker - Desenvolvimento](DOCS/manual-instalacao/INSTALL_DOCKER_DEV.md)**: Guia para rodar o ambiente de desenvolvimento localmente.
+- **[InstalaÃ§Ã£o Docker - Local (Prod)](DOCS/manual-instalacao/INSTALL_DOCKER_LOCAL.md)**: Guia para rodar/testar o build de produÃ§Ã£o localmente.
+- **[InstalaÃ§Ã£o VPS - ProduÃ§Ã£o](DOCS/manual-instalacao/INSTALL_VPS_PROD.md)**: Procedimento oficial para deploy em servidor VPS de ProduÃ§Ã£o.
+- **[InstalaÃ§Ã£o VPS - Dev/Staging](DOCS/manual-instalacao/INSTALL_VPS_DEV.md)**: Procedimento para deploy em servidor VPS de Desenvolvimento/HomologaÃ§Ã£o.
 
 ------------------------------------------------------------------------
 
@@ -209,7 +221,7 @@ curl -sS "$BACKEND_INTERNAL_URL/backups/internal/jobs/$JOB_ID" \
 ### 4) Restore pequeno de prova (com promocao)
 
 1. Enfileire restore de um dump pequeno conhecido.
-2. Faça polling ate `status=SUCCESS`.
+2. FaÃ§a polling ate `status=SUCCESS`.
 3. Evidencie timestamps (`createdAt`, `startedAt`, `finishedAt`) e `currentStep`.
 4. Valide health:
 

@@ -1,6 +1,7 @@
 import { UpdateService } from './update.service';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { SystemVersionService } from '@common/services/system-version.service';
 import * as fs from 'fs';
 
 type UpdateServiceTestHandle = {
@@ -21,9 +22,17 @@ function createService() {
     },
   };
   const auditMock = { log: async () => undefined };
+  const systemVersionMock = {
+  getVersionInfo: () => ({
+    version: 'v1.0.0',
+    commitSha: 'test-sha',
+    buildDate: '2026-01-01T00:00:00Z',
+  }),
+};
   return new UpdateService(
     prismaMock as unknown as PrismaService,
     auditMock as unknown as AuditService,
+    systemVersionMock as unknown as SystemVersionService,
   );
 }
 
