@@ -1,501 +1,255 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+import { useMemo, useState } from "react";
+import { Bell, CheckCheck, RefreshCw, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SystemNotificationsList } from "@/components/system-notifications/SystemNotificationsList";
 import {
-    Bell,
-    CheckCircle,
-    Trash2,
-    MailOpen,
-    Mail,
-    RefreshCw,
-    AlertCircle,
-    Clock,
-    Filter,
-    Check,
-    EyeOff,
-    X,
-    Search
-} from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
-import { useNotificationContext } from '@/providers/NotificationProvider';
-import api from '@/lib/api';
+  filterSystemNotifications,
+  getNotificationAction,
+  type NotificationCategoryFilter,
+  type NotificationReadFilter,
+  type NotificationSeverityFilter,
+} from "@/components/system-notifications/systemNotifications.utils";
+import { useSystemNotificationsContext } from "@/contexts/SystemNotificationsContext";
 
-interface Notification {
-    id: string;
-    title: string;
-    description: string;
-    createdAt: string;
-    read: boolean;
-    type?: 'info' | 'success' | 'warning' | 'error';
-}
+const DEFAULT_READ_FILTER: NotificationReadFilter = "all";
+const DEFAULT_SEVERITY_FILTER: NotificationSeverityFilter = "all";
+const DEFAULT_CATEGORY_FILTER: NotificationCategoryFilter = "all";
 
-export default function NotificacaoPage() {
-    const { toast } = useToast();
-    // Integração com o contexto global para atualizar o badge
-    const { refreshNotifications: refreshGlobalBadge } = useNotificationContext();
+export default function NotificationsPage() {
+  const {
+    items,
+    unreadCount,
+    loading,
+    error,
+    isEnabled,
+    refresh,
+    markAsRead,
+    markAllAsRead,
+  } = useSystemNotificationsContext();
 
-    const [notifications, setNotifications] = useState<Notification[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [processingId, setProcessingId] = useState<string | null>(null);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [showFilters, setShowFilters] = useState(false);
-    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [readFilter, setReadFilter] = useState<NotificationReadFilter>(DEFAULT_READ_FILTER);
+  const [severityFilter, setSeverityFilter] = useState<NotificationSeverityFilter>(
+    DEFAULT_SEVERITY_FILTER,
+  );
+  const [categoryFilter, setCategoryFilter] = useState<NotificationCategoryFilter>(
+    DEFAULT_CATEGORY_FILTER,
+  );
 
-    // ✅ PADRÃO CORRETO DE FETCH: Executa apenas UMA VEZ na montagem
-    const fetchNotifications = useCallback(async () => {
-        try {
-            setLoading(true);
-            const response = await api.get('/notifications');
-            const data = response.data?.notifications || [];
+  const filteredItems = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    const base = filterSystemNotifications(items, {
+      read: readFilter,
+      severity: severityFilter,
+      category: categoryFilter,
+    });
 
-            if (Array.isArray(data)) {
-                setNotifications(data);
-            } else {
-                console.error('Formato de resposta inválido:', response.data);
-                setNotifications([]);
-            }
-        } catch (error) {
-            console.error('Erro ao buscar notificações:', error);
-            toast({
-                title: 'Erro ao carregar',
-                description: 'Não foi possível buscar as notificações.',
-                variant: 'destructive',
-            });
-        } finally {
-            setLoading(false);
-        }
-    }, [toast]);
-
-    useEffect(() => {
-        fetchNotifications();
-    }, [fetchNotifications]);
-
-    // Derived state for filtered notifications
-    const filteredNotifications = notifications.filter(n =>
-        n.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        n.description.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    // Stats
-    const unreadCount = notifications.filter(n => !n.read).length;
-    const errorCount = notifications.filter(n => n.type === 'error').length;
-
-    // Ações manuais que chamam o refetch
-    const handleMarkAsRead = async (id: string) => {
-        setProcessingId(id);
-        try {
-            await api.patch(`/notifications/${id}/read`);
-            await fetchNotifications();
-            refreshGlobalBadge(); // Atualiza badge HEADER
-            toast({ description: "Notificação marcada como lida." });
-        } catch {
-            toast({ title: "Erro", description: "Falha ao atualizar status.", variant: "destructive" });
-        } finally {
-            setProcessingId(null);
-        }
-    };
-
-    const handleMarkAsUnread = async (id: string) => {
-        setProcessingId(id);
-        try {
-            await api.patch(`/notifications/${id}/unread`);
-            await fetchNotifications();
-            refreshGlobalBadge(); // Atualiza badge HEADER
-            toast({ description: "Notificação marcada como não lida." });
-        } catch {
-            toast({ title: "Erro", description: "Falha ao atualizar status.", variant: "destructive" });
-        } finally {
-            setProcessingId(null);
-        }
-    };
-
-    const handleDelete = async (id: string) => {
-        setProcessingId(id);
-        try {
-            await api.delete(`/notifications/${id}`);
-            await fetchNotifications();
-            refreshGlobalBadge(); // Atualiza badge HEADER
-            setSelectedIds(prev => prev.filter(pid => pid !== id));
-            toast({ description: "Notificação excluída." });
-        } catch {
-            toast({ title: "Erro", description: "Falha ao excluir.", variant: "destructive" });
-        } finally {
-            setProcessingId(null);
-        }
-    };
-
-    const handleBulkDelete = async () => {
-        if (selectedIds.length === 0) return;
-
-        try {
-            setLoading(true);
-            // Implement batch delete or sequential delete (POST para garantir body)
-            await api.post('/notifications/batch-delete', { ids: selectedIds });
-            await fetchNotifications();
-            refreshGlobalBadge(); // Atualiza badge HEADER
-            setSelectedIds([]);
-            toast({ description: `${selectedIds.length} notificações excluídas.` });
-        } catch (error: unknown) {
-            console.error('Bulk Delete Error:', error);
-            const msg = (error as { response?: { data?: { message?: string } }, message?: string }).response?.data?.message || (error as { message?: string }).message;
-            toast({
-                title: "Erro na Exclusão",
-                description: Array.isArray(msg) ? msg.join(', ') : msg,
-                variant: "destructive"
-            });
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleMarkAllAsRead = async () => {
-        try {
-            setLoading(true);
-            await api.patch('/notifications/mark-all-read');
-            await fetchNotifications();
-            refreshGlobalBadge(); // Atualiza badge HEADER
-            toast({ description: "Todas as notificações marcadas como lidas." });
-        } catch {
-            toast({ title: "Erro", description: "Falha ao atualizar.", variant: "destructive" });
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const toggleSelection = (id: string) => {
-        setSelectedIds(prev =>
-            prev.includes(id)
-                ? prev.filter(pid => pid !== id)
-                : [...prev, id]
-        );
-    };
-
-    const selectAll = () => {
-        setSelectedIds(filteredNotifications.map(n => n.id));
-    };
-
-    const clearSelection = () => {
-        setSelectedIds([]);
-    };
-
-    const getIcon = (type?: string) => {
-        switch (type) {
-            case 'success': return <CheckCircle className="h-5 w-5 text-green-500" />;
-            case 'warning': return <AlertCircle className="h-5 w-5 text-yellow-500" />;
-            case 'error': return <AlertCircle className="h-5 w-5 text-red-500" />;
-            default: return <Bell className="h-5 w-5 text-blue-500" />;
-        }
-    };
-
-    const getBadgeColor = (type?: string) => {
-        switch (type) {
-            case 'success': return 'bg-green-100 text-green-800 hover:bg-green-200';
-            case 'warning': return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200';
-            case 'error': return 'bg-red-100 text-red-800 hover:bg-red-200';
-            default: return 'bg-blue-100 text-blue-800 hover:bg-blue-200';
-        }
-    };
-
-    const getBadgeLabel = (type?: string) => {
-        switch (type) {
-            case 'success': return 'Sucesso';
-            case 'warning': return 'Aviso';
-            case 'error': return 'Erro';
-            default: return 'Info';
-        }
+    if (!query) {
+      return base;
     }
 
-    const formatDate = (dateString: string) => {
-        try {
-            return new Intl.DateTimeFormat('pt-BR', {
-                day: '2-digit',
-                month: 'long',
-                hour: '2-digit',
-                minute: '2-digit'
-            }).format(new Date(dateString));
-        } catch {
-            return 'Data inválida';
-        }
-    };
+    return base.filter((item) => {
+      const action = getNotificationAction(item) || "";
+      return (
+        item.title.toLowerCase().includes(query) ||
+        item.body.toLowerCase().includes(query) ||
+        action.toLowerCase().includes(query)
+      );
+    });
+  }, [categoryFilter, items, readFilter, searchTerm, severityFilter]);
 
+  const criticalUnreadCount = useMemo(
+    () => items.filter((item) => !item.isRead && item.severity === "critical").length,
+    [items],
+  );
+
+  const hasActiveFilters =
+    readFilter !== DEFAULT_READ_FILTER ||
+    severityFilter !== DEFAULT_SEVERITY_FILTER ||
+    categoryFilter !== DEFAULT_CATEGORY_FILTER ||
+    searchTerm.trim().length > 0;
+
+  const clearFilters = () => {
+    setReadFilter(DEFAULT_READ_FILTER);
+    setSeverityFilter(DEFAULT_SEVERITY_FILTER);
+    setCategoryFilter(DEFAULT_CATEGORY_FILTER);
+    setSearchTerm("");
+  };
+
+  if (!isEnabled) {
     return (
-        <div className="p-6 container mx-auto space-y-6 max-w-6xl">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold flex items-center gap-2 text-gray-900">
-                        <Bell className="h-8 w-8 text-primary" />
-                        Central de Notificações
-                    </h1>
-                    <p className="text-muted-foreground mt-1">
-                        Gerencie suas notificações do sistema
-                    </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant="outline"
-                        onClick={fetchNotifications}
-                        disabled={loading}
-                        className="gap-2"
-                    >
-                        <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                        Atualizar
-                    </Button>
-
-                    <Button
-                        variant="outline"
-                        onClick={() => setShowFilters(!showFilters)}
-                        className="gap-2"
-                    >
-                        <Filter className="h-4 w-4" />
-                        Filtros
-                    </Button>
-                </div>
-            </div>
-
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card>
-                    <CardContent className="p-4 flex items-center gap-4">
-                        <div className="p-2 bg-blue-100 rounded-full">
-                            <Bell className="h-5 w-5 text-blue-600" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">Total</p>
-                            <h3 className="text-2xl font-bold">{notifications.length}</h3>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent className="p-4 flex items-center gap-4">
-                        <div className="p-2 bg-yellow-100 rounded-full">
-                            <EyeOff className="h-5 w-5 text-yellow-600" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">Não lidas</p>
-                            <h3 className="text-2xl font-bold">{unreadCount}</h3>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent className="p-4 flex items-center gap-4">
-                        <div className="p-2 bg-red-100 rounded-full">
-                            <AlertCircle className="h-5 w-5 text-red-600" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">Erros</p>
-                            <h3 className="text-2xl font-bold">{errorCount}</h3>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent className="p-4 flex items-center gap-4">
-                        <div className={`p-2 rounded-full ${selectedIds.length > 0 ? 'bg-green-100' : 'bg-gray-100'}`}>
-                            <Check className={`h-5 w-5 ${selectedIds.length > 0 ? 'text-green-600' : 'text-gray-400'}`} />
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">Selecionadas</p>
-                            <h3 className="text-2xl font-bold">{selectedIds.length}</h3>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Filters & Actions */}
-            <div className="space-y-4">
-                {(showFilters || searchTerm) && (
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                        <Input
-                            placeholder="Buscar por título ou descrição..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10"
-                        />
-                    </div>
-                )}
-
-                {/* Bulk Actions */}
-                {selectedIds.length > 0 && (
-                    <Card className="bg-blue-50 border-blue-200">
-                        <CardContent className="p-4 flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-blue-800">
-                                <Check className="h-4 w-4" />
-                                <span className="font-medium">{selectedIds.length} itens selecionados</span>
-                            </div>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={clearSelection}
-                                    className="hover:bg-blue-100 text-blue-700"
-                                >
-                                    <X className="h-4 w-4 mr-2" />
-                                    Cancelar
-                                </Button>
-                                <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={handleBulkDelete}
-                                    className="bg-red-600 hover:bg-red-700"
-                                    disabled={loading}
-                                >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Excluir Selecionados
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-            </div>
-
-            {/* Notifications List */}
-            <Card>
-                <CardHeader className="pb-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                            {filteredNotifications.length > 0 && (
-                                <div title={selectedIds.length === filteredNotifications.length ? "Desmarcar todos" : "Selecionar todos"}>
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedIds.length === filteredNotifications.length && filteredNotifications.length > 0}
-                                        onChange={selectedIds.length === filteredNotifications.length ? clearSelection : selectAll}
-                                        style={{ width: '1.2rem', height: '1.2rem' }}
-                                        className="rounded border-gray-300 text-primary focus:ring-primary cursor-pointer accent-primary"
-                                    />
-                                </div>
-                            )}
-                            <CardTitle>Lista de Notificações</CardTitle>
-                        </div>
-                        <div className="flex gap-2">
-                            {unreadCount > 0 && (
-                                <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={handleMarkAllAsRead}
-                                    disabled={loading}
-                                >
-                                    <MailOpen className="h-4 w-4 mr-2" />
-                                    Marcar todas como lidas
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                    {loading && notifications.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground space-y-4">
-                            <RefreshCw className="h-10 w-10 animate-spin text-primary" />
-                            <p>Carregando notificações...</p>
-                        </div>
-                    ) : filteredNotifications.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground space-y-4">
-                            <div className="bg-gray-100 p-4 rounded-full">
-                                <Bell className="h-8 w-8 text-gray-400" />
-                            </div>
-                            <div>
-                                <p className="font-medium text-gray-900">Nenhuma notificação encontrada</p>
-                                <p className="text-sm mt-1">
-                                    {searchTerm ? "Tente ajustar seus filtros de busca." : "Você não tem notificações no momento."}
-                                </p>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="divide-y divide-gray-100">
-                            {filteredNotifications.map((notification) => {
-                                const isSelected = selectedIds.includes(notification.id);
-                                return (
-                                    <div
-                                        key={notification.id}
-                                        className={`flex gap-4 p-4 transition-colors hover:bg-gray-50/80 ${notification.read ? 'opacity-80' : 'bg-blue-50/30'
-                                            } ${isSelected ? 'bg-blue-50 border-l border-blue-500' : ''}`}
-                                    >
-                                        <div className="flex flex-col items-center gap-3 pt-1">
-                                            <input
-                                                type="checkbox"
-                                                checked={isSelected}
-                                                onChange={() => toggleSelection(notification.id)}
-                                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
-                                            />
-                                            {getIcon(notification.type)}
-                                        </div>
-
-                                        <div className="flex-1 min-w-0 space-y-1">
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <h4 className={`text-base truncate ${notification.read ? 'text-gray-600 font-medium' : 'text-gray-900 font-bold'}`}>
-                                                        {notification.title}
-                                                    </h4>
-                                                    <Badge variant="outline" className={`${getBadgeColor(notification.type)} border-0`}>
-                                                        {getBadgeLabel(notification.type)}
-                                                    </Badge>
-                                                    {!notification.read && (
-                                                        <Badge className="bg-blue-600 hover:bg-blue-700 text-xs px-2 py-0.5 h-5">Nova</Badge>
-                                                    )}
-                                                </div>
-
-                                                <span className="text-xs text-muted-foreground flex items-center gap-1 bg-gray-50 px-2 py-1 rounded whitespace-nowrap">
-                                                    <Clock className="h-3 w-3" />
-                                                    {formatDate(notification.createdAt)}
-                                                </span>
-                                            </div>
-
-                                            <p className={`text-sm leading-relaxed ${notification.read ? 'text-gray-500' : 'text-gray-700'}`}>
-                                                {notification.description}
-                                            </p>
-                                        </div>
-
-                                        <div className="flex flex-col gap-1 pl-2 border-l border-gray-100 ml-2 justify-center">
-                                            {notification.read ? (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-8 w-8 text-gray-400 hover:text-blue-600"
-                                                    onClick={() => handleMarkAsUnread(notification.id)}
-                                                    disabled={processingId === notification.id}
-                                                    title="Marcar como não lida"
-                                                >
-                                                    <Mail className="h-4 w-4" />
-                                                </Button>
-                                            ) : (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                                    onClick={() => handleMarkAsRead(notification.id)}
-                                                    disabled={processingId === notification.id}
-                                                    title="Marcar como lida"
-                                                >
-                                                    <MailOpen className="h-4 w-4" />
-                                                </Button>
-                                            )}
-
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50"
-                                                onClick={() => handleDelete(notification.id)}
-                                                disabled={processingId === notification.id}
-                                                title="Excluir"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </div>
+      <div className="p-6 max-w-4xl mx-auto">
+        <Card>
+          <CardContent className="p-6 text-center">
+            <Bell className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+            <p className="text-sm font-medium">Central de notificacoes indisponivel.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Este recurso e exclusivo para SUPER_ADMIN.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     );
+  }
+
+  return (
+    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Central de notificacoes</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Eventos operacionais persistidos para acompanhamento do SUPER_ADMIN.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              void refresh();
+            }}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
+            Atualizar
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              void markAllAsRead();
+            }}
+            disabled={unreadCount === 0}
+          >
+            <CheckCheck className="h-4 w-4 mr-1" />
+            Marcar todas lidas
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Total carregadas</p>
+            <p className="text-2xl font-semibold mt-1">{items.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Nao lidas</p>
+            <p className="text-2xl font-semibold mt-1">{unreadCount}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Criticas nao lidas</p>
+            <p className="text-2xl font-semibold mt-1">{criticalUnreadCount}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Filtros</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="grid gap-3 md:grid-cols-4">
+            <label className="space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">Busca</span>
+              <div className="relative">
+                <Search className="h-4 w-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="pl-8"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Titulo, mensagem ou acao"
+                />
+              </div>
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">Leitura</span>
+              <select
+                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                value={readFilter}
+                onChange={(event) => setReadFilter(event.target.value as NotificationReadFilter)}
+              >
+                <option value="all">Todas</option>
+                <option value="unread">Nao lidas</option>
+                <option value="read">Lidas</option>
+              </select>
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">Severidade</span>
+              <select
+                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                value={severityFilter}
+                onChange={(event) =>
+                  setSeverityFilter(event.target.value as NotificationSeverityFilter)
+                }
+              >
+                <option value="all">Todas</option>
+                <option value="critical">Criticas</option>
+                <option value="warning">Warnings</option>
+                <option value="info">Informativas</option>
+              </select>
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">Categoria</span>
+              <select
+                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                value={categoryFilter}
+                onChange={(event) =>
+                  setCategoryFilter(event.target.value as NotificationCategoryFilter)
+                }
+              >
+                <option value="all">Todas</option>
+                <option value="update">Update</option>
+                <option value="maintenance">Maintenance</option>
+                <option value="backup">Backup</option>
+                <option value="restore">Restore</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="mt-3 flex justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              disabled={!hasActiveFilters}
+            >
+              Limpar filtros
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Notificacoes ({filteredItems.length})</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <SystemNotificationsList
+            items={filteredItems}
+            loading={loading}
+            error={error}
+            hasActiveFilters={hasActiveFilters}
+            variant="full"
+            onMarkAsRead={markAsRead}
+          />
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

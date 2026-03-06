@@ -28,6 +28,7 @@ interface SystemNotificationsListProps {
   loading: boolean;
   error: string | null;
   hasActiveFilters: boolean;
+  variant?: "compact" | "full";
   onMarkAsRead: (id: string) => Promise<void>;
 }
 
@@ -79,9 +80,11 @@ export function SystemNotificationsList({
   loading,
   error,
   hasActiveFilters,
+  variant = "full",
   onMarkAsRead,
 }: SystemNotificationsListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const isCompact = variant === "compact";
 
   const safeRowsById = useMemo(() => {
     const rows = new Map<string, ReturnType<typeof getNotificationSafeMetadataRows>>();
@@ -97,6 +100,15 @@ export function SystemNotificationsList({
     if (!notification.isRead) {
       void onMarkAsRead(notification.id);
     }
+  };
+
+  const getPreviewBody = (body: string): string => {
+    const normalized = String(body || "").replace(/\s+/g, " ").trim();
+    if (normalized.length <= 90) {
+      return normalized;
+    }
+
+    return `${normalized.slice(0, 87)}...`;
   };
 
   if (loading && items.length === 0) {
@@ -149,7 +161,7 @@ export function SystemNotificationsList({
             key={notification.id}
             data-testid={`system-notification-item-${notification.id}`}
             data-severity={notification.severity}
-            className={`px-4 py-3 border-b border-gray-100 dark:border-border last:border-b-0 border-l-4 transition-colors ${
+            className={`${isCompact ? "px-3 py-2" : "px-4 py-3"} border-b border-gray-100 dark:border-border last:border-b-0 border-l-4 transition-colors ${
               isUnread ? itemClassUnread : itemClassRead
             }`}
           >
@@ -167,7 +179,7 @@ export function SystemNotificationsList({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
                     <p
-                      className={`text-sm truncate ${
+                      className={`${isCompact ? "text-[13px]" : "text-sm"} truncate ${
                         isUnread
                           ? "font-semibold text-gray-900 dark:text-foreground"
                           : "font-medium text-gray-700 dark:text-muted-foreground"
@@ -177,42 +189,71 @@ export function SystemNotificationsList({
                     </p>
 
                     <span
-                      className={`px-2 py-1 text-xs rounded-full font-medium flex-shrink-0 ${badgeClass}`}
+                      className={`px-1.5 py-0.5 text-[10px] rounded-full font-medium flex-shrink-0 ${badgeClass}`}
                     >
                       {severityLabel[notification.severity]}
                     </span>
                   </div>
 
-                  <p className="text-xs text-gray-600 dark:text-muted-foreground/90 mt-1 line-clamp-2">
-                    {notification.body}
-                  </p>
-
-                  <div className="flex flex-wrap items-center gap-2 mt-2">
-                    <span className="text-[11px] px-2 py-0.5 rounded-md bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200">
-                      {getNotificationCategoryLabel(category)}
-                    </span>
-                    {action && (
-                      <span className="text-[11px] px-2 py-0.5 rounded-md bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-300 font-mono">
-                        {action}
+                  {isCompact ? (
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <p className="text-[11px] leading-4 text-gray-600 dark:text-muted-foreground/90 max-w-full truncate">
+                        {getPreviewBody(notification.body)}
+                      </p>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200">
+                        {getNotificationCategoryLabel(category)}
                       </span>
-                    )}
-                  </div>
+                      {action && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-300 font-mono">
+                          {action}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-xs text-gray-600 dark:text-muted-foreground/90 mt-1 line-clamp-2">
+                        {notification.body}
+                      </p>
 
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-xs text-gray-400 dark:text-slate-500">
-                      {formatNotificationRelativeTime(notification.createdAt)}
-                    </span>
-                    <span className="text-xs text-gray-400 dark:text-slate-500 flex items-center gap-1">
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <span className="text-[11px] px-2 py-0.5 rounded-md bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200">
+                          {getNotificationCategoryLabel(category)}
+                        </span>
+                        {action && (
+                          <span className="text-[11px] px-2 py-0.5 rounded-md bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-300 font-mono">
+                            {action}
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  <div className={`${isCompact ? "mt-1.5" : "mt-2"} flex items-center justify-between gap-2`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-[11px] text-gray-400 dark:text-slate-500 truncate">
+                        {formatNotificationRelativeTime(notification.createdAt)}
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-300">
+                        {notification.isRead ? "Lida" : "Nao lida"}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-gray-400 dark:text-slate-500 flex items-center gap-1 shrink-0">
                       {isExpanded ? "Ocultar" : "Detalhes"}
                       {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                     </span>
                   </div>
+
+                  {!isCompact && (
+                    <span className="sr-only">
+                      {formatNotificationRelativeTime(notification.createdAt)}
+                    </span>
+                  )}
                 </div>
               </div>
             </button>
 
             {isExpanded && (
-              <div className="mt-3 ml-7 rounded-md border border-gray-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/40 p-3 space-y-3">
+              <div className={`${isCompact ? "mt-2 ml-6 p-2.5" : "mt-3 ml-7 p-3"} rounded-md border border-gray-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/40 space-y-3`}>
                 <div>
                   <p className="text-xs font-semibold text-gray-700 dark:text-slate-300">
                     Detalhes operacionais
