@@ -705,10 +705,32 @@ restart_pm2_processes() {
 }
 
 load_runtime_env_from_shared() {
+  if [[ ! -f "$SHARED_DIR/.env" ]]; then
+    export UPLOADS_DIR="${UPLOADS_DIR:-$SHARED_DIR/uploads}"
+    export BACKUP_DIR="${BACKUP_DIR:-$SHARED_DIR/backups}"
+    export LOGOS_UPLOAD_DIR="${LOGOS_UPLOAD_DIR:-${UPLOADS_DIR}/logos}"
+    return 0
+  fi
+
+  export UPLOADS_DIR="${UPLOADS_DIR:-$SHARED_DIR/uploads}"
+  export BACKUP_DIR="${BACKUP_DIR:-$SHARED_DIR/backups}"
+
   set -a
   # shellcheck disable=SC1090
   source "$SHARED_DIR/.env"
   set +a
+
+  if [[ -z "${UPLOADS_DIR:-}" ]]; then
+    UPLOADS_DIR="$SHARED_DIR/uploads"
+  fi
+  if [[ -z "${BACKUP_DIR:-}" ]]; then
+    BACKUP_DIR="$SHARED_DIR/backups"
+  fi
+  if [[ -z "${LOGOS_UPLOAD_DIR:-}" ]] || [[ "${LOGOS_UPLOAD_DIR}" == "/logos" ]]; then
+    LOGOS_UPLOAD_DIR="${UPLOADS_DIR}/logos"
+  fi
+
+  export UPLOADS_DIR BACKUP_DIR LOGOS_UPLOAD_DIR
 }
 
 wait_for_http_ok() {
@@ -1002,9 +1024,11 @@ main() {
   export APP_BASE_DIR="$BASE_DIR"
   export UPLOADS_DIR="$SHARED_DIR/uploads"
   export BACKUP_DIR="$SHARED_DIR/backups"
+  export LOGOS_UPLOAD_DIR="$SHARED_DIR/uploads/logos"
   update_env_file "APP_BASE_DIR" "$BASE_DIR" "$SHARED_DIR/.env"
   update_env_file "UPLOADS_DIR" "$SHARED_DIR/uploads" "$SHARED_DIR/.env"
   update_env_file "BACKUP_DIR" "$SHARED_DIR/backups" "$SHARED_DIR/.env"
+  update_env_file "LOGOS_UPLOAD_DIR" "$SHARED_DIR/uploads/logos" "$SHARED_DIR/.env"
 
   local target_release_name=""
   local release_dir=""

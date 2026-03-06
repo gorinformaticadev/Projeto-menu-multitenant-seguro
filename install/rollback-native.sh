@@ -139,12 +139,31 @@ restart_pm2_processes() {
 
 load_runtime_env_from_shared() {
   if [[ ! -f "$SHARED_DIR/.env" ]]; then
+    export UPLOADS_DIR="${UPLOADS_DIR:-$SHARED_DIR/uploads}"
+    export BACKUP_DIR="${BACKUP_DIR:-$SHARED_DIR/backups}"
+    export LOGOS_UPLOAD_DIR="${LOGOS_UPLOAD_DIR:-${UPLOADS_DIR}/logos}"
     return 0
   fi
+
+  export UPLOADS_DIR="${UPLOADS_DIR:-$SHARED_DIR/uploads}"
+  export BACKUP_DIR="${BACKUP_DIR:-$SHARED_DIR/backups}"
+
   set -a
   # shellcheck disable=SC1090
   source "$SHARED_DIR/.env"
   set +a
+
+  if [[ -z "${UPLOADS_DIR:-}" ]]; then
+    UPLOADS_DIR="$SHARED_DIR/uploads"
+  fi
+  if [[ -z "${BACKUP_DIR:-}" ]]; then
+    BACKUP_DIR="$SHARED_DIR/backups"
+  fi
+  if [[ -z "${LOGOS_UPLOAD_DIR:-}" ]] || [[ "${LOGOS_UPLOAD_DIR}" == "/logos" ]]; then
+    LOGOS_UPLOAD_DIR="${UPLOADS_DIR}/logos"
+  fi
+
+  export UPLOADS_DIR BACKUP_DIR LOGOS_UPLOAD_DIR
 }
 
 wait_for_http_ok() {
