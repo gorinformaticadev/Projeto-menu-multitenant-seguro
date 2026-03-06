@@ -724,3 +724,113 @@ Protecao:
 - notificacoes realtime/inbox
 - SSE/WebSocket adicionais
 - frontend dedicado para auditoria
+
+## Etapa 7 - Dashboard Operacional Modular
+
+Implementacao de dashboard operacional configuravel com widgets independentes, layout reorganizavel e persistencia por role/usuario.
+
+### Backend (API agregada + layout persistente)
+
+Novos endpoints:
+
+- `GET /api/system/dashboard`
+- `GET /api/system/dashboard/layout`
+- `PUT /api/system/dashboard/layout`
+
+Protecao:
+
+- `JwtAuthGuard + RolesGuard`
+- roles permitidas: `SUPER_ADMIN`, `ADMIN`, `USER`, `CLIENT`
+
+Contrato agregado (`GET /api/system/dashboard`):
+
+- `version`
+- `uptime`
+- `maintenance`
+- `system`
+- `cpu`
+- `memory`
+- `disk`
+- `database`
+- `redis`
+- `workers`
+- `api`
+- `security`
+- `backup`
+- `jobs`
+- `errors`
+- `tenants`
+- `notifications`
+- `widgets.available`
+
+Caracteristicas:
+
+- coleta fail-safe por metrica (falha em uma metrica nao derruba o endpoint)
+- metrica de tempo medio de resposta da API em memoria via interceptor global
+- projection por role:
+  - `SUPER_ADMIN`: visao completa
+  - `ADMIN`: visao reduzida de infraestrutura sensivel
+  - `USER/CLIENT`: visao basica com campos restritos
+
+### Persistencia de layout (Prisma)
+
+Novo modelo:
+
+- `DashboardLayout` (`dashboard_layouts`)
+
+Campos:
+
+- `id`
+- `userId`
+- `role`
+- `layoutJson`
+- `filtersJson`
+- `createdAt`
+- `updatedAt`
+
+Regras:
+
+- `@@unique([userId, role])`
+- layout salvo por usuario e role
+- defaults por role quando nao existe registro persistido
+
+Migration:
+
+- `apps/backend/prisma/migrations/20260306193000_stage7_dashboard_operational_layouts/migration.sql`
+
+### Frontend (inbox operacional do dashboard)
+
+Rota:
+
+- `/dashboard`
+
+Funcionalidades aplicadas:
+
+- grid responsivo em estilo observabilidade com `react-grid-layout`
+- drag & drop para reorganizacao dos widgets
+- ocultar/exibir widgets individualmente
+- filtros globais:
+  - periodo
+  - severidade
+  - tenant (quando aplicavel)
+- persistencia automatica de layout/filtros (debounce) em `/api/system/dashboard/layout`
+- polling automatico de metricas a cada `15s`
+- fallback visual seguro para metricas indisponiveis/restritas
+
+### Validacao desta etapa
+
+Backend:
+
+- `pnpm -C apps/backend build`
+- `pnpm -C apps/backend test`
+- `pnpm -C apps/backend test:smoke`
+
+Frontend:
+
+- `pnpm -C apps/frontend lint`
+- `pnpm -C apps/frontend test`
+- `pnpm -C apps/frontend build`
+
+Observacao:
+
+- lint atual do projeto permanece com warnings legados fora do escopo da etapa.

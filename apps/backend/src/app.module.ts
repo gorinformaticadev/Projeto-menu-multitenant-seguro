@@ -32,6 +32,8 @@ import { PathsModule } from './core/common/paths/paths.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { MaintenanceModeGuard } from './maintenance/maintenance-mode.guard';
 import { SystemDataRetentionModule } from './retention/system-data-retention.module';
+import { ResponseTimeMetricsInterceptor } from './dashboard/system-response-time-metrics.interceptor';
+import { SystemDashboardModule } from './dashboard/system-dashboard.module';
 
 @Module({
   imports: [
@@ -81,6 +83,7 @@ import { SystemDataRetentionModule } from './retention/system-data-retention.mod
     UpdateModule,
     BackupModule,
     NotificationsModule, // Novo sistema Socket.IO apenas
+    SystemDashboardModule,
     SystemDataRetentionModule,
     WhatsAppModule,
     SecureFilesModule, // Módulo de uploads sensíveis
@@ -96,6 +99,10 @@ import { SystemDataRetentionModule } from './retention/system-data-retention.mod
     {
       provide: APP_INTERCEPTOR,
       useClass: TenantInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ResponseTimeMetricsInterceptor,
     },
     // Maintenance Mode Global
     {
@@ -139,5 +146,4 @@ export class AppModule implements NestModule {
 }
 
 // Forced restart trigger
-
 

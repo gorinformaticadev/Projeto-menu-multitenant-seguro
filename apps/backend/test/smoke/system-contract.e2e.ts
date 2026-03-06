@@ -31,6 +31,8 @@ import { AuditService } from '../../src/audit/audit.service';
 import { SystemAuditController } from '../../src/audit/system-audit.controller';
 import { SystemDataRetentionController } from '../../src/retention/system-data-retention.controller';
 import { SystemDataRetentionService } from '../../src/retention/system-data-retention.service';
+import { SystemDashboardController } from '../../src/dashboard/system-dashboard.controller';
+import { SystemDashboardService } from '../../src/dashboard/system-dashboard.service';
 
 const DEFAULT_MAINTENANCE_STATE: MaintenanceState = {
   enabled: false,
@@ -152,6 +154,30 @@ const retentionServiceMock = {
   })),
 };
 
+const systemDashboardServiceMock = {
+  getDashboard: jest.fn(async () => ({
+    generatedAt: '2026-03-06T14:00:00.000Z',
+    version: { status: 'ok', version: 'v1.2.3' },
+    uptime: { status: 'ok', human: '01:22:33' },
+    maintenance: { status: 'ok', enabled: false },
+    api: { status: 'ok', avgResponseTimeMs: 45.3, sampleSize: 12 },
+    notifications: { status: 'ok', criticalUnread: 1, criticalRecent: 2 },
+    widgets: { available: ['version', 'uptime', 'maintenance', 'api', 'notifications'] },
+  })),
+  getLayout: jest.fn(async () => ({
+    role: Role.SUPER_ADMIN,
+    layoutJson: { lg: [] },
+    filtersJson: { periodMinutes: 60, severity: 'all', hiddenWidgetIds: [] },
+    updatedAt: '2026-03-06T14:01:00.000Z',
+  })),
+  saveLayout: jest.fn(async () => ({
+    role: Role.SUPER_ADMIN,
+    layoutJson: { lg: [] },
+    filtersJson: { periodMinutes: 60, severity: 'all', hiddenWidgetIds: [] },
+    updatedAt: '2026-03-06T14:02:00.000Z',
+  })),
+};
+
 @Injectable()
 class MockJwtAuthGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
@@ -178,6 +204,15 @@ class MockJwtAuthGuard implements CanActivate {
       return true;
     }
 
+    if (authorization === 'Bearer smoke-user-token') {
+      req.user = {
+        id: 'smoke-user',
+        sub: 'smoke-user',
+        role: Role.USER,
+      };
+      return true;
+    }
+
     throw new UnauthorizedException('Token invalido ou expirado');
   }
 }
@@ -199,6 +234,7 @@ class DummyTenantsController {
     SystemNotificationsController,
     SystemAuditController,
     SystemDataRetentionController,
+    SystemDashboardController,
   ],
   providers: [
     Reflector,
@@ -229,9 +265,18 @@ class DummyTenantsController {
       useValue: retentionServiceMock,
     },
     {
+      provide: SystemDashboardService,
+      useValue: systemDashboardServiceMock,
+    },
+    {
       provide: JwtService,
       useValue: {
-        verify: jest.fn(() => ({ role: Role.SUPER_ADMIN })),
+        verify: jest.fn((token: string) => {
+          if (token === 'smoke-user-token') {
+            return { role: Role.USER, sub: 'smoke-user' };
+          }
+          return { role: Role.SUPER_ADMIN, sub: 'smoke-admin' };
+        }),
       },
     },
   ],
@@ -240,8 +285,12 @@ class SmokeContractTestModule {}
 
 describe('System contract smoke', () => {
   let app: INestApplication;
+  let previousJwtSecret: string | undefined;
 
   beforeAll(async () => {
+    previousJwtSecret = process.env.JWT_SECRET;
+    process.env.JWT_SECRET = 'smoke-secret';
+
     const moduleRef = await Test.createTestingModule({
       imports: [SmokeContractTestModule],
     })
@@ -272,9 +321,18 @@ describe('System contract smoke', () => {
     auditServiceMock.findOne.mockClear();
     auditServiceMock.log.mockClear();
     retentionServiceMock.runRetentionCleanup.mockClear();
+    systemDashboardServiceMock.getDashboard.mockClear();
+    systemDashboardServiceMock.getLayout.mockClear();
+    systemDashboardServiceMock.saveLayout.mockClear();
   });
 
   afterAll(async () => {
+    if (previousJwtSecret === undefined) {
+      delete process.env.JWT_SECRET;
+    } else {
+      process.env.JWT_SECRET = previousJwtSecret;
+    }
+
     if (app) {
       await app.close();
     }
@@ -414,7 +472,41 @@ describe('System contract smoke', () => {
     expect(retentionServiceMock.runRetentionCleanup).toHaveBeenCalledWith('manual');
   });
 
-  it('maintenance guard returns 503 for regular routes and still allows health, update status and notifications', async () => {
+  it('GET /api/system/dashboard returns aggregated payload for authenticated user', async () => {
+    await request(app.getHttpServer()).get('/api/system/dashboard').expect(401);
+
+    const response = await request(app.getHttpServer())
+      .get('/api/system/dashboard')
+      .set('Authorization', 'Bearer smoke-admin-token')
+      .expect(200);
+
+    expect(response.body.version.version).toBe('v1.2.3');
+    expect(response.body.widgets.available).toContain('notifications');
+    expect(systemDashboardServiceMock.getDashboard).toHaveBeenCalledTimes(1);
+  });
+
+  it('GET/PUT /api/system/dashboard/layout loads and persists layout', async () => {
+    const getResponse = await request(app.getHttpServer())
+      .get('/api/system/dashboard/layout')
+      .set('Authorization', 'Bearer smoke-admin-token')
+      .expect(200);
+
+    expect(getResponse.body.role).toBe(Role.SUPER_ADMIN);
+    expect(systemDashboardServiceMock.getLayout).toHaveBeenCalledTimes(1);
+
+    await request(app.getHttpServer())
+      .put('/api/system/dashboard/layout')
+      .set('Authorization', 'Bearer smoke-admin-token')
+      .send({
+        layoutJson: { lg: [{ i: 'version', x: 0, y: 0, w: 1, h: 1 }] },
+        filtersJson: { periodMinutes: 30, severity: 'critical', hiddenWidgetIds: ['maintenance'] },
+      })
+      .expect(200);
+
+    expect(systemDashboardServiceMock.saveLayout).toHaveBeenCalledTimes(1);
+  });
+
+  it('maintenance guard returns 503 for regular routes and allows dashboard only for admin roles', async () => {
     maintenanceState = {
       enabled: true,
       reason: 'upgrade in progress',
@@ -440,5 +532,15 @@ describe('System contract smoke', () => {
       .get('/api/system/notifications')
       .set('Authorization', 'Bearer smoke-admin-token')
       .expect(200);
+
+    await request(app.getHttpServer())
+      .get('/api/system/dashboard')
+      .set('Authorization', 'Bearer smoke-admin-token')
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .get('/api/system/dashboard')
+      .set('Authorization', 'Bearer smoke-user-token')
+      .expect(503);
   });
 });

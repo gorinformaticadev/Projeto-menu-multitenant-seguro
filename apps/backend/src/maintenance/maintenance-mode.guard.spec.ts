@@ -1,4 +1,4 @@
-import { ExecutionContext } from '@nestjs/common';
+import { ExecutionContext, ServiceUnavailableException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { MaintenanceModeGuard } from './maintenance-mode.guard';
 
@@ -105,6 +105,67 @@ describe('MaintenanceModeGuard', () => {
         action: 'MAINTENANCE_BYPASS_USED',
         severity: 'critical',
       }),
+    );
+  });
+
+  it('allows dashboard read during maintenance for ADMIN token', async () => {
+    const guard = createGuard();
+    const request: any = {
+      method: 'GET',
+      originalUrl: '/api/system/dashboard?periodMinutes=15',
+      headers: {
+        authorization: 'Bearer admin-token',
+      },
+    };
+
+    maintenanceModeServiceMock.getState.mockResolvedValue({
+      enabled: true,
+      reason: 'manutencao',
+      startedAt: null,
+      etaSeconds: 600,
+      allowedRoles: ['SUPER_ADMIN'],
+      bypassHeader: 'X-Maintenance-Bypass',
+    });
+
+    jwtServiceMock.verify.mockReturnValue({
+      role: 'ADMIN',
+      sub: 'admin-1',
+    });
+
+    const allowed = await guard.canActivate(createContext(request));
+
+    expect(allowed).toBe(true);
+    expect(jwtServiceMock.verify).toHaveBeenCalledWith('admin-token', {
+      secret: 'jwt-secret',
+    });
+  });
+
+  it('blocks dashboard read during maintenance for USER token', async () => {
+    const guard = createGuard();
+    const request: any = {
+      method: 'GET',
+      originalUrl: '/api/system/dashboard',
+      headers: {
+        authorization: 'Bearer user-token',
+      },
+    };
+
+    maintenanceModeServiceMock.getState.mockResolvedValue({
+      enabled: true,
+      reason: 'manutencao',
+      startedAt: null,
+      etaSeconds: 600,
+      allowedRoles: ['SUPER_ADMIN'],
+      bypassHeader: 'X-Maintenance-Bypass',
+    });
+
+    jwtServiceMock.verify.mockReturnValue({
+      role: 'USER',
+      sub: 'user-1',
+    });
+
+    await expect(guard.canActivate(createContext(request))).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
     );
   });
 });

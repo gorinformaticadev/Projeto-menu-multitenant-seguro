@@ -42,6 +42,13 @@ export class MaintenanceModeGuard implements CanActivate {
       return true;
     }
 
+    if (
+      this.isDashboardReadPath(method, requestPath) &&
+      (await this.canAccessDashboardDuringMaintenance(request))
+    ) {
+      return true;
+    }
+
     if (this.isWhitelistedPath(method, requestPath)) {
       return true;
     }
@@ -170,6 +177,46 @@ export class MaintenanceModeGuard implements CanActivate {
     }
   }
 
+  private isDashboardReadPath(method: string, requestPath: string): boolean {
+    const isReadMethod = method === 'GET' || method === 'HEAD';
+    if (!isReadMethod) {
+      return false;
+    }
+
+    return (
+      this.matchesPath(requestPath, '/api/system/dashboard') ||
+      this.matchesPath(requestPath, '/api/system/dashboard/layout')
+    );
+  }
+
+  private async canAccessDashboardDuringMaintenance(request: Request): Promise<boolean> {
+    const roleFromRequest = String((request as any)?.user?.role || '').trim().toUpperCase();
+    if (this.isDashboardMaintenanceRole(roleFromRequest)) {
+      return true;
+    }
+
+    const token = this.extractBearerToken(request);
+    if (!token) {
+      return false;
+    }
+
+    const jwtSecret = String(process.env.JWT_SECRET || '').trim();
+    if (!jwtSecret) {
+      this.logger.warn('JWT_SECRET ausente; acesso ao dashboard durante maintenance foi negado.');
+      return false;
+    }
+
+    try {
+      const payload = this.jwtService.verify<{ role?: string }>(token, {
+        secret: jwtSecret,
+      });
+      const role = String(payload?.role || '').trim().toUpperCase();
+      return this.isDashboardMaintenanceRole(role);
+    } catch {
+      return false;
+    }
+  }
+
   private matchesPath(actualPath: string, expectedBasePath: string): boolean {
     return actualPath === expectedBasePath || actualPath.startsWith(`${expectedBasePath}/`);
   }
@@ -231,6 +278,10 @@ export class MaintenanceModeGuard implements CanActivate {
       return false;
     }
     return allowedRoles.includes(role);
+  }
+
+  private isDashboardMaintenanceRole(role: string): boolean {
+    return role === 'SUPER_ADMIN' || role === 'ADMIN';
   }
 
   private async logBypassUsage(
