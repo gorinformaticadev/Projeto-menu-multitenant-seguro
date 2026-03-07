@@ -1,6 +1,7 @@
 ﻿import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { RateLimitMetricsService, RateLimitStatsParams } from '../common/services/rate-limit-metrics.service';
+import { humanizeAuditAction, resolveAuditDisplayMessage } from './audit-log-presentation.util';
 
 export type AuditSeverity = 'info' | 'warning' | 'critical';
 
@@ -265,6 +266,7 @@ export class AuditService {
       total,
       byAction: byAction.map((item) => ({
         action: item.action,
+        actionLabel: humanizeAuditAction(item.action),
         count: item._count,
       })),
       byUser: byUser.map((item) => ({
@@ -388,8 +390,8 @@ export class AuditService {
   }
 
   private normalizeMessage(input: string | undefined, action: string): string {
-    const normalized = String(input || '').trim();
-    return normalized.length > 0 ? normalized.slice(0, 300) : action.slice(0, 300);
+    const normalized = resolveAuditDisplayMessage(action, input);
+    return normalized.slice(0, 300);
   }
 
   private normalizeString(input: unknown): string | null {
@@ -613,9 +615,13 @@ export class AuditService {
   private sanitizeAuditLogRow(log: any) {
     const parsedDetails = this.parseDetails(typeof log.details === 'string' ? log.details : null);
     const metadataInput = this.normalizeMetadataInput(log.metadata);
+    const actionLabel = humanizeAuditAction(log.action);
+    const message = resolveAuditDisplayMessage(log.action, log.message);
 
     return {
       ...log,
+      actionLabel,
+      message,
       details:
         parsedDetails && typeof parsedDetails === 'object' && !Array.isArray(parsedDetails)
           ? this.sanitizeMetadata(parsedDetails as Record<string, unknown>)

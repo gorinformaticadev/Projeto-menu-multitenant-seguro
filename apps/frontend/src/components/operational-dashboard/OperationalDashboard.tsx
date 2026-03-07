@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Activity,
   AlertTriangle,
   BellDot,
+  ChevronDown,
   Check,
   Eye,
   EyeOff,
@@ -12,7 +13,6 @@ import {
   LayoutGrid,
   Loader2,
   Maximize2,
-  Move,
   RefreshCw,
   Server,
   ShieldAlert,
@@ -57,6 +57,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   allowedWidgetIdsByRole,
   dashboardGridBreakpoints,
   dashboardGridCols,
@@ -69,6 +74,10 @@ import {
   type DashboardMetric,
   type DashboardRole,
 } from "@/components/operational-dashboard/dashboard.utils";
+import {
+  DashboardMetricState,
+  resolveDashboardMetricState,
+} from "@/components/operational-dashboard/DashboardMetricState";
 import { OperationalDashboardWidget } from "@/components/operational-dashboard/OperationalDashboardWidget";
 
 type DashboardFiltersState = {
@@ -101,6 +110,12 @@ type DashboardPayload = {
 };
 
 type Layouts = ReturnType<typeof normalizeLayoutForWidgets>;
+type HealthBucketKey = "good" | "attention" | "restricted";
+type HealthBucketItem = {
+  id: string;
+  label: string;
+  statusLabel: string;
+};
 
 const POLL_INTERVAL_MS = 15000;
 
@@ -159,19 +174,22 @@ function formatPercent(value: unknown): string {
 function metricStatusLabel(metric: DashboardMetric | null | undefined): string {
   const status = String(metric?.status || "").toLowerCase();
   if (!status) {
-    return "Sem status";
+    return "Sem dados";
   }
   if (status === "ok") {
     return "OK";
   }
   if (status === "healthy") {
-    return "Saudável";
+    return "Saudavel";
+  }
+  if (status === "error") {
+    return "Indisponivel";
   }
   if (status === "degraded") {
     return "Degradado";
   }
   if (status === "down") {
-    return "Off";
+    return "Indisponivel";
   }
   if (status === "unavailable") {
     return "Indisponivel";
@@ -190,6 +208,37 @@ function toMetric(value: unknown): DashboardMetric | null {
     return null;
   }
   return value as DashboardMetric;
+}
+
+function operationalWidgetTone(
+  metric: DashboardMetric | null | undefined,
+): "neutral" | "warn" | "danger" | "modern" {
+  const tone = statusTone(metric?.status);
+  if (tone === "warn" || tone === "danger" || tone === "neutral") {
+    return tone;
+  }
+  return "modern";
+}
+
+function metricStateAccentClassName(tone: "neutral" | "warn" | "danger"): string {
+  if (tone === "warn") {
+    return "bg-amber-400";
+  }
+  if (tone === "danger") {
+    return "bg-rose-400";
+  }
+  return "bg-slate-400";
+}
+
+function buildAuditEventLine(row: Record<string, unknown>): string {
+  const actionLabel = String(row.actionLabel || row.message || row.action || "").trim() || "--";
+  const message = String(row.message || "").trim();
+
+  if (!message || message === actionLabel) {
+    return actionLabel;
+  }
+
+  return `${actionLabel} - ${message}`;
 }
 
 function toVisibleLayouts(layouts: Layouts, visibleWidgetIds: Set<string>): Layouts {
@@ -390,6 +439,130 @@ function ResourceMeter({
         />
       </div>
     </div>
+  );
+}
+
+function HealthBucketLegendRow({
+  label,
+  value,
+  color,
+  items,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  items: HealthBucketItem[];
+}) {
+  const [open, setOpen] = useState(false);
+  const closeTimeoutRef = useRef<number | null>(null);
+  const hasItems = items.length > 0;
+
+  const clearCloseTimeout = useCallback(() => {
+    if (closeTimeoutRef.current !== null) {
+      window.clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+  }, []);
+
+  const scheduleClose = useCallback(() => {
+    clearCloseTimeout();
+    closeTimeoutRef.current = window.setTimeout(() => {
+      setOpen(false);
+    }, 120);
+  }, [clearCloseTimeout]);
+
+  useEffect(() => {
+    return () => {
+      clearCloseTimeout();
+    };
+  }, [clearCloseTimeout]);
+
+  const content = (
+    <>
+      <div className="flex min-w-0 items-center gap-2">
+        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${color}`} />
+        <span className="truncate text-[11px] font-medium text-slate-300">
+          {label}
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <p className="shrink-0 text-base font-semibold tracking-tight text-white">
+          {value}
+        </p>
+        {hasItems ? (
+          <ChevronDown
+            className={`h-3.5 w-3.5 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        ) : null}
+      </div>
+    </>
+  );
+
+  if (!hasItems) {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-left transition-colors hover:border-white/20 hover:bg-white/10"
+          onClick={() => {
+            clearCloseTimeout();
+            setOpen((current) => !current);
+          }}
+          onMouseEnter={() => {
+            clearCloseTimeout();
+            setOpen(true);
+          }}
+          onMouseLeave={scheduleClose}
+          aria-expanded={open}
+          aria-label={`${label}: ${value} widgets`}
+        >
+          {content}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="left"
+        align="start"
+        sideOffset={10}
+        className="w-72 rounded-[20px] border border-slate-700/70 bg-slate-950/95 p-3 text-slate-100 shadow-2xl"
+        onMouseEnter={clearCloseTimeout}
+        onMouseLeave={scheduleClose}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+              {label}
+            </p>
+            <p className="mt-1 text-[11px] text-slate-400">
+              {value} widgets identificados neste grupo
+            </p>
+          </div>
+          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${color}`} />
+        </div>
+        <div className="mt-3 max-h-52 space-y-2 overflow-auto pr-1">
+          {items.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2"
+            >
+              <span className="min-w-0 truncate text-sm text-slate-100">
+                {item.label}
+              </span>
+              <span className="shrink-0 rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[10px] font-medium text-slate-300">
+                {item.statusLabel}
+              </span>
+            </div>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -738,11 +911,21 @@ export function OperationalDashboard() {
       attention: 0,
       restricted: 0,
     };
+    const healthDetails: Record<HealthBucketKey, HealthBucketItem[]> = {
+      good: [],
+      attention: [],
+      restricted: [],
+    };
 
     for (const widgetId of availableWidgetIds) {
       const metric = toMetric(dashboard?.[widgetId]);
       const bucket = classifyMetricStatus(metric?.status);
       counts[bucket] += 1;
+      healthDetails[bucket].push({
+        id: widgetId,
+        label: widgetLabelById[widgetId] || widgetId,
+        statusLabel: metricStatusLabel(metric),
+      });
     }
 
     const apiMetric = toMetric(dashboard?.api);
@@ -754,6 +937,10 @@ export function OperationalDashboard() {
     const maintenanceMetric = toMetric(dashboard?.maintenance);
     const jobsMetric = toMetric(dashboard?.jobs);
     const tenantsMetric = toMetric(dashboard?.tenants);
+    const securityMetricState = resolveDashboardMetricState(securityMetric);
+    const maintenanceMetricState = resolveDashboardMetricState(maintenanceMetric);
+    const jobsMetricState = resolveDashboardMetricState(jobsMetric);
+    const tenantsMetricState = resolveDashboardMetricState(tenantsMetric);
     const deniedRows = Array.isArray(securityMetric?.deniedAccess) ? securityMetric.deniedAccess : [];
     const blockedAttempts = deniedRows.reduce((total, item) => {
       const row = item as Record<string, unknown>;
@@ -767,39 +954,61 @@ export function OperationalDashboard() {
         { name: "Restrito", value: counts.restricted, color: "#64748b" },
       ].filter((item) => item.value > 0),
       counts,
+      healthDetails,
       avgLatency:
         apiMetric?.avgResponseTimeMs !== null && apiMetric?.avgResponseTimeMs !== undefined
           ? `${apiMetric.avgResponseTimeMs}ms`
           : "--",
       unreadNotifications: String(notificationsMetric?.criticalUnread ?? "--"),
-      blockedAttempts: String(blockedAttempts),
+      blockedAttempts: securityMetricState ? "--" : String(blockedAttempts),
       visibleWidgets: visibleWidgetIds.length,
       panoramaSignals: [
-        {
-          label: "Manutencao",
-          value: maintenanceMetric?.enabled ? "Ativa" : "Estavel",
-          hint: maintenanceMetric?.enabled
-            ? String(maintenanceMetric?.reason || "Janela operacional")
-            : "Sem janela ativa",
-          accentClassName: maintenanceMetric?.enabled ? "bg-amber-400" : "bg-emerald-400",
-        },
-        {
-          label: "Jobs na fila",
-          value: String(jobsMetric?.pending ?? "--"),
-          hint: `${String(jobsMetric?.running ?? "--")} em execucao`,
-          accentClassName: "bg-sky-400",
-        },
-        {
-          label: "Lojas / Tenants",
-          value: String(tenantsMetric?.active ?? "--"),
-          hint: `${String(tenantsMetric?.total ?? "--")} registradas`,
-          accentClassName: "bg-cyan-400",
-        },
+        maintenanceMetricState
+          ? {
+            label: "Manutencao",
+            value: maintenanceMetricState.title,
+            hint: maintenanceMetricState.description,
+            accentClassName: metricStateAccentClassName(maintenanceMetricState.tone),
+          }
+          : {
+            label: "Manutenção",
+            value: maintenanceMetric?.enabled ? "Ativa" : "Estavel",
+            hint: maintenanceMetric?.enabled
+              ? String(maintenanceMetric?.reason || "Janela operacional")
+              : "Sem janela ativa",
+            accentClassName: maintenanceMetric?.enabled ? "bg-amber-400" : "bg-emerald-400",
+          },
+        jobsMetricState
+          ? {
+            label: "Jobs na fila",
+            value: jobsMetricState.title,
+            hint: jobsMetricState.description,
+            accentClassName: metricStateAccentClassName(jobsMetricState.tone),
+          }
+          : {
+            label: "Jobs na fila",
+            value: String(jobsMetric?.pending ?? "--"),
+            hint: `${String(jobsMetric?.running ?? "--")} em execucao`,
+            accentClassName: "bg-sky-400",
+          },
+        tenantsMetricState
+          ? {
+            label: "Empresas / Tenants",
+            value: tenantsMetricState.title,
+            hint: tenantsMetricState.description,
+            accentClassName: metricStateAccentClassName(tenantsMetricState.tone),
+          }
+          : {
+            label: "Empresas / Tenants",
+            value: String(tenantsMetric?.active ?? "--"),
+            hint: `${String(tenantsMetric?.total ?? "--")} registradas`,
+            accentClassName: "bg-cyan-400",
+          },
       ],
       resourceUsage: [
         { label: "CPU", value: Number(cpuMetric?.usagePercent), toneClassName: "bg-sky-500" },
-        { label: "Memoria", value: Number(memoryMetric?.usedPercent), toneClassName: "bg-emerald-500" },
-        { label: "Disco", value: Number(diskMetric?.usedPercent), toneClassName: "bg-amber-500" },
+        { label: "Memória", value: Number(memoryMetric?.usedPercent), toneClassName: "bg-emerald-500" },
+        { label: "Armazenamento", value: Number(diskMetric?.usedPercent), toneClassName: "bg-amber-500" },
       ],
     };
   }, [availableWidgetIds, dashboard, visibleWidgetIds.length]);
@@ -812,7 +1021,7 @@ export function OperationalDashboard() {
       "version",
       <OperationalDashboardWidget
         id="version"
-        title="Versao"
+        title="Versão"
         subtitle={metricStatusLabel(versionMetric)}
         tone={statusTone(versionMetric?.status)}
         isEditing={isLayoutEditing}
@@ -1119,118 +1328,139 @@ export function OperationalDashboard() {
     );
 
     const databaseMetric = toMetric(dashboard?.database);
+    const databaseMetricState = resolveDashboardMetricState(databaseMetric);
     map.set(
       "database",
       <OperationalDashboardWidget
         id="database"
         title="Banco (Status)"
         subtitle={metricStatusLabel(databaseMetric)}
-        tone="modern"
+        tone={operationalWidgetTone(databaseMetric)}
         isEditing={isLayoutEditing}
         onHide={hideHandler}
         compact
       >
-        <div className="mt-auto flex items-end justify-between gap-2">
-          <div>
-            <p className="text-[1.55rem] font-bold leading-none tracking-tight text-emerald-400">
-              {databaseMetric?.latencyMs !== null && databaseMetric?.latencyMs !== undefined
-                ? `${databaseMetric.latencyMs}ms`
-                : "--"}
-            </p>
-            <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400/80">
-              banco
-            </p>
+        {databaseMetricState ? (
+          <DashboardMetricState metric={databaseMetric} />
+        ) : (
+          <div className="mt-auto flex items-end justify-between gap-2">
+            <div>
+              <p className="text-[1.55rem] font-bold leading-none tracking-tight text-emerald-400">
+                {databaseMetric?.latencyMs !== null && databaseMetric?.latencyMs !== undefined
+                  ? `${databaseMetric.latencyMs}ms`
+                  : "--"}
+              </p>
+              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400/80">
+                banco
+              </p>
+            </div>
+            <span className="rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[10px] font-medium capitalize text-slate-100">
+              {String(databaseMetric?.status || "--")}
+            </span>
           </div>
-          <span className="rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[10px] font-medium capitalize text-slate-100">
-            {String(databaseMetric?.status || "--")}
-          </span>
-        </div>
+        )}
       </OperationalDashboardWidget>,
     );
 
     const redisMetric = toMetric(dashboard?.redis);
+    const redisMetricState = resolveDashboardMetricState(redisMetric);
     map.set(
       "redis",
       <OperationalDashboardWidget
         id="redis"
         title="Redis (Cache)"
         subtitle={metricStatusLabel(redisMetric)}
-        tone="modern"
+        tone={operationalWidgetTone(redisMetric)}
         isEditing={isLayoutEditing}
         onHide={hideHandler}
         compact
       >
-        <div className="mt-auto flex items-end justify-between gap-2">
-          <div>
-            <p className="text-[1.55rem] font-bold leading-none tracking-tight text-sky-400">
-              {redisMetric?.latencyMs !== null && redisMetric?.latencyMs !== undefined
-                ? `${redisMetric.latencyMs}ms`
-                : "--"}
-            </p>
-            <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400/80">
-              cache
-            </p>
+        {redisMetricState ? (
+          <DashboardMetricState metric={redisMetric} />
+        ) : (
+          <div className="mt-auto flex items-end justify-between gap-2">
+            <div>
+              <p className="text-[1.55rem] font-bold leading-none tracking-tight text-sky-400">
+                {redisMetric?.latencyMs !== null && redisMetric?.latencyMs !== undefined
+                  ? `${redisMetric.latencyMs}ms`
+                  : "--"}
+              </p>
+              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400/80">
+                cache
+              </p>
+            </div>
+            <span className="rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[10px] font-medium capitalize text-slate-100">
+              {String(redisMetric?.status || "--")}
+            </span>
           </div>
-          <span className="rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[10px] font-medium capitalize text-slate-100">
-            {String(redisMetric?.status || "--")}
-          </span>
-        </div>
+        )}
       </OperationalDashboardWidget>,
     );
 
     const workersMetric = toMetric(dashboard?.workers);
+    const workersMetricState = resolveDashboardMetricState(workersMetric);
     map.set(
       "workers",
       <OperationalDashboardWidget
         id="workers"
-        title="Workers Ativos"
+        title="Trabalhos Ativos"
         subtitle={metricStatusLabel(workersMetric)}
-        tone="modern"
+        tone={operationalWidgetTone(workersMetric)}
         isEditing={isLayoutEditing}
         onHide={hideHandler}
         compact
       >
-        <div className="mt-auto flex items-end justify-between gap-2">
-          <p className="text-[1.7rem] font-bold leading-none tracking-tight text-blue-400/90">
-            {String(workersMetric?.activeWorkers ?? workersMetric?.runningJobs ?? "--")}
-          </p>
-          <div className="text-right">
-            <p className="text-[10px] text-slate-400/80">
-              Executando: <span className="font-medium text-slate-300">{String(workersMetric?.runningJobs ?? "--")}</span>
+        {workersMetricState ? (
+          <DashboardMetricState metric={workersMetric} />
+        ) : (
+          <div className="mt-auto flex items-end justify-between gap-2">
+            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-blue-400/90">
+              {String(workersMetric?.activeWorkers ?? workersMetric?.runningJobs ?? "--")}
             </p>
-            <p className="text-[10px] text-slate-400/80">
-              Pendentes: <span className="font-medium text-amber-300/80">{String(workersMetric?.pendingJobs ?? "--")}</span>
-            </p>
+            <div className="text-right">
+              <p className="text-[10px] text-slate-400/80">
+                Executando: <span className="font-medium text-slate-300">{String(workersMetric?.runningJobs ?? "--")}</span>
+              </p>
+              <p className="text-[10px] text-slate-400/80">
+                Pendentes: <span className="font-medium text-amber-300/80">{String(workersMetric?.pendingJobs ?? "--")}</span>
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </OperationalDashboardWidget>,
     );
 
     const jobsMetric = toMetric(dashboard?.jobs);
+    const jobsMetricState = resolveDashboardMetricState(jobsMetric);
     map.set(
       "jobs",
       <OperationalDashboardWidget
         id="jobs"
         title="Jobs na Fila"
         subtitle={metricStatusLabel(jobsMetric)}
-        tone="modern"
+        tone={operationalWidgetTone(jobsMetric)}
         isEditing={isLayoutEditing}
         onHide={hideHandler}
         compact
       >
-        <div className="mt-auto flex items-end justify-between gap-2">
-          <p className="text-[1.7rem] font-bold leading-none tracking-tight text-blue-400/90">
-            {String(jobsMetric?.running ?? "--")}
-          </p>
-          <div className="text-right">
-            <p className="text-[10px] text-slate-400/80">Pendentes: <span className="text-amber-300/80">{String(jobsMetric?.pending ?? "--")}</span></p>
-            <p className="text-[10px] text-slate-400/80">Falhas 24h: <span className="text-red-400">{String(jobsMetric?.failedLast24h ?? "--")}</span></p>
+        {jobsMetricState ? (
+          <DashboardMetricState metric={jobsMetric} />
+        ) : (
+          <div className="mt-auto flex items-end justify-between gap-2">
+            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-blue-400/90">
+              {String(jobsMetric?.running ?? "--")}
+            </p>
+            <div className="text-right">
+              <p className="text-[10px] text-slate-400/80">Pendentes: <span className="text-amber-300/80">{String(jobsMetric?.pending ?? "--")}</span></p>
+              <p className="text-[10px] text-slate-400/80">Falhas 24h: <span className="text-red-400">{String(jobsMetric?.failedLast24h ?? "--")}</span></p>
+            </div>
           </div>
-        </div>
+        )}
       </OperationalDashboardWidget>,
     );
 
     const backupMetric = toMetric(dashboard?.backup);
+    const backupMetricState = resolveDashboardMetricState(backupMetric);
     const lastBackup = (backupMetric?.lastBackup || null) as Record<string, unknown> | null;
     map.set(
       "backup",
@@ -1243,7 +1473,9 @@ export function OperationalDashboard() {
         onHide={hideHandler}
         compact
       >
-        {lastBackup ? (
+        {backupMetricState ? (
+          <DashboardMetricState metric={backupMetric} />
+        ) : lastBackup ? (
           <div className="mt-auto space-y-2">
             <div className="flex items-center justify-between gap-3">
               <p className="truncate text-sm font-semibold">
@@ -1272,6 +1504,7 @@ export function OperationalDashboard() {
     );
 
     const errorsMetric = toMetric(dashboard?.errors);
+    const errorsMetricState = resolveDashboardMetricState(errorsMetric);
     const recentErrors = Array.isArray(errorsMetric?.recent) ? errorsMetric.recent : [];
     map.set(
       "errors",
@@ -1283,20 +1516,21 @@ export function OperationalDashboard() {
         isEditing={isLayoutEditing}
         onHide={hideHandler}
       >
-        {recentErrors.length > 0 ? (
+        {errorsMetricState ? (
+          <DashboardMetricState metric={errorsMetric} />
+        ) : recentErrors.length > 0 ? (
           <div className="max-h-40 space-y-2 overflow-auto pr-1">
             {recentErrors.slice(0, 5).map((item, index) => {
               const row = item as Record<string, unknown>;
               return (
                 <div
                   key={`${row.id || index}`}
-                  className="rounded border border-red-200/60 px-2 py-1 dark:border-red-900/50"
+                  className="flex items-center justify-between gap-3 rounded border border-red-200/60 px-2.5 py-2 dark:border-red-900/50"
                 >
-                  <p className="truncate text-xs font-semibold">{String(row.action || "--")}</p>
-                  <p className="truncate text-[11px] text-muted-foreground">
-                    {String(row.message || "--")}
+                  <p className="min-w-0 truncate text-[11px] font-medium text-slate-100">
+                    {buildAuditEventLine(row)}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="shrink-0 text-[10px] text-muted-foreground">
                     {formatDateTime(row.createdAt)}
                   </p>
                 </div>
@@ -1309,6 +1543,7 @@ export function OperationalDashboard() {
       </OperationalDashboardWidget>,
     );
     const securityMetric = toMetric(dashboard?.security);
+    const securityMetricState = resolveDashboardMetricState(securityMetric);
     const rawDenied = Array.isArray(securityMetric?.deniedAccess) ? securityMetric.deniedAccess : [];
     const deniedData = rawDenied.slice(0, 5).map((item) => {
       const row = item as Record<string, unknown>;
@@ -1325,18 +1560,24 @@ export function OperationalDashboard() {
         id="security"
         title="Acessos Negados (Top 5 IPs)"
         subtitle={metricStatusLabel(securityMetric)}
-        tone="modern"
+        tone={operationalWidgetTone(securityMetric)}
         isEditing={isLayoutEditing}
         onHide={hideHandler}
         noPadding
       >
-        <div className="flex flex-col h-full">
+        <div className="flex h-full flex-col">
           <div className="px-3 pt-3 flex items-end justify-between">
-            <p className="text-3xl font-bold tracking-tight text-slate-50">{deniedData.reduce((acc, curr) => acc + curr.count, 0)}</p>
+            <p className="text-3xl font-bold tracking-tight text-slate-50">
+              {securityMetricState ? "--" : deniedData.reduce((acc, curr) => acc + curr.count, 0)}
+            </p>
             <p className="text-xs text-slate-400 mb-1">Total Negados</p>
           </div>
           <div className="flex-1 min-h-0 w-full mt-4 pr-3 pb-2">
-            {deniedData.length > 0 ? (
+            {securityMetricState ? (
+              <div className="flex h-full flex-col px-3 pb-3">
+                <DashboardMetricState metric={securityMetric} className="h-full" />
+              </div>
+            ) : deniedData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={deniedData} layout="vertical" margin={{ top: 0, right: 0, left: 30, bottom: 0 }}>
                   <XAxis type="number" hide />
@@ -1595,16 +1836,6 @@ export function OperationalDashboard() {
                   </span>
                 </div>
 
-                <div className="mt-4 max-w-2xl">
-                  <h2 className="text-3xl font-semibold tracking-tight text-white">
-                    Visao mais compacta, grafica e pronta para reorganizacao livre.
-                  </h2>
-                  <p className="mt-2 text-sm text-slate-300">
-                    O topo resume saude, risco e latencia. No modo de edicao voce pode mover
-                    os cards para qualquer posicao e ajustar o tamanho dos blocos.
-                  </p>
-                </div>
-
                 <div className="mt-5 grid gap-3 md:grid-cols-3">
                   <OverviewStat
                     icon={<Activity className="h-4 w-4" />}
@@ -1616,7 +1847,7 @@ export function OperationalDashboard() {
                     icon={<BellDot className="h-4 w-4" />}
                     label="Notificacoes"
                     value={dashboardOverview.unreadNotifications}
-                    hint="Criticas nao lidas"
+                    hint="Notificações não lidas"
                   />
                   <OverviewStat
                     icon={<ShieldAlert className="h-4 w-4" />}
@@ -1645,9 +1876,6 @@ export function OperationalDashboard() {
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">
                       Saude do painel
-                    </p>
-                    <p className="mt-1 text-sm text-slate-400">
-                      Distribuicao dos widgets monitorados
                     </p>
                   </div>
                   <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-slate-100">
@@ -1699,24 +1927,35 @@ export function OperationalDashboard() {
 
                 <div className="mt-3 space-y-2">
                   {[
-                    { label: "Saudavel", value: dashboardOverview.counts.good, color: "bg-emerald-500" },
-                    { label: "Atencao", value: dashboardOverview.counts.attention, color: "bg-amber-500" },
-                    { label: "Restrito", value: dashboardOverview.counts.restricted, color: "bg-slate-500" },
+                    {
+                      id: "good" as const,
+                      label: "Saudavel",
+                      value: dashboardOverview.counts.good,
+                      color: "bg-emerald-500",
+                      items: dashboardOverview.healthDetails.good,
+                    },
+                    {
+                      id: "attention" as const,
+                      label: "Atencao",
+                      value: dashboardOverview.counts.attention,
+                      color: "bg-amber-500",
+                      items: dashboardOverview.healthDetails.attention,
+                    },
+                    {
+                      id: "restricted" as const,
+                      label: "Restrito",
+                      value: dashboardOverview.counts.restricted,
+                      color: "bg-slate-500",
+                      items: dashboardOverview.healthDetails.restricted,
+                    },
                   ].map((item) => (
-                    <div
-                      key={item.label}
-                      className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2"
-                    >
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${item.color}`} />
-                        <span className="truncate text-[11px] font-medium text-slate-300">
-                          {item.label}
-                        </span>
-                      </div>
-                      <p className="shrink-0 text-base font-semibold tracking-tight text-white">
-                        {item.value}
-                      </p>
-                    </div>
+                    <HealthBucketLegendRow
+                      key={item.id}
+                      label={item.label}
+                      value={item.value}
+                      color={item.color}
+                      items={item.items}
+                    />
                   ))}
                 </div>
               </div>
@@ -1726,16 +1965,9 @@ export function OperationalDashboard() {
           <section className="rounded-[32px] border border-slate-200/80 bg-white/80 p-4 shadow-[0_25px_60px_-38px_rgba(15,23,42,0.35)] backdrop-blur-sm dark:border-slate-800/80 dark:bg-slate-950/45">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                  Pressao atual
-                </p>
                 <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-                  Recursos e liberdade de layout
+                  Monitoramento do Servidor
                 </h3>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Cards pequenos ocupam menos area e os blocos maiores podem crescer quando
-                  necessario.
-                </p>
               </div>
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
                 <Maximize2 className="h-4 w-4" />
@@ -1751,24 +1983,6 @@ export function OperationalDashboard() {
                   toneClassName={resource.toneClassName}
                 />
               ))}
-            </div>
-
-            <div className="mt-4 rounded-[24px] border border-slate-200/80 bg-slate-50/90 p-4 dark:border-slate-800 dark:bg-slate-900/70">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Move className="h-4 w-4 text-sky-500" />
-                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    Layout livre no grid
-                  </p>
-                </div>
-                <span className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] text-slate-500 dark:border-slate-700 dark:text-slate-300">
-                  arrastar + redimensionar
-                </span>
-              </div>
-              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                Use o modo de edicao para reposicionar qualquer widget abaixo ou ao lado dos
-                demais. O layout salvo respeita o tamanho de cada card em cada breakpoint.
-              </p>
             </div>
           </section>
         </div>

@@ -13,11 +13,13 @@ import { FileText, Search, Calendar, User, Activity } from "lucide-react";
 interface AuditLog {
   id: string;
   action: string;
+  actionLabel?: string;
+  message?: string | null;
   userId: string | null;
   tenantId: string | null;
   ipAddress: string | null;
   userAgent: string | null;
-  details: string | null;
+  details: unknown;
   createdAt: string;
   user?: {
     id: string;
@@ -29,7 +31,7 @@ interface AuditLog {
 
 interface AuditStats {
   total: number;
-  byAction: Array<{ action: string; count: number }>;
+  byAction: Array<{ action: string; actionLabel?: string; count: number }>;
   byUser: Array<{ userId: string; count: number }>;
 }
 
@@ -153,7 +155,7 @@ export default function LogsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {stats.byAction[0]?.action || "N/A"}
+                  {stats.byAction[0]?.actionLabel || stats.byAction[0]?.action || "N/A"}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {stats.byAction[0]?.count || 0} ocorrências
@@ -257,12 +259,18 @@ export default function LogsPage() {
                               log.action
                             )}`}
                           >
-                            {log.action}
+                            {log.actionLabel || log.action}
                           </span>
                           <span className="text-sm text-muted-foreground">
                             {formatDate(log.createdAt)}
                           </span>
                         </div>
+
+                        {log.message && log.message !== (log.actionLabel || log.action) ? (
+                          <p className="text-sm text-foreground">
+                            {log.message}
+                          </p>
+                        ) : null}
 
                         {log.user && (
                           <div className="text-sm">
@@ -287,7 +295,7 @@ export default function LogsPage() {
                                 Ver detalhes
                               </summary>
                               <pre className="mt-2 p-2 bg-gray-50 rounded text-xs overflow-auto">
-                                {JSON.stringify(JSON.parse(log.details), null, 2)}
+                                {JSON.stringify(log.details, null, 2)}
                               </pre>
                             </details>
                           )}

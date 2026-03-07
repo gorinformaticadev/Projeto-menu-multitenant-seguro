@@ -817,6 +817,69 @@ Funcionalidades aplicadas:
 - polling automatico de metricas a cada `15s`
 - fallback visual seguro para metricas indisponiveis/restritas
 
+### Etapa 7.1 - Hardening complementar
+
+Politica final de acesso durante maintenance:
+
+- leitura do dashboard operacional permanece liberada apenas para `ADMIN` e `SUPER_ADMIN` autenticados
+- `USER` e `CLIENT` continuam bloqueados pelo `MaintenanceModeGuard` quando `enabled=true`
+
+Politica da metrica de tempo medio da API:
+
+- o card principal usa a categoria `business`
+- ficam excluidos da media os endpoints operacionais/observabilidade:
+  - `/api/system/dashboard`
+  - `/api/system/dashboard/layout`
+  - `/api/system/maintenance/state`
+  - `/api/system/notifications`
+  - `/api/system/notifications/unread-count`
+  - `/api/system/notifications/stream`
+  - `/api/system/update/status`
+  - `/api/system/update/log`
+  - `/api/system/version`
+  - `/api/system/metrics`
+- `GET /api/health` fica segmentado em `health`
+- demais rotas `/api/system/*` nao excluidas entram na categoria `system`
+
+Politica de falha parcial por widget no agregado:
+
+- cada bloco sensivel e resolvido isoladamente com `safeMetric`
+- falha em um widget nao derruba `GET /api/system/dashboard`
+- fallback por widget:
+  - `database`, `redis`, `workers` -> `status=error`
+  - `jobs`, `backup`, `security`, `errors` -> `status=degraded`
+- o frontend renderiza estado proprio por widget (`Indisponivel`, `Degradado`, `Sem dados`) sem toast por ciclo de polling
+
+Cache curto no agregado:
+
+- cache em memoria com TTL de `10s` para:
+  - `redis`
+  - `workers`
+  - `jobs`
+  - `backup`
+  - `security`
+  - `errors`
+- sem cache para:
+  - `maintenance`
+  - `uptime`
+  - `notifications`
+  - `version`
+
+Politica explicita de widgets por role:
+
+- `SUPER_ADMIN`:
+  - `version`, `uptime`, `maintenance`, `api`, `cpu`, `memory`, `disk`, `system`, `database`, `redis`, `workers`, `jobs`, `backup`, `errors`, `security`, `tenants`, `notifications`
+- `ADMIN`:
+  - `version`, `uptime`, `maintenance`, `api`, `cpu`, `memory`, `database`, `jobs`, `backup`, `errors`, `security`, `notifications`
+- `USER` e `CLIENT`:
+  - `version`, `uptime`, `maintenance`, `api`, `notifications`
+
+Endurecimento de persistencia/layout:
+
+- `widgets.available` no backend e a fonte de verdade para a UI
+- `layoutJson` e `filtersJson.hiddenWidgetIds` sao sanitizados no backend conforme a role antes de salvar e antes de devolver
+- a precedencia continua explicita em `resolution.source` (`user_role` > `role_default`)
+
 ### Validacao desta etapa
 
 Backend:

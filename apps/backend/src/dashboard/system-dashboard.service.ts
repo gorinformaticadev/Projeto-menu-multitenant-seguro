@@ -4,6 +4,7 @@ import Redis from 'ioredis';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
+import { humanizeAuditAction, resolveAuditDisplayMessage } from '../audit/audit-log-presentation.util';
 import { SystemVersionService } from '../common/services/system-version.service';
 import { MaintenanceModeService } from '../maintenance/maintenance-mode.service';
 import { PrismaService } from '../core/prisma/prisma.service';
@@ -29,16 +30,40 @@ export interface DashboardLayoutInput {
 }
 
 interface DashboardMetricFallback {
-  status: 'unavailable';
+  status: 'error' | 'degraded' | 'unavailable';
   error: string;
 }
 
 type DashboardMetric<T extends Record<string, unknown>> = T | DashboardMetricFallback;
+type DashboardLayoutBreakpoint = 'lg' | 'md' | 'sm';
+
+interface DashboardMetricCacheEntry {
+  expiresAt: number;
+  value: DashboardMetric<Record<string, unknown>>;
+}
+
+interface SafeMetricOptions {
+  cacheKey?: string;
+  cacheTtlMs?: number;
+  fallbackStatus?: DashboardMetricFallback['status'];
+}
 
 const DEFAULT_PERIOD_MINUTES = 60;
 const MIN_PERIOD_MINUTES = 5;
 const MAX_PERIOD_MINUTES = 24 * 60;
 const MAX_JSON_STORAGE_LENGTH = 200_000;
+const DASHBOARD_LAYOUT_BREAKPOINTS: DashboardLayoutBreakpoint[] = ['lg', 'md', 'sm'];
+
+// Curto cache em memoria para widgets caros/externos no polling do agregado.
+// Nao cacheamos maintenance, uptime, notifications nem version para manter o estado mais fresco.
+const DASHBOARD_CACHED_METRIC_TTLS = {
+  redis: 10_000,
+  workers: 10_000,
+  jobs: 10_000,
+  backup: 10_000,
+  security: 10_000,
+  errors: 10_000,
+} as const;
 
 const SUPER_ADMIN_WIDGET_IDS = [
   'version',
@@ -77,9 +102,17 @@ const ADMIN_WIDGET_IDS = [
 
 const BASIC_WIDGET_IDS = ['version', 'uptime', 'maintenance', 'api', 'notifications'];
 
+const ROLE_WIDGET_POLICY: Record<Role, string[]> = {
+  [Role.SUPER_ADMIN]: [...SUPER_ADMIN_WIDGET_IDS],
+  [Role.ADMIN]: [...ADMIN_WIDGET_IDS],
+  [Role.USER]: [...BASIC_WIDGET_IDS],
+  [Role.CLIENT]: [...BASIC_WIDGET_IDS],
+};
+
 @Injectable()
 export class SystemDashboardService {
   private readonly logger = new Logger(SystemDashboardService.name);
+  private readonly metricCache = new Map<string, DashboardMetricCacheEntry>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -126,14 +159,25 @@ export class SystemDashboardService {
     const database = await this.safeMetric(
       'database',
       async () => this.getDatabaseMetric(),
+      { fallbackStatus: 'error' },
     );
     const redis = await this.safeMetric(
       'redis',
       async () => this.getRedisMetric(),
+      {
+        cacheKey: 'redis',
+        cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.redis,
+        fallbackStatus: 'error',
+      },
     );
     const workers = await this.safeMetric(
       'workers',
       async () => this.getWorkersMetric(),
+      {
+        cacheKey: 'workers',
+        cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.workers,
+        fallbackStatus: 'error',
+      },
     );
     const api = await this.safeMetric(
       'api',
@@ -142,18 +186,38 @@ export class SystemDashboardService {
     const security = await this.safeMetric(
       'security',
       async () => this.getSecurityMetric(windowStart, tenantFilter),
+      {
+        cacheKey: `security:${filters.periodMinutes}:${tenantFilter || 'all'}`,
+        cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.security,
+        fallbackStatus: 'degraded',
+      },
     );
     const backup = await this.safeMetric(
       'backup',
       async () => this.getBackupMetric(tenantFilter),
+      {
+        cacheKey: `backup:${tenantFilter || 'all'}`,
+        cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.backup,
+        fallbackStatus: 'degraded',
+      },
     );
     const jobs = await this.safeMetric(
       'jobs',
       async () => this.getJobsMetric(),
+      {
+        cacheKey: 'jobs',
+        cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.jobs,
+        fallbackStatus: 'degraded',
+      },
     );
     const errors = await this.safeMetric(
       'errors',
       async () => this.getRecentCriticalErrorsMetric(windowStart, tenantFilter, filters.severity),
+      {
+        cacheKey: `errors:${filters.periodMinutes}:${tenantFilter || 'all'}:${filters.severity}`,
+        cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.errors,
+        fallbackStatus: 'degraded',
+      },
     );
     const tenants = await this.safeMetric(
       'tenants',
@@ -226,16 +290,16 @@ export class SystemDashboardService {
 
     return {
       role: layout.role,
-      layoutJson: this.normalizePersistedJson(layout.layoutJson, this.getDefaultLayout(actor.role)),
-      filtersJson: this.normalizePersistedJson(layout.filtersJson, this.getDefaultFilters(actor.role)),
+      layoutJson: this.sanitizeLayoutJsonForRole(layout.layoutJson, actor.role),
+      filtersJson: this.sanitizeFiltersJsonForRole(layout.filtersJson, actor.role),
       updatedAt: layout.updatedAt.toISOString(),
       resolution: this.buildLayoutResolution('user_role', actor),
     };
   }
 
   async saveLayout(actor: DashboardActor, input: DashboardLayoutInput) {
-    const layoutJson = this.sanitizeJson(input.layoutJson, this.getDefaultLayout(actor.role));
-    const filtersJson = this.sanitizeJson(input.filtersJson, this.getDefaultFilters(actor.role));
+    const layoutJson = this.sanitizeLayoutJsonForRole(input.layoutJson, actor.role);
+    const filtersJson = this.sanitizeFiltersJsonForRole(input.filtersJson, actor.role);
 
     const saved = await this.prisma.dashboardLayout.upsert({
       where: {
@@ -264,8 +328,8 @@ export class SystemDashboardService {
 
     return {
       role: saved.role,
-      layoutJson: this.normalizePersistedJson(saved.layoutJson, this.getDefaultLayout(actor.role)),
-      filtersJson: this.normalizePersistedJson(saved.filtersJson, this.getDefaultFilters(actor.role)),
+      layoutJson: this.sanitizeLayoutJsonForRole(saved.layoutJson, actor.role),
+      filtersJson: this.sanitizeFiltersJsonForRole(saved.filtersJson, actor.role),
       updatedAt: saved.updatedAt.toISOString(),
       resolution: this.buildLayoutResolution('user_role', actor),
     };
@@ -657,7 +721,8 @@ export class SystemDashboardService {
       recent: criticalRows.map((row) => ({
         id: row.id,
         action: row.action,
-        message: this.truncateText(row.message || row.action, 220),
+        actionLabel: humanizeAuditAction(row.action),
+        message: this.truncateText(resolveAuditDisplayMessage(row.action, row.message), 220),
         createdAt: row.createdAt.toISOString(),
       })),
     };
@@ -733,13 +798,7 @@ export class SystemDashboardService {
   }
 
   private getAllowedWidgetIds(role: Role): string[] {
-    if (role === Role.SUPER_ADMIN) {
-      return [...SUPER_ADMIN_WIDGET_IDS];
-    }
-    if (role === Role.ADMIN) {
-      return [...ADMIN_WIDGET_IDS];
-    }
-    return [...BASIC_WIDGET_IDS];
+    return [...(ROLE_WIDGET_POLICY[role] || ROLE_WIDGET_POLICY[Role.CLIENT])];
   }
 
   private getDefaultLayout(role: Role): Record<string, unknown> {
@@ -827,10 +886,10 @@ export class SystemDashboardService {
     if (role === Role.ADMIN) {
       return {
         ...payload,
-        system: this.pickIfAvailable(payload.system, ['status', 'platform', 'release', 'arch', 'nodeVersion']),
+        system: this.pickIfAvailable(payload.system, ['status', 'platform', 'release', 'arch', 'nodeVersion', 'error']),
         disk: { status: 'restricted' },
-        redis: this.pickIfAvailable(payload.redis, ['status', 'latencyMs']),
-        workers: this.pickIfAvailable(payload.workers, ['status', 'runningJobs', 'pendingJobs']),
+        redis: this.pickIfAvailable(payload.redis, ['status', 'latencyMs', 'error']),
+        workers: this.pickIfAvailable(payload.workers, ['status', 'runningJobs', 'pendingJobs', 'error']),
       };
     }
 
@@ -887,15 +946,52 @@ export class SystemDashboardService {
     }
   }
 
-  private normalizePersistedJson(
+  private sanitizeLayoutJsonForRole(
     input: unknown,
-    fallback: Record<string, unknown>,
+    role: Role,
   ): Record<string, unknown> {
-    if (!input || typeof input !== 'object' || Array.isArray(input)) {
-      return fallback;
+    const fallback = this.getDefaultLayout(role);
+    const parsed = this.sanitizeJson(input, fallback);
+    const allowedWidgetIds = new Set(this.getAllowedWidgetIds(role));
+    const sanitized: Record<string, unknown> = {};
+
+    for (const breakpoint of DASHBOARD_LAYOUT_BREAKPOINTS) {
+      const fallbackEntries = Array.isArray(fallback[breakpoint]) ? fallback[breakpoint] : [];
+      const sourceEntries = Array.isArray(parsed[breakpoint]) ? parsed[breakpoint] : fallbackEntries;
+      sanitized[breakpoint] = sourceEntries.filter((entry) => {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+          return false;
+        }
+
+        const widgetId = String((entry as Record<string, unknown>).i || '').trim();
+        return allowedWidgetIds.has(widgetId);
+      });
     }
 
-    return input as Record<string, unknown>;
+    return sanitized;
+  }
+
+  private sanitizeFiltersJsonForRole(input: unknown, role: Role): Record<string, unknown> {
+    const fallback = this.getDefaultFilters(role);
+    const parsed = this.sanitizeJson(input, fallback);
+    const normalized = this.normalizeFilters({
+      periodMinutes: parsed.periodMinutes as number | undefined,
+      tenantId: role === Role.SUPER_ADMIN ? (parsed.tenantId as string | undefined) : undefined,
+      severity: parsed.severity as string | undefined,
+    });
+    const allowedWidgetIds = new Set(this.getAllowedWidgetIds(role));
+    const hiddenWidgetIds = Array.isArray(parsed.hiddenWidgetIds)
+      ? parsed.hiddenWidgetIds
+          .map((item) => String(item || '').trim())
+          .filter((item) => item.length > 0 && allowedWidgetIds.has(item))
+      : [];
+
+    return {
+      periodMinutes: normalized.periodMinutes,
+      tenantId: role === Role.SUPER_ADMIN ? normalized.tenantId : null,
+      severity: normalized.severity,
+      hiddenWidgetIds,
+    };
   }
 
   private buildLayoutResolution(source: 'user_role' | 'role_default', actor: DashboardActor) {
@@ -916,17 +1012,60 @@ export class SystemDashboardService {
   private async safeMetric<T extends Record<string, unknown>>(
     metricName: string,
     producer: () => Promise<T>,
+    options: SafeMetricOptions = {},
   ): Promise<DashboardMetric<T>> {
+    const cached = this.readCachedMetric<T>(options.cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     try {
-      return await producer();
+      const metric = await producer();
+      this.writeCachedMetric(options.cacheKey, options.cacheTtlMs, metric);
+      return metric;
     } catch (error) {
       const message = this.normalizeErrorMessage(error);
       this.logger.warn(`Falha ao coletar metrica ${metricName}: ${message}`);
-      return {
-        status: 'unavailable',
+      const fallback: DashboardMetricFallback = {
+        status: options.fallbackStatus || 'unavailable',
         error: message,
       };
+      this.writeCachedMetric(options.cacheKey, options.cacheTtlMs, fallback);
+      return fallback;
     }
+  }
+
+  private readCachedMetric<T extends Record<string, unknown>>(cacheKey?: string): DashboardMetric<T> | null {
+    if (!cacheKey) {
+      return null;
+    }
+
+    const entry = this.metricCache.get(cacheKey);
+    if (!entry) {
+      return null;
+    }
+
+    if (entry.expiresAt <= Date.now()) {
+      this.metricCache.delete(cacheKey);
+      return null;
+    }
+
+    return entry.value as DashboardMetric<T>;
+  }
+
+  private writeCachedMetric<T extends Record<string, unknown>>(
+    cacheKey: string | undefined,
+    cacheTtlMs: number | undefined,
+    value: DashboardMetric<T>,
+  ) {
+    if (!cacheKey || !cacheTtlMs || cacheTtlMs <= 0) {
+      return;
+    }
+
+    this.metricCache.set(cacheKey, {
+      expiresAt: Date.now() + cacheTtlMs,
+      value: value as DashboardMetric<Record<string, unknown>>,
+    });
   }
 
   private formatDuration(totalSeconds: number): string {

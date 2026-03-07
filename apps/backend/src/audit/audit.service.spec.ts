@@ -52,6 +52,25 @@ describe('AuditService rate limit observability', () => {
     ).resolves.toBeNull();
   });
 
+  it('persists a human-friendly message when the event does not provide one', async () => {
+    const service = createService();
+    prismaMock.auditLog.create.mockResolvedValueOnce({ id: 'audit-pt' });
+
+    await service.log({
+      action: 'TOKEN_REFRESHED',
+      severity: 'info',
+    });
+
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'TOKEN_REFRESHED',
+          message: 'Sessao renovada',
+        }),
+      }),
+    );
+  });
+
   it('filters by actor and severity and returns sanitized metadata', async () => {
     const service = createService();
     const createdAt = new Date('2026-03-06T12:00:00.000Z');
@@ -95,6 +114,36 @@ describe('AuditService rate limit observability', () => {
     expect(result.data[0].details).toEqual({
       path: '[path-redacted]',
     });
+  });
+
+  it('returns action label and humanized message for technical audit entries', async () => {
+    const service = createService();
+    const createdAt = new Date('2026-03-06T12:00:00.000Z');
+
+    prismaMock.auditLog.findMany.mockResolvedValueOnce([
+      {
+        id: 'audit-pt-1',
+        action: 'TOKEN_REFRESHED',
+        message: 'TOKEN_REFRESHED',
+        severity: 'critical',
+        actorUserId: 'user-1',
+        metadata: {},
+        details: null,
+        createdAt,
+        user: null,
+      },
+    ]);
+    prismaMock.auditLog.count.mockResolvedValueOnce(1);
+
+    const result = await service.findAll({
+      page: 1,
+      limit: 10,
+      severity: 'critical',
+    });
+
+    expect(result.data[0].action).toBe('TOKEN_REFRESHED');
+    expect(result.data[0].actionLabel).toBe('Sessao renovada');
+    expect(result.data[0].message).toBe('Sessao renovada');
   });
 
   it('applies default and maximum limit on findAll pagination', async () => {

@@ -1,6 +1,7 @@
 export type DashboardMetricStatus =
   | "ok"
   | "healthy"
+  | "error"
   | "degraded"
   | "down"
   | "restricted"
@@ -96,7 +97,7 @@ export function formatDurationSeconds(value: unknown): string {
 
 export function isMetricUnavailable(metric: unknown): boolean {
   const status = String((metric as DashboardMetric | undefined)?.status || "").toLowerCase();
-  return status === "unavailable" || status === "restricted";
+  return status === "error" || status === "down" || status === "unavailable" || status === "restricted";
 }
 
 export function statusTone(status: unknown): "neutral" | "good" | "warn" | "danger" {
@@ -107,7 +108,7 @@ export function statusTone(status: unknown): "neutral" | "good" | "warn" | "dang
   if (normalized === "warning" || normalized === "degraded") {
     return "warn";
   }
-  if (normalized === "critical" || normalized === "down" || normalized === "unavailable") {
+  if (normalized === "critical" || normalized === "error" || normalized === "down" || normalized === "unavailable") {
     return "danger";
   }
   return "neutral";
