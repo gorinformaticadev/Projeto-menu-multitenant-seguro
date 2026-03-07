@@ -35,14 +35,31 @@ export const dashboardGridBreakpoints = {
 export const dashboardGridCols = {
   lg: 8,
   md: 6,
-  sm: 2,
+  sm: 1,
 } as const;
 
 export const dashboardGridRowHeight = 104;
+export const dashboardMobileEditingMaxWidth = 640;
 
 const analyticsWidgetIds = new Set(["api", "cpu", "memory", "disk", "security", "errors"]);
 
 const tallWidgetIds = new Set(["backup"]);
+const smallViewportPriority = [
+  "errors",
+  "backup",
+  "database",
+  "workers",
+  "redis",
+  "system",
+  "version",
+  "uptime",
+  "tenants",
+  "notifications",
+] as const;
+
+export function isDashboardMobileViewport(width: number): boolean {
+  return Number.isFinite(width) && width > 0 && width < dashboardMobileEditingMaxWidth;
+}
 
 export function formatBytes(value: unknown): string {
   const numeric = Number(value);
@@ -213,6 +230,7 @@ function mergeLayoutWithWidgetIds(
   const columns = dashboardGridCols[breakpoint];
   const merged: LayoutEntry[] = [];
   const used = new Set<string>();
+  const orderedWidgetIds = sortWidgetIdsForBreakpoint(widgetIds, breakpoint);
   const orderedItems = [...items].sort((left, right) => {
     const byRow = Number(left.y) - Number(right.y);
     if (byRow !== 0) {
@@ -247,7 +265,7 @@ function mergeLayoutWithWidgetIds(
     used.add(id);
   }
 
-  for (const id of widgetIds) {
+  for (const id of orderedWidgetIds) {
     if (used.has(id)) {
       continue;
     }
@@ -263,6 +281,30 @@ function mergeLayoutWithWidgetIds(
   }
 
   return merged;
+}
+
+function sortWidgetIdsForBreakpoint(
+  widgetIds: string[],
+  breakpoint: DashboardBreakpoint,
+): string[] {
+  if (breakpoint !== "sm") {
+    return widgetIds;
+  }
+
+  const priority = new Map<string, number>(
+    smallViewportPriority.map((id, index) => [id, index]),
+  );
+
+  return [...widgetIds].sort((left, right) => {
+    const leftPriority = priority.get(left) ?? Number.MAX_SAFE_INTEGER;
+    const rightPriority = priority.get(right) ?? Number.MAX_SAFE_INTEGER;
+
+    if (leftPriority !== rightPriority) {
+      return leftPriority - rightPriority;
+    }
+
+    return widgetIds.indexOf(left) - widgetIds.indexOf(right);
+  });
 }
 
 function normalizeLayoutItem(

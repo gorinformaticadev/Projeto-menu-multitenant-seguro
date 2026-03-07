@@ -10,7 +10,6 @@ import {
   Check,
   Eye,
   EyeOff,
-  Info,
   LayoutGrid,
   Loader2,
   Maximize2,
@@ -79,16 +78,21 @@ import {
   formatBytes,
   formatDateTime,
   formatDurationSeconds,
+  isDashboardMobileViewport,
   normalizeLayoutForWidgets,
   statusTone,
   type DashboardMetric,
   type DashboardRole,
 } from "@/components/operational-dashboard/dashboard.utils";
 import {
+  DashboardSurfaceState,
   DashboardMetricState,
   resolveDashboardMetricState,
 } from "@/components/operational-dashboard/DashboardMetricState";
-import { OperationalDashboardWidget } from "@/components/operational-dashboard/OperationalDashboardWidget";
+import {
+  OperationalDashboardWidget,
+  OperationalDashboardWidgetSkeleton,
+} from "@/components/operational-dashboard/OperationalDashboardWidget";
 
 type DashboardFiltersState = {
   periodMinutes: number;
@@ -379,6 +383,147 @@ function MiniTrendSparkline({
   );
 }
 
+function DashboardCollectionState({
+  title,
+  description,
+  minHeight = "min-h-[320px]",
+}: {
+  title: string;
+  description: string;
+  minHeight?: string;
+}) {
+  return (
+    <div className={`flex ${minHeight} items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-slate-50/85 p-4 dark:border-slate-800 dark:bg-slate-950/30`}>
+      <DashboardSurfaceState
+        title={title}
+        description={description}
+        centered
+        className="max-w-sm border-slate-200/90 bg-white/80 dark:border-slate-800/80 dark:bg-slate-950/50"
+      />
+    </div>
+  );
+}
+
+function DashboardChartState({
+  title = "Sem dados",
+  description = "Sem leitura consolidada neste ciclo.",
+  dark = false,
+}: {
+  title?: string;
+  description?: string;
+  dark?: boolean;
+}) {
+  return (
+    <DashboardSurfaceState
+      title={title}
+      description={description}
+      centered
+      className={dark
+        ? "h-full border-white/10 bg-white/5 text-slate-100"
+        : "h-full border-dashed border-slate-200/80 bg-slate-50/70 dark:border-slate-800/80 dark:bg-slate-950/35"}
+    />
+  );
+}
+
+function DashboardOverviewSkeleton() {
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.9fr)]">
+      <section className="overflow-hidden rounded-[32px] border border-slate-900 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_30%),linear-gradient(150deg,_rgba(2,6,23,0.98),_rgba(15,23,42,0.96))] px-5 py-5 text-slate-50 shadow-[0_35px_90px_-45px_rgba(15,23,42,0.85)]">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_220px]">
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <div className="h-7 w-24 animate-pulse rounded-full bg-white/10" />
+              <div className="h-7 w-28 animate-pulse rounded-full bg-white/10" />
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={`overview-stat-skeleton-${index}`} className="rounded-[20px] border border-white/10 bg-white/6 px-3.5 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="h-2.5 w-20 animate-pulse rounded-full bg-white/15" />
+                      <div className="h-8 w-24 animate-pulse rounded-2xl bg-white/15" />
+                      <div className="h-2.5 w-28 animate-pulse rounded-full bg-white/10" />
+                    </div>
+                    <div className="h-8 w-8 animate-pulse rounded-xl bg-white/10" />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={`panorama-signal-skeleton-${index}`} className="rounded-[20px] border border-white/10 bg-white/5 px-3.5 py-3">
+                  <div className="h-1.5 w-10 animate-pulse rounded-full bg-white/15" />
+                  <div className="mt-3 h-2.5 w-24 animate-pulse rounded-full bg-white/10" />
+                  <div className="mt-2 h-7 w-16 animate-pulse rounded-2xl bg-white/15" />
+                  <div className="mt-2 h-2.5 w-28 animate-pulse rounded-full bg-white/10" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[28px] border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div className="space-y-2">
+                <div className="h-2.5 w-28 animate-pulse rounded-full bg-white/10" />
+                <div className="h-2.5 w-20 animate-pulse rounded-full bg-white/10" />
+              </div>
+              <div className="h-10 w-10 animate-pulse rounded-2xl bg-white/10" />
+            </div>
+            <div className="mt-4 flex h-32 items-center justify-center">
+              <div className="h-24 w-24 animate-pulse rounded-full border-8 border-white/10 border-t-cyan-300/40" />
+            </div>
+            <div className="mt-3 space-y-2">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={`health-skeleton-${index}`} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-white/20" />
+                    <div className="h-2.5 w-20 animate-pulse rounded-full bg-white/10" />
+                  </div>
+                  <div className="h-4 w-6 animate-pulse rounded-full bg-white/15" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-[32px] border border-slate-200/80 bg-white/80 p-4 shadow-[0_25px_60px_-38px_rgba(15,23,42,0.35)] backdrop-blur-sm dark:border-slate-800/80 dark:bg-slate-950/45">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-2">
+            <div className="h-3 w-28 animate-pulse rounded-full bg-slate-200/80 dark:bg-slate-800/80" />
+            <div className="h-7 w-44 animate-pulse rounded-2xl bg-slate-200/80 dark:bg-slate-800/80" />
+          </div>
+          <div className="h-11 w-11 animate-pulse rounded-2xl bg-slate-200/80 dark:bg-slate-800/80" />
+        </div>
+        <div className="mt-4 space-y-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={`resource-skeleton-${index}`} className="rounded-[18px] border border-slate-200/80 bg-white/75 p-2.5 shadow-sm dark:border-slate-800/80 dark:bg-slate-950/45">
+              <div className="flex items-center justify-between gap-3">
+                <div className="h-2.5 w-20 animate-pulse rounded-full bg-slate-200/80 dark:bg-slate-800/80" />
+                <div className="h-4 w-10 animate-pulse rounded-full bg-slate-200/80 dark:bg-slate-800/80" />
+              </div>
+              <div className="mt-3 h-2 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
+              <div className="mt-3 h-10 animate-pulse rounded-[16px] bg-slate-100/80 dark:bg-slate-900/60" />
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function DashboardGridSkeleton() {
+  return (
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={`grid-skeleton-${index}`} className={index === 5 ? "md:col-span-2 xl:col-span-1" : undefined}>
+          <OperationalDashboardWidgetSkeleton compact={index > 2} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function toVisibleLayouts(layouts: Layouts, visibleWidgetIds: Set<string>): Layouts {
   const output: Layouts = {};
   for (const [breakpoint, entries] of Object.entries(layouts)) {
@@ -488,15 +633,15 @@ function QuickActionButton({
     <button
       type="button"
       onClick={onClick}
-      className="group flex min-w-[220px] flex-1 items-start justify-between gap-3 rounded-[22px] border border-slate-200/80 bg-white/80 px-4 py-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white dark:border-slate-800/80 dark:bg-slate-950/40 dark:hover:border-blue-800"
+      className="group flex min-w-0 flex-1 items-start justify-between gap-3 rounded-[22px] border border-slate-200/80 bg-white/80 px-4 py-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-800/80 dark:bg-slate-950/40 dark:hover:border-blue-800 dark:focus-visible:ring-offset-slate-950 sm:min-w-[220px]"
     >
       <div className="min-w-0">
         <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">{label}</p>
-        <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
           {description}
         </p>
       </div>
-      <span className="rounded-full border border-slate-200 px-2 py-1 text-[10px] font-medium text-slate-600 transition-colors group-hover:border-blue-200 group-hover:text-blue-700 dark:border-slate-700 dark:text-slate-300 dark:group-hover:border-blue-800 dark:group-hover:text-blue-300">
+      <span className="hidden rounded-full border border-slate-200 px-2 py-1 text-[10px] font-medium text-slate-600 transition-colors group-hover:border-blue-200 group-hover:text-blue-700 dark:border-slate-700 dark:text-slate-300 dark:group-hover:border-blue-800 dark:group-hover:text-blue-300 sm:inline-flex">
         Abrir
       </span>
     </button>
@@ -536,37 +681,52 @@ function OverviewStat({
   onClick?: () => void;
 }) {
   const isInteractive = Boolean(onClick);
+  const content = (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-300/80">
+          {label}
+        </p>
+        <p className="mt-1.5 text-[1.35rem] font-semibold tracking-tight text-white">{value}</p>
+        <p className="mt-1 text-[10px] text-slate-300/80">{hint}</p>
+        {trend ? <MiniTrendSparkline config={trend} className="mt-3 h-14" /> : null}
+      </div>
+      <div className="space-y-2 text-right">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-slate-100">
+          {icon}
+        </div>
+        {isInteractive ? (
+          <span className="hidden text-[10px] font-medium text-cyan-200/90 sm:block">
+            {actionLabel || "Abrir"}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  if (!isInteractive) {
+    return (
+      <div
+        className={`rounded-[20px] border px-3.5 py-3 text-left backdrop-blur-sm ${tone === "danger"
+          ? "border-rose-400/20 bg-rose-500/10 text-rose-50"
+          : "border-white/10 bg-white/6 text-slate-50"
+          }`}
+      >
+        {content}
+      </div>
+    );
+  }
 
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={!isInteractive}
-      className={`rounded-[20px] border px-3.5 py-3 backdrop-blur-sm ${tone === "danger"
+      className={`rounded-[20px] border px-3.5 py-3 text-left backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${tone === "danger"
         ? "border-rose-400/20 bg-rose-500/10 text-rose-50"
         : "border-white/10 bg-white/6 text-slate-50"
-        } ${isInteractive ? "text-left transition-all hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-white/10" : "text-left"}`}
+        }`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-300/80">
-            {label}
-          </p>
-          <p className="mt-1.5 text-[1.35rem] font-semibold tracking-tight text-white">{value}</p>
-          <p className="mt-1 text-[10px] text-slate-300/80">{hint}</p>
-          {trend ? <MiniTrendSparkline config={trend} className="mt-3 h-14" /> : null}
-        </div>
-        <div className="space-y-2 text-right">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-slate-100">
-            {icon}
-          </div>
-          {isInteractive ? (
-            <span className="block text-[10px] font-medium text-cyan-200/90">
-              {actionLabel || "Abrir"}
-            </span>
-          ) : null}
-        </div>
-      </div>
+      {content}
     </button>
   );
 }
@@ -613,7 +773,11 @@ function PanoramaSignal({
 
   if (isInteractive) {
     return (
-      <button type="button" onClick={onClick} className="w-full text-left">
+      <button
+        type="button"
+        onClick={onClick}
+        className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+      >
         {card}
       </button>
     );
@@ -626,7 +790,10 @@ function PanoramaSignal({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button type="button" className="w-full text-left">
+        <button
+          type="button"
+          className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+        >
           {card}
         </button>
       </PopoverTrigger>
@@ -767,7 +934,7 @@ function HealthBucketLegendRow({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-left transition-colors hover:border-white/20 hover:bg-white/10"
+          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-left transition-colors hover:border-white/20 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
           onClick={() => {
             clearCloseTimeout();
             setOpen((current) => !current);
@@ -856,6 +1023,10 @@ export function OperationalDashboard() {
   const [activeQuickFilter, setActiveQuickFilter] = useState<DashboardQuickFilter>("all");
 
   const { width, mounted, containerRef } = useContainerWidth({ initialWidth: 1280 });
+  const isMobileViewport = isDashboardMobileViewport(width);
+  const canEditLayout = !isMobileViewport;
+  const layoutEditingActive = canEditLayout && isLayoutEditing;
+  const showInitialSkeleton = !mounted || (loading && !dashboard);
 
   const availableWidgetIds = useMemo(() => {
     const fromApi = Array.isArray(dashboard?.widgets?.available)
@@ -881,8 +1052,8 @@ export function OperationalDashboard() {
     [availableWidgetIdsKey],
   );
 
-  const activeHiddenWidgetIds = isLayoutEditing ? editingHiddenWidgetIds : hiddenWidgetIds;
-  const activeLayouts = isLayoutEditing ? editingLayouts : layouts;
+  const activeHiddenWidgetIds = layoutEditingActive ? editingHiddenWidgetIds : hiddenWidgetIds;
+  const activeLayouts = layoutEditingActive ? editingLayouts : layouts;
 
   const hasDraftFilterChanges = useMemo(
     () =>
@@ -898,7 +1069,7 @@ export function OperationalDashboard() {
   );
 
   const hasPendingLayoutChanges = useMemo(() => {
-    if (!isLayoutEditing) {
+    if (!layoutEditingActive) {
       return false;
     }
 
@@ -906,7 +1077,7 @@ export function OperationalDashboard() {
       buildLayoutComparisonSnapshot(editingLayouts, editingHiddenWidgetIds) !==
       buildLayoutComparisonSnapshot(layouts, hiddenWidgetIds)
     );
-  }, [editingHiddenWidgetIds, editingLayouts, hiddenWidgetIds, isLayoutEditing, layouts]);
+  }, [editingHiddenWidgetIds, editingLayouts, hiddenWidgetIds, layoutEditingActive, layouts]);
 
   const refreshDashboard = useCallback(
     async (silent = false) => {
@@ -1055,6 +1226,16 @@ export function OperationalDashboard() {
   }, [refreshDashboard]);
 
   useEffect(() => {
+    if (!isMobileViewport || !isLayoutEditing) {
+      return;
+    }
+
+    setEditingLayouts(cloneLayouts(layouts));
+    setEditingHiddenWidgetIds([...hiddenWidgetIds]);
+    setIsLayoutEditing(false);
+  }, [hiddenWidgetIds, isLayoutEditing, isMobileViewport, layouts]);
+
+  useEffect(() => {
     setLayouts((current: Layouts) => {
       const normalized = normalizeLayoutForWidgets(current, stableAvailableWidgetIds);
       return JSON.stringify(current) === JSON.stringify(normalized) ? current : normalized;
@@ -1095,11 +1276,15 @@ export function OperationalDashboard() {
   }, [defaultFilters]);
 
   const beginLayoutEditing = useCallback(() => {
+    if (!canEditLayout) {
+      return;
+    }
+
     setIsFiltersOpen(false);
     setEditingLayouts(cloneLayouts(layouts));
     setEditingHiddenWidgetIds([...hiddenWidgetIds]);
     setIsLayoutEditing(true);
-  }, [hiddenWidgetIds, layouts]);
+  }, [canEditLayout, hiddenWidgetIds, layouts]);
 
   const cancelLayoutEditing = useCallback(() => {
     setEditingLayouts(cloneLayouts(layouts));
@@ -1391,7 +1576,7 @@ export function OperationalDashboard() {
   }, [availableWidgetIds, dashboard, visibleWidgetIds.length]);
   const cardsById = useMemo(() => {
     const map = new Map<string, ReactNode>();
-    const hideHandler = isLayoutEditing ? toggleWidgetVisibilityInEditor : undefined;
+    const hideHandler = layoutEditingActive ? toggleWidgetVisibilityInEditor : undefined;
 
     const versionMetric = toMetric(dashboard?.version);
     const versionIntent = getWidgetIntent("version");
@@ -1402,7 +1587,7 @@ export function OperationalDashboard() {
         title="Versão"
         subtitle={metricStatusLabel(versionMetric)}
         tone={statusTone(versionMetric?.status)}
-        isEditing={isLayoutEditing}
+        isEditing={layoutEditingActive}
         onHide={hideHandler}
         onSelect={versionIntent ? () => executeDashboardIntent(versionIntent) : undefined}
         actionLabel={versionIntent?.label}
@@ -1432,7 +1617,7 @@ export function OperationalDashboard() {
         title="Uptime"
         subtitle={metricStatusLabel(uptimeMetric)}
         tone={statusTone(uptimeMetric?.status)}
-        isEditing={isLayoutEditing}
+        isEditing={layoutEditingActive}
         onHide={hideHandler}
         compact
       >
@@ -1459,7 +1644,7 @@ export function OperationalDashboard() {
         title="Manutencao"
         subtitle={metricStatusLabel(maintenanceMetric)}
         tone={maintenanceMetric?.enabled ? "warn" : "modern"}
-        isEditing={isLayoutEditing}
+        isEditing={layoutEditingActive}
         onHide={hideHandler}
         onSelect={maintenanceIntent ? () => executeDashboardIntent(maintenanceIntent) : undefined}
         actionLabel={maintenanceIntent?.label}
@@ -1509,7 +1694,7 @@ export function OperationalDashboard() {
         title="API Latency"
         subtitle={metricStatusLabel(apiMetric)}
         tone="modern"
-        isEditing={isLayoutEditing}
+        isEditing={layoutEditingActive}
         onHide={hideHandler}
         noPadding
       >
@@ -1551,7 +1736,7 @@ export function OperationalDashboard() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">Sem dados precisos</div>
+              <DashboardChartState description="Sem latencia consolidada por categoria." />
             )}
           </div>
         </div>
@@ -1569,7 +1754,7 @@ export function OperationalDashboard() {
         title="CPU Usage"
         subtitle={metricStatusLabel(cpuMetric)}
         tone="modern"
-        isEditing={isLayoutEditing}
+        isEditing={layoutEditingActive}
         onHide={hideHandler}
         noPadding
       >
@@ -1600,7 +1785,7 @@ export function OperationalDashboard() {
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">Sem dados precisos</div>
+              <DashboardChartState description="Sem amostra curta de carga da CPU." />
             )}
           </div>
         </div>
@@ -1622,7 +1807,7 @@ export function OperationalDashboard() {
         title="Memoria"
         subtitle={metricStatusLabel(memoryMetric)}
         tone="modern"
-        isEditing={isLayoutEditing}
+        isEditing={layoutEditingActive}
         onHide={hideHandler}
       >
         <div className="flex h-full items-center">
@@ -1673,7 +1858,7 @@ export function OperationalDashboard() {
         title="Disco"
         subtitle={metricStatusLabel(diskMetric)}
         tone="modern"
-        isEditing={isLayoutEditing}
+        isEditing={layoutEditingActive}
         onHide={hideHandler}
       >
         <div className="flex h-full items-center">
@@ -1717,7 +1902,7 @@ export function OperationalDashboard() {
         title="Sistema Operacional"
         subtitle={metricStatusLabel(systemMetric)}
         tone={statusTone(systemMetric?.status)}
-        isEditing={isLayoutEditing}
+        isEditing={layoutEditingActive}
         onHide={hideHandler}
         compact
       >
@@ -1744,7 +1929,7 @@ export function OperationalDashboard() {
         title="Banco (Status)"
         subtitle={metricStatusLabel(databaseMetric)}
         tone={operationalWidgetTone(databaseMetric)}
-        isEditing={isLayoutEditing}
+        isEditing={layoutEditingActive}
         onHide={hideHandler}
         compact
       >
@@ -1779,7 +1964,7 @@ export function OperationalDashboard() {
         title="Redis (Cache)"
         subtitle={metricStatusLabel(redisMetric)}
         tone={operationalWidgetTone(redisMetric)}
-        isEditing={isLayoutEditing}
+        isEditing={layoutEditingActive}
         onHide={hideHandler}
         compact
       >
@@ -1814,7 +1999,7 @@ export function OperationalDashboard() {
         title="Trabalhos Ativos"
         subtitle={metricStatusLabel(workersMetric)}
         tone={operationalWidgetTone(workersMetric)}
-        isEditing={isLayoutEditing}
+        isEditing={layoutEditingActive}
         onHide={hideHandler}
         compact
       >
@@ -1847,7 +2032,7 @@ export function OperationalDashboard() {
         title="Jobs na Fila"
         subtitle={metricStatusLabel(jobsMetric)}
         tone={operationalWidgetTone(jobsMetric)}
-        isEditing={isLayoutEditing}
+        isEditing={layoutEditingActive}
         onHide={hideHandler}
         compact
       >
@@ -1879,7 +2064,7 @@ export function OperationalDashboard() {
         title="Ultimo Backup"
         subtitle={metricStatusLabel(backupMetric)}
         tone={statusTone(backupMetric?.status)}
-        isEditing={isLayoutEditing}
+        isEditing={layoutEditingActive}
         onHide={hideHandler}
         onSelect={backupIntent ? () => executeDashboardIntent(backupIntent) : undefined}
         actionLabel={backupIntent?.label}
@@ -1935,7 +2120,12 @@ export function OperationalDashboard() {
             ) : null}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Nenhum backup concluido encontrado.</p>
+          <DashboardSurfaceState
+            title="Sem dados"
+            description="Nenhum backup concluido foi encontrado."
+            centered
+            className="mt-auto"
+          />
         )}
       </OperationalDashboardWidget>,
     );
@@ -1951,7 +2141,7 @@ export function OperationalDashboard() {
         title="Eventos Criticos"
         subtitle={metricStatusLabel(errorsMetric)}
         tone={statusTone(errorsMetric?.status)}
-        isEditing={isLayoutEditing}
+        isEditing={layoutEditingActive}
         onHide={hideHandler}
         onSelect={errorsIntent ? () => executeDashboardIntent(errorsIntent) : undefined}
         actionLabel={errorsIntent?.label}
@@ -1978,7 +2168,12 @@ export function OperationalDashboard() {
             })}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Sem eventos criticos no periodo.</p>
+          <DashboardSurfaceState
+            title="Sem dados"
+            description="Sem eventos criticos no periodo atual."
+            centered
+            className="mt-auto"
+          />
         )}
       </OperationalDashboardWidget>,
     );
@@ -2001,7 +2196,7 @@ export function OperationalDashboard() {
         title="Acessos Negados (Top 5 IPs)"
         subtitle={metricStatusLabel(securityMetric)}
         tone={operationalWidgetTone(securityMetric)}
-        isEditing={isLayoutEditing}
+        isEditing={layoutEditingActive}
         onHide={hideHandler}
         noPadding
       >
@@ -2030,7 +2225,7 @@ export function OperationalDashboard() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">Nenhuma tentativa negada recente.</div>
+              <DashboardChartState description="Nenhuma tentativa negada recente." />
             )}
           </div>
         </div>
@@ -2045,7 +2240,7 @@ export function OperationalDashboard() {
         title="Lojas / Tenants"
         subtitle={metricStatusLabel(tenantsMetric)}
         tone="modern"
-        isEditing={isLayoutEditing}
+        isEditing={layoutEditingActive}
         onHide={hideHandler}
         compact
       >
@@ -2068,7 +2263,7 @@ export function OperationalDashboard() {
         title="Notificacoes Criticas"
         subtitle={metricStatusLabel(notificationsMetric)}
         tone="modern"
-        isEditing={isLayoutEditing}
+        isEditing={layoutEditingActive}
         onHide={hideHandler}
         onSelect={notificationsIntent ? () => executeDashboardIntent(notificationsIntent) : undefined}
         actionLabel={notificationsIntent?.label}
@@ -2093,7 +2288,7 @@ export function OperationalDashboard() {
     dashboard,
     executeDashboardIntent,
     getWidgetIntent,
-    isLayoutEditing,
+    layoutEditingActive,
     toggleWidgetVisibilityInEditor,
   ]);
 
@@ -2131,6 +2326,11 @@ export function OperationalDashboard() {
                   <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
                     Auto refresh {Math.floor(POLL_INTERVAL_MS / 1000)}s
                   </span>
+                  {isMobileViewport ? (
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-200">
+                      Reordenacao disponivel no desktop
+                    </span>
+                  ) : null}
                 </div>
               </div>
 
@@ -2158,17 +2358,23 @@ export function OperationalDashboard() {
                 </ToolbarIconButton>
 
                 <ToolbarIconButton
-                  label={isLayoutEditing ? "Cancelar edicao de layout" : "Editar layout"}
+                  label={
+                    !canEditLayout
+                      ? "Editar layout disponivel apenas em telas maiores"
+                      : layoutEditingActive
+                        ? "Cancelar edicao de layout"
+                        : "Editar layout"
+                  }
                   onClick={() => {
-                    if (isLayoutEditing) {
+                    if (layoutEditingActive) {
                       cancelLayoutEditing();
                       return;
                     }
 
                     beginLayoutEditing();
                   }}
-                  active={isLayoutEditing}
-                  disabled={savingLayout}
+                  active={layoutEditingActive}
+                  disabled={savingLayout || !canEditLayout}
                 >
                   {savingLayout ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -2191,7 +2397,7 @@ export function OperationalDashboard() {
                     Contextuais
                   </span>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-3">
+                <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
                   {quickActions.length > 0 ? (
                     quickActions.map((action) => (
                       <QuickActionButton
@@ -2223,19 +2429,19 @@ export function OperationalDashboard() {
                     <button
                       type="button"
                       onClick={() => setActiveQuickFilter("all")}
-                      className="text-xs font-medium text-blue-700 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                      className="text-xs font-medium text-blue-700 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-blue-300 dark:hover:text-blue-200 dark:focus-visible:ring-offset-slate-950"
                     >
                       Limpar
                     </button>
                   ) : null}
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                   {dashboardQuickFilterOptions.map((option) => (
                     <button
                       key={option.id}
                       type="button"
                       onClick={() => setActiveQuickFilter(option.id)}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${activeQuickFilter === option.id
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950 ${activeQuickFilter === option.id
                         ? "border-blue-200 bg-blue-100 text-blue-800 dark:border-blue-800 dark:bg-blue-900/50 dark:text-blue-100"
                         : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-slate-100"
                         }`}
@@ -2251,7 +2457,7 @@ export function OperationalDashboard() {
           </div>
         </div>
 
-        {isLayoutEditing ? (
+        {layoutEditingActive ? (
           <div className="rounded-[28px] border border-blue-200 bg-blue-50/80 p-4 shadow-sm dark:border-blue-900/60 dark:bg-blue-950/30">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
@@ -2342,7 +2548,10 @@ export function OperationalDashboard() {
           </div>
         ) : null}
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.9fr)]">
+        {showInitialSkeleton ? (
+          <DashboardOverviewSkeleton />
+        ) : (
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.9fr)]">
           <section className="overflow-hidden rounded-[32px] border border-slate-900 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.2),_transparent_30%),radial-gradient(circle_at_right,_rgba(59,130,246,0.24),_transparent_26%),linear-gradient(150deg,_rgba(2,6,23,0.98),_rgba(15,23,42,0.96))] px-5 py-5 text-slate-50 shadow-[0_35px_90px_-45px_rgba(15,23,42,0.85)]">
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_220px]">
               <div className="min-w-0">
@@ -2444,9 +2653,11 @@ export function OperationalDashboard() {
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex h-full items-center justify-center rounded-[22px] border border-dashed border-white/10 text-[11px] text-slate-400">
-                      Sem dados de saude consolidados.
-                    </div>
+                    <DashboardChartState
+                      title="Sem dados"
+                      description="Sem saude consolidada neste ciclo."
+                      dark
+                    />
                   )}
                 </div>
 
@@ -2515,32 +2726,26 @@ export function OperationalDashboard() {
               ))}
             </div>
           </section>
-        </div>
+          </div>
+        )}
 
         <div ref={containerRef}>
-          {!mounted || (loading && !dashboard) ? (
-            <div className="flex min-h-[320px] items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-slate-50 text-slate-500 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-400">
-              <div className="flex items-center gap-3 text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Carregando visao operacional...
-              </div>
-            </div>
+          {showInitialSkeleton ? (
+            <DashboardGridSkeleton />
           ) : visibleWidgetIds.length === 0 ? (
-            <div className="flex min-h-[320px] items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-slate-50 text-slate-500 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-400">
-              <div className="flex items-center gap-3 text-sm">
-                <Info className="h-4 w-4" />
-                Nenhum widget visivel no layout atual.
-              </div>
-            </div>
+            <DashboardCollectionState
+              title="Sem dados"
+              description="Nenhum widget visivel no layout atual."
+            />
           ) : gridWidgetIds.length === 0 ? (
-            <div className="flex min-h-[320px] items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-slate-50 text-slate-500 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-400">
-              <div className="flex items-center gap-3 text-sm">
-                <Info className="h-4 w-4" />
-                {activeQuickFilter === "all"
+            <DashboardCollectionState
+              title="Sem dados"
+              description={
+                activeQuickFilter === "all"
                   ? "Nenhum widget livre disponivel."
-                  : "Nenhum widget livre corresponde ao filtro rapido atual."}
-              </div>
-            </div>
+                  : "Nenhum widget livre corresponde ao filtro rapido atual."
+              }
+            />
           ) : (
             <Responsive
               width={width}
@@ -2552,12 +2757,12 @@ export function OperationalDashboard() {
               containerPadding={[0, 0]}
               // @ts-expect-error compactType is valid for react-grid-layout
               compactType={null}
-              dragConfig={{ enabled: isLayoutEditing, handle: ".dashboard-drag-handle" }}
-              resizeConfig={{ enabled: isLayoutEditing, handles: ["se"] }}
+              dragConfig={{ enabled: layoutEditingActive, handle: ".dashboard-drag-handle" }}
+              resizeConfig={{ enabled: layoutEditingActive, handles: ["se"] }}
               allowOverlap={false}
-              className={`operational-dashboard-grid ${isLayoutEditing ? "is-editing" : ""}`}
+              className={`operational-dashboard-grid ${layoutEditingActive ? "is-editing" : ""}`}
               onLayoutChange={(_: Layout, nextLayouts: ResponsiveLayouts<string>) => {
-                if (!isLayoutEditing) {
+                if (!layoutEditingActive) {
                   return;
                 }
 
@@ -2603,7 +2808,7 @@ export function OperationalDashboard() {
               </span>
             )}
             <span className="rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-900">
-              {isLayoutEditing ? "Edicao de layout ativa" : "Modo leitura"}
+              {layoutEditingActive ? "Edicao de layout ativa" : "Modo leitura"}
             </span>
           </div>
         </div>

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   allowedWidgetIdsByRole,
+  dashboardGridCols,
   formatBytes,
   formatDurationSeconds,
+  isDashboardMobileViewport,
   normalizeLayoutForWidgets,
 } from "@/components/operational-dashboard/dashboard.utils";
 
@@ -57,5 +59,27 @@ describe("dashboard.utils", () => {
       w: 3,
       h: 2,
     });
+  });
+
+  it("uses a single column layout on small screens", () => {
+    expect(dashboardGridCols.sm).toBe(1);
+
+    const normalized = normalizeLayoutForWidgets({}, ["version", "backup", "errors"]);
+    expect(normalized.sm.every((item) => item.w === 1)).toBe(true);
+  });
+
+  it("prioritizes critical widgets first on small screens", () => {
+    const normalized = normalizeLayoutForWidgets({}, ["version", "backup", "errors"]);
+    const orderedIds = [...normalized.sm]
+      .sort((left, right) => Number(left.y) - Number(right.y) || Number(left.x) - Number(right.x))
+      .map((item) => item.i);
+
+    expect(orderedIds.slice(0, 2)).toEqual(["errors", "backup"]);
+  });
+
+  it("flags dashboard editing as mobile-only restriction under 640px", () => {
+    expect(isDashboardMobileViewport(375)).toBe(true);
+    expect(isDashboardMobileViewport(640)).toBe(false);
+    expect(isDashboardMobileViewport(1024)).toBe(false);
   });
 });

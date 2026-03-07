@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { EyeOff, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,6 +51,18 @@ const subtitleClassName: Record<WidgetTone, string> = {
   danger: "text-rose-700/90 dark:text-rose-200/80",
 };
 
+function isNestedInteractiveElement(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return Boolean(
+    target.closest(
+      "button, a, input, select, textarea, [role='button'], [role='link'], [data-dashboard-stop-select='true']",
+    ),
+  );
+}
+
 export function OperationalDashboardWidget({
   id,
   title,
@@ -65,28 +77,50 @@ export function OperationalDashboardWidget({
   children,
 }: OperationalDashboardWidgetProps) {
   const isInteractive = Boolean(onSelect) && !isEditing;
+  const handleSelect = (event: MouseEvent<HTMLDivElement>) => {
+    if (
+      !isInteractive ||
+      (event.currentTarget !== event.target && isNestedInteractiveElement(event.target))
+    ) {
+      return;
+    }
+
+    onSelect?.();
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!isInteractive) {
+      return;
+    }
+
+    if (event.currentTarget !== event.target && isNestedInteractiveElement(event.target)) {
+      return;
+    }
+
+    if (
+      event.key === "Enter" ||
+      event.key === " " ||
+      event.key === "Spacebar" ||
+      event.code === "Space" ||
+      event.keyCode === 32
+    ) {
+      event.preventDefault();
+      onSelect?.();
+    }
+  };
 
   return (
     <Card
       role={isInteractive ? "button" : undefined}
       tabIndex={isInteractive ? 0 : undefined}
       aria-label={isInteractive ? actionLabel || `Abrir ${title}` : undefined}
-      onClick={isInteractive ? onSelect : undefined}
-      onKeyDown={
-        isInteractive
-          ? (event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              onSelect?.();
-            }
-          }
-          : undefined
-      }
+      onClick={isInteractive ? handleSelect : undefined}
+      onKeyDown={isInteractive ? handleKeyDown : undefined}
       className={cn(
         "relative flex h-full flex-col overflow-hidden rounded-[24px] border backdrop-blur-sm transition-all duration-200",
         toneClassName[tone],
         isInteractive &&
-          "cursor-pointer hover:-translate-y-0.5 hover:border-blue-300/70 hover:shadow-[0_30px_70px_-40px_rgba(37,99,235,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70",
+          "cursor-pointer hover:-translate-y-0.5 hover:border-blue-300/70 hover:shadow-[0_30px_70px_-40px_rgba(37,99,235,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950",
         isEditing && "ring-1 ring-blue-300/70 shadow-[0_0_0_1px_rgba(59,130,246,0.18)]",
       )}
     >
@@ -133,7 +167,7 @@ export function OperationalDashboardWidget({
           ) : null}
 
           {isInteractive ? (
-            <span className="shrink-0 rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[10px] font-medium text-current/80">
+            <span className="hidden shrink-0 rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[10px] font-medium text-current/80 sm:inline-flex">
               {actionLabel || "Abrir"}
             </span>
           ) : null}
@@ -147,6 +181,40 @@ export function OperationalDashboardWidget({
         )}
       >
         {children}
+      </CardContent>
+    </Card>
+  );
+}
+
+export function OperationalDashboardWidgetSkeleton({
+  compact = false,
+}: {
+  compact?: boolean;
+}) {
+  return (
+    <Card
+      className="relative flex h-full flex-col overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/85 shadow-[0_20px_50px_-32px_rgba(15,23,42,0.2)] dark:border-slate-800/80 dark:bg-slate-950/45"
+      data-testid="operational-dashboard-widget-skeleton"
+    >
+      <div className="pointer-events-none absolute inset-x-8 top-[-3.5rem] h-24 rounded-full bg-slate-200/60 blur-3xl dark:bg-slate-800/50" />
+      <CardHeader className={cn("relative z-10 p-4 pb-2", compact && "p-3 pb-1")}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex items-start gap-3">
+            <div className="mt-1 h-7 w-7 shrink-0 animate-pulse rounded-lg bg-slate-200/80 dark:bg-slate-800/80" />
+            <div className="min-w-0 space-y-2">
+              <div className="h-2.5 w-24 animate-pulse rounded-full bg-slate-200/80 dark:bg-slate-800/80" />
+              <div className="h-2 w-20 animate-pulse rounded-full bg-slate-200/60 dark:bg-slate-800/60" />
+            </div>
+          </div>
+          <div className="hidden h-5 w-14 animate-pulse rounded-full bg-slate-200/60 dark:bg-slate-800/60 sm:block" />
+        </div>
+      </CardHeader>
+      <CardContent className={cn("relative z-10 flex flex-1 flex-col p-4 pt-0", compact && "p-3 pt-0")}>
+        <div className="mt-auto space-y-3">
+          <div className="h-8 w-20 animate-pulse rounded-2xl bg-slate-200/80 dark:bg-slate-800/80" />
+          <div className="h-3 w-28 animate-pulse rounded-full bg-slate-200/60 dark:bg-slate-800/60" />
+          <div className="h-16 animate-pulse rounded-[20px] bg-slate-100/80 dark:bg-slate-900/60" />
+        </div>
       </CardContent>
     </Card>
   );

@@ -49,6 +49,36 @@ export function resolveDashboardMetricState(
   };
 }
 
+export function DashboardSurfaceState({
+  title,
+  description,
+  tone = "neutral",
+  className,
+  centered = false,
+}: {
+  title: string;
+  description: string;
+  tone?: DashboardMetricStateTone;
+  className?: string;
+  centered?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "w-full rounded-2xl border px-3 py-2.5",
+        centered && "flex min-h-[5.5rem] flex-col items-center justify-center text-center",
+        toneClassName[tone],
+        className,
+      )}
+      data-testid="dashboard-surface-state"
+      data-tone={tone}
+    >
+      <p className="text-sm font-semibold tracking-tight">{title}</p>
+      <p className="mt-1 text-[11px] leading-relaxed opacity-80">{description}</p>
+    </div>
+  );
+}
+
 export function DashboardMetricState({
   metric,
   className,
@@ -71,10 +101,11 @@ export function DashboardMetricState({
       data-testid="dashboard-metric-state"
       data-tone={state.tone}
     >
-      <div className={cn("w-full rounded-2xl border px-3 py-2.5", toneClassName[state.tone])}>
-        <p className="text-sm font-semibold tracking-tight">{state.title}</p>
-        <p className="mt-1 text-[11px] leading-relaxed opacity-80">{state.description}</p>
-      </div>
+      <DashboardSurfaceState
+        title={state.title}
+        description={state.description}
+        tone={state.tone}
+      />
     </div>
   );
 }

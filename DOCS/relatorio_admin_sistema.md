@@ -1033,3 +1033,67 @@ Decisoes de escopo mantidas:
   - `version` e `maintenance` ainda reutilizam `/configuracoes/sistema/updates?tab=status`
   - `backup` reutiliza a mesma area base em `/configuracoes/sistema/updates?tab=backup`
   - se os fluxos operacionais crescerem, vale separar telas ou subareas dedicadas para reduzir ambiguidade de drill-down
+
+### Etapa 7.4 - Polimento visual, responsividade e consistencia
+
+Auditoria visual resumida:
+
+- pontos que ja estavam bons:
+  - hierarquia principal com bloco fixo de `Panorama` + grid livre
+  - fallback por widget sem quebrar o dashboard
+  - filtros rapidos e acoes rapidas ja tinham base funcional reaproveitavel
+- inconsistencias ajustadas:
+  - loading inicial ainda usava spinner generico no grid
+  - estados vazios estavam misturados entre texto solto e caixas visuais diferentes
+  - edicao de layout continuava exposta em telas pequenas
+  - cards clicaveis e popovers precisavam de foco visivel mais consistente
+  - a faixa de acoes/foco rapido ainda podia poluir em resolucoes menores
+
+Padrao visual consolidado:
+
+- `OperationalDashboardWidget` continua como base unica dos cards arrastaveis
+- `DashboardSurfaceState` virou o bloco compartilhado para:
+  - `Sem dados`
+  - `Degradado`
+  - `Indisponivel`
+  - mensagens vazias contextuais
+- `OperationalDashboardWidgetSkeleton` passou a cobrir o carregamento inicial do grid
+- headers, pills de acao e foco visivel dos widgets interativos foram padronizados
+
+Responsividade aplicada:
+
+- grid `sm` agora trabalha em coluna unica
+- ordem dos widgets pequenos prioriza problemas operacionais no viewport menor
+- drag/drop e resize ficam desativados abaixo de `640px`
+- em mobile o dashboard entra em modo leitura automaticamente e mostra a indicacao de que reorganizacao fica disponivel apenas em telas maiores
+- faixa de `Acoes rapidas` e `Foco rapido` foi reorganizada para grid/chips mais estaveis em telas pequenas
+
+Loading e polling:
+
+- o carregamento inicial do dashboard agora usa skeletons no topo e no grid
+- durante polling normal os dados anteriores continuam em tela; o refresh nao reseta os cards
+- o dashboard evita flicker desnecessario ao trocar spinner global por placeholders estruturais
+
+Estados padronizados:
+
+- `loading`
+  - skeletons leves por area
+- `empty`
+  - `Sem dados` com descricao curta contextual
+- `degraded`
+  - `Degradado` com explicacao curta
+- `error`
+  - `Indisponivel` com tentativa de recuperacao no proximo ciclo
+
+Aplicacoes diretas do padrao:
+
+- cards de `api`, `cpu`, `backup`, `errors` e `security`
+- area vazia do grid livre
+- estado sem dados do grafico de `Saude do painel`
+
+Observacoes de acessibilidade:
+
+- widgets clicaveis mantem suporte por teclado com `Enter` e `Espaco`
+- controles internos nao disparam navegacao dupla do card
+- quick actions, chips de foco rapido e popovers ganharam foco visivel
+- o dashboard nao depende apenas de cor para severidade; os estados continuam com texto explicito (`Sem dados`, `Degradado`, `Indisponivel`)
