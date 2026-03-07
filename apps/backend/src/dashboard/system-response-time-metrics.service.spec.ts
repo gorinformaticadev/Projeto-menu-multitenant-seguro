@@ -60,4 +60,18 @@ describe('ResponseTimeMetricsService', () => {
     expect(series.some((point) => point.sampleSize > 0)).toBe(true);
     expect(series[series.length - 1].at).toBeLessThanOrEqual(Date.now());
   });
+
+  it('ignores invalid durations and keeps timestamps monotonic when the clock goes backwards', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-07T02:00:00.000Z'));
+
+    service.record(40, 'business');
+    jest.setSystemTime(new Date('2026-03-07T01:59:59.000Z'));
+    service.record(Number.NaN, 'business');
+    service.record(50, 'business');
+
+    const samples = (service as any).samplesByCategory.business;
+
+    expect(samples).toHaveLength(2);
+    expect(samples[1].at).toBeGreaterThan(samples[0].at);
+  });
 });

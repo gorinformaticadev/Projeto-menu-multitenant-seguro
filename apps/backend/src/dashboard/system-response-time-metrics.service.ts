@@ -34,8 +34,9 @@ export class ResponseTimeMetricsService {
     }
 
     const bucket = this.samplesByCategory[category];
+    const lastAt = bucket.length > 0 ? bucket[bucket.length - 1].at : undefined;
     bucket.push({
-      at: Date.now(),
+      at: this.toMonotonicTimestamp(Date.now(), lastAt),
       durationMs,
     });
 
@@ -151,5 +152,14 @@ export class ResponseTimeMetricsService {
     }
 
     return Math.max(MIN_SERIES_BUCKET_COUNT, Math.min(MAX_SERIES_BUCKET_COUNT, Math.floor(bucketCount)));
+  }
+
+  private toMonotonicTimestamp(timestamp: number, previousTimestamp?: number): number {
+    const safeTimestamp = Number.isFinite(timestamp) ? Math.floor(timestamp) : Date.now();
+    if (!Number.isFinite(previousTimestamp)) {
+      return safeTimestamp;
+    }
+
+    return Math.max(safeTimestamp, Number(previousTimestamp) + 1);
   }
 }

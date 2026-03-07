@@ -1132,7 +1132,12 @@ export class SystemDashboardService {
   }
 
   private recordMemoryHistorySample(sample: MemoryHistoryEntry) {
-    this.memoryHistory.push(sample);
+    const normalized = this.normalizeMemoryHistorySample(sample);
+    if (!normalized) {
+      return;
+    }
+
+    this.memoryHistory.push(normalized);
     this.pruneMemoryHistory();
   }
 
@@ -1158,6 +1163,46 @@ export class SystemDashboardService {
     while (this.memoryHistory.length > MEMORY_HISTORY_MAX_POINTS) {
       this.memoryHistory.shift();
     }
+  }
+
+  private normalizeMemoryHistorySample(sample: MemoryHistoryEntry): MemoryHistoryEntry | null {
+    const recordedAtRaw = Number(sample.recordedAt);
+    const rssBytes = Number(sample.rssBytes);
+    const heapUsedBytes = Number(sample.heapUsedBytes);
+    const usedPercentRaw =
+      sample.usedPercent === null || sample.usedPercent === undefined ? null : Number(sample.usedPercent);
+
+    if (!Number.isFinite(recordedAtRaw) || !Number.isFinite(rssBytes) || !Number.isFinite(heapUsedBytes)) {
+      return null;
+    }
+
+    if (recordedAtRaw < 0 || rssBytes < 0 || heapUsedBytes < 0) {
+      return null;
+    }
+
+    const previousTimestamp =
+      this.memoryHistory.length > 0 ? this.memoryHistory[this.memoryHistory.length - 1].recordedAt : undefined;
+
+    return {
+      recordedAt: this.toMonotonicTimestamp(recordedAtRaw, previousTimestamp),
+      usedPercent:
+        usedPercentRaw === null
+          ? null
+          : Number.isFinite(usedPercentRaw)
+            ? Math.max(0, Math.min(100, Number(usedPercentRaw.toFixed(2))))
+            : null,
+      rssBytes: Math.floor(rssBytes),
+      heapUsedBytes: Math.floor(heapUsedBytes),
+    };
+  }
+
+  private toMonotonicTimestamp(timestamp: number, previousTimestamp?: number): number {
+    const safeTimestamp = Number.isFinite(timestamp) ? Math.floor(timestamp) : Date.now();
+    if (!Number.isFinite(previousTimestamp)) {
+      return safeTimestamp;
+    }
+
+    return Math.max(safeTimestamp, Number(previousTimestamp) + 1);
   }
 
   private mapBackupSummary(backup: {

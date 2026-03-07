@@ -11,6 +11,10 @@ describe('SystemDashboardService', () => {
       findUnique: jest.fn(),
       upsert: jest.fn(),
     },
+    backupJob: {
+      count: jest.fn(),
+      findMany: jest.fn(),
+    },
   };
 
   const versionServiceMock = {
@@ -394,6 +398,35 @@ describe('SystemDashboardService', () => {
     );
   });
 
+  it('queries recent backups with descending order and backend take limit', async () => {
+    const service = createService();
+    prismaMock.backupJob.findMany.mockResolvedValue([]);
+
+    await (service as any).getBackupMetric('tenant-1');
+
+    expect(prismaMock.backupJob.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ finishedAt: 'desc' }, { createdAt: 'desc' }],
+        take: 10,
+      }),
+    );
+  });
+
+  it('queries recent failed jobs with descending order and backend take limit', async () => {
+    const service = createService();
+    prismaMock.backupJob.count.mockResolvedValue(0);
+    prismaMock.backupJob.findMany.mockResolvedValue([]);
+
+    await (service as any).getJobsMetric();
+
+    expect(prismaMock.backupJob.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ finishedAt: 'desc' }, { updatedAt: 'desc' }],
+        take: 20,
+      }),
+    );
+  });
+
   it('prunes expired cache entries and keeps the metric cache bounded', () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-03-06T19:10:00.000Z'));
     const service = createService();
@@ -451,6 +484,149 @@ describe('SystemDashboardService', () => {
         heapUsedBytes: 89,
       }),
     );
+  });
+
+  it('ignores invalid memory samples and keeps timestamps monotonic when the clock regresses', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-06T21:00:00.000Z'));
+    const service = createService();
+    const internalService = service as any;
+
+    internalService.recordMemoryHistorySample({
+      recordedAt: Date.now(),
+      usedPercent: 42,
+      rssBytes: 256,
+      heapUsedBytes: 128,
+    });
+
+    jest.setSystemTime(new Date('2026-03-06T20:59:59.000Z'));
+    internalService.recordMemoryHistorySample({
+      recordedAt: Date.now(),
+      usedPercent: Number.NaN,
+      rssBytes: 300,
+      heapUsedBytes: 150,
+    });
+    internalService.recordMemoryHistorySample({
+      recordedAt: Date.now(),
+      usedPercent: 45,
+      rssBytes: 280,
+      heapUsedBytes: 140,
+    });
+    internalService.recordMemoryHistorySample({
+      recordedAt: Date.now(),
+      usedPercent: 50,
+      rssBytes: Number.NaN,
+      heapUsedBytes: 150,
+    });
+
+    const history = internalService.getMemoryHistorySeries();
+
+    expect(history).toHaveLength(3);
+    expect(history[0].at < history[1].at).toBe(true);
+    expect(history[1].at < history[2].at).toBe(true);
+    expect(history[1].value).toBeNull();
+    expect(history[2].value).toBe(45);
+  });
+
+  it('keeps the aggregated dashboard payload within a bounded size budget', async () => {
+    const service = createService();
+    const longError = 'x'.repeat(220);
+    const longMessage = 'm'.repeat(220);
+    const longFileName = 'backup-'.concat('a'.repeat(80)).concat('.zip');
+    stubDashboardMetrics(service, {
+      getApiMetric: {
+        status: 'ok',
+        avgResponseTimeMs: 118,
+        sampleSize: 96,
+        windowSeconds: 300,
+        historyWindowSeconds: 900,
+        scope: 'business',
+        byCategory: {
+          business: { averageMs: 118, sampleSize: 96 },
+          system: { averageMs: 32, sampleSize: 12 },
+          health: { averageMs: 8, sampleSize: 6 },
+        },
+        history: Array.from({ length: 12 }, (_, index) => ({
+          at: `2026-03-06T21:${String(index).padStart(2, '0')}:00.000Z`,
+          value: 100 + index,
+          sampleSize: 8,
+        })),
+      },
+      getMemoryMetric: {
+        status: 'ok',
+        totalBytes: 1024,
+        freeBytes: 256,
+        usedBytes: 768,
+        usedPercent: 75,
+        process: {
+          rssBytes: 512,
+          heapTotalBytes: 256,
+          heapUsedBytes: 192,
+          externalBytes: 32,
+        },
+        history: Array.from({ length: 30 }, (_, index) => ({
+          at: `2026-03-06T21:${String(index).padStart(2, '0')}:30.000Z`,
+          value: 40 + (index % 10),
+          rssBytes: 500 + index,
+          heapUsedBytes: 190 + index,
+        })),
+      },
+      getBackupMetric: {
+        status: 'ok',
+        lastBackup: {
+          id: 'backup-0',
+          artifactId: 'artifact-0',
+          fileName: longFileName,
+          status: 'SUCCESS',
+          sizeBytes: 512_000,
+          startedAt: '2026-03-06T21:00:00.000Z',
+          finishedAt: '2026-03-06T21:01:00.000Z',
+          durationSeconds: 60,
+        },
+        recentBackups: Array.from({ length: 10 }, (_, index) => ({
+          id: `backup-${index}`,
+          artifactId: `artifact-${index}`,
+          fileName: `${longFileName}-${index}`,
+          status: 'SUCCESS',
+          sizeBytes: 512_000 + index,
+          startedAt: `2026-03-06T20:${String(index).padStart(2, '0')}:00.000Z`,
+          finishedAt: `2026-03-06T20:${String(index).padStart(2, '0')}:45.000Z`,
+          durationSeconds: 45,
+        })),
+      },
+      getJobsMetric: {
+        status: 'ok',
+        running: 4,
+        pending: 7,
+        failedLast24h: 20,
+        lastFailure: {
+          id: 'job-0',
+          type: 'BACKUP',
+          finishedAt: '2026-03-06T21:10:00.000Z',
+          error: longError,
+        },
+        recentFailures: Array.from({ length: 20 }, (_, index) => ({
+          id: `job-${index}`,
+          type: 'BACKUP',
+          finishedAt: `2026-03-06T20:${String(index).padStart(2, '0')}:00.000Z`,
+          error: longError,
+        })),
+      },
+      getRecentCriticalErrorsMetric: {
+        status: 'ok',
+        recent: Array.from({ length: 20 }, (_, index) => ({
+          id: `audit-${index}`,
+          action: 'UPDATE_FAILED',
+          actionLabel: 'Atualizacao falhou',
+          message: longMessage,
+          createdAt: `2026-03-06T19:${String(index).padStart(2, '0')}:00.000Z`,
+        })),
+      },
+    });
+
+    const result = await service.getDashboard(actor);
+    const payloadBytes = Buffer.byteLength(JSON.stringify(result), 'utf8');
+
+    expect(payloadBytes).toBeLessThan(40_000);
   });
 
   it('returns the explicit widget policy for the actor role', async () => {
