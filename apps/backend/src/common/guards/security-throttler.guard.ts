@@ -13,6 +13,7 @@ import { createHash } from 'crypto';
 import { SecurityConfigService } from '@core/security-config/security-config.service';
 import { AuditService } from '../../audit/audit.service';
 import { RateLimitMetricsService } from '../services/rate-limit-metrics.service';
+import { SystemTelemetryService } from '@common/services/system-telemetry.service';
 
 type ThrottleScope = 'ip' | 'user' | 'tenant-user' | 'tenant' | 'api-key';
 
@@ -60,6 +61,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     private readonly securityConfigService: SecurityConfigService,
     private readonly auditService: AuditService,
     private readonly rateLimitMetricsService: RateLimitMetricsService,
+    private readonly systemTelemetryService: SystemTelemetryService,
   ) {
     super(options, storageService, reflector);
   }
@@ -195,6 +197,14 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     if (!data.blocked) {
       return;
     }
+
+    this.systemTelemetryService.recordSecurityEvent({
+      type: 'rate_limited',
+      request: data.req,
+      route: data.identity.path,
+      ip: data.identity.clientIp,
+      statusCode: 429,
+    });
 
     let shouldAudit = true;
     try {
@@ -444,3 +454,5 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     }
   }
 }
+
+

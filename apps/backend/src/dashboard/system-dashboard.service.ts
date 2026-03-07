@@ -9,6 +9,7 @@ import { SystemVersionService } from '../common/services/system-version.service'
 import { MaintenanceModeService } from '../maintenance/maintenance-mode.service';
 import { PrismaService } from '../core/prisma/prisma.service';
 import { ResponseTimeMetricsService } from './system-response-time-metrics.service';
+import { SystemTelemetryService } from '@common/services/system-telemetry.service';
 
 type DashboardSeverity = 'all' | 'info' | 'warning' | 'critical';
 
@@ -102,6 +103,8 @@ const SUPER_ADMIN_WIDGET_IDS = [
   'workers',
   'jobs',
   'backup',
+  'routeLatency',
+  'routeErrors',
   'errors',
   'security',
   'tenants',
@@ -118,6 +121,8 @@ const ADMIN_WIDGET_IDS = [
   'database',
   'jobs',
   'backup',
+  'routeLatency',
+  'routeErrors',
   'errors',
   'security',
   'notifications',
@@ -145,6 +150,7 @@ export class SystemDashboardService {
     private readonly systemVersionService: SystemVersionService,
     private readonly maintenanceModeService: MaintenanceModeService,
     private readonly responseTimeMetricsService: ResponseTimeMetricsService,
+    private readonly systemTelemetryService: SystemTelemetryService,
   ) {}
 
   async getDashboard(actor: DashboardActor, filtersInput: DashboardFiltersInput = {}) {
@@ -210,6 +216,16 @@ export class SystemDashboardService {
       'api',
       async () => this.getApiMetric(apiHistoryWindowMs),
     );
+    const routeLatency = await this.safeMetric(
+      'routeLatency',
+      async () => this.getRouteLatencyMetric(filters.periodMinutes),
+      { fallbackStatus: 'degraded' },
+    );
+    const routeErrors = await this.safeMetric(
+      'routeErrors',
+      async () => this.getRouteErrorsMetric(filters.periodMinutes),
+      { fallbackStatus: 'degraded' },
+    );
     const security = await this.safeMetric(
       'security',
       async () => this.getSecurityMetric(windowStart, tenantFilter),
@@ -274,6 +290,8 @@ export class SystemDashboardService {
       redis,
       workers,
       api,
+      routeLatency,
+      routeErrors,
       security,
       backup,
       jobs,
@@ -584,61 +602,50 @@ export class SystemDashboardService {
     };
   }
 
-  private async getSecurityMetric(windowStart: Date, tenantId?: string | null) {
-    const deniedLogs = await this.prisma.auditLog.findMany({
-      where: {
-        createdAt: {
-          gte: windowStart,
-        },
-        ...(tenantId ? { tenantId } : {}),
-        OR: [
-          { action: { contains: 'DENIED' } },
-          { action: { contains: 'BLOCKED' } },
-          { action: { contains: 'UNAUTHORIZED' } },
-          { action: 'RATE_LIMIT_BLOCKED' },
-        ],
-      },
-      select: {
-        ip: true,
-        ipAddress: true,
-        createdAt: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 300,
-    });
-
-    const aggregate = new Map<string, { count: number; lastAt: string }>();
-
-    for (const entry of deniedLogs) {
-      const ip = String(entry.ip || entry.ipAddress || 'unknown').trim() || 'unknown';
-      const previous = aggregate.get(ip);
-      const isoTime = entry.createdAt.toISOString();
-      if (!previous) {
-        aggregate.set(ip, { count: 1, lastAt: isoTime });
-        continue;
-      }
-
-      aggregate.set(ip, {
-        count: previous.count + 1,
-        lastAt: previous.lastAt > isoTime ? previous.lastAt : isoTime,
-      });
-    }
-
-    const deniedAccess = Array.from(aggregate.entries())
-      .map(([ip, data]) => ({
-        ip,
-        count: data.count,
-        lastAt: data.lastAt,
-      }))
-      .sort((a, b) => b.count - a.count || b.lastAt.localeCompare(a.lastAt))
-      .slice(0, 10);
+  private async getRouteLatencyMetric(periodMinutes: number) {
+    const snapshot = this.systemTelemetryService.getApiSnapshot(this.resolveTelemetryWindowMs(periodMinutes));
 
     return {
       status: 'ok' as const,
-      deniedAccess,
-      windowStart: windowStart.toISOString(),
+      windowStart: snapshot.windowStart,
+      windowSeconds: snapshot.windowSeconds,
+      totalRequestsRecent: snapshot.totalRequestsRecent,
+      avgResponseMs: snapshot.avgResponseMs,
+      errorRateRecent: snapshot.errorRateRecent,
+      topSlowRoutes: snapshot.topSlowRoutes,
+      tenantScopeApplied: false,
+    };
+  }
+
+  private async getRouteErrorsMetric(periodMinutes: number) {
+    const snapshot = this.systemTelemetryService.getApiSnapshot(this.resolveTelemetryWindowMs(periodMinutes));
+
+    return {
+      status: 'ok' as const,
+      windowStart: snapshot.windowStart,
+      windowSeconds: snapshot.windowSeconds,
+      totalRequestsRecent: snapshot.totalRequestsRecent,
+      totalErrorCount: snapshot.totalErrorCount,
+      errorRateRecent: snapshot.errorRateRecent,
+      topErrorRoutes: snapshot.topErrorRoutes,
+      tenantScopeApplied: false,
+    };
+  }
+
+  private async getSecurityMetric(windowStart: Date, _tenantId?: string | null) {
+    const snapshot = this.systemTelemetryService.getSecuritySnapshot(Date.now() - windowStart.getTime());
+
+    return {
+      status: 'ok' as const,
+      deniedAccess: snapshot.deniedAccess,
+      topDeniedIps: snapshot.topDeniedIps,
+      topRateLimitedIps: snapshot.topRateLimitedIps,
+      maintenanceBypassAttemptsRecent: snapshot.maintenanceBypassAttemptsRecent,
+      accessDeniedRecent: snapshot.accessDeniedRecent,
+      routeDistribution: snapshot.routeDistribution,
+      windowStart: snapshot.windowStart,
+      windowSeconds: snapshot.windowSeconds,
+      tenantScopeApplied: false,
     };
   }
 
@@ -921,7 +928,8 @@ export class SystemDashboardService {
         system: this.pickIfAvailable(payload.system, ['status', 'platform', 'release', 'arch', 'nodeVersion', 'error']),
         disk: { status: 'restricted' },
         redis: this.pickIfAvailable(payload.redis, ['status', 'latencyMs', 'error']),
-        workers: this.pickIfAvailable(payload.workers, ['status', 'runningJobs', 'pendingJobs', 'error']),
+        workers: this.pickIfAvailable(payload.workers, ['status', 'activeWorkers', 'runningJobs', 'pendingJobs', 'error']),
+        security: this.maskSecurityMetric(payload.security),
       };
     }
 
@@ -935,10 +943,59 @@ export class SystemDashboardService {
       redis: { status: 'restricted' },
       workers: { status: 'restricted' },
       security: { status: 'restricted' },
+      routeLatency: { status: 'restricted' },
+      routeErrors: { status: 'restricted' },
       backup: { status: 'restricted' },
       jobs: { status: 'restricted' },
       errors: { status: 'restricted' },
       tenants: { status: 'restricted' },
+    };
+  }
+
+  private maskSecurityMetric(value: any) {
+    if (!value || typeof value !== 'object') {
+      return value;
+    }
+
+    const topDeniedIps = Array.isArray(value.topDeniedIps)
+      ? value.topDeniedIps.map((entry: Record<string, unknown>) => ({
+          ...entry,
+          ip: this.systemTelemetryService.maskIp(entry.ip),
+        }))
+      : [];
+    const topRateLimitedIps = Array.isArray(value.topRateLimitedIps)
+      ? value.topRateLimitedIps.map((entry: Record<string, unknown>) => ({
+          ...entry,
+          ip: this.systemTelemetryService.maskIp(entry.ip),
+        }))
+      : [];
+    const accessDeniedRecent = Array.isArray(value.accessDeniedRecent)
+      ? value.accessDeniedRecent.slice(0, 10).map((entry: Record<string, unknown>) => ({
+          ...entry,
+          ip: this.systemTelemetryService.maskIp(entry.ip),
+        }))
+      : [];
+    const deniedAccess = Array.isArray(value.deniedAccess)
+      ? value.deniedAccess.map((entry: Record<string, unknown>) => ({
+          ...entry,
+          ip: this.systemTelemetryService.maskIp(entry.ip),
+        }))
+      : [];
+
+    return {
+      ...this.pickIfAvailable(value, [
+        'status',
+        'windowStart',
+        'windowSeconds',
+        'maintenanceBypassAttemptsRecent',
+        'routeDistribution',
+        'tenantScopeApplied',
+        'error',
+      ]),
+      topDeniedIps,
+      topRateLimitedIps,
+      accessDeniedRecent,
+      deniedAccess,
     };
   }
 
@@ -1131,6 +1188,13 @@ export class SystemDashboardService {
     return normalizedMinutes * 60 * 1000;
   }
 
+  private resolveTelemetryWindowMs(periodMinutes: number): number {
+    const normalizedMinutes = Number.isFinite(periodMinutes)
+      ? Math.max(5, Math.min(MAX_PERIOD_MINUTES, Math.floor(periodMinutes)))
+      : DEFAULT_PERIOD_MINUTES;
+    return normalizedMinutes * 60 * 1000;
+  }
+
   private recordMemoryHistorySample(sample: MemoryHistoryEntry) {
     const normalized = this.normalizeMemoryHistorySample(sample);
     if (!normalized) {
@@ -1280,3 +1344,11 @@ export class SystemDashboardService {
     return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3)}...` : normalized;
   }
 }
+
+
+
+
+
+
+
+

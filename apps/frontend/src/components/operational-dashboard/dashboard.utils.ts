@@ -41,11 +41,14 @@ export const dashboardGridCols = {
 export const dashboardGridRowHeight = 104;
 export const dashboardMobileEditingMaxWidth = 640;
 
-const analyticsWidgetIds = new Set(["api", "cpu", "memory", "disk", "security", "errors"]);
+const analyticsWidgetIds = new Set(["api", "cpu", "memory", "disk", "security", "errors", "routeLatency", "routeErrors"]);
 
 const tallWidgetIds = new Set(["backup"]);
 const smallViewportPriority = [
   "errors",
+  "routeErrors",
+  "security",
+  "routeLatency",
   "backup",
   "database",
   "workers",
@@ -147,6 +150,8 @@ export function allowedWidgetIdsByRole(role: DashboardRole): string[] {
       "workers",
       "jobs",
       "backup",
+      "routeLatency",
+      "routeErrors",
       "errors",
       "security",
       "tenants",
@@ -165,6 +170,8 @@ export function allowedWidgetIdsByRole(role: DashboardRole): string[] {
       "database",
       "jobs",
       "backup",
+      "routeLatency",
+      "routeErrors",
       "errors",
       "security",
       "notifications",
@@ -451,3 +458,4 @@ function clampOptional(value: number, min: number, max: number): number | undefi
 
   return clampValue(value, min, max);
 }
+

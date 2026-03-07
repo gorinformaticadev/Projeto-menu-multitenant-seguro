@@ -1097,3 +1097,114 @@ Observacoes de acessibilidade:
 - controles internos nao disparam navegacao dupla do card
 - quick actions, chips de foco rapido e popovers ganharam foco visivel
 - o dashboard nao depende apenas de cor para severidade; os estados continuam com texto explicito (`Sem dados`, `Degradado`, `Indisponivel`)
+
+### Etapa 8 - Telemetria operacional leve, erros por rota e seguranca operacional
+
+Escopo implementado no backend:
+
+- servico central `SystemTelemetryService` com agregacao curta em memoria
+- interceptor global `SystemTelemetryInterceptor` para registrar:
+  - rota normalizada
+  - metodo
+  - latencia
+  - status HTTP
+- integracao direta nos pontos que falham antes do interceptor:
+  - `JwtAuthGuard` -> `401`
+  - `RolesGuard` -> `403`
+  - `TenantInterceptor` -> `403`
+  - `SecurityThrottlerGuard` -> `429`
+  - `MaintenanceModeGuard` -> `503` e tentativa de bypass negada
+
+Politica de normalizacao de rota:
+
+- query string sempre removida
+- ids numericos, UUIDs e ObjectIds viram `:id`
+- segmentos opacos/tokenizados longos viram `:token`
+- quando o framework fornece `route.path`, a telemetria prioriza o template real da rota
+- exemplos:
+  - `/api/users/123` -> `/api/users/:id`
+  - `/api/orders/987/items/1` -> `/api/orders/:id/items/:id`
+  - `/api/tokens/9f86d081884c7d659a2feaa0c55ad015` -> `/api/tokens/:token`
+
+Rotas excluidas ou reduzidas para evitar ruido:
+
+- excluidas da telemetria de request/latencia por rota:
+  - `/api/health`
+  - `/api/system/dashboard`
+  - `/api/system/dashboard/layout`
+  - `/api/system/maintenance/state`
+  - `/api/system/notifications/*`
+  - `/api/system/update/status`
+  - `/api/system/update/log`
+  - `/api/system/version`
+  - `/api/system/metrics`
+- seguranca operacional continua coletando eventos negados relevantes em rotas sensiveis, inclusive dashboard durante maintenance, mas segue ignorando health/notifications/metrics puramente internas
+
+Buffers e limites em memoria:
+
+- requests agregados por rota:
+  - retencao: `15 minutos`
+  - limite maximo: `5000 eventos`
+- eventos de seguranca:
+  - retencao: `6 horas`
+  - limite maximo: `2000 eventos`
+- sem crescimento indefinido; entradas antigas sao podadas por janela e por teto maximo
+- historico continua efemero em memoria:
+  - reinicia apos restart do processo
+  - nao cria armazenamento em banco nesta etapa
+
+Metricas novas expostas no dashboard:
+
+| Widget | Tipo | Fonte | Observacao |
+| --- | --- | --- | --- |
+| `routeLatency` | top rotas lentas + media recente | telemetria em memoria por rota | usa rota normalizada, sem query/token |
+| `routeErrors` | top rotas com erro + taxa recente | telemetria em memoria por rota | inclui contagem de erro e `5xx` por rota |
+| `security` | pressao de seguranca | telemetria em memoria de `401/403/429/503` | substitui o snapshot simples por denied IPs, rate limit e bypass |
+
+Widgets e leitura operacional por role:
+
+- `SUPER_ADMIN`
+  - acesso completo a `routeLatency`, `routeErrors` e `security`
+- `ADMIN`
+  - ve `routeLatency` e `routeErrors`
+  - ve `security` com IP mascarado e lista recente resumida
+- `USER` / `CLIENT`
+  - sem widgets de telemetria operacional no dashboard
+  - payload continua com projection `restricted` caso algum layout legado tente referenciar esses blocos
+
+Widgets do dashboard atualizados:
+
+- `Top rotas lentas`
+  - mostra media recente, janela e top 5 rotas mais lentas
+- `Top rotas com erro`
+  - mostra total de erros recentes, taxa de erro e top 5 rotas com falha
+- `Pressao de seguranca`
+  - mostra total negado, `429` recentes, tentativas de bypass e listas curtas de IPs/eventos
+
+Seguranca e privacidade:
+
+- nao gravamos query string
+- nao gravamos corpo da request
+- nao gravamos tokens
+- IP so aparece mascarado para `ADMIN`
+- rotas expostas no dashboard ja saem normalizadas, sem ids reais e sem segmentos opacos brutos
+
+Limitacoes assumidas nesta etapa:
+
+- telemetria nova nao e segmentada profundamente por tenant
+- filtros de tenant do dashboard nao refinam a telemetria por rota/IP nesta etapa
+- sem persistencia historica em banco, sem Prometheus/Grafana e sem alerting automatico complexo
+
+Validacao executada nesta etapa:
+
+- backend
+  - testes dedicados do utilitario, servico e interceptor de telemetria
+  - `system-dashboard.service.spec.ts`
+  - `maintenance-mode.guard.spec.ts`
+  - `security-throttler.guard.spec.ts`
+  - `test:smoke`
+  - `build`
+- frontend
+  - `eslint` dos arquivos do dashboard operacional
+  - testes de `dashboard.utils`, `dashboard.interactions` e `DashboardMetricState`
+  - `build`

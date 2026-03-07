@@ -83,6 +83,8 @@ const infrastructureWidgetIds = new Set([
   "database",
   "redis",
   "workers",
+  "routeLatency",
+  "routeErrors",
   "security",
 ]);
 
@@ -151,8 +153,22 @@ function hasProblemSignal(widgetId: string, metric: DashboardMetric | null | und
     return asCount(metric?.failedLast24h) > 0 || hasRecentEntries(metric?.recentFailures);
   }
 
+  if (widgetId === "routeLatency") {
+    const slowRoutes = Array.isArray(metric?.topSlowRoutes) ? metric.topSlowRoutes : [];
+    const avgResponseMs = Number(metric?.avgResponseMs);
+    return slowRoutes.length > 0 && (!Number.isFinite(avgResponseMs) || avgResponseMs >= 500);
+  }
+
+  if (widgetId === "routeErrors") {
+    return asCount(metric?.totalErrorCount) > 0 || asCount(metric?.errorRateRecent) > 0;
+  }
+
   if (widgetId === "security") {
-    return getDeniedAccessCount(metric) > 0;
+    return (
+      getDeniedAccessCount(metric) > 0 ||
+      hasRecentEntries(metric?.topRateLimitedIps) ||
+      asCount(metric?.maintenanceBypassAttemptsRecent) > 0
+    );
   }
 
   return false;
@@ -172,8 +188,22 @@ function hasCriticalSignal(widgetId: string, metric: DashboardMetric | null | un
     return hasRecentEntries(metric?.recent);
   }
 
+  if (widgetId === "routeLatency") {
+    const slowRoutes = Array.isArray(metric?.topSlowRoutes) ? metric.topSlowRoutes : [];
+    const avgResponseMs = Number(metric?.avgResponseMs);
+    return slowRoutes.length > 0 && (!Number.isFinite(avgResponseMs) || avgResponseMs >= 500);
+  }
+
+  if (widgetId === "routeErrors") {
+    return asCount(metric?.totalErrorCount) > 0 || asCount(metric?.errorRateRecent) > 0;
+  }
+
   if (widgetId === "security") {
-    return getDeniedAccessCount(metric) > 0;
+    return (
+      getDeniedAccessCount(metric) > 0 ||
+      hasRecentEntries(metric?.topRateLimitedIps) ||
+      asCount(metric?.maintenanceBypassAttemptsRecent) > 0
+    );
   }
 
   return false;
@@ -302,3 +332,4 @@ export function getDashboardQuickActions(
     ];
   });
 }
+

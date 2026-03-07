@@ -4,6 +4,7 @@ import { MaintenanceModeService } from '../maintenance/maintenance-mode.service'
 import { PrismaService } from '../core/prisma/prisma.service';
 import { SystemDashboardService } from './system-dashboard.service';
 import { ResponseTimeMetricsService } from './system-response-time-metrics.service';
+import { SystemTelemetryService } from '@common/services/system-telemetry.service';
 
 describe('SystemDashboardService', () => {
   const prismaMock = {
@@ -31,12 +32,19 @@ describe('SystemDashboardService', () => {
     getSeriesForWindow: jest.fn(),
   };
 
+  const systemTelemetryServiceMock = {
+    getApiSnapshot: jest.fn(),
+    getSecuritySnapshot: jest.fn(),
+    maskIp: jest.fn((value) => 'masked:' + String(value)),
+  };
+
   const createService = () =>
     new SystemDashboardService(
       prismaMock as unknown as PrismaService,
       versionServiceMock as unknown as SystemVersionService,
       maintenanceServiceMock as unknown as MaintenanceModeService,
       responseTimeMetricsServiceMock as unknown as ResponseTimeMetricsService,
+      systemTelemetryServiceMock as unknown as SystemTelemetryService,
     );
 
   const actor = {
@@ -130,10 +138,37 @@ describe('SystemDashboardService', () => {
         byCategory: [],
         history: [],
       },
+      getRouteLatencyMetric: {
+        status: 'ok',
+        windowStart: '2026-03-06T17:00:00.000Z',
+        windowSeconds: 3600,
+        totalRequestsRecent: 30,
+        avgResponseMs: 48,
+        errorRateRecent: 6.67,
+        topSlowRoutes: [],
+        tenantScopeApplied: false,
+      },
+      getRouteErrorsMetric: {
+        status: 'ok',
+        windowStart: '2026-03-06T17:00:00.000Z',
+        windowSeconds: 3600,
+        totalRequestsRecent: 30,
+        totalErrorCount: 2,
+        errorRateRecent: 6.67,
+        topErrorRoutes: [],
+        tenantScopeApplied: false,
+      },
       getSecurityMetric: {
         status: 'ok',
         deniedAccess: [],
+        topDeniedIps: [],
+        topRateLimitedIps: [],
+        maintenanceBypassAttemptsRecent: 0,
+        accessDeniedRecent: [],
+        routeDistribution: [],
         windowStart: '2026-03-06T17:00:00.000Z',
+        windowSeconds: 3600,
+        tenantScopeApplied: false,
       },
       getBackupMetric: {
         status: 'ok',
@@ -335,6 +370,46 @@ describe('SystemDashboardService', () => {
         available: expect.arrayContaining(['workers', 'jobs', 'backup']),
       }),
     );
+  });
+
+  it('masks security telemetry for ADMIN and blocks telemetry widgets for basic roles', async () => {
+    const service = createService();
+    stubDashboardMetrics(service, {
+      getSecurityMetric: {
+        status: 'ok',
+        deniedAccess: [{ ip: '10.0.0.15', count: 3, lastSeenAt: '2026-03-06T19:00:00.000Z', route: '/api/admin/users' }],
+        topDeniedIps: [{ ip: '10.0.0.15', count: 3, lastSeenAt: '2026-03-06T19:00:00.000Z', route: '/api/admin/users' }],
+        topRateLimitedIps: [{ ip: '10.0.0.25', count: 2, lastSeenAt: '2026-03-06T19:05:00.000Z', route: '/api/auth/login' }],
+        maintenanceBypassAttemptsRecent: 1,
+        accessDeniedRecent: [{ type: 'forbidden', statusCode: 403, method: 'GET', route: '/api/admin/users', ip: '10.0.0.15', at: '2026-03-06T19:00:00.000Z' }],
+        routeDistribution: [{ route: '/api/admin/users', count: 3 }],
+        windowStart: '2026-03-06T18:00:00.000Z',
+        windowSeconds: 3600,
+        tenantScopeApplied: false,
+      },
+    });
+
+    const adminResult = await service.getDashboard({
+      userId: 'admin-1',
+      role: Role.ADMIN,
+      tenantId: 'tenant-1',
+    });
+    const userResult = await service.getDashboard({
+      userId: 'user-2',
+      role: Role.USER,
+      tenantId: 'tenant-1',
+    });
+
+    expect(adminResult.widgets.available).toEqual(expect.arrayContaining(['routeLatency', 'routeErrors']));
+    expect(adminResult.security).toEqual(
+      expect.objectContaining({
+        topDeniedIps: [expect.objectContaining({ ip: 'masked:10.0.0.15' })],
+        topRateLimitedIps: [expect.objectContaining({ ip: 'masked:10.0.0.25' })],
+      }),
+    );
+    expect(userResult.widgets.available).not.toContain('routeLatency');
+    expect(userResult.routeLatency).toEqual({ status: 'restricted' });
+    expect(userResult.routeErrors).toEqual({ status: 'restricted' });
   });
 
   it('caches expensive metrics for a short ttl and recomputes after expiration', async () => {
@@ -656,6 +731,8 @@ describe('SystemDashboardService', () => {
           'database',
           'jobs',
           'backup',
+          'routeLatency',
+          'routeErrors',
           'errors',
           'security',
           'notifications',
@@ -669,3 +746,10 @@ describe('SystemDashboardService', () => {
     );
   });
 });
+
+
+
+
+
+
+

@@ -158,6 +158,34 @@ type SparklineConfig = {
   valueSuffix?: string;
 };
 
+type RouteTelemetryItem = {
+  method: string;
+  route: string;
+  requestCount: number;
+  avgMs: number | null;
+  p95Ms: number | null;
+  errorCount: number;
+  errorRate: number;
+  status5xx: number;
+  lastErrorAt: string | null;
+};
+
+type SecurityIpTelemetryItem = {
+  ip: string;
+  count: number;
+  lastSeenAt: string;
+  route: string | null;
+};
+
+type SecurityRecentTelemetryItem = {
+  type: string;
+  statusCode: number;
+  method: string;
+  route: string;
+  ip: string;
+  at: string;
+};
+
 const POLL_INTERVAL_MS = 15000;
 
 const widgetLabelById: Record<string, string> = {
@@ -174,6 +202,8 @@ const widgetLabelById: Record<string, string> = {
   workers: "Workers",
   jobs: "Jobs",
   backup: "Backup",
+  routeLatency: "Rotas lentas",
+  routeErrors: "Rotas com erro",
   errors: "Erros",
   security: "Seguranca",
   tenants: "Tenants",
@@ -323,6 +353,91 @@ function buildAuditEventLine(row: Record<string, unknown>): string {
   }
 
   return `${actionLabel} - ${message}`;
+}
+
+function normalizeRouteTelemetryItems(value: unknown): RouteTelemetryItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item) => item && typeof item === "object" && !Array.isArray(item))
+    .map((item) => {
+      const row = item as Record<string, unknown>;
+      const avgMs = Number(row.avgMs);
+      const p95Ms = Number(row.p95Ms);
+      const errorRate = Number(row.errorRate);
+
+      return {
+        method: String(row.method || "GET").trim().toUpperCase(),
+        route: String(row.route || "--").trim() || "--",
+        requestCount: Number(row.requestCount || 0),
+        avgMs: Number.isFinite(avgMs) ? avgMs : null,
+        p95Ms: Number.isFinite(p95Ms) ? p95Ms : null,
+        errorCount: Number(row.errorCount || 0),
+        errorRate: Number.isFinite(errorRate) ? errorRate : 0,
+        status5xx: Number(row.status5xx || 0),
+        lastErrorAt: row.lastErrorAt ? String(row.lastErrorAt) : null,
+      };
+    });
+}
+
+function normalizeSecurityIpTelemetryItems(value: unknown): SecurityIpTelemetryItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item) => item && typeof item === "object" && !Array.isArray(item))
+    .map((item) => {
+      const row = item as Record<string, unknown>;
+      return {
+        ip: String(row.ip || "--"),
+        count: Number(row.count || 0),
+        lastSeenAt: String(row.lastSeenAt || row.lastAt || ""),
+        route: row.route ? String(row.route) : null,
+      };
+    });
+}
+
+function normalizeSecurityRecentTelemetryItems(value: unknown): SecurityRecentTelemetryItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item) => item && typeof item === "object" && !Array.isArray(item))
+    .map((item) => {
+      const row = item as Record<string, unknown>;
+      return {
+        type: String(row.type || "").trim(),
+        statusCode: Number(row.statusCode || 0),
+        method: String(row.method || "GET").trim().toUpperCase(),
+        route: String(row.route || "--").trim() || "--",
+        ip: String(row.ip || "--"),
+        at: String(row.at || row.createdAt || ""),
+      };
+    });
+}
+
+function formatSecurityEventType(type: string): string {
+  const normalized = type.trim().toLowerCase();
+  if (normalized === "rate_limited") {
+    return "Limite de requisicoes";
+  }
+  if (normalized === "maintenance_bypass_attempt") {
+    return "Tentativa de bypass";
+  }
+  if (normalized === "forbidden") {
+    return "Acesso negado";
+  }
+  if (normalized === "unauthorized") {
+    return "Nao autenticado";
+  }
+  if (normalized === "maintenance_blocked") {
+    return "Manutencao bloqueada";
+  }
+  return normalized || "Seguranca";
 }
 
 function MiniTrendSparkline({
@@ -1512,7 +1627,7 @@ export function OperationalDashboard() {
             accentClassName: metricStateAccentClassName(maintenanceMetricState.tone),
           }
           : {
-            label: "Manutenção",
+            label: "Manutencao",
             widgetId: "maintenance",
             value: maintenanceMetric?.enabled ? "Ativa" : "Estavel",
             hint: maintenanceMetric?.enabled
@@ -1569,7 +1684,7 @@ export function OperationalDashboard() {
           value: Number(cpuMetric?.usagePercent),
           toneClassName: "bg-sky-500",
         },
-        { label: "Memória", value: Number(memoryMetric?.usedPercent), toneClassName: "bg-emerald-500" },
+        { label: "Memoria", value: Number(memoryMetric?.usedPercent), toneClassName: "bg-emerald-500" },
         { label: "Armazenamento", value: Number(diskMetric?.usedPercent), toneClassName: "bg-amber-500" },
       ],
     };
@@ -1584,7 +1699,7 @@ export function OperationalDashboard() {
       "version",
       <OperationalDashboardWidget
         id="version"
-        title="Versão"
+        title="Versao"
         subtitle={metricStatusLabel(versionMetric)}
         tone={statusTone(versionMetric?.status)}
         isEditing={layoutEditingActive}
@@ -2130,6 +2245,144 @@ export function OperationalDashboard() {
       </OperationalDashboardWidget>,
     );
 
+    const routeLatencyMetric = toMetric(dashboard?.routeLatency);
+    const routeLatencyMetricState = resolveDashboardMetricState(routeLatencyMetric);
+    const topSlowRoutes = normalizeRouteTelemetryItems(routeLatencyMetric?.topSlowRoutes);
+    map.set(
+      "routeLatency",
+      <OperationalDashboardWidget
+        id="routeLatency"
+        title="Top rotas lentas"
+        subtitle={metricStatusLabel(routeLatencyMetric)}
+        tone={operationalWidgetTone(routeLatencyMetric)}
+        isEditing={layoutEditingActive}
+        onHide={hideHandler}
+      >
+        {routeLatencyMetricState ? (
+          <DashboardMetricState metric={routeLatencyMetric} />
+        ) : topSlowRoutes.length > 0 ? (
+          <div className="flex h-full min-h-0 flex-col gap-3">
+            <div className="flex items-end justify-between gap-3 rounded-[20px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70">
+              <div>
+                <p className="text-[1.7rem] font-bold leading-none tracking-tight text-sky-400">
+                  {routeLatencyMetric?.avgResponseMs !== null && routeLatencyMetric?.avgResponseMs !== undefined
+                    ? `${routeLatencyMetric.avgResponseMs}ms`
+                    : "--"}
+                </p>
+                <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                  media recente
+                </p>
+              </div>
+              <div className="text-right text-[11px] text-slate-400">
+                <p>{String(routeLatencyMetric?.totalRequestsRecent ?? 0)} req</p>
+                <p>{String(routeLatencyMetric?.windowSeconds ?? "--")}s janela</p>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+              {topSlowRoutes.map((item) => (
+                <div
+                  key={`${item.method}:${item.route}`}
+                  className="rounded-[20px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-2 text-[11px] font-semibold text-slate-100">
+                        <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-sky-300">
+                          {item.method}
+                        </span>
+                        <span className="truncate">{item.route}</span>
+                      </p>
+                      <p className="mt-1 text-[10px] text-slate-400">
+                        {item.requestCount} req - p95 {item.p95Ms !== null ? `${item.p95Ms}ms` : "--"}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-sm font-semibold text-sky-300">
+                      {item.avgMs !== null ? `${item.avgMs}ms` : "--"}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <DashboardSurfaceState
+            title="Sem dados"
+            description="Nenhuma rota lenta relevante na janela atual."
+            centered
+            className="mt-auto"
+          />
+        )}
+      </OperationalDashboardWidget>,
+    );
+
+    const routeErrorsMetric = toMetric(dashboard?.routeErrors);
+    const routeErrorsMetricState = resolveDashboardMetricState(routeErrorsMetric);
+    const topErrorRoutes = normalizeRouteTelemetryItems(routeErrorsMetric?.topErrorRoutes);
+    map.set(
+      "routeErrors",
+      <OperationalDashboardWidget
+        id="routeErrors"
+        title="Top rotas com erro"
+        subtitle={metricStatusLabel(routeErrorsMetric)}
+        tone={operationalWidgetTone(routeErrorsMetric)}
+        isEditing={layoutEditingActive}
+        onHide={hideHandler}
+      >
+        {routeErrorsMetricState ? (
+          <DashboardMetricState metric={routeErrorsMetric} />
+        ) : topErrorRoutes.length > 0 ? (
+          <div className="flex h-full min-h-0 flex-col gap-3">
+            <div className="flex items-end justify-between gap-3 rounded-[20px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70">
+              <div>
+                <p className="text-[1.7rem] font-bold leading-none tracking-tight text-rose-400">
+                  {String(routeErrorsMetric?.totalErrorCount ?? "--")}
+                </p>
+                <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                  erros recentes
+                </p>
+              </div>
+              <div className="text-right text-[11px] text-slate-400">
+                <p>{formatPercent(routeErrorsMetric?.errorRateRecent)}</p>
+                <p>{String(routeErrorsMetric?.totalRequestsRecent ?? 0)} req</p>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+              {topErrorRoutes.map((item) => (
+                <div
+                  key={`${item.method}:${item.route}`}
+                  className="rounded-[20px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-2 text-[11px] font-semibold text-slate-100">
+                        <span className="rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-rose-300">
+                          {item.method}
+                        </span>
+                        <span className="truncate">{item.route}</span>
+                      </p>
+                      <p className="mt-1 text-[10px] text-slate-400">
+                        {item.errorCount} erros - 5xx {item.status5xx} - {formatPercent(item.errorRate)}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-right text-[10px] text-slate-400">
+                      {item.lastErrorAt ? formatDateTime(item.lastErrorAt) : "--"}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <DashboardSurfaceState
+            title="Sem dados"
+            description="Nenhuma rota com erro na janela atual."
+            centered
+            className="mt-auto"
+          />
+        )}
+      </OperationalDashboardWidget>,
+    );
+
     const errorsMetric = toMetric(dashboard?.errors);
     const errorsMetricState = resolveDashboardMetricState(errorsMetric);
     const recentErrors = Array.isArray(errorsMetric?.recent) ? errorsMetric.recent : [];
@@ -2179,56 +2432,113 @@ export function OperationalDashboard() {
     );
     const securityMetric = toMetric(dashboard?.security);
     const securityMetricState = resolveDashboardMetricState(securityMetric);
-    const rawDenied = Array.isArray(securityMetric?.deniedAccess) ? securityMetric.deniedAccess : [];
-    const deniedData = rawDenied.slice(0, 5).map((item) => {
-      const row = item as Record<string, unknown>;
-      return {
-        ip: String(row.ip || "--"),
-        count: Number(row.count || 0),
-        lastAt: row.lastAt ? new Date(String(row.lastAt)).getTime() : 0,
-      };
-    });
+    const deniedIps = normalizeSecurityIpTelemetryItems(securityMetric?.topDeniedIps || securityMetric?.deniedAccess);
+    const rateLimitedIps = normalizeSecurityIpTelemetryItems(securityMetric?.topRateLimitedIps);
+    const recentSecurityEvents = normalizeSecurityRecentTelemetryItems(securityMetric?.accessDeniedRecent);
 
     map.set(
       "security",
       <OperationalDashboardWidget
         id="security"
-        title="Acessos Negados (Top 5 IPs)"
+        title="Pressao de seguranca"
         subtitle={metricStatusLabel(securityMetric)}
         tone={operationalWidgetTone(securityMetric)}
         isEditing={layoutEditingActive}
         onHide={hideHandler}
-        noPadding
       >
-        <div className="flex h-full flex-col">
-          <div className="px-3 pt-3 flex items-end justify-between">
-            <p className="text-3xl font-bold tracking-tight text-slate-50">
-              {securityMetricState ? "--" : deniedData.reduce((acc, curr) => acc + curr.count, 0)}
-            </p>
-            <p className="text-xs text-slate-400 mb-1">Total Negados</p>
-          </div>
-          <div className="flex-1 min-h-0 w-full mt-4 pr-3 pb-2">
-            {securityMetricState ? (
-              <div className="flex h-full flex-col px-3 pb-3">
-                <DashboardMetricState metric={securityMetric} className="h-full" />
+        {securityMetricState ? (
+          <DashboardMetricState metric={securityMetric} />
+        ) : deniedIps.length > 0 || rateLimitedIps.length > 0 || recentSecurityEvents.length > 0 ? (
+          <div className="flex h-full min-h-0 flex-col gap-3">
+            <div className="grid gap-2 sm:grid-cols-3">
+              <div className="rounded-[18px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70">
+                <p className="text-[1.45rem] font-bold tracking-tight text-rose-400">
+                  {deniedIps.reduce((acc, item) => acc + item.count, 0)}
+                </p>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">negados</p>
               </div>
-            ) : deniedData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={deniedData} layout="vertical" margin={{ top: 0, right: 0, left: 30, bottom: 0 }}>
-                  <XAxis type="number" hide />
-                  <YAxis dataKey="ip" type="category" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10 }} width={90} />
-                  <Bar dataKey="count" fill="#f43f5e" radius={[0, 4, 4, 0]} isAnimationActive={false}>
-                    {deniedData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={index === 0 ? "#e11d48" : "#fb7185"} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <DashboardChartState description="Nenhuma tentativa negada recente." />
-            )}
+              <div className="rounded-[18px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70">
+                <p className="text-[1.45rem] font-bold tracking-tight text-amber-300">
+                  {rateLimitedIps.reduce((acc, item) => acc + item.count, 0)}
+                </p>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">429 recentes</p>
+              </div>
+              <div className="rounded-[18px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70">
+                <p className="text-[1.45rem] font-bold tracking-tight text-sky-300">
+                  {String(securityMetric?.maintenanceBypassAttemptsRecent ?? 0)}
+                </p>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">bypass</p>
+              </div>
+            </div>
+            <div className="grid flex-1 gap-3 lg:grid-cols-[1.2fr_1fr]">
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  IPs com mais negacoes
+                </p>
+                {deniedIps.slice(0, 4).map((item) => (
+                  <div
+                    key={`${item.ip}:${item.route || 'na'}`}
+                    className="rounded-[18px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-[11px] font-semibold text-slate-100">{item.ip}</p>
+                        <p className="mt-1 truncate text-[10px] text-slate-400">
+                          {item.route || "rota nao informada"}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-sm font-semibold text-rose-300">{item.count}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  Pressao recente
+                </p>
+                {(rateLimitedIps.length > 0 ? rateLimitedIps : recentSecurityEvents.slice(0, 4)).slice(0, 4).map((item, index) => {
+                  if ("count" in item) {
+                    return (
+                      <div
+                        key={`${item.ip}:${index}`}
+                        className="rounded-[18px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-[11px] font-semibold text-slate-100">{item.ip}</p>
+                            <p className="mt-1 truncate text-[10px] text-slate-400">{item.route || "429"}</p>
+                          </div>
+                          <span className="shrink-0 text-sm font-semibold text-amber-300">{item.count}</span>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={`${item.type}:${item.at}:${index}`}
+                      className="rounded-[18px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70"
+                    >
+                      <p className="truncate text-[11px] font-semibold text-slate-100">
+                        {formatSecurityEventType(item.type)} - {item.method} {item.route}
+                      </p>
+                      <p className="mt-1 truncate text-[10px] text-slate-400">
+                        {item.ip} - {item.statusCode} - {item.at ? formatDateTime(item.at) : "--"}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-        </div>
+        ) : (
+          <DashboardSurfaceState
+            title="Sem dados"
+            description="Nenhum evento de seguranca relevante na janela atual."
+            centered
+            className="mt-auto"
+          />
+        )}
       </OperationalDashboardWidget>,
     );
 
@@ -2581,7 +2891,7 @@ export function OperationalDashboard() {
                     icon={<BellDot className="h-4 w-4" />}
                     label="Notificacoes"
                     value={dashboardOverview.unreadNotifications}
-                    hint="Notificações não lidas"
+                    hint="Notificacoes nao lidas"
                   />
                   <OverviewStat
                     icon={<ShieldAlert className="h-4 w-4" />}
@@ -2957,3 +3267,8 @@ export function OperationalDashboard() {
     </TooltipProvider >
   );
 }
+
+
+
+
+

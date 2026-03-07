@@ -1,4 +1,4 @@
-﻿import {
+import {
   CanActivate,
   Controller,
   ExecutionContext,
@@ -33,6 +33,7 @@ import { SystemDataRetentionController } from '../../src/retention/system-data-r
 import { SystemDataRetentionService } from '../../src/retention/system-data-retention.service';
 import { SystemDashboardController } from '../../src/dashboard/system-dashboard.controller';
 import { SystemDashboardService } from '../../src/dashboard/system-dashboard.service';
+import { SystemTelemetryService } from '../../src/common/services/system-telemetry.service';
 
 const DEFAULT_MAINTENANCE_STATE: MaintenanceState = {
   enabled: false,
@@ -154,6 +155,10 @@ const retentionServiceMock = {
   })),
 };
 
+const systemTelemetryServiceMock = {
+  recordSecurityEvent: jest.fn(),
+};
+
 const systemDashboardServiceMock = {
   getDashboard: jest.fn(async () => ({
     generatedAt: '2026-03-06T14:00:00.000Z',
@@ -269,6 +274,10 @@ class DummyTenantsController {
       useValue: systemDashboardServiceMock,
     },
     {
+      provide: SystemTelemetryService,
+      useValue: systemTelemetryServiceMock,
+    },
+    {
       provide: JwtService,
       useValue: {
         verify: jest.fn((token: string) => {
@@ -324,6 +333,7 @@ describe('System contract smoke', () => {
     systemDashboardServiceMock.getDashboard.mockClear();
     systemDashboardServiceMock.getLayout.mockClear();
     systemDashboardServiceMock.saveLayout.mockClear();
+    systemTelemetryServiceMock.recordSecurityEvent.mockClear();
   });
 
   afterAll(async () => {
@@ -544,3 +554,4 @@ describe('System contract smoke', () => {
       .expect(503);
   });
 });
+

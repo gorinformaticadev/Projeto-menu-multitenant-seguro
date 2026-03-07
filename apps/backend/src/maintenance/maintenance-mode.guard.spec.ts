@@ -15,6 +15,9 @@ describe('MaintenanceModeGuard', () => {
   const notificationServiceMock = {
     emitSystemAlert: jest.fn(),
   };
+  const systemTelemetryServiceMock = {
+    recordSecurityEvent: jest.fn(),
+  };
 
   let previousBypassToken: string | undefined;
   let previousJwtSecret: string | undefined;
@@ -25,6 +28,7 @@ describe('MaintenanceModeGuard', () => {
       jwtServiceMock as unknown as JwtService,
       auditServiceMock as any,
       notificationServiceMock as any,
+      systemTelemetryServiceMock as any,
     );
 
   const createContext = (request: any): ExecutionContext =>
@@ -167,5 +171,13 @@ describe('MaintenanceModeGuard', () => {
     await expect(guard.canActivate(createContext(request))).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
+    expect(systemTelemetryServiceMock.recordSecurityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'maintenance_blocked',
+        statusCode: 503,
+      }),
+    );
   });
 });
+
+

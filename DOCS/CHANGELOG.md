@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file. See [standa
 ### Features
 
 * **dashboard:** harden operational history buffers and add contextual drill-down, responsive visual polish, unified widget states, mobile-safe layout editing, and updated dashboard documentation
+* **dashboard:** add lightweight operational telemetry with normalized route latency/error metrics and security pressure summaries for the operational dashboard
 
 ## [3.0.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v2.0.0...v3.0.0) (2026-01-27)
 

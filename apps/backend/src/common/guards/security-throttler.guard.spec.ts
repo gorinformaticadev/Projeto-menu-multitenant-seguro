@@ -18,6 +18,9 @@ describe('SecurityThrottlerGuard identity resolution', () => {
   const rateLimitMetricsService = {
     record: jest.fn(),
   };
+  const systemTelemetryService = {
+    recordSecurityEvent: jest.fn(),
+  };
 
   const createGuard = () =>
     new SecurityThrottlerGuard(
@@ -27,6 +30,7 @@ describe('SecurityThrottlerGuard identity resolution', () => {
       securityConfigService as any,
       auditService as any,
       rateLimitMetricsService as any,
+      systemTelemetryService as any,
     );
 
   it('uses tenant:user tracker when request is authenticated', () => {
@@ -53,3 +57,4 @@ describe('SecurityThrottlerGuard identity resolution', () => {
     expect(identity.tracker.startsWith('ip:10.0.0.20:target:')).toBe(true);
   });
 });
+

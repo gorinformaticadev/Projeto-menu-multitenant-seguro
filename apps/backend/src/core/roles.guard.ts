@@ -2,34 +2,49 @@ import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@
 import { Reflector } from '@nestjs/core';
 import { Role } from '@prisma/client';
 import { ROLES_KEY } from '@core/decorators/roles.decorator';
+import { SystemTelemetryService } from '@common/services/system-telemetry.service';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private reflector: Reflector) { }
+  constructor(
+    private reflector: Reflector,
+    private readonly systemTelemetryService: SystemTelemetryService,
+  ) {}
 
   canActivate(context: ExecutionContext): boolean {
     const requiredRoles = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
+    const request = context.switchToHttp().getRequest();
 
-    // POLÍTICA DE SEGURANÇA: Negar por padrão se não especificado
     if (!requiredRoles || requiredRoles.length === 0) {
-      throw new ForbiddenException('Acesso negado - permissões não definidas');
+      this.recordForbidden(request);
+      throw new ForbiddenException('Acesso negado - permissoes nao definidas');
     }
 
-    const { user } = context.switchToHttp().getRequest();
+    const { user } = request;
 
     if (!user) {
-      throw new ForbiddenException('Usuário não autenticado');
+      this.recordForbidden(request);
+      throw new ForbiddenException('Usuario nao autenticado');
     }
 
     const hasRole = requiredRoles.some((role) => user.role === role);
 
     if (!hasRole) {
-      throw new ForbiddenException(`Permissão insuficiente. Requer: ${requiredRoles.join(', ')}`);
+      this.recordForbidden(request);
+      throw new ForbiddenException(`Permissao insuficiente. Requer: ${requiredRoles.join(', ')}`);
     }
 
     return true;
+  }
+
+  private recordForbidden(request: Record<string, any>) {
+    this.systemTelemetryService.recordSecurityEvent({
+      type: 'forbidden',
+      request,
+      statusCode: 403,
+    });
   }
 }

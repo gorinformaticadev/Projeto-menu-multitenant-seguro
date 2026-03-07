@@ -11,7 +11,7 @@ import { MaintenanceModeService, MaintenanceState } from './maintenance-mode.ser
 import { AuditService } from '../audit/audit.service';
 import { extractAuditContext } from '../audit/audit-request-context.util';
 import { NotificationService } from '../notifications/notification.service';
-
+import { SystemTelemetryService } from '@common/services/system-telemetry.service';
 
 @Injectable()
 export class MaintenanceModeGuard implements CanActivate {
@@ -22,6 +22,7 @@ export class MaintenanceModeGuard implements CanActivate {
     private readonly jwtService: JwtService,
     private readonly auditService: AuditService,
     private readonly notificationService: NotificationService,
+    private readonly systemTelemetryService: SystemTelemetryService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -56,6 +57,13 @@ export class MaintenanceModeGuard implements CanActivate {
     if (await this.canBypass(request, maintenance, method, requestPath)) {
       return true;
     }
+
+    this.systemTelemetryService.recordSecurityEvent({
+      type: 'maintenance_blocked',
+      request,
+      route: requestPath,
+      statusCode: 503,
+    });
 
     throw new ServiceUnavailableException({
       error: 'MAINTENANCE_MODE',
@@ -138,7 +146,12 @@ export class MaintenanceModeGuard implements CanActivate {
     const headerName = String(maintenance.bypassHeader || 'X-Maintenance-Bypass').trim().toLowerCase();
     const providedBypassToken = this.readHeader(request, headerName);
 
-    if (!providedBypassToken || providedBypassToken !== expectedBypassToken) {
+    if (!providedBypassToken) {
+      return false;
+    }
+
+    if (providedBypassToken !== expectedBypassToken) {
+      this.recordMaintenanceBypassAttempt(request, method, requestPath);
       return false;
     }
 
@@ -153,11 +166,13 @@ export class MaintenanceModeGuard implements CanActivate {
     const jwtSecret = String(process.env.JWT_SECRET || '').trim();
     if (!jwtSecret) {
       this.logger.warn('JWT_SECRET ausente; bypass de maintenance foi negado.');
+      this.recordMaintenanceBypassAttempt(request, method, requestPath);
       return false;
     }
 
     const token = this.extractBearerToken(request);
     if (!token) {
+      this.recordMaintenanceBypassAttempt(request, method, requestPath);
       return false;
     }
 
@@ -167,12 +182,14 @@ export class MaintenanceModeGuard implements CanActivate {
       });
       const role = String(payload?.role || '').trim().toUpperCase();
       if (!this.hasBypassRole(role, allowedRoles)) {
+        this.recordMaintenanceBypassAttempt(request, method, requestPath);
         return false;
       }
 
       await this.logBypassUsage(request, method, requestPath, payload);
       return true;
     } catch {
+      this.recordMaintenanceBypassAttempt(request, method, requestPath);
       return false;
     }
   }
@@ -282,6 +299,16 @@ export class MaintenanceModeGuard implements CanActivate {
 
   private isDashboardMaintenanceRole(role: string): boolean {
     return role === 'SUPER_ADMIN' || role === 'ADMIN';
+  }
+
+  private recordMaintenanceBypassAttempt(request: Request, method: string, requestPath: string) {
+    this.systemTelemetryService.recordSecurityEvent({
+      type: 'maintenance_bypass_attempt',
+      request,
+      route: requestPath,
+      statusCode: 403,
+    });
+    this.logger.warn(`Tentativa de bypass de maintenance negada em ${method} ${requestPath}`);
   }
 
   private async logBypassUsage(

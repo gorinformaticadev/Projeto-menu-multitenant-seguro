@@ -1,4 +1,4 @@
-﻿import { Module, NestModule, MiddlewareConsumer, DynamicModule } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer, DynamicModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from "@nestjs/throttler";
@@ -18,6 +18,7 @@ import { ValidatorsModule } from './common/validators/validators.module';
 import { HttpsRedirectMiddleware } from './common/middleware/https-redirect.middleware';
 import { SentryModule } from './common/services/sentry.module';
 import { CommonModule } from './common/common.module';
+import { SystemTelemetryModule } from './common/system-telemetry.module';
 import { UpdateModule } from './update/update.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SecureFilesModule } from './core/secure-files/secure-files.module';
@@ -33,6 +34,7 @@ import { MaintenanceModule } from './maintenance/maintenance.module';
 import { MaintenanceModeGuard } from './maintenance/maintenance-mode.guard';
 import { SystemDataRetentionModule } from './retention/system-data-retention.module';
 import { ResponseTimeMetricsInterceptor } from './dashboard/system-response-time-metrics.interceptor';
+import { SystemTelemetryInterceptor } from './common/interceptors/system-telemetry.interceptor';
 import { SystemDashboardModule } from './dashboard/system-dashboard.module';
 
 @Module({
@@ -40,14 +42,15 @@ import { SystemDashboardModule } from './dashboard/system-dashboard.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    // Módulo de agendamento para tarefas cron
+    // Modulo de agendamento para tarefas cron
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
     PathsModule,
     SentryModule,
     CommonModule,
+    SystemTelemetryModule,
     // ============================================
-    // 🛡️  RATE LIMITING - Guard global + limites por endpoint via @Throttle
+    // Rate limiting global com limites por endpoint via @Throttle
     // ============================================
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
@@ -86,7 +89,7 @@ import { SystemDashboardModule } from './dashboard/system-dashboard.module';
     SystemDashboardModule,
     SystemDataRetentionModule,
     WhatsAppModule,
-    SecureFilesModule, // Módulo de uploads sensíveis
+    SecureFilesModule, // Modulo de uploads sensiveis
     MaintenanceModule,
     CronModule,
     HealthModule,
@@ -102,6 +105,10 @@ import { SystemDashboardModule } from './dashboard/system-dashboard.module';
     },
     {
       provide: APP_INTERCEPTOR,
+      useClass: SystemTelemetryInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
       useClass: ResponseTimeMetricsInterceptor,
     },
     // Maintenance Mode Global
@@ -114,7 +121,7 @@ import { SystemDashboardModule } from './dashboard/system-dashboard.module';
       provide: APP_GUARD,
       useClass: SecurityThrottlerGuard,
     },
-    // CSRF Protection Global (TEMPORARIAMENTE DESABILITADO PARA RESOLVER 403 EM PRODUÇÃO)
+    // CSRF Protection Global (TEMPORARIAMENTE DESABILITADO PARA RESOLVER 403 EM PRODUÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½O)
     // {
     //   provide: APP_GUARD,
     //   useClass: CsrfGuard,
@@ -124,13 +131,13 @@ import { SystemDashboardModule } from './dashboard/system-dashboard.module';
 export class AppModule implements NestModule {
   static async register(): Promise<DynamicModule> {
     const prisma = new PrismaService();
-    // Conecta explicitamente para garantir que o banco está acessível
-    // (Opcional, pois o Prisma conecta ao fazer a query, mas boa prática para debug)
+    // Conecta explicitamente para garantir que o banco estÃƒÂ¯Ã‚Â¿Ã‚Â½ acessÃƒÂ¯Ã‚Â¿Ã‚Â½vel
+    // (Opcional, pois o Prisma conecta ao fazer a query, mas boa prÃƒÂ¯Ã‚Â¿Ã‚Â½tica para debug)
 
     const dynamicModules = await DynamicModulesLoader.load(prisma);
 
-    // Desconecta após carregar (cada módulo terá seu próprio PrismaService via injeção se necessário,
-    // ou usarão o PrismaModule global)
+    // Desconecta apÃƒÂ¯Ã‚Â¿Ã‚Â½s carregar (cada mÃƒÂ¯Ã‚Â¿Ã‚Â½dulo terÃƒÂ¯Ã‚Â¿Ã‚Â½ seu prÃƒÂ¯Ã‚Â¿Ã‚Â½prio PrismaService via injeÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½o se necessÃƒÂ¯Ã‚Â¿Ã‚Â½rio,
+    // ou usarÃƒÂ¯Ã‚Â¿Ã‚Â½o o PrismaModule global)
     await prisma.$disconnect();
 
     return {
@@ -140,10 +147,13 @@ export class AppModule implements NestModule {
   }
 
   configure(consumer: MiddlewareConsumer) {
-    // HTTPS Redirect - Apenas em produção
+    // HTTPS Redirect - Apenas em produÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½o
     consumer.apply(HttpsRedirectMiddleware).forRoutes('*');
   }
 }
 
 // Forced restart trigger
+
+
+
 

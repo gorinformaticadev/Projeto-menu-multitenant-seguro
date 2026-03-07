@@ -7,17 +7,19 @@ import {
 
 describe("dashboard.interactions", () => {
   it("filtra widgets com problemas operacionais reais no modo problems", () => {
-    const widgetIds = ["version", "maintenance", "jobs", "notifications", "api"];
+    const widgetIds = ["version", "maintenance", "jobs", "notifications", "routeErrors", "security", "api"];
 
     const result = filterDashboardWidgetIds(widgetIds, "problems", {
       version: { status: "healthy" },
       maintenance: { status: "healthy", enabled: true },
       jobs: { status: "healthy", failedLast24h: 2 },
       notifications: { status: "healthy", criticalUnread: 1 },
+      routeErrors: { status: "healthy", totalErrorCount: 3, errorRateRecent: 6.2 },
+      security: { status: "healthy", topRateLimitedIps: [{ ip: "10.0.0.2", count: 2 }] },
       api: { status: "healthy" },
     });
 
-    expect(result).toEqual(["maintenance", "jobs", "notifications"]);
+    expect(result).toEqual(["maintenance", "jobs", "notifications", "routeErrors", "security"]);
   });
 
   it("mantem apenas falhas graves no modo critical", () => {
@@ -31,6 +33,16 @@ describe("dashboard.interactions", () => {
     });
 
     expect(result).toEqual(["database", "notifications", "errors"]);
+  });
+
+  it("classifica telemetria de rota como infraestrutura", () => {
+    const result = filterDashboardWidgetIds(["routeLatency", "routeErrors", "jobs"], "infrastructure", {
+      routeLatency: { status: "healthy" },
+      routeErrors: { status: "healthy" },
+      jobs: { status: "healthy" },
+    });
+
+    expect(result).toEqual(["routeLatency", "routeErrors"]);
   });
 
   it("retorna o drill-down correto por widget quando existe destino util", () => {
@@ -77,3 +89,4 @@ describe("dashboard.interactions", () => {
     expect(adminActions.map((item) => item.id)).toEqual(["updates", "backups"]);
   });
 });
+
