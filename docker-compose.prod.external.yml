@@ -20,7 +20,7 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      test: [ "CMD", "curl", "-f", "http://localhost:5000" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -51,51 +51,60 @@ services:
       - SEED_LOCK_RETRY_MS=${SEED_LOCK_RETRY_MS:-2000}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - DB_HOST=db
+      - DB_PORT=5432
       - UPLOADS_DIR=/app/uploads
       - BACKUP_DIR=/app/backups
     volumes:
-      - uploads:/app/uploads
-      - backups:/app/backups
+      - uploads_prod:/app/uploads
+      - backups_prod:/app/backups
     networks:
-      - app-network
+      - multitenant-network
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/api/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:4000/api/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
 
   db:
-    image: postgres:15-alpine
+    image: postgres:15
+    container_name: multitenant-postgres
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-${DB_USER:-postgres}}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-${DB_PASSWORD:-postgres}}
-      - POSTGRES_DB=${POSTGRES_DB:-${DB_NAME:-multitenant}}
+      - POSTGRES_DB=${DB_NAME:-multitenant}
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
       - postgres_data_prod:/var/lib/postgresql/data
     networks:
-      - app-network
+      - multitenant-network
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-${DB_USER:-postgres}}" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-multitenant}" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   redis:
     image: redis:7-alpine
+    container_name: multitenant-redis
     restart: unless-stopped
+    command: sh -c 'redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"'
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
       - redis_data_prod:/data
     networks:
-      - app-network
+      - multitenant-network
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5

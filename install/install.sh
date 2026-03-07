@@ -415,8 +415,11 @@ native_setup_database() {
     local db_name="$1"
     local db_user="$2"
     local db_pass="$3"
+    local redis_pass="$4"
     log_info "Etapa 14/23: instalando PostgreSQL/Redis e criando database..."
     as_root "DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql postgresql-contrib redis-server"
+    as_root "sed -i 's/^# requirepass foobared/requirepass ${redis_pass}/g' /etc/redis/redis.conf"
+    as_root "if ! grep -q '^requirepass ' /etc/redis/redis.conf; then echo 'requirepass ${redis_pass}' >> /etc/redis/redis.conf; fi"
     as_root "systemctl enable postgresql redis-server && systemctl restart postgresql redis-server"
     as_root "if ! sudo -u postgres psql -tAc \"SELECT 1 FROM pg_roles WHERE rolname='${db_user}'\" | grep -q 1; then sudo -u postgres psql -c \"CREATE USER \\\"${db_user}\\\" WITH PASSWORD '${db_pass}' CREATEDB;\"; else sudo -u postgres psql -c \"ALTER USER \\\"${db_user}\\\" WITH PASSWORD '${db_pass}' CREATEDB;\"; fi"
     as_root "if ! sudo -u postgres psql -tAc \"SELECT 1 FROM pg_database WHERE datname='${db_name}'\" | grep -q 1; then sudo -u postgres psql -c \"CREATE DATABASE \\\"${db_name}\\\" OWNER \\\"${db_user}\\\";\"; fi"
@@ -434,6 +437,7 @@ native_create_app_envs() {
     local db_pass="$8"
     local jwt_secret="$9"
     local enc_key="${10}"
+    local redis_pass="${11}"
 
     local backend_env="$app_dir/apps/backend/.env"
     local frontend_env="$app_dir/apps/frontend/.env.local"
@@ -453,9 +457,10 @@ native_create_app_envs() {
     upsert_env "UPLOADS_PUBLIC_URL" "https://${domain}/uploads" "$backend_env"
     upsert_env "UPLOADS_DIR" "${app_dir}/uploads" "$backend_env"
     upsert_env "BACKUP_DIR" "${app_dir}/backups" "$backend_env"
-    upsert_env "LOGOS_UPLOAD_DIR" "${app_dir}/uploads/logos" "$backend_env"
     upsert_env "REDIS_HOST" "127.0.0.1" "$backend_env"
     upsert_env "REDIS_PORT" "6379" "$backend_env"
+    upsert_env "REDIS_PASSWORD" "$11" "$backend_env"
+    upsert_env "REDIS_DB" "0" "$backend_env"
     upsert_env "SEED_LOCK_ID" "${SEED_LOCK_ID:-87456321}" "$backend_env"
     upsert_env "SEED_LOCK_WAIT_SECONDS" "${SEED_LOCK_WAIT_SECONDS:-90}" "$backend_env"
     upsert_env "SEED_LOCK_RETRY_MS" "${SEED_LOCK_RETRY_MS:-2000}" "$backend_env"
@@ -530,7 +535,8 @@ native_show_report() {
     local db_pass="$6"
     local jwt_secret="$7"
     local enc_key="$8"
-    local app_dir="$9"
+    local redis_pass="$9"
+    local app_dir="${10}"
     echoblue "=========================================================="
     echoblue "      RELATORIO FINAL DE INSTALACAO - NATIVE             "
     echoblue "=========================================================="
@@ -541,6 +547,7 @@ native_show_report() {
     echo "Database: ${db_name}"
     echo "DB user: ${db_user}"
     echo "DB pass: ${db_pass}"
+    echo "Redis pass: ${redis_pass}"
     echo "JWT_SECRET: ${jwt_secret}"
     echo "ENCRYPTION_KEY: ${enc_key}"
     echo "Diretorio: ${app_dir}"
@@ -558,6 +565,7 @@ run_install_native() {
     local db_pass="$8"
     local jwt_secret="$9"
     local enc_key="${10}"
+    local redis_pass="${11}"
     local app_dir="${NATIVE_BASE_DIR}/${instance_name}"
 
     native_system_create_user "$admin_pass"
@@ -574,8 +582,8 @@ run_install_native() {
     native_install_project_dependencies "$app_dir"
     native_install_certbot
     native_build_apps "$app_dir"
-    native_setup_database "$db_name" "$db_user" "$db_pass"
-    native_create_app_envs "$app_dir" "$domain" "$email" "$admin_email" "$admin_pass" "$db_name" "$db_user" "$db_pass" "$jwt_secret" "$enc_key"
+    native_setup_database "$db_name" "$db_user" "$db_pass" "$redis_pass"
+    native_create_app_envs "$app_dir" "$domain" "$email" "$admin_email" "$admin_pass" "$db_name" "$db_user" "$db_pass" "$jwt_secret" "$enc_key" "$redis_pass"
     native_migrate_and_seed "$app_dir"
     native_start_pm2_apps "$app_dir" "$instance_name"
     native_configure_nginx_proxy "$domain" "$instance_name"
@@ -584,7 +592,7 @@ run_install_native() {
         log_warn "SSL nao foi emitido/configurado nesta execucao. Instalacao native continuara sem abortar."
     fi
     native_start_firewall
-    native_show_report "$domain" "$admin_email" "$admin_pass" "$db_name" "$db_user" "$db_pass" "$jwt_secret" "$enc_key" "$app_dir"
+    native_show_report "$domain" "$admin_email" "$admin_pass" "$db_name" "$db_user" "$db_pass" "$jwt_secret" "$enc_key" "$redis_pass" "$app_dir"
 }
 
 # --- Validações ---
@@ -830,6 +838,9 @@ run_update_native() {
     local native_instances=()
     local selected_count=0
 
+    # Pega variaveis globais e repassa
+    local redis_pass="${REDIS_PASSWORD:-$(openssl rand -hex 16)}"
+
     while IFS= read -r instance_dir; do
         [[ -n "$instance_dir" ]] && native_instances+=("$instance_dir")
     done < <(list_native_instances)
@@ -852,6 +863,21 @@ run_update_native() {
         native_system_permissions_and_project "$instance_dir"
         native_write_version_metadata "$instance_dir"
         native_install_project_dependencies "$instance_dir"
+        
+        # O Update também injeta a senha de Redis se rodando native
+        if [[ -f "/etc/redis/redis.conf" ]]; then
+            as_root "sed -i 's/^# requirepass foobared/requirepass ${redis_pass}/g' /etc/redis/redis.conf"
+            as_root "if ! grep -q '^requirepass ' /etc/redis/redis.conf; then echo 'requirepass ${redis_pass}' >> /etc/redis/redis.conf; fi"
+            as_root "systemctl restart redis-server || true"
+        fi
+        
+        # Propaga o novo REDIS_PASSWORD pro .env do backend da instancia e forca a adicao se ja havia algum valor no install/.env.production
+        if [[ -f "$instance_dir/apps/backend/.env" ]]; then
+             upsert_env "REDIS_PASSWORD" "$redis_pass" "$instance_dir/apps/backend/.env"
+             upsert_env "REDIS_DB" "0" "$instance_dir/apps/backend/.env"
+             as_root "chown ${NATIVE_SYSTEM_USER}:${NATIVE_SYSTEM_USER} '$instance_dir/apps/backend/.env'"
+        fi
+
         native_build_apps "$instance_dir"
         native_migrate_and_seed "$instance_dir"
         native_restart_apps "$instance_name"
@@ -1060,6 +1086,7 @@ run_install() {
     local db_name="${DB_NAME:-db_${domain_prefix}}"
     local db_user="${DB_USER:-us_${domain_prefix}}"
     local db_pass="${DB_PASSWORD:-$(openssl rand -hex 16)}"
+    local redis_pass="${REDIS_PASSWORD:-$(openssl rand -hex 16)}"
     local jwt_secret="${JWT_SECRET:-$(openssl rand -hex 32)}"
     local enc_key="${ENCRYPTION_KEY:-$(openssl rand -hex 32)}"
     local db_host_env="db"
@@ -1103,6 +1130,8 @@ run_install() {
     upsert_env "DB_PASSWORD" "$db_pass"
     upsert_env "DB_NAME" "$db_name"
     upsert_env "DATABASE_URL" "postgresql://$db_user:$db_pass@$db_host_env:5432/$db_name?schema=public"
+    upsert_env "REDIS_PASSWORD" "$redis_pass"
+    upsert_env "REDIS_DB" "0"
     upsert_env "JWT_SECRET" "$jwt_secret"
     upsert_env "ENCRYPTION_KEY" "$enc_key"
     upsert_env "REQUIRE_SECRET_MANAGER" "false"
@@ -1129,6 +1158,8 @@ run_install() {
             log_info "Criado apps/backend/.env a partir de .env.example"
         fi
         upsert_env "DATABASE_URL" "postgresql://$db_user:$db_pass@$db_host_env:5432/$db_name?schema=public" "$BACKEND_ENV"
+        upsert_env "REDIS_PASSWORD" "$redis_pass" "$BACKEND_ENV"
+        upsert_env "REDIS_DB" "0" "$BACKEND_ENV"
         upsert_env "JWT_SECRET" "$jwt_secret" "$BACKEND_ENV"
         upsert_env "ENCRYPTION_KEY" "$enc_key" "$BACKEND_ENV"
         upsert_env "FRONTEND_URL" "https://$domain" "$BACKEND_ENV"
@@ -1149,7 +1180,7 @@ run_install() {
     fi
 
     if [[ "$install_mode" == "native" ]]; then
-        run_install_native "$domain_prefix" "$domain" "$email" "${admin_email:-$email}" "$admin_pass" "$db_name" "$db_user" "$db_pass" "$jwt_secret" "$enc_key"
+        run_install_native "$domain_prefix" "$domain" "$email" "${admin_email:-$email}" "$admin_pass" "$db_name" "$db_user" "$db_pass" "$jwt_secret" "$enc_key" "$redis_pass"
         return 0
     fi
 
@@ -1230,6 +1261,7 @@ run_install() {
     echo -e "\033[1;32m🔴 CACHE (Redis):\033[0m"
     echo -e "   Host:           redis"
     echo -e "   Porta:          6379"
+    echo -e "   Senha:          $redis_pass"
     echo -e "\n"
 
     echo -e "\033[1;32m🔑 SEGREDOS DO SISTEMA:\033[0m"
@@ -1305,6 +1337,17 @@ run_update() {
     upsert_env "IMAGE_TAG" "$IMAGE_TAG" "$ENV_PRODUCTION"
     upsert_env "LOCAL_BUILD_ONLY" "$LOCAL_BUILD_ONLY" "$ENV_PRODUCTION"
     upsert_env "REQUIRE_SECRET_MANAGER" "${REQUIRE_SECRET_MANAGER:-false}" "$ENV_PRODUCTION"
+
+    # Garante segurança do Redis em updates posteriores a 1.x
+    local redis_pass="${REDIS_PASSWORD:-}"
+    if [[ -z "$redis_pass" ]]; then
+        redis_pass="$(openssl rand -hex 16)"
+        log_info "Gerando nova REDIS_PASSWORD segura ($redis_pass) durante o update..."
+        upsert_env "REDIS_PASSWORD" "$redis_pass" "$ENV_PRODUCTION"
+        upsert_env "REDIS_DB" "0" "$ENV_PRODUCTION"
+        export REDIS_PASSWORD="$redis_pass"
+        export REDIS_DB="0"
+    fi
 
     if [[ -d "$PROJECT_ROOT/.git" ]] && [[ -n "$branch" ]]; then
         log_info "Atualizando repositório (branch: ${branch})..."

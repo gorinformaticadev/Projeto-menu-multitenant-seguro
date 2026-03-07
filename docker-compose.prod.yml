@@ -60,6 +60,7 @@ services:
       - SEED_LOCK_RETRY_MS=${SEED_LOCK_RETRY_MS:-2000}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
       - DB_HOST=db
       - DB_PORT=5432
       - UPLOADS_DIR=/app/uploads
@@ -104,13 +105,15 @@ services:
     image: redis:7-alpine
     container_name: multitenant-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: sh -c 'redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"'
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
     networks:
       - multitenant-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 30s
       timeout: 10s
       retries: 3
