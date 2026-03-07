@@ -486,6 +486,24 @@ model CronSchedule {
   @@map("cron_schedules")
 }
 
+model CronJobHeartbeat {
+  jobKey                  String   @id
+  lastStartedAt           DateTime?
+  lastSucceededAt         DateTime?
+  lastFailedAt            DateTime?
+  lastDurationMs          Int?
+  lastStatus              String   @default("idle")
+  lastError               String?
+  nextExpectedRunAt       DateTime?
+  consecutiveFailureCount Int      @default(0)
+  updatedAt               DateTime @updatedAt
+
+  @@index([lastStatus])
+  @@index([updatedAt])
+  @@index([nextExpectedRunAt])
+  @@map("cron_job_heartbeats")
+}
+
 enum Role {
   SUPER_ADMIN
   ADMIN

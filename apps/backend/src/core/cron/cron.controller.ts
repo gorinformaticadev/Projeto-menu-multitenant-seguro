@@ -15,8 +15,14 @@ export class CronController {
     }
 
     @Get()
-    listJobs() {
+    async listJobs() {
         return this.cronService.listJobs();
+    }
+
+    @Get('runtime')
+    @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+    async getRuntimeJobs() {
+        return this.cronService.getRuntimeJobs();
     }
 
     @Post(':key/trigger')
@@ -44,8 +50,12 @@ export class CronController {
 
         try {
             await this.cronService.updateSchedule(key, schedule);
-        } catch (error: any) {
-            throw new BadRequestException(error?.message || 'falha ao atualizar schedule');
+        } catch (error: unknown) {
+            const message =
+                error instanceof Error && error.message.trim().length > 0
+                    ? error.message
+                    : 'falha ao atualizar schedule';
+            throw new BadRequestException(message);
         }
         return { success: true, schedule };
     }

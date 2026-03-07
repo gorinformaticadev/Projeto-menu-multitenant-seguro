@@ -9,6 +9,7 @@ import { AuditModule } from '../audit/audit.module';
 import { CommonModule } from '../common/common.module';
 import { PathsModule } from '@core/common/paths/paths.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { CronModule } from '@core/cron/cron.module';
 
 /**
  * Módulo do Sistema de Atualizações
@@ -21,7 +22,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
  * - Interface REST para administradores
  */
 @Module({
-  imports: [PrismaModule, AuditModule, CommonModule, PathsModule, NotificationsModule],
+  imports: [PrismaModule, AuditModule, CommonModule, PathsModule, NotificationsModule, CronModule],
   controllers: [UpdateController, SystemUpdateController],
   providers: [UpdateService, UpdateCronService, SystemUpdateAdminService],
   exports: [UpdateService, SystemUpdateAdminService],
@@ -29,4 +30,3 @@ import { NotificationsModule } from '../notifications/notifications.module';
 export class UpdateModule {
   // Empty implementation
 }
-

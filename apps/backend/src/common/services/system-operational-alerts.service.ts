@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { CronExpression } from '@nestjs/schedule';
 import { BackupJobStatus } from '@prisma/client';
 import Redis from 'ioredis';
 import { AuditService } from '../../audit/audit.service';
+import { CronService } from '../../core/cron/cron.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { NotificationGateway } from '../../notifications/notification.gateway';
 import { NotificationService, SystemNotificationSeverity } from '../../notifications/notification.service';
@@ -58,7 +59,7 @@ const DEFAULT_ALERT_JOB_FAILURE_STORM_THRESHOLD = 4;
 const DEFAULT_ALERT_INFRA_DEGRADED_MIN_CONSECUTIVE = 3;
 
 @Injectable()
-export class SystemOperationalAlertsService {
+export class SystemOperationalAlertsService implements OnModuleInit {
   private readonly logger = new Logger(SystemOperationalAlertsService.name);
   private readonly lockId = this.readIntFromEnv('OPS_ALERTS_LOCK_ID', 98542174, 1, Number.MAX_SAFE_INTEGER);
   private readonly advisoryLockEnabled =
@@ -73,11 +74,26 @@ export class SystemOperationalAlertsService {
     private readonly notificationGateway: NotificationGateway,
     private readonly pushNotificationService: PushNotificationService,
     private readonly auditService: AuditService,
+    private readonly cronService: CronService,
   ) {}
 
-  @Cron(CronExpression.EVERY_MINUTE, {
-    name: 'system_operational_alerts_evaluator',
-  })
+  async onModuleInit(): Promise<void> {
+    await this.cronService.register(
+      'system.operational_alerts_evaluator',
+      CronExpression.EVERY_MINUTE,
+      async () => {
+        await this.handleOperationalAlertsEvaluator();
+      },
+      {
+        name: 'Operational alerts evaluator',
+        description: 'Avalia telemetria e emite alertas operacionais automaticos.',
+        settingsUrl: '/configuracoes/sistema/cron',
+        origin: 'core',
+        editable: true,
+      },
+    );
+  }
+
   async handleOperationalAlertsEvaluator(): Promise<void> {
     const lockAcquired = await this.tryAcquireAdvisoryLock();
     if (!lockAcquired) {
@@ -172,7 +188,7 @@ export class SystemOperationalAlertsService {
     method: string;
     route: string;
   }): Promise<boolean> {
-    return this.emitAlertIfNeeded(
+    return this.dispatchOperationalAlert(
       {
         action: 'MAINTENANCE_BYPASS_USED',
         cooldownKey: 'MAINTENANCE_BYPASS_USED',
@@ -188,8 +204,16 @@ export class SystemOperationalAlertsService {
         source: 'maintenance',
       },
       Date.now(),
-      this.getEvaluatorConfig().cooldownMinutes,
     );
+  }
+
+  async dispatchOperationalAlert(
+    input: AlertDispatchInput,
+    nowMs = Date.now(),
+    cooldownMinutes = this.getEvaluatorConfig().cooldownMinutes,
+  ): Promise<boolean> {
+    this.pruneCooldownState(nowMs);
+    return this.emitAlertIfNeeded(input, nowMs, cooldownMinutes);
   }
 
   private async evaluateHigh5xxErrorRateAlert(

@@ -4,55 +4,50 @@ import { UpdateService } from './update.service';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { CronService } from '@core/cron/cron.service';
 
-/**
- * Serviço de CronJob para verificação automática de atualizações
- * 
- * Agora usa o sistema de Cron Dinâmico
- */
 @Injectable()
 export class UpdateCronService implements OnModuleInit {
   private readonly logger = new Logger(UpdateCronService.name);
 
   constructor(
-    private updateService: UpdateService,
-    private prisma: PrismaService,
-    private cronService: CronService, // Injeta o novo serviço
-  ) {
-    // Empty implementation
+    private readonly updateService: UpdateService,
+    private readonly prisma: PrismaService,
+    private readonly cronService: CronService,
+  ) {}
+
+  async onModuleInit(): Promise<void> {
+    await this.registerUpdateCheckJob();
+    await this.registerLogCleanupJob();
   }
 
-  onModuleInit() {
-    // Registra os jobs no sistema dinâmico
-    this.registerUpdateCheckJob();
-    this.registerLogCleanupJob();
-  }
-
-  private registerUpdateCheckJob() {
-    this.cronService.register(
+  private async registerUpdateCheckJob(): Promise<void> {
+    await this.cronService.register(
       'system.update_check',
       CronExpression.EVERY_DAY_AT_MIDNIGHT,
       async () => {
         try {
-          this.logger.log('Iniciando verificação automática de atualizações...');
+          this.logger.log('Iniciando verificacao automatica de atualizacoes...');
           const result = await this.updateService.checkForUpdates();
           if (result.updateAvailable) {
-            this.logger.log(`Nova versão disponível: ${result.availableVersion}`);
+            this.logger.log(`Nova versao disponivel: ${result.availableVersion}`);
           } else {
-            this.logger.log('Sistema está atualizado');
+            this.logger.log('Sistema esta atualizado');
           }
         } catch (error) {
-          this.logger.error('Erro na verificação automática de atualizações:', error);
+          this.logger.error('Erro na verificacao automatica de atualizacoes:', error);
         }
       },
       {
-        name: 'Verificar Atualizações',
-        description: 'Verifica diariamente se há novas versões do sistema disponíveis no Git.'
-      }
+        name: 'Verificar atualizacoes',
+        description: 'Verifica diariamente se ha novas versoes do sistema no Git.',
+        settingsUrl: '/configuracoes/sistema/cron',
+        origin: 'core',
+        editable: true,
+      },
     );
   }
 
-  private registerLogCleanupJob() {
-    this.cronService.register(
+  private async registerLogCleanupJob(): Promise<void> {
+    await this.cronService.register(
       'system.log_cleanup',
       CronExpression.EVERY_WEEK,
       async () => {
@@ -61,13 +56,11 @@ export class UpdateCronService implements OnModuleInit {
           const cutoffDate = new Date();
           cutoffDate.setDate(cutoffDate.getDate() - 90);
 
-
           const logsToDelete = await this.prisma.updateLog.count({
             where: { startedAt: { lt: cutoffDate } },
           });
 
           if (logsToDelete > 0) {
-
             await this.prisma.updateLog.deleteMany({
               where: { startedAt: { lt: cutoffDate } },
             });
@@ -78,9 +71,12 @@ export class UpdateCronService implements OnModuleInit {
         }
       },
       {
-        name: 'Limpeza de Logs',
-        description: 'Remove logs de atualização com mais de 90 dias.'
-      }
+        name: 'Limpeza de logs',
+        description: 'Remove logs de atualizacao com mais de 90 dias.',
+        settingsUrl: '/configuracoes/sistema/cron',
+        origin: 'core',
+        editable: true,
+      },
     );
   }
 }

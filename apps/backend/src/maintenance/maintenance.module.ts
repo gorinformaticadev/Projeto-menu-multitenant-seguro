@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PrismaModule } from '../core/prisma/prisma.module';
 import { PathsModule } from '../core/common/paths/paths.module';
+import { CronModule } from '../core/cron/cron.module';
 import { TokenCleanupService } from '../common/services/token-cleanup.service';
 import { AuditModule } from '../audit/audit.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -11,7 +12,7 @@ import { MaintenanceModeGuard } from './maintenance-mode.guard';
 import { MaintenanceController } from './maintenance.controller';
 
 @Module({
-  imports: [JwtModule.register({}), PrismaModule, PathsModule, AuditModule, NotificationsModule, CommonModule],
+  imports: [JwtModule.register({}), PrismaModule, PathsModule, AuditModule, NotificationsModule, CommonModule, CronModule],
   controllers: [MaintenanceController],
   providers: [TokenCleanupService, MaintenanceModeService, MaintenanceModeGuard],
   exports: [TokenCleanupService, MaintenanceModeService, MaintenanceModeGuard],

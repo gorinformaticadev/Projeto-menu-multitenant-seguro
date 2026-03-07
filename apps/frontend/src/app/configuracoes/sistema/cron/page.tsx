@@ -18,8 +18,21 @@ interface CronJob {
   schedule: string;
   enabled: boolean;
   editable?: boolean;
+  origin?: "core" | "modulo";
+  runtimeRegistered?: boolean;
+  runtimeActive?: boolean;
+  sourceOfTruth?: "database";
   lastRun?: string;
+  lastStartedAt?: string;
+  lastSucceededAt?: string;
+  lastFailedAt?: string;
+  lastDurationMs?: number;
+  lastStatus?: "idle" | "running" | "success" | "failed";
+  lastError?: string;
   nextRun?: string;
+  nextExpectedRunAt?: string;
+  consecutiveFailureCount?: number;
+  issue?: "runtime_not_registered" | null;
   settingsUrl?: string;
 }
 
@@ -34,7 +47,7 @@ export default function CronJobsPage() {
   const fetchJobs = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get("/cron");
+      const response = await api.get("/cron/runtime");
       setJobs(response.data);
     } catch {
       toast({
@@ -119,10 +132,17 @@ export default function CronJobsPage() {
       });
       cancelEditingSchedule();
       await fetchJobs();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const description =
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        typeof (error as { response?: { data?: { message?: string } } }).response?.data?.message === "string"
+          ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+          : "Nao foi possivel salvar a expressao cron";
       toast({
         title: "Erro ao salvar periodicidade",
-        description: error?.response?.data?.message || "Nao foi possivel salvar a expressao cron",
+        description,
         variant: "destructive",
       });
     } finally {
@@ -133,6 +153,32 @@ export default function CronJobsPage() {
   if (loading) {
     return <div className="p-8 text-center">Carregando tarefas...</div>;
   }
+
+  const formatDateTime = (value?: string) => {
+    if (!value) {
+      return "-";
+    }
+
+    return format(new Date(value), "dd/MM/yyyy HH:mm:ss", { locale: ptBR });
+  };
+
+  const renderStatus = (job: CronJob) => {
+    const status = job.lastStatus || (job.enabled ? "idle" : "idle");
+    const labels: Record<string, string> = {
+      idle: "Aguardando",
+      running: "Executando",
+      success: "Sucesso",
+      failed: "Falhou",
+    };
+    const variant =
+      status === "failed" ? "destructive" : status === "running" ? "secondary" : "default";
+
+    return (
+      <Badge variant={variant}>
+        {labels[status] || "Aguardando"}
+      </Badge>
+    );
+  };
 
   return (
     <div className="p-8 space-y-6">
@@ -166,6 +212,10 @@ export default function CronJobsPage() {
                     <Badge variant={job.enabled ? "default" : "secondary"}>
                       {job.enabled ? "Ativo" : "Pausado"}
                     </Badge>
+                    {renderStatus(job)}
+                    <Badge variant={job.runtimeRegistered ? "outline" : "destructive"}>
+                      {job.runtimeRegistered ? "Runtime OK" : "Sem runtime"}
+                    </Badge>
                   </CardTitle>
                   <CardDescription>{job.description}</CardDescription>
                 </div>
@@ -198,7 +248,7 @@ export default function CronJobsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 gap-3 text-sm mt-4 md:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 text-sm mt-4 md:grid-cols-4">
                   <div>
                     <span className="text-muted-foreground block text-xs">Cronograma</span>
                     {!isEditing ? (
@@ -234,11 +284,19 @@ export default function CronJobsPage() {
                     )}
                   </div>
                   <div>
-                    <span className="text-muted-foreground block text-xs">Ultima Execucao</span>
-                    {job.lastRun ? format(new Date(job.lastRun), "dd/MM/yyyy HH:mm:ss", { locale: ptBR }) : "-"}
+                    <span className="text-muted-foreground block text-xs">Ultima execucao</span>
+                    {formatDateTime(job.lastStartedAt || job.lastRun)}
                   </div>
                   <div>
-                    <span className="text-muted-foreground block text-xs">Proxima Execucao</span>
+                    <span className="text-muted-foreground block text-xs">Ultimo sucesso</span>
+                    {formatDateTime(job.lastSucceededAt)}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-xs">Ultima falha</span>
+                    {formatDateTime(job.lastFailedAt)}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-xs">Proxima execucao</span>
                     {job.enabled && job.nextRun ? (
                       <span className="text-green-600 font-medium">
                         {format(new Date(job.nextRun), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
@@ -247,7 +305,37 @@ export default function CronJobsPage() {
                       <span className="text-muted-foreground">Agendamento pausado</span>
                     )}
                   </div>
+                  <div>
+                    <span className="text-muted-foreground block text-xs">Origem</span>
+                    <span>
+                      {job.sourceOfTruth === "database" ? "Persistida" : "Runtime"}
+                      {job.origin ? ` / ${job.origin}` : ""}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-xs">Heartbeat</span>
+                    <span>
+                      {job.lastDurationMs ? `${job.lastDurationMs} ms` : "-"}
+                      {typeof job.consecutiveFailureCount === "number"
+                        ? ` • falhas seguidas: ${job.consecutiveFailureCount}`
+                        : ""}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-xs">Proximo esperado</span>
+                    {formatDateTime(job.nextExpectedRunAt)}
+                  </div>
                 </div>
+                {job.issue === "runtime_not_registered" && (
+                  <div className="mt-4 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                    O job esta salvo na configuracao, mas ainda nao foi registrado no runtime atual.
+                  </div>
+                )}
+                {job.lastError && (
+                  <div className="mt-4 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm break-words">
+                    <span className="font-medium">Ultimo erro:</span> {job.lastError}
+                  </div>
+                )}
               </CardContent>
             </Card>
           );

@@ -1484,3 +1484,117 @@ Limitacao conhecida mantida:
 
 - ainda nao existe estado `resolved`
 - problemas continuos podem reemitir apos cada cooldown, o que e desejado nesta etapa, mas um ciclo de resolucao/ack permanece como melhoria futura
+
+### Etapa 8.3 - Diagnostico do scheduler, heartbeat e watchdog de jobs
+
+Fonte de verdade final dos jobs:
+
+- a fonte de verdade do agendamento editavel passou a ser `cron_schedules`
+- todos os jobs ativos do sistema agora se registram no `CronService`
+- a tela `/configuracoes/sistema/cron` e o endpoint `GET /api/cron/runtime` passam a refletir o runtime real
+- alteracoes de cron ou enable/disable continuam aplicadas em quente, sem restart
+
+Divergencia corrigida:
+
+- antes desta etapa havia duas excecoes fora do scheduler dinamico:
+  - `system_operational_alerts_evaluator`
+  - `cleanup-expired-tokens`
+- ambos estavam em `@Cron(...)`, logo:
+  - nao apareciam corretamente na tela
+  - nao obedeciam o cron salvo em `cron_schedules`
+  - nao tinham status/heartbeat unificado
+- agora esses jobs tambem usam `CronService.register(...)`
+
+Inventario atual dos jobs operacionais:
+
+| Job | Fonte atual | Cron salvo em tela? | Cron aplicado em runtime? | Ultima execucao visivel? | Problema encontrado |
+| --- | --- | --- | --- | --- | --- |
+| `system.backup_auto_create` | `BackupCronService -> CronService.register` | sim | sim | sim | sem divergencia apos unificacao |
+| `system.backup_retention` | `BackupCronService -> CronService.register` | sim | sim | sim | sem divergencia apos unificacao |
+| `system.update_check` | `UpdateCronService -> CronService.register` | sim | sim | sim | ajustado para marcar `origin=core` e usar a tela de cron |
+| `system.log_cleanup` | `UpdateCronService -> CronService.register` | sim | sim | sim | ajustado para marcar `origin=core` e usar a tela de cron |
+| `system.system_data_retention` | `SystemDataRetentionService -> CronService.register` | sim | sim | sim | sem divergencia apos unificacao |
+| `system.operational_alerts_evaluator` | `SystemOperationalAlertsService -> CronService.register` | sim | sim | sim | antes estava hardcoded em `@Cron`, fora da tela |
+| `system.token_cleanup` | `TokenCleanupService -> CronService.register` | sim | sim | sim | antes estava hardcoded em `@Cron`, fora da tela |
+| `system.job_watchdog_evaluator` | `SystemJobWatchdogService -> CronService.register` | sim | sim | sim | novo job central de watchdog |
+
+Heartbeat persistido:
+
+- foi criada a tabela `cron_job_heartbeats`
+- cada job importante registra:
+  - `jobKey`
+  - `lastStartedAt`
+  - `lastSucceededAt`
+  - `lastFailedAt`
+  - `lastDurationMs`
+  - `lastStatus`
+  - `lastError`
+  - `nextExpectedRunAt`
+  - `consecutiveFailureCount`
+  - `updatedAt`
+- o `CronService` atualiza esse heartbeat em:
+  - registro/rebind do job
+  - execucao agendada
+  - trigger manual
+  - enable/disable
+
+Watchdog de jobs:
+
+- foi adicionado `SystemJobWatchdogService`
+- ele roda a cada minuto como job do proprio `CronService`
+- usa o runtime real do scheduler para detectar:
+  - `JOB_NOT_RUNNING`
+    - job habilitado mas nao registrado no runtime
+    - ou `nextExpectedRunAt` ultrapassado alem da tolerancia
+  - `JOB_STUCK_RUNNING`
+    - job em `running` por tempo acima do aceitavel
+  - `JOB_REPEATED_FAILURES`
+    - falhas consecutivas acima de `CRON_WATCHDOG_REPEATED_FAILURE_THRESHOLD`
+- a tolerancia de atraso/travamento e derivada do intervalo do cron:
+  - atraso: entre `5 min` e `12 h`
+  - travamento: entre `10 min` e `6 h`
+  - cada job ainda pode sobrescrever isso via metadata no registro
+- o watchdog nao avalia durante `pauseAllForMaintenance()`, evitando falso positivo em restore/maintenance controlada
+
+Politica de alerta do watchdog:
+
+| Alerta | Regra | Canal | Cooldown |
+| --- | --- | --- | --- |
+| `JOB_NOT_RUNNING` | job habilitado sem runtime ou atrasado alem da tolerancia | inbox + push | `OPS_ALERT_COOLDOWN_MINUTES` |
+| `JOB_STUCK_RUNNING` | job ficou em `running` por tempo anormal | inbox + push | `OPS_ALERT_COOLDOWN_MINUTES` |
+| `JOB_REPEATED_FAILURES` | `consecutiveFailureCount >= CRON_WATCHDOG_REPEATED_FAILURE_THRESHOLD` | inbox | `OPS_ALERT_COOLDOWN_MINUTES` |
+
+Tela `/configuracoes/sistema/cron`:
+
+- agora consome `GET /api/cron/runtime`
+- exibe por job:
+  - cron configurado
+  - ativo/pausado
+  - status atual (`aguardando`, `executando`, `sucesso`, `falhou`)
+  - ultima execucao
+  - ultimo sucesso
+  - ultima falha
+  - duracao/heartbeat
+  - proxima execucao
+  - proximo horario esperado
+  - origem da configuracao
+  - divergencia de runtime, quando existir
+- `GET /api/cron/runtime` ficou disponivel para `ADMIN` e `SUPER_ADMIN`
+- `GET /api/cron`, `PUT /api/cron/:key/toggle`, `PUT /api/cron/:key/schedule` e `POST /api/cron/:key/trigger` continuam `SUPER_ADMIN`
+- o watchdog agora reutiliza a mesma trilha operacional de inbox/push/cooldown dos alertas automaticos gerais, sem manter um segundo pipeline paralelo
+
+Observabilidade e diagnostico:
+
+- se um job estiver salvo no banco e nao tiver callback registrado, ele aparece como `Sem runtime`
+- se um job falhar ou travar, o inbox operacional passa a receber alerta watchdog na mesma trilha de alertas operacionais
+- `recentOperationalAlerts` do dashboard continua coerente, porque os alertas do watchdog entram como `module = operational-alerts` com `source = job-watchdog`
+
+Validacao executada nesta etapa:
+
+- backend
+  - `pnpm -C apps/backend exec jest src/core/cron/cron.service.spec.ts src/core/cron/cron.controller.spec.ts src/common/services/token-cleanup.service.spec.ts src/common/services/system-operational-alerts.service.spec.ts src/common/services/system-job-watchdog.service.spec.ts src/retention/system-data-retention.service.spec.ts --runInBand`
+  - `pnpm -C apps/backend test:smoke`
+  - `pnpm -C apps/backend exec nest build`
+- frontend
+  - `pnpm -C apps/frontend exec eslint src/app/configuracoes/sistema/cron/page.tsx`
+  - `pnpm -C apps/frontend build`

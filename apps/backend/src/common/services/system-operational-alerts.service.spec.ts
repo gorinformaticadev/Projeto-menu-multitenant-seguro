@@ -5,6 +5,7 @@ import { NotificationGateway } from '../../notifications/notification.gateway';
 import { Notification } from '../../notifications/notification.entity';
 import { NotificationService } from '../../notifications/notification.service';
 import { PushNotificationService } from '../../notifications/push-notification.service';
+import { CronService } from '../../core/cron/cron.service';
 import { SystemTelemetryService } from './system-telemetry.service';
 import { SystemOperationalAlertsService } from './system-operational-alerts.service';
 
@@ -28,6 +29,9 @@ describe('SystemOperationalAlertsService', () => {
   const auditServiceMock = {
     log: jest.fn(),
   };
+  const cronServiceMock = {
+    register: jest.fn(),
+  };
 
   const baseNotification: Notification = {
     id: 'notification-1',
@@ -46,6 +50,10 @@ describe('SystemOperationalAlertsService', () => {
   let telemetryService: SystemTelemetryService;
   let service: SystemOperationalAlertsService;
   let previousEnv: Record<string, string | undefined>;
+  let serviceInternals: {
+    checkDatabaseHealth: () => Promise<{ status: 'healthy' | 'error'; latencyMs: number | null }>;
+    checkRedisHealth: () => Promise<{ status: 'healthy' | 'down'; latencyMs: number | null }>;
+  };
 
   const createService = () =>
     new SystemOperationalAlertsService(
@@ -55,6 +63,7 @@ describe('SystemOperationalAlertsService', () => {
       notificationGatewayMock as unknown as NotificationGateway,
       pushNotificationServiceMock as unknown as PushNotificationService,
       auditServiceMock as unknown as AuditService,
+      cronServiceMock as unknown as CronService,
     );
 
   beforeEach(() => {
@@ -62,6 +71,10 @@ describe('SystemOperationalAlertsService', () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-03-07T14:00:00.000Z'));
     telemetryService = new SystemTelemetryService();
     service = createService();
+    serviceInternals = service as unknown as {
+      checkDatabaseHealth: () => Promise<{ status: 'healthy' | 'error'; latencyMs: number | null }>;
+      checkRedisHealth: () => Promise<{ status: 'healthy' | 'down'; latencyMs: number | null }>;
+    };
     previousEnv = {
       OPS_ALERT_5XX_RATE_THRESHOLD: process.env.OPS_ALERT_5XX_RATE_THRESHOLD,
       OPS_ALERT_WINDOW_MINUTES: process.env.OPS_ALERT_WINDOW_MINUTES,
@@ -90,11 +103,12 @@ describe('SystemOperationalAlertsService', () => {
     notificationServiceMock.createSystemNotificationEntity.mockResolvedValue(baseNotification);
     pushNotificationServiceMock.getPublicKey.mockResolvedValue('public-key');
     prismaMock.backupJob.findMany.mockResolvedValue([]);
+    cronServiceMock.register.mockResolvedValue(undefined);
     jest
-      .spyOn(service as any, 'checkDatabaseHealth')
+      .spyOn(serviceInternals, 'checkDatabaseHealth')
       .mockResolvedValue({ status: 'healthy', latencyMs: 12 });
     jest
-      .spyOn(service as any, 'checkRedisHealth')
+      .spyOn(serviceInternals, 'checkRedisHealth')
       .mockResolvedValue({ status: 'healthy', latencyMs: 6 });
   });
 
@@ -119,6 +133,21 @@ describe('SystemOperationalAlertsService', () => {
 
     expect(result.emitted).not.toContain('OPS_HIGH_5XX_ERROR_RATE');
     expect(notificationServiceMock.createSystemNotificationEntity).not.toHaveBeenCalled();
+  });
+
+  it('registers evaluator job in the dynamic cron runtime on module init', async () => {
+    await service.onModuleInit();
+
+    expect(cronServiceMock.register).toHaveBeenCalledWith(
+      'system.operational_alerts_evaluator',
+      expect.any(String),
+      expect.any(Function),
+      expect.objectContaining({
+        name: 'Operational alerts evaluator',
+        origin: 'core',
+        settingsUrl: '/configuracoes/sistema/cron',
+      }),
+    );
   });
 
   it('applies cooldown to repeated critical alerts', async () => {
@@ -299,7 +328,7 @@ describe('SystemOperationalAlertsService', () => {
 
   it('requires consecutive degraded checks before emitting infra alert', async () => {
     const databaseSpy = jest
-      .spyOn(service as any, 'checkDatabaseHealth')
+      .spyOn(serviceInternals, 'checkDatabaseHealth')
       .mockResolvedValue({ status: 'error', latencyMs: null });
 
     await service.evaluateOperationalAlerts(new Date());
@@ -320,7 +349,7 @@ describe('SystemOperationalAlertsService', () => {
 
   it('re-emits infra alert only after cooldown when the degradation persists', async () => {
     jest
-      .spyOn(service as any, 'checkRedisHealth')
+      .spyOn(serviceInternals, 'checkRedisHealth')
       .mockResolvedValue({ status: 'down', latencyMs: null });
 
     await service.evaluateOperationalAlerts(new Date());

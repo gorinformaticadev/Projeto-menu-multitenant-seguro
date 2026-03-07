@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file. See [standa
 * **dashboard:** split the main dashboard shell from the operational section, add module-driven dashboard cards via `GET /api/system/dashboard/module-cards`, restrict the operational aggregate to `SUPER_ADMIN`, and embed period/tenant controls directly in quick actions
 * **ops:** align recent operational alerts with the active dashboard window, deliver legacy update/restore system alerts through realtime with selective push, and deduplicate push deliveries by endpoint
 * **ops:** calibrate operational alert thresholds, keep push restricted to critical events, and add cooldown coverage for continuous degradation and legacy critical deliveries
+* **ops:** unify cron runtime under the dynamic scheduler, add persisted cron job heartbeat/watchdog alerts, and expose real runtime state in `/api/cron/runtime` and `/configuracoes/sistema/cron`
 
 ## [3.0.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v2.0.0...v3.0.0) (2026-01-27)
 

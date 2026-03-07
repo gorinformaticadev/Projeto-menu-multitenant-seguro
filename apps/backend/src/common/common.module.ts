@@ -16,9 +16,11 @@ import { ModuleInstallerService } from '@core/module-installer.service';
 import { SystemVersionService } from './services/system-version.service';
 import { PathsModule } from '@core/common/paths/paths.module';
 import { SystemOperationalAlertsService } from './services/system-operational-alerts.service';
+import { SystemJobWatchdogService } from './services/system-job-watchdog.service';
+import { CronModule } from '../core/cron/cron.module';
 
 @Module({
-  imports: [PrismaModule, SecurityConfigModule, NotificationsModule, AuditModule, PathsModule],
+  imports: [PrismaModule, SecurityConfigModule, NotificationsModule, AuditModule, PathsModule, CronModule],
   controllers: [CspReportController, SystemVersionController, UserModulesController, ModuleInstallerController],
   providers: [
     PlatformInitService,
@@ -27,6 +29,7 @@ import { SystemOperationalAlertsService } from './services/system-operational-al
     ModuleInstallerService,
     ModuleDatabaseExecutorService,
     SystemOperationalAlertsService,
+    SystemJobWatchdogService,
     {
       provide: 'EventBus',
       useValue: eventBus
@@ -39,6 +42,7 @@ import { SystemOperationalAlertsService } from './services/system-operational-al
     ModuleInstallerService,
     ModuleDatabaseExecutorService,
     SystemOperationalAlertsService,
+    SystemJobWatchdogService,
     PrismaModule  // Export PrismaModule for module dependencies
   ],
 })

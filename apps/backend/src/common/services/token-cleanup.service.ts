@@ -1,19 +1,37 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { CronExpression } from '@nestjs/schedule';
+import { CronService } from '@core/cron/cron.service';
 import { PrismaService } from '@core/prisma/prisma.service';
 
 @Injectable()
-export class TokenCleanupService {
+export class TokenCleanupService implements OnModuleInit {
   private readonly logger = new Logger(TokenCleanupService.name);
   private readonly lockId = Number(process.env.TOKEN_CLEANUP_LOCK_ID || 98542173);
   private readonly advisoryLockEnabled =
     String(process.env.TOKEN_CLEANUP_USE_ADVISORY_LOCK || 'true').toLowerCase() !== 'false';
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cronService: CronService,
+  ) {}
 
-  @Cron(CronExpression.EVERY_6_HOURS, {
-    name: 'cleanup-expired-tokens',
-  })
+  async onModuleInit(): Promise<void> {
+    await this.cronService.register(
+      'system.token_cleanup',
+      CronExpression.EVERY_6_HOURS,
+      async () => {
+        await this.cleanupExpiredTokens();
+      },
+      {
+        name: 'Token cleanup',
+        description: 'Remove refresh tokens expirados e antigos automaticamente.',
+        settingsUrl: '/configuracoes/sistema/cron',
+        origin: 'core',
+        editable: true,
+      },
+    );
+  }
+
   async cleanupExpiredTokens(): Promise<void> {
     const lockAcquired = await this.tryAcquireAdvisoryLock();
     if (!lockAcquired) {
