@@ -872,6 +872,9 @@ export class SystemDashboardService {
         where: {
           ...scopeWhere,
           module: 'operational-alerts',
+          createdAt: {
+            gte: windowStart,
+          },
         },
         select: {
           id: true,

@@ -5,6 +5,7 @@ import { StringValue } from 'ms';
 import { NotificationService } from './notification.service';
 import { NotificationGateway } from './notification.gateway';
 import { PushNotificationService } from './push-notification.service';
+import { SystemAlertDeliveryService } from './system-alert-delivery.service';
 import { NotificationsController } from './notifications.controller';
 import { SystemNotificationsController } from './system-notifications.controller';
 import { PrismaModule } from '@core/prisma/prisma.module';
@@ -30,7 +31,7 @@ import { PrismaModule } from '@core/prisma/prisma.module';
     }),
   ],
   controllers: [NotificationsController, SystemNotificationsController],
-  providers: [NotificationService, NotificationGateway, PushNotificationService],
+  providers: [NotificationService, NotificationGateway, PushNotificationService, SystemAlertDeliveryService],
   exports: [NotificationService, NotificationGateway, PushNotificationService],
 })
 export class NotificationsModule {}

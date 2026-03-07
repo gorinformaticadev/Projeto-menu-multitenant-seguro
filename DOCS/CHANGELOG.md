@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file. See [standa
 * **dashboard:** harden operational history buffers and add contextual drill-down, responsive visual polish, unified widget states, mobile-safe layout editing, and updated dashboard documentation
 * **dashboard:** add lightweight operational telemetry with normalized route latency/error metrics and security pressure summaries for the operational dashboard
 * **dashboard:** split the main dashboard shell from the operational section, add module-driven dashboard cards via `GET /api/system/dashboard/module-cards`, restrict the operational aggregate to `SUPER_ADMIN`, and embed period/tenant controls directly in quick actions
+* **ops:** align recent operational alerts with the active dashboard window, deliver legacy update/restore system alerts through realtime with selective push, and deduplicate push deliveries by endpoint
 
 ## [3.0.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v2.0.0...v3.0.0) (2026-01-27)
 

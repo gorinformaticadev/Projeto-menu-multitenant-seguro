@@ -305,6 +305,59 @@ describe('SystemDashboardService', () => {
     );
   });
 
+  it('limits recent operational alerts to the active window in notifications metric', async () => {
+    const service = createService();
+    const windowStart = new Date('2026-03-07T10:00:00.000Z');
+    prismaMock.notification.count
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(5)
+      .mockResolvedValueOnce(3);
+    prismaMock.notification.findMany.mockResolvedValue([
+      {
+        id: 'notif-1',
+        title: 'Aumento de erros 5xx',
+        body: 'A taxa de erros 5xx ultrapassou o limite configurado.',
+        severity: 'critical',
+        createdAt: new Date('2026-03-07T10:30:00.000Z'),
+        data: { alertAction: 'OPS_HIGH_5XX_ERROR_RATE' },
+      },
+    ]);
+
+    const result = await (service as any).getNotificationsMetric(actor, windowStart);
+
+    expect(prismaMock.notification.findMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        module: 'operational-alerts',
+        createdAt: {
+          gte: windowStart,
+        },
+      }),
+      select: {
+        id: true,
+        title: true,
+        body: true,
+        severity: true,
+        createdAt: true,
+        data: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 3,
+    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        operationalRecentCount: 3,
+        recentOperationalAlerts: [
+          expect.objectContaining({
+            id: 'notif-1',
+            action: 'OPS_HIGH_5XX_ERROR_RATE',
+          }),
+        ],
+      }),
+    );
+  });
+
   it('sanitizes persisted layout and filters to the widget policy of the role', async () => {
     const service = createService();
     moduleSecurityServiceMock.getAvailableModules.mockResolvedValue([

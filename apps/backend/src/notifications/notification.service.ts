@@ -65,6 +65,8 @@ export interface SystemNotificationDto {
   title: string;
   body: string;
   data: Record<string, unknown>;
+  module: string | null;
+  source: string | null;
   createdAt: Date;
   isRead: boolean;
   readAt: Date | null;
@@ -368,6 +370,28 @@ export class NotificationService {
 
   async getUnreadCount(scope?: { targetRole?: string; targetUserId?: string }): Promise<number> {
     return this.getUnreadSystemNotificationsCount(scope);
+  }
+
+  async findSystemNotificationEntityById(id: string): Promise<Notification | null> {
+    const notificationId = this.normalizeText(id, 80);
+    if (!notificationId) {
+      return null;
+    }
+
+    try {
+      const row = await this.prisma.notification.findUnique({
+        where: { id: notificationId },
+      });
+
+      if (!row || !this.isSystemNotificationRecord(row)) {
+        return null;
+      }
+
+      return this.mapToEntity(row);
+    } catch (error) {
+      this.logger.error(`Falha ao buscar notificacao de sistema id=${notificationId}: ${String(error)}`);
+      return null;
+    }
   }
 
   /**
@@ -866,6 +890,8 @@ export class NotificationService {
       title: String(row.title || ''),
       body: String(row.body || row.message || ''),
       data: this.parseMetadata(row.data),
+      module: this.normalizeText(row.module || undefined, 80) || null,
+      source: this.normalizeText(row.source || undefined, 40) || null,
       createdAt: row.createdAt,
       isRead: Boolean(row.isRead ?? row.read),
       readAt: row.readAt || null,

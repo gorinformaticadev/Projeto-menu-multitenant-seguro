@@ -138,8 +138,11 @@ export class PushNotificationService {
           auth: true,
         },
       });
+      const uniqueSubscriptions = Array.from(
+        new Map(subscriptions.map((subscription) => [subscription.endpoint, subscription])).values(),
+      );
 
-      if (subscriptions.length === 0) {
+      if (uniqueSubscriptions.length === 0) {
         return;
       }
 
@@ -157,7 +160,7 @@ export class PushNotificationService {
       const successIds: string[] = [];
 
       await Promise.all(
-        subscriptions.map(async (sub) => {
+        uniqueSubscriptions.map(async (sub) => {
           try {
             await this.webPush!.sendNotification(
               {

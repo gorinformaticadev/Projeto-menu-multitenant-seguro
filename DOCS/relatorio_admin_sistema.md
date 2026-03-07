@@ -1391,12 +1391,16 @@ Dashboard:
   - `criticalUnread`
   - `criticalRecent`
   - contador de alertas operacionais recentes
-  - lista curta dos ultimos alertas operacionais emitidos
+  - lista curta dos ultimos alertas operacionais emitidos, alinhada com a mesma janela temporal do contador
+- system alerts legados de update/restore agora tambem passam pelo gateway de notificacoes:
+  - inbox/realtime para todos
+  - push apenas quando a acao estiver na allowlist critica
+- o envio de push agora deduplica subscriptions por `endpoint` antes de entregar
 
 Limitacoes assumidas nesta etapa:
 
-- push seletivo ficou aplicado ao fluxo novo de alertas operacionais automaticos
-- alertas criticos legados de update/restore/backups continuam no fluxo anterior de inbox persistida e ainda nao foram migrados integralmente para a mesma politica seletiva de push
+- `BACKUP_FAILED` continua inbox only por ser alerta moderado
+- `UPDATE_FAILED`, `UPDATE_ROLLED_BACK_AUTO` e `RESTORE_FAILED` entram na politica seletiva de push
 - a retencao/cooldown continua em memoria local do processo, com lock advisory para reduzir duplicidade entre instancias
 
 Validacao executada nesta etapa:
