@@ -116,6 +116,24 @@ type HealthBucketItem = {
   label: string;
   statusLabel: string;
 };
+type SignalDetailItem = {
+  label: string;
+  hint?: string;
+};
+type TrendPoint = {
+  at: string;
+  label: string;
+  value: number | null;
+  sampleSize?: number;
+};
+type SparklineConfig = {
+  id: string;
+  data: TrendPoint[];
+  strokeColor: string;
+  fillColor: string;
+  emptyLabel?: string;
+  valueSuffix?: string;
+};
 
 const POLL_INTERVAL_MS = 15000;
 
@@ -169,6 +187,49 @@ function formatPercent(value: unknown): string {
     return "--";
   }
   return `${numeric.toFixed(2)}%`;
+}
+
+function formatTimeOfDay(value: unknown): string {
+  if (!value) {
+    return "--";
+  }
+
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) {
+    return "--";
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function normalizeTrendSeries(value: unknown): TrendPoint[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item) => item && typeof item === "object" && !Array.isArray(item))
+    .map((item) => {
+      const row = item as Record<string, unknown>;
+      const at = String(row.at || row.timestamp || "").trim();
+      const numericValue = Number(row.value);
+      const sampleSize = Number(row.sampleSize);
+
+      return {
+        at,
+        label: formatTimeOfDay(at),
+        value: Number.isFinite(numericValue) ? numericValue : null,
+        sampleSize: Number.isFinite(sampleSize) ? sampleSize : undefined,
+      };
+    })
+    .filter((point) => point.at.length > 0);
+}
+
+function hasTrendData(points: TrendPoint[]): boolean {
+  return points.filter((point) => Number.isFinite(point.value)).length >= 2;
 }
 
 function metricStatusLabel(metric: DashboardMetric | null | undefined): string {
@@ -239,6 +300,64 @@ function buildAuditEventLine(row: Record<string, unknown>): string {
   }
 
   return `${actionLabel} - ${message}`;
+}
+
+function MiniTrendSparkline({
+  config,
+  className = "mt-3 h-14",
+}: {
+  config: SparklineConfig;
+  className?: string;
+}) {
+  if (!hasTrendData(config.data)) {
+    return (
+      <div className={`flex items-center text-[10px] text-slate-400 ${className}`}>
+        {config.emptyLabel || "Sem historico recente"}
+      </div>
+    );
+  }
+
+  return (
+    <div className={className}>
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={config.data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id={config.id} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={config.fillColor} stopOpacity={0.7} />
+              <stop offset="95%" stopColor={config.fillColor} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke={config.strokeColor}
+            strokeWidth={2}
+            fillOpacity={1}
+            fill={`url(#${config.id})`}
+            connectNulls
+            isAnimationActive={false}
+          />
+          <RechartsTooltip
+            cursor={false}
+            labelFormatter={(_label, payload) => String(payload?.[0]?.payload?.label || "")}
+            formatter={(value: number) => {
+              const numeric = Number(value);
+              return Number.isFinite(numeric)
+                ? `${numeric.toFixed(0)}${config.valueSuffix || ""}`
+                : "--";
+            }}
+            contentStyle={{
+              borderRadius: 14,
+              border: "1px solid rgba(148,163,184,0.18)",
+              background: "rgba(2,6,23,0.96)",
+              color: "#e2e8f0",
+              fontSize: 11,
+            }}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
 }
 
 function toVisibleLayouts(layouts: Layouts, visibleWidgetIds: Set<string>): Layouts {
@@ -356,12 +475,14 @@ function OverviewStat({
   value,
   hint,
   tone = "neutral",
+  trend,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
   hint: string;
   tone?: "neutral" | "danger";
+  trend?: SparklineConfig;
 }) {
   return (
     <div
@@ -377,6 +498,7 @@ function OverviewStat({
           </p>
           <p className="mt-1.5 text-[1.35rem] font-semibold tracking-tight text-white">{value}</p>
           <p className="mt-1 text-[10px] text-slate-300/80">{hint}</p>
+          {trend ? <MiniTrendSparkline config={trend} className="mt-3 h-14" /> : null}
         </div>
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-slate-100">
           {icon}
@@ -391,21 +513,71 @@ function PanoramaSignal({
   value,
   hint,
   accentClassName,
+  detailsTitle,
+  detailsItems = [],
 }: {
   label: string;
   value: string;
   hint: string;
   accentClassName: string;
+  detailsTitle?: string;
+  detailsItems?: SignalDetailItem[];
 }) {
-  return (
+  const hasDetails = detailsItems.length > 0;
+  const card = (
     <div className="rounded-[20px] border border-white/10 bg-white/5 px-3.5 py-3 backdrop-blur-sm">
-      <div className={`h-1.5 w-10 rounded-full ${accentClassName}`} />
+      <div className="flex items-start justify-between gap-2">
+        <div className={`h-1.5 w-10 rounded-full ${accentClassName}`} />
+        {hasDetails ? <ChevronDown className="mt-0.5 h-3.5 w-3.5 text-slate-500" /> : null}
+      </div>
       <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300/80">
         {label}
       </p>
       <p className="mt-1.5 text-[1.1rem] font-semibold tracking-tight text-white">{value}</p>
       <p className="mt-1 truncate text-[10px] text-slate-400">{hint}</p>
     </div>
+  );
+
+  if (!hasDetails) {
+    return card;
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button type="button" className="w-full text-left">
+          {card}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="bottom"
+        align="start"
+        sideOffset={10}
+        className="w-80 rounded-[20px] border border-slate-700/70 bg-slate-950/95 p-3 text-slate-100 shadow-2xl"
+      >
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+            {detailsTitle || label}
+          </p>
+          <p className="mt-1 text-[11px] text-slate-400">
+            Historico recente disponivel para consulta rapida.
+          </p>
+        </div>
+        <div className="mt-3 max-h-60 space-y-2 overflow-auto pr-1">
+          {detailsItems.map((item, index) => (
+            <div
+              key={`${item.label}-${index}`}
+              className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2"
+            >
+              <p className="text-sm font-medium text-slate-100">{item.label}</p>
+              {item.hint ? (
+                <p className="mt-1 text-[10px] leading-snug text-slate-400">{item.hint}</p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -414,11 +586,13 @@ function ResourceMeter({
   value,
   suffix = "%",
   toneClassName,
+  trend,
 }: {
   label: string;
   value: number;
   suffix?: string;
   toneClassName: string;
+  trend?: SparklineConfig;
 }) {
   const boundedValue = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
 
@@ -438,6 +612,7 @@ function ResourceMeter({
           style={{ width: `${boundedValue}%` }}
         />
       </div>
+      {trend ? <MiniTrendSparkline config={trend} className="h-11" /> : null}
     </div>
   );
 }
@@ -937,6 +1112,9 @@ export function OperationalDashboard() {
     const maintenanceMetric = toMetric(dashboard?.maintenance);
     const jobsMetric = toMetric(dashboard?.jobs);
     const tenantsMetric = toMetric(dashboard?.tenants);
+    const apiHistory = normalizeTrendSeries(apiMetric?.history);
+    const memoryHistory = normalizeTrendSeries(memoryMetric?.history);
+    const recentJobFailures = Array.isArray(jobsMetric?.recentFailures) ? jobsMetric.recentFailures : [];
     const securityMetricState = resolveDashboardMetricState(securityMetric);
     const maintenanceMetricState = resolveDashboardMetricState(maintenanceMetric);
     const jobsMetricState = resolveDashboardMetricState(jobsMetric);
@@ -946,6 +1124,10 @@ export function OperationalDashboard() {
       const row = item as Record<string, unknown>;
       return total + Number(row.count || 0);
     }, 0);
+    const apiWindowSeconds = Number(apiMetric?.windowSeconds);
+    const apiWindowMinutes = Number.isFinite(apiWindowSeconds) && apiWindowSeconds > 0
+      ? Math.max(1, Math.round(apiWindowSeconds / 60))
+      : 5;
 
     return {
       statusChart: [
@@ -959,6 +1141,27 @@ export function OperationalDashboard() {
         apiMetric?.avgResponseTimeMs !== null && apiMetric?.avgResponseTimeMs !== undefined
           ? `${apiMetric.avgResponseTimeMs}ms`
           : "--",
+      apiLatencyHint: `Media atual (${apiWindowMinutes} min)`,
+      apiLatencyTrend: apiHistory.length > 0
+        ? {
+          id: "overview-api-latency-history",
+          data: apiHistory,
+          strokeColor: "#38bdf8",
+          fillColor: "rgba(56,189,248,0.24)",
+          valueSuffix: "ms",
+          emptyLabel: "Sem historico recente de latencia",
+        }
+        : undefined,
+      memoryTrend: memoryHistory.length > 0
+        ? {
+          id: "server-memory-history",
+          data: memoryHistory,
+          strokeColor: "#22c55e",
+          fillColor: "rgba(34,197,94,0.24)",
+          valueSuffix: "%",
+          emptyLabel: "Sem historico curto de memoria",
+        }
+        : undefined,
       unreadNotifications: String(notificationsMetric?.criticalUnread ?? "--"),
       blockedAttempts: securityMetricState ? "--" : String(blockedAttempts),
       visibleWidgets: visibleWidgetIds.length,
@@ -990,6 +1193,17 @@ export function OperationalDashboard() {
             value: String(jobsMetric?.pending ?? "--"),
             hint: `${String(jobsMetric?.running ?? "--")} em execucao`,
             accentClassName: "bg-sky-400",
+            detailsTitle: "Ultimas falhas de jobs",
+            detailsItems: recentJobFailures.slice(0, 5).map((item) => {
+              const row = item as Record<string, unknown>;
+              const finishedAt = row.finishedAt ? formatDateTime(row.finishedAt) : "--";
+              const errorText = String(row.error || "").trim();
+
+              return {
+                label: String(row.type || row.id || "Falha"),
+                hint: errorText ? `${finishedAt} - ${errorText}` : finishedAt,
+              };
+            }),
           },
         tenantsMetricState
           ? {
@@ -1106,8 +1320,18 @@ export function OperationalDashboard() {
     );
 
     const apiMetric = toMetric(dashboard?.api);
-    const rawApiCategories = (apiMetric?.byCategory || {}) as Record<string, number>;
-    const apiData = Object.entries(rawApiCategories).map(([key, val]) => ({ category: key, latency: val }));
+    const apiHistory = normalizeTrendSeries(apiMetric?.history);
+    const rawApiCategories = (apiMetric?.byCategory || {}) as Record<
+      string,
+      { averageMs?: number | null; sampleSize?: number }
+    >;
+    const apiData = Object.entries(rawApiCategories)
+      .map(([key, val]) => ({
+        category: key,
+        latency: Number(val?.averageMs),
+        sampleSize: Number(val?.sampleSize),
+      }))
+      .filter((item) => Number.isFinite(item.latency));
 
     map.set(
       "api",
@@ -1129,7 +1353,22 @@ export function OperationalDashboard() {
             </p>
             <p className="text-xs text-slate-400 mb-1">Amostras: {String(apiMetric?.sampleSize ?? 0)}</p>
           </div>
-          <div className="flex-1 min-h-0 w-full mt-4 pr-3 pb-2">
+          {apiHistory.length > 0 ? (
+            <div className="px-3">
+              <MiniTrendSparkline
+                config={{
+                  id: "widget-api-latency-history",
+                  data: apiHistory,
+                  strokeColor: "#38bdf8",
+                  fillColor: "rgba(56,189,248,0.24)",
+                  valueSuffix: "ms",
+                  emptyLabel: "Sem historico recente de latencia",
+                }}
+                className="mt-3 h-20"
+              />
+            </div>
+          ) : null}
+          <div className="flex-1 min-h-0 w-full mt-3 pr-3 pb-2">
             {apiData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={apiData} layout="vertical" margin={{ top: 0, right: 0, left: 30, bottom: 0 }}>
@@ -1462,6 +1701,7 @@ export function OperationalDashboard() {
     const backupMetric = toMetric(dashboard?.backup);
     const backupMetricState = resolveDashboardMetricState(backupMetric);
     const lastBackup = (backupMetric?.lastBackup || null) as Record<string, unknown> | null;
+    const recentBackups = Array.isArray(backupMetric?.recentBackups) ? backupMetric.recentBackups : [];
     map.set(
       "backup",
       <OperationalDashboardWidget
@@ -1496,6 +1736,31 @@ export function OperationalDashboard() {
                 {lastBackup.finishedAt ? formatDateTime(lastBackup.finishedAt) : "--"}
               </span>
             </div>
+            {recentBackups.length > 1 ? (
+              <div className="border-t border-slate-200/70 pt-2 dark:border-slate-800/70">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                  Historico recente
+                </p>
+                <div className="mt-2 space-y-1.5">
+                  {recentBackups.slice(1, 4).map((item, index) => {
+                    const row = item as Record<string, unknown>;
+                    return (
+                      <div
+                        key={`${row.id || index}`}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/70 px-2.5 py-1.5 text-[11px] dark:border-slate-800/70"
+                      >
+                        <span className="min-w-0 truncate text-slate-600 dark:text-slate-300">
+                          {String(row.fileName || row.id || "--")}
+                        </span>
+                        <span className="shrink-0 text-slate-500 dark:text-slate-400">
+                          {row.finishedAt ? formatDateTime(row.finishedAt) : "--"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">Nenhum backup concluido encontrado.</p>
@@ -1841,7 +2106,8 @@ export function OperationalDashboard() {
                     icon={<Activity className="h-4 w-4" />}
                     label="Latencia media"
                     value={dashboardOverview.avgLatency}
-                    hint={`Janela de ${appliedFilters.periodMinutes} min`}
+                    hint={dashboardOverview.apiLatencyHint}
+                    trend={dashboardOverview.apiLatencyTrend}
                   />
                   <OverviewStat
                     icon={<BellDot className="h-4 w-4" />}
@@ -1981,6 +2247,11 @@ export function OperationalDashboard() {
                   label={resource.label}
                   value={resource.value}
                   toneClassName={resource.toneClassName}
+                  trend={
+                    resource.label.toLowerCase().startsWith("mem")
+                      ? dashboardOverview.memoryTrend
+                      : undefined
+                  }
                 />
               ))}
             </div>

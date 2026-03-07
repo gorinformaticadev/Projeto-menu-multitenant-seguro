@@ -36,6 +36,19 @@ interface DashboardMetricFallback {
 
 type DashboardMetric<T extends Record<string, unknown>> = T | DashboardMetricFallback;
 type DashboardLayoutBreakpoint = 'lg' | 'md' | 'sm';
+interface DashboardHistoryPoint {
+  at: string;
+  value: number | null;
+  sampleSize?: number;
+  rssBytes?: number;
+  heapUsedBytes?: number;
+}
+interface MemoryHistoryEntry {
+  recordedAt: number;
+  usedPercent: number | null;
+  rssBytes: number;
+  heapUsedBytes: number;
+}
 
 interface DashboardMetricCacheEntry {
   expiresAt: number;
@@ -54,6 +67,13 @@ const MAX_PERIOD_MINUTES = 24 * 60;
 const MAX_JSON_STORAGE_LENGTH = 200_000;
 const DASHBOARD_LAYOUT_BREAKPOINTS: DashboardLayoutBreakpoint[] = ['lg', 'md', 'sm'];
 const DASHBOARD_METRIC_CACHE_MAX_ENTRIES = 64;
+const API_HISTORY_BUCKETS = 12;
+const API_HISTORY_MAX_WINDOW_MINUTES = 15;
+const MEMORY_HISTORY_RETENTION_MS = 5 * 60 * 1000;
+const MEMORY_HISTORY_MAX_POINTS = 30;
+const RECENT_BACKUPS_LIMIT = 10;
+const RECENT_JOB_FAILURES_LIMIT = 20;
+const RECENT_CRITICAL_ERRORS_LIMIT = 20;
 
 // Curto cache em memoria para widgets caros/externos no polling do agregado.
 // Nao cacheamos maintenance, uptime, notifications nem version para manter o estado mais fresco.
@@ -116,6 +136,9 @@ const ROLE_WIDGET_POLICY: Record<Role, string[]> = {
 export class SystemDashboardService {
   private readonly logger = new Logger(SystemDashboardService.name);
   private readonly metricCache = new Map<string, DashboardMetricCacheEntry>();
+  // Historico leve em memoria para memoria do processo/sistema.
+  // Mantemos janela curta e tamanho fixo para nao crescer indefinidamente.
+  private readonly memoryHistory: MemoryHistoryEntry[] = [];
 
   constructor(
     private readonly prisma: PrismaService,
@@ -130,6 +153,7 @@ export class SystemDashboardService {
     const now = new Date();
     const windowStart = new Date(now.getTime() - filters.periodMinutes * 60 * 1000);
     const tenantFilter = this.resolveTenantFilter(actor, filters.tenantId);
+    const apiHistoryWindowMs = this.resolveApiHistoryWindowMs(filters.periodMinutes);
 
     const version = await this.safeMetric(
       'version',
@@ -184,7 +208,7 @@ export class SystemDashboardService {
     );
     const api = await this.safeMetric(
       'api',
-      async () => this.getApiMetric(),
+      async () => this.getApiMetric(apiHistoryWindowMs),
     );
     const security = await this.safeMetric(
       'security',
@@ -403,6 +427,13 @@ export class SystemDashboardService {
     const usedBytes = Math.max(0, totalBytes - freeBytes);
     const usedPercent = totalBytes > 0 ? Number(((usedBytes / totalBytes) * 100).toFixed(2)) : null;
 
+    this.recordMemoryHistorySample({
+      recordedAt: Date.now(),
+      usedPercent,
+      rssBytes: processMemory.rss,
+      heapUsedBytes: processMemory.heapUsed,
+    });
+
     return {
       status: 'ok' as const,
       totalBytes,
@@ -415,6 +446,7 @@ export class SystemDashboardService {
         heapUsedBytes: processMemory.heapUsed,
         externalBytes: processMemory.external,
       },
+      history: this.getMemoryHistorySeries(),
     };
   }
 
@@ -528,18 +560,27 @@ export class SystemDashboardService {
     };
   }
 
-  private async getApiMetric() {
+  private async getApiMetric(historyWindowMs: number) {
     const windowMs = 5 * 60 * 1000;
     const snapshot = this.responseTimeMetricsService.getAverageForWindow(windowMs, 'business');
     const byCategory = this.responseTimeMetricsService.getCategorizedAverages(windowMs);
+    const history = this.responseTimeMetricsService
+      .getSeriesForWindow(historyWindowMs, 'business', API_HISTORY_BUCKETS)
+      .map((point) => ({
+        at: new Date(point.at).toISOString(),
+        value: point.averageMs,
+        sampleSize: point.sampleSize,
+      }));
 
     return {
       status: 'ok' as const,
       avgResponseTimeMs: snapshot.averageMs,
       sampleSize: snapshot.sampleSize,
       windowSeconds: Math.floor(snapshot.windowMs / 1000),
+      historyWindowSeconds: Math.floor(historyWindowMs / 1000),
       scope: 'business' as const,
       byCategory,
+      history,
     };
   }
 
@@ -602,7 +643,7 @@ export class SystemDashboardService {
   }
 
   private async getBackupMetric(tenantId?: string | null) {
-    const lastBackup = await this.prisma.backupJob.findFirst({
+    const backupRows = await this.prisma.backupJob.findMany({
       where: {
         type: BackupJobType.BACKUP,
         status: BackupJobStatus.SUCCESS,
@@ -618,28 +659,20 @@ export class SystemDashboardService {
         artifactId: true,
       },
       orderBy: [{ finishedAt: 'desc' }, { createdAt: 'desc' }],
+      take: RECENT_BACKUPS_LIMIT,
     });
+    const recentBackups = backupRows.map((backup) => this.mapBackupSummary(backup));
 
     return {
       status: 'ok' as const,
-      lastBackup: lastBackup
-        ? {
-            id: lastBackup.id,
-            artifactId: lastBackup.artifactId || null,
-            fileName: lastBackup.fileName || null,
-            status: lastBackup.status,
-            sizeBytes: lastBackup.sizeBytes ? Number(lastBackup.sizeBytes) : null,
-            startedAt: lastBackup.startedAt ? lastBackup.startedAt.toISOString() : null,
-            finishedAt: lastBackup.finishedAt ? lastBackup.finishedAt.toISOString() : null,
-            durationSeconds: this.calculateDurationSeconds(lastBackup.startedAt, lastBackup.finishedAt),
-          }
-        : null,
+      lastBackup: recentBackups[0] || null,
+      recentBackups,
     };
   }
 
   private async getJobsMetric() {
     const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [running, pending, failedLast24h, lastFailure] = await Promise.all([
+    const [running, pending, failedLast24h, recentFailureRows] = await Promise.all([
       this.prisma.backupJob.count({
         where: {
           status: BackupJobStatus.RUNNING,
@@ -658,7 +691,7 @@ export class SystemDashboardService {
           },
         },
       }),
-      this.prisma.backupJob.findFirst({
+      this.prisma.backupJob.findMany({
         where: {
           status: BackupJobStatus.FAILED,
         },
@@ -669,22 +702,18 @@ export class SystemDashboardService {
           error: true,
         },
         orderBy: [{ finishedAt: 'desc' }, { updatedAt: 'desc' }],
+        take: RECENT_JOB_FAILURES_LIMIT,
       }),
     ]);
+    const recentFailures = recentFailureRows.map((failure) => this.mapJobFailureSummary(failure));
 
     return {
       status: 'ok' as const,
       running,
       pending,
       failedLast24h,
-      lastFailure: lastFailure
-        ? {
-            id: lastFailure.id,
-            type: lastFailure.type,
-            finishedAt: lastFailure.finishedAt ? lastFailure.finishedAt.toISOString() : null,
-            error: this.truncateText(String(lastFailure.error || ''), 220),
-          }
-        : null,
+      lastFailure: recentFailures[0] || null,
+      recentFailures,
     };
   }
 
@@ -716,7 +745,7 @@ export class SystemDashboardService {
       orderBy: {
         createdAt: 'desc',
       },
-      take: 5,
+      take: RECENT_CRITICAL_ERRORS_LIMIT,
     });
 
     return {
@@ -1093,6 +1122,77 @@ export class SystemDashboardService {
 
       this.metricCache.delete(oldestKey);
     }
+  }
+
+  private resolveApiHistoryWindowMs(periodMinutes: number): number {
+    const normalizedMinutes = Number.isFinite(periodMinutes)
+      ? Math.max(5, Math.min(API_HISTORY_MAX_WINDOW_MINUTES, Math.floor(periodMinutes)))
+      : 5;
+    return normalizedMinutes * 60 * 1000;
+  }
+
+  private recordMemoryHistorySample(sample: MemoryHistoryEntry) {
+    this.memoryHistory.push(sample);
+    this.pruneMemoryHistory();
+  }
+
+  private getMemoryHistorySeries(windowMs = MEMORY_HISTORY_RETENTION_MS): DashboardHistoryPoint[] {
+    const cutoff = Date.now() - windowMs;
+    this.pruneMemoryHistory(cutoff);
+
+    return this.memoryHistory
+      .filter((entry) => entry.recordedAt >= cutoff)
+      .map((entry) => ({
+        at: new Date(entry.recordedAt).toISOString(),
+        value: entry.usedPercent,
+        rssBytes: entry.rssBytes,
+        heapUsedBytes: entry.heapUsedBytes,
+      }));
+  }
+
+  private pruneMemoryHistory(cutoff = Date.now() - MEMORY_HISTORY_RETENTION_MS) {
+    while (this.memoryHistory.length > 0 && this.memoryHistory[0].recordedAt < cutoff) {
+      this.memoryHistory.shift();
+    }
+
+    while (this.memoryHistory.length > MEMORY_HISTORY_MAX_POINTS) {
+      this.memoryHistory.shift();
+    }
+  }
+
+  private mapBackupSummary(backup: {
+    id: string;
+    artifactId: string | null;
+    fileName: string | null;
+    status: BackupJobStatus;
+    sizeBytes: bigint | number | null;
+    startedAt: Date | null;
+    finishedAt: Date | null;
+  }) {
+    return {
+      id: backup.id,
+      artifactId: backup.artifactId || null,
+      fileName: backup.fileName || null,
+      status: backup.status,
+      sizeBytes: backup.sizeBytes ? Number(backup.sizeBytes) : null,
+      startedAt: backup.startedAt ? backup.startedAt.toISOString() : null,
+      finishedAt: backup.finishedAt ? backup.finishedAt.toISOString() : null,
+      durationSeconds: this.calculateDurationSeconds(backup.startedAt, backup.finishedAt),
+    };
+  }
+
+  private mapJobFailureSummary(failure: {
+    id: string;
+    type: BackupJobType;
+    finishedAt: Date | null;
+    error: string | null;
+  }) {
+    return {
+      id: failure.id,
+      type: failure.type,
+      finishedAt: failure.finishedAt ? failure.finishedAt.toISOString() : null,
+      error: this.truncateText(String(failure.error || ''), 220),
+    };
   }
 
   private formatDuration(totalSeconds: number): string {

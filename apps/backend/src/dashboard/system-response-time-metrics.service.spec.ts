@@ -44,4 +44,20 @@ describe('ResponseTimeMetricsService', () => {
     expect(categorized.system.averageMs).toBe(30);
     expect(categorized.health.averageMs).toBeNull();
   });
+
+  it('returns a bounded time series for the requested window', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-07T01:00:00.000Z'));
+
+    service.record(60, 'business');
+    jest.advanceTimersByTime(15_000);
+    service.record(120, 'business');
+    jest.advanceTimersByTime(15_000);
+    service.record(180, 'business');
+
+    const series = service.getSeriesForWindow(60_000, 'business', 6);
+
+    expect(series).toHaveLength(6);
+    expect(series.some((point) => point.sampleSize > 0)).toBe(true);
+    expect(series[series.length - 1].at).toBeLessThanOrEqual(Date.now());
+  });
 });

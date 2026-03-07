@@ -897,3 +897,80 @@ Frontend:
 Observacao:
 
 - lint atual do projeto permanece com warnings legados fora do escopo da etapa.
+
+### Etapa 7.2 - Auditoria de historico e graficos incrementais
+
+Inventario atual das metricas do dashboard:
+
+| Widget | Tipo atual | Historico disponivel | Fonte |
+| --- | --- | --- | --- |
+| `version` | snapshot de versao/build | nao | `SystemVersionService` |
+| `uptime` | contador derivado do processo | nao persistido | `process.uptime()` |
+| `maintenance` | snapshot de estado | nao | `MaintenanceModeService` |
+| `system` | snapshot do host/node | nao | `os.*` / `process.*` |
+| `cpu` | snapshot + `loadAvg` do host | parcial, apenas amostra do SO | `os.loadavg()` |
+| `memory` | snapshot de uso | sim, buffer leve em memoria | `os.*` / `process.memoryUsage()` |
+| `disk` | snapshot de armazenamento | nao | `fs.statfs()` |
+| `database` | snapshot de latencia | nao | `SELECT 1` |
+| `redis` | snapshot de ping | nao | `ioredis.ping()` |
+| `workers` | snapshot de filas em execucao | nao | `backupJob.count()` |
+| `api` | media atual + categorias | sim, serie temporal real em memoria | `ResponseTimeMetricsService` |
+| `security` | agregacao por IP no periodo | historico apenas via janela consultada, sem serie fixa | `audit_logs` |
+| `backup` | ultimo backup | sim, lista recente | `backup_jobs` |
+| `jobs` | contadores + ultima falha | sim, lista recente de falhas | `backup_jobs` |
+| `errors` | eventos criticos recentes | sim, lista recente | `audit_logs` |
+| `tenants` | contagem de tenants | nao | `tenant.count()` |
+| `notifications` | contadores criticos | nao | `notification.count()` |
+
+Melhorias incrementais aplicadas:
+
+- `api`
+  - continua com media atual de `5 min`
+  - agora expoe `history` com `12` buckets para janela curta de `5` a `15 min`
+  - a base ja existia em memoria no `ResponseTimeMetricsService`
+- `memory`
+  - agora expoe `history` curto em memoria
+  - buffer fixo de `30` pontos com retencao maxima de `5 min`
+  - coleta acontece durante as leituras normais do dashboard/polling
+- `backup`
+  - continua com `lastBackup`
+  - agora expoe `recentBackups` com os `10` backups bem-sucedidos mais recentes
+- `jobs`
+  - continua com `running`, `pending`, `failedLast24h` e `lastFailure`
+  - agora expoe `recentFailures` com as `20` falhas mais recentes
+- `errors`
+  - ampliado de `5` para `20` eventos criticos recentes dentro da janela/filtro atual
+
+Historico leve exposto no endpoint agregado:
+
+- `api.history`
+  - serie temporal leve para sparkline
+- `memory.history`
+  - serie curta em memoria para sparkline de uso
+- `backup.recentBackups`
+  - lista recente para contexto operacional
+- `jobs.recentFailures`
+  - lista recente para detalhe rapido
+- `errors.recent`
+  - lista recente de eventos criticos
+
+Limites e protecoes:
+
+- nenhum buffer cresce indefinidamente
+- `ResponseTimeMetricsService`
+  - retencao maxima: `30 min`
+  - limite: `1200` amostras por categoria
+- historico de memoria
+  - retencao maxima: `5 min`
+  - limite: `30` pontos
+- historicos de banco/auditoria
+  - `recentBackups`: `10`
+  - `recentFailures`: `20`
+  - `errors.recent`: `20`
+- o payload agregado continua pequeno e o hardening de falha parcial por widget permanece ativo
+
+Limitacoes conhecidas desta etapa:
+
+- historico de memoria e dependente de leitura do dashboard; nao existe coletor em background dedicado
+- `cpu.loadAvg` continua sendo amostra do sistema operacional, nao um historico proprio do dashboard
+- `security` e `notifications` continuam expostos como agregacoes/snapshots do periodo, sem serie temporal dedicada

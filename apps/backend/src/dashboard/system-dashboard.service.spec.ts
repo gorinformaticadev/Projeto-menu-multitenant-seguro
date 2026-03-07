@@ -24,6 +24,7 @@ describe('SystemDashboardService', () => {
   const responseTimeMetricsServiceMock = {
     getAverageForWindow: jest.fn(),
     getCategorizedAverages: jest.fn(),
+    getSeriesForWindow: jest.fn(),
   };
 
   const createService = () =>
@@ -120,8 +121,10 @@ describe('SystemDashboardService', () => {
         avgResponseTimeMs: 18,
         sampleSize: 4,
         windowSeconds: 300,
+        historyWindowSeconds: 600,
         scope: 'business',
         byCategory: [],
+        history: [],
       },
       getSecurityMetric: {
         status: 'ok',
@@ -131,6 +134,7 @@ describe('SystemDashboardService', () => {
       getBackupMetric: {
         status: 'ok',
         lastBackup: null,
+        recentBackups: [],
       },
       getJobsMetric: {
         status: 'ok',
@@ -138,6 +142,7 @@ describe('SystemDashboardService', () => {
         pending: 2,
         failedLast24h: 0,
         lastFailure: null,
+        recentFailures: [],
       },
       getRecentCriticalErrorsMetric: {
         status: 'ok',
@@ -345,6 +350,50 @@ describe('SystemDashboardService', () => {
     expect(redisSpy).toHaveBeenCalledTimes(2);
   });
 
+  it('builds api history from the response time metrics service', async () => {
+    const service = createService();
+    responseTimeMetricsServiceMock.getAverageForWindow.mockReturnValue({
+      averageMs: 118,
+      sampleSize: 6,
+      windowMs: 300_000,
+    });
+    responseTimeMetricsServiceMock.getCategorizedAverages.mockReturnValue({
+      business: { averageMs: 118, sampleSize: 6 },
+      system: { averageMs: 35, sampleSize: 3 },
+      health: { averageMs: 8, sampleSize: 2 },
+    });
+    responseTimeMetricsServiceMock.getSeriesForWindow.mockReturnValue([
+      { at: Date.parse('2026-03-06T19:20:00.000Z'), averageMs: 110, sampleSize: 2 },
+      { at: Date.parse('2026-03-06T19:21:00.000Z'), averageMs: 126, sampleSize: 4 },
+    ]);
+
+    const result = await (service as any).getApiMetric(10 * 60 * 1000);
+
+    expect(responseTimeMetricsServiceMock.getSeriesForWindow).toHaveBeenCalledWith(
+      10 * 60 * 1000,
+      'business',
+      12,
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        avgResponseTimeMs: 118,
+        historyWindowSeconds: 600,
+        history: [
+          {
+            at: '2026-03-06T19:20:00.000Z',
+            value: 110,
+            sampleSize: 2,
+          },
+          {
+            at: '2026-03-06T19:21:00.000Z',
+            value: 126,
+            sampleSize: 4,
+          },
+        ],
+      }),
+    );
+  });
+
   it('prunes expired cache entries and keeps the metric cache bounded', () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-03-06T19:10:00.000Z'));
     const service = createService();
@@ -367,6 +416,41 @@ describe('SystemDashboardService', () => {
     expect(internalService.metricCache.has('dynamic:0')).toBe(false);
     expect(internalService.metricCache.has('dynamic:6')).toBe(true);
     expect(internalService.metricCache.has('dynamic:69')).toBe(true);
+  });
+
+  it('keeps memory history bounded to a short in-memory window', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-06T20:00:00.000Z'));
+    const service = createService();
+    const internalService = service as any;
+
+    for (let index = 0; index < 40; index += 1) {
+      internalService.recordMemoryHistorySample({
+        recordedAt: Date.now(),
+        usedPercent: index,
+        rssBytes: 100 + index,
+        heapUsedBytes: 50 + index,
+      });
+      jest.advanceTimersByTime(10_000);
+    }
+
+    const history = internalService.getMemoryHistorySeries();
+
+    expect(internalService.memoryHistory.length).toBe(30);
+    expect(history).toHaveLength(30);
+    expect(history[0]).toEqual(
+      expect.objectContaining({
+        value: 10,
+        rssBytes: 110,
+        heapUsedBytes: 60,
+      }),
+    );
+    expect(history[history.length - 1]).toEqual(
+      expect.objectContaining({
+        value: 39,
+        rssBytes: 139,
+        heapUsedBytes: 89,
+      }),
+    );
   });
 
   it('returns the explicit widget policy for the actor role', async () => {
