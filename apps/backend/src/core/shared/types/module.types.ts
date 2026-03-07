@@ -20,7 +20,25 @@ export interface ModuleDashboardWidget {
   order?: number;
   permissions?: string[];
   roles?: string[];
+  visibilityRole?: 'SUPER_ADMIN' | 'ADMIN' | 'USER' | 'CLIENT';
   size?: 'small' | 'medium' | 'large';
+  module?: string;
+  icon?: string;
+  description?: string;
+  route?: string;
+  actionLabel?: string;
+  kind?: 'summary' | 'list' | 'kanban';
+  stats?: Array<{
+    label: string;
+    value: string;
+  }>;
+  items?: Array<{
+    id: string;
+    label: string;
+    value?: string;
+    column?: string;
+    tone?: 'neutral' | 'good' | 'warn' | 'danger';
+  }>;
 }
 
 export interface ModuleTaskbarItem {

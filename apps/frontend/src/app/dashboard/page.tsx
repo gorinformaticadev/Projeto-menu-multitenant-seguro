@@ -1,7 +1,7 @@
 "use client";
 
-import { OperationalDashboard } from "@/components/operational-dashboard/OperationalDashboard";
+import { DashboardHome } from "@/components/dashboard/DashboardHome";
 
 export default function DashboardPage() {
-  return <OperationalDashboard />;
+  return <DashboardHome />;
 }

@@ -13,10 +13,12 @@ interface OperationalDashboardWidgetProps {
   title: string;
   subtitle?: string;
   tone?: WidgetTone;
+  headerIcon?: ReactNode;
   isEditing?: boolean;
   onHide?: (id: string) => void;
   onSelect?: () => void;
   actionLabel?: string;
+  headerActions?: ReactNode;
   noPadding?: boolean;
   compact?: boolean;
   children: ReactNode;
@@ -51,16 +53,23 @@ const subtitleClassName: Record<WidgetTone, string> = {
   danger: "text-rose-700/90 dark:text-rose-200/80",
 };
 
-function isNestedInteractiveElement(target: EventTarget | null): boolean {
+function isNestedInteractiveElement(
+  target: EventTarget | null,
+  currentTarget?: HTMLElement | null,
+): boolean {
   if (!(target instanceof HTMLElement)) {
     return false;
   }
 
-  return Boolean(
-    target.closest(
-      "button, a, input, select, textarea, [role='button'], [role='link'], [data-dashboard-stop-select='true']",
-    ),
+  const interactiveElement = target.closest(
+    "button, a, input, select, textarea, [role='button'], [role='link'], [data-dashboard-stop-select='true']",
   );
+
+  if (!interactiveElement) {
+    return false;
+  }
+
+  return interactiveElement !== currentTarget;
 }
 
 export function OperationalDashboardWidget({
@@ -68,10 +77,12 @@ export function OperationalDashboardWidget({
   title,
   subtitle,
   tone = "neutral",
+  headerIcon,
   isEditing = false,
   onHide,
   onSelect,
   actionLabel,
+  headerActions,
   noPadding = false,
   compact = false,
   children,
@@ -80,7 +91,8 @@ export function OperationalDashboardWidget({
   const handleSelect = (event: MouseEvent<HTMLDivElement>) => {
     if (
       !isInteractive ||
-      (event.currentTarget !== event.target && isNestedInteractiveElement(event.target))
+      (event.currentTarget !== event.target &&
+        isNestedInteractiveElement(event.target, event.currentTarget))
     ) {
       return;
     }
@@ -93,7 +105,10 @@ export function OperationalDashboardWidget({
       return;
     }
 
-    if (event.currentTarget !== event.target && isNestedInteractiveElement(event.target)) {
+    if (
+      event.currentTarget !== event.target &&
+      isNestedInteractiveElement(event.target, event.currentTarget)
+    ) {
       return;
     }
 
@@ -136,7 +151,13 @@ export function OperationalDashboardWidget({
 
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className={cn("inline-flex h-2.5 w-2.5 shrink-0 rounded-full", toneDotClassName[tone])} />
+                {headerIcon ? (
+                  <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-slate-200/80 bg-slate-50/85 text-slate-700 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-200">
+                    {headerIcon}
+                  </span>
+                ) : (
+                  <span className={cn("inline-flex h-2.5 w-2.5 shrink-0 rounded-full", toneDotClassName[tone])} />
+                )}
                 <CardTitle className={cn(
                   "truncate text-[0.78rem] font-semibold uppercase tracking-[0.16em] text-current/90",
                   compact && "text-[0.7rem] tracking-[0.14em]",
@@ -152,25 +173,33 @@ export function OperationalDashboardWidget({
             </div>
           </div>
 
-          {onHide && isEditing ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 shrink-0 rounded-xl text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
-              onClick={() => onHide(id)}
-              title="Ocultar widget"
-              aria-label={`Ocultar widget ${title}`}
-            >
-              <EyeOff className="h-3.5 w-3.5" />
-            </Button>
-          ) : null}
+          <div className="flex shrink-0 items-start gap-2">
+            {headerActions ? (
+              <div className="flex items-center gap-2" data-dashboard-stop-select="true">
+                {headerActions}
+              </div>
+            ) : null}
 
-          {isInteractive ? (
-            <span className="hidden shrink-0 rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[10px] font-medium text-current/80 sm:inline-flex">
-              {actionLabel || "Abrir"}
-            </span>
-          ) : null}
+            {onHide && isEditing ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0 rounded-xl text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
+                onClick={() => onHide(id)}
+                title="Ocultar widget"
+                aria-label={`Ocultar widget ${title}`}
+              >
+                <EyeOff className="h-3.5 w-3.5" />
+              </Button>
+            ) : null}
+
+            {isInteractive ? (
+              <span className="hidden shrink-0 rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[10px] font-medium text-current/80 sm:inline-flex">
+                {actionLabel || "Abrir"}
+              </span>
+            ) : null}
+          </div>
         </div>
       </CardHeader>
       <CardContent

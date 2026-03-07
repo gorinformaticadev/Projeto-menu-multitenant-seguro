@@ -45,6 +45,9 @@ const analyticsWidgetIds = new Set(["api", "cpu", "memory", "disk", "security", 
 
 const tallWidgetIds = new Set(["backup"]);
 const smallViewportPriority = [
+  "operationalOverview",
+  "platform:welcome",
+  "platform:statistics",
   "errors",
   "routeErrors",
   "security",
@@ -345,6 +348,42 @@ function normalizeLayoutItem(
 
 function getWidgetLayoutPreset(id: string, breakpoint: DashboardBreakpoint): LayoutPreset {
   const columns = dashboardGridCols[breakpoint];
+
+  if (id === "operationalOverview") {
+    if (breakpoint === "lg") {
+      return clampPreset({ w: 4, h: 2, minW: 3, minH: 2, maxW: 6, maxH: 3 }, columns);
+    }
+
+    if (breakpoint === "md") {
+      return clampPreset({ w: 4, h: 2, minW: 3, minH: 2, maxW: 6, maxH: 3 }, columns);
+    }
+
+    return clampPreset({ w: columns, h: 2, minW: 1, minH: 2 }, columns);
+  }
+
+  if (id === "platform:welcome") {
+    if (breakpoint === "lg") {
+      return clampPreset({ w: 3, h: 2, minW: 3, minH: 2, maxW: 4, maxH: 3 }, columns);
+    }
+
+    if (breakpoint === "md") {
+      return clampPreset({ w: 3, h: 2, minW: 3, minH: 2, maxW: 4, maxH: 3 }, columns);
+    }
+
+    return clampPreset({ w: columns, h: 2, minW: 1, minH: 2 }, columns);
+  }
+
+  if (id === "platform:statistics") {
+    if (breakpoint === "lg") {
+      return clampPreset({ w: 3, h: 2, minW: 3, minH: 2, maxW: 4, maxH: 3 }, columns);
+    }
+
+    if (breakpoint === "md") {
+      return clampPreset({ w: 3, h: 2, minW: 3, minH: 2, maxW: 4, maxH: 3 }, columns);
+    }
+
+    return clampPreset({ w: columns, h: 2, minW: 1, minH: 2 }, columns);
+  }
 
   if (analyticsWidgetIds.has(id)) {
     if (breakpoint === "lg") {

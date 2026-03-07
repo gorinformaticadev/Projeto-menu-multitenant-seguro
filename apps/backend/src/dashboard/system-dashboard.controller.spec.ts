@@ -8,6 +8,7 @@ import { SystemDashboardController } from './system-dashboard.controller';
 describe('SystemDashboardController', () => {
   const dashboardServiceMock = {
     getDashboard: jest.fn(),
+    getModuleCards: jest.fn(),
     getLayout: jest.fn(),
     saveLayout: jest.fn(),
   };
@@ -18,13 +19,16 @@ describe('SystemDashboardController', () => {
     jest.clearAllMocks();
   });
 
-  it('protects endpoint with JWT + roles', () => {
+  it('protects controller with JWT + roles and restricts operational aggregate to SUPER_ADMIN', () => {
     const guards = Reflect.getMetadata(GUARDS_METADATA, SystemDashboardController) || [];
-    const roles = Reflect.getMetadata(ROLES_KEY, SystemDashboardController) || [];
+    const controllerRoles = Reflect.getMetadata(ROLES_KEY, SystemDashboardController) || [];
+    const methodRoles =
+      Reflect.getMetadata(ROLES_KEY, SystemDashboardController.prototype.getDashboard) || [];
 
     expect(guards).toContain(JwtAuthGuard);
     expect(guards).toContain(RolesGuard);
-    expect(roles).toEqual([Role.SUPER_ADMIN, Role.ADMIN, Role.USER, Role.CLIENT]);
+    expect(controllerRoles).toEqual([Role.SUPER_ADMIN, Role.ADMIN, Role.USER, Role.CLIENT]);
+    expect(methodRoles).toEqual([Role.SUPER_ADMIN]);
   });
 
   it('delegates dashboard query with parsed period', async () => {
@@ -43,6 +47,9 @@ describe('SystemDashboardController', () => {
         userId: 'u1',
         role: Role.SUPER_ADMIN,
         tenantId: null,
+        name: null,
+        email: null,
+        tenantName: null,
       },
       {
         periodMinutes: 15,
@@ -69,17 +76,40 @@ describe('SystemDashboardController', () => {
       userId: 'u2',
       role: Role.SUPER_ADMIN,
       tenantId: null,
+      name: null,
+      email: null,
+      tenantName: null,
     });
     expect(dashboardServiceMock.saveLayout).toHaveBeenCalledWith(
       {
         userId: 'u2',
         role: Role.SUPER_ADMIN,
         tenantId: null,
+        name: null,
+        email: null,
+        tenantName: null,
       },
       {
         layoutJson: { lg: [] },
         filtersJson: { periodMinutes: 30 },
       },
     );
+  });
+
+  it('loads module cards using actor context', async () => {
+    const controller = createController();
+    dashboardServiceMock.getModuleCards.mockResolvedValue({ cards: [] });
+
+    const req = { user: { sub: 'u3', role: 'ADMIN', tenantId: 'tenant-1' } };
+    await controller.getModuleCards(req);
+
+    expect(dashboardServiceMock.getModuleCards).toHaveBeenCalledWith({
+      userId: 'u3',
+      role: Role.ADMIN,
+      tenantId: 'tenant-1',
+      name: null,
+      email: null,
+      tenantName: null,
+    });
   });
 });

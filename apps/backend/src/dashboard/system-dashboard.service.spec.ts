@@ -2,6 +2,7 @@ import { Role } from '@prisma/client';
 import { SystemVersionService } from '../common/services/system-version.service';
 import { MaintenanceModeService } from '../maintenance/maintenance-mode.service';
 import { PrismaService } from '../core/prisma/prisma.service';
+import { ModuleSecurityService } from '../core/module-security.service';
 import { SystemDashboardService } from './system-dashboard.service';
 import { ResponseTimeMetricsService } from './system-response-time-metrics.service';
 import { SystemTelemetryService } from '@common/services/system-telemetry.service';
@@ -11,6 +12,12 @@ describe('SystemDashboardService', () => {
     dashboardLayout: {
       findUnique: jest.fn(),
       upsert: jest.fn(),
+    },
+    user: {
+      count: jest.fn(),
+    },
+    tenant: {
+      count: jest.fn(),
     },
     backupJob: {
       count: jest.fn(),
@@ -37,6 +44,9 @@ describe('SystemDashboardService', () => {
     getSecuritySnapshot: jest.fn(),
     maskIp: jest.fn((value) => 'masked:' + String(value)),
   };
+  const moduleSecurityServiceMock = {
+    getAvailableModules: jest.fn(),
+  };
 
   const createService = () =>
     new SystemDashboardService(
@@ -45,6 +55,7 @@ describe('SystemDashboardService', () => {
       maintenanceServiceMock as unknown as MaintenanceModeService,
       responseTimeMetricsServiceMock as unknown as ResponseTimeMetricsService,
       systemTelemetryServiceMock as unknown as SystemTelemetryService,
+      moduleSecurityServiceMock as unknown as ModuleSecurityService,
     );
 
   const actor = {
@@ -223,6 +234,9 @@ describe('SystemDashboardService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useRealTimers();
+    moduleSecurityServiceMock.getAvailableModules.mockResolvedValue([]);
+    prismaMock.user.count.mockResolvedValue(0);
+    prismaMock.tenant.count.mockResolvedValue(0);
   });
 
   afterEach(() => {
@@ -232,11 +246,20 @@ describe('SystemDashboardService', () => {
   it('returns role defaults when persisted layout does not exist', async () => {
     const service = createService();
     prismaMock.dashboardLayout.findUnique.mockResolvedValue(null);
+    moduleSecurityServiceMock.getAvailableModules.mockResolvedValue([
+      {
+        slug: 'crm',
+        name: 'CRM',
+        version: '1.2.0',
+        description: 'Pipeline comercial',
+        menus: [{ label: 'Funil', route: '/modules/crm', icon: 'Briefcase' }],
+      },
+    ]);
 
     const result = await service.getLayout({
       userId: 'user-1',
       role: Role.ADMIN,
-      tenantId: null,
+      tenantId: 'tenant-1',
     });
 
     expect(prismaMock.dashboardLayout.findUnique).toHaveBeenCalledWith({
@@ -256,8 +279,18 @@ describe('SystemDashboardService', () => {
     });
     expect(result.role).toBe(Role.ADMIN);
     expect(result.updatedAt).toBeNull();
-    expect(result.layoutJson).toBeDefined();
-    expect(result.filtersJson).toBeDefined();
+    expect(result.layoutJson).toEqual({
+      lg: expect.arrayContaining([expect.objectContaining({ i: 'module:crm' })]),
+      md: expect.arrayContaining([expect.objectContaining({ i: 'module:crm' })]),
+      sm: expect.arrayContaining([expect.objectContaining({ i: 'module:crm' })]),
+    });
+    expect(result.filtersJson).toEqual({
+      periodMinutes: 30,
+      tenantId: null,
+      severity: 'all',
+      operationalPinned: false,
+      hiddenWidgetIds: [],
+    });
     expect(result.resolution).toEqual(
       expect.objectContaining({
         source: 'role_default',
@@ -268,19 +301,28 @@ describe('SystemDashboardService', () => {
 
   it('sanitizes persisted layout and filters to the widget policy of the role', async () => {
     const service = createService();
+    moduleSecurityServiceMock.getAvailableModules.mockResolvedValue([
+      {
+        slug: 'crm',
+        name: 'CRM',
+        version: '1.2.0',
+        description: 'Pipeline comercial',
+        menus: [{ label: 'Funil', route: '/modules/crm', icon: 'Briefcase' }],
+      },
+    ]);
     prismaMock.dashboardLayout.findUnique.mockResolvedValue({
       id: 'layout-1',
       role: Role.USER,
       layoutJson: {
-        lg: [{ i: 'version', x: 0, y: 0, w: 1, h: 1 }, { i: 'database', x: 1, y: 0, w: 1, h: 1 }],
-        md: [{ i: 'notifications', x: 0, y: 0, w: 1, h: 1 }],
+        lg: [{ i: 'module:crm', x: 0, y: 0, w: 1, h: 1 }, { i: 'database', x: 1, y: 0, w: 1, h: 1 }],
+        md: [{ i: 'module:crm', x: 0, y: 0, w: 1, h: 1 }],
         sm: [{ i: 'workers', x: 0, y: 0, w: 1, h: 1 }],
       },
       filtersJson: {
         periodMinutes: 45,
         tenantId: 'tenant-hidden',
         severity: 'warning',
-        hiddenWidgetIds: ['version', 'database', 'workers'],
+        hiddenWidgetIds: ['module:crm', 'database', 'workers'],
       },
       updatedAt: new Date('2026-03-06T18:30:00.000Z'),
     });
@@ -292,15 +334,16 @@ describe('SystemDashboardService', () => {
     });
 
     expect(result.layoutJson).toEqual({
-      lg: [{ i: 'version', x: 0, y: 0, w: 1, h: 1 }],
-      md: [{ i: 'notifications', x: 0, y: 0, w: 1, h: 1 }],
+      lg: [{ i: 'module:crm', x: 0, y: 0, w: 1, h: 1 }],
+      md: [{ i: 'module:crm', x: 0, y: 0, w: 1, h: 1 }],
       sm: [],
     });
     expect(result.filtersJson).toEqual({
       periodMinutes: 45,
       tenantId: null,
       severity: 'warning',
-      hiddenWidgetIds: ['version'],
+      operationalPinned: false,
+      hiddenWidgetIds: ['module:crm'],
     });
     expect(result.resolution).toEqual(
       expect.objectContaining({
@@ -312,10 +355,15 @@ describe('SystemDashboardService', () => {
 
   it('saves layout with safe fallback when payload is invalid', async () => {
     const service = createService();
+    moduleSecurityServiceMock.getAvailableModules.mockResolvedValue([]);
     prismaMock.dashboardLayout.upsert.mockResolvedValue({
       role: Role.SUPER_ADMIN,
-      layoutJson: { lg: [] },
-      filtersJson: { periodMinutes: 60 },
+      layoutJson: {
+        lg: [],
+        md: [],
+        sm: [],
+      },
+      filtersJson: { periodMinutes: 60, hiddenWidgetIds: [] },
       updatedAt: new Date('2026-03-06T18:30:00.000Z'),
     });
 
@@ -343,11 +391,84 @@ describe('SystemDashboardService', () => {
     );
     expect(result.role).toBe(Role.SUPER_ADMIN);
     expect(result.updatedAt).toBe('2026-03-06T18:30:00.000Z');
+    expect(result.layoutJson).toEqual({
+      lg: [],
+      md: [],
+      sm: [],
+    });
     expect(result.resolution).toEqual(
       expect.objectContaining({
         source: 'user_role',
         precedence: ['user_role', 'role_default'],
       }),
+    );
+  });
+
+  it('returns dashboard cards for active modules with explicit visibility rules', async () => {
+    const service = createService();
+    prismaMock.dashboardLayout.findUnique.mockResolvedValue(null);
+    moduleSecurityServiceMock.getAvailableModules.mockResolvedValue([
+      {
+        slug: 'crm',
+        name: 'CRM',
+        version: '1.2.0',
+        description: 'Pipeline comercial',
+        menus: [{ label: 'Funil', route: '/modules/crm', icon: 'Briefcase' }],
+      },
+    ]);
+
+    const cards = await service.getModuleCards({
+      userId: 'user-9',
+      role: Role.ADMIN,
+      tenantId: 'tenant-1',
+      name: 'Ana Admin',
+      email: 'ana@example.com',
+      tenantName: 'Tenant Alpha',
+    });
+    const layout = await service.getLayout({
+      userId: 'user-10',
+      role: Role.SUPER_ADMIN,
+      tenantId: null,
+    });
+
+    expect(cards.cards).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'platform:welcome',
+          title: 'Bem-vindo',
+          module: 'platform',
+          visibilityRole: Role.CLIENT,
+        }),
+        expect.objectContaining({
+          id: 'platform:statistics',
+          title: 'Estatisticas',
+          module: 'platform',
+          visibilityRole: Role.ADMIN,
+        }),
+        expect.objectContaining({
+          id: 'module:crm',
+          title: 'CRM',
+          module: 'crm',
+          href: '/modules/crm',
+          visibilityRole: Role.CLIENT,
+        }),
+      ]),
+    );
+    expect(layout.layoutJson).toEqual(
+      expect.objectContaining({
+        lg: expect.any(Array),
+        md: expect.any(Array),
+        sm: expect.any(Array),
+      }),
+    );
+    expect((layout.layoutJson as any).lg).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ i: 'operationalOverview' })]),
+    );
+    expect((layout.layoutJson as any).md).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ i: 'operationalOverview' })]),
+    );
+    expect((layout.layoutJson as any).sm).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ i: 'operationalOverview' })]),
     );
   });
 

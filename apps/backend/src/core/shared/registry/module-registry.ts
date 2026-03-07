@@ -22,6 +22,12 @@ import {
 class ModuleRegistry implements IModuleRegistry {
   private static instance: ModuleRegistry;
   private contributions: Map<string, ModuleContribution> = new Map();
+  private readonly roleRank = new Map<string, number>([
+    ['SUPER_ADMIN', 0],
+    ['ADMIN', 1],
+    ['USER', 2],
+    ['CLIENT', 3],
+  ]);
 
   private constructor() { }
 
@@ -117,9 +123,14 @@ class ModuleRegistry implements IModuleRegistry {
         continue;
       }
 
-      const filteredWidgets = contribution.dashboard.filter(widget =>
-        this.hasAccess(widget.roles, widget.permissions, userRole, permissions)
-      );
+      const filteredWidgets = contribution.dashboard
+        .filter(widget =>
+          this.hasAccess(widget.roles, widget.permissions, userRole, permissions)
+        )
+        .map(widget => ({
+          ...widget,
+          module: widget.module || contribution.id,
+        }));
 
       widgets.push(...filteredWidgets);
     }
@@ -222,10 +233,22 @@ class ModuleRegistry implements IModuleRegistry {
       return true;
     }
 
-    // Verifica roles
+    // Verifica roles com hierarquia:
+    // SUPER_ADMIN ve ADMIN/USER/CLIENT, ADMIN ve USER/CLIENT e assim por diante.
     if (itemRoles && userRole) {
-      if (itemRoles.includes(userRole)) {
-        return true;
+      const normalizedUserRole = String(userRole).trim().toUpperCase();
+      const userRank = this.roleRank.get(normalizedUserRole);
+
+      if (userRank !== undefined) {
+        const hasRoleAccess = itemRoles.some((role) => {
+          const normalizedRole = String(role || '').trim().toUpperCase();
+          const itemRank = this.roleRank.get(normalizedRole);
+          return itemRank !== undefined && userRank <= itemRank;
+        });
+
+        if (hasRoleAccess) {
+          return true;
+        }
       }
     }
 

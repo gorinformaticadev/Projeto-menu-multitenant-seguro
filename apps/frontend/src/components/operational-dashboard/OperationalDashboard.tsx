@@ -16,7 +16,6 @@ import {
   RefreshCw,
   Server,
   ShieldAlert,
-  SlidersHorizontal,
   X,
 } from "lucide-react";
 import {
@@ -44,13 +43,6 @@ import { useSystemNotificationsContext } from "@/contexts/SystemNotificationsCon
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Tooltip,
   TooltipContent,
@@ -94,7 +86,7 @@ import {
   OperationalDashboardWidgetSkeleton,
 } from "@/components/operational-dashboard/OperationalDashboardWidget";
 
-type DashboardFiltersState = {
+export type OperationalDashboardFiltersState = {
   periodMinutes: number;
   tenantId: string;
   severity: "all" | "info" | "warning" | "critical";
@@ -226,7 +218,7 @@ function filterStandaloneWidgetIds(widgetIds: string[]): string[] {
   return widgetIds.filter((id) => !embeddedOverviewWidgetIds.has(id));
 }
 
-function getDefaultFilters(role: DashboardRole): DashboardFiltersState {
+function getDefaultFilters(role: DashboardRole): OperationalDashboardFiltersState {
   return {
     periodMinutes: role === "SUPER_ADMIN" ? 60 : 30,
     tenantId: "",
@@ -674,8 +666,8 @@ function normalizeErrorMessage(error: unknown): string {
 }
 
 function hasActiveFilters(
-  current: DashboardFiltersState,
-  fallback: DashboardFiltersState,
+  current: OperationalDashboardFiltersState,
+  fallback: OperationalDashboardFiltersState,
 ): boolean {
   return (
     current.periodMinutes !== fallback.periodMinutes ||
@@ -1104,21 +1096,62 @@ function HealthBucketLegendRow({
   );
 }
 
-export function OperationalDashboard() {
+type OperationalDashboardProps = {
+  embedded?: boolean;
+  storedFilters?: Partial<OperationalDashboardFiltersState> | null;
+  onFiltersChange?: (filters: OperationalDashboardFiltersState) => void | Promise<void>;
+};
+
+function normalizeStoredFiltersInput(
+  role: DashboardRole,
+  storedFilters?: Partial<OperationalDashboardFiltersState> | null,
+): OperationalDashboardFiltersState {
+  const fallback = getDefaultFilters(role);
+  const periodMinutes = Number(storedFilters?.periodMinutes);
+
+  return {
+    periodMinutes:
+      Number.isFinite(periodMinutes) && periodMinutes >= 5
+        ? Math.floor(periodMinutes)
+        : fallback.periodMinutes,
+    tenantId: role === "SUPER_ADMIN" ? String(storedFilters?.tenantId || "") : "",
+    severity:
+      storedFilters?.severity === "info" ||
+      storedFilters?.severity === "warning" ||
+      storedFilters?.severity === "critical"
+        ? storedFilters.severity
+        : "all",
+  };
+}
+
+export function OperationalDashboard({
+  embedded = false,
+  storedFilters = null,
+  onFiltersChange,
+}: OperationalDashboardProps = {}) {
   const router = useRouter();
   const { user } = useAuth();
   const { openDrawer, isEnabled: notificationsEnabled } = useSystemNotificationsContext();
   const { toast } = useToast();
   const role = (user?.role || "USER") as DashboardRole;
+  const isOperationalAllowed = role === "SUPER_ADMIN";
   const defaultFilters = useMemo(() => getDefaultFilters(role), [role]);
+  const externalFilters = useMemo(
+    () => normalizeStoredFiltersInput(role, storedFilters),
+    [role, storedFilters],
+  );
   const roleWidgetIds = useMemo(() => allowedWidgetIdsByRole(role), [role]);
   const defaultGridWidgetIds = useMemo(
     () => filterStandaloneWidgetIds(roleWidgetIds),
     [roleWidgetIds],
   );
 
-  const [appliedFilters, setAppliedFilters] = useState<DashboardFiltersState>(defaultFilters);
-  const [draftFilters, setDraftFilters] = useState<DashboardFiltersState>(defaultFilters);
+  const [appliedFilters, setAppliedFilters] = useState<OperationalDashboardFiltersState>(
+    embedded ? externalFilters : defaultFilters,
+  );
+  const [draftFilters, setDraftFilters] = useState<OperationalDashboardFiltersState>(
+    embedded ? externalFilters : defaultFilters,
+  );
   const [layouts, setLayouts] = useState<Layouts>(() =>
     normalizeLayoutForWidgets({}, defaultGridWidgetIds),
   );
@@ -1133,13 +1166,12 @@ export function OperationalDashboard() {
   const [savingLayout, setSavingLayout] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastLayoutUpdateAt, setLastLayoutUpdateAt] = useState<string | null>(null);
-  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [isLayoutEditing, setIsLayoutEditing] = useState(false);
   const [activeQuickFilter, setActiveQuickFilter] = useState<DashboardQuickFilter>("all");
 
   const { width, mounted, containerRef } = useContainerWidth({ initialWidth: 1280 });
   const isMobileViewport = isDashboardMobileViewport(width);
-  const canEditLayout = !isMobileViewport;
+  const canEditLayout = !embedded && !isMobileViewport;
   const layoutEditingActive = canEditLayout && isLayoutEditing;
   const showInitialSkeleton = !mounted || (loading && !dashboard);
 
@@ -1196,6 +1228,14 @@ export function OperationalDashboard() {
 
   const refreshDashboard = useCallback(
     async (silent = false) => {
+      if (!isOperationalAllowed) {
+        setDashboard(null);
+        setError(null);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
       if (silent) {
         setRefreshing(true);
       } else {
@@ -1227,13 +1267,13 @@ export function OperationalDashboard() {
         }
       }
     },
-    [appliedFilters.periodMinutes, appliedFilters.severity, appliedFilters.tenantId],
+    [appliedFilters.periodMinutes, appliedFilters.severity, appliedFilters.tenantId, isOperationalAllowed],
   );
 
   const persistDashboardPreferences = useCallback(
     async (
       nextLayouts: Layouts,
-      nextFilters: DashboardFiltersState,
+      nextFilters: OperationalDashboardFiltersState,
       nextHiddenWidgetIds: string[],
     ): Promise<boolean> => {
       setSavingLayout(true);
@@ -1271,6 +1311,23 @@ export function OperationalDashboard() {
   );
 
   const loadLayout = useCallback(async () => {
+    if (!isOperationalAllowed) {
+      return;
+    }
+
+    if (embedded) {
+      const fallbackLayouts = normalizeLayoutForWidgets({}, defaultGridWidgetIds);
+      setLayouts(fallbackLayouts);
+      setEditingLayouts(cloneLayouts(fallbackLayouts));
+      setHiddenWidgetIds([]);
+      setEditingHiddenWidgetIds([]);
+      setAppliedFilters(externalFilters);
+      setDraftFilters(externalFilters);
+      setLastLayoutUpdateAt(null);
+      setIsLayoutEditing(false);
+      return;
+    }
+
     try {
       const response = await api.get<DashboardLayoutResponse>("/system/dashboard/layout");
       const payload = response.data || {};
@@ -1279,7 +1336,7 @@ export function OperationalDashboard() {
           ? normalizeLayoutForWidgets({}, defaultGridWidgetIds)
           : normalizeLayoutForWidgets(payload.layoutJson, defaultGridWidgetIds);
       const filtersPayload = payload.filtersJson || {};
-      const nextFilters: DashboardFiltersState = {
+      const nextFilters: OperationalDashboardFiltersState = {
         periodMinutes:
           Number.isFinite(Number(filtersPayload.periodMinutes)) &&
             Number(filtersPayload.periodMinutes) > 0
@@ -1316,7 +1373,7 @@ export function OperationalDashboard() {
       setDraftFilters(defaultFilters);
       setIsLayoutEditing(false);
     }
-  }, [defaultFilters, defaultGridWidgetIds]);
+  }, [defaultFilters, defaultGridWidgetIds, embedded, externalFilters, isOperationalAllowed]);
 
   useEffect(() => {
     const fallbackLayouts = normalizeLayoutForWidgets({}, defaultGridWidgetIds);
@@ -1324,21 +1381,34 @@ export function OperationalDashboard() {
     setEditingLayouts(cloneLayouts(fallbackLayouts));
     setHiddenWidgetIds([]);
     setEditingHiddenWidgetIds([]);
-    setAppliedFilters(defaultFilters);
-    setDraftFilters(defaultFilters);
+    setAppliedFilters(embedded ? externalFilters : defaultFilters);
+    setDraftFilters(embedded ? externalFilters : defaultFilters);
     setIsLayoutEditing(false);
-    setIsFiltersOpen(false);
+    setLastLayoutUpdateAt(null);
     void loadLayout();
-  }, [defaultFilters, defaultGridWidgetIds, loadLayout]);
+  }, [defaultFilters, defaultGridWidgetIds, embedded, externalFilters, loadLayout]);
 
   useEffect(() => {
+    if (!embedded) {
+      return;
+    }
+
+    setAppliedFilters(externalFilters);
+    setDraftFilters(externalFilters);
+  }, [embedded, externalFilters]);
+
+  useEffect(() => {
+    if (!isOperationalAllowed) {
+      return;
+    }
+
     void refreshDashboard();
     const interval = setInterval(() => {
       void refreshDashboard(true);
     }, POLL_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [refreshDashboard]);
+  }, [isOperationalAllowed, refreshDashboard]);
 
   useEffect(() => {
     if (!isMobileViewport || !isLayoutEditing) {
@@ -1373,7 +1443,7 @@ export function OperationalDashboard() {
   }, [stableAvailableWidgetIds]);
 
   const applyFilters = useCallback(async () => {
-    const nextFilters: DashboardFiltersState = {
+    const nextFilters: OperationalDashboardFiltersState = {
       periodMinutes: draftFilters.periodMinutes,
       severity: draftFilters.severity,
       tenantId: role === "SUPER_ADMIN" ? draftFilters.tenantId : "",
@@ -1381,10 +1451,13 @@ export function OperationalDashboard() {
 
     setAppliedFilters(nextFilters);
     setDraftFilters(nextFilters);
-    setIsFiltersOpen(false);
+    if (embedded) {
+      await onFiltersChange?.(nextFilters);
+      return;
+    }
 
     await persistDashboardPreferences(layouts, nextFilters, hiddenWidgetIds);
-  }, [draftFilters, hiddenWidgetIds, layouts, persistDashboardPreferences, role]);
+  }, [draftFilters, embedded, hiddenWidgetIds, layouts, onFiltersChange, persistDashboardPreferences, role]);
 
   const restoreFilterDefaults = useCallback(() => {
     setDraftFilters(defaultFilters);
@@ -1395,7 +1468,6 @@ export function OperationalDashboard() {
       return;
     }
 
-    setIsFiltersOpen(false);
     setEditingLayouts(cloneLayouts(layouts));
     setEditingHiddenWidgetIds([...hiddenWidgetIds]);
     setIsLayoutEditing(true);
@@ -2602,99 +2674,90 @@ export function OperationalDashboard() {
     toggleWidgetVisibilityInEditor,
   ]);
 
-  if (!user) {
+  if (!user || !isOperationalAllowed) {
     return null;
   }
 
   return (
     <TooltipProvider delayDuration={120}>
-      <div className="mx-auto max-w-[1600px] space-y-4 p-4 md:p-6">
+      <div className={embedded ? "space-y-4" : "mx-auto max-w-[1600px] space-y-4 p-4 md:p-6"}>
         <div className="space-y-3">
-          <div className="rounded-[24px] border border-slate-900 bg-slate-950 px-4 py-3 text-slate-50 shadow-xl">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0 space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="inline-flex h-7 items-center rounded-full border border-slate-700 bg-slate-900 px-2.5">
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-300">
-                      Visao operacional
-                    </span>
+          {!embedded ? (
+            <div className="rounded-[24px] border border-slate-900 bg-slate-950 px-4 py-3 text-slate-50 shadow-xl">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="inline-flex h-7 items-center rounded-full border border-slate-700 bg-slate-900 px-2.5">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-300">
+                        Visao operacional
+                      </span>
+                    </div>
+                    <h1 className="text-lg font-semibold tracking-tight text-white">
+                      Dashboard Operacional
+                    </h1>
                   </div>
-                  <h1 className="text-lg font-semibold tracking-tight text-white">
-                    Dashboard Operacional
-                  </h1>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-300">
-                  <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
-                    Snapshot: {dashboard?.generatedAt ? formatDateTime(dashboard.generatedAt) : "--"}
-                  </span>
-                  <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
-                    Layout:{" "}
-                    {lastLayoutUpdateAt
-                      ? `salvo em ${formatDateTime(lastLayoutUpdateAt)}`
-                      : "padrao ativo"}
-                  </span>
-                  <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
-                    Auto refresh {Math.floor(POLL_INTERVAL_MS / 1000)}s
-                  </span>
-                  {isMobileViewport ? (
-                    <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-200">
-                      Reordenacao disponivel no desktop
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-300">
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+                      Snapshot: {dashboard?.generatedAt ? formatDateTime(dashboard.generatedAt) : "--"}
                     </span>
-                  ) : null}
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+                      Layout:{" "}
+                      {lastLayoutUpdateAt
+                        ? `salvo em ${formatDateTime(lastLayoutUpdateAt)}`
+                        : "padrao ativo"}
+                    </span>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+                      Auto refresh {Math.floor(POLL_INTERVAL_MS / 1000)}s
+                    </span>
+                    {isMobileViewport ? (
+                      <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-200">
+                        Reordenacao disponivel no desktop
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex items-center justify-end gap-2">
-                <ToolbarIconButton
-                  label="Atualizar dashboard"
-                  onClick={() => {
-                    void refreshDashboard(true);
-                  }}
-                  active={refreshing}
-                  disabled={refreshing}
-                >
-                  <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
-                </ToolbarIconButton>
+                <div className="flex items-center justify-end gap-2">
+                  <ToolbarIconButton
+                    label="Atualizar dashboard"
+                    onClick={() => {
+                      void refreshDashboard(true);
+                    }}
+                    active={refreshing}
+                    disabled={refreshing}
+                  >
+                    <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
+                  </ToolbarIconButton>
 
-                <ToolbarIconButton
-                  label="Abrir filtros"
-                  onClick={() => {
-                    setDraftFilters(appliedFilters);
-                    setIsFiltersOpen(true);
-                  }}
-                  active={isFiltersOpen || hasAppliedActiveFilters}
-                >
-                  <SlidersHorizontal className="h-5 w-5" />
-                </ToolbarIconButton>
-
-                <ToolbarIconButton
-                  label={
-                    !canEditLayout
-                      ? "Editar layout disponivel apenas em telas maiores"
-                      : layoutEditingActive
-                        ? "Cancelar edicao de layout"
-                        : "Editar layout"
-                  }
-                  onClick={() => {
-                    if (layoutEditingActive) {
-                      cancelLayoutEditing();
-                      return;
+                  <ToolbarIconButton
+                    label={
+                      !canEditLayout
+                        ? "Editar layout disponivel apenas em telas maiores"
+                        : layoutEditingActive
+                          ? "Cancelar edicao de layout"
+                          : "Editar layout"
                     }
+                    onClick={() => {
+                      if (layoutEditingActive) {
+                        cancelLayoutEditing();
+                        return;
+                      }
 
-                    beginLayoutEditing();
-                  }}
-                  active={layoutEditingActive}
-                  disabled={savingLayout || !canEditLayout}
-                >
-                  {savingLayout ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <LayoutGrid className="h-5 w-5" />
-                  )}
-                </ToolbarIconButton>
+                      beginLayoutEditing();
+                    }}
+                    active={layoutEditingActive}
+                    disabled={savingLayout || !canEditLayout}
+                  >
+                    {savingLayout ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <LayoutGrid className="h-5 w-5" />
+                    )}
+                  </ToolbarIconButton>
+                </div>
               </div>
             </div>
-          </div>
+          ) : null}
 
           <div className="rounded-[24px] border border-slate-200/80 bg-white/80 px-4 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.35)] dark:border-slate-800/80 dark:bg-slate-950/45">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -2761,6 +2824,72 @@ export function OperationalDashboard() {
                       {option.label}
                     </button>
                   ))}
+                </div>
+                <div className="mt-4 rounded-[22px] border border-slate-200/80 bg-slate-50/80 p-3 dark:border-slate-800/80 dark:bg-slate-900/40">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                        Recorte operacional
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Periodo e tenant ficam disponiveis direto nas acoes rapidas.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-9 text-xs"
+                        onClick={restoreFilterDefaults}
+                      >
+                        Padrao
+                      </Button>
+                      <Button
+                        type="button"
+                        className="h-9 text-xs"
+                        onClick={() => {
+                          void applyFilters();
+                        }}
+                        disabled={!hasDraftFilterChanges}
+                      >
+                        Aplicar
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {[15, 30, 60, 180].map((minutes) => (
+                      <button
+                        key={minutes}
+                        type="button"
+                        onClick={() =>
+                          setDraftFilters((current) => ({ ...current, periodMinutes: minutes }))
+                        }
+                        className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950 ${
+                          draftFilters.periodMinutes === minutes
+                            ? "border-blue-200 bg-blue-100 text-blue-800 dark:border-blue-800 dark:bg-blue-900/50 dark:text-blue-100"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-slate-100"
+                        }`}
+                      >
+                        {minutes} min
+                      </button>
+                    ))}
+                  </div>
+                  {role === "SUPER_ADMIN" ? (
+                    <div className="mt-3">
+                      <Input
+                        value={draftFilters.tenantId}
+                        aria-label="Filtrar por tenant"
+                        placeholder="tenant-id"
+                        onChange={(event) => {
+                          const nextTenantId = event.target.value;
+                          setDraftFilters((current) => ({
+                            ...current,
+                            tenantId: nextTenantId,
+                          }));
+                        }}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -3122,147 +3251,6 @@ export function OperationalDashboard() {
             </span>
           </div>
         </div>
-        <Dialog
-          open={isFiltersOpen}
-          onOpenChange={(open) => {
-            if (!open) {
-              setDraftFilters(appliedFilters);
-            }
-            setIsFiltersOpen(open);
-          }}
-        >
-          <DialogContent className="left-auto right-0 top-0 h-[100dvh] max-h-[100dvh] w-full max-w-[28rem] translate-x-0 translate-y-0 gap-0 rounded-none border-l border-border p-0 sm:rounded-none">
-            <DialogHeader className="border-b border-border px-5 py-4 text-left">
-              <DialogTitle className="text-base font-semibold">Filtros do dashboard</DialogTitle>
-              <DialogDescription>
-                Ajuste o recorte operacional da visao sem ocupar espaco no grid principal.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-5 px-5 py-5">
-              <section className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium text-foreground">Periodo</p>
-                  <span className="text-[11px] text-muted-foreground">Em minutos</span>
-                </div>
-                <div className="grid grid-cols-4 gap-2">
-                  {[15, 30, 60, 180].map((minutes) => (
-                    <Button
-                      key={minutes}
-                      type="button"
-                      variant={draftFilters.periodMinutes === minutes ? "default" : "outline"}
-                      className="h-9 text-xs"
-                      onClick={() =>
-                        setDraftFilters((current) => ({ ...current, periodMinutes: minutes }))
-                      }
-                    >
-                      {minutes}
-                    </Button>
-                  ))}
-                </div>
-                <Input
-                  type="number"
-                  min={5}
-                  step={5}
-                  value={draftFilters.periodMinutes}
-                  aria-label="Periodo em minutos"
-                  onChange={(event) => {
-                    const nextValue = Number(event.target.value);
-                    setDraftFilters((current) => ({
-                      ...current,
-                      periodMinutes:
-                        Number.isFinite(nextValue) && nextValue >= 5
-                          ? Math.floor(nextValue)
-                          : current.periodMinutes,
-                    }));
-                  }}
-                />
-              </section>
-
-              <section className="space-y-2">
-                <p className="text-sm font-medium text-foreground">Severidade</p>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { value: "all", label: "Todas" },
-                    { value: "critical", label: "Criticas" },
-                    { value: "warning", label: "Warnings" },
-                    { value: "info", label: "Info" },
-                  ].map((option) => (
-                    <Button
-                      key={option.value}
-                      type="button"
-                      variant={draftFilters.severity === option.value ? "default" : "outline"}
-                      className="h-9 text-xs"
-                      onClick={() =>
-                        setDraftFilters((current) => ({
-                          ...current,
-                          severity: option.value as DashboardFiltersState["severity"],
-                        }))
-                      }
-                    >
-                      {option.label}
-                    </Button>
-                  ))}
-                </div>
-              </section>
-
-              {role === "SUPER_ADMIN" ? (
-                <section className="space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-medium text-foreground">Tenant</p>
-                    <span className="text-[11px] text-muted-foreground">
-                      Opcional para SUPER_ADMIN
-                    </span>
-                  </div>
-                  <Input
-                    value={draftFilters.tenantId}
-                    aria-label="Filtrar por tenant"
-                    placeholder="tenant-id"
-                    onChange={(event) =>
-                      setDraftFilters((current) => ({
-                        ...current,
-                        tenantId: event.target.value.trim(),
-                      }))
-                    }
-                  />
-                </section>
-              ) : null}
-            </div>
-
-            <div className="mt-auto flex items-center justify-between gap-3 border-t border-border px-5 py-4">
-              <Button type="button" variant="ghost" onClick={restoreFilterDefaults}>
-                Restaurar padrao
-              </Button>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setDraftFilters(appliedFilters);
-                    setIsFiltersOpen(false);
-                  }}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  type="button"
-                  className="gap-2"
-                  disabled={!hasDraftFilterChanges || savingLayout}
-                  onClick={() => {
-                    void applyFilters();
-                  }}
-                >
-                  {savingLayout ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <SlidersHorizontal className="h-4 w-4" />
-                  )}
-                  Aplicar filtros
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
     </TooltipProvider >
   );

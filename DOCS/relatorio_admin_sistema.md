@@ -1208,3 +1208,93 @@ Validacao executada nesta etapa:
   - `eslint` dos arquivos do dashboard operacional
   - testes de `dashboard.utils`, `dashboard.interactions` e `DashboardMetricState`
   - `build`
+
+### Etapa 8.1 - Shell principal do dashboard, cards de modulos e operacional recolhido
+
+Politica final de exibicao do dashboard:
+
+- o agregado operacional `/api/system/dashboard` ficou restrito a `SUPER_ADMIN`
+- o dashboard principal `/dashboard` continua disponivel para usuarios autenticados, mas passa a ser composto por:
+  - cards comuns/publicados pelos modulos habilitados para o usuario e tenant
+  - card fixo `Dashboard Operacional`, exibido somente para `SUPER_ADMIN`, em largura total e fora do grid editavel
+
+Comportamento esperado por role:
+
+- `SUPER_ADMIN`
+  - ve os cards comuns de modulo quando tambem pertence a um tenant/modulos ativos
+  - ve adicionalmente o card principal `Dashboard Operacional`
+  - a secao operacional completa fica recolhida por padrao e so expande ao clicar nesse card
+- `ADMIN` / `USER` / `CLIENT`
+  - nao recebem a secao operacional nem o payload agregado operacional
+  - veem apenas os cards publicados pelos modulos permitidos
+
+Hierarquia explicita de visibilidade dos cards:
+
+- niveis suportados:
+  - `SUPER_ADMIN`
+  - `ADMIN`
+  - `USER`
+  - `CLIENT`
+- cada card do dashboard principal passa a carregar uma regra `visibilityRole`
+- a regra funciona como piso minimo:
+  - `SUPER_ADMIN` pode ver cards marcados para `SUPER_ADMIN`, `ADMIN`, `USER` e `CLIENT`
+  - `ADMIN` pode ver cards marcados para `ADMIN`, `USER` e `CLIENT`
+  - `USER` pode ver cards marcados para `USER` e `CLIENT`
+  - `CLIENT` ve apenas cards marcados para `CLIENT`
+- para widgets declarados pelos modulos:
+  - `visibilityRole` pode ser informado explicitamente
+  - se o modulo declarar apenas `roles`, o backend deriva o piso pela hierarquia
+  - se o modulo nao declarar regra explicita, o fallback assume `CLIENT`
+
+Novo endpoint para integracao de modulos:
+
+- `GET /api/system/dashboard/module-cards`
+  - retorna os cards do dashboard principal para a role/tenant atual
+  - reaproveita o registro de modulos e faz fallback para cards genericos quando o modulo nao publica widget rico
+  - contrato preparado para cards:
+    - `summary`
+    - `list`
+    - `kanban`
+  - campos principais:
+    - `id`
+    - `title`
+    - `description`
+    - `module`
+    - `kind`
+    - `icon`
+    - `href`
+    - `actionLabel`
+    - `size`
+    - `stats`
+    - `items`
+
+Persistencia e edicao de layout:
+
+- o botao `Editar layout` do dashboard principal agora controla os cards do shell principal:
+  - cards de modulo
+- os cards comuns continuam arrastaveis e redimensionaveis nas telas maiores
+- em mobile, a edicao permanece bloqueada e o dashboard entra em modo leitura
+- o card principal do operacional fica fora do grid e nao participa da ordenacao/ocultacao
+
+UX do operacional apos a reorganizacao:
+
+- o componente `OperationalDashboard` passou a suportar modo embutido
+- o card principal do operacional ocupa sozinho a primeira linha
+- esse card mostra apenas:
+  - `Dashboard Operacional`
+  - `Visao operacional recolhida por padrao.`
+  - acao `Abrir` / `Recolher`
+- no modo embutido:
+  - o header preto do operacional nao se repete
+  - o drawer/botao `Filtros` foi removido
+  - `Periodo` e `Tenant` foram movidos para a area `Acoes rapidas`, abaixo de `Foco rapido`
+  - o grid operacional usa fallback local/default, sem competir com o layout persistido do shell principal
+- quando expandido:
+  - a secao operacional aparece logo abaixo do card principal
+  - os cards de modulos continuam abaixo da secao operacional
+
+Debito tecnico registrado:
+
+- `version` e `maintenance` continuam reaproveitando a area de `updates`
+- `backup` continua caindo na mesma area base de sistema/updates
+- se no futuro for necessario permitir layout persistido tambem para a grade operacional embutida, o correto sera separar o armazenamento do shell principal e da secao operacional

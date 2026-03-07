@@ -10,6 +10,10 @@ import { MaintenanceModeService } from '../maintenance/maintenance-mode.service'
 import { PrismaService } from '../core/prisma/prisma.service';
 import { ResponseTimeMetricsService } from './system-response-time-metrics.service';
 import { SystemTelemetryService } from '@common/services/system-telemetry.service';
+import { ModuleSecurityService } from '../core/module-security.service';
+import { registerCoreModule } from '../core/shared/modules/core-module';
+import { moduleRegistry } from '../core/shared/registry/module-registry';
+import { ModuleDashboardWidget } from '../core/shared/types/module.types';
 
 type DashboardSeverity = 'all' | 'info' | 'warning' | 'critical';
 
@@ -17,6 +21,9 @@ export interface DashboardActor {
   userId: string;
   role: Role;
   tenantId?: string | null;
+  name?: string | null;
+  email?: string | null;
+  tenantName?: string | null;
 }
 
 export interface DashboardFiltersInput {
@@ -56,6 +63,39 @@ interface DashboardMetricCacheEntry {
   value: DashboardMetric<Record<string, unknown>>;
 }
 
+export interface DashboardModuleCard {
+  id: string;
+  title: string;
+  description: string | null;
+  module: string;
+  visibilityRole: Role;
+  kind: 'summary' | 'list' | 'kanban';
+  icon: string | null;
+  href: string | null;
+  actionLabel: string | null;
+  order: number;
+  size: 'small' | 'medium' | 'large';
+  stats: Array<{
+    label: string;
+    value: string;
+  }>;
+  items: Array<{
+    id: string;
+    label: string;
+    value?: string;
+    column?: string;
+    tone?: 'neutral' | 'good' | 'warn' | 'danger';
+  }>;
+}
+
+export interface DashboardModuleCardsResponse {
+  generatedAt: string;
+  cards: DashboardModuleCard[];
+  widgets: {
+    available: string[];
+  };
+}
+
 interface SafeMetricOptions {
   cacheKey?: string;
   cacheTtlMs?: number;
@@ -75,6 +115,7 @@ const MEMORY_HISTORY_MAX_POINTS = 30;
 const RECENT_BACKUPS_LIMIT = 10;
 const RECENT_JOB_FAILURES_LIMIT = 20;
 const RECENT_CRITICAL_ERRORS_LIMIT = 20;
+const LEGACY_CORE_PLATFORM_WIDGET_IDS = new Set(['welcome-widget', 'stats-widget']);
 
 // Curto cache em memoria para widgets caros/externos no polling do agregado.
 // Nao cacheamos maintenance, uptime, notifications nem version para manter o estado mais fresco.
@@ -151,6 +192,7 @@ export class SystemDashboardService {
     private readonly maintenanceModeService: MaintenanceModeService,
     private readonly responseTimeMetricsService: ResponseTimeMetricsService,
     private readonly systemTelemetryService: SystemTelemetryService,
+    private readonly moduleSecurityService: ModuleSecurityService,
   ) {}
 
   async getDashboard(actor: DashboardActor, filtersInput: DashboardFiltersInput = {}) {
@@ -299,14 +341,27 @@ export class SystemDashboardService {
       tenants,
       notifications,
       widgets: {
-        available: this.getAllowedWidgetIds(actor.role),
+        available: this.getOperationalWidgetIds(actor.role),
       },
     };
 
     return this.applyRoleProjection(payload, actor.role);
   }
 
+  async getModuleCards(actor: DashboardActor): Promise<DashboardModuleCardsResponse> {
+    const cards = await this.resolveModuleCards(actor);
+
+    return {
+      generatedAt: new Date().toISOString(),
+      cards,
+      widgets: {
+        available: cards.map((card) => card.id),
+      },
+    };
+  }
+
   async getLayout(actor: DashboardActor) {
+    const allowedWidgetIds = await this.getLayoutWidgetIds(actor);
     const layout = await this.prisma.dashboardLayout.findUnique({
       where: {
         userId_role: {
@@ -326,8 +381,8 @@ export class SystemDashboardService {
     if (!layout) {
       return {
         role: actor.role,
-        layoutJson: this.getDefaultLayout(actor.role),
-        filtersJson: this.getDefaultFilters(actor.role),
+        layoutJson: this.getDefaultLayout(allowedWidgetIds),
+        filtersJson: this.getDefaultFilters(actor.role, allowedWidgetIds),
         updatedAt: null,
         resolution: this.buildLayoutResolution('role_default', actor),
       };
@@ -335,16 +390,17 @@ export class SystemDashboardService {
 
     return {
       role: layout.role,
-      layoutJson: this.sanitizeLayoutJsonForRole(layout.layoutJson, actor.role),
-      filtersJson: this.sanitizeFiltersJsonForRole(layout.filtersJson, actor.role),
+      layoutJson: this.sanitizeLayoutJson(layout.layoutJson, allowedWidgetIds),
+      filtersJson: this.sanitizeFiltersJson(layout.filtersJson, actor.role, allowedWidgetIds),
       updatedAt: layout.updatedAt.toISOString(),
       resolution: this.buildLayoutResolution('user_role', actor),
     };
   }
 
   async saveLayout(actor: DashboardActor, input: DashboardLayoutInput) {
-    const layoutJson = this.sanitizeLayoutJsonForRole(input.layoutJson, actor.role);
-    const filtersJson = this.sanitizeFiltersJsonForRole(input.filtersJson, actor.role);
+    const allowedWidgetIds = await this.getLayoutWidgetIds(actor);
+    const layoutJson = this.sanitizeLayoutJson(input.layoutJson, allowedWidgetIds);
+    const filtersJson = this.sanitizeFiltersJson(input.filtersJson, actor.role, allowedWidgetIds);
 
     const saved = await this.prisma.dashboardLayout.upsert({
       where: {
@@ -373,8 +429,8 @@ export class SystemDashboardService {
 
     return {
       role: saved.role,
-      layoutJson: this.sanitizeLayoutJsonForRole(saved.layoutJson, actor.role),
-      filtersJson: this.sanitizeFiltersJsonForRole(saved.filtersJson, actor.role),
+      layoutJson: this.sanitizeLayoutJson(saved.layoutJson, allowedWidgetIds),
+      filtersJson: this.sanitizeFiltersJson(saved.filtersJson, actor.role, allowedWidgetIds),
       updatedAt: saved.updatedAt.toISOString(),
       resolution: this.buildLayoutResolution('user_role', actor),
     };
@@ -836,12 +892,11 @@ export class SystemDashboardService {
     return { OR: or };
   }
 
-  private getAllowedWidgetIds(role: Role): string[] {
+  private getOperationalWidgetIds(role: Role): string[] {
     return [...(ROLE_WIDGET_POLICY[role] || ROLE_WIDGET_POLICY[Role.CLIENT])];
   }
 
-  private getDefaultLayout(role: Role): Record<string, unknown> {
-    const widgetIds = this.getAllowedWidgetIds(role);
+  private getDefaultLayout(widgetIds: string[]): Record<string, unknown> {
     return {
       lg: this.buildGridLayout(widgetIds, 4),
       md: this.buildGridLayout(widgetIds, 2),
@@ -849,11 +904,12 @@ export class SystemDashboardService {
     };
   }
 
-  private getDefaultFilters(role: Role): Record<string, unknown> {
+  private getDefaultFilters(role: Role, _widgetIds: string[]): Record<string, unknown> {
     return {
       periodMinutes: role === Role.SUPER_ADMIN ? DEFAULT_PERIOD_MINUTES : 30,
       tenantId: null,
       severity: 'all',
+      operationalPinned: false,
       hiddenWidgetIds: [],
     };
   }
@@ -868,6 +924,431 @@ export class SystemDashboardService {
       minW: 1,
       minH: 1,
     }));
+  }
+
+  private async getLayoutWidgetIds(actor: DashboardActor): Promise<string[]> {
+    const moduleCards = await this.resolveModuleCards(actor);
+    return Array.from(new Set(moduleCards.map((card) => card.id)));
+  }
+
+  private ensureModuleDashboardRegistry() {
+    if (!moduleRegistry.isRegistered('core')) {
+      registerCoreModule();
+    }
+  }
+
+  private async resolveModuleCards(actor: DashboardActor): Promise<DashboardModuleCard[]> {
+    this.ensureModuleDashboardRegistry();
+
+    const role = String(actor.role || '').trim().toUpperCase();
+    const tenantId = this.normalizeNullableString(actor.tenantId);
+    const availableModules = tenantId
+      ? await this.moduleSecurityService.getAvailableModules(tenantId, role)
+      : [];
+    const modulesBySlug = new Map<string, Record<string, any>>();
+
+    for (const moduleEntry of availableModules) {
+      if (!moduleEntry || typeof moduleEntry !== 'object') {
+        continue;
+      }
+
+      const slug = String((moduleEntry as Record<string, unknown>).slug || '').trim();
+      if (!slug) {
+        continue;
+      }
+
+      modulesBySlug.set(slug, moduleEntry as Record<string, any>);
+    }
+
+    const cards: DashboardModuleCard[] = await this.buildPlatformCards(
+      actor,
+      Array.from(modulesBySlug.values()),
+    );
+    const coveredModules = new Set<string>();
+    const registryWidgets = moduleRegistry
+      .getDashboardWidgets(role, [])
+      .filter(
+        (widget) =>
+          !(
+            String(widget.module || '').trim() === 'core' &&
+            LEGACY_CORE_PLATFORM_WIDGET_IDS.has(String(widget.id || '').trim())
+          ),
+      );
+
+    for (const widget of registryWidgets) {
+      const card = this.mapRegisteredModuleCard(widget, modulesBySlug);
+      if (!card) {
+        continue;
+      }
+
+      cards.push(card);
+      coveredModules.add(card.module);
+    }
+
+    for (const moduleEntry of modulesBySlug.values()) {
+      const slug = String(moduleEntry.slug || '').trim();
+      if (!slug || coveredModules.has(slug)) {
+        continue;
+      }
+
+      cards.push(this.buildFallbackModuleCard(moduleEntry));
+    }
+
+    return cards.sort((left, right) => {
+      if (left.order !== right.order) {
+        return left.order - right.order;
+      }
+
+      return left.title.localeCompare(right.title);
+    });
+  }
+
+  private async buildPlatformCards(
+    actor: DashboardActor,
+    availableModules: Record<string, any>[],
+  ): Promise<DashboardModuleCard[]> {
+    const cards: DashboardModuleCard[] = [
+      this.buildWelcomePlatformCard(actor, availableModules),
+    ];
+
+    if (this.getRoleRank(actor.role) <= this.getRoleRank(Role.ADMIN)) {
+      cards.push(await this.buildStatisticsPlatformCard(actor, availableModules));
+    }
+
+    return cards;
+  }
+
+  private buildWelcomePlatformCard(
+    actor: DashboardActor,
+    availableModules: Record<string, any>[],
+  ): DashboardModuleCard {
+    const displayName = this.normalizeNullableString(actor.name) || 'Usuario';
+    const tenantName =
+      this.normalizeNullableString(actor.tenantName) ||
+      (actor.role === Role.SUPER_ADMIN ? 'Plataforma multitenant' : 'Tenant atual');
+
+    return {
+      id: 'platform:welcome',
+      title: 'Bem-vindo',
+      description: `${this.resolveGreeting()}, ${displayName}. Este painel acompanha o seu contexto atual na plataforma.`,
+      module: 'platform',
+      visibilityRole: Role.CLIENT,
+      kind: 'summary',
+      icon: 'Handshake',
+      href: null,
+      actionLabel: null,
+      order: 1,
+      size: 'large',
+      stats: [
+        { label: 'Perfil', value: this.humanizeDashboardRole(actor.role) },
+        { label: 'Escopo', value: actor.role === Role.SUPER_ADMIN ? 'Global' : 'Tenant' },
+        { label: 'Modulos', value: String(availableModules.length) },
+      ],
+      items: [
+        {
+          id: 'platform:welcome:user',
+          label: 'Usuario',
+          value: displayName,
+          tone: 'neutral',
+        },
+        {
+          id: 'platform:welcome:email',
+          label: 'Email',
+          value: this.normalizeNullableString(actor.email) || '--',
+          tone: 'neutral',
+        },
+        {
+          id: 'platform:welcome:tenant',
+          label: 'Tenant',
+          value: tenantName,
+          tone: 'neutral',
+        },
+      ],
+    };
+  }
+
+  private async buildStatisticsPlatformCard(
+    actor: DashboardActor,
+    availableModules: Record<string, any>[],
+  ): Promise<DashboardModuleCard> {
+    const tenantScopeWhere =
+      actor.role === Role.SUPER_ADMIN
+        ? {}
+        : actor.tenantId
+          ? { tenantId: actor.tenantId }
+          : { id: '__no_user__' };
+    const totalMenus = availableModules.reduce((total, moduleEntry) => {
+      const menus = Array.isArray(moduleEntry?.menus) ? moduleEntry.menus : [];
+      return total + menus.length;
+    }, 0);
+
+    const [usersInScope, verifiedUsersInScope, activeTenants] = await Promise.all([
+      this.prisma.user.count({
+        where: tenantScopeWhere,
+      }),
+      this.prisma.user.count({
+        where: {
+          ...tenantScopeWhere,
+          emailVerified: true,
+        },
+      }),
+      actor.role === Role.SUPER_ADMIN
+        ? this.prisma.tenant.count({
+            where: {
+              ativo: true,
+            },
+          })
+        : Promise.resolve(actor.tenantId ? 1 : 0),
+    ]);
+
+    return {
+      id: 'platform:statistics',
+      title: 'Estatisticas',
+      description: 'Resumo padrao da plataforma para acompanhamento administrativo.',
+      module: 'platform',
+      visibilityRole: Role.ADMIN,
+      kind: 'summary',
+      icon: 'BarChart3',
+      href: null,
+      actionLabel: null,
+      order: 2,
+      size: 'medium',
+      stats: [
+        { label: 'Usuarios', value: String(usersInScope) },
+        { label: 'Verificados', value: String(verifiedUsersInScope) },
+        { label: 'Modulos', value: String(availableModules.length) },
+        { label: 'Menus', value: String(totalMenus) },
+      ],
+      items: [
+        {
+          id: 'platform:statistics:role',
+          label: 'Perfil atual',
+          value: this.humanizeDashboardRole(actor.role),
+          tone: 'neutral',
+        },
+        {
+          id: 'platform:statistics:tenants',
+          label: actor.role === Role.SUPER_ADMIN ? 'Tenants ativos' : 'Tenant em foco',
+          value:
+            actor.role === Role.SUPER_ADMIN
+              ? String(activeTenants)
+              : this.normalizeNullableString(actor.tenantName) || 'Tenant atual',
+          tone: 'good',
+        },
+        {
+          id: 'platform:statistics:coverage',
+          label: 'Cobertura',
+          value: actor.role === Role.SUPER_ADMIN ? 'Visao global' : 'Visao administrativa',
+          tone: 'neutral',
+        },
+      ],
+    };
+  }
+
+  private mapRegisteredModuleCard(
+    widget: ModuleDashboardWidget,
+    modulesBySlug: Map<string, Record<string, any>>,
+  ): DashboardModuleCard | null {
+    const moduleSlug = String(widget.module || '').trim();
+    if (!moduleSlug) {
+      return null;
+    }
+
+    const moduleEntry = modulesBySlug.get(moduleSlug);
+    const route = this.resolveModulePrimaryRoute(moduleEntry);
+    const kind = widget.kind || this.inferModuleCardKind(widget);
+    const title = String(widget.name || widget.id || '').trim();
+
+    if (!title) {
+      return null;
+    }
+
+    return {
+      id: `module:${moduleSlug}:${String(widget.id || title).trim()}`,
+      title,
+      description: this.normalizeNullableString(widget.description) || this.normalizeNullableString(moduleEntry?.description),
+      module: moduleSlug,
+      visibilityRole: this.resolveWidgetVisibilityRole(
+        widget.visibilityRole ? [widget.visibilityRole] : widget.roles,
+        moduleEntry,
+      ),
+      kind,
+      icon: this.normalizeNullableString(widget.icon) || this.normalizeNullableString(moduleEntry?.menus?.[0]?.icon),
+      href: this.normalizeNullableString(widget.route) || route,
+      actionLabel: this.normalizeNullableString(widget.actionLabel) || (route ? 'Abrir modulo' : null),
+      order: Number.isFinite(Number(widget.order)) ? Number(widget.order) : 50,
+      size: widget.size || 'medium',
+      stats: Array.isArray(widget.stats) ? widget.stats.slice(0, 3) : [],
+      items: Array.isArray(widget.items) ? widget.items.slice(0, 12) : [],
+    };
+  }
+
+  private buildFallbackModuleCard(moduleEntry: Record<string, any>): DashboardModuleCard {
+    const moduleSlug = String(moduleEntry.slug || '').trim();
+    const menus = Array.isArray(moduleEntry.menus) ? moduleEntry.menus : [];
+    const route = this.resolveModulePrimaryRoute(moduleEntry);
+    const items = menus.slice(0, 6).map((menu: Record<string, unknown>, index: number) => ({
+      id: `${moduleSlug}:menu:${index}`,
+      label: String(menu.label || menu.route || 'Acesso rapido').trim(),
+      value: this.normalizeNullableString(menu.route) || undefined,
+      column: 'Atalhos',
+      tone: 'neutral' as const,
+    }));
+
+    return {
+      id: `module:${moduleSlug}`,
+      title: String(moduleEntry.name || moduleSlug).trim() || moduleSlug,
+      description: this.normalizeNullableString(moduleEntry.description) || 'Modulo ativo para esta conta.',
+      module: moduleSlug,
+      visibilityRole: this.resolveModuleVisibilityRole(moduleEntry),
+      kind: items.length >= 4 ? 'list' : 'summary',
+      icon: this.normalizeNullableString(menus[0]?.icon) || 'Package',
+      href: route,
+      actionLabel: route ? 'Abrir modulo' : null,
+      order: 100,
+      size: 'medium',
+      stats: [
+        { label: 'Versao', value: String(moduleEntry.version || '--') },
+        { label: 'Menus', value: String(menus.length) },
+      ],
+      items,
+    };
+  }
+
+  private resolveModulePrimaryRoute(moduleEntry?: Record<string, any> | null): string | null {
+    const menus = Array.isArray(moduleEntry?.menus) ? moduleEntry.menus : [];
+    const firstRoute = menus
+      .map((menu: Record<string, unknown>) => this.normalizeNullableString(menu.route))
+      .find((route) => Boolean(route));
+
+    return firstRoute || null;
+  }
+
+  private inferModuleCardKind(widget: ModuleDashboardWidget): 'summary' | 'list' | 'kanban' {
+    const component = String(widget.component || '').trim().toLowerCase();
+    const name = String(widget.name || '').trim().toLowerCase();
+    const signature = `${component} ${name}`;
+
+    if (signature.includes('kanban') || signature.includes('board')) {
+      return 'kanban';
+    }
+
+    if (signature.includes('list')) {
+      return 'list';
+    }
+
+    return 'summary';
+  }
+
+  private resolveWidgetVisibilityRole(
+    roles: string[] | undefined,
+    moduleEntry?: Record<string, any>,
+  ): Role {
+    if (Array.isArray(roles) && roles.length > 0) {
+      const ranked = roles
+        .map((role) => String(role || '').trim().toUpperCase())
+        .map((role) => this.parseDashboardRole(role))
+        .filter((role): role is Role => Boolean(role))
+        .sort((left, right) => this.getRoleRank(left) - this.getRoleRank(right));
+
+      if (ranked.length > 0) {
+        return ranked[ranked.length - 1];
+      }
+    }
+
+    return this.resolveModuleVisibilityRole(moduleEntry);
+  }
+
+  private resolveModuleVisibilityRole(moduleEntry?: Record<string, any>): Role {
+    const menus = Array.isArray(moduleEntry?.menus) ? moduleEntry.menus : [];
+    const declaredRoles = menus.flatMap((menu: Record<string, unknown>) =>
+      Array.isArray(menu.roles) ? menu.roles : [],
+    );
+    const parsedRole = this.resolveWidgetVisibilityRoleFromCandidates(declaredRoles);
+    if (parsedRole) {
+      return parsedRole;
+    }
+
+    const permissions = menus
+      .map((menu: Record<string, unknown>) => String(menu.permission || '').trim().toLowerCase())
+      .filter((permission) => permission.length > 0);
+
+    if (permissions.some((permission) => permission.includes('super_admin'))) {
+      return Role.SUPER_ADMIN;
+    }
+
+    if (permissions.some((permission) => permission.includes('admin'))) {
+      return Role.ADMIN;
+    }
+
+    return Role.CLIENT;
+  }
+
+  private resolveWidgetVisibilityRoleFromCandidates(roles: unknown[]): Role | null {
+    const ranked = roles
+      .map((role) => this.parseDashboardRole(String(role || '').trim().toUpperCase()))
+      .filter((role): role is Role => Boolean(role))
+      .sort((left, right) => this.getRoleRank(left) - this.getRoleRank(right));
+
+    if (ranked.length === 0) {
+      return null;
+    }
+
+    return ranked[ranked.length - 1];
+  }
+
+  private parseDashboardRole(value: string): Role | null {
+    return value === Role.SUPER_ADMIN ||
+      value === Role.ADMIN ||
+      value === Role.USER ||
+      value === Role.CLIENT
+      ? value
+      : null;
+  }
+
+  private getRoleRank(role: Role): number {
+    if (role === Role.SUPER_ADMIN) {
+      return 0;
+    }
+
+    if (role === Role.ADMIN) {
+      return 1;
+    }
+
+    if (role === Role.USER) {
+      return 2;
+    }
+
+    return 3;
+  }
+
+  private humanizeDashboardRole(role: Role): string {
+    if (role === Role.SUPER_ADMIN) {
+      return 'Super Admin';
+    }
+
+    if (role === Role.ADMIN) {
+      return 'Admin';
+    }
+
+    if (role === Role.USER) {
+      return 'Usuario';
+    }
+
+    return 'Cliente';
+  }
+
+  private resolveGreeting(date = new Date()): string {
+    const hour = date.getHours();
+    if (hour < 12) {
+      return 'Bom dia';
+    }
+
+    if (hour < 18) {
+      return 'Boa tarde';
+    }
+
+    return 'Boa noite';
   }
 
   private normalizeFilters(input: DashboardFiltersInput): {
@@ -1035,13 +1516,13 @@ export class SystemDashboardService {
     }
   }
 
-  private sanitizeLayoutJsonForRole(
+  private sanitizeLayoutJson(
     input: unknown,
-    role: Role,
+    widgetIds: string[],
   ): Record<string, unknown> {
-    const fallback = this.getDefaultLayout(role);
+    const fallback = this.getDefaultLayout(widgetIds);
     const parsed = this.sanitizeJson(input, fallback);
-    const allowedWidgetIds = new Set(this.getAllowedWidgetIds(role));
+    const allowedWidgetIds = new Set(widgetIds);
     const sanitized: Record<string, unknown> = {};
 
     for (const breakpoint of DASHBOARD_LAYOUT_BREAKPOINTS) {
@@ -1060,15 +1541,19 @@ export class SystemDashboardService {
     return sanitized;
   }
 
-  private sanitizeFiltersJsonForRole(input: unknown, role: Role): Record<string, unknown> {
-    const fallback = this.getDefaultFilters(role);
+  private sanitizeFiltersJson(
+    input: unknown,
+    role: Role,
+    widgetIds: string[],
+  ): Record<string, unknown> {
+    const fallback = this.getDefaultFilters(role, widgetIds);
     const parsed = this.sanitizeJson(input, fallback);
     const normalized = this.normalizeFilters({
       periodMinutes: parsed.periodMinutes as number | undefined,
       tenantId: role === Role.SUPER_ADMIN ? (parsed.tenantId as string | undefined) : undefined,
       severity: parsed.severity as string | undefined,
     });
-    const allowedWidgetIds = new Set(this.getAllowedWidgetIds(role));
+    const allowedWidgetIds = new Set(widgetIds);
     const hiddenWidgetIds = Array.isArray(parsed.hiddenWidgetIds)
       ? parsed.hiddenWidgetIds
           .map((item) => String(item || '').trim())
@@ -1079,6 +1564,7 @@ export class SystemDashboardService {
       periodMinutes: normalized.periodMinutes,
       tenantId: role === Role.SUPER_ADMIN ? normalized.tenantId : null,
       severity: normalized.severity,
+      operationalPinned: role === Role.SUPER_ADMIN ? parsed.operationalPinned === true : false,
       hiddenWidgetIds,
     };
   }
