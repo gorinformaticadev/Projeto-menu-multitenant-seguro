@@ -26,6 +26,8 @@ describe('SystemTelemetryService', () => {
 
     expect(snapshot.totalRequestsRecent).toBe(6);
     expect(snapshot.totalErrorCount).toBe(4);
+    expect(snapshot.total5xxCount).toBe(2);
+    expect(snapshot.error5xxRateRecent).toBe(33.33);
     expect(snapshot.topSlowRoutes[0]).toEqual(
       expect.objectContaining({
         method: 'GET',
@@ -103,6 +105,10 @@ describe('SystemTelemetryService', () => {
     const snapshot = service.getSecuritySnapshot(15 * 60 * 1000, 5);
 
     expect(snapshot.maintenanceBypassAttemptsRecent).toBe(1);
+    expect(snapshot.unauthorizedCountRecent).toBe(0);
+    expect(snapshot.forbiddenCountRecent).toBe(2);
+    expect(snapshot.rateLimitedCountRecent).toBe(1);
+    expect(snapshot.deniedSpikeCountRecent).toBe(3);
     expect(snapshot.topDeniedIps[0]).toEqual(
       expect.objectContaining({
         ip: '10.0.0.10',

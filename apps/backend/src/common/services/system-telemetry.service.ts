@@ -46,6 +46,39 @@ export interface SecurityTelemetryRecentEvent {
   at: string;
 }
 
+export interface ApiTelemetrySnapshot {
+  status: 'ok';
+  windowStart: string;
+  windowSeconds: number;
+  totalRequestsRecent: number;
+  totalErrorCount: number;
+  total5xxCount: number;
+  avgResponseMs: number | null;
+  errorRateRecent: number;
+  error5xxRateRecent: number;
+  topSlowRoutes: RouteTelemetrySummary[];
+  topErrorRoutes: RouteTelemetrySummary[];
+}
+
+export interface SecurityTelemetrySnapshot {
+  status: 'ok';
+  windowStart: string;
+  windowSeconds: number;
+  maintenanceBypassAttemptsRecent: number;
+  unauthorizedCountRecent: number;
+  forbiddenCountRecent: number;
+  rateLimitedCountRecent: number;
+  deniedSpikeCountRecent: number;
+  topDeniedIps: SecurityTelemetryIpSummary[];
+  topRateLimitedIps: SecurityTelemetryIpSummary[];
+  accessDeniedRecent: SecurityTelemetryRecentEvent[];
+  routeDistribution: Array<{
+    route: string;
+    count: number;
+  }>;
+  deniedAccess: SecurityTelemetryIpSummary[];
+}
+
 type RequestTelemetryRecord = {
   at: number;
   method: string;
@@ -164,7 +197,7 @@ export class SystemTelemetryService {
     this.trimSecurityEvents();
   }
 
-  getApiSnapshot(windowMs = REQUEST_RETENTION_MS, topLimit = DEFAULT_TOP_LIMIT) {
+  getApiSnapshot(windowMs = REQUEST_RETENTION_MS, topLimit = DEFAULT_TOP_LIMIT): ApiTelemetrySnapshot {
     const normalizedWindowMs = this.normalizeWindowMs(windowMs, REQUEST_RETENTION_MS);
     const cutoff = Date.now() - normalizedWindowMs;
     this.pruneRequestEvents(cutoff);
@@ -175,6 +208,7 @@ export class SystemTelemetryService {
 
     const totalRequestsRecent = summaries.reduce((total, entry) => total + entry.requestCount, 0);
     const totalErrorCount = summaries.reduce((total, entry) => total + entry.errorCount, 0);
+    const total5xxCount = summaries.reduce((total, entry) => total + entry.status5xx, 0);
     const totalDurationMs = relevant.reduce((total, entry) => total + entry.durationMs, 0);
     const avgResponseMs =
       totalRequestsRecent > 0 ? Number((totalDurationMs / totalRequestsRecent).toFixed(2)) : null;
@@ -185,8 +219,10 @@ export class SystemTelemetryService {
       windowSeconds: Math.floor(normalizedWindowMs / 1000),
       totalRequestsRecent,
       totalErrorCount,
+      total5xxCount,
       avgResponseMs,
       errorRateRecent: this.computeRate(totalErrorCount, totalRequestsRecent),
+      error5xxRateRecent: this.computeRate(total5xxCount, totalRequestsRecent),
       topSlowRoutes: summaries
         .filter((entry) => this.isEligibleForTopSlowRoutes(entry))
         .sort((left, right) => {
@@ -214,7 +250,10 @@ export class SystemTelemetryService {
     };
   }
 
-  getSecuritySnapshot(windowMs = SECURITY_RETENTION_MS, topLimit = DEFAULT_TOP_LIMIT) {
+  getSecuritySnapshot(
+    windowMs = SECURITY_RETENTION_MS,
+    topLimit = DEFAULT_TOP_LIMIT,
+  ): SecurityTelemetrySnapshot {
     const normalizedWindowMs = this.normalizeWindowMs(windowMs, SECURITY_RETENTION_MS);
     const cutoff = Date.now() - normalizedWindowMs;
     this.pruneSecurityEvents(cutoff);
@@ -223,19 +262,39 @@ export class SystemTelemetryService {
     const deniedIps = new Map<string, SecurityAggregate>();
     const rateLimitedIps = new Map<string, SecurityAggregate>();
     const routeDistribution = new Map<string, number>();
+    let unauthorizedCountRecent = 0;
+    let forbiddenCountRecent = 0;
+    let rateLimitedCountRecent = 0;
 
     for (const event of relevant) {
       routeDistribution.set(event.route, (routeDistribution.get(event.route) || 0) + 1);
 
       if (event.statusCode === 429 || event.type === 'rate_limited') {
+        rateLimitedCountRecent += 1;
         this.bumpSecurityAggregate(rateLimitedIps, event.ip, event.route, event.at);
         continue;
+      }
+
+      if (event.statusCode === 401 || event.type === 'unauthorized') {
+        unauthorizedCountRecent += 1;
+      }
+
+      if (
+        event.statusCode === 403 ||
+        event.statusCode === 503 ||
+        event.type === 'forbidden' ||
+        event.type === 'maintenance_blocked' ||
+        event.type === 'maintenance_bypass_attempt'
+      ) {
+        forbiddenCountRecent += 1;
       }
 
       if (event.statusCode === 401 || event.statusCode === 403 || event.statusCode === 503) {
         this.bumpSecurityAggregate(deniedIps, event.ip, event.route, event.at);
       }
     }
+
+    const deniedSpikeCountRecent = unauthorizedCountRecent + forbiddenCountRecent + rateLimitedCountRecent;
 
     return {
       status: 'ok' as const,
@@ -244,6 +303,10 @@ export class SystemTelemetryService {
       maintenanceBypassAttemptsRecent: relevant.filter(
         (event) => event.type === 'maintenance_bypass_attempt',
       ).length,
+      unauthorizedCountRecent,
+      forbiddenCountRecent,
+      rateLimitedCountRecent,
+      deniedSpikeCountRecent,
       topDeniedIps: this.mapSecurityAggregate(deniedIps, topLimit),
       topRateLimitedIps: this.mapSecurityAggregate(rateLimitedIps, topLimit),
       accessDeniedRecent: relevant

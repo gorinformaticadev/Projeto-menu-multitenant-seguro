@@ -5,12 +5,13 @@ import { PathsModule } from '../core/common/paths/paths.module';
 import { TokenCleanupService } from '../common/services/token-cleanup.service';
 import { AuditModule } from '../audit/audit.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { CommonModule } from '../common/common.module';
 import { MaintenanceModeService } from './maintenance-mode.service';
 import { MaintenanceModeGuard } from './maintenance-mode.guard';
 import { MaintenanceController } from './maintenance.controller';
 
 @Module({
-  imports: [JwtModule.register({}), PrismaModule, PathsModule, AuditModule, NotificationsModule],
+  imports: [JwtModule.register({}), PrismaModule, PathsModule, AuditModule, NotificationsModule, CommonModule],
   controllers: [MaintenanceController],
   providers: [TokenCleanupService, MaintenanceModeService, MaintenanceModeGuard],
   exports: [TokenCleanupService, MaintenanceModeService, MaintenanceModeGuard],

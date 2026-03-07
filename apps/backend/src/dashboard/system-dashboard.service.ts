@@ -842,7 +842,7 @@ export class SystemDashboardService {
 
   private async getNotificationsMetric(actor: DashboardActor, windowStart: Date) {
     const scopeWhere = this.buildNotificationsScope(actor);
-    const [criticalUnread, criticalRecent] = await Promise.all([
+    const [criticalUnread, criticalRecent, operationalRecentCount, recentOperationalAlertsRows] = await Promise.all([
       this.prisma.notification.count({
         where: {
           ...scopeWhere,
@@ -859,12 +859,48 @@ export class SystemDashboardService {
           },
         },
       }),
+      this.prisma.notification.count({
+        where: {
+          ...scopeWhere,
+          module: 'operational-alerts',
+          createdAt: {
+            gte: windowStart,
+          },
+        },
+      }),
+      this.prisma.notification.findMany({
+        where: {
+          ...scopeWhere,
+          module: 'operational-alerts',
+        },
+        select: {
+          id: true,
+          title: true,
+          body: true,
+          severity: true,
+          createdAt: true,
+          data: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: 3,
+      }),
     ]);
 
     return {
       status: 'ok' as const,
       criticalUnread,
       criticalRecent,
+      operationalRecentCount,
+      recentOperationalAlerts: recentOperationalAlertsRows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        body: this.truncateText(row.body, 160),
+        severity: row.severity,
+        createdAt: row.createdAt.toISOString(),
+        action: this.normalizeNullableString((row.data as Record<string, unknown> | null)?.alertAction) || null,
+      })),
     };
   }
 

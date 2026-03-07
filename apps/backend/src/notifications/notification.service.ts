@@ -35,6 +35,10 @@ export interface CreateSystemNotificationInput {
   targetRole?: string | null;
   targetUserId?: string | null;
   type?: string;
+  module?: string | null;
+  source?: string | null;
+  tenantId?: string | null;
+  userId?: string | null;
 }
 
 export interface SystemNotificationListParams {
@@ -157,12 +161,38 @@ export class NotificationService {
   }
 
   async createSystemNotification(input: CreateSystemNotificationInput): Promise<SystemNotificationDto | null> {
+    const row = await this.persistSystemNotification(input);
+    if (!row) {
+      return null;
+    }
+
+    const dto = this.toSystemNotificationDto(row);
+    this.systemAlertsSubject.next(dto);
+    return dto;
+  }
+
+  async createSystemNotificationEntity(input: CreateSystemNotificationInput): Promise<Notification | null> {
+    const row = await this.persistSystemNotification(input);
+    if (!row) {
+      return null;
+    }
+
+    const dto = this.toSystemNotificationDto(row);
+    this.systemAlertsSubject.next(dto);
+    return this.mapToEntity(row);
+  }
+
+  private async persistSystemNotification(input: CreateSystemNotificationInput): Promise<any | null> {
     const severity = this.normalizeSeverity(input.severity);
     const title = this.normalizeText(input.title, 140);
     const body = this.normalizeText(input.body, 500);
     const targetRole = this.normalizeText(input.targetRole || 'SUPER_ADMIN', 40);
     const targetUserId = this.normalizeText(input.targetUserId || undefined, 80);
     const type = this.normalizeText(input.type || 'SYSTEM_ALERT', 40);
+    const source = this.normalizeText(input.source || 'system', 40) || 'system';
+    const moduleName = this.normalizeText(input.module || 'system', 80) || 'system';
+    const tenantId = this.normalizeText(input.tenantId || undefined, 80);
+    const userId = this.normalizeText(input.userId || targetUserId || undefined, 80);
     const data = this.sanitizeData(input.data || {});
 
     if (!title || !body) {
@@ -183,17 +213,14 @@ export class NotificationService {
           isRead: false,
           read: false,
           readAt: null,
-          audience: targetUserId ? 'user' : 'super_admin',
-          source: 'system',
-          module: 'system',
-          tenantId: null,
-          userId: targetUserId,
+          audience: targetUserId ? 'user' : tenantId ? 'admin' : 'super_admin',
+          source,
+          module: moduleName,
+          tenantId,
+          userId,
         },
       });
-
-      const dto = this.toSystemNotificationDto(notification);
-      this.systemAlertsSubject.next(dto);
-      return dto;
+      return notification;
     } catch (error) {
       this.logger.error(`Falha ao persistir notificacao de sistema: ${String(error)}`);
       return null;

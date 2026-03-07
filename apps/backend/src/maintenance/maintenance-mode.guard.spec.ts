@@ -12,8 +12,8 @@ describe('MaintenanceModeGuard', () => {
   const auditServiceMock = {
     log: jest.fn(),
   };
-  const notificationServiceMock = {
-    emitSystemAlert: jest.fn(),
+  const systemOperationalAlertsServiceMock = {
+    notifyMaintenanceBypassUsed: jest.fn(),
   };
   const systemTelemetryServiceMock = {
     recordSecurityEvent: jest.fn(),
@@ -27,7 +27,7 @@ describe('MaintenanceModeGuard', () => {
       maintenanceModeServiceMock as any,
       jwtServiceMock as unknown as JwtService,
       auditServiceMock as any,
-      notificationServiceMock as any,
+      systemOperationalAlertsServiceMock as any,
       systemTelemetryServiceMock as any,
     );
 
@@ -104,10 +104,10 @@ describe('MaintenanceModeGuard', () => {
         }),
       }),
     );
-    expect(notificationServiceMock.emitSystemAlert).toHaveBeenCalledWith(
+    expect(systemOperationalAlertsServiceMock.notifyMaintenanceBypassUsed).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: 'MAINTENANCE_BYPASS_USED',
-        severity: 'critical',
+        route: '/api/private/resource',
+        method: 'GET',
       }),
     );
   });

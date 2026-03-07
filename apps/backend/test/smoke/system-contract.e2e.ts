@@ -33,6 +33,7 @@ import { SystemDataRetentionController } from '../../src/retention/system-data-r
 import { SystemDataRetentionService } from '../../src/retention/system-data-retention.service';
 import { SystemDashboardController } from '../../src/dashboard/system-dashboard.controller';
 import { SystemDashboardService } from '../../src/dashboard/system-dashboard.service';
+import { SystemOperationalAlertsService } from '../../src/common/services/system-operational-alerts.service';
 import { SystemTelemetryService } from '../../src/common/services/system-telemetry.service';
 
 const DEFAULT_MAINTENANCE_STATE: MaintenanceState = {
@@ -158,6 +159,9 @@ const retentionServiceMock = {
 const systemTelemetryServiceMock = {
   recordSecurityEvent: jest.fn(),
 };
+const systemOperationalAlertsServiceMock = {
+  notifyMaintenanceBypassUsed: jest.fn(async () => true),
+};
 
 const systemDashboardServiceMock = {
   getDashboard: jest.fn(async () => ({
@@ -166,7 +170,13 @@ const systemDashboardServiceMock = {
     uptime: { status: 'ok', human: '01:22:33' },
     maintenance: { status: 'ok', enabled: false },
     api: { status: 'ok', avgResponseTimeMs: 45.3, sampleSize: 12 },
-    notifications: { status: 'ok', criticalUnread: 1, criticalRecent: 2 },
+    notifications: {
+      status: 'ok',
+      criticalUnread: 1,
+      criticalRecent: 2,
+      operationalRecentCount: 1,
+      recentOperationalAlerts: [],
+    },
     widgets: { available: ['version', 'uptime', 'maintenance', 'api', 'notifications'] },
   })),
   getLayout: jest.fn(async () => ({
@@ -278,6 +288,10 @@ class DummyTenantsController {
       useValue: systemTelemetryServiceMock,
     },
     {
+      provide: SystemOperationalAlertsService,
+      useValue: systemOperationalAlertsServiceMock,
+    },
+    {
       provide: JwtService,
       useValue: {
         verify: jest.fn((token: string) => {
@@ -334,6 +348,7 @@ describe('System contract smoke', () => {
     systemDashboardServiceMock.getLayout.mockClear();
     systemDashboardServiceMock.saveLayout.mockClear();
     systemTelemetryServiceMock.recordSecurityEvent.mockClear();
+    systemOperationalAlertsServiceMock.notifyMaintenanceBypassUsed.mockClear();
   });
 
   afterAll(async () => {

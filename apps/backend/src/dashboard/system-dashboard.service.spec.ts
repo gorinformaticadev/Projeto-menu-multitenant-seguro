@@ -23,6 +23,10 @@ describe('SystemDashboardService', () => {
       count: jest.fn(),
       findMany: jest.fn(),
     },
+    notification: {
+      count: jest.fn(),
+      findMany: jest.fn(),
+    },
   };
 
   const versionServiceMock = {
@@ -207,6 +211,8 @@ describe('SystemDashboardService', () => {
         status: 'ok',
         criticalUnread: 0,
         criticalRecent: 0,
+        operationalRecentCount: 0,
+        recentOperationalAlerts: [],
       },
     };
 

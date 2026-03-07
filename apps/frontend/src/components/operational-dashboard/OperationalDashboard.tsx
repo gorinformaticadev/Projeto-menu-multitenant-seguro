@@ -178,6 +178,15 @@ type SecurityRecentTelemetryItem = {
   at: string;
 };
 
+type OperationalAlertListItem = {
+  id: string;
+  title: string;
+  body: string;
+  severity: string;
+  createdAt: string;
+  action?: string | null;
+};
+
 const POLL_INTERVAL_MS = 15000;
 
 const widgetLabelById: Record<string, string> = {
@@ -2638,6 +2647,9 @@ export function OperationalDashboard({
 
     const notificationsMetric = toMetric(dashboard?.notifications);
     const notificationsIntent = getWidgetIntent("notifications");
+    const recentOperationalAlerts = Array.isArray(notificationsMetric?.recentOperationalAlerts)
+      ? notificationsMetric.recentOperationalAlerts as OperationalAlertListItem[]
+      : [];
     map.set(
       "notifications",
       <OperationalDashboardWidget
@@ -2651,15 +2663,35 @@ export function OperationalDashboard({
         actionLabel={notificationsIntent?.label}
         compact
       >
-        <div className="mt-auto flex items-end justify-between gap-2">
-          <p className="text-[1.7rem] font-bold leading-none tracking-tight text-blue-400/90">
-            {String(notificationsMetric?.criticalUnread ?? "--")}
-          </p>
-          <div className="text-right">
-            <p className="text-[10px] text-slate-400/80">Nao lidas</p>
-            <p className="text-[10px] text-slate-400/80">
-              Recentes no periodo: <span className="text-slate-300 font-medium">{String(notificationsMetric?.criticalRecent ?? "--")}</span>
+        <div className="mt-auto space-y-3">
+          <div className="flex items-end justify-between gap-2">
+            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-blue-400/90">
+              {String(notificationsMetric?.criticalUnread ?? "--")}
             </p>
+            <div className="text-right">
+              <p className="text-[10px] text-slate-400/80">Nao lidas</p>
+              <p className="text-[10px] text-slate-400/80">
+                Criticas no periodo: <span className="text-slate-300 font-medium">{String(notificationsMetric?.criticalRecent ?? "--")}</span>
+              </p>
+              <p className="text-[10px] text-slate-400/80">
+                Alertas operacionais: <span className="text-slate-300 font-medium">{String(notificationsMetric?.operationalRecentCount ?? "--")}</span>
+              </p>
+            </div>
+          </div>
+          <div className="space-y-1.5 border-t border-white/10 pt-2">
+            {recentOperationalAlerts.length > 0 ? (
+              recentOperationalAlerts.map((alert) => (
+                <div key={alert.id} className="flex items-start justify-between gap-2 text-[10px]">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-slate-100">{alert.title}</p>
+                    <p className="truncate text-slate-400/80">{alert.body}</p>
+                  </div>
+                  <span className="shrink-0 text-slate-500">{formatTimeOfDay(alert.createdAt)}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-[10px] text-slate-400/80">Sem alertas operacionais recentes.</p>
+            )}
           </div>
         </div>
       </OperationalDashboardWidget>,

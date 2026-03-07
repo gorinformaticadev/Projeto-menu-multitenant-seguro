@@ -30,6 +30,10 @@ interface ConnectionMetrics {
   connectionFailureRate: number;
 }
 
+interface EmitNotificationOptions {
+  push?: boolean;
+}
+
 interface AuthenticatedSocket extends Socket {
   user?: {
     id: string;
@@ -350,7 +354,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
    * Emite nova notificação para usuários apropriados
    * CRÍTICO: Nunca deve falhar ou quebrar requisições HTTP
    */
-  async emitNewNotification(notification: Notification) {
+  async emitNewNotification(notification: Notification, options: EmitNotificationOptions = {}) {
     try {
       const rooms = this.determineTargetRooms(notification);
       
@@ -373,10 +377,12 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
       }
 
       // Enviar push para PWA/background sem afetar fluxo principal
-      try {
-        await this.pushNotificationService.sendNotification(notification);
-      } catch (pushError) {
-        this.logger.error('Erro ao enviar push (nao critico):', pushError);
+      if (options.push !== false) {
+        try {
+          await this.pushNotificationService.sendNotification(notification);
+        } catch (pushError) {
+          this.logger.error('Erro ao enviar push (nao critico):', pushError);
+        }
       }
       
     } catch (error) {

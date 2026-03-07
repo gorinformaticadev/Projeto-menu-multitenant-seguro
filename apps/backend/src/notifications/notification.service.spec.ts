@@ -106,6 +106,59 @@ describe('NotificationService system notifications', () => {
     });
   });
 
+  it('creates system notification entity with explicit module, source and tenant scope', async () => {
+    const service = createService();
+    const createdAt = new Date('2026-03-06T12:15:00.000Z');
+    prismaMock.notification.create.mockResolvedValue({
+      id: 'notif-entity-1',
+      type: 'SYSTEM_ALERT',
+      severity: 'critical',
+      title: 'Servico degradado',
+      body: 'Banco de dados apresentou degradacao persistente.',
+      message: 'Banco de dados apresentou degradacao persistente.',
+      data: { alertAction: 'OPS_DATABASE_DEGRADED' },
+      createdAt,
+      updatedAt: createdAt,
+      isRead: false,
+      read: false,
+      readAt: null,
+      targetRole: 'SUPER_ADMIN',
+      targetUserId: null,
+      source: 'operational-alerts',
+      module: 'operational-alerts',
+      tenantId: 'tenant-1',
+      userId: null,
+      audience: 'admin',
+    });
+
+    const result = await service.createSystemNotificationEntity({
+      severity: 'critical',
+      title: 'Servico degradado',
+      body: 'Banco de dados apresentou degradacao persistente.',
+      module: 'operational-alerts',
+      source: 'operational-alerts',
+      tenantId: 'tenant-1',
+      type: 'SYSTEM_ALERT',
+      data: { alertAction: 'OPS_DATABASE_DEGRADED' },
+    });
+
+    expect(prismaMock.notification.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        source: 'operational-alerts',
+        module: 'operational-alerts',
+        tenantId: 'tenant-1',
+        audience: 'admin',
+      }),
+    });
+    expect(result).toMatchObject({
+      id: 'notif-entity-1',
+      title: 'Servico degradado',
+      type: 'error',
+      tenantId: 'tenant-1',
+      read: false,
+    });
+  });
+
   it('creates persisted notification for RESTORE_COMPLETED as critical', async () => {
     const service = createService();
     const createdAt = new Date('2026-03-06T12:20:00.000Z');

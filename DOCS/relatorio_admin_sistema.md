@@ -1298,3 +1298,115 @@ Debito tecnico registrado:
 - `version` e `maintenance` continuam reaproveitando a area de `updates`
 - `backup` continua caindo na mesma area base de sistema/updates
 - se no futuro for necessario permitir layout persistido tambem para a grade operacional embutida, o correto sera separar o armazenamento do shell principal e da secao operacional
+
+### Etapa 8.1 - Thresholds e alertas operacionais automaticos com push seletivo
+
+Inventario da infra reaproveitada:
+
+- inbox persistida:
+  - continua usando `NotificationService` e a tabela `Notification`
+- realtime/push:
+  - continua usando `NotificationGateway.emitNewNotification(...)`
+  - push continua centralizado em `PushNotificationService`
+  - selecao de destinatarios para notificacoes globais segue atendendo `SUPER_ADMIN`
+- scheduler:
+  - a avaliacao automatica foi adicionada como cron `system_operational_alerts_evaluator`, executada a cada `1 minuto`
+
+Servico central:
+
+- novo servico `SystemOperationalAlertsService`
+  - avalia snapshots da telemetria operacional existente
+  - aplica janela explicita, amostra minima e cooldown
+  - persiste notificacoes operacionais em `module=operational-alerts`
+  - usa inbox sempre
+  - usa push apenas para alertas criticos selecionados e apenas quando a infra de Web Push estiver disponivel
+  - faz fallback automatico para inbox only quando o push nao estiver configurado
+
+Thresholds implementados:
+
+| Alerta | Regra base | Canal |
+| --- | --- | --- |
+| `OPS_HIGH_5XX_ERROR_RATE` | taxa de `5xx` acima de `OPS_ALERT_5XX_RATE_THRESHOLD`, com `OPS_ALERT_MIN_REQUEST_SAMPLE` | inbox + push |
+| `OPS_CRITICAL_SLOW_ROUTE` | rota elegivel acima de `OPS_ALERT_ROUTE_LATENCY_MS_THRESHOLD`, com `OPS_ALERT_MIN_ROUTE_SAMPLE` | inbox |
+| `OPS_ACCESS_DENIED_SPIKE` | `401/403/429` acima de `OPS_ALERT_DENIED_SPIKE_THRESHOLD`, com `OPS_ALERT_MIN_DENIED_SAMPLE` | inbox |
+| `OPS_JOB_FAILURE_STORM` | falhas repetidas de jobs acima de `OPS_ALERT_JOB_FAILURE_STORM_THRESHOLD` | inbox + push |
+| `OPS_DATABASE_DEGRADED` | banco degradado/erro por `OPS_ALERT_INFRA_DEGRADED_MIN_CONSECUTIVE` avaliacoes consecutivas | inbox + push |
+| `OPS_REDIS_DEGRADED` | redis degradado/down por `OPS_ALERT_INFRA_DEGRADED_MIN_CONSECUTIVE` avaliacoes consecutivas | inbox + push |
+| `MAINTENANCE_BYPASS_USED` | bypass de maintenance por `SUPER_ADMIN` | inbox + push |
+
+Configuracoes de ambiente suportadas:
+
+- `OPS_ALERT_5XX_RATE_THRESHOLD`
+- `OPS_ALERT_WINDOW_MINUTES`
+- `OPS_ALERT_MIN_REQUEST_SAMPLE`
+- `OPS_ALERT_ROUTE_LATENCY_MS_THRESHOLD`
+- `OPS_ALERT_MIN_ROUTE_SAMPLE`
+- `OPS_ALERT_DENIED_SPIKE_THRESHOLD`
+- `OPS_ALERT_MIN_DENIED_SAMPLE`
+- `OPS_ALERT_JOB_FAILURE_STORM_THRESHOLD`
+- `OPS_ALERT_INFRA_DEGRADED_MIN_CONSECUTIVE`
+- `OPS_ALERT_COOLDOWN_MINUTES`
+
+Anti-ruido e deduplicacao:
+
+- todos os alertas automaticos passam por cooldown configuravel
+- a chave de deduplicacao e estavel por tipo de alerta
+- para rota lenta critica, a chave inclui `metodo + rota normalizada`
+- rotas internas do proprio painel continuam excluidas da telemetria:
+  - `/api/system/dashboard`
+  - `/api/system/dashboard/module-cards`
+  - `/api/system/dashboard/layout`
+  - notificacoes internas e endpoints de health/version/status
+- rankings de rota continuam exigindo amostra minima antes de aparecer no dashboard ou alimentar alerta
+
+Politica de canais:
+
+- inbox only:
+  - alertas moderados/acionaveis, mas nao urgentes
+  - `OPS_CRITICAL_SLOW_ROUTE`
+  - `OPS_ACCESS_DENIED_SPIKE`
+- inbox + push:
+  - alertas criticos selecionados
+  - `OPS_HIGH_5XX_ERROR_RATE`
+  - `OPS_JOB_FAILURE_STORM`
+  - `OPS_DATABASE_DEGRADED`
+  - `OPS_REDIS_DEGRADED`
+  - `MAINTENANCE_BYPASS_USED`
+- sem push:
+  - quando a infra atual de Web Push nao estiver configurada ou nao retornar chave publica valida
+
+Auditoria:
+
+- alertas criticos automaticos passam a registrar `AuditLog` com a acao operacional correspondente:
+  - `OPS_HIGH_5XX_ERROR_RATE`
+  - `OPS_JOB_FAILURE_STORM`
+  - `OPS_DATABASE_DEGRADED`
+  - `OPS_REDIS_DEGRADED`
+- `MAINTENANCE_BYPASS_USED` continua auditado no guard e agora reaproveita o servico central apenas para inbox/push com cooldown
+
+Dashboard:
+
+- nao foi criada tela nova
+- o card `Notificacoes Criticas` do dashboard operacional passou a mostrar:
+  - `criticalUnread`
+  - `criticalRecent`
+  - contador de alertas operacionais recentes
+  - lista curta dos ultimos alertas operacionais emitidos
+
+Limitacoes assumidas nesta etapa:
+
+- push seletivo ficou aplicado ao fluxo novo de alertas operacionais automaticos
+- alertas criticos legados de update/restore/backups continuam no fluxo anterior de inbox persistida e ainda nao foram migrados integralmente para a mesma politica seletiva de push
+- a retencao/cooldown continua em memoria local do processo, com lock advisory para reduzir duplicidade entre instancias
+
+Validacao executada nesta etapa:
+
+- backend
+  - `jest` direcionado para:
+    - `system-telemetry.service.spec.ts`
+    - `system-operational-alerts.service.spec.ts`
+    - `maintenance-mode.guard.spec.ts`
+    - `system-dashboard.service.spec.ts`
+    - `notification.service.spec.ts`
+- frontend
+  - `eslint` do `OperationalDashboard.tsx`

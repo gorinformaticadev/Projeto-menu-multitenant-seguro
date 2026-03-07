@@ -15,6 +15,7 @@ import { ModuleInstallerController } from '@core/module-installer.controller';
 import { ModuleInstallerService } from '@core/module-installer.service';
 import { SystemVersionService } from './services/system-version.service';
 import { PathsModule } from '@core/common/paths/paths.module';
+import { SystemOperationalAlertsService } from './services/system-operational-alerts.service';
 
 @Module({
   imports: [PrismaModule, SecurityConfigModule, NotificationsModule, AuditModule, PathsModule],
@@ -25,6 +26,7 @@ import { PathsModule } from '@core/common/paths/paths.module';
     ModuleSecurityService,
     ModuleInstallerService,
     ModuleDatabaseExecutorService,
+    SystemOperationalAlertsService,
     {
       provide: 'EventBus',
       useValue: eventBus
@@ -36,6 +38,7 @@ import { PathsModule } from '@core/common/paths/paths.module';
     ModuleSecurityService,
     ModuleInstallerService,
     ModuleDatabaseExecutorService,
+    SystemOperationalAlertsService,
     PrismaModule  // Export PrismaModule for module dependencies
   ],
 })

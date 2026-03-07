@@ -296,3 +296,12 @@ Up
 
 * **security:** enhance input sanitization and encryption security ([04f9a09](https://github.com/gorinformatica/menu-multitenant/commit/04f9a096f84e554a63ed456ba6d69b77054c3318))
 * **segurança:** melhore a segurança com armazenamento criptografado de dados confidenciais ([aba42d2](https://github.com/gorinformatica/menu-multitenant/commit/aba42d28e79b7f2e047d37871837dd0b62f6a0ff))
+## 2026-03-07
+
+### Dashboard / Observabilidade
+
+- adiciona `SystemOperationalAlertsService` com thresholds operacionais, amostra minima, cooldown e cron por minuto
+- gera notificacoes persistidas para alertas operacionais automaticos e usa push seletivo apenas nos alertas criticos suportados
+- integra `MAINTENANCE_BYPASS_USED` ao fluxo central de alertas com deduplicacao
+- expande os snapshots de telemetria para incluir taxa `5xx` e contadores recentes de `401/403/429`
+- adiciona contador e lista curta de alertas operacionais recentes no card de notificacoes do dashboard operacional
