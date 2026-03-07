@@ -345,6 +345,30 @@ describe('SystemDashboardService', () => {
     expect(redisSpy).toHaveBeenCalledTimes(2);
   });
 
+  it('prunes expired cache entries and keeps the metric cache bounded', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-06T19:10:00.000Z'));
+    const service = createService();
+    const internalService = service as any;
+
+    internalService.metricCache.set('expired-security', {
+      expiresAt: Date.now() - 1,
+      value: { status: 'degraded', error: 'stale' },
+    });
+
+    for (let index = 0; index < 70; index += 1) {
+      internalService.writeCachedMetric(`dynamic:${index}`, 10_000, {
+        status: 'ok',
+        sample: index,
+      });
+    }
+
+    expect(internalService.metricCache.has('expired-security')).toBe(false);
+    expect(internalService.metricCache.size).toBe(64);
+    expect(internalService.metricCache.has('dynamic:0')).toBe(false);
+    expect(internalService.metricCache.has('dynamic:6')).toBe(true);
+    expect(internalService.metricCache.has('dynamic:69')).toBe(true);
+  });
+
   it('returns the explicit widget policy for the actor role', async () => {
     const service = createService();
     stubDashboardMetrics(service);

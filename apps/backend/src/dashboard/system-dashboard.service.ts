@@ -53,9 +53,12 @@ const MIN_PERIOD_MINUTES = 5;
 const MAX_PERIOD_MINUTES = 24 * 60;
 const MAX_JSON_STORAGE_LENGTH = 200_000;
 const DASHBOARD_LAYOUT_BREAKPOINTS: DashboardLayoutBreakpoint[] = ['lg', 'md', 'sm'];
+const DASHBOARD_METRIC_CACHE_MAX_ENTRIES = 64;
 
 // Curto cache em memoria para widgets caros/externos no polling do agregado.
 // Nao cacheamos maintenance, uptime, notifications nem version para manter o estado mais fresco.
+// Alem do TTL curto, limitamos o cache para evitar crescimento descontrolado
+// em combinacoes de tenant/filtros no polling.
 const DASHBOARD_CACHED_METRIC_TTLS = {
   redis: 10_000,
   workers: 10_000,
@@ -1040,6 +1043,8 @@ export class SystemDashboardService {
       return null;
     }
 
+    this.pruneExpiredMetricCacheEntries();
+
     const entry = this.metricCache.get(cacheKey);
     if (!entry) {
       return null;
@@ -1062,10 +1067,32 @@ export class SystemDashboardService {
       return;
     }
 
+    const now = Date.now();
+    this.pruneExpiredMetricCacheEntries(now);
     this.metricCache.set(cacheKey, {
-      expiresAt: Date.now() + cacheTtlMs,
+      expiresAt: now + cacheTtlMs,
       value: value as DashboardMetric<Record<string, unknown>>,
     });
+    this.trimMetricCacheToLimit();
+  }
+
+  private pruneExpiredMetricCacheEntries(now = Date.now()) {
+    for (const [cacheKey, entry] of this.metricCache.entries()) {
+      if (entry.expiresAt <= now) {
+        this.metricCache.delete(cacheKey);
+      }
+    }
+  }
+
+  private trimMetricCacheToLimit(limit = DASHBOARD_METRIC_CACHE_MAX_ENTRIES) {
+    while (this.metricCache.size > limit) {
+      const oldestKey = this.metricCache.keys().next().value;
+      if (!oldestKey) {
+        break;
+      }
+
+      this.metricCache.delete(oldestKey);
+    }
   }
 
   private formatDuration(totalSeconds: number): string {
