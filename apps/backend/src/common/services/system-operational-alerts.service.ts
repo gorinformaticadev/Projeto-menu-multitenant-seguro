@@ -90,6 +90,7 @@ export class SystemOperationalAlertsService implements OnModuleInit {
         settingsUrl: '/configuracoes/sistema/cron',
         origin: 'core',
         editable: true,
+        watchdogEnabled: false,
       },
     );
   }
@@ -498,6 +499,13 @@ export class SystemOperationalAlertsService implements OnModuleInit {
   }
 
   private async checkRedisHealth(): Promise<InfraHealthMetric> {
+    if (!this.isRedisMonitoringRequired()) {
+      return {
+        status: 'not_configured',
+        latencyMs: null,
+      };
+    }
+
     const host = String(process.env.REDIS_HOST || '').trim();
     const port = this.readIntFromEnv('REDIS_PORT', 6379, 1, 65535);
     const password = String(process.env.REDIS_PASSWORD || '').trim();
@@ -545,6 +553,19 @@ export class SystemOperationalAlertsService implements OnModuleInit {
         redis.disconnect();
       }
     }
+  }
+
+  private isRedisMonitoringRequired(): boolean {
+    const explicitFlag = String(process.env.OPS_ALERT_REDIS_REQUIRED || '').trim().toLowerCase();
+    if (explicitFlag === 'true') {
+      return true;
+    }
+
+    if (explicitFlag === 'false') {
+      return false;
+    }
+
+    return false;
   }
 
   private getEvaluatorConfig(): EvaluatorConfig {

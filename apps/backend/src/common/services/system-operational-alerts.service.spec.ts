@@ -87,6 +87,7 @@ describe('SystemOperationalAlertsService', () => {
       OPS_ALERT_INFRA_DEGRADED_MIN_CONSECUTIVE:
         process.env.OPS_ALERT_INFRA_DEGRADED_MIN_CONSECUTIVE,
       OPS_ALERT_COOLDOWN_MINUTES: process.env.OPS_ALERT_COOLDOWN_MINUTES,
+      OPS_ALERT_REDIS_REQUIRED: process.env.OPS_ALERT_REDIS_REQUIRED,
     };
 
     process.env.OPS_ALERT_5XX_RATE_THRESHOLD = '10';
@@ -99,6 +100,7 @@ describe('SystemOperationalAlertsService', () => {
     process.env.OPS_ALERT_JOB_FAILURE_STORM_THRESHOLD = '4';
     process.env.OPS_ALERT_INFRA_DEGRADED_MIN_CONSECUTIVE = '3';
     process.env.OPS_ALERT_COOLDOWN_MINUTES = '15';
+    process.env.OPS_ALERT_REDIS_REQUIRED = 'false';
 
     notificationServiceMock.createSystemNotificationEntity.mockResolvedValue(baseNotification);
     pushNotificationServiceMock.getPublicKey.mockResolvedValue('public-key');
@@ -146,6 +148,7 @@ describe('SystemOperationalAlertsService', () => {
         name: 'Operational alerts evaluator',
         origin: 'core',
         settingsUrl: '/configuracoes/sistema/cron',
+        watchdogEnabled: false,
       }),
     );
   });
@@ -348,6 +351,7 @@ describe('SystemOperationalAlertsService', () => {
   });
 
   it('re-emits infra alert only after cooldown when the degradation persists', async () => {
+    process.env.OPS_ALERT_REDIS_REQUIRED = 'true';
     jest
       .spyOn(serviceInternals, 'checkRedisHealth')
       .mockResolvedValue({ status: 'down', latencyMs: null });
@@ -364,6 +368,21 @@ describe('SystemOperationalAlertsService', () => {
 
     expect(notificationServiceMock.createSystemNotificationEntity).toHaveBeenCalledTimes(2);
     expect(notificationGatewayMock.emitNewNotification).toHaveBeenCalledTimes(2);
+  });
+
+  it('treats redis as not configured by default when explicit monitoring is disabled', async () => {
+    delete process.env.OPS_ALERT_REDIS_REQUIRED;
+    const freshService = createService();
+    const freshInternals = freshService as unknown as {
+      checkRedisHealth: () => Promise<{ status: 'healthy' | 'down' | 'not_configured'; latencyMs: number | null }>;
+    };
+
+    const result = await freshInternals.checkRedisHealth();
+
+    expect(result).toEqual({
+      status: 'not_configured',
+      latencyMs: null,
+    });
   });
 
   it('uses cooldown and push policy for maintenance bypass notifications', async () => {

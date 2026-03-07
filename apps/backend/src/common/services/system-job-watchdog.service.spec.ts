@@ -160,4 +160,31 @@ describe('SystemJobWatchdogService', () => {
     });
     expect(operationalAlertsServiceMock.dispatchOperationalAlert).not.toHaveBeenCalled();
   });
+
+  it('ignores jobs explicitly excluded from watchdog monitoring', async () => {
+    cronServiceMock.getRuntimeJobs.mockResolvedValue([
+      {
+        key: 'system.operational_alerts_evaluator',
+        name: 'Operational alerts evaluator',
+        description: 'Avalia alertas operacionais',
+        schedule: '* * * * *',
+        enabled: true,
+        runtimeRegistered: true,
+        runtimeActive: true,
+        watchdogEnabled: false,
+        lastStatus: 'running',
+        lastStartedAt: new Date('2026-03-07T14:30:00.000Z'),
+        nextExpectedRunAt: new Date('2026-03-07T14:31:00.000Z'),
+        consecutiveFailureCount: 0,
+      },
+    ]);
+
+    const result = await service.evaluateWatchdog(new Date('2026-03-07T15:00:00.000Z'));
+
+    expect(result).toEqual({
+      emitted: [],
+      skipped: [],
+    });
+    expect(operationalAlertsServiceMock.dispatchOperationalAlert).not.toHaveBeenCalled();
+  });
 });
