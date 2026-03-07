@@ -1029,3 +1029,7 @@ Decisoes de escopo mantidas:
 - `jobs` continua sem nova rota dedicada, porque o popover com falhas recentes ja entrega o melhor drill-down util nesta etapa
 - `database`, `redis` e `workers` permanecem apenas como snapshot operacional
 - nao foi criada segunda inbox, segunda tela de logs ou rota vazia apenas para melhorar a aparencia
+- debito tecnico assumido:
+  - `version` e `maintenance` ainda reutilizam `/configuracoes/sistema/updates?tab=status`
+  - `backup` reutiliza a mesma area base em `/configuracoes/sistema/updates?tab=backup`
+  - se os fluxos operacionais crescerem, vale separar telas ou subareas dedicadas para reduzir ambiguidade de drill-down

@@ -259,56 +259,46 @@ export function getDashboardQuickActions(
   role: DashboardRole,
   notificationsEnabled: boolean,
 ): DashboardQuickAction[] {
-  const actions: DashboardQuickAction[] = [];
-
-  if (role === "SUPER_ADMIN" || role === "ADMIN") {
-    actions.push({
+  const candidates: Array<{
+    id: string;
+    widgetId: string;
+    description: string;
+  }> = [
+    {
       id: "updates",
-      label: "Abrir atualizacoes",
+      widgetId: "version",
       description: "Vai para status de versao, maintenance e update do sistema.",
-      intent: {
-        type: "route",
-        href: "/configuracoes/sistema/updates?tab=status",
-        label: "Abrir atualizacoes",
-      },
-    });
-
-    actions.push({
+    },
+    {
       id: "backups",
-      label: "Abrir backups",
+      widgetId: "backup",
       description: "Abre a area de backup e restore ja existente no sistema.",
-      intent: {
-        type: "route",
-        href: "/configuracoes/sistema/updates?tab=backup",
-        label: "Abrir backups",
-      },
-    });
-  }
-
-  if (role === "SUPER_ADMIN" && notificationsEnabled) {
-    actions.push({
+    },
+    {
       id: "notifications",
-      label: "Ver notificacoes criticas",
+      widgetId: "notifications",
       description: "Reabre a central lateral de notificacoes a partir do dashboard.",
-      intent: {
-        type: "notifications-drawer",
-        label: "Ver notificacoes criticas",
-      },
-    });
-  }
-
-  if (role === "SUPER_ADMIN") {
-    actions.push({
+    },
+    {
       id: "logs",
-      label: "Ver auditoria",
+      widgetId: "errors",
       description: "Abre a tela de logs para investigar eventos criticos recentes.",
-      intent: {
-        type: "route",
-        href: "/logs",
-        label: "Ver auditoria",
-      },
-    });
-  }
+    },
+  ];
 
-  return actions;
+  return candidates.flatMap((candidate) => {
+    const intent = getDashboardWidgetIntent(candidate.widgetId, role, notificationsEnabled);
+    if (!intent) {
+      return [];
+    }
+
+    return [
+      {
+        id: candidate.id,
+        label: intent.label,
+        description: candidate.description,
+        intent,
+      },
+    ];
+  });
 }
