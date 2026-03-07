@@ -76,15 +76,15 @@ describe('SystemOperationalAlertsService', () => {
       OPS_ALERT_COOLDOWN_MINUTES: process.env.OPS_ALERT_COOLDOWN_MINUTES,
     };
 
-    process.env.OPS_ALERT_5XX_RATE_THRESHOLD = '5';
+    process.env.OPS_ALERT_5XX_RATE_THRESHOLD = '10';
     process.env.OPS_ALERT_WINDOW_MINUTES = '5';
-    process.env.OPS_ALERT_MIN_REQUEST_SAMPLE = '5';
-    process.env.OPS_ALERT_ROUTE_LATENCY_MS_THRESHOLD = '900';
-    process.env.OPS_ALERT_MIN_ROUTE_SAMPLE = '3';
-    process.env.OPS_ALERT_DENIED_SPIKE_THRESHOLD = '4';
-    process.env.OPS_ALERT_MIN_DENIED_SAMPLE = '4';
-    process.env.OPS_ALERT_JOB_FAILURE_STORM_THRESHOLD = '3';
-    process.env.OPS_ALERT_INFRA_DEGRADED_MIN_CONSECUTIVE = '2';
+    process.env.OPS_ALERT_MIN_REQUEST_SAMPLE = '25';
+    process.env.OPS_ALERT_ROUTE_LATENCY_MS_THRESHOLD = '1500';
+    process.env.OPS_ALERT_MIN_ROUTE_SAMPLE = '8';
+    process.env.OPS_ALERT_DENIED_SPIKE_THRESHOLD = '15';
+    process.env.OPS_ALERT_MIN_DENIED_SAMPLE = '12';
+    process.env.OPS_ALERT_JOB_FAILURE_STORM_THRESHOLD = '4';
+    process.env.OPS_ALERT_INFRA_DEGRADED_MIN_CONSECUTIVE = '3';
     process.env.OPS_ALERT_COOLDOWN_MINUTES = '15';
 
     notificationServiceMock.createSystemNotificationEntity.mockResolvedValue(baseNotification);
@@ -122,12 +122,12 @@ describe('SystemOperationalAlertsService', () => {
   });
 
   it('applies cooldown to repeated critical alerts', async () => {
-    for (let index = 1; index <= 5; index += 1) {
+    for (let index = 1; index <= 30; index += 1) {
       telemetryService.recordRequest({
         method: 'GET',
         route: `/api/users/${index}`,
         durationMs: 220,
-        statusCode: index <= 3 ? 500 : 200,
+        statusCode: index <= 4 ? 500 : 200,
       });
     }
 
@@ -139,34 +139,33 @@ describe('SystemOperationalAlertsService', () => {
   });
 
   it('emits warning alerts as inbox only without push', async () => {
-    telemetryService.recordSecurityEvent({
-      type: 'forbidden',
-      method: 'GET',
-      route: '/api/admin/users/1',
-      ip: '10.0.0.10',
-      statusCode: 403,
-    });
-    telemetryService.recordSecurityEvent({
-      type: 'forbidden',
-      method: 'GET',
-      route: '/api/admin/users/2',
-      ip: '10.0.0.11',
-      statusCode: 403,
-    });
-    telemetryService.recordSecurityEvent({
-      type: 'rate_limited',
-      method: 'POST',
-      route: '/api/auth/login',
-      ip: '10.0.0.20',
-      statusCode: 429,
-    });
-    telemetryService.recordSecurityEvent({
-      type: 'unauthorized',
-      method: 'GET',
-      route: '/api/admin/users/3',
-      ip: '10.0.0.12',
-      statusCode: 401,
-    });
+    for (let index = 1; index <= 6; index += 1) {
+      telemetryService.recordSecurityEvent({
+        type: 'forbidden',
+        method: 'GET',
+        route: `/api/admin/users/${index}`,
+        ip: `10.0.0.${10 + index}`,
+        statusCode: 403,
+      });
+    }
+    for (let index = 1; index <= 5; index += 1) {
+      telemetryService.recordSecurityEvent({
+        type: 'rate_limited',
+        method: 'POST',
+        route: '/api/auth/login',
+        ip: `10.0.1.${10 + index}`,
+        statusCode: 429,
+      });
+    }
+    for (let index = 1; index <= 4; index += 1) {
+      telemetryService.recordSecurityEvent({
+        type: 'unauthorized',
+        method: 'GET',
+        route: `/api/admin/users/${20 + index}`,
+        ip: `10.0.2.${10 + index}`,
+        statusCode: 401,
+      });
+    }
 
     await service.evaluateOperationalAlerts(new Date());
 
@@ -184,7 +183,7 @@ describe('SystemOperationalAlertsService', () => {
   });
 
   it('emits critical alerts with push when infra is available', async () => {
-    for (let index = 1; index <= 6; index += 1) {
+    for (let index = 1; index <= 30; index += 1) {
       telemetryService.recordRequest({
         method: 'GET',
         route: `/api/payments/${index}`,
@@ -220,6 +219,7 @@ describe('SystemOperationalAlertsService', () => {
       { id: 'job-1', type: BackupJobStatus.FAILED, finishedAt: new Date('2026-03-07T13:58:00.000Z') },
       { id: 'job-2', type: BackupJobStatus.FAILED, finishedAt: new Date('2026-03-07T13:57:00.000Z') },
       { id: 'job-3', type: BackupJobStatus.FAILED, finishedAt: new Date('2026-03-07T13:56:00.000Z') },
+      { id: 'job-4', type: BackupJobStatus.FAILED, finishedAt: new Date('2026-03-07T13:55:00.000Z') },
     ]);
 
     await service.evaluateOperationalAlerts(new Date());
@@ -250,6 +250,53 @@ describe('SystemOperationalAlertsService', () => {
     expect(notificationServiceMock.createSystemNotificationEntity).not.toHaveBeenCalled();
   });
 
+  it('does not emit alert for weak 5xx sample below the calibrated threshold', async () => {
+    for (let index = 1; index <= 25; index += 1) {
+      telemetryService.recordRequest({
+        method: 'GET',
+        route: `/api/invoices/${index}`,
+        durationMs: 180,
+        statusCode: index <= 2 ? 500 : 200,
+      });
+    }
+
+    const result = await service.evaluateOperationalAlerts(new Date());
+
+    expect(result.emitted).not.toContain('OPS_HIGH_5XX_ERROR_RATE');
+    expect(notificationServiceMock.createSystemNotificationEntity).not.toHaveBeenCalled();
+  });
+
+  it('does not emit slow-route alert for low route volume even with high latency', async () => {
+    for (let index = 1; index <= 7; index += 1) {
+      telemetryService.recordRequest({
+        method: 'GET',
+        route: `/api/orders/${index}`,
+        durationMs: 2_400,
+        statusCode: 200,
+      });
+    }
+
+    const result = await service.evaluateOperationalAlerts(new Date());
+
+    expect(result.emitted).not.toEqual(
+      expect.arrayContaining([expect.stringContaining('OPS_CRITICAL_SLOW_ROUTE')]),
+    );
+    expect(notificationServiceMock.createSystemNotificationEntity).not.toHaveBeenCalled();
+  });
+
+  it('does not emit job storm for only three isolated failures', async () => {
+    prismaMock.backupJob.findMany.mockResolvedValue([
+      { id: 'job-1', type: BackupJobStatus.FAILED, finishedAt: new Date('2026-03-07T13:58:00.000Z') },
+      { id: 'job-2', type: BackupJobStatus.FAILED, finishedAt: new Date('2026-03-07T13:57:00.000Z') },
+      { id: 'job-3', type: BackupJobStatus.FAILED, finishedAt: new Date('2026-03-07T13:56:00.000Z') },
+    ]);
+
+    const result = await service.evaluateOperationalAlerts(new Date());
+
+    expect(result.emitted).not.toContain('OPS_JOB_FAILURE_STORM');
+    expect(notificationServiceMock.createSystemNotificationEntity).not.toHaveBeenCalled();
+  });
+
   it('requires consecutive degraded checks before emitting infra alert', async () => {
     const databaseSpy = jest
       .spyOn(service as any, 'checkDatabaseHealth')
@@ -257,17 +304,37 @@ describe('SystemOperationalAlertsService', () => {
 
     await service.evaluateOperationalAlerts(new Date());
     await service.evaluateOperationalAlerts(new Date());
+    await service.evaluateOperationalAlerts(new Date());
 
-    expect(databaseSpy).toHaveBeenCalledTimes(2);
+    expect(databaseSpy).toHaveBeenCalledTimes(3);
     expect(notificationServiceMock.createSystemNotificationEntity).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Servico degradado',
         data: expect.objectContaining({
           service: 'database',
-          consecutiveChecks: 2,
+          consecutiveChecks: 3,
         }),
       }),
     );
+  });
+
+  it('re-emits infra alert only after cooldown when the degradation persists', async () => {
+    jest
+      .spyOn(service as any, 'checkRedisHealth')
+      .mockResolvedValue({ status: 'down', latencyMs: null });
+
+    await service.evaluateOperationalAlerts(new Date());
+    await service.evaluateOperationalAlerts(new Date());
+    await service.evaluateOperationalAlerts(new Date());
+    await service.evaluateOperationalAlerts(new Date());
+
+    expect(notificationServiceMock.createSystemNotificationEntity).toHaveBeenCalledTimes(1);
+
+    jest.advanceTimersByTime(16 * 60 * 1000);
+    await service.evaluateOperationalAlerts(new Date());
+
+    expect(notificationServiceMock.createSystemNotificationEntity).toHaveBeenCalledTimes(2);
+    expect(notificationGatewayMock.emitNewNotification).toHaveBeenCalledTimes(2);
   });
 
   it('uses cooldown and push policy for maintenance bypass notifications', async () => {

@@ -1414,3 +1414,73 @@ Validacao executada nesta etapa:
     - `notification.service.spec.ts`
 - frontend
   - `eslint` do `OperationalDashboard.tsx`
+
+### Etapa 8.2 - Calibracao final de thresholds, cooldown e ruido operacional
+
+Tabela final dos alertas ativos:
+
+| Alerta | Threshold | Janela | Amostra minima | Cooldown | Canal |
+| --- | --- | --- | --- | --- | --- |
+| `OPS_HIGH_5XX_ERROR_RATE` | `10%` de `5xx` | `5 min` | `25 requests` | `15 min` | inbox + push |
+| `OPS_CRITICAL_SLOW_ROUTE` | `1500 ms` de media | `5 min` | `8 requests na rota` | `15 min` | inbox |
+| `OPS_ACCESS_DENIED_SPIKE` | `15` eventos negados | `5 min` | `12 eventos` | `15 min` | inbox |
+| `OPS_JOB_FAILURE_STORM` | `4` falhas de job | `5 min` | `4 falhas` | `15 min` | inbox + push |
+| `OPS_DATABASE_DEGRADED` | `status degraded/error` | `3 verificacoes consecutivas` | `3 checks` | `15 min` | inbox + push |
+| `OPS_REDIS_DEGRADED` | `status degraded/down` | `3 verificacoes consecutivas` | `3 checks` | `15 min` | inbox + push |
+| `MAINTENANCE_BYPASS_USED` | evento imediato | n/a | n/a | `15 min` | inbox + push |
+| `UPDATE_FAILED` | legado orientado a evento | n/a | n/a | `15 min` na entrega | inbox + push |
+| `UPDATE_ROLLED_BACK_AUTO` | legado orientado a evento | n/a | n/a | `15 min` na entrega | inbox + push |
+| `RESTORE_FAILED` | legado orientado a evento | n/a | n/a | `15 min` na entrega | inbox + push |
+
+Calibracao aplicada:
+
+- `OPS_HIGH_5XX_ERROR_RATE`
+  - subiu de `5%` para `10%`
+  - a amostra minima caiu de `30` para `25`, mantendo sensibilidade para ambiente com trafego moderado sem disparar com `2/25`
+- `OPS_CRITICAL_SLOW_ROUTE`
+  - manteve o limiar de `1500 ms`
+  - exigencia de volume subiu para `8` requests da mesma rota normalizada
+- `OPS_ACCESS_DENIED_SPIKE`
+  - passou para `15` eventos com amostra minima de `12`
+  - permanece inbox only para evitar ruido de push em seguranca moderada
+- `OPS_JOB_FAILURE_STORM`
+  - subiu de `3` para `4` falhas
+  - reduz falso positivo em falhas isoladas sem esconder sequencia real
+- `OPS_DATABASE_DEGRADED` / `OPS_REDIS_DEGRADED`
+  - mantidos em `3` verificacoes consecutivas
+  - continuam reemitindo apenas depois do cooldown se a condicao persistir
+
+Politica final de push:
+
+- somente estes eventos geram push:
+  - `OPS_HIGH_5XX_ERROR_RATE`
+  - `OPS_JOB_FAILURE_STORM`
+  - `OPS_DATABASE_DEGRADED`
+  - `OPS_REDIS_DEGRADED`
+  - `UPDATE_FAILED`
+  - `UPDATE_ROLLED_BACK_AUTO`
+  - `RESTORE_FAILED`
+  - `MAINTENANCE_BYPASS_USED`
+- eventos moderados continuam inbox only:
+  - `OPS_CRITICAL_SLOW_ROUTE`
+  - `OPS_ACCESS_DENIED_SPIKE`
+  - `BACKUP_FAILED`
+
+Deduplicacao e cooldown:
+
+- cooldown continua por chave estavel no avaliador operacional
+- `OPS_CRITICAL_SLOW_ROUTE` usa chave por `metodo + rota normalizada`
+- servicos degradados usam chave separada por `database` e `redis`
+- system alerts legados criticos agora tambem passam por cooldown de entrega de `15 min`
+- push segue deduplicado por `endpoint`, preservando entrega por dispositivo legitimo sem multiplicar envios para o mesmo endpoint cadastrado mais de uma vez
+
+Dashboard:
+
+- `operationalRecentCount` e `recentOperationalAlerts` continuam usando a mesma janela temporal
+- a lista permanece curta (`3` itens) e ordenada por `createdAt desc`
+- o card continua sem UI nova, apenas com feed operacional curto
+
+Limitacao conhecida mantida:
+
+- ainda nao existe estado `resolved`
+- problemas continuos podem reemitir apos cada cooldown, o que e desejado nesta etapa, mas um ciclo de resolucao/ack permanece como melhoria futura

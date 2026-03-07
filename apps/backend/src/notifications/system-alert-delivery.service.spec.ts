@@ -34,7 +34,12 @@ describe('SystemAlertDeliveryService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-07T15:00:00.000Z'));
     notificationServiceMock.findSystemNotificationEntityById.mockResolvedValue(baseNotification);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('delivers push for allowlisted critical system alert actions', async () => {
@@ -103,5 +108,32 @@ describe('SystemAlertDeliveryService', () => {
 
     expect(notificationServiceMock.findSystemNotificationEntityById).not.toHaveBeenCalled();
     expect(notificationGatewayMock.emitNewNotification).not.toHaveBeenCalled();
+  });
+
+  it('applies cooldown to repeated legacy critical alerts and re-delivers after the window', async () => {
+    const service = createService();
+    const event: SystemNotificationDto = {
+      id: 'notif-4',
+      type: 'SYSTEM_ALERT',
+      severity: 'critical',
+      title: 'Rollback automatico executado',
+      body: 'Update terminou com rollback automatico.',
+      data: { action: 'UPDATE_ROLLED_BACK_AUTO' },
+      module: 'update',
+      source: 'system',
+      createdAt: new Date('2026-03-07T15:00:00.000Z'),
+      isRead: false,
+      readAt: null,
+    };
+
+    await (service as any).dispatchSystemAlert(event);
+    await (service as any).dispatchSystemAlert(event);
+
+    expect(notificationGatewayMock.emitNewNotification).toHaveBeenCalledTimes(1);
+
+    jest.advanceTimersByTime(16 * 60 * 1000);
+    await (service as any).dispatchSystemAlert(event);
+
+    expect(notificationGatewayMock.emitNewNotification).toHaveBeenCalledTimes(2);
   });
 });
