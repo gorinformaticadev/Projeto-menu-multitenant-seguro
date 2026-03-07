@@ -69,7 +69,7 @@ export default function ConfiguracoesPage() {
       name: "Agendamento de Tarefas",
       href: "/configuracoes/sistema/cron",
       icon: Clock,
-      description: "Gerenciar jobs, backups e cronogramas",
+      description: "Gerenciar tarefas agendadas, backups e cronogramas",
       show: user?.role === "SUPER_ADMIN",
       color: "bg-indigo-50 text-indigo-600 border-indigo-100",
       iconColor: "text-indigo-500"

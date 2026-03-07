@@ -1598,3 +1598,54 @@ Validacao executada nesta etapa:
 - frontend
   - `pnpm -C apps/frontend exec eslint src/app/configuracoes/sistema/cron/page.tsx`
   - `pnpm -C apps/frontend build`
+
+## Etapa 8.4 - Refinar a UX da tela de tarefas agendadas
+
+Objetivo desta rodada:
+
+- deixar a tela `/configuracoes/sistema/cron` mais administrativa e menos tecnica
+- substituir a linguagem visivel de `Job` por `Tarefa`
+- reduzir ruido visual sem perder detalhes operacionais
+
+Padrao visual aplicado:
+
+- nomes amigaveis em portugues sao resolvidos por chave tecnica no frontend
+- descricoes longas saem da lista principal e passam a aparecer em popover de informacao
+- a lista principal mostra:
+  - nome amigavel
+  - status ativo/inativo
+  - estado de execucao
+  - situacao do runtime
+  - cronograma amigavel
+  - ultima execucao / ultimo sucesso / ultima falha
+  - proxima execucao / proximo horario esperado
+  - duracao / falhas seguidas / chave tecnica
+
+Edicao de tarefa:
+
+- o botao textual `Editar` foi removido da lista
+- a engrenagem virou a unica entrada para editar a tarefa
+- a edicao passou a usar modal dedicado
+- o modal mostra:
+  - nome amigavel
+  - chave tecnica somente leitura
+  - status ativo/inativo
+  - modo simplificado de cron
+  - modo avancado para expressao manual
+  - preview da expressao final
+  - descricao amigavel final
+  - proxima execucao estimada quando o cron e interpretavel com seguranca
+
+Modo simplificado suportado:
+
+- a cada X minutos
+- a cada X horas
+- todo dia em um horario
+- toda semana em um dia e horario
+- todo mes em um dia e horario
+
+Fallbacks e limitacoes:
+
+- cronogramas mais complexos continuam suportados no modo avancado
+- quando a expressao nao pode ser interpretada com seguranca, a lista mostra `Cronograma personalizado`
+- o nome amigavel continua sendo controlado por mapa de apresentacao; o `jobKey` permanece como fonte tecnica interna

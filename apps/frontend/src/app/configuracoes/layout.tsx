@@ -77,7 +77,7 @@ export default function ConfiguracoesLayout({
       name: "Agendamento de Tarefas",
       href: "/configuracoes/sistema/cron",
       icon: Clock,
-      description: "Gerenciar jobs e cronogramas",
+      description: "Gerenciar tarefas agendadas e cronogramas",
       show: user?.role === "SUPER_ADMIN",
     },
   ];
