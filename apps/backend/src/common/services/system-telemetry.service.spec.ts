@@ -12,23 +12,25 @@ describe('SystemTelemetryService', () => {
     jest.useRealTimers();
   });
 
-  it('aggregates top slow routes and top error routes by normalized route', () => {
+  it('aggregates top routes while filtering one-off noise from rare endpoints', () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-03-07T10:00:00.000Z'));
 
     service.recordRequest({ method: 'GET', route: '/api/users/1', durationMs: 500, statusCode: 200 });
     service.recordRequest({ method: 'GET', route: '/api/users/2', durationMs: 700, statusCode: 500 });
+    service.recordRequest({ method: 'GET', route: '/api/users/3', durationMs: 600, statusCode: 200 });
+    service.recordRequest({ method: 'POST', route: '/api/admin/export', durationMs: 1200, statusCode: 500 });
     service.recordRequest({ method: 'POST', route: '/api/orders/99', durationMs: 260, statusCode: 422 });
-    service.recordRequest({ method: 'POST', route: '/api/orders/100', durationMs: 240, statusCode: 201 });
+    service.recordRequest({ method: 'POST', route: '/api/orders/100', durationMs: 240, statusCode: 422 });
 
     const snapshot = service.getApiSnapshot(15 * 60 * 1000, 3);
 
-    expect(snapshot.totalRequestsRecent).toBe(4);
-    expect(snapshot.totalErrorCount).toBe(2);
+    expect(snapshot.totalRequestsRecent).toBe(6);
+    expect(snapshot.totalErrorCount).toBe(4);
     expect(snapshot.topSlowRoutes[0]).toEqual(
       expect.objectContaining({
         method: 'GET',
         route: '/api/users/:id',
-        requestCount: 2,
+        requestCount: 3,
         avgMs: 600,
         errorCount: 1,
       }),
@@ -36,7 +38,17 @@ describe('SystemTelemetryService', () => {
     expect(snapshot.topErrorRoutes).toEqual(
       expect.arrayContaining([
         [expect.objectContaining({ method: 'GET', route: '/api/users/:id', errorCount: 1 })][0],
-        [expect.objectContaining({ method: 'POST', route: '/api/orders/:id', errorCount: 1 })][0],
+        [expect.objectContaining({ method: 'POST', route: '/api/orders/:id', errorCount: 2 })][0],
+      ]),
+    );
+    expect(snapshot.topSlowRoutes).not.toEqual(
+      expect.arrayContaining([
+        [expect.objectContaining({ route: '/api/admin/export' })][0],
+      ]),
+    );
+    expect(snapshot.topErrorRoutes).not.toEqual(
+      expect.arrayContaining([
+        [expect.objectContaining({ route: '/api/admin/export' })][0],
       ]),
     );
   });

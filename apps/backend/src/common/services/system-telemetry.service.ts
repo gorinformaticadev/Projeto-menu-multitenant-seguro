@@ -88,6 +88,8 @@ const SECURITY_RETENTION_MS = 6 * 60 * 60 * 1000;
 const SECURITY_MAX_ENTRIES = 2_000;
 const DEFAULT_TOP_LIMIT = 5;
 const RECENT_SECURITY_LIMIT = 20;
+const MIN_REQUESTS_FOR_ROUTE_TOP_LIST = 3;
+const MIN_ERRORS_FOR_ROUTE_ERROR_LIST = 2;
 
 @Injectable()
 export class SystemTelemetryService {
@@ -185,7 +187,8 @@ export class SystemTelemetryService {
       totalErrorCount,
       avgResponseMs,
       errorRateRecent: this.computeRate(totalErrorCount, totalRequestsRecent),
-      topSlowRoutes: [...summaries]
+      topSlowRoutes: summaries
+        .filter((entry) => this.isEligibleForTopSlowRoutes(entry))
         .sort((left, right) => {
           const rightLatency = right.avgMs ?? -1;
           const leftLatency = left.avgMs ?? -1;
@@ -197,8 +200,8 @@ export class SystemTelemetryService {
           );
         })
         .slice(0, Math.max(1, topLimit)),
-      topErrorRoutes: [...summaries]
-        .filter((entry) => entry.errorCount > 0)
+      topErrorRoutes: summaries
+        .filter((entry) => this.isEligibleForTopErrorRoutes(entry))
         .sort((left, right) => {
           return (
             right.errorCount - left.errorCount ||
@@ -329,6 +332,21 @@ export class SystemTelemetryService {
       status5xx: entry.status5xx,
       lastErrorAt: entry.lastErrorAt ? new Date(entry.lastErrorAt).toISOString() : null,
     };
+  }
+
+  private isEligibleForTopSlowRoutes(entry: RouteTelemetrySummary): boolean {
+    return entry.requestCount >= MIN_REQUESTS_FOR_ROUTE_TOP_LIST;
+  }
+
+  private isEligibleForTopErrorRoutes(entry: RouteTelemetrySummary): boolean {
+    if (entry.errorCount <= 0) {
+      return false;
+    }
+
+    return (
+      entry.requestCount >= MIN_REQUESTS_FOR_ROUTE_TOP_LIST ||
+      entry.errorCount >= MIN_ERRORS_FOR_ROUTE_ERROR_LIST
+    );
   }
 
   private mapSecurityAggregate(source: Map<string, SecurityAggregate>, limit: number): SecurityTelemetryIpSummary[] {

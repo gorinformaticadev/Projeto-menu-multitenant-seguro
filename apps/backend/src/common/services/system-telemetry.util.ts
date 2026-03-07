@@ -3,6 +3,7 @@ type RequestLike = Record<string, any>;
 const REQUEST_EXCLUDED_PATHS = [
   '/api/health',
   '/api/system/dashboard',
+  '/api/system/dashboard/module-cards',
   '/api/system/dashboard/layout',
   '/api/system/maintenance/state',
   '/api/system/notifications',

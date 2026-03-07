@@ -24,6 +24,7 @@ describe('system-telemetry.util', () => {
 
   it('skips noisy internal polling routes from request telemetry', () => {
     expect(shouldCollectRequestTelemetry('GET', '/api/system/dashboard')).toBe(false);
+    expect(shouldCollectRequestTelemetry('GET', '/api/system/dashboard/module-cards')).toBe(false);
     expect(shouldCollectRequestTelemetry('GET', '/api/system/notifications/stream')).toBe(false);
     expect(shouldCollectRequestTelemetry('GET', '/api/orders/:id')).toBe(true);
   });
