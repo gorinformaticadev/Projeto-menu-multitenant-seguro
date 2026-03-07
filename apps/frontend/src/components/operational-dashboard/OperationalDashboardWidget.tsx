@@ -15,6 +15,8 @@ interface OperationalDashboardWidgetProps {
   tone?: WidgetTone;
   isEditing?: boolean;
   onHide?: (id: string) => void;
+  onSelect?: () => void;
+  actionLabel?: string;
   noPadding?: boolean;
   compact?: boolean;
   children: ReactNode;
@@ -56,15 +58,35 @@ export function OperationalDashboardWidget({
   tone = "neutral",
   isEditing = false,
   onHide,
+  onSelect,
+  actionLabel,
   noPadding = false,
   compact = false,
   children,
 }: OperationalDashboardWidgetProps) {
+  const isInteractive = Boolean(onSelect) && !isEditing;
+
   return (
     <Card
+      role={isInteractive ? "button" : undefined}
+      tabIndex={isInteractive ? 0 : undefined}
+      aria-label={isInteractive ? actionLabel || `Abrir ${title}` : undefined}
+      onClick={isInteractive ? onSelect : undefined}
+      onKeyDown={
+        isInteractive
+          ? (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onSelect?.();
+            }
+          }
+          : undefined
+      }
       className={cn(
         "relative flex h-full flex-col overflow-hidden rounded-[24px] border backdrop-blur-sm transition-all duration-200",
         toneClassName[tone],
+        isInteractive &&
+          "cursor-pointer hover:-translate-y-0.5 hover:border-blue-300/70 hover:shadow-[0_30px_70px_-40px_rgba(37,99,235,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70",
         isEditing && "ring-1 ring-blue-300/70 shadow-[0_0_0_1px_rgba(59,130,246,0.18)]",
       )}
     >
@@ -108,6 +130,12 @@ export function OperationalDashboardWidget({
             >
               <EyeOff className="h-3.5 w-3.5" />
             </Button>
+          ) : null}
+
+          {isInteractive ? (
+            <span className="shrink-0 rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[10px] font-medium text-current/80">
+              {actionLabel || "Abrir"}
+            </span>
           ) : null}
         </div>
       </CardHeader>

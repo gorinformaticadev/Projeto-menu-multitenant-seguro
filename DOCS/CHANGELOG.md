@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [Unreleased]
+
+### Features
+
+* **dashboard:** harden operational history buffers and add contextual drill-down with quick actions, local focus filters, and updated dashboard documentation
+
 ## [3.0.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v2.0.0...v3.0.0) (2026-01-27)
 
 

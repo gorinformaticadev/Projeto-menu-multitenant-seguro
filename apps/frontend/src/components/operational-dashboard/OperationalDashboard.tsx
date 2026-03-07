@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import {
   Activity,
   AlertTriangle,
@@ -40,6 +41,7 @@ import {
 } from "react-grid-layout";
 import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSystemNotificationsContext } from "@/contexts/SystemNotificationsContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +63,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  dashboardQuickFilterOptions,
+  filterDashboardWidgetIds,
+  getDashboardQuickActions,
+  getDashboardWidgetIntent,
+  type DashboardNavigationIntent,
+  type DashboardQuickFilter,
+} from "@/components/operational-dashboard/dashboard.interactions";
 import {
   allowedWidgetIdsByRole,
   dashboardGridBreakpoints,
@@ -119,6 +129,15 @@ type HealthBucketItem = {
 type SignalDetailItem = {
   label: string;
   hint?: string;
+};
+type OverviewStatItem = {
+  widgetId: string;
+  icon: ReactNode;
+  label: string;
+  value: string;
+  hint: string;
+  tone?: "neutral" | "danger";
+  trend?: SparklineConfig;
 };
 type TrendPoint = {
   at: string;
@@ -456,6 +475,34 @@ function ToolbarIconButton({
   );
 }
 
+function QuickActionButton({
+  label,
+  description,
+  onClick,
+}: {
+  label: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex min-w-[220px] flex-1 items-start justify-between gap-3 rounded-[22px] border border-slate-200/80 bg-white/80 px-4 py-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white dark:border-slate-800/80 dark:bg-slate-950/40 dark:hover:border-blue-800"
+    >
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">{label}</p>
+        <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+          {description}
+        </p>
+      </div>
+      <span className="rounded-full border border-slate-200 px-2 py-1 text-[10px] font-medium text-slate-600 transition-colors group-hover:border-blue-200 group-hover:text-blue-700 dark:border-slate-700 dark:text-slate-300 dark:group-hover:border-blue-800 dark:group-hover:text-blue-300">
+        Abrir
+      </span>
+    </button>
+  );
+}
+
 function classifyMetricStatus(status: unknown): "good" | "attention" | "restricted" {
   const normalized = String(status || "").trim().toLowerCase();
   if (normalized === "restricted") {
@@ -476,6 +523,8 @@ function OverviewStat({
   hint,
   tone = "neutral",
   trend,
+  actionLabel,
+  onClick,
 }: {
   icon: ReactNode;
   label: string;
@@ -483,13 +532,20 @@ function OverviewStat({
   hint: string;
   tone?: "neutral" | "danger";
   trend?: SparklineConfig;
+  actionLabel?: string;
+  onClick?: () => void;
 }) {
+  const isInteractive = Boolean(onClick);
+
   return (
-    <div
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!isInteractive}
       className={`rounded-[20px] border px-3.5 py-3 backdrop-blur-sm ${tone === "danger"
         ? "border-rose-400/20 bg-rose-500/10 text-rose-50"
         : "border-white/10 bg-white/6 text-slate-50"
-        }`}
+        } ${isInteractive ? "text-left transition-all hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-white/10" : "text-left"}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -500,11 +556,18 @@ function OverviewStat({
           <p className="mt-1 text-[10px] text-slate-300/80">{hint}</p>
           {trend ? <MiniTrendSparkline config={trend} className="mt-3 h-14" /> : null}
         </div>
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-slate-100">
-          {icon}
+        <div className="space-y-2 text-right">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-slate-100">
+            {icon}
+          </div>
+          {isInteractive ? (
+            <span className="block text-[10px] font-medium text-cyan-200/90">
+              {actionLabel || "Abrir"}
+            </span>
+          ) : null}
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -515,6 +578,8 @@ function PanoramaSignal({
   accentClassName,
   detailsTitle,
   detailsItems = [],
+  actionLabel,
+  onClick,
 }: {
   label: string;
   value: string;
@@ -522,10 +587,15 @@ function PanoramaSignal({
   accentClassName: string;
   detailsTitle?: string;
   detailsItems?: SignalDetailItem[];
+  actionLabel?: string;
+  onClick?: () => void;
 }) {
   const hasDetails = detailsItems.length > 0;
+  const isInteractive = Boolean(onClick) && !hasDetails;
   const card = (
-    <div className="rounded-[20px] border border-white/10 bg-white/5 px-3.5 py-3 backdrop-blur-sm">
+    <div
+      className={`rounded-[20px] border border-white/10 bg-white/5 px-3.5 py-3 backdrop-blur-sm ${isInteractive ? "transition-all hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-white/10" : ""}`}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className={`h-1.5 w-10 rounded-full ${accentClassName}`} />
         {hasDetails ? <ChevronDown className="mt-0.5 h-3.5 w-3.5 text-slate-500" /> : null}
@@ -535,8 +605,19 @@ function PanoramaSignal({
       </p>
       <p className="mt-1.5 text-[1.1rem] font-semibold tracking-tight text-white">{value}</p>
       <p className="mt-1 truncate text-[10px] text-slate-400">{hint}</p>
+      {isInteractive ? (
+        <p className="mt-2 text-[10px] font-medium text-cyan-200/90">{actionLabel || "Abrir"}</p>
+      ) : null}
     </div>
   );
+
+  if (isInteractive) {
+    return (
+      <button type="button" onClick={onClick} className="w-full text-left">
+        {card}
+      </button>
+    );
+  }
 
   if (!hasDetails) {
     return card;
@@ -742,7 +823,9 @@ function HealthBucketLegendRow({
 }
 
 export function OperationalDashboard() {
+  const router = useRouter();
   const { user } = useAuth();
+  const { openDrawer, isEnabled: notificationsEnabled } = useSystemNotificationsContext();
   const { toast } = useToast();
   const role = (user?.role || "USER") as DashboardRole;
   const defaultFilters = useMemo(() => getDefaultFilters(role), [role]);
@@ -770,6 +853,7 @@ export function OperationalDashboard() {
   const [lastLayoutUpdateAt, setLastLayoutUpdateAt] = useState<string | null>(null);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [isLayoutEditing, setIsLayoutEditing] = useState(false);
+  const [activeQuickFilter, setActiveQuickFilter] = useState<DashboardQuickFilter>("all");
 
   const { width, mounted, containerRef } = useContainerWidth({ initialWidth: 1280 });
 
@@ -1066,19 +1150,50 @@ export function OperationalDashboard() {
     });
   }, []);
 
+  const executeDashboardIntent = useCallback((intent: DashboardNavigationIntent | null) => {
+    if (!intent) {
+      return;
+    }
+
+    if (intent.type === "notifications-drawer") {
+      openDrawer();
+      return;
+    }
+
+    router.push(intent.href);
+  }, [openDrawer, router]);
+
+  const getWidgetIntent = useCallback((widgetId: string) => {
+    return getDashboardWidgetIntent(widgetId, role, notificationsEnabled);
+  }, [notificationsEnabled, role]);
+
   const visibleWidgetIds = useMemo(() => {
     const hiddenSet = new Set(activeHiddenWidgetIds);
     return stableAvailableWidgetIds.filter((id) => !hiddenSet.has(id));
   }, [activeHiddenWidgetIds, stableAvailableWidgetIds]);
 
+  const dashboardMetrics = useMemo(() => {
+    const metrics: Record<string, DashboardMetric | null> = {};
+
+    for (const widgetId of availableWidgetIds) {
+      metrics[widgetId] = toMetric(dashboard?.[widgetId]);
+    }
+
+    return metrics;
+  }, [availableWidgetIds, dashboard]);
+
   const gridWidgetIds = useMemo(() => {
-    return visibleWidgetIds;
-  }, [visibleWidgetIds]);
+    return filterDashboardWidgetIds(visibleWidgetIds, activeQuickFilter, dashboardMetrics);
+  }, [activeQuickFilter, dashboardMetrics, visibleWidgetIds]);
 
   const gridWidgetSet = useMemo(() => new Set(gridWidgetIds), [gridWidgetIds]);
   const layoutsForRender = useMemo(
     () => toVisibleLayouts(activeLayouts, gridWidgetSet),
     [activeLayouts, gridWidgetSet],
+  );
+  const quickActions = useMemo(
+    () => getDashboardQuickActions(role, notificationsEnabled),
+    [notificationsEnabled, role],
   );
   const dashboardOverview = useMemo(() => {
     const counts = {
@@ -1152,6 +1267,46 @@ export function OperationalDashboard() {
           emptyLabel: "Sem historico recente de latencia",
         }
         : undefined,
+      unreadNotifications: String(notificationsMetric?.criticalUnread ?? "--"),
+      blockedAttempts: securityMetricState ? "--" : String(blockedAttempts),
+      visibleWidgets: visibleWidgetIds.length,
+      overviewStats: [
+        {
+          widgetId: "api",
+          icon: <Activity className="h-4 w-4" />,
+          label: "Latencia media",
+          value:
+            apiMetric?.avgResponseTimeMs !== null && apiMetric?.avgResponseTimeMs !== undefined
+              ? `${apiMetric.avgResponseTimeMs}ms`
+              : "--",
+          hint: `Media atual (${apiWindowMinutes} min)`,
+          trend: apiHistory.length > 0
+            ? {
+              id: "overview-api-latency-history",
+              data: apiHistory,
+              strokeColor: "#38bdf8",
+              fillColor: "rgba(56,189,248,0.24)",
+              valueSuffix: "ms",
+              emptyLabel: "Sem historico recente de latencia",
+            }
+            : undefined,
+        },
+        {
+          widgetId: "notifications",
+          icon: <BellDot className="h-4 w-4" />,
+          label: "Notificacoes",
+          value: String(notificationsMetric?.criticalUnread ?? "--"),
+          hint: "Notificacoes nao lidas",
+        },
+        {
+          widgetId: "security",
+          icon: <ShieldAlert className="h-4 w-4" />,
+          label: "Acessos bloqueados",
+          value: securityMetricState ? "--" : String(blockedAttempts),
+          hint: "Top IPs no periodo",
+          tone: "danger" as const,
+        },
+      ] satisfies OverviewStatItem[],
       memoryTrend: memoryHistory.length > 0
         ? {
           id: "server-memory-history",
@@ -1162,12 +1317,10 @@ export function OperationalDashboard() {
           emptyLabel: "Sem historico curto de memoria",
         }
         : undefined,
-      unreadNotifications: String(notificationsMetric?.criticalUnread ?? "--"),
-      blockedAttempts: securityMetricState ? "--" : String(blockedAttempts),
-      visibleWidgets: visibleWidgetIds.length,
       panoramaSignals: [
         maintenanceMetricState
           ? {
+            widgetId: "maintenance",
             label: "Manutencao",
             value: maintenanceMetricState.title,
             hint: maintenanceMetricState.description,
@@ -1175,6 +1328,7 @@ export function OperationalDashboard() {
           }
           : {
             label: "Manutenção",
+            widgetId: "maintenance",
             value: maintenanceMetric?.enabled ? "Ativa" : "Estavel",
             hint: maintenanceMetric?.enabled
               ? String(maintenanceMetric?.reason || "Janela operacional")
@@ -1183,12 +1337,14 @@ export function OperationalDashboard() {
           },
         jobsMetricState
           ? {
+            widgetId: "jobs",
             label: "Jobs na fila",
             value: jobsMetricState.title,
             hint: jobsMetricState.description,
             accentClassName: metricStateAccentClassName(jobsMetricState.tone),
           }
           : {
+            widgetId: "jobs",
             label: "Jobs na fila",
             value: String(jobsMetric?.pending ?? "--"),
             hint: `${String(jobsMetric?.running ?? "--")} em execucao`,
@@ -1207,12 +1363,14 @@ export function OperationalDashboard() {
           },
         tenantsMetricState
           ? {
+            widgetId: "tenants",
             label: "Empresas / Tenants",
             value: tenantsMetricState.title,
             hint: tenantsMetricState.description,
             accentClassName: metricStateAccentClassName(tenantsMetricState.tone),
           }
           : {
+            widgetId: "tenants",
             label: "Empresas / Tenants",
             value: String(tenantsMetric?.active ?? "--"),
             hint: `${String(tenantsMetric?.total ?? "--")} registradas`,
@@ -1220,7 +1378,12 @@ export function OperationalDashboard() {
           },
       ],
       resourceUsage: [
-        { label: "CPU", value: Number(cpuMetric?.usagePercent), toneClassName: "bg-sky-500" },
+        {
+          widgetId: "cpu",
+          label: "CPU",
+          value: Number(cpuMetric?.usagePercent),
+          toneClassName: "bg-sky-500",
+        },
         { label: "Memória", value: Number(memoryMetric?.usedPercent), toneClassName: "bg-emerald-500" },
         { label: "Armazenamento", value: Number(diskMetric?.usedPercent), toneClassName: "bg-amber-500" },
       ],
@@ -1231,6 +1394,7 @@ export function OperationalDashboard() {
     const hideHandler = isLayoutEditing ? toggleWidgetVisibilityInEditor : undefined;
 
     const versionMetric = toMetric(dashboard?.version);
+    const versionIntent = getWidgetIntent("version");
     map.set(
       "version",
       <OperationalDashboardWidget
@@ -1240,6 +1404,8 @@ export function OperationalDashboard() {
         tone={statusTone(versionMetric?.status)}
         isEditing={isLayoutEditing}
         onHide={hideHandler}
+        onSelect={versionIntent ? () => executeDashboardIntent(versionIntent) : undefined}
+        actionLabel={versionIntent?.label}
         compact
       >
         <div className="mt-auto flex items-end justify-between gap-2">
@@ -1285,6 +1451,7 @@ export function OperationalDashboard() {
     );
 
     const maintenanceMetric = toMetric(dashboard?.maintenance);
+    const maintenanceIntent = getWidgetIntent("maintenance");
     map.set(
       "maintenance",
       <OperationalDashboardWidget
@@ -1294,6 +1461,8 @@ export function OperationalDashboard() {
         tone={maintenanceMetric?.enabled ? "warn" : "modern"}
         isEditing={isLayoutEditing}
         onHide={hideHandler}
+        onSelect={maintenanceIntent ? () => executeDashboardIntent(maintenanceIntent) : undefined}
+        actionLabel={maintenanceIntent?.label}
         compact
       >
         <div className="mt-auto flex items-end justify-between gap-2">
@@ -1702,6 +1871,7 @@ export function OperationalDashboard() {
     const backupMetricState = resolveDashboardMetricState(backupMetric);
     const lastBackup = (backupMetric?.lastBackup || null) as Record<string, unknown> | null;
     const recentBackups = Array.isArray(backupMetric?.recentBackups) ? backupMetric.recentBackups : [];
+    const backupIntent = getWidgetIntent("backup");
     map.set(
       "backup",
       <OperationalDashboardWidget
@@ -1711,6 +1881,8 @@ export function OperationalDashboard() {
         tone={statusTone(backupMetric?.status)}
         isEditing={isLayoutEditing}
         onHide={hideHandler}
+        onSelect={backupIntent ? () => executeDashboardIntent(backupIntent) : undefined}
+        actionLabel={backupIntent?.label}
         compact
       >
         {backupMetricState ? (
@@ -1771,6 +1943,7 @@ export function OperationalDashboard() {
     const errorsMetric = toMetric(dashboard?.errors);
     const errorsMetricState = resolveDashboardMetricState(errorsMetric);
     const recentErrors = Array.isArray(errorsMetric?.recent) ? errorsMetric.recent : [];
+    const errorsIntent = getWidgetIntent("errors");
     map.set(
       "errors",
       <OperationalDashboardWidget
@@ -1780,6 +1953,8 @@ export function OperationalDashboard() {
         tone={statusTone(errorsMetric?.status)}
         isEditing={isLayoutEditing}
         onHide={hideHandler}
+        onSelect={errorsIntent ? () => executeDashboardIntent(errorsIntent) : undefined}
+        actionLabel={errorsIntent?.label}
       >
         {errorsMetricState ? (
           <DashboardMetricState metric={errorsMetric} />
@@ -1885,6 +2060,7 @@ export function OperationalDashboard() {
     );
 
     const notificationsMetric = toMetric(dashboard?.notifications);
+    const notificationsIntent = getWidgetIntent("notifications");
     map.set(
       "notifications",
       <OperationalDashboardWidget
@@ -1894,6 +2070,8 @@ export function OperationalDashboard() {
         tone="modern"
         isEditing={isLayoutEditing}
         onHide={hideHandler}
+        onSelect={notificationsIntent ? () => executeDashboardIntent(notificationsIntent) : undefined}
+        actionLabel={notificationsIntent?.label}
         compact
       >
         <div className="mt-auto flex items-end justify-between gap-2">
@@ -1911,7 +2089,13 @@ export function OperationalDashboard() {
     );
 
     return map;
-  }, [dashboard, isLayoutEditing, toggleWidgetVisibilityInEditor]);
+  }, [
+    dashboard,
+    executeDashboardIntent,
+    getWidgetIntent,
+    isLayoutEditing,
+    toggleWidgetVisibilityInEditor,
+  ]);
 
   if (!user) {
     return null;
@@ -1992,6 +2176,76 @@ export function OperationalDashboard() {
                     <LayoutGrid className="h-5 w-5" />
                   )}
                 </ToolbarIconButton>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[24px] border border-slate-200/80 bg-white/80 px-4 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.35)] dark:border-slate-800/80 dark:bg-slate-950/45">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    Acoes rapidas
+                  </p>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                    Contextuais
+                  </span>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  {quickActions.length > 0 ? (
+                    quickActions.map((action) => (
+                      <QuickActionButton
+                        key={action.id}
+                        label={action.label}
+                        description={action.description}
+                        onClick={() => executeDashboardIntent(action.intent)}
+                      />
+                    ))
+                  ) : (
+                    <div className="rounded-[20px] border border-dashed border-slate-200/80 px-4 py-3 text-sm text-slate-500 dark:border-slate-800/80 dark:text-slate-400">
+                      Nenhuma acao contextual disponivel para a role atual.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="xl:max-w-[34rem] xl:min-w-[28rem]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                      Foco rapido
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Filtra apenas os blocos visiveis nesta tela sem persistir no backend.
+                    </p>
+                  </div>
+                  {activeQuickFilter !== "all" ? (
+                    <button
+                      type="button"
+                      onClick={() => setActiveQuickFilter("all")}
+                      className="text-xs font-medium text-blue-700 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                    >
+                      Limpar
+                    </button>
+                  ) : null}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {dashboardQuickFilterOptions.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setActiveQuickFilter(option.id)}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${activeQuickFilter === option.id
+                        ? "border-blue-200 bg-blue-100 text-blue-800 dark:border-blue-800 dark:bg-blue-900/50 dark:text-blue-100"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-slate-100"
+                        }`}
+                      aria-pressed={activeQuickFilter === option.id}
+                      title={option.description}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -2099,6 +2353,11 @@ export function OperationalDashboard() {
                   <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-slate-300">
                     {dashboardOverview.visibleWidgets} cards livres
                   </span>
+                  {activeQuickFilter !== "all" ? (
+                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-slate-300">
+                      Filtro rapido: {dashboardQuickFilterOptions.find((option) => option.id === activeQuickFilter)?.label || activeQuickFilter}
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className="mt-5 grid gap-3 md:grid-cols-3">
@@ -2273,7 +2532,16 @@ export function OperationalDashboard() {
                 Nenhum widget visivel no layout atual.
               </div>
             </div>
-          ) : gridWidgetIds.length === 0 ? null : (
+          ) : gridWidgetIds.length === 0 ? (
+            <div className="flex min-h-[320px] items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-slate-50 text-slate-500 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-400">
+              <div className="flex items-center gap-3 text-sm">
+                <Info className="h-4 w-4" />
+                {activeQuickFilter === "all"
+                  ? "Nenhum widget livre disponivel."
+                  : "Nenhum widget livre corresponde ao filtro rapido atual."}
+              </div>
+            </div>
+          ) : (
             <Responsive
               width={width}
               layouts={layoutsForRender as unknown as ResponsiveLayouts<string>}
@@ -2312,6 +2580,11 @@ export function OperationalDashboard() {
             <span className="rounded-full border border-slate-200 px-2 py-1 dark:border-slate-700">
               Severidade: {appliedFilters.severity === "all" ? "todas" : appliedFilters.severity}
             </span>
+            {activeQuickFilter !== "all" ? (
+              <span className="rounded-full border border-slate-200 px-2 py-1 dark:border-slate-700">
+                Foco rapido: {dashboardQuickFilterOptions.find((option) => option.id === activeQuickFilter)?.label || activeQuickFilter}
+              </span>
+            ) : null}
             {role === "SUPER_ADMIN" && appliedFilters.tenantId ? (
               <span className="rounded-full border border-slate-200 px-2 py-1 dark:border-slate-700">
                 Tenant: {appliedFilters.tenantId}

@@ -974,3 +974,58 @@ Limitacoes conhecidas desta etapa:
 - historico de memoria e dependente de leitura do dashboard; nao existe coletor em background dedicado
 - `cpu.loadAvg` continua sendo amostra do sistema operacional, nao um historico proprio do dashboard
 - `security` e `notifications` continuam expostos como agregacoes/snapshots do periodo, sem serie temporal dedicada
+
+### Etapa 7.3 - Auditoria de drill-down e acoes rapidas
+
+Inventario consolidado das interacoes do dashboard:
+
+| Widget / bloco | Ja era clicavel? | Destino / detalhe existente | Estado apos auditoria |
+| --- | --- | --- | --- |
+| `version` | nao | rota real em `/configuracoes/sistema/updates?tab=status` | passou a abrir atualizacoes |
+| `maintenance` | nao | rota real em `/configuracoes/sistema/updates?tab=status` | passou a abrir atualizacoes |
+| `backup` | nao | rota real em `/configuracoes/sistema/updates?tab=backup` | passou a abrir backups |
+| `jobs` | parcial | popover com ultimas falhas ja existia | mantido como detalhe local; sem rota nova |
+| `errors` | nao | tela real em `/logs` | passou a abrir auditoria para `SUPER_ADMIN` |
+| `notifications` | nao | drawer e pagina `/notifications` ja existiam | dashboard passou a reabrir o drawer para `SUPER_ADMIN` |
+| `tenants` | nao | existe rota `/empresas`, mas nao foi ligada nesta etapa | mantido como informativo |
+| `database` / `redis` / `workers` | nao | nao existe tela operacional dedicada melhor do que o snapshot | mantidos como informativos |
+| `saude do painel` | sim | popover por bucket ja existia | mantido |
+| `panorama.jobs` | sim | popover com falhas recentes ja existia | mantido |
+
+Rotas e componentes reaproveitados:
+
+- `/configuracoes/sistema/updates`
+  - aba `status` para versao / maintenance / update
+  - aba `backup` para backup / restore
+- `/logs`
+  - usada como drill-down de `Eventos Criticos`
+- `SystemNotificationsDrawer`
+  - reaproveitado para abrir notificacoes criticas direto do dashboard
+
+Implementacoes incrementais desta etapa:
+
+- faixa discreta de `Acoes rapidas` no topo do dashboard
+  - `Abrir atualizacoes`
+  - `Abrir backups`
+  - `Ver notificacoes criticas` (somente quando o drawer ja esta habilitado)
+  - `Ver auditoria` (`SUPER_ADMIN`)
+- widgets clicaveis onde ja havia destino real e util
+  - `version`
+  - `maintenance`
+  - `backup`
+  - `errors`
+  - `notifications`
+- filtros locais de foco rapido no frontend
+  - `all`
+  - `problems`
+  - `critical`
+  - `operations`
+  - `infrastructure`
+- os filtros rapidos atuam apenas sobre o conjunto de widgets livres/renderizados no grid desta etapa
+- quando o filtro rapido nao encontra widgets livres correspondentes, o dashboard mostra estado vazio explicito em vez de sumir com a area
+
+Decisoes de escopo mantidas:
+
+- `jobs` continua sem nova rota dedicada, porque o popover com falhas recentes ja entrega o melhor drill-down util nesta etapa
+- `database`, `redis` e `workers` permanecem apenas como snapshot operacional
+- nao foi criada segunda inbox, segunda tela de logs ou rota vazia apenas para melhorar a aparencia
