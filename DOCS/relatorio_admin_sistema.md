@@ -1736,3 +1736,238 @@ Validacao executada nesta etapa:
 - frontend
   - `pnpm -C apps/frontend test -- src/app/logs/logs.utils.test.ts src/app/configuracoes/sistema/diagnostico/diagnostics.utils.test.ts`
   - `pnpm -C apps/frontend exec eslint src/app/logs/page.tsx src/app/logs/logs.utils.ts src/app/logs/logs.utils.test.ts`
+
+## Auditoria de consistencia operacional - navegacao e estados visuais
+
+Objetivo desta verificacao:
+
+- mapear se as telas operacionais/admin estao organizadas de forma logica
+- identificar sobreposicoes entre dashboard, diagnostico, logs, auditoria e notificacoes
+- inventariar os estados visuais usados hoje e apontar onde ha divergencia
+- preparar uma recomendacao clara para a proxima etapa, sem refatoracao grande agora
+
+### Parte 1 - Organizacao da UI, rotas e menu
+
+#### Inventario das telas operacionais reais
+
+| Tela | Rota | Papel principal | Role efetiva | Redundancia/confusao? | Observacao |
+| --- | --- | --- | --- | --- | --- |
+| Dashboard | `/dashboard` | entrada principal da plataforma; cards de modulos e, para `SUPER_ADMIN`, resumo operacional recolhido | autenticado (`SUPER_ADMIN`, `ADMIN`, `USER`, `CLIENT`) | parcial | para `SUPER_ADMIN` ele tambem virou ponto de acesso a operacao, mas nao e a melhor tela para triagem tecnica profunda |
+| Diagnostico operacional | `/configuracoes/sistema/diagnostico` | leitura unificada do estado do sistema, tarefas, updates, backup/restore, alertas, auditoria e logs reaproveitados | `ADMIN`, `SUPER_ADMIN` | parcial com dashboard operacional | hoje esta mais proximo da funcao de "estado atual do sistema" do que o proprio dashboard |
+| Tarefas agendadas / Cron | `/configuracoes/sistema/cron` | runtime das tarefas, heartbeat, watchdog e edicao de cronograma | menu: `SUPER_ADMIN`; backend runtime: `ADMIN`/`SUPER_ADMIN`; mutacoes: `SUPER_ADMIN` | baixa | a pagina nao esta protegida no frontend por role; um `ADMIN` pode chegar nela por URL e ver parte da tela, mas recebe `403` nas acoes mutaveis |
+| Atualizacoes | `/configuracoes/sistema/updates` | update/deploy, status do sistema, configuracao do repositorio, historico de update | menu: `SUPER_ADMIN`; backend `status` responde para autenticado; mutacoes `SUPER_ADMIN` | media | concentra update e ainda abriga backup/restore, misturando duas responsabilidades operacionais diferentes |
+| Backup / Restore | `/configuracoes/sistema/updates?tab=backup` | operacoes de backup, restore e historico correlato | `SUPER_ADMIN` na pratica | alta | nao ha rota propria; operacionalmente e uma area distinta, mas aparece como aba de Updates |
+| Logs | `/logs` | listagem de auditoria reaproveitada com escopo por role | `SUPER_ADMIN` usa auditoria completa; `ADMIN` usa auditoria do sistema | alta | o nome "Logs" sugere log tecnico, mas a base atual e auditoria/eventos; nao existe menu visivel para chegar aqui |
+| Auditoria | sem rota dedicada no frontend | historico de acoes administrativas e operacionais persistidas | `ADMIN`/`SUPER_ADMIN` via `/logs`, resumos em diagnostico | alta | hoje nao existe uma tela separada chamada "Auditoria"; o conceito foi absorvido por `/logs` e pelo diagnostico |
+| Notificacoes | `/notifications` | inbox persistida de alertas do sistema | `SUPER_ADMIN` | media | a rota existe, mas o acesso principal e pelo sino/drawer no topo; nao aparece no sidebar nem na tela de configuracoes |
+
+#### Estrutura atual do menu
+
+Leitura do menu hoje:
+
+- `Sidebar` principal:
+  - `Dashboard`
+  - grupo `Administracao`
+    - `Empresas`
+    - `Usuarios`
+    - `Configuracoes`
+- dentro de `Configuracoes`:
+  - `Diagnostico Operacional`
+  - `Sistema de Updates`
+  - `Agendamento de Tarefas`
+  - demais telas administrativas
+- `Notificacoes`:
+  - acesso principal pelo sino no `TopBar`
+  - pagina `/notifications` abre como "central", mas nao existe entrada dedicada no menu
+- `Logs`:
+  - sem entrada no sidebar
+  - sem entrada na tela hub de `Configuracoes`
+  - acesso indireto via links do diagnostico e navegacao manual
+
+O que ja esta consistente:
+
+- existe um eixo administrativo coerente em `Configuracoes > Sistema`
+- `Diagnostico`, `Cron` e `Updates` estao agrupados dentro da mesma familia de telas
+- `Dashboard` ficou como porta de entrada geral da plataforma, sem obrigar todo usuario a entrar em operacao
+
+O que esta confuso ou redundante:
+
+- `Dashboard` e `Diagnostico` ainda se sobrepoem para `SUPER_ADMIN`
+  - o dashboard operacional mostra estado atual e alertas
+  - o diagnostico tambem mostra estado atual, so que de forma mais consolidada e administrativa
+- `Backup / Restore` estar dentro de `Updates` embaralha a navegacao
+  - update/deploy e backup/restore sao operacoes diferentes
+  - hoje o usuario precisa saber da aba correta, nao da funcao
+- `Logs` nao e uma tela facil de descobrir
+  - a rota existe
+  - o nome sugere log tecnico generico
+  - na pratica ela mostra auditoria/eventos, nao um sistema geral de runtime logs
+- `Auditoria` nao existe como rotulo/rota explicita no frontend
+  - conceitualmente o sistema tem auditoria
+  - visualmente o admin procura "logs", mas encontra uma visao de auditoria
+- `Notificacoes` tem boa UX de atalho rapido no topo, mas baixa descoberta como area historica
+  - o drawer funciona bem para consumo rapido
+  - a pagina completa fica escondida para quem nao souber que existe
+- ha pequena divergencia entre UI e backend em algumas telas operacionais
+  - `Cron`: backend runtime permite `ADMIN`, mas a UI foi desenhada como tela de `SUPER_ADMIN`
+  - `Updates`: a rota nao esta protegida por `ProtectedRoute`, embora as mutacoes sejam `SUPER_ADMIN`
+
+#### Clareza de responsabilidade por tela
+
+Pergunta operacional | Tela que hoje melhor responde | Leitura da clareza atual
+--- | --- | ---
+`Qual e o estado atual do sistema?` | `/configuracoes/sistema/diagnostico` | razoavelmente claro para admin; ainda concorre com o dashboard operacional do `SUPER_ADMIN`
+`Quais tarefas agendadas estao com problema?` | `/configuracoes/sistema/cron` | claro
+`Onde vejo falhas tecnicas e eventos de sistema?` | `/logs` | pouco claro, porque o nome da rota sugere log tecnico, mas o conteudo e auditoria/eventos reaproveitados
+`Onde vejo historico de acoes administrativas?` | `/logs` | pouco obvio; falta o rotulo "Auditoria"
+`Onde vejo alertas recentes?` | drawer de notificacoes e `/notifications` | claro para `SUPER_ADMIN`, pouco descobrivel na navegacao estrutural
+
+Diagnostico final da arquitetura de navegacao:
+
+- o sistema ja tem as pecas certas
+- a principal fragilidade nao e falta de tela, e sim semantica/navegacao:
+  - `Dashboard` e `Diagnostico` ainda disputam a ideia de "visao operacional"
+  - `Logs` agrega auditoria sem se chamar auditoria
+  - `Backup / Restore` ficou escondido dentro de `Updates`
+  - `Notificacoes` depende mais do atalho do topo do que de uma IA de menu clara
+
+#### Recomendacao de agrupamento/menu para a proxima etapa
+
+Sem implementar agora, a recomendacao mais limpa e:
+
+- `Dashboard`
+  - papel: entrada geral da plataforma e cards de modulos
+  - operacional: manter apenas resumo/atalho, nao competir com diagnostico
+- `Configuracoes > Sistema`
+  - `Diagnostico Operacional`
+    - tela canonica para "estado atual do sistema"
+  - `Tarefas Agendadas`
+    - cron, heartbeat e watchdog
+  - `Atualizacoes`
+    - update/deploy
+  - `Backups e Restore`
+    - idealmente com entrada propria, mesmo se continuar usando a mesma rota com `tab=backup`
+  - `Auditoria e Logs`
+    - renomear ou pelo menos expor `/logs` com semantica correta
+  - `Notificacoes`
+    - manter sino/drawer, mas com entrada secundaria visivel para historico completo
+
+### Parte 2 - Auditoria da padronizacao visual de estados e status
+
+#### Inventario dos estados visuais encontrados
+
+| Estado / conceito | Label exibida hoje | Cor predominante | Icone / sinal | Onde aparece | Consistente? |
+| --- | --- | --- | --- | --- | --- |
+| healthy / success operacional | `Saudavel`, `Ok`, `Sucesso` | verde | variavel | dashboard, diagnostico, updates, restore | parcial |
+| attention / warning | `Atencao`, `Warning`, `Parcial` | amarelo / amber | alerta | diagnostico, notificacoes, maintenance, erros parciais | parcial |
+| degraded | `Degradado` | amber no dashboard | sem icone fixo | dashboard operacional | nao |
+| critical / failed / error | `Critica`, `Falhou`, `Indisponivel` | vermelho / rose | alerta, x, badge destructive | notificacoes, cron, updates, restore, dashboard | parcial |
+| running | `Executando`, `Em andamento` | cinza no cron, azul em updates/restore | spinner / play | cron, updates, restore | nao |
+| idle / waiting | `Aguardando`, `Sem leitura`, `Sem dados` | cinza / slate | neutro | cron, dashboard, diagnostico | parcial |
+| active / inactive | `Ativa`, `Pausada`, `Ativo`, `Inativo` | default/secondary/cinza ou amber | switch/badge | cron, diagnostico, maintenance, updates | nao |
+| maintenance | `Sistema em manutencao`, `Ativo` | amber | `AlertTriangle`, `Wrench` | banner global, updates, dashboard, diagnostico | nao |
+| notification severity | `Informativa`, `Warning`, `Critica` | azul / amber / vermelho | `CheckCircle2`, `AlertTriangle`, `AlertCircle` | drawer e pagina de notificacoes | sim, dentro da propria feature |
+| empty / no data | `Sem dados`, `Sem leitura`, `Nenhum registro`, `Nenhuma notificacao` | cinza / slate | componente comum em parte da UI | dashboard, diagnostico, logs, notifications | parcial |
+
+#### O que ja esta centralizado
+
+- `DashboardMetricState` e `DashboardSurfaceState`
+  - centralizam `Sem dados`, `Indisponivel` e `Degradado` no dashboard e em partes do shell principal
+- `diagnostics.utils.ts`
+  - centraliza o badge do nivel geral (`healthy`, `attention`, `critical`) e o estado de bloco (`ok`, `error`)
+- `cron-task.utils.ts`
+  - centraliza o nome amigavel e descricao das tarefas
+- `SystemNotificationsList`
+  - centraliza bem a severidade de notificacoes dentro da propria feature
+
+#### Onde os componentes ainda divergem
+
+- `Updates` e `Backup/Restore`
+  - usam pills e blocos manuais com `bg-green-500`, `bg-red-500`, `bg-yellow-500`, `bg-blue-100` etc.
+  - nao reaproveitam `Badge`/`DashboardSurfaceState` com uma semantica unica
+- `Cron`
+  - usa `Badge` do shadcn com combinacao de `outline`, `secondary` e `destructive`
+  - visualmente conversa com o sistema, mas nao casa 1:1 com `DashboardMetricState`
+- `Logs`
+  - coloriza por sufixo da acao (`SUCCESS`, `FAILED`, `UPDATE`, `DELETE`) e nao por severidade real
+  - isso e util para leitura rapida, mas foge do vocabulario de status usado nas outras telas
+- `Diagnostico`
+  - trata erro de bloco como `Parcial` em amarelo
+  - no dashboard, erro operacional costuma ir para `Indisponivel` em rose/vermelho
+- `Maintenance`
+  - hoje usa amber/amarelo em banner e updates
+  - visualmente se confunde com `warning/attention`, sem identidade propria
+
+#### Inconsistencias visuais objetivas
+
+- `Degradado` nao tem uma identidade propria consistente
+  - hoje no dashboard ele cai em amber
+  - em outras telas o conceito muitas vezes vira apenas `Parcial` ou `Warning`
+- `Maintenance` esta visualmente proximo demais de `warning`
+  - para leitura operacional, o estado de manutencao e especial e nao deveria disputar o mesmo codigo visual de atencao generica
+- `Running` muda demais de tela para tela
+  - `Cron`: badge neutra/secondary
+  - `Updates`: pill azul
+  - `Restore`: bloco colorido com spinner
+- `Success` e `Healthy` estao semanticamente proximos, mas visualmente variam entre
+  - verde forte solido
+  - outline neutra
+  - verde pastel
+- `Logs` usa classificacao por acao, nao por severidade
+  - isso e aceitavel tecnicamente, mas aumenta a percepcao de "carnaval visual" quando comparado com notificacoes, cron e diagnostico
+- `Warning` aparece como `Warning`, `Atencao` e `Parcial`
+  - mesma camada semantica, tres labels diferentes
+
+#### Leitura de legibilidade e ruido visual
+
+O que esta bom:
+
+- dashboard e diagnostico ja reduziram bastante o ruido com cards mais limpos
+- notificacoes estao bem hierarquizadas por severidade
+- cron esta mais administrativo e menos tecnico do que antes
+
+Onde ainda ha cansaco visual:
+
+- `Updates` e `Backup/Restore` concentram a maior parte do ruido
+  - muitas cores fortes
+  - muitos blocos informativos com estilos diferentes
+  - badges e alert boxes sem uma base visual comum
+- a mistura de azul, verde, amarelo e vermelho forte em poucas areas cria mais variacao do que o necessario
+- `Logs` ainda parece uma tela de apoio, nao uma tela integrada ao sistema visual operacional
+
+#### Padrao recomendado para a proxima etapa
+
+Sem implementar agora, o padrao mais previsivel seria:
+
+- `healthy` / `success`
+  - verde
+- `attention` / `warning`
+  - amarelo
+- `degraded`
+  - laranja
+- `critical` / `failed` / `error`
+  - vermelho
+- `maintenance`
+  - azul
+- `inactive` / `disabled` / `idle`
+  - cinza
+- `running`
+  - azul neutro consistente
+
+Regras de componente recomendadas:
+
+- usar um unico componente de status pill/badge para severidade e runtime state
+- deixar `DashboardSurfaceState` como base tambem para algumas telas administrativas
+- separar claramente:
+  - status de severidade
+  - status de execucao
+  - status de disponibilidade
+
+Resumo final da auditoria:
+
+- a arquitetura operacional ja esta funcional, mas ainda com semantica difusa entre `Dashboard`, `Diagnostico`, `Logs` e `Notificacoes`
+- o maior ganho da proxima etapa nao sera criar tela nova; sera:
+  - explicitar melhor a navegacao
+  - dar nome correto a `/logs` versus auditoria
+  - reduzir a sobreposicao entre `Dashboard` e `Diagnostico`
+  - unificar visualmente `warning`, `degraded`, `maintenance`, `running` e `failed`

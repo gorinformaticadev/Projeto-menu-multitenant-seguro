@@ -225,7 +225,7 @@ export function Sidebar() {
     <div
       ref={sidebarRef}
       className={cn(
-        "flex flex-col h-full bg-gradient-to-b from-secondary to-background border-r border-border/40 shadow-xl z-20 transition-all duration-300 relative",
+        "relative z-20 flex h-full flex-col border-r border-border/80 bg-secondary shadow-[6px_0_24px_rgba(15,23,42,0.05)] transition-all duration-300 dark:shadow-[8px_0_28px_rgba(2,6,23,0.24)]",
         isExpanded ? "w-56" : "w-16"
       )}
     >
@@ -235,10 +235,9 @@ export function Sidebar() {
         onClick={() => setIsExpanded(!isExpanded)}
         className={cn(
           "absolute -right-3 top-0 z-50",
-          "h-6 w-6 rounded-full flex items-center justify-center",
-          "bg-background shadow-neu-sm hover:shadow-neu-flat",
-          "text-muted-foreground hover:text-primary transition-all duration-300",
-          "focus:outline-none border border-white/20" // Borda sutil para contraste
+          "flex h-6 w-6 items-center justify-center rounded-full border border-border/80 bg-card shadow-sm",
+          "text-muted-foreground transition-all duration-300 hover:text-primary hover:shadow-md",
+          "focus:outline-none"
         )}
         title={isExpanded ? "Recolher" : "Expandir"}
       >
@@ -329,10 +328,10 @@ export function Sidebar() {
                     href={item.route}
                     onClick={handleItemClick}
                     className={cn(
-                      "flex items-center gap-2 px-3 py-2 text-sm font-medium transition-all duration-200 group relative",
+                      "group relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200",
                       isActive
-                        ? "bg-primary/10 text-primary border-l-2 border-primary"
-                        : "text-muted-foreground/70 hover:text-foreground hover:bg-white/5 hover:opacity-100",
+                        ? "border border-primary/15 bg-card text-primary shadow-sm"
+                        : "text-muted-foreground hover:bg-card/80 hover:text-foreground",
                       !isExpanded && "justify-center px-0"
                     )}
                     title={!isExpanded ? item.label : undefined}
@@ -355,8 +354,7 @@ export function Sidebar() {
                           variant="ghost"
                           onClick={() => toggleGroup(groupId)}
                           className={cn(
-                            "w-full justify-between px-3 py-2 text-sm font-medium transition-all duration-200",
-                            "hover:text-primary hover:shadow-neu-flat",
+                            "w-full justify-between rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 hover:bg-card/80 hover:text-primary",
                             hasActiveItem && "text-primary font-semibold"
                           )}
                         >
@@ -385,10 +383,10 @@ export function Sidebar() {
                                   href={item.route}
                                   onClick={handleItemClick}
                                   className={cn(
-                                    "flex items-center gap-2 px-3 py-2 text-sm font-medium transition-all duration-200 group relative",
+                                    "group relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200",
                                     isActive
-                                      ? "bg-primary/10 text-primary border-l-2 border-primary"
-                                      : "text-muted-foreground/70 hover:text-foreground hover:bg-white/5 hover:opacity-100"
+                                      ? "border border-primary/15 bg-card text-primary shadow-sm"
+                                      : "text-muted-foreground hover:bg-card/80 hover:text-foreground"
                                   )}
                                 >
                                   <Icon className="h-4 w-4" />
@@ -416,8 +414,8 @@ export function Sidebar() {
                             });
                           }}
                           className={cn(
-                            "w-full justify-center px-1 py-1 transition-all duration-200 hover:text-primary hover:shadow-neu-flat hover:-translate-y-0.5",
-                            hasActiveItem && "text-primary shadow-neu-pressed hover:translate-y-0 hover:shadow-neu-pressed"
+                            "w-full justify-center rounded-xl px-1 py-2 text-muted-foreground transition-all duration-200 hover:bg-card/80 hover:text-primary",
+                            hasActiveItem && "bg-card text-primary shadow-sm"
                           )}
                           title={config.name}
                         >

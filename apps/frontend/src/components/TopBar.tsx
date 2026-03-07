@@ -132,18 +132,18 @@ export function TopBar() {
   );
 
   return (
-    <div className="fixed top-0 left-0 right-0 h-16 bg-white dark:bg-card border-b border-gray-200 dark:border-border shadow-sm z-50 transition-colors duration-200">
+    <div className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-border/80 bg-card/95 shadow-[0_1px_2px_rgba(15,23,42,0.04)] backdrop-blur supports-[backdrop-filter]:bg-card/85 dark:bg-card/90">
 
       {/* OVERLAY DE BUSCA MOBILE */}
       <div
-        className={`absolute inset-0 bg-white dark:bg-card px-4 flex items-center transition-transform duration-300 z-50 ${showMobileSearch ? 'translate-y-0' : '-translate-y-full'
+        className={`absolute inset-0 z-50 flex items-center bg-card/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-card/90 transition-transform duration-300 ${showMobileSearch ? 'translate-y-0' : '-translate-y-full'
           }`}
       >
         <Button
           variant="ghost"
           size="icon"
           onClick={() => setShowMobileSearch(false)}
-          className="mr-2 text-gray-500 dark:text-muted-foreground flex-shrink-0"
+          className="mr-2 flex-shrink-0 text-muted-foreground"
         >
           <ArrowLeftIcon className="h-5 w-5" />
         </Button>
@@ -164,16 +164,16 @@ export function TopBar() {
                 className="h-10 w-auto object-contain"
               />
             ) : (
-              <div className="h-10 w-10 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/20">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-[0_10px_24px_rgba(37,99,235,0.18)]">
                 <span className="text-white font-bold text-lg">S</span>
               </div>
             )}
           </div>
           {/* Nome e Tenant responsivos */}
           <div className="flex flex-col max-w-[120px] md:max-w-none">
-            <h1 className="text-sm md:text-lg font-bold text-gray-900 dark:text-foreground leading-tight truncate">{platformName}</h1>
+            <h1 className="truncate text-sm font-bold leading-tight text-foreground md:text-lg">{platformName}</h1>
             {user?.tenant && (
-              <p className="text-xs text-gray-500 dark:text-muted-foreground truncate">{user.tenant.nomeFantasia}</p>
+              <p className="truncate text-xs text-muted-foreground">{user.tenant.nomeFantasia}</p>
             )}
           </div>
         </div>
@@ -189,7 +189,7 @@ export function TopBar() {
           <Button
             variant="ghost"
             size="icon"
-            className="lg:hidden text-gray-600 dark:text-muted-foreground hover:bg-gray-100 dark:hover:bg-accent rounded-full"
+            className="rounded-full text-muted-foreground hover:bg-accent lg:hidden"
             onClick={() => setShowMobileSearch(true)}
           >
             <Search className="h-5 w-5" />
@@ -206,12 +206,12 @@ export function TopBar() {
           <div className="relative" ref={userMenuRef}>
             <Button
               variant="ghost"
-              className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-accent transition-colors p-1 md:px-3 md:py-2 rounded-full md:rounded-md"
+              className="flex items-center gap-2 rounded-full p-1 transition-colors hover:bg-accent md:rounded-xl md:px-3 md:py-2"
               onClick={() => setShowUserMenu(!showUserMenu)}
             >
               {/* Logo do Tenant do Usuario */}
               {userTenantLogo ? (
-                <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 dark:bg-secondary border border-gray-200 dark:border-border">
+                <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-border bg-secondary">
                   <Image
                     src={`/uploads/logos/${userTenantLogo}`}
                     alt="Logo Tenant"
@@ -228,27 +228,27 @@ export function TopBar() {
                   </div>
                 </div>
               ) : (
-                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-semibold shadow-sm">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white shadow-[0_6px_16px_rgba(37,99,235,0.18)]">
                   {user?.name?.charAt(0).toUpperCase()}
                 </div>
               )}
               <div className="hidden md:block text-left">
                 {user?.tenant?.nomeFantasia && (
-                  <p className="text-sm text-blue-600 dark:text-blue-400 font-medium truncate">{user.tenant.nomeFantasia}</p>
+                  <p className="truncate text-sm font-medium text-primary">{user.tenant.nomeFantasia}</p>
                 )}
-                <p className="text-sm font-medium text-gray-900 dark:text-foreground">{user?.name}</p>
-                <p className="text-[10px] text-gray-500 dark:text-muted-foreground">{user?.role}</p>
+                <p className="text-sm font-medium text-foreground">{user?.name}</p>
+                <p className="text-[10px] text-muted-foreground">{user?.role}</p>
               </div>
             </Button>
 
             {/* Dropdown Menu */}
             {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-popover rounded-lg shadow-lg dark:shadow-shadow-dark border border-gray-200 dark:border-border py-2 z-50">
-                <div className="px-4 py-2 border-b border-gray-200 dark:border-border">
+              <div className="absolute right-0 z-50 mt-2 w-56 rounded-xl border border-border/80 bg-popover py-2 shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:shadow-[0_18px_36px_rgba(2,6,23,0.3)]">
+                <div className="border-b border-border px-4 py-2">
                   <div className="flex items-center gap-3 mb-2">
                     {/* Logo da Tenant no Menu */}
                     {userTenantLogo ? (
-                      <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 dark:bg-secondary border border-gray-200 dark:border-border flex-shrink-0">
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-secondary">
                         <Image
                           src={`/uploads/logos/${userTenantLogo}`}
                           alt="Logo Tenant"
@@ -265,32 +265,32 @@ export function TopBar() {
                         </div>
                       </div>
                     ) : (
-                      <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-semibold flex-shrink-0 shadow-sm">
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-[0_8px_18px_rgba(37,99,235,0.18)]">
                         {user?.name?.charAt(0).toUpperCase()}
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
                       {user?.tenant?.nomeFantasia && (
-                        <p className="text-sm text-blue-600 dark:text-blue-400 font-medium truncate mb-1">{user.tenant.nomeFantasia}</p>
+                        <p className="mb-1 truncate text-sm font-medium text-primary">{user.tenant.nomeFantasia}</p>
                       )}
-                      <p className="text-sm font-medium text-gray-900 dark:text-foreground truncate">{user?.name}</p>
-                      <p className="text-xs text-gray-500 dark:text-muted-foreground truncate">{user?.email}</p>
+                      <p className="truncate text-sm font-medium text-foreground">{user?.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Seletor de Tema */}
-                <div className="px-4 py-2 border-b border-gray-200 dark:border-border">
-                  <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Tema</div>
+                <div className="border-b border-border px-4 py-2">
+                  <div className="mb-2 text-xs font-semibold text-muted-foreground">Tema</div>
                   <ThemeToggle />
                 </div>
 
                 <a
                   href="/perfil"
                   onClick={() => setShowUserMenu(false)}
-                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-foreground hover:bg-gray-100 dark:hover:bg-accent flex items-center gap-2 transition-colors"
+                  className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent"
                 >
-                  <User className="h-4 w-4 text-gray-500 dark:text-muted-foreground" />
+                  <User className="h-4 w-4 text-muted-foreground" />
                   Meu Perfil
                 </a>
 
@@ -302,32 +302,32 @@ export function TopBar() {
                   <a
                     href="/configuracoes/sistema/updates"
                     onClick={() => setShowUserMenu(false)}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-foreground hover:bg-gray-100 dark:hover:bg-accent flex items-center gap-2 transition-colors"
+                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent"
                     title="Clique para gerenciar atualizacoes"
                   >
-                    <Info className="h-4 w-4 text-gray-500 dark:text-muted-foreground" />
+                    <Info className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <span className="text-xs text-gray-600 dark:text-muted-foreground">Versao do Sistema</span>
-                      <div className="text-xs font-mono font-medium text-gray-800 dark:text-foreground">{systemVersion}</div>
+                      <span className="text-xs text-muted-foreground">Versao do Sistema</span>
+                      <div className="text-xs font-mono font-medium text-foreground">{systemVersion}</div>
                     </div>
                   </a>
                 ) : (
-                  <div className="px-4 py-2 text-left text-sm text-gray-500 dark:text-muted-foreground flex items-center gap-2 cursor-default">
-                    <Info className="h-4 w-4 text-gray-400 dark:text-slate-600" />
+                  <div className="flex cursor-default items-center gap-2 px-4 py-2 text-left text-sm text-muted-foreground">
+                    <Info className="h-4 w-4 text-muted-foreground/70" />
                     <div>
                       <span className="text-xs">Versao do Sistema</span>
-                      <div className="text-xs font-mono font-medium text-gray-700 dark:text-gray-300">{systemVersion}</div>
+                      <div className="text-xs font-mono font-medium text-foreground/85">{systemVersion}</div>
                     </div>
                   </div>
                 )}
 
-                <div className="border-t border-gray-200 dark:border-border mt-2 pt-2">
+                <div className="mt-2 border-t border-border pt-2">
                   <button
                     onClick={() => {
                       setShowUserMenu(false);
                       logout();
                     }}
-                    className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 transition-colors"
+                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
                   >
                     <LogOut className="h-4 w-4" />
                     Sair

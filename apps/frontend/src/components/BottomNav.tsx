@@ -31,7 +31,7 @@ export function BottomNav() {
 
   return (
     <>
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-lg border-t z-50 px-2 h-16 flex items-center justify-between pb-safe shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-16 items-center justify-between border-t border-border/80 bg-card/95 px-2 shadow-[0_-6px_18px_rgba(15,23,42,0.06)] backdrop-blur-lg pb-safe md:hidden supports-[backdrop-filter]:bg-card/88">
 
         {/* Esquerda: Home, Empresas */}
         <div className="flex flex-1 justify-around">
@@ -58,7 +58,7 @@ export function BottomNav() {
         <div className="flex-shrink-0 px-2">
           <button
             onClick={() => setIsLauncherOpen(true)}
-            className="flex flex-col items-center justify-center -translate-y-5 bg-primary text-primary-foreground w-14 h-14 rounded-2xl shadow-lg shadow-primary/20 ring-4 ring-background transition-all active:scale-90 hover:brightness-110"
+            className="flex h-14 w-14 -translate-y-5 flex-col items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[0_12px_26px_rgba(37,99,235,0.24)] ring-4 ring-background transition-all hover:brightness-110 active:scale-90"
             aria-label="Launcher de Módulos"
           >
             <Image
@@ -112,7 +112,7 @@ export function BottomNav() {
                   onClick={() => setIsLauncherOpen(false)}
                   className="flex flex-col items-center gap-2 group transition-all active:scale-95"
                 >
-                  <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300 shadow-sm">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-border/70 bg-secondary text-primary shadow-sm transition-all duration-300 group-hover:border-primary/20 group-hover:bg-primary group-hover:text-primary-foreground">
                     <LayoutGrid size={32} />
                   </div>
                   <span className="text-[11px] font-bold text-center truncate w-full px-1">

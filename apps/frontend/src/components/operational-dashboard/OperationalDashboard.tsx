@@ -724,8 +724,8 @@ function ToolbarIconButton({
           disabled={disabled}
           aria-label={label}
           className={`h-11 w-11 rounded-xl border transition-all ${active
-            ? "border-blue-400 bg-blue-600 text-white hover:bg-blue-500 hover:text-white"
-            : "border-white/10 bg-white/5 text-slate-200 hover:border-slate-500 hover:bg-white/10 hover:text-white"
+            ? "border-blue-500 bg-blue-600 text-white hover:bg-blue-500 hover:text-white"
+            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-white/10 dark:hover:text-white"
             }`}
         >
           {children}
@@ -800,19 +800,19 @@ function OverviewStat({
   const content = (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-300/80">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-300/80">
           {label}
         </p>
-        <p className="mt-1.5 text-[1.35rem] font-semibold tracking-tight text-white">{value}</p>
-        <p className="mt-1 text-[10px] text-slate-300/80">{hint}</p>
+        <p className="mt-1.5 text-[1.35rem] font-semibold tracking-tight text-slate-900 dark:text-white">{value}</p>
+        <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-300/80">{hint}</p>
         {trend ? <MiniTrendSparkline config={trend} className="mt-3 h-14" /> : null}
       </div>
       <div className="space-y-2 text-right">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-slate-100">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-slate-100">
           {icon}
         </div>
         {isInteractive ? (
-          <span className="hidden text-[10px] font-medium text-cyan-200/90 sm:block">
+          <span className="hidden text-[10px] font-medium text-blue-700 dark:text-cyan-200/90 sm:block">
             {actionLabel || "Abrir"}
           </span>
         ) : null}
@@ -824,8 +824,8 @@ function OverviewStat({
     return (
       <div
         className={`rounded-[20px] border px-3.5 py-3 text-left backdrop-blur-sm ${tone === "danger"
-          ? "border-rose-400/20 bg-rose-500/10 text-rose-50"
-          : "border-white/10 bg-white/6 text-slate-50"
+          ? "border-rose-200/80 bg-rose-50/70 text-slate-900 dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-50"
+          : "border-slate-200/80 bg-white/82 text-slate-900 dark:border-white/10 dark:bg-white/6 dark:text-slate-50"
           }`}
       >
         {content}
@@ -837,9 +837,9 @@ function OverviewStat({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-[20px] border px-3.5 py-3 text-left backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${tone === "danger"
-        ? "border-rose-400/20 bg-rose-500/10 text-rose-50"
-        : "border-white/10 bg-white/6 text-slate-50"
+      className={`rounded-[20px] border px-3.5 py-3 text-left backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:hover:border-cyan-300/30 dark:hover:bg-white/10 dark:focus-visible:ring-cyan-300/70 dark:focus-visible:ring-offset-slate-950 ${tone === "danger"
+        ? "border-rose-200/80 bg-rose-50/70 text-slate-900 dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-50"
+        : "border-slate-200/80 bg-white/82 text-slate-900 dark:border-white/10 dark:bg-white/6 dark:text-slate-50"
         }`}
     >
       {content}
@@ -870,19 +870,19 @@ function PanoramaSignal({
   const isInteractive = Boolean(onClick) && !hasDetails;
   const card = (
     <div
-      className={`rounded-[20px] border border-white/10 bg-white/5 px-3.5 py-3 backdrop-blur-sm ${isInteractive ? "transition-all hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-white/10" : ""}`}
+      className={`rounded-[20px] border border-slate-200/80 bg-white/82 px-3.5 py-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/5 ${isInteractive ? "transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white dark:hover:border-cyan-300/30 dark:hover:bg-white/10" : ""}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className={`h-1.5 w-10 rounded-full ${accentClassName}`} />
-        {hasDetails ? <ChevronDown className="mt-0.5 h-3.5 w-3.5 text-slate-500" /> : null}
+        {hasDetails ? <ChevronDown className="mt-0.5 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" /> : null}
       </div>
-      <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300/80">
+      <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300/80">
         {label}
       </p>
-      <p className="mt-1.5 text-[1.1rem] font-semibold tracking-tight text-white">{value}</p>
-      <p className="mt-1 truncate text-[10px] text-slate-400">{hint}</p>
+      <p className="mt-1.5 text-[1.1rem] font-semibold tracking-tight text-slate-900 dark:text-white">{value}</p>
+      <p className="mt-1 truncate text-[10px] text-slate-500 dark:text-slate-400">{hint}</p>
       {isInteractive ? (
-        <p className="mt-2 text-[10px] font-medium text-cyan-200/90">{actionLabel || "Abrir"}</p>
+        <p className="mt-2 text-[10px] font-medium text-blue-700 dark:text-cyan-200/90">{actionLabel || "Abrir"}</p>
       ) : null}
     </div>
   );
@@ -892,7 +892,7 @@ function PanoramaSignal({
       <button
         type="button"
         onClick={onClick}
-        className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+        className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:focus-visible:ring-cyan-300/70 dark:focus-visible:ring-offset-slate-950"
       >
         {card}
       </button>
@@ -908,7 +908,7 @@ function PanoramaSignal({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+          className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:focus-visible:ring-cyan-300/70 dark:focus-visible:ring-offset-slate-950"
         >
           {card}
         </button>
@@ -917,13 +917,13 @@ function PanoramaSignal({
         side="bottom"
         align="start"
         sideOffset={10}
-        className="w-80 rounded-[20px] border border-slate-700/70 bg-slate-950/95 p-3 text-slate-100 shadow-2xl"
+        className="w-80 rounded-[20px] border border-slate-200 bg-white/95 p-3 text-slate-900 shadow-xl dark:border-slate-700/70 dark:bg-slate-950/95 dark:text-slate-100 dark:shadow-2xl"
       >
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-600 dark:text-slate-300">
             {detailsTitle || label}
           </p>
-          <p className="mt-1 text-[11px] text-slate-400">
+          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
             Historico recente disponivel para consulta rapida.
           </p>
         </div>
@@ -931,11 +931,11 @@ function PanoramaSignal({
           {detailsItems.map((item, index) => (
             <div
               key={`${item.label}-${index}`}
-              className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2"
+              className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-white/10 dark:bg-white/5"
             >
-              <p className="text-sm font-medium text-slate-100">{item.label}</p>
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{item.label}</p>
               {item.hint ? (
-                <p className="mt-1 text-[10px] leading-snug text-slate-400">{item.hint}</p>
+                <p className="mt-1 text-[10px] leading-snug text-slate-500 dark:text-slate-400">{item.hint}</p>
               ) : null}
             </div>
           ))}
@@ -1020,12 +1020,12 @@ function HealthBucketLegendRow({
     <>
       <div className="flex min-w-0 items-center gap-2">
         <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${color}`} />
-        <span className="truncate text-[11px] font-medium text-slate-300">
+        <span className="truncate text-[11px] font-medium text-slate-600 dark:text-slate-300">
           {label}
         </span>
       </div>
       <div className="flex items-center gap-2">
-        <p className="shrink-0 text-base font-semibold tracking-tight text-white">
+        <p className="shrink-0 text-base font-semibold tracking-tight text-slate-900 dark:text-white">
           {value}
         </p>
         {hasItems ? (
@@ -1039,7 +1039,7 @@ function HealthBucketLegendRow({
 
   if (!hasItems) {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white/82 px-3 py-2 dark:border-white/10 dark:bg-white/5">
         {content}
       </div>
     );
@@ -1050,7 +1050,7 @@ function HealthBucketLegendRow({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-left transition-colors hover:border-white/20 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white/82 px-3 py-2 text-left transition-colors hover:border-blue-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20 dark:hover:bg-white/10 dark:focus-visible:ring-cyan-300/70 dark:focus-visible:ring-offset-slate-950"
           onClick={() => {
             clearCloseTimeout();
             setOpen((current) => !current);
@@ -1070,16 +1070,16 @@ function HealthBucketLegendRow({
         side="left"
         align="start"
         sideOffset={10}
-        className="w-72 rounded-[20px] border border-slate-700/70 bg-slate-950/95 p-3 text-slate-100 shadow-2xl"
+        className="w-72 rounded-[20px] border border-slate-200 bg-white/95 p-3 text-slate-900 shadow-xl dark:border-slate-700/70 dark:bg-slate-950/95 dark:text-slate-100 dark:shadow-2xl"
         onMouseEnter={clearCloseTimeout}
         onMouseLeave={scheduleClose}
       >
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-600 dark:text-slate-300">
               {label}
             </p>
-            <p className="mt-1 text-[11px] text-slate-400">
+            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
               {value} widgets identificados neste grupo
             </p>
           </div>
@@ -1089,12 +1089,12 @@ function HealthBucketLegendRow({
           {items.map((item) => (
             <div
               key={item.id}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2"
+              className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-white/10 dark:bg-white/5"
             >
-              <span className="min-w-0 truncate text-sm text-slate-100">
+              <span className="min-w-0 truncate text-sm text-slate-900 dark:text-slate-100">
                 {item.label}
               </span>
-              <span className="shrink-0 rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[10px] font-medium text-slate-300">
+              <span className="shrink-0 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-slate-300">
                 {item.statusLabel}
               </span>
             </div>
@@ -1896,12 +1896,12 @@ export function OperationalDashboard({
       >
         <div className="flex flex-col h-full">
           <div className="px-3 pt-3 flex items-end justify-between">
-            <p className="text-4xl font-bold text-blue-400">
+            <p className="text-4xl font-bold text-slate-900 dark:text-blue-400">
               {apiMetric?.avgResponseTimeMs !== null && apiMetric?.avgResponseTimeMs !== undefined
                 ? `${apiMetric.avgResponseTimeMs}ms`
                 : "--"}
             </p>
-            <p className="text-xs text-slate-400 mb-1">Amostras: {String(apiMetric?.sampleSize ?? 0)}</p>
+            <p className="mb-1 text-xs text-slate-500 dark:text-slate-400">Amostras: {String(apiMetric?.sampleSize ?? 0)}</p>
           </div>
           {apiHistory.length > 0 ? (
             <div className="px-3">
@@ -1956,8 +1956,8 @@ export function OperationalDashboard({
       >
         <div className="flex flex-col h-full">
           <div className="px-3 pt-3 flex items-end justify-between">
-            <p className="text-4xl font-bold text-blue-400">{formatPercent(cpuMetric?.usagePercent)}</p>
-            <p className="text-xs text-slate-400 mb-1">Cores: {String(cpuMetric?.cores ?? "--")}</p>
+            <p className="text-4xl font-bold text-slate-900 dark:text-blue-400">{formatPercent(cpuMetric?.usagePercent)}</p>
+            <p className="mb-1 text-xs text-slate-500 dark:text-slate-400">Cores: {String(cpuMetric?.cores ?? "--")}</p>
           </div>
           <div className="flex-1 min-h-0 w-full mt-2">
             {cpuLoadData.length > 0 ? (
@@ -2008,9 +2008,9 @@ export function OperationalDashboard({
       >
         <div className="flex h-full items-center">
           <div className="flex-1 space-y-1">
-            <p className="text-3xl font-bold tracking-tight text-slate-50">{formatPercent(memoryMetric?.usedPercent)}</p>
-            <p className="text-xs text-slate-400">Usado: <span className="text-slate-200">{formatBytes(memUsed)}</span></p>
-            <p className="text-xs text-slate-400">Total: <span className="text-slate-200">{formatBytes(memoryMetric?.totalBytes)}</span></p>
+            <p className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50">{formatPercent(memoryMetric?.usedPercent)}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Usado: <span className="text-slate-700 dark:text-slate-200">{formatBytes(memUsed)}</span></p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Total: <span className="text-slate-700 dark:text-slate-200">{formatBytes(memoryMetric?.totalBytes)}</span></p>
           </div>
           <div className="h-24 w-24 shrink-0">
             {memUsed > 0 ? (
@@ -2059,9 +2059,9 @@ export function OperationalDashboard({
       >
         <div className="flex h-full items-center">
           <div className="flex-1 space-y-1">
-            <p className="text-3xl font-bold tracking-tight text-slate-50">{formatPercent(diskMetric?.usedPercent)}</p>
-            <p className="text-xs text-slate-400">Usado: <span className="text-slate-200">{formatBytes(diskUsed)}</span></p>
-            <p className="text-xs text-slate-400">Total: <span className="text-slate-200">{formatBytes(diskMetric?.totalBytes)}</span></p>
+            <p className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50">{formatPercent(diskMetric?.usedPercent)}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Usado: <span className="text-slate-700 dark:text-slate-200">{formatBytes(diskUsed)}</span></p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Total: <span className="text-slate-700 dark:text-slate-200">{formatBytes(diskMetric?.totalBytes)}</span></p>
           </div>
           <div className="h-24 w-24 shrink-0">
             {diskUsed > 0 ? (
@@ -2134,16 +2134,16 @@ export function OperationalDashboard({
         ) : (
           <div className="mt-auto flex items-end justify-between gap-2">
             <div>
-              <p className="text-[1.55rem] font-bold leading-none tracking-tight text-emerald-400">
+              <p className="text-[1.55rem] font-bold leading-none tracking-tight text-emerald-700 dark:text-emerald-400">
                 {databaseMetric?.latencyMs !== null && databaseMetric?.latencyMs !== undefined
                   ? `${databaseMetric.latencyMs}ms`
                   : "--"}
               </p>
-              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400/80">
+              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400/80">
                 banco
               </p>
             </div>
-            <span className="rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[10px] font-medium capitalize text-slate-100">
+            <span className="rounded-full border border-slate-200 bg-white/80 px-2 py-0.5 text-[10px] font-medium capitalize text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-slate-100">
               {String(databaseMetric?.status || "--")}
             </span>
           </div>
@@ -2169,16 +2169,16 @@ export function OperationalDashboard({
         ) : (
           <div className="mt-auto flex items-end justify-between gap-2">
             <div>
-              <p className="text-[1.55rem] font-bold leading-none tracking-tight text-sky-400">
+              <p className="text-[1.55rem] font-bold leading-none tracking-tight text-sky-700 dark:text-sky-400">
                 {redisMetric?.latencyMs !== null && redisMetric?.latencyMs !== undefined
                   ? `${redisMetric.latencyMs}ms`
                   : "--"}
               </p>
-              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400/80">
+              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400/80">
                 cache
               </p>
             </div>
-            <span className="rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[10px] font-medium capitalize text-slate-100">
+            <span className="rounded-full border border-slate-200 bg-white/80 px-2 py-0.5 text-[10px] font-medium capitalize text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-slate-100">
               {String(redisMetric?.status || "--")}
             </span>
           </div>
@@ -2203,15 +2203,15 @@ export function OperationalDashboard({
           <DashboardMetricState metric={workersMetric} />
         ) : (
           <div className="mt-auto flex items-end justify-between gap-2">
-            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-blue-400/90">
+            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-slate-900 dark:text-blue-400/90">
               {String(workersMetric?.activeWorkers ?? workersMetric?.runningJobs ?? "--")}
             </p>
             <div className="text-right">
-              <p className="text-[10px] text-slate-400/80">
-                Executando: <span className="font-medium text-slate-300">{String(workersMetric?.runningJobs ?? "--")}</span>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400/80">
+                Executando: <span className="font-medium text-slate-700 dark:text-slate-300">{String(workersMetric?.runningJobs ?? "--")}</span>
               </p>
-              <p className="text-[10px] text-slate-400/80">
-                Pendentes: <span className="font-medium text-amber-300/80">{String(workersMetric?.pendingJobs ?? "--")}</span>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400/80">
+                Pendentes: <span className="font-medium text-amber-700 dark:text-amber-300/80">{String(workersMetric?.pendingJobs ?? "--")}</span>
               </p>
             </div>
           </div>
@@ -2236,12 +2236,12 @@ export function OperationalDashboard({
           <DashboardMetricState metric={jobsMetric} />
         ) : (
           <div className="mt-auto flex items-end justify-between gap-2">
-            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-blue-400/90">
+            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-slate-900 dark:text-blue-400/90">
               {String(jobsMetric?.running ?? "--")}
             </p>
             <div className="text-right">
-              <p className="text-[10px] text-slate-400/80">Pendentes: <span className="text-amber-300/80">{String(jobsMetric?.pending ?? "--")}</span></p>
-              <p className="text-[10px] text-slate-400/80">Falhas 24h: <span className="text-red-400">{String(jobsMetric?.failedLast24h ?? "--")}</span></p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400/80">Pendentes: <span className="text-amber-700 dark:text-amber-300/80">{String(jobsMetric?.pending ?? "--")}</span></p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400/80">Falhas 24h: <span className="text-rose-700 dark:text-red-400">{String(jobsMetric?.failedLast24h ?? "--")}</span></p>
             </div>
           </div>
         )}
@@ -2345,16 +2345,16 @@ export function OperationalDashboard({
           <div className="flex h-full min-h-0 flex-col gap-3">
             <div className="flex items-end justify-between gap-3 rounded-[20px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70">
               <div>
-                <p className="text-[1.7rem] font-bold leading-none tracking-tight text-sky-400">
+                  <p className="text-[1.7rem] font-bold leading-none tracking-tight text-sky-700 dark:text-sky-400">
                   {routeLatencyMetric?.avgResponseMs !== null && routeLatencyMetric?.avgResponseMs !== undefined
                     ? `${routeLatencyMetric.avgResponseMs}ms`
                     : "--"}
                 </p>
-                <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
                   media recente
                 </p>
               </div>
-              <div className="text-right text-[11px] text-slate-400">
+              <div className="text-right text-[11px] text-slate-500 dark:text-slate-400">
                 <p>{String(routeLatencyMetric?.totalRequestsRecent ?? 0)} req</p>
                 <p>{String(routeLatencyMetric?.windowSeconds ?? "--")}s janela</p>
               </div>
@@ -2367,17 +2367,17 @@ export function OperationalDashboard({
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="flex items-center gap-2 text-[11px] font-semibold text-slate-100">
-                        <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-sky-300">
+                      <p className="flex items-center gap-2 text-[11px] font-semibold text-slate-900 dark:text-slate-100">
+                        <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300">
                           {item.method}
                         </span>
                         <span className="truncate">{item.route}</span>
                       </p>
-                      <p className="mt-1 text-[10px] text-slate-400">
+                      <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
                         {item.requestCount} req - p95 {item.p95Ms !== null ? `${item.p95Ms}ms` : "--"}
                       </p>
                     </div>
-                    <p className="shrink-0 text-sm font-semibold text-sky-300">
+                    <p className="shrink-0 text-sm font-semibold text-sky-700 dark:text-sky-300">
                       {item.avgMs !== null ? `${item.avgMs}ms` : "--"}
                     </p>
                   </div>
@@ -2415,14 +2415,14 @@ export function OperationalDashboard({
           <div className="flex h-full min-h-0 flex-col gap-3">
             <div className="flex items-end justify-between gap-3 rounded-[20px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70">
               <div>
-                <p className="text-[1.7rem] font-bold leading-none tracking-tight text-rose-400">
+                <p className="text-[1.7rem] font-bold leading-none tracking-tight text-rose-700 dark:text-rose-400">
                   {String(routeErrorsMetric?.totalErrorCount ?? "--")}
                 </p>
-                <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
                   erros recentes
                 </p>
               </div>
-              <div className="text-right text-[11px] text-slate-400">
+              <div className="text-right text-[11px] text-slate-500 dark:text-slate-400">
                 <p>{formatPercent(routeErrorsMetric?.errorRateRecent)}</p>
                 <p>{String(routeErrorsMetric?.totalRequestsRecent ?? 0)} req</p>
               </div>
@@ -2435,17 +2435,17 @@ export function OperationalDashboard({
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="flex items-center gap-2 text-[11px] font-semibold text-slate-100">
-                        <span className="rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-rose-300">
+                      <p className="flex items-center gap-2 text-[11px] font-semibold text-slate-900 dark:text-slate-100">
+                        <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
                           {item.method}
                         </span>
                         <span className="truncate">{item.route}</span>
                       </p>
-                      <p className="mt-1 text-[10px] text-slate-400">
+                      <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
                         {item.errorCount} erros - 5xx {item.status5xx} - {formatPercent(item.errorRate)}
                       </p>
                     </div>
-                    <p className="shrink-0 text-right text-[10px] text-slate-400">
+                    <p className="shrink-0 text-right text-[10px] text-slate-500 dark:text-slate-400">
                       {item.lastErrorAt ? formatDateTime(item.lastErrorAt) : "--"}
                     </p>
                   </div>
@@ -2491,7 +2491,7 @@ export function OperationalDashboard({
                   key={`${row.id || index}`}
                   className="flex items-center justify-between gap-3 rounded border border-red-200/60 px-2.5 py-2 dark:border-red-900/50"
                 >
-                  <p className="min-w-0 truncate text-[11px] font-medium text-slate-100">
+                  <p className="min-w-0 truncate text-[11px] font-medium text-slate-900 dark:text-slate-100">
                     {buildAuditEventLine(row)}
                   </p>
                   <p className="shrink-0 text-[10px] text-muted-foreground">
@@ -2533,27 +2533,27 @@ export function OperationalDashboard({
           <div className="flex h-full min-h-0 flex-col gap-3">
             <div className="grid gap-2 sm:grid-cols-3">
               <div className="rounded-[18px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70">
-                <p className="text-[1.45rem] font-bold tracking-tight text-rose-400">
+                <p className="text-[1.45rem] font-bold tracking-tight text-rose-700 dark:text-rose-400">
                   {deniedIps.reduce((acc, item) => acc + item.count, 0)}
                 </p>
-                <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">negados</p>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">negados</p>
               </div>
               <div className="rounded-[18px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70">
-                <p className="text-[1.45rem] font-bold tracking-tight text-amber-300">
+                <p className="text-[1.45rem] font-bold tracking-tight text-amber-700 dark:text-amber-300">
                   {rateLimitedIps.reduce((acc, item) => acc + item.count, 0)}
                 </p>
-                <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">429 recentes</p>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">429 recentes</p>
               </div>
               <div className="rounded-[18px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70">
-                <p className="text-[1.45rem] font-bold tracking-tight text-sky-300">
+                <p className="text-[1.45rem] font-bold tracking-tight text-sky-700 dark:text-sky-300">
                   {String(securityMetric?.maintenanceBypassAttemptsRecent ?? 0)}
                 </p>
-                <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">bypass</p>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">bypass</p>
               </div>
             </div>
             <div className="grid flex-1 gap-3 lg:grid-cols-[1.2fr_1fr]">
               <div className="space-y-2">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                   IPs com mais negacoes
                 </p>
                 {deniedIps.slice(0, 4).map((item) => (
@@ -2563,18 +2563,18 @@ export function OperationalDashboard({
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-[11px] font-semibold text-slate-100">{item.ip}</p>
-                        <p className="mt-1 truncate text-[10px] text-slate-400">
+                        <p className="truncate text-[11px] font-semibold text-slate-900 dark:text-slate-100">{item.ip}</p>
+                        <p className="mt-1 truncate text-[10px] text-slate-500 dark:text-slate-400">
                           {item.route || "rota nao informada"}
                         </p>
                       </div>
-                      <span className="shrink-0 text-sm font-semibold text-rose-300">{item.count}</span>
+                      <span className="shrink-0 text-sm font-semibold text-rose-700 dark:text-rose-300">{item.count}</span>
                     </div>
                   </div>
                 ))}
               </div>
               <div className="space-y-2">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                   Pressao recente
                 </p>
                 {(rateLimitedIps.length > 0 ? rateLimitedIps : recentSecurityEvents.slice(0, 4)).slice(0, 4).map((item, index) => {
@@ -2586,10 +2586,10 @@ export function OperationalDashboard({
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="truncate text-[11px] font-semibold text-slate-100">{item.ip}</p>
-                            <p className="mt-1 truncate text-[10px] text-slate-400">{item.route || "429"}</p>
+                            <p className="truncate text-[11px] font-semibold text-slate-900 dark:text-slate-100">{item.ip}</p>
+                            <p className="mt-1 truncate text-[10px] text-slate-500 dark:text-slate-400">{item.route || "429"}</p>
                           </div>
-                          <span className="shrink-0 text-sm font-semibold text-amber-300">{item.count}</span>
+                          <span className="shrink-0 text-sm font-semibold text-amber-700 dark:text-amber-300">{item.count}</span>
                         </div>
                       </div>
                     );
@@ -2600,10 +2600,10 @@ export function OperationalDashboard({
                       key={`${item.type}:${item.at}:${index}`}
                       className="rounded-[18px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70"
                     >
-                      <p className="truncate text-[11px] font-semibold text-slate-100">
+                      <p className="truncate text-[11px] font-semibold text-slate-900 dark:text-slate-100">
                         {formatSecurityEventType(item.type)} - {item.method} {item.route}
                       </p>
-                      <p className="mt-1 truncate text-[10px] text-slate-400">
+                      <p className="mt-1 truncate text-[10px] text-slate-500 dark:text-slate-400">
                         {item.ip} - {item.statusCode} - {item.at ? formatDateTime(item.at) : "--"}
                       </p>
                     </div>
@@ -2636,8 +2636,8 @@ export function OperationalDashboard({
         compact
       >
         <div className="mt-auto flex items-end justify-between gap-2">
-          <p className="text-[1.7rem] font-bold leading-none tracking-tight text-blue-400/90">{String(tenantsMetric?.active ?? "--")}</p>
-          <div className="text-right text-[10px] text-slate-400/80">
+          <p className="text-[1.7rem] font-bold leading-none tracking-tight text-slate-900 dark:text-blue-400/90">{String(tenantsMetric?.active ?? "--")}</p>
+          <div className="text-right text-[10px] text-slate-500 dark:text-slate-400/80">
             <p>ativas</p>
             <p>{String(tenantsMetric?.total ?? "--")} total</p>
           </div>
@@ -2665,32 +2665,32 @@ export function OperationalDashboard({
       >
         <div className="mt-auto space-y-3">
           <div className="flex items-end justify-between gap-2">
-            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-blue-400/90">
+            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-slate-900 dark:text-blue-400/90">
               {String(notificationsMetric?.criticalUnread ?? "--")}
             </p>
             <div className="text-right">
-              <p className="text-[10px] text-slate-400/80">Nao lidas</p>
-              <p className="text-[10px] text-slate-400/80">
-                Criticas no periodo: <span className="text-slate-300 font-medium">{String(notificationsMetric?.criticalRecent ?? "--")}</span>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400/80">Nao lidas</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400/80">
+                Criticas no periodo: <span className="font-medium text-slate-700 dark:text-slate-300">{String(notificationsMetric?.criticalRecent ?? "--")}</span>
               </p>
-              <p className="text-[10px] text-slate-400/80">
-                Alertas operacionais: <span className="text-slate-300 font-medium">{String(notificationsMetric?.operationalRecentCount ?? "--")}</span>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400/80">
+                Alertas operacionais: <span className="font-medium text-slate-700 dark:text-slate-300">{String(notificationsMetric?.operationalRecentCount ?? "--")}</span>
               </p>
             </div>
           </div>
-          <div className="space-y-1.5 border-t border-white/10 pt-2">
+          <div className="space-y-1.5 border-t border-slate-200/80 pt-2 dark:border-white/10">
             {recentOperationalAlerts.length > 0 ? (
               recentOperationalAlerts.map((alert) => (
                 <div key={alert.id} className="flex items-start justify-between gap-2 text-[10px]">
                   <div className="min-w-0">
-                    <p className="truncate font-medium text-slate-100">{alert.title}</p>
-                    <p className="truncate text-slate-400/80">{alert.body}</p>
+                    <p className="truncate font-medium text-slate-900 dark:text-slate-100">{alert.title}</p>
+                    <p className="truncate text-slate-500 dark:text-slate-400/80">{alert.body}</p>
                   </div>
-                  <span className="shrink-0 text-slate-500">{formatTimeOfDay(alert.createdAt)}</span>
+                  <span className="shrink-0 text-slate-500 dark:text-slate-500">{formatTimeOfDay(alert.createdAt)}</span>
                 </div>
               ))
             ) : (
-              <p className="text-[10px] text-slate-400/80">Sem alertas operacionais recentes.</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400/80">Sem alertas operacionais recentes.</p>
             )}
           </div>
         </div>
@@ -2715,34 +2715,34 @@ export function OperationalDashboard({
       <div className={embedded ? "space-y-4" : "mx-auto max-w-[1600px] space-y-4 p-4 md:p-6"}>
         <div className="space-y-3">
           {!embedded ? (
-            <div className="rounded-[24px] border border-slate-900 bg-slate-950 px-4 py-3 text-slate-50 shadow-xl">
+            <div className="rounded-[24px] border border-slate-200/80 bg-white/88 px-4 py-3 text-slate-900 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.18)] dark:border-slate-900 dark:bg-slate-950 dark:text-slate-50 dark:shadow-xl">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="inline-flex h-7 items-center rounded-full border border-slate-700 bg-slate-900 px-2.5">
-                      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-300">
+                    <div className="inline-flex h-7 items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 dark:border-slate-700 dark:bg-slate-900">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700 dark:text-blue-300">
                         Visao operacional
                       </span>
                     </div>
-                    <h1 className="text-lg font-semibold tracking-tight text-white">
+                    <h1 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
                       Dashboard Operacional
                     </h1>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-300">
-                    <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-300">
+                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 dark:border-white/10 dark:bg-white/5">
                       Snapshot: {dashboard?.generatedAt ? formatDateTime(dashboard.generatedAt) : "--"}
                     </span>
-                    <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 dark:border-white/10 dark:bg-white/5">
                       Layout:{" "}
                       {lastLayoutUpdateAt
                         ? `salvo em ${formatDateTime(lastLayoutUpdateAt)}`
                         : "padrao ativo"}
                     </span>
-                    <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 dark:border-white/10 dark:bg-white/5">
                       Auto refresh {Math.floor(POLL_INTERVAL_MS / 1000)}s
                     </span>
                     {isMobileViewport ? (
-                      <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-200">
+                      <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
                         Reordenacao disponivel no desktop
                       </span>
                     ) : null}
@@ -3023,18 +3023,18 @@ export function OperationalDashboard({
           <DashboardOverviewSkeleton />
         ) : (
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.9fr)]">
-          <section className="overflow-hidden rounded-[32px] border border-slate-900 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.2),_transparent_30%),radial-gradient(circle_at_right,_rgba(59,130,246,0.24),_transparent_26%),linear-gradient(150deg,_rgba(2,6,23,0.98),_rgba(15,23,42,0.96))] px-5 py-5 text-slate-50 shadow-[0_35px_90px_-45px_rgba(15,23,42,0.85)]">
+          <section className="overflow-hidden rounded-[32px] border border-slate-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.09),_transparent_30%),radial-gradient(circle_at_right,_rgba(59,130,246,0.12),_transparent_26%),linear-gradient(180deg,_rgba(255,255,255,0.96),_rgba(248,250,252,0.95))] px-5 py-5 text-slate-900 shadow-[0_22px_55px_-38px_rgba(15,23,42,0.2)] dark:border-slate-900 dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.2),_transparent_30%),radial-gradient(circle_at_right,_rgba(59,130,246,0.24),_transparent_26%),linear-gradient(150deg,_rgba(2,6,23,0.98),_rgba(15,23,42,0.96))] dark:text-slate-50 dark:shadow-[0_35px_90px_-45px_rgba(15,23,42,0.85)]">
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_220px]">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-200">
+                  <span className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-700 dark:border-cyan-400/25 dark:bg-cyan-400/10 dark:text-cyan-200">
                     Panorama
                   </span>
-                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-slate-300">
+                  <span className="rounded-full border border-slate-200 bg-white/85 px-3 py-1 text-[11px] text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
                     {dashboardOverview.visibleWidgets} cards livres
                   </span>
                   {activeQuickFilter !== "all" ? (
-                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-slate-300">
+                    <span className="rounded-full border border-slate-200 bg-white/85 px-3 py-1 text-[11px] text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
                       Filtro rapido: {dashboardQuickFilterOptions.find((option) => option.id === activeQuickFilter)?.label || activeQuickFilter}
                     </span>
                   ) : null}
@@ -3076,14 +3076,14 @@ export function OperationalDashboard({
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+              <div className="rounded-[28px] border border-slate-200/80 bg-white/78 p-4 backdrop-blur-sm dark:border-white/10 dark:bg-white/5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300">
                       Saude do painel
                     </p>
                   </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-slate-100">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-slate-100">
                     <Server className="h-4 w-4" />
                   </div>
                 </div>
