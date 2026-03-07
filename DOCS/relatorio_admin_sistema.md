@@ -1649,3 +1649,90 @@ Fallbacks e limitacoes:
 - cronogramas mais complexos continuam suportados no modo avancado
 - quando a expressao nao pode ser interpretada com seguranca, a lista mostra `Cronograma personalizado`
 - o nome amigavel continua sendo controlado por mapa de apresentacao; o `jobKey` permanece como fonte tecnica interna
+
+## Etapa 9 - Pagina de diagnostico operacional unificada
+
+Objetivo desta rodada:
+
+- consolidar estado operacional relevante em uma unica pagina administrativa
+- reaproveitar dashboard, cron runtime, update, backup/restore, auditoria e notificacoes
+- auditar a funcionalidade de logs existente antes de criar qualquer pagina paralela
+
+Inventario reaproveitado:
+
+| Bloco | Ja existe? | Endpoint atual | Tela atual | Reaproveitavel? | Falta o que? |
+| --- | --- | --- | --- | --- | --- |
+| Saude geral | sim | `/api/system/dashboard` | `/dashboard` | sim | consolidacao em pagina unica |
+| Maintenance | sim | `/api/system/dashboard` | `/dashboard` | sim | resumo administrativo |
+| Cron runtime | sim | `/api/cron/runtime` | `/configuracoes/sistema/cron` | sim | resumo e link rapido |
+| Heartbeat jobs | sim | `/api/cron/runtime` | `/configuracoes/sistema/cron` | sim | agregacao de tarefas problematicas |
+| Ultimo update | sim | `/api/system/update/status` | `/configuracoes/sistema/updates` | sim | resumo curto |
+| Ultimo rollback | sim | `/api/system/update/log` | `/configuracoes/sistema/updates` | sim | resumo curto |
+| Ultimo backup | sim | endpoints de backup | `/configuracoes/sistema/updates` | sim | consolidacao |
+| Ultimo restore | sim | endpoints de backup | `/configuracoes/sistema/updates` | sim | consolidacao |
+| Alertas operacionais | sim | `/api/system/dashboard` + notificacoes | dashboard/inbox | sim | agrupamento unico |
+| Auditoria | sim | `/api/system/audit` e `/api/audit-logs` | `/logs` | sim | separar escopo por role |
+| Logs tecnicos | parcialmente | base de auditoria existente | `/logs` | parcialmente | ainda nao existe storage generico de runtime logs |
+
+Decisao sobre logs:
+
+- nao foi criada uma segunda pagina de logs
+- a rota existente `/logs` foi reaproveitada e ajustada
+- `SUPER_ADMIN` continua usando auditoria completa via `/api/audit-logs`
+- `ADMIN` agora usa auditoria operacional resumida via `/api/system/audit`
+- a pagina de logs recebeu correcoes de runtime:
+  - fonte de dados estabilizada para evitar refetch em loop
+  - filtros passaram a usar estado aplicado, sem busca a cada tecla
+  - datas passaram a considerar o dia inteiro (`00:00:00.000` ate `23:59:59.999`)
+  - o endpoint completo de auditoria voltou a exigir `JwtAuthGuard`
+
+Nova pagina:
+
+- rota: `/configuracoes/sistema/diagnostico`
+- acesso: `ADMIN` e `SUPER_ADMIN`
+- endpoint agregado: `GET /api/system/diagnostics`
+
+Blocos expostos:
+
+- estado geral derivado:
+  - `healthy`
+  - `attention`
+  - `critical`
+- panorama operacional resumido
+- scheduler / tarefas criticas com link para cron
+- update / rollback com link para updates
+- backup / restore com ultimo estado conhecido
+- alertas operacionais recentes
+- auditoria recente relevante
+- resumo sobre disponibilidade de logs tecnicos
+
+Regra do estado geral:
+
+- `healthy`
+  - sem maintenance ativo
+  - sem falha critica recente
+  - sem tarefa critica travada ou atrasada
+- `attention`
+  - maintenance ativo
+  - warnings recentes
+  - degradacao operacional sem falha critica aberta
+- `critical`
+  - falha critica recente de update/restore/backup
+  - alerta operacional critico recente
+  - tarefa critica travada, sem runtime ou falhando repetidamente
+
+Limitacoes conhecidas:
+
+- a secao de logs tecnicos ainda depende da base de auditoria existente
+- ainda nao existe persistencia geral de runtime logs com stack traces completos
+- a pagina de diagnostico resume e linka; nao duplica a inbox nem a auditoria completa
+
+Validacao executada nesta etapa:
+
+- backend
+  - `pnpm -C apps/backend exec jest src/diagnostics/system-diagnostics.service.spec.ts src/diagnostics/system-diagnostics.controller.spec.ts src/audit/system-audit.controller.spec.ts src/audit/audit.controller.spec.ts --runInBand`
+  - `pnpm -C apps/backend test:smoke`
+  - `pnpm -C apps/backend exec nest build`
+- frontend
+  - `pnpm -C apps/frontend test -- src/app/logs/logs.utils.test.ts src/app/configuracoes/sistema/diagnostico/diagnostics.utils.test.ts`
+  - `pnpm -C apps/frontend exec eslint src/app/logs/page.tsx src/app/logs/logs.utils.ts src/app/logs/logs.utils.test.ts`

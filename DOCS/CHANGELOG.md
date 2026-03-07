@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file. See [standa
 * **ops:** calibrate operational alert thresholds, keep push restricted to critical events, and add cooldown coverage for continuous degradation and legacy critical deliveries
 * **ops:** unify cron runtime under the dynamic scheduler, add persisted cron job heartbeat/watchdog alerts, and expose real runtime state in `/api/cron/runtime` and `/configuracoes/sistema/cron`
 * **ops:** refine the scheduled tasks screen with friendly PT-BR labels, popover descriptions, simplified cron editing, and a single gear-driven edit flow
+* **ops:** add `/api/system/diagnostics` and `/configuracoes/sistema/diagnostico`, reuse the existing `/logs` page with role-aware audit sources, and harden log filters/date windows and auth guards
 
 ## [3.0.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v2.0.0...v3.0.0) (2026-01-27)
 

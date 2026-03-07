@@ -12,7 +12,8 @@ import {
   ChevronRight,
   Clock,
   LayoutDashboard,
-  Cog
+  Cog,
+  Activity
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +56,15 @@ export default function ConfiguracoesPage() {
       show: user?.role === "SUPER_ADMIN",
       color: "bg-amber-50 text-amber-600 border-amber-100",
       iconColor: "text-amber-500"
+    },
+    {
+      name: "Diagnóstico Operacional",
+      href: "/configuracoes/sistema/diagnostico",
+      icon: Activity,
+      description: "Estado geral, tarefas, alertas, auditoria e base de logs reaproveitada",
+      show: user?.role === "SUPER_ADMIN" || user?.role === "ADMIN",
+      color: "bg-sky-50 text-sky-600 border-sky-100",
+      iconColor: "text-sky-500"
     },
     {
       name: "Sistema de Updates",

@@ -34,6 +34,18 @@ export class SystemAuditController {
     });
   }
 
+  @Get('stats')
+  async getStats(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.auditService.getStatsByActionPrefixes({
+      allowedActionPrefixes: [...SYSTEM_AUDIT_ACTION_PREFIXES],
+      startDate: this.parseDate(from),
+      endDate: this.parseDate(to),
+    });
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string) {
     const log = await this.auditService.findOne(id);

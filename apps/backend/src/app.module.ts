@@ -36,6 +36,7 @@ import { SystemDataRetentionModule } from './retention/system-data-retention.mod
 import { ResponseTimeMetricsInterceptor } from './dashboard/system-response-time-metrics.interceptor';
 import { SystemTelemetryInterceptor } from './common/interceptors/system-telemetry.interceptor';
 import { SystemDashboardModule } from './dashboard/system-dashboard.module';
+import { SystemDiagnosticsModule } from './diagnostics/system-diagnostics.module';
 
 @Module({
   imports: [
@@ -87,6 +88,7 @@ import { SystemDashboardModule } from './dashboard/system-dashboard.module';
     BackupModule,
     NotificationsModule, // Novo sistema Socket.IO apenas
     SystemDashboardModule,
+    SystemDiagnosticsModule,
     SystemDataRetentionModule,
     WhatsAppModule,
     SecureFilesModule, // Modulo de uploads sensiveis

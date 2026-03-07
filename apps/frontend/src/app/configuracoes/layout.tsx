@@ -12,7 +12,8 @@ import {
   Download,
   Package,
   ChevronRight,
-  Clock
+  Clock,
+  Activity
 } from "lucide-react";
 
 export default function ConfiguracoesLayout({
@@ -58,6 +59,13 @@ export default function ConfiguracoesLayout({
       icon: Package,
       description: "Instalar e gerenciar módulos",
       show: user?.role === "SUPER_ADMIN",
+    },
+    {
+      name: "Diagnostico Operacional",
+      href: "/configuracoes/sistema/diagnostico",
+      icon: Activity,
+      description: "Visao unificada de saude, tarefas, alertas e auditoria",
+      show: user?.role === "SUPER_ADMIN" || user?.role === "ADMIN",
     },
     {
       name: "Sistema de Updates",

@@ -276,6 +276,78 @@ export class AuditService {
     };
   }
 
+  async getStatsByActionPrefixes(params: {
+    allowedActionPrefixes?: string[];
+    startDate?: Date;
+    endDate?: Date;
+    tenantId?: string;
+  }) {
+    const where: any = {};
+    const allowedActionPrefixes = this.normalizeActionPrefixes(params.allowedActionPrefixes);
+
+    if (params.startDate || params.endDate) {
+      where.createdAt = {};
+      if (params.startDate) {
+        where.createdAt.gte = params.startDate;
+      }
+      if (params.endDate) {
+        where.createdAt.lte = params.endDate;
+      }
+    }
+
+    if (params.tenantId) {
+      where.tenantId = params.tenantId;
+    }
+
+    if (allowedActionPrefixes.length > 0) {
+      where.AND = where.AND || [];
+      where.AND.push({
+        OR: allowedActionPrefixes.map((prefix) => ({
+          action: { startsWith: prefix },
+        })),
+      });
+    }
+
+    const [total, byAction, byUser] = await Promise.all([
+      this.prisma.auditLog.count({ where }),
+      this.prisma.auditLog.groupBy({
+        by: ['action'],
+        where,
+        _count: true,
+        orderBy: {
+          _count: {
+            action: 'desc',
+          },
+        },
+        take: 10,
+      }),
+      this.prisma.auditLog.groupBy({
+        by: ['userId'],
+        where: { ...where, userId: { not: null } },
+        _count: true,
+        orderBy: {
+          _count: {
+            userId: 'desc',
+          },
+        },
+        take: 10,
+      }),
+    ]);
+
+    return {
+      total,
+      byAction: byAction.map((item) => ({
+        action: item.action,
+        actionLabel: humanizeAuditAction(item.action),
+        count: item._count,
+      })),
+      byUser: byUser.map((item) => ({
+        userId: item.userId,
+        count: item._count,
+      })),
+    };
+  }
+
   async getRateLimitStats(params: RateLimitStatsParams = {}) {
     return this.rateLimitMetricsService.getStats(params);
   }

@@ -10,6 +10,7 @@ describe('SystemAuditController', () => {
   const auditServiceMock = {
     findAll: jest.fn(),
     findOne: jest.fn(),
+    getStatsByActionPrefixes: jest.fn(),
   };
 
   const createController = () => new SystemAuditController(auditServiceMock as any);
@@ -65,6 +66,31 @@ describe('SystemAuditController', () => {
 
     expect(auditServiceMock.findOne).toHaveBeenCalledWith('audit-1');
     expect(result).toEqual({ id: 'audit-1', action: 'UPDATE_FAILED' });
+  });
+
+  it('exposes scoped stats for system actions', async () => {
+    const controller = createController();
+    auditServiceMock.getStatsByActionPrefixes.mockResolvedValue({
+      total: 4,
+      byAction: [],
+      byUser: [],
+    });
+
+    const result = await controller.getStats(
+      '2026-03-01T00:00:00.000Z',
+      '2026-03-06T23:59:59.000Z',
+    );
+
+    expect(auditServiceMock.getStatsByActionPrefixes).toHaveBeenCalledWith({
+      allowedActionPrefixes: [...SYSTEM_AUDIT_ACTION_PREFIXES],
+      startDate: new Date('2026-03-01T00:00:00.000Z'),
+      endDate: new Date('2026-03-06T23:59:59.000Z'),
+    });
+    expect(result).toEqual({
+      total: 4,
+      byAction: [],
+      byUser: [],
+    });
   });
 
   it('returns null for non-system actions on detail endpoint', async () => {
