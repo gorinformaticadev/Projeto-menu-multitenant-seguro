@@ -2,6 +2,7 @@ import { Controller, Get, Put, Body, UseGuards, Request } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { SecurityConfigService } from './security-config.service';
 import { UpdateSecurityConfigDto } from './dto/update-security-config.dto';
+import { UpdateWebPushConfigDto } from './dto/update-web-push-config.dto';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { Roles } from '@core/common/decorators/roles.decorator';
@@ -41,6 +42,33 @@ export class SecurityConfigController {
     @Request() req: AuthenticatedRequest,
   ) {
     return this.securityConfigService.updateConfig(dto, req.user.id);
+  }
+
+  /**
+   * GET /security-config/web-push
+   * Obter configuracao de Web Push (sem expor chave privada)
+   * Apenas SUPER_ADMIN
+   */
+  @SkipThrottle()
+  @Get('web-push')
+  @Roles(Role.SUPER_ADMIN)
+  async getWebPushConfig() {
+    return this.securityConfigService.getWebPushConfig();
+  }
+
+  /**
+   * PUT /security-config/web-push
+   * Atualizar configuracao de Web Push
+   * Apenas SUPER_ADMIN
+   */
+  @SkipThrottle()
+  @Put('web-push')
+  @Roles(Role.SUPER_ADMIN)
+  async updateWebPushConfig(
+    @Body() dto: UpdateWebPushConfigDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.securityConfigService.updateWebPushConfig(dto, req.user.id);
   }
 
   /**
