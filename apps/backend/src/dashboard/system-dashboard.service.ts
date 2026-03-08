@@ -63,6 +63,34 @@ interface DashboardMetricCacheEntry {
   value: DashboardMetric<Record<string, unknown>>;
 }
 
+interface InstalledModuleDashboardDefinition {
+  id?: string;
+  name?: string;
+  title?: string;
+  component?: string;
+  order?: number;
+  permissions?: string[];
+  roles?: string[];
+  visibilityRole?: 'SUPER_ADMIN' | 'ADMIN' | 'USER' | 'CLIENT';
+  size?: 'small' | 'medium' | 'large';
+  icon?: string | null;
+  description?: string | null;
+  route?: string | null;
+  actionLabel?: string | null;
+  kind?: 'summary' | 'list' | 'kanban';
+  stats?: Array<{
+    label: string;
+    value: string;
+  }>;
+  items?: Array<{
+    id: string;
+    label: string;
+    value?: string;
+    column?: string;
+    tone?: 'neutral' | 'good' | 'warn' | 'danger';
+  }>;
+}
+
 export interface DashboardModuleCard {
   id: string;
   title: string;
@@ -1030,6 +1058,13 @@ export class SystemDashboardService {
         continue;
       }
 
+      const manifestCards = await this.buildInstalledManifestModuleCards(moduleEntry, modulesBySlug);
+      if (manifestCards.length > 0) {
+        cards.push(...manifestCards);
+        coveredModules.add(slug);
+        continue;
+      }
+
       cards.push(this.buildFallbackModuleCard(moduleEntry));
     }
 
@@ -1220,6 +1255,129 @@ export class SystemDashboardService {
       stats: Array.isArray(widget.stats) ? widget.stats.slice(0, 3) : [],
       items: Array.isArray(widget.items) ? widget.items.slice(0, 12) : [],
     };
+  }
+
+  private async buildInstalledManifestModuleCards(
+    moduleEntry: Record<string, any>,
+    modulesBySlug: Map<string, Record<string, any>>,
+  ): Promise<DashboardModuleCard[]> {
+    const moduleSlug = String(moduleEntry.slug || '').trim();
+    if (!moduleSlug) {
+      return [];
+    }
+
+    const manifest = await this.readInstalledModuleManifest(moduleSlug);
+    const rawDefinitions = Array.isArray(manifest?.dashboard) ? manifest.dashboard : [];
+    const cards: DashboardModuleCard[] = [];
+
+    for (let index = 0; index < rawDefinitions.length; index += 1) {
+      const definition = rawDefinitions[index];
+      if (!definition || typeof definition !== 'object') {
+        continue;
+      }
+
+      const normalizedWidget = this.normalizeInstalledManifestWidget(
+        moduleSlug,
+        definition as InstalledModuleDashboardDefinition,
+        index,
+      );
+      const card = this.mapRegisteredModuleCard(normalizedWidget, modulesBySlug);
+      if (card) {
+        cards.push(card);
+      }
+    }
+
+    return cards;
+  }
+
+  private normalizeInstalledManifestWidget(
+    moduleSlug: string,
+    definition: InstalledModuleDashboardDefinition,
+    index: number,
+  ): ModuleDashboardWidget {
+    const name =
+      this.normalizeNullableString(definition.name) ||
+      this.normalizeNullableString(definition.title) ||
+      `Modulo ${moduleSlug}`;
+    const visibilityRole =
+      definition.visibilityRole === 'SUPER_ADMIN' ||
+      definition.visibilityRole === 'ADMIN' ||
+      definition.visibilityRole === 'USER' ||
+      definition.visibilityRole === 'CLIENT'
+        ? definition.visibilityRole
+        : undefined;
+    const size =
+      definition.size === 'small' || definition.size === 'medium' || definition.size === 'large'
+        ? definition.size
+        : undefined;
+    const kind =
+      definition.kind === 'summary' || definition.kind === 'list' || definition.kind === 'kanban'
+        ? definition.kind
+        : undefined;
+
+    return {
+      id: this.normalizeNullableString(definition.id) || `manifest-${index + 1}`,
+      name,
+      component: this.normalizeNullableString(definition.component) || 'manifest-card',
+      order: Number.isFinite(Number(definition.order)) ? Number(definition.order) : 50,
+      permissions: Array.isArray(definition.permissions)
+        ? definition.permissions.map((permission) => String(permission || '').trim()).filter(Boolean)
+        : undefined,
+      roles: Array.isArray(definition.roles)
+        ? definition.roles.map((role) => String(role || '').trim()).filter(Boolean)
+        : undefined,
+      visibilityRole,
+      size,
+      module: moduleSlug,
+      icon: this.normalizeNullableString(definition.icon),
+      description: this.normalizeNullableString(definition.description),
+      route: this.normalizeNullableString(definition.route),
+      actionLabel: this.normalizeNullableString(definition.actionLabel),
+      kind,
+      stats: Array.isArray(definition.stats)
+        ? definition.stats
+            .map((stat) => ({
+              label: String(stat?.label || '').trim(),
+              value: String(stat?.value || '').trim(),
+            }))
+            .filter((stat) => stat.label && stat.value)
+        : undefined,
+      items: Array.isArray(definition.items)
+        ? definition.items
+            .map((item, itemIndex) => ({
+              id:
+                this.normalizeNullableString(item?.id) ||
+                `${moduleSlug}:manifest-item:${index}:${itemIndex}`,
+              label: String(item?.label || '').trim(),
+              value: this.normalizeNullableString(item?.value) || undefined,
+              column: this.normalizeNullableString(item?.column) || undefined,
+              tone:
+                item?.tone === 'good' || item?.tone === 'warn' || item?.tone === 'danger'
+                  ? item.tone
+                  : ('neutral' as const),
+            }))
+            .filter((item) => item.label)
+        : undefined,
+    };
+  }
+
+  private async readInstalledModuleManifest(moduleSlug: string): Promise<Record<string, unknown> | null> {
+    const modulePath = path.join(process.cwd(), 'src', 'modules', moduleSlug);
+    const candidateFiles = ['module.json', 'module.config.json'];
+
+    for (const filename of candidateFiles) {
+      try {
+        const content = await fs.readFile(path.join(modulePath, filename), 'utf-8');
+        const parsed = JSON.parse(content);
+        if (parsed && typeof parsed === 'object') {
+          return parsed as Record<string, unknown>;
+        }
+      } catch {
+        // Ignora ausencia/JSON invalido e tenta o proximo arquivo.
+      }
+    }
+
+    return null;
   }
 
   private buildFallbackModuleCard(moduleEntry: Record<string, any>): DashboardModuleCard {
