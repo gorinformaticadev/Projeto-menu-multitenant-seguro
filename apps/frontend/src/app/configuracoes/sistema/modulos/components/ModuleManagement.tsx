@@ -35,6 +35,14 @@ import {
 // **INTERFACE ATUALIZADA** - Agora importada de module-utils
 // interface InstalledModule já está definida em @/lib/module-utils
 
+interface ModuleInstallerCapabilities {
+  environment: string;
+  overrideEnabled: boolean;
+  mutableModuleOpsAllowed: boolean;
+  reason: 'development' | 'explicit_override' | 'blocked';
+  message: string;
+}
+
 export function ModuleManagement() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -51,7 +59,9 @@ export function ModuleManagement() {
   const [reloadingConfig, setReloadingConfig] = useState<string | null>(null);
   const [runningMigrationsSeeds, setRunningMigrationsSeeds] = useState<string | null>(null);
   const [showMigrationsSeedsDialog, setShowMigrationsSeedsDialog] = useState(false);
-  const moduleUploadEnabled = process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_ENABLE_MODULE_UPLOAD === 'true';
+  const [installerCapabilities, setInstallerCapabilities] = useState<ModuleInstallerCapabilities | null>(null);
+  const [loadingCapabilities, setLoadingCapabilities] = useState(true);
+  const moduleUploadEnabled = installerCapabilities?.mutableModuleOpsAllowed ?? false;
   const [selectedModuleForMigrations, setSelectedModuleForMigrations] = useState<InstalledModule | null>(null);
 
   const loadInstalledModules = useCallback(async () => {
@@ -72,9 +82,28 @@ export function ModuleManagement() {
     }
   }, [toast]);
 
+  const loadInstallerCapabilities = useCallback(async () => {
+    try {
+      setLoadingCapabilities(true);
+      const response = await api.get("/configuracoes/sistema/modulos/capabilities");
+      setInstallerCapabilities(response.data);
+    } catch {
+      setInstallerCapabilities({
+        environment: 'unknown',
+        overrideEnabled: false,
+        mutableModuleOpsAllowed: false,
+        reason: 'blocked',
+        message: 'Nao foi possivel validar no backend se o instalador interno esta liberado para alteracoes de modulos.',
+      });
+    } finally {
+      setLoadingCapabilities(false);
+    }
+  }, []);
+
   useEffect(() => {
-    loadInstalledModules();
-  }, [loadInstalledModules]);
+    void loadInstalledModules();
+    void loadInstallerCapabilities();
+  }, [loadInstalledModules, loadInstallerCapabilities]);
 
   const handleFileSelect = () => {
     fileInputRef.current?.click();
@@ -119,7 +148,7 @@ export function ModuleManagement() {
 
   const uploadModule = async () => {
     if (!moduleUploadEnabled) {
-      toast({ title: 'Operacao bloqueada', description: 'Upload de modulo habilitado apenas em DEV com ENABLE_MODULE_UPLOAD=true.', variant: 'destructive' });
+      toast({ title: 'Operacao bloqueada', description: installerCapabilities?.message || 'Operacoes mutaveis de modulos estao bloqueadas neste ambiente.', variant: 'destructive' });
       return;
     }
 
@@ -185,7 +214,7 @@ export function ModuleManagement() {
 
   const handleRemoveModule = async () => {
     if (!moduleUploadEnabled) {
-      toast({ title: 'Operacao bloqueada', description: 'Desinstalacao de modulo habilitada apenas em DEV com ENABLE_MODULE_UPLOAD=true.', variant: 'destructive' });
+      toast({ title: 'Operacao bloqueada', description: installerCapabilities?.message || 'Operacoes mutaveis de modulos estao bloqueadas neste ambiente.', variant: 'destructive' });
       return;
     }
 
@@ -363,7 +392,7 @@ export function ModuleManagement() {
 
   const reloadModuleConfig = async (moduleName: string) => {
     if (!moduleUploadEnabled) {
-      toast({ title: 'Operacao bloqueada', description: 'Reload de configuracao habilitado apenas em DEV com ENABLE_MODULE_UPLOAD=true.', variant: 'destructive' });
+      toast({ title: 'Operacao bloqueada', description: installerCapabilities?.message || 'Operacoes mutaveis de modulos estao bloqueadas neste ambiente.', variant: 'destructive' });
       return;
     }
 
@@ -460,6 +489,15 @@ export function ModuleManagement() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {!loadingCapabilities && installerCapabilities && !moduleUploadEnabled && (
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  <p className="font-medium">Instalador interno em modo restrito</p>
+                  <p className="mt-1">
+                    Ambiente atual: <strong>{installerCapabilities.environment}</strong>. {installerCapabilities.message}
+                  </p>
+                </div>
+              )}
+
               {!selectedFile ? (
                 <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
                   <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
@@ -467,7 +505,7 @@ export function ModuleManagement() {
                   <p className="text-sm text-muted-foreground mb-4">
                     Arraste e solte ou clique para selecionar um módulo (.zip, máx. 50MB)
                   </p>
-                  <Button onClick={handleFileSelect} disabled={uploading || !moduleUploadEnabled}>
+                  <Button onClick={handleFileSelect} disabled={uploading || loadingCapabilities || !moduleUploadEnabled}>
                     Selecionar Arquivo
                   </Button>
                   <input
@@ -528,7 +566,7 @@ export function ModuleManagement() {
                   <div className="flex gap-3">
                     <Button
                       onClick={uploadModule}
-                      disabled={uploading || !moduleUploadEnabled}
+                      disabled={uploading || loadingCapabilities || !moduleUploadEnabled}
                       className="flex-1"
                     >
                       {uploading ? (
@@ -546,7 +584,7 @@ export function ModuleManagement() {
                     <Button
                       variant="outline"
                       onClick={clearSelectedFile}
-                      disabled={uploading || !moduleUploadEnabled}
+                      disabled={uploading || loadingCapabilities || !moduleUploadEnabled}
                     >
                       Cancelar
                     </Button>
@@ -661,7 +699,7 @@ export function ModuleManagement() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => reloadModuleConfig(module.slug)}
-                                    disabled={reloadingConfig === module.slug || !moduleUploadEnabled}
+                                    disabled={reloadingConfig === module.slug || loadingCapabilities || !moduleUploadEnabled}
                                   >
                                     {reloadingConfig === module.slug ? (
                                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
@@ -790,7 +828,7 @@ export function ModuleManagement() {
                                     variant="destructive"
                                     size="sm"
                                     onClick={() => openRemoveDialog(module)}
-                                    disabled={!allowedActions.uninstall || !moduleUploadEnabled}
+                                    disabled={!allowedActions.uninstall || loadingCapabilities || !moduleUploadEnabled}
                                   >
                                     <Trash2 className="h-4 w-4 mr-1" />
                                     Desinstalar

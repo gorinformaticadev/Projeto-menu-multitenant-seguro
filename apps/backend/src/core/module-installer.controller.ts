@@ -28,19 +28,44 @@ import { SkipThrottle } from '@nestjs/throttler';
 export class ModuleInstallerController {
     constructor(private readonly installer: ModuleInstallerService) { }
 
+    private getMutableModuleOpsStatus() {
+        const environment = (process.env.NODE_ENV || 'development').trim().toLowerCase();
+        const overrideEnabled = process.env.ENABLE_MODULE_UPLOAD === 'true';
+        const isDevelopment = environment === 'development';
+        const mutableModuleOpsAllowed = isDevelopment || overrideEnabled;
+
+        return {
+            environment,
+            overrideEnabled,
+            mutableModuleOpsAllowed,
+            reason: isDevelopment
+                ? 'development'
+                : overrideEnabled
+                    ? 'explicit_override'
+                    : 'blocked',
+            message: isDevelopment
+                ? 'Operacoes mutaveis de modulos liberadas automaticamente em development.'
+                : overrideEnabled
+                    ? 'Operacoes mutaveis de modulos liberadas por ENABLE_MODULE_UPLOAD=true.'
+                    : 'Upload/uninstall/reload de modulos desabilitado fora de development. Defina ENABLE_MODULE_UPLOAD=true para liberar explicitamente.'
+        };
+    }
+
     private ensureMutableModuleOpsAllowed() {
-        const isDev = process.env.NODE_ENV === 'development';
-        const enabled = process.env.ENABLE_MODULE_UPLOAD === 'true';
-        if (!isDev || !enabled) {
-            throw new ForbiddenException(
-                'Upload/uninstall/reload de modulos desabilitado. Em producao, use apenas ativacao/configuracao/migrations.'
-            );
+        const status = this.getMutableModuleOpsStatus();
+        if (!status.mutableModuleOpsAllowed) {
+            throw new ForbiddenException(status.message);
         }
     }
 
     @Get()
     async listModules(@Request() _req) {
         return await this.installer.listModules();
+    }
+
+    @Get('capabilities')
+    getCapabilities() {
+        return this.getMutableModuleOpsStatus();
     }
 
     @Post('upload')
