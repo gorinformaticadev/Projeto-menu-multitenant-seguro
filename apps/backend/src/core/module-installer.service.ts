@@ -66,26 +66,37 @@ export class ModuleInstallerService {
             let integrityStatus = 'ok';
             let integrityMessage = '';
             const missingFolders: string[] = [];
+            const backendPath = path.join(this.backendModulesPath, module.slug);
+            const frontendPath = path.join(this.frontendBase, module.slug);
+            const legacyBackendPath = path.join(backendPath, 'backend');
+            const legacyFrontendPath = path.join(backendPath, 'frontend');
+            const expectsBackend = module.hasBackend || fs.existsSync(legacyBackendPath);
+            const expectsFrontend = module.hasFrontend || module._count.menus > 0 || fs.existsSync(legacyFrontendPath);
+            const backendEntrypointExists =
+                fs.existsSync(path.join(backendPath, `${module.slug}.module.ts`)) ||
+                fs.existsSync(path.join(backendPath, `${module.slug}.module.js`));
 
             // Verificar Backend
-            if (module.hasBackend) {
-                const backendPath = path.join(this.backendModulesPath, module.slug);
-                if (!fs.existsSync(backendPath)) {
-                    missingFolders.push('backend');
-                }
+            if (expectsBackend && (!fs.existsSync(backendPath) || !backendEntrypointExists)) {
+                missingFolders.push('backend');
             }
 
             // Verificar Frontend
-            if (module.hasFrontend) {
-                const frontendPath = path.join(this.frontendBase, module.slug);
-                if (!fs.existsSync(frontendPath)) {
-                    missingFolders.push('frontend');
-                }
+            if (expectsFrontend && !fs.existsSync(frontendPath)) {
+                missingFolders.push('frontend');
+            }
+
+            if (fs.existsSync(legacyBackendPath)) {
+                missingFolders.push('legacy-backend-layout');
+            }
+
+            if (expectsFrontend && fs.existsSync(legacyFrontendPath) && !fs.existsSync(frontendPath)) {
+                missingFolders.push('legacy-frontend-layout');
             }
 
             if (missingFolders.length > 0) {
                 integrityStatus = 'corrupted';
-                integrityMessage = `Arquivos ausentes: ${missingFolders.join(', ')}`;
+                integrityMessage = `Problemas detectados: ${missingFolders.join(', ')}`;
             }
 
             return {
@@ -93,7 +104,7 @@ export class ModuleInstallerService {
                 name: module.name,
                 version: module.version,
                 description: module.description,
-                status: (integrityStatus === 'corrupted' && missingFolders.includes('backend')) ? 'corrupted' : module.status, // Só marca corrompido se falat backend
+                status: integrityStatus === 'corrupted' ? 'corrupted' : module.status,
                 originalStatus: module.status,
                 hasBackend: module.hasBackend,
                 hasFrontend: module.hasFrontend,

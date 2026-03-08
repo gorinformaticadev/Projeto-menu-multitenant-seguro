@@ -10,6 +10,8 @@ import * as path from 'path';
 @Injectable()
 export class ModuleSecurityService {
     private readonly logger = new Logger(ModuleSecurityService.name);
+    private readonly backendModulesPath = path.resolve(process.cwd(), 'src', 'modules');
+    private readonly frontendModulesPath = path.resolve(process.cwd(), '..', 'frontend', 'src', 'app', 'modules');
 
     constructor(private readonly prisma: PrismaService) { }
 
@@ -60,9 +62,9 @@ export class ModuleSecurityService {
         const errors: string[] = [];
 
         try {
-            const _modulePath = `modules/${slug}`;
-
-            const moduleJsonPath = path.join(process.cwd(), _modulePath, 'module.json');
+            const backendPath = path.join(this.backendModulesPath, slug);
+            const frontendPath = path.join(this.frontendModulesPath, slug);
+            const moduleJsonPath = path.join(backendPath, 'module.json');
             if (!fs.existsSync(moduleJsonPath)) {
                 errors.push('module.json não encontrado');
                 return { valid: false, errors };
@@ -80,8 +82,8 @@ export class ModuleSecurityService {
             }
 
             // Verificar estrutura de pastas
-            const hasBackend = fs.existsSync(path.join(process.cwd(), _modulePath, 'backend'));
-            const hasFrontend = fs.existsSync(path.join(process.cwd(), _modulePath, 'frontend'));
+            const hasBackend = fs.existsSync(backendPath);
+            const hasFrontend = fs.existsSync(frontendPath);
 
             if (!hasBackend && !hasFrontend) {
                 errors.push('Módulo deve ter pelo menos backend ou frontend');
@@ -140,9 +142,7 @@ export class ModuleSecurityService {
         try {
             const modules = await this.prisma.module.findMany({
                 where: {
-                    status: {
-                        in: ['active', 'installed', 'db_ready']
-                    }
+                    status: 'active'
                 },
                 include: {
                     tenantModules: {
@@ -160,6 +160,12 @@ export class ModuleSecurityService {
 
                 // 1. Filtro básico: habilitado para o tenant?
                 if (!enabled) return acc;
+
+                const integrity = this.getModuleIntegrity(module);
+                if (!integrity.valid) {
+                    this.logger.warn(`Modulo ${module.slug} ocultado do menu por integridade invalida: ${integrity.issues.join(', ')}`);
+                    return acc;
+                }
 
                 // 2. Filtro de Segurança por Role (Hard Security)
                 // Se algum menu do módulo exige 'admin' e o usuário não é, remove o módulo inteiro ou apenas os menus restritos?
@@ -264,5 +270,39 @@ export class ModuleSecurityService {
                     permission: child.permission
                 }))
         }));
+    }
+
+    private getModuleIntegrity(module: { slug: string; hasBackend: boolean; hasFrontend: boolean; menus: any[] }) {
+        const issues: string[] = [];
+        const backendPath = path.join(this.backendModulesPath, module.slug);
+        const frontendPath = path.join(this.frontendModulesPath, module.slug);
+        const misplacedBackendPath = path.join(backendPath, 'backend');
+        const misplacedFrontendPath = path.join(backendPath, 'frontend');
+        const expectsBackend = module.hasBackend;
+        const expectsFrontend = module.hasFrontend || module.menus.length > 0;
+        const backendEntrypointExists =
+            fs.existsSync(path.join(backendPath, `${module.slug}.module.ts`)) ||
+            fs.existsSync(path.join(backendPath, `${module.slug}.module.js`));
+
+        if (expectsBackend && (!fs.existsSync(backendPath) || !backendEntrypointExists)) {
+            issues.push('backend');
+        }
+
+        if (expectsFrontend && !fs.existsSync(frontendPath)) {
+            issues.push('frontend');
+        }
+
+        if (fs.existsSync(misplacedBackendPath)) {
+            issues.push('legacy-backend-layout');
+        }
+
+        if (expectsFrontend && fs.existsSync(misplacedFrontendPath) && !fs.existsSync(frontendPath)) {
+            issues.push('legacy-frontend-layout');
+        }
+
+        return {
+            valid: issues.length === 0,
+            issues,
+        };
     }
 }
