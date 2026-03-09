@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { getConfigurationPanelItems } from "@/lib/configuration-menu";
 import {
   Shield,
   BellRing,
@@ -16,6 +17,17 @@ import {
   Activity
 } from "lucide-react";
 
+const settingsIconMap = {
+  Shield,
+  BellRing,
+  Building2,
+  Settings,
+  Download,
+  Package,
+  Clock,
+  Activity,
+};
+
 export default function ConfiguracoesLayout({
   children,
 }: {
@@ -24,73 +36,10 @@ export default function ConfiguracoesLayout({
   const pathname = usePathname();
   const { user } = useAuth();
 
-  const menuItems = [
-    {
-      name: "Visão Geral",
-      href: "/configuracoes",
-      icon: Settings,
-      description: "Configurações gerais do sistema",
-      show: true,
-    },
-    {
-      name: "Segurança",
-      href: "/configuracoes/seguranca",
-      icon: Shield,
-      description: "Políticas de segurança e autenticação",
-      show: user?.role === "SUPER_ADMIN",
-    },
-    {
-      name: "Identidade da Plataforma",
-      href: "/configuracoes/identidade",
-      icon: Building2,
-      description: "Informações básicas da plataforma",
-      show: user?.role === "SUPER_ADMIN",
-    },
-    {
-      name: "Notificações Push",
-      href: "/configuracoes/notificacoes-push",
-      icon: BellRing,
-      description: "Chaves VAPID para PWA/Windows",
-      show: user?.role === "SUPER_ADMIN",
-    },
-    {
-      name: "Gerenciamento de Módulos",
-      href: "/configuracoes/sistema/modulos",
-      icon: Package,
-      description: "Instalar e gerenciar módulos",
-      show: user?.role === "SUPER_ADMIN",
-    },
-    {
-      name: "Diagnostico Operacional",
-      href: "/configuracoes/sistema/diagnostico",
-      icon: Activity,
-      description: "Visao unificada de saude, tarefas, alertas e auditoria",
-      show: user?.role === "SUPER_ADMIN" || user?.role === "ADMIN",
-    },
-    {
-      name: "Sistema de Updates",
-      href: "/configuracoes/sistema/updates",
-      icon: Download,
-      description: "Atualizações automáticas via Git",
-      show: user?.role === "SUPER_ADMIN",
-    },
-    {
-      name: "Configurações da Empresa",
-      href: "/configuracoes/empresa",
-      icon: Building2,
-      description: "Informações da empresa",
-      show: user?.role === "ADMIN",
-    },
-    {
-      name: "Agendamento de Tarefas",
-      href: "/configuracoes/sistema/cron",
-      icon: Clock,
-      description: "Gerenciar tarefas agendadas e cronogramas",
-      show: user?.role === "SUPER_ADMIN",
-    },
-  ];
-
-  const visibleItems = menuItems.filter(item => item.show);
+  const visibleItems = getConfigurationPanelItems(user?.role).map((item) => ({
+    ...item,
+    icon: settingsIconMap[item.icon as keyof typeof settingsIconMap] || Settings,
+  }));
 
   return (
     <div className="flex h-screen bg-background">

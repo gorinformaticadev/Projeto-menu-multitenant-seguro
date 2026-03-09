@@ -13,6 +13,7 @@
 
 import api, { API_URL } from './api';
 import { FrontendModuleDefinition, DashboardWidgetDefinition } from './module-types';
+import { getConfigurationPanelItems } from './configuration-menu';
 
 export interface ModuleMenu {
   id?: string;
@@ -170,10 +171,25 @@ class ModuleRegistry {
 
     const adminItems: ModuleMenu[] = [];
     if (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') {
+      const configurationChildren = getConfigurationPanelItems(userRole).map((item) => ({
+        id: item.id,
+        label: item.name,
+        route: item.href,
+        icon: item.icon,
+        order: item.order,
+      }));
+
       adminItems.push(
         { id: 'tenants', label: 'Empresas', route: '/empresas', icon: 'Building2', order: 10 },
         { id: 'users', label: 'Usuários', route: '/usuarios', icon: 'Users', order: 11 },
-        { id: 'configuracoes', label: 'Configurações', route: '/configuracoes', icon: 'Settings', order: 12 }
+        {
+          id: 'configuracoes',
+          label: 'Configurações',
+          route: '/configuracoes',
+          icon: 'Settings',
+          order: 12,
+          children: configurationChildren,
+        }
       );
     }
 
