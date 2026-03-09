@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,16 +22,83 @@ export default function ConfiguracoesLayout({
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const lastScrollTopRef = useRef(0);
+  const lastToggleScrollTopRef = useRef(0);
+  const [isTopMenuHidden, setIsTopMenuHidden] = useState(false);
 
   const visibleItems = getConfigurationPanelItems(user?.role);
   const activeItem = visibleItems.find(
     (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
   );
 
+  useEffect(() => {
+    setIsTopMenuHidden(false);
+    lastToggleScrollTopRef.current = 0;
+  }, [pathname]);
+
+  useEffect(() => {
+    const scrollContainer = layoutRef.current?.closest("main");
+    if (!(scrollContainer instanceof HTMLElement)) {
+      return;
+    }
+
+    lastScrollTopRef.current = scrollContainer.scrollTop;
+    lastToggleScrollTopRef.current = scrollContainer.scrollTop;
+    let frameId = 0;
+
+    const syncVisibility = () => {
+      const currentScrollTop = scrollContainer.scrollTop;
+      const previousScrollTop = lastScrollTopRef.current;
+      const scrollingDown = currentScrollTop > previousScrollTop;
+      const scrollingUp = currentScrollTop < previousScrollTop;
+      const distanceSinceToggle = Math.abs(currentScrollTop - lastToggleScrollTopRef.current);
+
+      if (currentScrollTop <= 12) {
+        setIsTopMenuHidden(false);
+        lastToggleScrollTopRef.current = currentScrollTop;
+      } else if (!isTopMenuHidden && scrollingDown && distanceSinceToggle >= 96) {
+        setIsTopMenuHidden(true);
+        lastToggleScrollTopRef.current = currentScrollTop;
+      } else if (isTopMenuHidden && scrollingUp && distanceSinceToggle >= 64) {
+        setIsTopMenuHidden(false);
+        lastToggleScrollTopRef.current = currentScrollTop;
+      }
+
+      lastScrollTopRef.current = currentScrollTop;
+      frameId = 0;
+    };
+
+    const handleScroll = () => {
+      if (frameId) {
+        return;
+      }
+
+      frameId = window.requestAnimationFrame(syncVisibility);
+    };
+
+    scrollContainer.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+      scrollContainer.removeEventListener("scroll", handleScroll);
+    };
+  }, [isTopMenuHidden]);
+
   return (
-    <div className="min-h-full bg-background">
+    <div ref={layoutRef} className="min-h-full bg-background">
       <div className="flex min-h-full min-w-0 flex-1 flex-col pb-20 md:pb-0">
-        <div className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
+        <div
+          className={cn(
+            "sticky top-0 z-30 overflow-hidden bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85",
+            "transition-[max-height,opacity,transform,border-color] duration-200 ease-out",
+            isTopMenuHidden
+              ? "max-h-0 -translate-y-2 border-b border-transparent opacity-0 pointer-events-none"
+              : "max-h-24 translate-y-0 border-b border-border opacity-100",
+          )}
+        >
           <div className="px-3 py-2 md:px-6">
             <div className="md:hidden">
               <Select
