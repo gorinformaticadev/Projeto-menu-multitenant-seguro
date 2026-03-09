@@ -4,7 +4,30 @@
  */
 
 // Tipos de status do módulo (deve coincidir com backend)
-export type ModuleStatus = 'detected' | 'installed' | 'db_ready' | 'active' | 'disabled';
+export type ModuleStatus = 'detected' | 'installed' | 'db_ready' | 'active' | 'disabled' | 'corrupted';
+export type ModuleLifecycleCurrent = 'uploaded' | 'files_installed' | 'db_ready' | 'approved' | 'active' | 'disabled' | 'error';
+export type ModuleLifecycleStepStatus = 'pending' | 'ready' | 'blocked' | 'error';
+
+export interface ModuleLifecycleStep {
+  status: ModuleLifecycleStepStatus;
+  detail: string;
+}
+
+export interface ModuleLifecycle {
+  current: ModuleLifecycleCurrent;
+  blockers: string[];
+  dependencies: string[];
+  frontendInspectMode: 'filesystem' | 'unavailable' | 'not_required';
+  frontendValidationLevel: 'structural' | 'permissive' | 'not_required';
+  steps: {
+    files: ModuleLifecycleStep;
+    database: ModuleLifecycleStep;
+    dependencies: ModuleLifecycleStep;
+    build: ModuleLifecycleStep;
+    approval: ModuleLifecycleStep;
+    activation: ModuleLifecycleStep;
+  };
+}
 
 // Interface de ações permitidas
 export interface AllowedModuleActions {
@@ -32,6 +55,7 @@ export interface InstalledModule {
     migrations: number;
     menus: number;
   };
+  lifecycle?: ModuleLifecycle;
 }
 
 /**
@@ -45,7 +69,35 @@ export interface InstalledModule {
  * - active: Desativar + Executar Migrations/Seeds (apenas)
  * - disabled: Ativar + Executar Migrations/Seeds + Desinstalar
  */
-export function getAllowedModuleActions(status: ModuleStatus): AllowedModuleActions {
+export function getAllowedModuleActions(module: Pick<InstalledModule, 'status' | 'lifecycle'>): AllowedModuleActions {
+  const { status, lifecycle } = module;
+
+  if (lifecycle) {
+    const filesReady = lifecycle.steps.files.status === 'ready';
+    const dependenciesReady = lifecycle.steps.dependencies.status === 'ready';
+    const databaseReady = lifecycle.steps.database.status === 'ready';
+    const buildReady = lifecycle.steps.build.status !== 'blocked';
+
+    return {
+      updateDatabase:
+        status !== 'active' &&
+        status !== 'disabled' &&
+        filesReady &&
+        dependenciesReady &&
+        !databaseReady,
+      runMigrationsSeeds: false,
+      activate:
+        status !== 'active' &&
+        filesReady &&
+        dependenciesReady &&
+        databaseReady &&
+        buildReady,
+      deactivate: status === 'active',
+      uninstall: status !== 'active' && status !== 'detected',
+      viewInfo: true,
+    };
+  }
+
   switch (status) {
     case 'detected':
       return {
@@ -176,7 +228,7 @@ export function getStatusGuidance(status: ModuleStatus) {
       return {
         title: 'Preparação Pendente',
         message: 'Execute a preparação do banco de dados antes de ativar este módulo',
-        suggestion: 'Clique em "Atualizar Banco"'
+        suggestion: 'Clique em "Preparar Banco"'
       };
     
     case 'db_ready':
@@ -209,10 +261,80 @@ export function getStatusGuidance(status: ModuleStatus) {
   }
 }
 
+export function getLifecycleStepBadgeClass(status: ModuleLifecycleStepStatus) {
+  switch (status) {
+    case 'ready':
+      return 'bg-green-50 text-green-800 border-green-200';
+    case 'blocked':
+      return 'bg-amber-50 text-amber-900 border-amber-200';
+    case 'error':
+      return 'bg-red-50 text-red-800 border-red-200';
+    default:
+      return 'bg-slate-50 text-slate-700 border-slate-200';
+  }
+}
+
 /**
  * Tooltips para botões desabilitados
  */
-export function getDisabledTooltip(action: keyof AllowedModuleActions, status: ModuleStatus): string {
+export function getDisabledTooltip(action: keyof AllowedModuleActions, module: Pick<InstalledModule, 'status' | 'lifecycle'>): string {
+  const { status, lifecycle } = module;
+
+  if (lifecycle) {
+    switch (action) {
+      case 'updateDatabase':
+        if (lifecycle.steps.files.status !== 'ready') {
+          return lifecycle.steps.files.detail;
+        }
+        if (lifecycle.steps.dependencies.status !== 'ready') {
+          return lifecycle.steps.dependencies.detail;
+        }
+        if (lifecycle.steps.database.status === 'ready') {
+          return 'Preparação de banco já realizada';
+        }
+        return 'A preparação oficial do banco está bloqueada no estado atual';
+
+      case 'activate':
+        if (status === 'active') {
+          return 'Módulo já está ativo';
+        }
+        if (lifecycle.steps.files.status !== 'ready') {
+          return lifecycle.steps.files.detail;
+        }
+        if (lifecycle.steps.dependencies.status !== 'ready') {
+          return lifecycle.steps.dependencies.detail;
+        }
+        if (lifecycle.steps.database.status !== 'ready') {
+          return lifecycle.steps.database.detail;
+        }
+        if (lifecycle.steps.build.status === 'blocked') {
+          return lifecycle.steps.build.detail;
+        }
+        return 'Status atual não permite ativação';
+
+      case 'deactivate':
+        if (status !== 'active') {
+          return 'Apenas módulos ativos podem ser desativados';
+        }
+        return '';
+
+      case 'uninstall':
+        if (status === 'active') {
+          return 'Desative o módulo antes de desinstalar';
+        }
+        if (lifecycle.steps.files.status === 'error') {
+          return 'Módulo com integridade inválida. Desinstalação ainda é permitida.';
+        }
+        return '';
+
+      case 'runMigrationsSeeds':
+        return 'Use a preparação oficial do banco do módulo';
+
+      default:
+        return '';
+    }
+  }
+
   switch (action) {
     case 'updateDatabase':
       if (status === 'db_ready' || status === 'active' || status === 'disabled') {

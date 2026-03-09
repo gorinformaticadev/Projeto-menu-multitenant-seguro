@@ -11,6 +11,50 @@ import { ModuleDatabaseExecutorService } from './services/module-database-execut
 import { AuditService } from '../audit/audit.service';
 import { PathsService } from './common/paths/paths.service';
 
+type ModuleLifecycleStepStatus = 'pending' | 'ready' | 'blocked' | 'error';
+type ModuleLifecycleState = 'uploaded' | 'files_installed' | 'db_ready' | 'approved' | 'active' | 'disabled' | 'error';
+type FrontendInspectMode = 'filesystem' | 'unavailable' | 'not_required';
+type FrontendValidationLevel = 'structural' | 'permissive' | 'not_required';
+
+interface ModuleLifecycleStep {
+    status: ModuleLifecycleStepStatus;
+    detail: string;
+}
+
+interface ModuleLifecycleSnapshot {
+    current: ModuleLifecycleState;
+    blockers: string[];
+    dependencies: string[];
+    frontendInspectMode: FrontendInspectMode;
+    frontendValidationLevel: FrontendValidationLevel;
+    steps: {
+        files: ModuleLifecycleStep;
+        database: ModuleLifecycleStep;
+        dependencies: ModuleLifecycleStep;
+        build: ModuleLifecycleStep;
+        approval: ModuleLifecycleStep;
+        activation: ModuleLifecycleStep;
+    };
+}
+
+interface ModuleOperationActorContext {
+    userId?: string;
+    ipAddress?: string;
+    userAgent?: string;
+}
+
+interface PrepareModuleDatabaseOptions {
+    invokedBy?: string;
+    visited?: Set<string>;
+    actor?: ModuleOperationActorContext;
+}
+
+interface ModuleManifestIntegrity {
+    valid: boolean;
+    detail: string;
+    manifest: ModuleJson | null;
+}
+
 /**
  * Serviço de Instalação de Módulos - DISTRIBUTED
  * Gerencia upload, instalação (frontend/backend distribuídos), ativação e migrations.
@@ -22,6 +66,7 @@ import { PathsService } from './common/paths/paths.service';
 @Injectable()
 export class ModuleInstallerService {
     private readonly logger = new Logger(ModuleInstallerService.name);
+    private readonly preparingModules = new Set<string>();
 
     // Caminhos definidos conforme especificação do monorepo
     private readonly backendModulesPath = path.resolve(process.cwd(), 'src', 'modules');
@@ -62,35 +107,23 @@ export class ModuleInstallerService {
         });
 
         // 2. Mapear e Verificar Integridade
-        return modules.map(module => {
+        return await Promise.all(modules.map(async module => {
             let integrityStatus = 'ok';
             let integrityMessage = '';
             const missingFolders: string[] = [];
             const backendPath = path.join(this.backendModulesPath, module.slug);
-            const frontendPath = path.join(this.frontendBase, module.slug);
             const legacyBackendPath = path.join(backendPath, 'backend');
             const legacyFrontendPath = path.join(backendPath, 'frontend');
             const expectsBackend = module.hasBackend || fs.existsSync(legacyBackendPath);
             const expectsFrontend = module.hasFrontend || module._count.menus > 0 || fs.existsSync(legacyFrontendPath);
-            const backendEntrypointExists =
-                fs.existsSync(path.join(backendPath, `${module.slug}.module.ts`)) ||
-                fs.existsSync(path.join(backendPath, `${module.slug}.module.js`));
-
-            // Verificar Backend
-            if (expectsBackend && (!fs.existsSync(backendPath) || !backendEntrypointExists)) {
-                missingFolders.push('backend');
-            }
-
-            // Verificar Frontend
-            if (expectsFrontend && !fs.existsSync(frontendPath)) {
-                missingFolders.push('frontend');
-            }
+            const physicalIntegrity = this.getPhysicalIntegrity(module.slug, expectsBackend, expectsFrontend);
+            missingFolders.push(...physicalIntegrity.issues);
 
             if (fs.existsSync(legacyBackendPath)) {
                 missingFolders.push('legacy-backend-layout');
             }
 
-            if (expectsFrontend && fs.existsSync(legacyFrontendPath) && !fs.existsSync(frontendPath)) {
+            if (expectsFrontend && fs.existsSync(legacyFrontendPath) && !fs.existsSync(path.join(this.frontendBase, module.slug))) {
                 missingFolders.push('legacy-frontend-layout');
             }
 
@@ -98,6 +131,8 @@ export class ModuleInstallerService {
                 integrityStatus = 'corrupted';
                 integrityMessage = `Problemas detectados: ${missingFolders.join(', ')}`;
             }
+
+            const lifecycle = await this.buildModuleLifecycle(module);
 
             return {
                 slug: module.slug,
@@ -115,13 +150,14 @@ export class ModuleInstallerService {
                     message: integrityMessage,
                     missingFolders
                 },
+                lifecycle,
                 stats: {
                     tenants: module._count.tenantModules,
                     migrations: module._count.migrations,
                     menus: module._count.menus
                 }
             };
-        });
+        }));
     }
     /**
      * Instala modulo a partir de arquivo ZIP
@@ -197,6 +233,8 @@ export class ModuleInstallerService {
                     version: validatedModule.version,
                     size: file.size,
                     sha256: moduleHash,
+                    dependencies: validatedModule.dependencies ?? [],
+                    validation: 'passed',
                     hasBackend: structure.hasBackend,
                     hasFrontend: structure.hasFrontend,
                     mode: wasExistingModule ? 'update' : 'install',
@@ -408,11 +446,22 @@ export class ModuleInstallerService {
         const module = await this.prisma.module.findUnique({ where: { slug } });
         if (!module) throw new BadRequestException('Módulo não encontrado');
 
-        if (module.status !== 'db_ready' && module.status !== 'disabled') {
-            const hasMigrations = fs.existsSync(path.join(this.backendModulesPath, slug, 'migrations'));
-            if (hasMigrations && module.status === 'installed') {
-                throw new BadRequestException('Execute migrations antes de ativar.');
-            }
+        const lifecycle = await this.buildModuleLifecycle(module);
+
+        if (lifecycle.steps.files.status !== 'ready') {
+            throw new BadRequestException(`Módulo com integridade inválida: ${lifecycle.steps.files.detail}`);
+        }
+
+        if (lifecycle.steps.dependencies.status !== 'ready') {
+            throw new BadRequestException(`Dependências não satisfeitas: ${lifecycle.steps.dependencies.detail}`);
+        }
+
+        if (lifecycle.steps.database.status !== 'ready') {
+            throw new BadRequestException(`Banco do módulo não está pronto: ${lifecycle.steps.database.detail}`);
+        }
+
+        if (lifecycle.steps.build.status === 'blocked') {
+            throw new BadRequestException(`Frontend do módulo não está pronto: ${lifecycle.steps.build.detail}`);
         }
 
         await this.prisma.module.update({
@@ -442,45 +491,165 @@ export class ModuleInstallerService {
         return { success: true, message: `Módulo ${slug} desativado` };
     }
 
-    async runModuleMigrations(slug: string) {
-        const module = await this.prisma.module.findUnique({ where: { slug } });
-        if (!module) throw new BadRequestException('Módulo não encontrado');
-
-        const modulePath = path.join(this.backendModulesPath, slug);
-        const count = await this.executeMigrations(slug, modulePath, 'migration');
-
-        return { success: true, count, message: 'Migrações executadas com sucesso' };
-    }
-
-    async runModuleSeeds(slug: string) {
-        const module = await this.prisma.module.findUnique({ where: { slug } });
-        if (!module) throw new BadRequestException('Módulo não encontrado');
-
-        const modulePath = path.join(this.backendModulesPath, slug);
-        const count = await this.executeMigrations(slug, modulePath, 'seed');
-
-        await this.prisma.module.update({
-            where: { slug },
-            data: { status: 'db_ready' }
+    async runModuleMigrations(slug: string, actor?: ModuleOperationActorContext) {
+        const result = await this.prepareModuleDatabase(slug, {
+            invokedBy: 'legacy-run-migrations',
+            actor,
         });
 
-        return { success: true, count, message: 'Seeds executados com sucesso' };
+        return {
+            success: true,
+            count: result.module.migrationsExecuted,
+            message: 'Endpoint legado redirecionado para a preparação oficial do banco do módulo.',
+            officialOperation: result.officialOperation,
+            module: result.module,
+            checks: result.checks,
+        };
     }
 
-    async updateModuleDatabase(slug: string) {
-        const module = await this.prisma.module.findUnique({ where: { slug } });
-        if (!module) throw new BadRequestException('Módulo não encontrado');
-
-        const modulePath = path.join(this.backendModulesPath, slug);
-        const migs = await this.executeMigrations(slug, modulePath, 'migration');
-        const seeds = await this.executeMigrations(slug, modulePath, 'seed');
-
-        await this.prisma.module.update({
-            where: { slug },
-            data: { status: 'db_ready' }
+    async runModuleSeeds(slug: string, actor?: ModuleOperationActorContext) {
+        const result = await this.prepareModuleDatabase(slug, {
+            invokedBy: 'legacy-run-seeds',
+            actor,
         });
 
-        return { success: true, executed: { migrations: migs, seeds }, message: 'Database atualizado' };
+        return {
+            success: true,
+            count: result.module.seedsExecuted,
+            message: 'Endpoint legado redirecionado para a preparação oficial do banco do módulo.',
+            officialOperation: result.officialOperation,
+            module: result.module,
+            checks: result.checks,
+        };
+    }
+
+    async prepareModuleDatabase(slug: string, options: PrepareModuleDatabaseOptions = {}) {
+        const {
+            invokedBy = 'prepare-database',
+            visited = new Set<string>(),
+            actor,
+        } = options;
+        let currentStage = 'validate-request';
+
+        if (visited.has(slug)) {
+            throw new BadRequestException(`Dependência circular detectada ao preparar ${slug}`);
+        }
+
+        if (this.preparingModules.has(slug)) {
+            throw new BadRequestException(`Já existe uma preparação de banco em andamento para o módulo ${slug}`);
+        }
+
+        this.preparingModules.add(slug);
+        visited.add(slug);
+
+        try {
+            currentStage = 'load-module';
+            const module = await this.prisma.module.findUnique({ where: { slug } });
+            if (!module) throw new BadRequestException('Módulo não encontrado');
+
+            const modulePath = path.join(this.backendModulesPath, slug);
+            if (!fs.existsSync(modulePath)) {
+                throw new BadRequestException(`Módulo não encontrado no disco: ${modulePath}`);
+            }
+
+            currentStage = 'validate-integrity';
+            const integrity = this.getPhysicalIntegrity(module.slug, module.hasBackend, module.hasFrontend);
+            if (!integrity.valid) {
+                throw new BadRequestException(`Integridade inválida: ${integrity.issues.join(', ')}`);
+            }
+
+            const manifest = integrity.manifestIntegrity.manifest;
+            if (!manifest) {
+                throw new BadRequestException(`Integridade inválida: ${integrity.manifestIntegrity.detail}`);
+            }
+
+            const dependencies = manifest.dependencies ?? [];
+            currentStage = 'resolve-dependencies';
+            await this.ensureDependenciesPrepared(slug, dependencies, visited, actor);
+            currentStage = 'validate-seeds';
+            await this.assertPendingSeedsAreSafe(slug, modulePath);
+
+            currentStage = 'audit-start';
+            await this.auditService.log({
+                action: 'MODULE_DB_PREPARE_STARTED',
+                userId: actor?.userId,
+                ipAddress: actor?.ipAddress,
+                userAgent: actor?.userAgent,
+                details: {
+                    slug,
+                    invokedBy,
+                    dependencies,
+                }
+            });
+
+            currentStage = 'run-migrations';
+            const migrationsExecuted = await this.executeMigrationsOneByOne(slug, modulePath, 'migration');
+            currentStage = 'run-seeds';
+            const seedsExecuted = await this.executeMigrationsOneByOne(slug, modulePath, 'seed');
+
+            if (module.status !== 'active' && module.status !== 'disabled') {
+                currentStage = 'persist-status';
+                await this.prisma.module.update({
+                    where: { slug },
+                    data: { status: 'db_ready' }
+                });
+            }
+
+            currentStage = 'audit-success';
+            await this.auditService.log({
+                action: 'MODULE_DB_PREPARE_SUCCESS',
+                userId: actor?.userId,
+                ipAddress: actor?.ipAddress,
+                userAgent: actor?.userAgent,
+                details: {
+                    slug,
+                    invokedBy,
+                    dependencies,
+                    migrationsExecuted,
+                    seedsExecuted,
+                }
+            });
+
+            return {
+                success: true,
+                officialOperation: 'prepare-module-database',
+                message: 'Banco do módulo preparado com sucesso',
+                module: {
+                    slug,
+                    status: module.status === 'active' || module.status === 'disabled' ? module.status : 'db_ready',
+                    migrationsExecuted,
+                    seedsExecuted,
+                },
+                checks: {
+                    integrity: 'ready',
+                    dependencies: dependencies.length > 0 ? 'ready' : 'not_required',
+                }
+            };
+        } catch (error) {
+            await this.auditService.log({
+                action: 'MODULE_DB_PREPARE_FAILED',
+                userId: actor?.userId,
+                ipAddress: actor?.ipAddress,
+                userAgent: actor?.userAgent,
+                details: {
+                    slug,
+                    invokedBy,
+                    stage: currentStage,
+                    error: error instanceof Error ? error.message : String(error),
+                }
+            });
+            throw error;
+        } finally {
+            visited.delete(slug);
+            this.preparingModules.delete(slug);
+        }
+    }
+
+    async updateModuleDatabase(slug: string, actor?: ModuleOperationActorContext) {
+        return await this.prepareModuleDatabase(slug, {
+            invokedBy: 'legacy-update-db',
+            actor,
+        });
     }
 
     async reloadModuleConfig(slug: string) {
@@ -574,67 +743,11 @@ export class ModuleInstallerService {
      * Isso evita erros como "trigger já existe" ou "tabela já existe"
      * VERSÃO MELHORADA: Executa uma migration por vez e para no primeiro erro
      */
-    async runMigrationsAndSeeds(slug: string) {
-        this.logger.log(`🔄 Executando migrations e seeds pendentes para o módulo: ${slug}`);
-
-        const module = await this.prisma.module.findUnique({ where: { slug } });
-        if (!module) throw new BadRequestException('Módulo não encontrado');
-
-        const modulePath = path.join(this.backendModulesPath, slug);
-        if (!fs.existsSync(modulePath)) {
-            throw new BadRequestException(`Módulo não encontrado no disco: ${modulePath}`);
-        }
-
-        try {
-            // NÃO remove registros existentes - apenas executa os pendentes
-            // Isso evita erros de "trigger já existe" ou "tabela já existe"
-            this.logger.log(`📋 Verificando migrations e seeds pendentes para ${slug}...`);
-
-            // Executa migrations pendentes (uma por vez, parando no primeiro erro)
-            const migrationsExecuted = await this.executeMigrationsOneByOne(slug, modulePath, 'migration');
-            this.logger.log(`📊 ${migrationsExecuted} migrations executadas para ${slug}`);
-
-            // Executa seeds pendentes (uma por vez, parando no primeiro erro)
-            const seedsExecuted = await this.executeMigrationsOneByOne(slug, modulePath, 'seed');
-            this.logger.log(`🌱 ${seedsExecuted} seeds executados para ${slug}`);
-
-            // Atualiza status do módulo para db_ready se necessário
-            if (module.status === 'installed' && (migrationsExecuted > 0 || seedsExecuted > 0)) {
-                await this.prisma.module.update({
-                    where: { slug },
-                    data: { status: 'db_ready' }
-                });
-                this.logger.log(`✅ Status do módulo ${slug} atualizado para db_ready`);
-            }
-
-            // Criar notificação
-            await this.notificationService.create({
-                title: 'Migrations e Seeds Executados',
-                description: `Módulo ${module.name}: ${migrationsExecuted} migrations e ${seedsExecuted} seeds pendentes foram executados.`,
-                type: 'success',
-                metadata: {
-                    module: slug,
-                    action: 'migrations-seeds-run',
-                    migrationsExecuted,
-                    seedsExecuted
-                }
-            });
-
-            return {
-                success: true,
-                message: 'Migrations e seeds executados com sucesso',
-                module: {
-                    name: module.name,
-                    slug: module.slug,
-                    migrationsExecuted,
-                    seedsExecuted
-                }
-            };
-
-        } catch (error) {
-            this.logger.error(`❌ Erro ao executar migrations/seeds para ${slug}:`, error);
-            throw new BadRequestException(`Erro ao executar migrations/seeds: ${error.message}`);
-        }
+    async runMigrationsAndSeeds(slug: string, actor?: ModuleOperationActorContext) {
+        return await this.prepareModuleDatabase(slug, {
+            invokedBy: 'legacy-run-migrations-seeds',
+            actor,
+        });
     }
 
     /**
@@ -746,7 +859,8 @@ export class ModuleInstallerService {
             }
         });
         if (!module) throw new BadRequestException('Módulo não encontrado');
-        return { module, migrations: module.migrations, menus: module.menus };
+        const lifecycle = await this.buildModuleLifecycle(module);
+        return { module: { ...module, lifecycle }, migrations: module.migrations, menus: module.menus };
     }
 
     async uninstallModule(slug: string, options: any) {
@@ -867,6 +981,299 @@ export class ModuleInstallerService {
 
         this.logger.log(`📊 Total de ${type} executadas: ${executed}`);
         return executed;
+    }
+
+    private readInstalledModuleManifest(slug: string, modulePath?: string): ModuleJson {
+        const resolvedModulePath = modulePath ?? path.join(this.backendModulesPath, slug);
+        const moduleJsonPath = path.join(resolvedModulePath, 'module.json');
+
+        if (!fs.existsSync(moduleJsonPath)) {
+            throw new BadRequestException(`module.json não encontrado para o módulo ${slug}`);
+        }
+
+        const raw = fs.readFileSync(moduleJsonPath, 'utf-8');
+        return ModuleJsonValidator.validate(JSON.parse(raw));
+    }
+
+    private getManifestIntegrity(slug: string, modulePath?: string): ModuleManifestIntegrity {
+        try {
+            const manifest = this.readInstalledModuleManifest(slug, modulePath);
+            return {
+                valid: true,
+                detail: 'module.json válido e legível.',
+                manifest,
+            };
+        } catch (error) {
+            return {
+                valid: false,
+                detail: error instanceof Error ? error.message : String(error),
+                manifest: null,
+            };
+        }
+    }
+
+    private getPhysicalIntegrity(slug: string, hasBackend: boolean, hasFrontend: boolean) {
+        const issues: string[] = [];
+        const backendPath = path.join(this.backendModulesPath, slug);
+        const frontendPath = path.join(this.frontendBase, slug);
+        const manifestIntegrity = this.getManifestIntegrity(slug, backendPath);
+        const backendEntrypointExists =
+            fs.existsSync(path.join(backendPath, `${slug}.module.ts`)) ||
+            fs.existsSync(path.join(backendPath, `${slug}.module.js`));
+
+        if (!manifestIntegrity.valid) {
+            issues.push(`manifest (${manifestIntegrity.detail})`);
+        }
+
+        if (hasBackend && (!fs.existsSync(backendPath) || !backendEntrypointExists)) {
+            issues.push('backend');
+        }
+
+        if (hasFrontend && fs.existsSync(path.resolve(process.cwd(), '..', 'frontend')) && !fs.existsSync(frontendPath)) {
+            issues.push('frontend');
+        }
+
+        return {
+            valid: issues.length === 0,
+            issues,
+            manifestIntegrity,
+        };
+    }
+
+    private getFrontendReadiness(slug: string, hasFrontend: boolean) {
+        if (!hasFrontend) {
+            return {
+                inspectMode: 'not_required' as const,
+                validationLevel: 'not_required' as const,
+                ready: true,
+                detail: 'Módulo sem frontend.',
+            };
+        }
+
+        const frontendRootVisible = fs.existsSync(path.resolve(process.cwd(), '..', 'frontend'));
+        if (!frontendRootVisible) {
+            return {
+                inspectMode: 'unavailable' as const,
+                validationLevel: 'permissive' as const,
+                ready: true,
+                detail: 'Validação permissiva: o frontend não é inspecionável a partir deste processo; o build atual não pôde ser comprovado.',
+            };
+        }
+
+        const frontendPath = path.join(this.frontendBase, slug);
+        if (!fs.existsSync(frontendPath)) {
+            return {
+                inspectMode: 'filesystem' as const,
+                validationLevel: 'structural' as const,
+                ready: false,
+                detail: 'Pasta do frontend do módulo não encontrada.',
+            };
+        }
+
+        const hasPageFile = this.findFilesRecursively(frontendPath, ['page.tsx', 'page.jsx', 'page.ts', 'page.js']).length > 0;
+        if (!hasPageFile) {
+            return {
+                inspectMode: 'filesystem' as const,
+                validationLevel: 'structural' as const,
+                ready: false,
+                detail: 'Nenhum arquivo de página do módulo foi encontrado no frontend.',
+            };
+        }
+
+        return {
+            inspectMode: 'filesystem' as const,
+            validationLevel: 'structural' as const,
+            ready: true,
+            detail: 'Validação estrutural: páginas do módulo encontradas no filesystem, mas o build atual não foi verificado.',
+        };
+    }
+
+    private findFilesRecursively(root: string, acceptedNames: string[]): string[] {
+        if (!fs.existsSync(root)) return [];
+
+        const result: string[] = [];
+        const stack = [root];
+
+        while (stack.length > 0) {
+            const current = stack.pop()!;
+            const entries = fs.readdirSync(current, { withFileTypes: true });
+
+            for (const entry of entries) {
+                const fullPath = path.join(current, entry.name);
+                if (entry.isDirectory()) {
+                    stack.push(fullPath);
+                    continue;
+                }
+
+                if (acceptedNames.includes(entry.name)) {
+                    result.push(fullPath);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private async ensureDependenciesPrepared(
+        slug: string,
+        dependencies: string[],
+        visited: Set<string>,
+        actor?: ModuleOperationActorContext,
+    ) {
+        for (const dependencySlug of dependencies) {
+            if (dependencySlug === slug) {
+                throw new BadRequestException(`Módulo ${slug} não pode depender de si mesmo`);
+            }
+
+            const dependency = await this.prisma.module.findUnique({ where: { slug: dependencySlug } });
+            if (!dependency) {
+                throw new BadRequestException(`Dependência obrigatória não instalada: ${dependencySlug}`);
+            }
+
+            if (visited.has(dependencySlug)) {
+                throw new BadRequestException(`Dependência circular detectada entre ${slug} e ${dependencySlug}`);
+            }
+
+            if (dependency.status === 'installed') {
+                await this.prepareModuleDatabase(dependencySlug, {
+                    invokedBy: `dependency-of:${slug}`,
+                    visited,
+                    actor,
+                });
+                continue;
+            }
+
+            if (!['db_ready', 'active'].includes(dependency.status)) {
+                throw new BadRequestException(`Dependência ${dependencySlug} não está pronta para uso (status: ${dependency.status})`);
+            }
+        }
+    }
+
+    private async assertPendingSeedsAreSafe(slug: string, modulePath: string) {
+        const seedsPath = path.join(modulePath, 'seeds');
+        if (!fs.existsSync(seedsPath)) return;
+
+        const module = await this.prisma.module.findUnique({ where: { slug } });
+        if (!module) throw new BadRequestException('Módulo não encontrado');
+
+        const pendingSeeds = fs.readdirSync(seedsPath).filter(file => file.endsWith('.sql')).sort();
+
+        for (const file of pendingSeeds) {
+            const existing = await this.prisma.moduleMigration.findUnique({
+                where: {
+                    moduleId_filename_type: {
+                        moduleId: module.id,
+                        filename: file,
+                        type: 'seed',
+                    }
+                }
+            });
+
+            if (existing) continue;
+
+            const sql = fs.readFileSync(path.join(seedsPath, file), 'utf-8');
+            const normalizedSql = sql.toUpperCase();
+            const hasInsert = normalizedSql.includes('INSERT INTO');
+            const hasSafeGuard =
+                normalizedSql.includes('ON CONFLICT') ||
+                normalizedSql.includes('NOT EXISTS');
+
+            if (hasInsert && !hasSafeGuard) {
+                throw new BadRequestException(
+                    `Seed inseguro bloqueado (${file}). Use ON CONFLICT, NOT EXISTS ou verificação equivalente antes do INSERT.`
+                );
+            }
+        }
+    }
+
+    private async buildModuleLifecycle(module: {
+        id: string;
+        slug: string;
+        status: string;
+        hasBackend: boolean;
+        hasFrontend: boolean;
+    }): Promise<ModuleLifecycleSnapshot> {
+        const integrity = this.getPhysicalIntegrity(module.slug, module.hasBackend, module.hasFrontend);
+        const manifestIntegrity = integrity.manifestIntegrity;
+        const dependencies = manifestIntegrity.manifest?.dependencies ?? [];
+        const frontend = this.getFrontendReadiness(module.slug, module.hasFrontend);
+
+        const dependencyModules = dependencies.length > 0
+            ? await this.prisma.module.findMany({
+                where: { slug: { in: dependencies } },
+                select: { slug: true, status: true }
+            })
+            : [];
+
+        const dependencyMap = new Map(dependencyModules.map(dep => [dep.slug, dep.status]));
+        const missingDependencies = dependencies.filter(dep => !dependencyMap.has(dep));
+        const blockedDependencies = dependencies.filter(dep => {
+            const status = dependencyMap.get(dep);
+            return status !== undefined && !['db_ready', 'active'].includes(status);
+        });
+
+        const databaseReady = ['db_ready', 'active', 'disabled'].includes(module.status);
+        const filesStep: ModuleLifecycleStep = integrity.valid
+            ? { status: 'ready', detail: 'Arquivos, entrypoints e manifesto principal foram validados.' }
+            : { status: 'error', detail: `Problemas encontrados: ${integrity.issues.join(', ')}` };
+
+        const dependenciesStep: ModuleLifecycleStep = !manifestIntegrity.valid
+            ? { status: 'blocked', detail: `Manifesto inválido: ${manifestIntegrity.detail}` }
+            : missingDependencies.length > 0
+            ? { status: 'blocked', detail: `Dependências ausentes: ${missingDependencies.join(', ')}` }
+            : blockedDependencies.length > 0
+                ? { status: 'blocked', detail: `Dependências ainda não prontas: ${blockedDependencies.join(', ')}` }
+                : { status: 'ready', detail: dependencies.length > 0 ? 'Dependências instaladas e prontas.' : 'Módulo sem dependências.' };
+
+        const databaseStep: ModuleLifecycleStep = databaseReady
+            ? { status: 'ready', detail: 'Banco do módulo preparado.' }
+            : { status: 'pending', detail: 'Banco do módulo ainda não foi preparado.' };
+
+        const buildStep: ModuleLifecycleStep = frontend.ready
+            ? { status: 'ready', detail: frontend.detail }
+            : { status: 'blocked', detail: frontend.detail };
+
+        const blockers = [
+            ...(filesStep.status !== 'ready' ? [filesStep.detail] : []),
+            ...(dependenciesStep.status !== 'ready' ? [dependenciesStep.detail] : []),
+            ...(databaseStep.status !== 'ready' ? [databaseStep.detail] : []),
+            ...(buildStep.status === 'blocked' ? [buildStep.detail] : []),
+        ];
+
+        const approvalReady = blockers.length === 0;
+        const approvalStep: ModuleLifecycleStep = approvalReady
+            ? { status: 'ready', detail: 'Módulo apto para aprovação/ativação global.' }
+            : { status: 'blocked', detail: blockers[0] };
+
+        const activationStep: ModuleLifecycleStep = module.status === 'active'
+            ? { status: 'ready', detail: 'Módulo ativo no sistema.' }
+            : approvalReady
+                ? { status: 'pending', detail: 'Módulo pronto para ativação.' }
+                : { status: 'blocked', detail: blockers[0] };
+
+        let current: ModuleLifecycleState = 'uploaded';
+        if (filesStep.status === 'error') current = 'error';
+        else if (module.status === 'active') current = 'active';
+        else if (module.status === 'disabled') current = 'disabled';
+        else if (approvalReady && module.status === 'db_ready') current = 'approved';
+        else if (databaseReady) current = 'db_ready';
+        else if (module.status === 'installed') current = 'files_installed';
+
+        return {
+            current,
+            blockers,
+            dependencies,
+            frontendInspectMode: frontend.inspectMode,
+            frontendValidationLevel: frontend.validationLevel,
+            steps: {
+                files: filesStep,
+                database: databaseStep,
+                dependencies: dependenciesStep,
+                build: buildStep,
+                approval: approvalStep,
+                activation: activationStep,
+            }
+        };
     }
 
     private ensureDirectories() {

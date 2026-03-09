@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   getAllowedModuleActions,
+  getLifecycleStepBadgeClass,
   getStatusBadgeConfig,
   getStatusGuidance,
   getDisabledTooltip,
@@ -57,12 +58,9 @@ export function ModuleManagement() {
   const [updatingDatabase, setUpdatingDatabase] = useState<string | null>(null);
   const [dbUpdateStatus, setDbUpdateStatus] = useState<string>("");
   const [reloadingConfig, setReloadingConfig] = useState<string | null>(null);
-  const [runningMigrationsSeeds, setRunningMigrationsSeeds] = useState<string | null>(null);
-  const [showMigrationsSeedsDialog, setShowMigrationsSeedsDialog] = useState(false);
   const [installerCapabilities, setInstallerCapabilities] = useState<ModuleInstallerCapabilities | null>(null);
   const [loadingCapabilities, setLoadingCapabilities] = useState(true);
   const moduleUploadEnabled = installerCapabilities?.mutableModuleOpsAllowed ?? false;
-  const [selectedModuleForMigrations, setSelectedModuleForMigrations] = useState<InstalledModule | null>(null);
 
   const loadInstalledModules = useCallback(async () => {
     try {
@@ -304,39 +302,25 @@ export function ModuleManagement() {
 
 
 
-  const updateModuleDatabase = async (moduleName: string) => {
+  const prepareModuleDatabase = async (moduleName: string) => {
     setUpdatingDatabase(moduleName);
-    setDbUpdateStatus("Rodando Migrations...");
+    setDbUpdateStatus("Validando módulo...");
 
     try {
-      // 1. Executar Migrations
-      const migResponse = await api.post(`/configuracoes/sistema/modulos/${moduleName}/run-migrations`);
+      setDbUpdateStatus("Preparando banco...");
+      const response = await api.post(`/configuracoes/sistema/modulos/${moduleName}/prepare-database`);
 
       toast({
-        title: "Migrations ok",
-        description: `${migResponse.data.count} migrations executadas com sucesso.`,
-      });
-
-      setDbUpdateStatus("Aguardando...");
-      // Pequena espera UX
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // 2. Executar Seeds
-      setDbUpdateStatus("Rodando Seeds...");
-      await api.post(`/configuracoes/sistema/modulos/${moduleName}/run-seeds`);
-
-      toast({
-        title: "Banco de dados atualizado!",
-        description: "Migrações e seeds finalizados. Módulo pronto para uso.",
+        title: "Banco preparado!",
+        description: response.data.message || "Migrações e seeds pendentes foram executados com sucesso.",
         className: "bg-green-50 border-green-200 text-green-800",
       });
 
-      // Recarregar lista de módulos para atualizar o status
       await loadInstalledModules();
 
     } catch (error: unknown) {
       toast({
-        title: "Erro ao atualizar banco de dados",
+        title: "Erro ao preparar banco de dados",
         description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro no servidor",
         variant: "destructive",
       });
@@ -419,45 +403,6 @@ export function ModuleManagement() {
     } finally {
       setReloadingConfig(null);
     }
-  };
-
-  const runMigrationsAndSeeds = async (moduleName: string) => {
-    setRunningMigrationsSeeds(moduleName);
-
-    try {
-      console.log(`🔄 Frontend: Executando migrations/seeds para ${moduleName}`);
-
-      // Endpoint: /configuracoes/sistema/modulos/:slug/run-migrations-seeds
-      const response = await api.post(`/configuracoes/sistema/modulos/${moduleName}/run-migrations-seeds`);
-
-      console.log(`✅ Frontend: Sucesso ao executar migrations/seeds:`, response.data);
-
-      toast({
-        title: "Migrations e Seeds Executados!",
-        description: `${response.data.module.migrationsExecuted} migrations e ${response.data.module.seedsExecuted} seeds foram executados novamente.`,
-      });
-
-      // Recarregar lista de módulos
-      await loadInstalledModules();
-
-    } catch (error: unknown) {
-      console.error(`❌ Frontend: Erro ao executar migrations/seeds:`, error);
-
-      toast({
-        title: "Erro ao executar migrations/seeds",
-        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro ao executar migrations e seeds",
-        variant: "destructive",
-      });
-    } finally {
-      setRunningMigrationsSeeds(null);
-      setShowMigrationsSeedsDialog(false);
-      setSelectedModuleForMigrations(null);
-    }
-  };
-
-  const handleMigrationsSeedsClick = (module: InstalledModule) => {
-    setSelectedModuleForMigrations(module);
-    setShowMigrationsSeedsDialog(true);
   };
 
   if (loading) {
@@ -650,8 +595,7 @@ export function ModuleManagement() {
               ) : (
                 <div className="space-y-4">
                   {modules.map((module) => {
-                    // Obtém ações permitidas baseadas no status
-                    const allowedActions = getAllowedModuleActions(module.status);
+                    const allowedActions = getAllowedModuleActions(module);
                     const badgeConfig = getStatusBadgeConfig(module.status);
                     const guidance = getStatusGuidance(module.status);
 
@@ -677,6 +621,36 @@ export function ModuleManagement() {
                                 <p className="text-primary mt-1">➡️ {guidance.suggestion}</p>
                               )}
                             </div>
+
+                            {module.lifecycle && (
+                              <div className="space-y-2">
+                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                  <Badge variant="outline">Lifecycle: {module.lifecycle.current}</Badge>
+                                  {module.lifecycle.frontendValidationLevel !== 'not_required' && (
+                                    <Badge variant="outline">
+                                      Build check: {module.lifecycle.frontendValidationLevel === 'permissive' ? 'permissiva' : 'estrutural'}
+                                    </Badge>
+                                  )}
+                                  {module.lifecycle.blockers.length > 0 && (
+                                    <span className="text-amber-700">
+                                      Bloqueios: {module.lifecycle.blockers.join(" | ")}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="grid grid-cols-2 xl:grid-cols-3 gap-2">
+                                  {Object.entries(module.lifecycle.steps).map(([stepKey, step]) => (
+                                    <div
+                                      key={stepKey}
+                                      className={`rounded border px-2 py-2 text-xs ${getLifecycleStepBadgeClass(step.status)}`}
+                                    >
+                                      <p className="font-medium capitalize">{stepKey}</p>
+                                      <p className="mt-1 uppercase tracking-wide">{step.status}</p>
+                                      <p className="mt-1 leading-snug">{step.detail}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
 
                             {module.stats && (
                               <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
@@ -713,29 +687,6 @@ export function ModuleManagement() {
                                 </TooltipContent>
                               </Tooltip>
 
-                              {/* Botão Executar Migrations/Seeds */}
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleMigrationsSeedsClick(module)}
-                                    disabled={!allowedActions.runMigrationsSeeds || runningMigrationsSeeds === module.slug}
-                                  >
-                                    {runningMigrationsSeeds === module.slug ? (
-                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                                    ) : (
-                                      <Database className="h-4 w-4 text-green-600" />
-                                    )}
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  {allowedActions.runMigrationsSeeds
-                                    ? 'Executar migrations e seeds pendentes'
-                                    : getDisabledTooltip('runMigrationsSeeds', module.status)}
-                                </TooltipContent>
-                              </Tooltip>
-
                               {/* Botão Detalhes (sempre ativo) */}
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -751,13 +702,13 @@ export function ModuleManagement() {
                                 <TooltipContent>Ver informações detalhadas</TooltipContent>
                               </Tooltip>
 
-                              {/* Botão Atualizar Banco */}
+                              {/* Botão Preparar Banco */}
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button
                                     variant="secondary"
                                     size="sm"
-                                    onClick={() => updateModuleDatabase(module.slug)}
+                                    onClick={() => prepareModuleDatabase(module.slug)}
                                     disabled={!allowedActions.updateDatabase || updatingDatabase === module.slug}
                                   >
                                     {updatingDatabase === module.slug ? (
@@ -768,15 +719,15 @@ export function ModuleManagement() {
                                     ) : (
                                       <>
                                         <Database className="h-4 w-4 mr-1" />
-                                        Atualizar Banco
+                                        Preparar Banco
                                       </>
                                     )}
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                   {allowedActions.updateDatabase
-                                    ? 'Executar migrations e seeds'
-                                    : getDisabledTooltip('updateDatabase', module.status)}
+                                    ? 'Operação oficial de preparação do banco do módulo'
+                                    : getDisabledTooltip('updateDatabase', module)}
                                 </TooltipContent>
                               </Tooltip>
 
@@ -797,7 +748,7 @@ export function ModuleManagement() {
                                 <TooltipContent>
                                   {allowedActions.activate
                                     ? 'Ativar módulo no sistema'
-                                    : getDisabledTooltip('activate', module.status)}
+                                    : getDisabledTooltip('activate', module)}
                                 </TooltipContent>
                               </Tooltip>
 
@@ -817,7 +768,7 @@ export function ModuleManagement() {
                                 <TooltipContent>
                                   {allowedActions.deactivate
                                     ? 'Desativar módulo temporariamente'
-                                    : getDisabledTooltip('deactivate', module.status)}
+                                    : getDisabledTooltip('deactivate', module)}
                                 </TooltipContent>
                               </Tooltip>
 
@@ -837,7 +788,7 @@ export function ModuleManagement() {
                                 <TooltipContent>
                                   {allowedActions.uninstall
                                     ? 'Remover módulo do sistema'
-                                    : getDisabledTooltip('uninstall', module.status)}
+                                    : getDisabledTooltip('uninstall', module)}
                                 </TooltipContent>
                               </Tooltip>
                             </div>
@@ -947,56 +898,6 @@ export function ModuleManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de Confirmação para Migrations/Seeds */}
-      <Dialog open={showMigrationsSeedsDialog} onOpenChange={setShowMigrationsSeedsDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Database className="h-5 w-5 text-green-600" />
-              Executar Migrations e Seeds Pendentes
-            </DialogTitle>
-            <DialogDescription asChild>
-              <div>
-                <p className="mb-4">
-                  Deseja executar as migrations e seeds pendentes do módulo <strong>{selectedModuleForMigrations?.name}</strong>?
-                </p>
-                <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm text-blue-800">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Info className="h-4 w-4" />
-                    <strong>Informação:</strong>
-                  </div>
-                  <p className="mb-2">Esta ação irá:</p>
-                  <ul className="list-disc list-inside space-y-1">
-                    <li>Verificar quais migrations e seeds ainda não foram executados</li>
-                    <li>Executar apenas os arquivos pendentes</li>
-                    <li>Manter os registros das execuções anteriores</li>
-                  </ul>
-                </div>
-              </div>
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowMigrationsSeedsDialog(false)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="default"
-              onClick={() => selectedModuleForMigrations && runMigrationsAndSeeds(selectedModuleForMigrations.slug)}
-              disabled={runningMigrationsSeeds !== null}
-            >
-              {runningMigrationsSeeds ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              ) : (
-                <Database className="h-4 w-4 mr-2" />
-              )}
-              Confirmar Execução
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

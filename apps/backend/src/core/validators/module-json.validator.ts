@@ -172,6 +172,7 @@ export class ModuleJsonValidator {
 
         // Validar que cada dependência é um slug válido
         if (json.dependencies && Array.isArray(json.dependencies)) {
+            const seenDependencies = new Set<string>();
             for (let i = 0; i < json.dependencies.length; i++) {
                 const depSlug = json.dependencies[i];
                 const depRegex = /^[a-zA-Z0-9_-]+$/;
@@ -181,6 +182,16 @@ export class ModuleJsonValidator {
                         `Dependência ${i + 1} (${depSlug}) deve conter apenas letras, números, hífen e underscore`
                     );
                 }
+
+                if (depSlug === json.name) {
+                    throw new BadRequestException('Um módulo não pode depender de si mesmo');
+                }
+
+                const normalizedSlug = depSlug.toLowerCase();
+                if (seenDependencies.has(normalizedSlug)) {
+                    throw new BadRequestException(`Dependência duplicada no module.json: ${depSlug}`);
+                }
+                seenDependencies.add(normalizedSlug);
             }
         }
     }

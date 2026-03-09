@@ -65,6 +65,7 @@ export class ModuleSecurityService {
             const backendPath = path.join(this.backendModulesPath, slug);
             const frontendPath = path.join(this.frontendModulesPath, slug);
             const moduleJsonPath = path.join(backendPath, 'module.json');
+            const frontendRootVisible = fs.existsSync(path.resolve(process.cwd(), '..', 'frontend'));
             if (!fs.existsSync(moduleJsonPath)) {
                 errors.push('module.json não encontrado');
                 return { valid: false, errors };
@@ -83,7 +84,7 @@ export class ModuleSecurityService {
 
             // Verificar estrutura de pastas
             const hasBackend = fs.existsSync(backendPath);
-            const hasFrontend = fs.existsSync(frontendPath);
+            const hasFrontend = frontendRootVisible ? fs.existsSync(frontendPath) : true;
 
             if (!hasBackend && !hasFrontend) {
                 errors.push('Módulo deve ter pelo menos backend ou frontend');
@@ -280,6 +281,7 @@ export class ModuleSecurityService {
         const misplacedFrontendPath = path.join(backendPath, 'frontend');
         const expectsBackend = module.hasBackend;
         const expectsFrontend = module.hasFrontend || module.menus.length > 0;
+        const frontendRootVisible = fs.existsSync(path.resolve(process.cwd(), '..', 'frontend'));
         const backendEntrypointExists =
             fs.existsSync(path.join(backendPath, `${module.slug}.module.ts`)) ||
             fs.existsSync(path.join(backendPath, `${module.slug}.module.js`));
@@ -288,7 +290,7 @@ export class ModuleSecurityService {
             issues.push('backend');
         }
 
-        if (expectsFrontend && !fs.existsSync(frontendPath)) {
+        if (expectsFrontend && frontendRootVisible && !fs.existsSync(frontendPath)) {
             issues.push('frontend');
         }
 
@@ -296,7 +298,7 @@ export class ModuleSecurityService {
             issues.push('legacy-backend-layout');
         }
 
-        if (expectsFrontend && fs.existsSync(misplacedFrontendPath) && !fs.existsSync(frontendPath)) {
+        if (expectsFrontend && frontendRootVisible && fs.existsSync(misplacedFrontendPath) && !fs.existsSync(frontendPath)) {
             issues.push('legacy-frontend-layout');
         }
 

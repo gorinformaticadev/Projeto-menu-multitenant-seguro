@@ -28,6 +28,14 @@ import { SkipThrottle } from '@nestjs/throttler';
 export class ModuleInstallerController {
     constructor(private readonly installer: ModuleInstallerService) { }
 
+    private buildActorContext(req: Record<string, any> | undefined) {
+        return {
+            userId: req?.user?.id || req?.user?.sub,
+            ipAddress: req?.ip,
+            userAgent: req?.headers?.['user-agent'] as string | undefined,
+        };
+    }
+
     private getMutableModuleOpsStatus() {
         const environment = (process.env.NODE_ENV || 'development').trim().toLowerCase();
         const overrideEnabled = process.env.ENABLE_MODULE_UPLOAD === 'true';
@@ -59,7 +67,7 @@ export class ModuleInstallerController {
     }
 
     @Get()
-    async listModules(@Request() _req) {
+    async listModules(@Request() _req): Promise<unknown> {
         return await this.installer.listModules();
     }
 
@@ -118,22 +126,30 @@ export class ModuleInstallerController {
     }
 
     @Post(':slug/update-db')
-    async updateDatabase(@Param('slug') slug: string) {
-        return await this.installer.updateModuleDatabase(slug);
+    async updateDatabase(@Param('slug') slug: string, @Request() req) {
+        return await this.installer.updateModuleDatabase(slug, this.buildActorContext(req));
+    }
+
+    @Post(':slug/prepare-database')
+    async prepareDatabase(@Param('slug') slug: string, @Request() req) {
+        return await this.installer.prepareModuleDatabase(slug, {
+            invokedBy: 'prepare-database',
+            actor: this.buildActorContext(req),
+        });
     }
 
     @Post(':slug/run-migrations')
-    async runMigrations(@Param('slug') slug: string) {
-        return await this.installer.runModuleMigrations(slug);
+    async runMigrations(@Param('slug') slug: string, @Request() req) {
+        return await this.installer.runModuleMigrations(slug, this.buildActorContext(req));
     }
 
     @Post(':slug/run-seeds')
-    async runSeeds(@Param('slug') slug: string) {
-        return await this.installer.runModuleSeeds(slug);
+    async runSeeds(@Param('slug') slug: string, @Request() req) {
+        return await this.installer.runModuleSeeds(slug, this.buildActorContext(req));
     }
 
     @Get(':slug/status')
-    async getModuleStatus(@Param('slug') slug: string) {
+    async getModuleStatus(@Param('slug') slug: string): Promise<unknown> {
         return await this.installer.getModuleStatus(slug);
     }
 
@@ -156,9 +172,9 @@ export class ModuleInstallerController {
     }
 
     @Post(':slug/run-migrations-seeds')
-    async runMigrationsAndSeeds(@Param('slug') slug: string) {
+    async runMigrationsAndSeeds(@Param('slug') slug: string, @Request() req) {
         try {
-            return await this.installer.runMigrationsAndSeeds(slug);
+            return await this.installer.runMigrationsAndSeeds(slug, this.buildActorContext(req));
         } catch (error) {
             throw error;
         }
