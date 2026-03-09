@@ -1,47 +1,187 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ElementType,
+} from "react";
+import {
+  Database,
+  Info,
+  Loader2,
+  MoreHorizontal,
+  Package,
+  PanelRight,
+  Power,
+  PowerOff,
+  RefreshCw,
+  Settings,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import api from "@/lib/api";
-import { Upload, Package, Trash2, Info, Settings, Power, PowerOff, Database, RefreshCw } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   getAllowedModuleActions,
+  getDisabledTooltip,
   getLifecycleStepBadgeClass,
   getStatusBadgeConfig,
   getStatusGuidance,
-  getDisabledTooltip,
-  type InstalledModule
+  type AllowedModuleActions,
+  type InstalledModule,
+  type ModuleLifecycleStepStatus,
 } from "@/lib/module-utils";
-
-// **NOVAS INTERFACES:** Controle de Migrations
-
-// interface ModuleMigrationStatus {
-//   moduleName: string;
-//   pendingMigrations: number;
-//   pendingSeeds: number;
-//   completedMigrations: number;
-//   completedSeeds: number;
-//   failedMigrations: number;
-//   failedSeeds: number;
-//   migrations: MigrationRecord[];
-//   seeds: MigrationRecord[];
-// }
-
-// **INTERFACE ATUALIZADA** - Agora importada de module-utils
-// interface InstalledModule já está definida em @/lib/module-utils
+import { cn } from "@/lib/utils";
 
 interface ModuleInstallerCapabilities {
   environment: string;
   overrideEnabled: boolean;
   mutableModuleOpsAllowed: boolean;
-  reason: 'development' | 'explicit_override' | 'blocked';
+  reason: "development" | "explicit_override" | "blocked";
   message: string;
+}
+
+type ModuleLifecycleStepKey =
+  | "files"
+  | "database"
+  | "dependencies"
+  | "build"
+  | "approval"
+  | "activation";
+
+interface LifecycleChip {
+  key: ModuleLifecycleStepKey;
+  label: string;
+  status: ModuleLifecycleStepStatus;
+}
+
+interface ModuleActionConfig {
+  key: "prepare" | "activate" | "deactivate" | "reload" | "uninstall";
+  label: string;
+  icon: ElementType;
+  onClick: () => Promise<void> | void;
+  disabled: boolean;
+  description: string;
+  variant?: "default" | "outline" | "secondary" | "destructive";
+  className?: string;
+  loading?: boolean;
+}
+
+const lifecycleStepLabels: Record<ModuleLifecycleStepKey, string> = {
+  files: "Arquivos",
+  database: "Banco",
+  dependencies: "Dependencias",
+  build: "Build",
+  approval: "Aprovacao",
+  activation: "Ativacao",
+};
+
+const lifecycleStepStatusLabels: Record<ModuleLifecycleStepStatus, string> = {
+  ready: "OK",
+  pending: "Pendente",
+  blocked: "Bloqueado",
+  error: "Erro",
+};
+
+function getCompactLifecycleChips(module: InstalledModule): LifecycleChip[] {
+  if (!module.lifecycle) {
+    return [];
+  }
+
+  const coreSteps: ModuleLifecycleStepKey[] = ["files", "database", "dependencies"];
+  const optionalSteps: ModuleLifecycleStepKey[] = ["build", "approval", "activation"];
+  const visibleKeys = new Set<ModuleLifecycleStepKey>(coreSteps);
+
+  optionalSteps.forEach((stepKey) => {
+    const step = module.lifecycle?.steps[stepKey];
+    if (!step) {
+      return;
+    }
+
+    if (stepKey === "build") {
+      if (
+        module.lifecycle?.frontendValidationLevel !== "not_required" ||
+        step.status !== "ready"
+      ) {
+        visibleKeys.add(stepKey);
+      }
+      return;
+    }
+
+    if (step.status !== "ready") {
+      visibleKeys.add(stepKey);
+    }
+  });
+
+  return Array.from(visibleKeys).map((key) => ({
+    key,
+    label: lifecycleStepLabels[key],
+    status: module.lifecycle!.steps[key].status,
+  }));
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) {
+    return "Nao informado";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString("pt-BR");
+}
+
+function getLifecycleSummaryText(module: InstalledModule) {
+  if (!module.lifecycle) {
+    return null;
+  }
+
+  if (module.lifecycle.blockers.length > 0) {
+    return module.lifecycle.blockers[0];
+  }
+
+  if (module.lifecycle.current === "active") {
+    return "Modulo operacional e disponivel para ativacao por tenant.";
+  }
+
+  if (module.lifecycle.current === "db_ready") {
+    return "Banco preparado. O proximo passo e a ativacao global.";
+  }
+
+  if (module.lifecycle.current === "files_installed") {
+    return "Arquivos instalados. Falta preparar o banco do modulo.";
+  }
+
+  if (module.lifecycle.current === "error") {
+    return "Existe ao menos um bloqueio tecnico que impede o uso do modulo.";
+  }
+
+  return null;
 }
 
 export function ModuleManagement() {
@@ -55,30 +195,75 @@ export function ModuleManagement() {
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState("upload");
+  const [detailsTab, setDetailsTab] = useState("overview");
+  const [moduleDetailsLoading, setModuleDetailsLoading] = useState(false);
   const [updatingDatabase, setUpdatingDatabase] = useState<string | null>(null);
-  const [dbUpdateStatus, setDbUpdateStatus] = useState<string>("");
+  const [dbUpdateStatus, setDbUpdateStatus] = useState("");
   const [reloadingConfig, setReloadingConfig] = useState<string | null>(null);
-  const [installerCapabilities, setInstallerCapabilities] = useState<ModuleInstallerCapabilities | null>(null);
+  const [installerCapabilities, setInstallerCapabilities] =
+    useState<ModuleInstallerCapabilities | null>(null);
   const [loadingCapabilities, setLoadingCapabilities] = useState(true);
+  const [confirmationInput, setConfirmationInput] = useState("");
+  const [openActionMenuFor, setOpenActionMenuFor] = useState<string | null>(null);
+
   const moduleUploadEnabled = installerCapabilities?.mutableModuleOpsAllowed ?? false;
 
-  const loadInstalledModules = useCallback(async () => {
-    try {
-      setLoading(true);
-      // Usa o endpoint correto /configuracoes/sistema/modulos que retorna módulos globais
-      const response = await api.get("/configuracoes/sistema/modulos");
-      // A API retorna array de módulos com status
-      setModules(response.data || []);
-    } catch (error: unknown) {
-      toast({
-        title: "Erro ao carregar módulos",
-        description: (error as unknown as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro no servidor",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  const fetchModuleDetails = useCallback(async (moduleSlug: string) => {
+    const response = await api.get(`/configuracoes/sistema/modulos/${moduleSlug}/status`);
+    return response.data.module as InstalledModule;
+  }, []);
+
+  const loadInstalledModules = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+      try {
+        if (!silent) {
+          setLoading(true);
+        }
+
+        const response = await api.get("/configuracoes/sistema/modulos");
+        setModules(response.data || []);
+      } catch (error: unknown) {
+        toast({
+          title: "Erro ao carregar modulos",
+          description:
+            (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+            "Ocorreu um erro no servidor",
+          variant: "destructive",
+        });
+      } finally {
+        if (!silent) {
+          setLoading(false);
+        }
+      }
+    },
+    [toast],
+  );
+
+  const refreshSelectedModuleDetails = useCallback(
+    async (moduleSlug: string) => {
+      if (!showInfoDialog || selectedModule?.slug !== moduleSlug) {
+        return;
+      }
+
+      try {
+        const updatedModule = await fetchModuleDetails(moduleSlug);
+        setSelectedModule(updatedModule);
+      } catch {
+        setShowInfoDialog(false);
+      }
+    },
+    [fetchModuleDetails, selectedModule?.slug, showInfoDialog],
+  );
+
+  const refreshModuleData = useCallback(
+    async (moduleSlug?: string) => {
+      await loadInstalledModules({ silent: true });
+      if (moduleSlug) {
+        await refreshSelectedModuleDetails(moduleSlug);
+      }
+    },
+    [loadInstalledModules, refreshSelectedModuleDetails],
+  );
 
   const loadInstallerCapabilities = useCallback(async () => {
     try {
@@ -87,11 +272,12 @@ export function ModuleManagement() {
       setInstallerCapabilities(response.data);
     } catch {
       setInstallerCapabilities({
-        environment: 'unknown',
+        environment: "unknown",
         overrideEnabled: false,
         mutableModuleOpsAllowed: false,
-        reason: 'blocked',
-        message: 'Nao foi possivel validar no backend se o instalador interno esta liberado para alteracoes de modulos.',
+        reason: "blocked",
+        message:
+          "Nao foi possivel validar no backend se o instalador interno esta liberado para alteracoes de modulos.",
       });
     } finally {
       setLoadingCapabilities(false);
@@ -107,85 +293,99 @@ export function ModuleManagement() {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {
       setSelectedFile(null);
       return;
     }
 
-    // Validar arquivo
-    if (!file.name.endsWith('.zip')) {
+    if (!file.name.endsWith(".zip")) {
       toast({
-        title: "Arquivo inválido",
-        description: "Apenas arquivos ZIP são aceitos",
+        title: "Arquivo invalido",
+        description: "Apenas arquivos ZIP sao aceitos",
         variant: "destructive",
       });
       setSelectedFile(null);
       return;
     }
 
-    if (file.size > 50 * 1024 * 1024) { // 50MB
+    if (file.size > 50 * 1024 * 1024) {
       toast({
         title: "Arquivo muito grande",
-        description: "O arquivo deve ter no máximo 50MB",
+        description: "O arquivo deve ter no maximo 50MB",
         variant: "destructive",
       });
       setSelectedFile(null);
       return;
     }
 
-    // Apenas armazenar o arquivo selecionado
     setSelectedFile(file);
-
     toast({
       title: "Arquivo selecionado",
       description: `Arquivo "${file.name}" pronto para upload`,
     });
   };
 
+  const clearSelectedFile = () => {
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) {
+      return "0 Bytes";
+    }
+
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+  };
+
   const uploadModule = async () => {
     if (!moduleUploadEnabled) {
-      toast({ title: 'Operacao bloqueada', description: installerCapabilities?.message || 'Operacoes mutaveis de modulos estao bloqueadas neste ambiente.', variant: 'destructive' });
+      toast({
+        title: "Operacao bloqueada",
+        description:
+          installerCapabilities?.message ||
+          "Operacoes mutaveis de modulos estao bloqueadas neste ambiente.",
+        variant: "destructive",
+      });
       return;
     }
 
-    if (!selectedFile) return;
+    if (!selectedFile) {
+      return;
+    }
 
     setUploading(true);
     const formData = new FormData();
-    // O backend espera o campo 'file', não 'module'
-    formData.append('file', selectedFile);
+    formData.append("file", selectedFile);
 
     try {
-      // Endpoint correto: /configuracoes/sistema/modulos/upload
       const response = await api.post("/configuracoes/sistema/modulos/upload", formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          "Content-Type": "multipart/form-data",
         },
       });
 
       toast({
         title: "Sucesso!",
-        description: response.data.message || "Módulo instalado com sucesso",
+        description: response.data.message || "Modulo instalado com sucesso",
       });
 
-      // Recarregar lista de módulos
-      await loadInstalledModules();
-
-      // Redirecionar para a aba "Módulos Instalados"
+      await loadInstalledModules({ silent: true });
       setActiveTab("installed");
-
-      // Limpar seleção
-      setSelectedFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-
+      clearSelectedFile();
     } catch (error: unknown) {
       toast({
         title: "Erro no upload",
-        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Erro ao fazer upload do módulo",
+        description:
+          (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          "Erro ao fazer upload do modulo",
         variant: "destructive",
       });
     } finally {
@@ -193,135 +393,133 @@ export function ModuleManagement() {
     }
   };
 
-  const clearSelectedFile = () => {
-    setSelectedFile(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+  const openRemoveDialog = (module: InstalledModule) => {
+    setOpenActionMenuFor(null);
+    setShowInfoDialog(false);
+    setSelectedModule(module);
+    setConfirmationInput("");
+    setShowRemoveDialog(true);
   };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const [confirmationInput, setConfirmationInput] = useState("");
 
   const handleRemoveModule = async () => {
     if (!moduleUploadEnabled) {
-      toast({ title: 'Operacao bloqueada', description: installerCapabilities?.message || 'Operacoes mutaveis de modulos estao bloqueadas neste ambiente.', variant: 'destructive' });
+      toast({
+        title: "Operacao bloqueada",
+        description:
+          installerCapabilities?.message ||
+          "Operacoes mutaveis de modulos estao bloqueadas neste ambiente.",
+        variant: "destructive",
+      });
       return;
     }
 
-    if (!selectedModule) return;
+    if (!selectedModule) {
+      return;
+    }
 
-    // Validação frontend básica da confirmação
     if (confirmationInput !== selectedModule.slug) {
       toast({
-        title: "Confirmação incorreta",
-        description: "Digite o slug exato do módulo para confirmar.",
+        title: "Confirmacao incorreta",
+        description: "Digite o slug exato do modulo para confirmar.",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      // Endpoint correto: /configuracoes/sistema/modulos/:slug/uninstall
-      // Enviando BODY com confirmationName e dataRemovalOption
       await api.delete(`/configuracoes/sistema/modulos/${selectedModule.slug}/uninstall`, {
         data: {
           confirmationName: confirmationInput,
-          dataRemovalOption: 'full' // Padrão: remover tudo
-        }
+          dataRemovalOption: "full",
+        },
       });
 
       toast({
-        title: "Módulo removido",
-        description: "Módulo removido com sucesso",
+        title: "Modulo removido",
+        description: "Modulo removido com sucesso",
       });
 
       setShowRemoveDialog(false);
+      setShowInfoDialog(false);
       setSelectedModule(null);
-      setConfirmationInput(""); // Limpa input
-      await loadInstalledModules();
-
+      setConfirmationInput("");
+      await loadInstalledModules({ silent: true });
     } catch (error: unknown) {
-      const errorMessage = (error as { response?: { data?: { message?: string }, status?: number } })?.response?.data?.message || "Ocorreu um erro no servidor";
+      const errorMessage =
+        (error as { response?: { data?: { message?: string }; status?: number } })?.response?.data
+          ?.message || "Ocorreu um erro no servidor";
       const status = (error as { response?: { status?: number } })?.response?.status;
 
-      // Se não encontrado, atualiza a lista para remover o fantasma
-      if (errorMessage === 'Módulo não encontrado' || status === 404) {
+      if (errorMessage === "MÃ³dulo nÃ£o encontrado" || status === 404) {
         toast({
-          title: "Módulo não encontrado",
-          description: "O módulo já foi removido ou não existe. Atualizando lista...",
-          variant: "default",
+          title: "Modulo nao encontrado",
+          description: "O modulo ja foi removido ou nao existe. Atualizando lista...",
         });
         setShowRemoveDialog(false);
+        setShowInfoDialog(false);
         setSelectedModule(null);
         setConfirmationInput("");
-        await loadInstalledModules();
+        await loadInstalledModules({ silent: true });
         return;
       }
 
       toast({
-        title: "Erro ao remover módulo",
+        title: "Erro ao remover modulo",
         description: errorMessage,
         variant: "destructive",
       });
     }
   };
 
-  const openRemoveDialog = (module: InstalledModule) => {
-    setSelectedModule(module);
-    setConfirmationInput(""); // Reset input ao abrir
-    setShowRemoveDialog(true);
-  };
-
-
-
-
   const openInfoDialog = async (module: InstalledModule) => {
     try {
-      // Endpoint correto: /configuracoes/sistema/modulos/:slug/status
-      const response = await api.get(`/configuracoes/sistema/modulos/${module.slug}/status`);
-      // O endpoint status retorna wrapping object { module: ... } e outras infos
-      // Ajustamos para exibir o módulo
-      setSelectedModule(response.data.module);
+      setOpenActionMenuFor(null);
+      setDetailsTab("overview");
+      setSelectedModule(module);
       setShowInfoDialog(true);
+      setModuleDetailsLoading(true);
+
+      const moduleDetails = await fetchModuleDetails(module.slug);
+      setSelectedModule(moduleDetails);
     } catch (error: unknown) {
+      setShowInfoDialog(false);
       toast({
-        title: "Erro ao carregar informações",
-        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro no servidor",
+        title: "Erro ao carregar informacoes",
+        description:
+          (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          "Ocorreu um erro no servidor",
         variant: "destructive",
       });
+    } finally {
+      setModuleDetailsLoading(false);
     }
   };
 
-
-
   const prepareModuleDatabase = async (moduleName: string) => {
     setUpdatingDatabase(moduleName);
-    setDbUpdateStatus("Validando módulo...");
+    setDbUpdateStatus("Validando modulo...");
 
     try {
       setDbUpdateStatus("Preparando banco...");
-      const response = await api.post(`/configuracoes/sistema/modulos/${moduleName}/prepare-database`);
+      const response = await api.post(
+        `/configuracoes/sistema/modulos/${moduleName}/prepare-database`,
+      );
 
       toast({
         title: "Banco preparado!",
-        description: response.data.message || "Migrações e seeds pendentes foram executados com sucesso.",
+        description:
+          response.data.message ||
+          "Migracoes e seeds pendentes foram executados com sucesso.",
         className: "bg-green-50 border-green-200 text-green-800",
       });
 
-      await loadInstalledModules();
-
+      await refreshModuleData(moduleName);
     } catch (error: unknown) {
       toast({
         title: "Erro ao preparar banco de dados",
-        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro no servidor",
+        description:
+          (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     } finally {
@@ -332,21 +530,20 @@ export function ModuleManagement() {
 
   const activateModule = async (moduleName: string) => {
     try {
-      // Endpoint para ativar módulo: /configuracoes/sistema/modulos/:slug/activate
       const response = await api.post(`/configuracoes/sistema/modulos/${moduleName}/activate`);
 
       toast({
-        title: "Módulo ativado!",
-        description: response.data.message || "Módulo ativado com sucesso",
+        title: "Modulo ativado!",
+        description: response.data.message || "Modulo ativado com sucesso",
       });
 
-      // Recarregar lista de módulos para atualizar o status
-      await loadInstalledModules();
-
+      await refreshModuleData(moduleName);
     } catch (error: unknown) {
       toast({
-        title: "Erro ao ativar módulo",
-        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro no servidor",
+        title: "Erro ao ativar modulo",
+        description:
+          (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     }
@@ -354,21 +551,20 @@ export function ModuleManagement() {
 
   const deactivateModule = async (moduleName: string) => {
     try {
-      // Endpoint para desativar módulo: /configuracoes/sistema/modulos/:slug/deactivate
       const response = await api.post(`/configuracoes/sistema/modulos/${moduleName}/deactivate`);
 
       toast({
-        title: "Módulo desativado!",
-        description: response.data.message || "Módulo desativado com sucesso",
+        title: "Modulo desativado!",
+        description: response.data.message || "Modulo desativado com sucesso",
       });
 
-      // Recarregar lista de módulos para atualizar o status
-      await loadInstalledModules();
-
+      await refreshModuleData(moduleName);
     } catch (error: unknown) {
       toast({
-        title: "Erro ao desativar módulo",
-        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro no servidor",
+        title: "Erro ao desativar modulo",
+        description:
+          (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          "Ocorreu um erro no servidor",
         variant: "destructive",
       });
     }
@@ -376,28 +572,33 @@ export function ModuleManagement() {
 
   const reloadModuleConfig = async (moduleName: string) => {
     if (!moduleUploadEnabled) {
-      toast({ title: 'Operacao bloqueada', description: installerCapabilities?.message || 'Operacoes mutaveis de modulos estao bloqueadas neste ambiente.', variant: 'destructive' });
+      toast({
+        title: "Operacao bloqueada",
+        description:
+          installerCapabilities?.message ||
+          "Operacoes mutaveis de modulos estao bloqueadas neste ambiente.",
+        variant: "destructive",
+      });
       return;
     }
 
     setReloadingConfig(moduleName);
 
     try {
-      // Endpoint: /configuracoes/sistema/modulos/:slug/reload-config
       await api.post(`/configuracoes/sistema/modulos/${moduleName}/reload-config`);
 
       toast({
-        title: "Configuração Recarregada!",
-        description: `Menus e configurações do módulo ${moduleName} foram atualizados.`,
+        title: "Configuracao recarregada!",
+        description: `Menus e configuracoes do modulo ${moduleName} foram atualizados.`,
       });
 
-      // Recarregar lista de módulos
-      await loadInstalledModules();
-
+      await refreshModuleData(moduleName);
     } catch (error: unknown) {
       toast({
-        title: "Erro ao recarregar configuração",
-        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro ao recarregar a configuração",
+        title: "Erro ao recarregar configuracao",
+        description:
+          (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          "Ocorreu um erro ao recarregar a configuracao",
         variant: "destructive",
       });
     } finally {
@@ -405,10 +606,155 @@ export function ModuleManagement() {
     }
   };
 
+  const getPrimaryAction = useCallback(
+    (module: InstalledModule, allowedActions: AllowedModuleActions): ModuleActionConfig | null => {
+      if (updatingDatabase === module.slug) {
+        return {
+          key: "prepare",
+          label: dbUpdateStatus || "Preparando...",
+          icon: Loader2,
+          onClick: () => undefined,
+          disabled: true,
+          description: "Preparacao do banco em andamento.",
+          variant: "secondary",
+          loading: true,
+        };
+      }
+
+      if (allowedActions.updateDatabase) {
+        return {
+          key: "prepare",
+          label: "Preparar banco",
+          icon: Database,
+          onClick: () => prepareModuleDatabase(module.slug),
+          disabled: false,
+          description: "Executa a preparacao oficial do banco do modulo.",
+          variant: "secondary",
+        };
+      }
+
+      if (allowedActions.activate) {
+        return {
+          key: "activate",
+          label: "Ativar",
+          icon: Power,
+          onClick: () => activateModule(module.slug),
+          disabled: false,
+          description: "Ativa o modulo globalmente no sistema.",
+          variant: "default",
+          className: "bg-green-600 hover:bg-green-700",
+        };
+      }
+
+      if (allowedActions.deactivate) {
+        return {
+          key: "deactivate",
+          label: "Desativar",
+          icon: PowerOff,
+          onClick: () => deactivateModule(module.slug),
+          disabled: false,
+          description: "Desativa o modulo sem remover seus dados.",
+          variant: "outline",
+        };
+      }
+
+      return null;
+    },
+    [activateModule, dbUpdateStatus, deactivateModule, prepareModuleDatabase, updatingDatabase],
+  );
+
+  const getSecondaryActions = useCallback(
+    (module: InstalledModule, allowedActions: AllowedModuleActions): ModuleActionConfig[] => {
+      const primaryAction = getPrimaryAction(module, allowedActions);
+
+      const actions: ModuleActionConfig[] = [
+        {
+          key: "reload",
+          label: reloadingConfig === module.slug ? "Recarregando..." : "Recarregar configuracao",
+          icon: reloadingConfig === module.slug ? Loader2 : RefreshCw,
+          onClick: () => reloadModuleConfig(module.slug),
+          disabled: reloadingConfig === module.slug || loadingCapabilities || !moduleUploadEnabled,
+          description: moduleUploadEnabled
+            ? "Sincroniza menus e configuracoes a partir do module.json atual."
+            : installerCapabilities?.message ||
+              "Operacoes mutaveis de modulos estao bloqueadas neste ambiente.",
+          variant: "outline",
+          loading: reloadingConfig === module.slug,
+        },
+        {
+          key: "prepare",
+          label:
+            updatingDatabase === module.slug ? dbUpdateStatus || "Preparando..." : "Preparar banco",
+          icon: updatingDatabase === module.slug ? Loader2 : Database,
+          onClick: () => prepareModuleDatabase(module.slug),
+          disabled: !allowedActions.updateDatabase || updatingDatabase === module.slug,
+          description: allowedActions.updateDatabase
+            ? "Executa a preparacao oficial do banco do modulo."
+            : getDisabledTooltip("updateDatabase", module),
+          variant: "outline",
+          loading: updatingDatabase === module.slug,
+        },
+        {
+          key: "activate",
+          label: "Ativar",
+          icon: Power,
+          onClick: () => activateModule(module.slug),
+          disabled: !allowedActions.activate,
+          description: allowedActions.activate
+            ? "Ativa o modulo globalmente."
+            : getDisabledTooltip("activate", module),
+          variant: "outline",
+        },
+        {
+          key: "deactivate",
+          label: "Desativar",
+          icon: PowerOff,
+          onClick: () => deactivateModule(module.slug),
+          disabled: !allowedActions.deactivate,
+          description: allowedActions.deactivate
+            ? "Desativa o modulo sem remover seus dados."
+            : getDisabledTooltip("deactivate", module),
+          variant: "outline",
+        },
+        {
+          key: "uninstall",
+          label: "Desinstalar",
+          icon: Trash2,
+          onClick: () => openRemoveDialog(module),
+          disabled: !allowedActions.uninstall || loadingCapabilities || !moduleUploadEnabled,
+          description:
+            allowedActions.uninstall && moduleUploadEnabled
+              ? "Remove os arquivos e o registro do modulo."
+              : !moduleUploadEnabled
+                ? installerCapabilities?.message ||
+                  "Operacoes mutaveis de modulos estao bloqueadas neste ambiente."
+                : getDisabledTooltip("uninstall", module),
+          variant: "destructive",
+        },
+      ];
+
+      return actions.filter((action) => action.key !== primaryAction?.key);
+    },
+    [
+      activateModule,
+      dbUpdateStatus,
+      deactivateModule,
+      getPrimaryAction,
+      installerCapabilities?.message,
+      loadingCapabilities,
+      moduleUploadEnabled,
+      openRemoveDialog,
+      prepareModuleDatabase,
+      reloadModuleConfig,
+      reloadingConfig,
+      updatingDatabase,
+    ],
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -417,20 +763,19 @@ export function ModuleManagement() {
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="upload">Instalar Módulos</TabsTrigger>
-          <TabsTrigger value="installed">Módulos Instalados</TabsTrigger>
+          <TabsTrigger value="upload">Instalar Modulos</TabsTrigger>
+          <TabsTrigger value="installed">Modulos Instalados</TabsTrigger>
         </TabsList>
 
         <TabsContent value="upload" className="mt-6">
-          {/* Upload Section */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Upload className="h-5 w-5" />
-                Instalação de Módulos
+                Instalacao de Modulos
               </CardTitle>
               <CardDescription>
-                Faça upload de módulos em formato ZIP para instalar globalmente no sistema
+                Faca upload de modulos em formato ZIP para instalar globalmente no sistema.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -438,20 +783,25 @@ export function ModuleManagement() {
                 <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                   <p className="font-medium">Instalador interno em modo restrito</p>
                   <p className="mt-1">
-                    Ambiente atual: <strong>{installerCapabilities.environment}</strong>. {installerCapabilities.message}
+                    Ambiente atual: <strong>{installerCapabilities.environment}</strong>.{" "}
+                    {installerCapabilities.message}
                   </p>
                 </div>
               )}
 
               {!selectedFile ? (
-                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
-                  <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                  <h3 className="text-lg font-semibold mb-2">Selecione um arquivo ZIP</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Arraste e solte ou clique para selecionar um módulo (.zip, máx. 50MB)
+                <div className="rounded-2xl border-2 border-dashed border-muted-foreground/25 p-8 text-center">
+                  <Upload className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
+                  <h3 className="text-lg font-semibold">Selecione um arquivo ZIP</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Arraste e solte ou clique para selecionar um modulo (.zip, max. 50MB)
                   </p>
-                  <Button onClick={handleFileSelect} disabled={uploading || loadingCapabilities || !moduleUploadEnabled}>
-                    Selecionar Arquivo
+                  <Button
+                    className="mt-5"
+                    onClick={handleFileSelect}
+                    disabled={uploading || loadingCapabilities || !moduleUploadEnabled}
+                  >
+                    Selecionar arquivo
                   </Button>
                   <input
                     ref={fileInputRef}
@@ -463,16 +813,15 @@ export function ModuleManagement() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* Informações do arquivo selecionado */}
-                  <div className="border border-green-200 bg-green-50 rounded-lg p-4">
-                    <div className="flex items-start justify-between">
+                  <div className="rounded-2xl border border-green-200 bg-green-50 p-4">
+                    <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="p-2 bg-green-100 rounded-lg">
+                        <div className="rounded-xl bg-green-100 p-2">
                           <Package className="h-6 w-6 text-green-600" />
                         </div>
                         <div>
-                          <h3 className="font-semibold text-green-800">Arquivo Selecionado</h3>
-                          <p className="text-sm text-green-700">Pronto para instalação</p>
+                          <h3 className="font-semibold text-green-800">Arquivo selecionado</h3>
+                          <p className="text-sm text-green-700">Pronto para instalacao</p>
                         </div>
                       </div>
                       <Button
@@ -481,48 +830,43 @@ export function ModuleManagement() {
                         onClick={clearSelectedFile}
                         className="text-green-600 hover:text-green-700"
                       >
-                        ✕
+                        x
                       </Button>
                     </div>
 
-                    <div className="mt-4 space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium text-green-800">Nome do arquivo:</span>
-                        <span className="text-sm font-mono text-green-700">{selectedFile.name}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium text-green-800">Tamanho:</span>
-                        <span className="text-sm text-green-700">{formatFileSize(selectedFile.size)}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium text-green-800">Tipo:</span>
-                        <span className="text-sm text-green-700">{selectedFile.type || 'application/zip'}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium text-green-800">Última modificação:</span>
-                        <span className="text-sm text-green-700">
-                          {new Date(selectedFile.lastModified).toLocaleString('pt-BR')}
-                        </span>
-                      </div>
+                    <div className="mt-4 grid gap-2 text-sm text-green-800 sm:grid-cols-2">
+                      <p>
+                        <span className="font-medium">Nome:</span> {selectedFile.name}
+                      </p>
+                      <p>
+                        <span className="font-medium">Tamanho:</span> {formatFileSize(selectedFile.size)}
+                      </p>
+                      <p>
+                        <span className="font-medium">Tipo:</span>{" "}
+                        {selectedFile.type || "application/zip"}
+                      </p>
+                      <p>
+                        <span className="font-medium">Modificado em:</span>{" "}
+                        {new Date(selectedFile.lastModified).toLocaleString("pt-BR")}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Botões de ação */}
-                  <div className="flex gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row">
                     <Button
                       onClick={uploadModule}
                       disabled={uploading || loadingCapabilities || !moduleUploadEnabled}
-                      className="flex-1"
+                      className="sm:flex-1"
                     >
                       {uploading ? (
                         <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Instalando módulo...
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Instalando modulo...
                         </>
                       ) : (
                         <>
-                          <Upload className="h-4 w-4 mr-2" />
-                          Instalar Módulo
+                          <Upload className="mr-2 h-4 w-4" />
+                          Instalar modulo
                         </>
                       )}
                     </Button>
@@ -535,7 +879,6 @@ export function ModuleManagement() {
                     </Button>
                   </div>
 
-                  {/* Input oculto para seleção de novo arquivo */}
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -546,27 +889,36 @@ export function ModuleManagement() {
                 </div>
               )}
 
-              <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-                <h4 className="font-medium mb-3 flex items-center gap-2">
+              <div className="mt-6 rounded-2xl bg-muted/50 p-4">
+                <h4 className="mb-3 flex items-center gap-2 font-medium">
                   <Info className="h-4 w-4" />
-                  Estrutura do Módulo
+                  Estrutura do modulo
                 </h4>
-                <div className="text-sm text-muted-foreground space-y-2">
-                  <p>• <code className="bg-muted px-1 rounded">module.json</code> - Configuração do módulo (obrigatório)</p>
-                  <p>• <code className="bg-muted px-1 rounded">migrations/</code> - Scripts SQL para banco de dados (opcional)</p>
-                  <p>• <code className="bg-muted px-1 rounded">package.json</code> - Dependências NPM (opcional)</p>
-                  <p>• Outros arquivos do módulo (componentes, assets, etc.)</p>
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <p>
+                    - <code className="rounded bg-muted px-1">module.json</code> - configuracao do
+                    modulo
+                  </p>
+                  <p>
+                    - <code className="rounded bg-muted px-1">migrations/</code> - scripts SQL
+                    opcionais
+                  </p>
+                  <p>
+                    - <code className="rounded bg-muted px-1">package.json</code> - dependencias
+                    opcionais
+                  </p>
+                  <p>- Demais arquivos do modulo, como componentes e assets.</p>
                 </div>
               </div>
 
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h4 className="font-medium mb-2 text-blue-800 flex items-center gap-2">
+              <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                <h4 className="mb-2 flex items-center gap-2 font-medium text-blue-800">
                   <Settings className="h-4 w-4" />
-                  Instalação Global
+                  Instalacao global
                 </h4>
                 <p className="text-sm text-blue-700">
-                  Os módulos instalados aqui ficam disponíveis para todos os tenants do sistema.
-                  Cada tenant pode ativar/desativar os módulos individualmente em suas configurações.
+                  Os modulos instalados aqui ficam disponiveis para todos os tenants do sistema.
+                  Cada tenant pode ativa-los ou desativa-los individualmente em suas configuracoes.
                 </p>
               </div>
             </CardContent>
@@ -574,316 +926,566 @@ export function ModuleManagement() {
         </TabsContent>
 
         <TabsContent value="installed" className="mt-6">
-          {/* Installed Modules */}
-          <Card>
-            <CardHeader>
+          <Card className="overflow-hidden">
+            <CardHeader className="border-b pb-4">
               <CardTitle className="flex items-center gap-2">
                 <Package className="h-5 w-5" />
-                Módulos Instalados no Sistema
+                Modulos Instalados no Sistema
               </CardTitle>
               <CardDescription>
-                Gerencie os módulos instalados globalmente no sistema
+                Visualize os modulos de forma compacta e abra os detalhes tecnicos apenas quando
+                necessario.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 sm:p-6">
               {modules.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                  <p>Nenhum módulo instalado no sistema</p>
-                  <p className="text-sm mt-2">Use a aba &quot;Instalar Módulos&quot; para adicionar novos módulos</p>
+                <div className="rounded-2xl border border-dashed border-muted-foreground/25 px-6 py-12 text-center">
+                  <Package className="mx-auto mb-4 h-12 w-12 text-muted-foreground/40" />
+                  <p className="text-base font-medium">Nenhum modulo instalado no sistema</p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Use a aba de instalacao para adicionar novos modulos.
+                  </p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {modules.map((module) => {
-                    const allowedActions = getAllowedModuleActions(module);
-                    const badgeConfig = getStatusBadgeConfig(module.status);
-                    const guidance = getStatusGuidance(module.status);
+                <TooltipProvider>
+                  <div className="space-y-3">
+                    {modules.map((module) => {
+                      const allowedActions = getAllowedModuleActions(module);
+                      const badgeConfig = getStatusBadgeConfig(module.status);
+                      const compactChips = getCompactLifecycleChips(module);
+                      const primaryAction = getPrimaryAction(module, allowedActions);
+                      const secondaryActions = getSecondaryActions(module, allowedActions);
+                      const lifecycleSummary = getLifecycleSummaryText(module);
 
-                    return (
-                      <div key={module.slug} className="p-4 border rounded-lg">
-                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                          {/* Informações do Módulo */}
-                          <div className="flex-1 space-y-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="font-medium">{module.name}</h3>
-                              <Badge className={`${badgeConfig.color} border`}>
-                                {badgeConfig.icon} {badgeConfig.label}
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">v{module.version}</span>
-                            </div>
-                            <p className="text-sm text-muted-foreground">{module.description}</p>
+                      return (
+                        <Card
+                          key={module.slug}
+                          className="border-border/70 bg-card/80 shadow-sm transition-shadow hover:shadow-md"
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                              <div className="min-w-0 flex-1 space-y-3">
+                                <div className="flex flex-wrap items-start gap-3">
+                                  <div className="rounded-2xl border border-border/60 bg-muted/50 p-2.5">
+                                    <Package className="h-5 w-5 text-foreground/75" />
+                                  </div>
 
-                            {/* Mensagem de orientação */}
-                            <div className="p-2 bg-muted/50 rounded text-xs">
-                              <p className="font-medium">{guidance.title}</p>
-                              <p className="text-muted-foreground">{guidance.message}</p>
-                              {guidance.suggestion && (
-                                <p className="text-primary mt-1">➡️ {guidance.suggestion}</p>
-                              )}
-                            </div>
-
-                            {module.lifecycle && (
-                              <div className="space-y-2">
-                                <div className="flex flex-wrap items-center gap-2 text-xs">
-                                  <Badge variant="outline">Lifecycle: {module.lifecycle.current}</Badge>
-                                  {module.lifecycle.frontendValidationLevel !== 'not_required' && (
-                                    <Badge variant="outline">
-                                      Build check: {module.lifecycle.frontendValidationLevel === 'permissive' ? 'permissiva' : 'estrutural'}
-                                    </Badge>
-                                  )}
-                                  {module.lifecycle.blockers.length > 0 && (
-                                    <span className="text-amber-700">
-                                      Bloqueios: {module.lifecycle.blockers.join(" | ")}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="grid grid-cols-2 xl:grid-cols-3 gap-2">
-                                  {Object.entries(module.lifecycle.steps).map(([stepKey, step]) => (
-                                    <div
-                                      key={stepKey}
-                                      className={`rounded border px-2 py-2 text-xs ${getLifecycleStepBadgeClass(step.status)}`}
-                                    >
-                                      <p className="font-medium capitalize">{stepKey}</p>
-                                      <p className="mt-1 uppercase tracking-wide">{step.status}</p>
-                                      <p className="mt-1 leading-snug">{step.detail}</p>
+                                  <div className="min-w-0 flex-1 space-y-2">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <h3 className="truncate text-base font-semibold sm:text-lg">
+                                        {module.name}
+                                      </h3>
+                                      <Badge className={cn("border", badgeConfig.color)}>
+                                        {badgeConfig.label}
+                                      </Badge>
+                                      <Badge variant="outline" className="text-xs">
+                                        v{module.version}
+                                      </Badge>
                                     </div>
-                                  ))}
+
+                                    <p className="line-clamp-2 text-sm text-muted-foreground">
+                                      {module.description}
+                                    </p>
+                                  </div>
                                 </div>
+
+                                {compactChips.length > 0 && (
+                                  <div className="flex flex-wrap gap-2">
+                                    {compactChips.map((chip) => (
+                                      <Badge
+                                        key={chip.key}
+                                        variant="outline"
+                                        className={cn(
+                                          "rounded-full px-2.5 py-1 text-[11px] font-medium",
+                                          getLifecycleStepBadgeClass(chip.status),
+                                        )}
+                                      >
+                                        {chip.label} {lifecycleStepStatusLabels[chip.status]}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                )}
+
+                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                  <span>Slug: {module.slug}</span>
+                                  {module.stats && <span>{module.stats.tenants} tenant(s)</span>}
+                                  {module.stats && <span>{module.stats.migrations} migration(s)</span>}
+                                  {module.stats && <span>{module.stats.menus} menu(s)</span>}
+                                  <span>{module.hasBackend ? "Backend" : "Sem backend"}</span>
+                                  <span>{module.hasFrontend ? "Frontend" : "Sem frontend"}</span>
+                                </div>
+
+                                {lifecycleSummary && (
+                                  <p className="text-xs text-muted-foreground">{lifecycleSummary}</p>
+                                )}
                               </div>
-                            )}
 
-                            {module.stats && (
-                              <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                                <span>📊 {module.stats.tenants} tenant(s)</span>
-                                <span>🗃️ {module.stats.migrations} migration(s)</span>
-                                <span>📑 {module.stats.menus} menu(s)</span>
+                              <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap xl:w-auto xl:justify-end">
+                                <Button
+                                  variant="outline"
+                                  className="w-full sm:w-auto"
+                                  onClick={() => openInfoDialog(module)}
+                                >
+                                  <PanelRight className="mr-2 h-4 w-4" />
+                                  Detalhes
+                                </Button>
+
+                                {primaryAction && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant={primaryAction.variant}
+                                        className={cn("w-full sm:w-auto", primaryAction.className)}
+                                        onClick={() => void primaryAction.onClick()}
+                                        disabled={primaryAction.disabled}
+                                      >
+                                        <primaryAction.icon
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            primaryAction.loading && "animate-spin",
+                                          )}
+                                        />
+                                        {primaryAction.label}
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>{primaryAction.description}</TooltipContent>
+                                  </Tooltip>
+                                )}
+
+                                <Popover
+                                  open={openActionMenuFor === module.slug}
+                                  onOpenChange={(open) =>
+                                    setOpenActionMenuFor(open ? module.slug : null)
+                                  }
+                                >
+                                  <PopoverTrigger asChild>
+                                    <Button variant="outline" size="icon" className="shrink-0">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                      <span className="sr-only">Mais acoes</span>
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent
+                                    align="end"
+                                    className="w-72 rounded-2xl border border-border/70 p-2"
+                                  >
+                                    <div className="space-y-1">
+                                      <div className="px-2 py-1.5">
+                                        <p className="text-sm font-medium">Acoes do modulo</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          Operacoes disponiveis para {module.name}
+                                        </p>
+                                      </div>
+
+                                      {secondaryActions.map((action) => (
+                                        <Tooltip key={action.key}>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              variant="ghost"
+                                              className="h-auto w-full justify-start rounded-xl px-3 py-2 text-left"
+                                              disabled={action.disabled}
+                                              onClick={() => {
+                                                setOpenActionMenuFor(null);
+                                                void action.onClick();
+                                              }}
+                                            >
+                                              <action.icon
+                                                className={cn(
+                                                  "mr-3 h-4 w-4 shrink-0",
+                                                  action.loading && "animate-spin",
+                                                  action.variant === "destructive" &&
+                                                    "text-destructive",
+                                                )}
+                                              />
+                                              <span className="min-w-0 flex-1">
+                                                <span className="block text-sm font-medium">
+                                                  {action.label}
+                                                </span>
+                                                <span className="block text-xs text-muted-foreground">
+                                                  {action.description}
+                                                </span>
+                                              </span>
+                                            </Button>
+                                          </TooltipTrigger>
+                                          {action.disabled && (
+                                            <TooltipContent>{action.description}</TooltipContent>
+                                          )}
+                                        </Tooltip>
+                                      ))}
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
                               </div>
-                            )}
-                          </div>
-
-                          {/* Botões de Ação - Controlados por Status */}
-                          <TooltipProvider>
-                            <div className="flex flex-wrap items-center gap-2">
-
-
-                              {/* Botão Recarregar Config (Novo) */}
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => reloadModuleConfig(module.slug)}
-                                    disabled={reloadingConfig === module.slug || loadingCapabilities || !moduleUploadEnabled}
-                                  >
-                                    {reloadingConfig === module.slug ? (
-                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                                    ) : (
-                                      <RefreshCw className="h-4 w-4 text-blue-600" />
-                                    )}
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  Recarregar configurações e menus do disco (module.json)
-                                </TooltipContent>
-                              </Tooltip>
-
-                              {/* Botão Detalhes (sempre ativo) */}
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => openInfoDialog(module)}
-                                  >
-                                    <Info className="h-4 w-4 mr-1" />
-                                    Detalhes
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Ver informações detalhadas</TooltipContent>
-                              </Tooltip>
-
-                              {/* Botão Preparar Banco */}
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() => prepareModuleDatabase(module.slug)}
-                                    disabled={!allowedActions.updateDatabase || updatingDatabase === module.slug}
-                                  >
-                                    {updatingDatabase === module.slug ? (
-                                      <>
-                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                        {dbUpdateStatus || "Atualizando..."}
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Database className="h-4 w-4 mr-1" />
-                                        Preparar Banco
-                                      </>
-                                    )}
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  {allowedActions.updateDatabase
-                                    ? 'Operação oficial de preparação do banco do módulo'
-                                    : getDisabledTooltip('updateDatabase', module)}
-                                </TooltipContent>
-                              </Tooltip>
-
-                              {/* Botão Ativar */}
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="default"
-                                    size="sm"
-                                    onClick={() => activateModule(module.slug)}
-                                    disabled={!allowedActions.activate}
-                                    className="bg-green-600 hover:bg-green-700"
-                                  >
-                                    <Power className="h-4 w-4 mr-1" />
-                                    Ativar
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  {allowedActions.activate
-                                    ? 'Ativar módulo no sistema'
-                                    : getDisabledTooltip('activate', module)}
-                                </TooltipContent>
-                              </Tooltip>
-
-                              {/* Botão Desativar */}
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => deactivateModule(module.slug)}
-                                    disabled={!allowedActions.deactivate}
-                                  >
-                                    <PowerOff className="h-4 w-4 mr-1" />
-                                    Desativar
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  {allowedActions.deactivate
-                                    ? 'Desativar módulo temporariamente'
-                                    : getDisabledTooltip('deactivate', module)}
-                                </TooltipContent>
-                              </Tooltip>
-
-                              {/* Botão Desinstalar */}
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() => openRemoveDialog(module)}
-                                    disabled={!allowedActions.uninstall || loadingCapabilities || !moduleUploadEnabled}
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-1" />
-                                    Desinstalar
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  {allowedActions.uninstall
-                                    ? 'Remover módulo do sistema'
-                                    : getDisabledTooltip('uninstall', module)}
-                                </TooltipContent>
-                              </Tooltip>
                             </div>
-                          </TooltipProvider>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </TooltipProvider>
               )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      {/* Info Dialog */}
-      <Dialog open={showInfoDialog} onOpenChange={setShowInfoDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Detalhes do Módulo</DialogTitle>
-            <DialogDescription>
-              Informações técnicas e configurações do módulo
-            </DialogDescription>
-          </DialogHeader>
-          {selectedModule && (
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Nome Técnico</label>
-                <p className="font-mono text-sm">{selectedModule.name}</p>
+      <Dialog
+        open={showInfoDialog}
+        onOpenChange={(open) => {
+          setShowInfoDialog(open);
+          if (!open) {
+            setModuleDetailsLoading(false);
+          }
+        }}
+      >
+        <DialogContent className="left-0 top-0 h-dvh max-w-none translate-x-0 translate-y-0 rounded-none border-0 p-0 sm:left-auto sm:right-0 sm:w-[min(760px,100vw)] sm:border-l sm:border-border/70">
+          <div className="flex h-full flex-col bg-background">
+            <DialogHeader className="border-b px-6 py-5 text-left">
+              <div className="pr-8">
+                <DialogTitle className="flex flex-wrap items-center gap-2 text-xl">
+                  <Package className="h-5 w-5 text-foreground/70" />
+                  {selectedModule?.name || "Detalhes do modulo"}
+                  {selectedModule && (
+                    <>
+                      <Badge
+                        className={cn(
+                          "border",
+                          getStatusBadgeConfig(selectedModule.status).color,
+                        )}
+                      >
+                        {getStatusBadgeConfig(selectedModule.status).label}
+                      </Badge>
+                      <Badge variant="outline">v{selectedModule.version}</Badge>
+                    </>
+                  )}
+                </DialogTitle>
+                <DialogDescription className="mt-2">
+                  {selectedModule?.description ||
+                    "Informacoes tecnicas e operacionais do modulo selecionado."}
+                </DialogDescription>
               </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Descrição</label>
-                <p className="text-sm">{selectedModule.description}</p>
+            </DialogHeader>
+
+            {moduleDetailsLoading ? (
+              <div className="flex flex-1 items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
-              {/* Configuração padrão removida - não faz parte da resposta do backend */}
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-700">
-                  <strong>Nota:</strong> Este módulo está instalado globalmente no sistema.
-                  Cada tenant pode ativá-lo ou desativá-lo individualmente em suas configurações.
-                </p>
+            ) : selectedModule ? (
+              <Tabs
+                value={detailsTab}
+                onValueChange={setDetailsTab}
+                className="flex min-h-0 flex-1 flex-col"
+              >
+                <div className="border-b px-4 py-3 sm:px-6">
+                  <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl bg-muted/60 p-1">
+                    <TabsTrigger value="overview" className="rounded-lg">
+                      Visao geral
+                    </TabsTrigger>
+                    <TabsTrigger value="technical" className="rounded-lg">
+                      Status tecnico
+                    </TabsTrigger>
+                    <TabsTrigger value="operations" className="rounded-lg">
+                      Operacoes
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+                  <TabsContent value="overview" className="mt-0 space-y-4">
+                    <Card className="border-border/70">
+                      <CardContent className="space-y-4 p-4">
+                        <div>
+                          <p className="text-sm font-medium">
+                            {getStatusGuidance(selectedModule.status).title}
+                          </p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {getStatusGuidance(selectedModule.status).message}
+                          </p>
+                          <p className="mt-2 text-xs text-primary">
+                            {getStatusGuidance(selectedModule.status).suggestion}
+                          </p>
+                        </div>
+
+                        <div className="grid gap-3 text-sm sm:grid-cols-2">
+                          <div className="rounded-xl border bg-muted/30 p-3">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                              Instalado em
+                            </p>
+                            <p className="mt-1 font-medium">
+                              {formatDateTime(selectedModule.installedAt)}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border bg-muted/30 p-3">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                              Ativado em
+                            </p>
+                            <p className="mt-1 font-medium">
+                              {formatDateTime(selectedModule.activatedAt)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {selectedModule.stats && (
+                          <div className="grid gap-3 sm:grid-cols-3">
+                            <div className="rounded-xl border bg-muted/30 p-3">
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                Tenants
+                              </p>
+                              <p className="mt-1 text-xl font-semibold">
+                                {selectedModule.stats.tenants}
+                              </p>
+                            </div>
+                            <div className="rounded-xl border bg-muted/30 p-3">
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                Migrations
+                              </p>
+                              <p className="mt-1 text-xl font-semibold">
+                                {selectedModule.stats.migrations}
+                              </p>
+                            </div>
+                            <div className="rounded-xl border bg-muted/30 p-3">
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                Menus
+                              </p>
+                              <p className="mt-1 text-xl font-semibold">
+                                {selectedModule.stats.menus}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                          <p className="text-sm text-blue-800">
+                            Este modulo esta instalado globalmente. A habilitacao por tenant
+                            continua sendo feita nas configuracoes da empresa.
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="technical" className="mt-0 space-y-4">
+                    <Card className="border-border/70">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Status do lifecycle</CardTitle>
+                        <CardDescription>
+                          Leitura rapida das etapas tecnicas exigidas para o modulo.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {selectedModule.lifecycle ? (
+                          <>
+                            <div className="flex flex-wrap gap-2">
+                              {(
+                                Object.keys(selectedModule.lifecycle.steps) as ModuleLifecycleStepKey[]
+                              ).map((stepKey) => {
+                                const step = selectedModule.lifecycle!.steps[stepKey];
+                                return (
+                                  <Badge
+                                    key={stepKey}
+                                    variant="outline"
+                                    className={cn(
+                                      "rounded-full px-3 py-1 text-xs font-medium",
+                                      getLifecycleStepBadgeClass(step.status),
+                                    )}
+                                  >
+                                    {lifecycleStepLabels[stepKey]}{" "}
+                                    {lifecycleStepStatusLabels[step.status]}
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+
+                            <div className="grid gap-3">
+                              {(
+                                Object.keys(selectedModule.lifecycle.steps) as ModuleLifecycleStepKey[]
+                              ).map((stepKey) => {
+                                const step = selectedModule.lifecycle!.steps[stepKey];
+                                return (
+                                  <div
+                                    key={stepKey}
+                                    className={cn(
+                                      "rounded-2xl border px-4 py-3",
+                                      getLifecycleStepBadgeClass(step.status),
+                                    )}
+                                  >
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <p className="font-medium">{lifecycleStepLabels[stepKey]}</p>
+                                      <Badge variant="outline" className="bg-white/70">
+                                        {lifecycleStepStatusLabels[step.status]}
+                                      </Badge>
+                                    </div>
+                                    <p className="mt-2 text-sm">{step.detail}</p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            <div className="grid gap-3 text-sm sm:grid-cols-2">
+                              <div className="rounded-xl border bg-muted/30 p-3">
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                  Backend
+                                </p>
+                                <p className="mt-1 font-medium">
+                                  {selectedModule.hasBackend ? "Disponivel" : "Nao encontrado"}
+                                </p>
+                              </div>
+                              <div className="rounded-xl border bg-muted/30 p-3">
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                  Frontend
+                                </p>
+                                <p className="mt-1 font-medium">
+                                  {selectedModule.hasFrontend ? "Disponivel" : "Nao encontrado"}
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {selectedModule.lifecycle.frontendValidationLevel ===
+                                  "not_required"
+                                    ? "Modulo sem frontend."
+                                    : selectedModule.lifecycle.frontendValidationLevel ===
+                                        "permissive"
+                                      ? "Validacao parcial. O backend nao conseguiu comprovar o build atual."
+                                      : "Validacao estrutural realizada no filesystem do frontend."}
+                                </p>
+                              </div>
+                            </div>
+
+                            {selectedModule.lifecycle.blockers.length > 0 && (
+                              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                                <p className="text-sm font-medium text-amber-900">
+                                  Bloqueios detectados
+                                </p>
+                                <ul className="mt-2 space-y-1 text-sm text-amber-800">
+                                  {selectedModule.lifecycle.blockers.map((blocker) => (
+                                    <li key={blocker}>- {blocker}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">
+                            O backend ainda nao retornou detalhes tecnicos do lifecycle para este
+                            modulo.
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="operations" className="mt-0">
+                    <div className="grid gap-3">
+                      {(() => {
+                        const allowedActions = getAllowedModuleActions(selectedModule);
+                        const detailActions = [
+                          getPrimaryAction(selectedModule, allowedActions),
+                          ...getSecondaryActions(selectedModule, allowedActions),
+                        ].filter(Boolean) as ModuleActionConfig[];
+
+                        return detailActions.map((action) => (
+                          <Card key={action.key} className="border-border/70">
+                            <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="flex min-w-0 items-start gap-3">
+                                <div className="rounded-xl border bg-muted/30 p-2">
+                                  <action.icon
+                                    className={cn(
+                                      "h-4 w-4",
+                                      action.loading && "animate-spin",
+                                      action.variant === "destructive" && "text-destructive",
+                                    )}
+                                  />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-medium">{action.label}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {action.description}
+                                  </p>
+                                </div>
+                              </div>
+                              <Button
+                                variant={action.variant}
+                                className={cn("w-full sm:w-auto", action.className)}
+                                disabled={action.disabled}
+                                onClick={() => void action.onClick()}
+                              >
+                                <action.icon
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    action.loading && "animate-spin",
+                                  )}
+                                />
+                                {action.label}
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        ));
+                      })()}
+                    </div>
+                  </TabsContent>
+                </div>
+              </Tabs>
+            ) : (
+              <div className="flex flex-1 items-center justify-center p-6 text-sm text-muted-foreground">
+                Nenhum modulo selecionado.
               </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowInfoDialog(false)}>
-              Fechar
-            </Button>
-          </DialogFooter>
+            )}
+
+            <DialogFooter className="border-t px-4 py-3 sm:px-6">
+              <Button variant="outline" onClick={() => setShowInfoDialog(false)}>
+                Fechar
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
-      {/* Remove Dialog */}
       <Dialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle className="text-destructive">Desinstalar Módulo</DialogTitle>
+            <DialogTitle className="text-destructive">Desinstalar modulo</DialogTitle>
             <DialogDescription>
-              Esta ação removerá permanentemente o módulo do sistema.
+              Esta acao remove permanentemente o modulo do sistema.
             </DialogDescription>
           </DialogHeader>
+
           {selectedModule && (
             <div className="space-y-4">
-              <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-                <p className="text-sm font-medium text-destructive mb-2">⚠️ Atenção!</p>
-                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                  <li>Todos os arquivos do módulo serão removidos do sistema</li>
-                  <li>O módulo será desativado automaticamente em todos os tenants</li>
-                  <li>Esta ação não pode ser desfeita</li>
-                  <li>Dados relacionados ao módulo podem ser perdidos</li>
+              <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4">
+                <p className="mb-2 text-sm font-medium text-destructive">Atencao</p>
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  <li>- Todos os arquivos do modulo serao removidos do sistema.</li>
+                  <li>- O modulo sera desativado para todos os tenants.</li>
+                  <li>- Esta acao nao pode ser desfeita.</li>
                 </ul>
               </div>
-              <div className="p-3 bg-muted rounded-lg space-y-2">
-                <p className="text-sm"><strong>Módulo:</strong> {selectedModule.name}</p>
-                <p className="text-sm"><strong>Slug (Nome Técnico):</strong> <code className="bg-white px-1 rounded border">{selectedModule.slug}</code></p>
+
+              <div className="rounded-2xl border bg-muted/30 p-4 text-sm">
+                <p>
+                  <strong>Modulo:</strong> {selectedModule.name}
+                </p>
+                <p className="mt-1">
+                  <strong>Slug:</strong>{" "}
+                  <code className="rounded border bg-background px-1.5 py-0.5">
+                    {selectedModule.slug}
+                  </code>
+                </p>
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">
-                  Digite o slug do módulo (<strong>{selectedModule.slug}</strong>) para confirmar:
+                  Digite o slug <strong>{selectedModule.slug}</strong> para confirmar:
                 </label>
                 <input
                   type="text"
                   value={confirmationInput}
-                  onChange={(e) => setConfirmationInput(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-destructive/50"
+                  onChange={(event) => setConfirmationInput(event.target.value)}
+                  className="w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none ring-offset-background transition focus-visible:ring-2 focus-visible:ring-destructive/40"
                   placeholder={`Digite ${selectedModule.slug}`}
                 />
               </div>
             </div>
           )}
+
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowRemoveDialog(false)}
-            >
+            <Button variant="outline" onClick={() => setShowRemoveDialog(false)}>
               Cancelar
             </Button>
             <Button
@@ -891,13 +1493,12 @@ export function ModuleManagement() {
               onClick={handleRemoveModule}
               disabled={selectedModule ? confirmationInput !== selectedModule.slug : true}
             >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Confirmar Desinstalação
+              <Trash2 className="mr-2 h-4 w-4" />
+              Confirmar desinstalacao
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }

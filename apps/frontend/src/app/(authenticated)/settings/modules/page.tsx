@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Upload, Package, CheckCircle, AlertTriangle, Trash2, Power, PowerOff } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AlertTriangle, CheckCircle, Package, Power, PowerOff, Trash2, Upload } from 'lucide-react';
 import axios from 'axios';
 
 interface Module {
@@ -36,7 +36,7 @@ export default function ModulesManagementPage() {
             const response = await axios.get('/api/modules');
             setModules(response.data.data || []);
         } catch (error) {
-            console.error('Erro ao carregar módulos:', error);
+            console.error('Erro ao carregar mÃ³dulos:', error);
         } finally {
             setLoading(false);
         }
@@ -83,17 +83,17 @@ export default function ModulesManagementPage() {
             });
 
             if (response.data.success) {
-                alert('Módulo enviado com sucesso!');
+                alert('MÃ³dulo enviado com sucesso!');
                 setSelectedFile(null);
                 loadModules();
             } else {
-                alert('Erro ao enviar módulo: ' + response.data.message);
+                alert(`Erro ao enviar mÃ³dulo: ${response.data.message}`);
             }
         } catch (error: unknown) {
             if (error instanceof Error) {
-                alert('Erro ao enviar módulo: ' + error.message);
+                alert(`Erro ao enviar mÃ³dulo: ${error.message}`);
             } else {
-                alert('Erro ao enviar módulo: Erro desconhecido');
+                alert('Erro ao enviar mÃ³dulo: Erro desconhecido');
             }
         } finally {
             setUploading(false);
@@ -103,23 +103,23 @@ export default function ModulesManagementPage() {
     const handleValidate = async (id: string) => {
         try {
             await axios.post(`/api/modules/${id}/validate`);
-            alert('Módulo validado com sucesso!');
+            alert('MÃ³dulo validado com sucesso!');
             loadModules();
         } catch {
-            alert('Erro ao validar módulo');
+            alert('Erro ao validar mÃ³dulo');
         }
     };
 
     const handleEnable = async (id: string) => {
         try {
             await axios.post(`/api/modules/${id}/enable`);
-            alert('Módulo ativado com sucesso!');
+            alert('MÃ³dulo ativado com sucesso!');
             loadModules();
         } catch (error: unknown) {
             if (error instanceof Error) {
-                alert('Erro ao ativar módulo: ' + error.message);
+                alert(`Erro ao ativar mÃ³dulo: ${error.message}`);
             } else {
-                alert('Erro ao ativar módulo: Erro desconhecido');
+                alert('Erro ao ativar mÃ³dulo: Erro desconhecido');
             }
         }
     };
@@ -127,74 +127,73 @@ export default function ModulesManagementPage() {
     const handleDisable = async (id: string) => {
         try {
             await axios.post(`/api/modules/${id}/disable`);
-            alert('Módulo desativado com sucesso!');
+            alert('MÃ³dulo desativado com sucesso!');
             loadModules();
         } catch {
-            alert('Erro ao desativar módulo');
+            alert('Erro ao desativar mÃ³dulo');
         }
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Tem certeza que deseja remover este módulo?')) return;
+        if (!confirm('Tem certeza que deseja remover este mÃ³dulo?')) return;
 
         try {
             await axios.delete(`/api/modules/${id}`);
-            alert('Módulo removido com sucesso!');
+            alert('MÃ³dulo removido com sucesso!');
             loadModules();
         } catch {
-            alert('Erro ao remover módulo');
+            alert('Erro ao remover mÃ³dulo');
         }
     };
 
     return (
-        <div className="container mx-auto py-6 px-4 max-w-7xl">
-            {/* Header */}
+        <div className="container mx-auto max-w-7xl px-4 py-6 text-slate-950 dark:text-slate-50">
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                    Gerenciamento de Módulos
+                <h1 className="mb-2 text-3xl font-bold text-slate-950 dark:text-slate-50">
+                    Gerenciamento de MÃ³dulos
                 </h1>
-                <p className="text-gray-600">
-                    Faça upload, valide e gerencie módulos do sistema
+                <p className="text-slate-600 dark:text-slate-300">
+                    FaÃ§a upload, valide e gerencie mÃ³dulos do sistema
                 </p>
             </div>
 
-            {/* Upload Section */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <div className="mb-8 rounded-lg bg-white p-6 shadow-md dark:border dark:border-slate-800/80 dark:bg-slate-950/55">
+                <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold text-slate-950 dark:text-slate-50">
                     <Upload className="h-5 w-5" />
-                    Upload de Módulo
+                    Upload de MÃ³dulo
                 </h2>
 
                 <div
-                    className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${dragActive
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-300 hover:border-gray-400'
-                        }`}
+                    className={`rounded-lg border-2 border-dashed p-8 text-center transition-colors ${
+                        dragActive
+                            ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/30'
+                            : 'border-gray-300 hover:border-gray-400 dark:border-slate-700 dark:hover:border-slate-600'
+                    }`}
                     onDragEnter={handleDrag}
                     onDragLeave={handleDrag}
                     onDragOver={handleDrag}
                     onDrop={handleDrop}
                 >
-                    <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <Package className="mx-auto mb-4 h-12 w-12 text-gray-400 dark:text-slate-500" />
 
                     {selectedFile ? (
                         <div className="mb-4">
-                            <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-sm font-medium text-slate-950 dark:text-slate-50">{selectedFile.name}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
                                 {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                             </p>
                         </div>
                     ) : (
                         <div className="mb-4">
-                            <p className="text-sm text-gray-600 mb-2">
+                            <p className="mb-2 text-sm text-slate-600 dark:text-slate-300">
                                 Arraste um arquivo .zip ou clique para selecionar
                             </p>
-                            <p className="text-xs text-gray-500">Tamanho máximo: 50MB</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Tamanho mÃ¡ximo: 50MB</p>
                         </div>
                     )}
 
-                    <div className="flex gap-2 justify-center">
-                        <label className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 cursor-pointer transition-colors">
+                    <div className="flex justify-center gap-2">
+                        <label className="cursor-pointer rounded-md bg-gray-100 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-200 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:bg-slate-900">
                             Selecionar Arquivo
                             <input
                                 type="file"
@@ -209,13 +208,13 @@ export default function ModulesManagementPage() {
                                 <button
                                     onClick={handleUpload}
                                     disabled={uploading}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                                    className="rounded-md bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 disabled:bg-gray-400 dark:disabled:bg-slate-700"
                                 >
-                                    {uploading ? 'Enviando...' : 'Enviar Módulo'}
+                                    {uploading ? 'Enviando...' : 'Enviar MÃ³dulo'}
                                 </button>
                                 <button
                                     onClick={() => setSelectedFile(null)}
-                                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                                    className="rounded-md bg-red-600 px-4 py-2 text-white transition-colors hover:bg-red-700"
                                 >
                                     Cancelar
                                 </button>
@@ -225,39 +224,38 @@ export default function ModulesManagementPage() {
                 </div>
             </div>
 
-            {/* Modules List */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-semibold mb-4">Módulos Instalados</h2>
+            <div className="rounded-lg bg-white p-6 shadow-md dark:border dark:border-slate-800/80 dark:bg-slate-950/55">
+                <h2 className="mb-4 text-xl font-semibold text-slate-950 dark:text-slate-50">MÃ³dulos Instalados</h2>
 
                 {loading ? (
-                    <div className="text-center py-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                        <p className="text-gray-600 mt-2">Carregando módulos...</p>
+                    <div className="py-8 text-center">
+                        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
+                        <p className="mt-2 text-slate-600 dark:text-slate-300">Carregando mÃ³dulos...</p>
                     </div>
                 ) : modules.length === 0 ? (
-                    <div className="text-center py-8">
-                        <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                        <p className="text-gray-600">Nenhum módulo instalado</p>
+                    <div className="py-8 text-center">
+                        <Package className="mx-auto mb-4 h-12 w-12 text-gray-400 dark:text-slate-500" />
+                        <p className="text-slate-600 dark:text-slate-300">Nenhum mÃ³dulo instalado</p>
                     </div>
                 ) : (
                     <div className="space-y-4">
                         {modules.map((module) => (
                             <div
                                 key={module.id}
-                                className="border rounded-lg p-4 hover:shadow-md transition-shadow"
+                                className="rounded-lg border p-4 transition-shadow hover:shadow-md dark:border-slate-800/80 dark:bg-slate-950/40"
                             >
                                 <div className="flex items-start justify-between">
                                     <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-2">
+                                        <div className="mb-2 flex items-center gap-2">
                                             <h3 className="text-lg font-semibold">{module.name}</h3>
-                                            <span className="text-sm text-gray-500">v{module.version}</span>
+                                            <span className="text-sm text-slate-500 dark:text-slate-400">v{module.version}</span>
 
                                             {module.enabled ? (
-                                                <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                                                <span className="rounded-full bg-green-100 px-2 py-1 text-xs text-green-800 dark:bg-green-950/35 dark:text-green-100">
                                                     Ativo
                                                 </span>
                                             ) : (
-                                                <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">
+                                                <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-800 dark:bg-slate-900/70 dark:text-slate-200">
                                                     Inativo
                                                 </span>
                                             )}
@@ -269,29 +267,29 @@ export default function ModulesManagementPage() {
                                             )}
 
                                             {module.sandboxed && (
-                                                <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                                                <span className="rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-950/35 dark:text-blue-100">
                                                     Sandbox
                                                 </span>
                                             )}
                                         </div>
 
                                         {module.description && (
-                                            <p className="text-sm text-gray-600 mb-2">{module.description}</p>
+                                            <p className="mb-2 text-sm text-slate-600 dark:text-slate-300">{module.description}</p>
                                         )}
 
-                                        <div className="flex gap-4 text-xs text-gray-500">
+                                        <div className="flex gap-4 text-xs text-slate-500 dark:text-slate-400">
                                             {module.author && <span>Autor: {module.author}</span>}
                                             {module.category && <span>Categoria: {module.category}</span>}
-                                            <span>{module.pagesCount} página(s)</span>
-                                            <span>{module.permissionsCount} permissão(ões)</span>
+                                            <span>{module.pagesCount} pÃ¡gina(s)</span>
+                                            <span>{module.permissionsCount} permissÃ£o(Ãµes)</span>
                                         </div>
                                     </div>
 
-                                    <div className="flex gap-2 ml-4">
+                                    <div className="ml-4 flex gap-2">
                                         {!module.validated && (
                                             <button
                                                 onClick={() => handleValidate(module.id)}
-                                                className="p-2 text-yellow-600 hover:bg-yellow-50 rounded-md transition-colors"
+                                                className="rounded-md p-2 text-yellow-600 transition-colors hover:bg-yellow-50 dark:hover:bg-yellow-950/20"
                                                 title="Validar"
                                             >
                                                 <CheckCircle className="h-5 w-5" />
@@ -301,7 +299,7 @@ export default function ModulesManagementPage() {
                                         {module.validated && !module.enabled && (
                                             <button
                                                 onClick={() => handleEnable(module.id)}
-                                                className="p-2 text-green-600 hover:bg-green-50 rounded-md transition-colors"
+                                                className="rounded-md p-2 text-green-600 transition-colors hover:bg-green-50 dark:hover:bg-green-950/20"
                                                 title="Ativar"
                                             >
                                                 <Power className="h-5 w-5" />
@@ -311,7 +309,7 @@ export default function ModulesManagementPage() {
                                         {module.enabled && (
                                             <button
                                                 onClick={() => handleDisable(module.id)}
-                                                className="p-2 text-orange-600 hover:bg-orange-50 rounded-md transition-colors"
+                                                className="rounded-md p-2 text-orange-600 transition-colors hover:bg-orange-50 dark:hover:bg-orange-950/20"
                                                 title="Desativar"
                                             >
                                                 <PowerOff className="h-5 w-5" />
@@ -320,7 +318,7 @@ export default function ModulesManagementPage() {
 
                                         <button
                                             onClick={() => handleDelete(module.id)}
-                                            className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                            className="rounded-md p-2 text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
                                             title="Remover"
                                         >
                                             <Trash2 className="h-5 w-5" />

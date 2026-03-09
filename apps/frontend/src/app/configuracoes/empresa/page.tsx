@@ -10,13 +10,13 @@ export default function EmpresaConfigPage() {
 
   return (
     <ProtectedRoute allowedRoles={["ADMIN"]}>
-      <div className="p-8">
+      <div className="p-8 text-slate-950 dark:text-slate-50">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+          <h1 className="flex items-center gap-2 text-3xl font-bold text-slate-950 dark:text-slate-50">
             <Building2 className="h-8 w-8" />
             Configurações da Empresa
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground dark:text-slate-300">
             Gerencie as configurações específicas da sua empresa
           </p>
         </div>
@@ -44,8 +44,8 @@ export default function EmpresaConfigPage() {
                 <li>Preferências de interface</li>
                 <li>Configurações de relatórios</li>
               </ul>
-              <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
+              <div className="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900/70 dark:bg-blue-950/30">
+                <p className="text-sm text-blue-800 dark:text-blue-100">
                   <strong>Nota:</strong> Esta funcionalidade será implementada em breve. 
                   Por enquanto, você pode acessar outras áreas do sistema através do menu principal.
                 </p>
@@ -77,12 +77,12 @@ export default function EmpresaConfigPage() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium">Nível de Acesso:</span>
-                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                <span className="rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800 dark:bg-blue-950/40 dark:text-blue-100">
                   {user?.role}
                 </span>
               </div>
-              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-green-800">
+              <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-900/70 dark:bg-green-950/30">
+                <p className="text-sm text-green-800 dark:text-green-100">
                   ✓ Você tem permissão para gerenciar configurações da empresa
                 </p>
               </div>

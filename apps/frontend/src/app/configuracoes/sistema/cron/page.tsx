@@ -8,7 +8,9 @@ import {
   Clock3,
   Info,
   Loader2,
+  MoreHorizontal,
   Pause,
+  PanelRight,
   Play,
   RotateCw,
   Settings2,
@@ -39,6 +41,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
+import { cn } from "@/lib/utils";
 import {
   buildCronExpressionFromForm,
   createCronEditorForm,
@@ -88,6 +91,7 @@ export default function CronJobsPage() {
   const [jobs, setJobs] = useState<CronJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [selectedJobKey, setSelectedJobKey] = useState<string | null>(null);
   const [editingJob, setEditingJob] = useState<CronJob | null>(null);
   const [editorForm, setEditorForm] = useState<CronEditorForm | null>(null);
   const [editorEnabled, setEditorEnabled] = useState(true);
@@ -154,6 +158,14 @@ export default function CronJobsPage() {
     }
   };
 
+  const openDetails = (job: CronJob) => {
+    setSelectedJobKey(job.key);
+  };
+
+  const closeDetails = () => {
+    setSelectedJobKey(null);
+  };
+
   const openEditor = (job: CronJob) => {
     setEditingJob(job);
     setEditorEnabled(job.enabled);
@@ -215,8 +227,8 @@ export default function CronJobsPage() {
     } catch (error: unknown) {
       const message =
         typeof error === "object" &&
-        error !== null &&
-        typeof (error as SaveError).response?.data?.message === "string"
+          error !== null &&
+          typeof (error as SaveError).response?.data?.message === "string"
           ? (error as SaveError).response?.data?.message
           : "Nao foi possivel salvar as alteracoes da tarefa.";
 
@@ -232,30 +244,39 @@ export default function CronJobsPage() {
 
   const runningCount = jobs.filter((job) => job.enabled).length;
   const runtimeIssuesCount = jobs.filter((job) => job.runtimeRegistered === false || job.issue).length;
+  const selectedJob = selectedJobKey ? jobs.find((job) => job.key === selectedJobKey) ?? null : null;
 
   if (loading) {
     return <div className="p-8 text-center">Carregando tarefas agendadas...</div>;
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-8">
+    <div className="space-y-6 p-4 text-slate-950 dark:text-slate-50 md:p-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-2">
-          <h1 className="flex items-center gap-3 text-3xl font-bold tracking-tight">
+          <h1 className="flex items-center gap-3 text-3xl font-bold tracking-tight text-slate-950 dark:text-slate-50">
             <Clock3 className="h-8 w-8 text-primary" />
             Tarefas agendadas
           </h1>
-          <p className="max-w-2xl text-sm text-muted-foreground">
-            Acompanhe rotinas automaticas, entenda o cronograma sem ler expressao crua e ajuste
-            a execucao em um fluxo mais administrativo.
+          <p className="max-w-2xl text-sm text-slate-600 dark:text-slate-300">
+            Visualize a saude das rotinas, execute acoes rapidas e deixe os detalhes tecnicos em
+            um painel lateral.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Badge variant="outline" className="rounded-full px-3 py-1">
+          <Badge variant="outline" className="rounded-full border-slate-200/80 bg-white/85 px-3 py-1 text-slate-700 dark:border-slate-800/80 dark:bg-slate-950/55 dark:text-slate-200">
             {runningCount} ativas
           </Badge>
-          <Badge variant={runtimeIssuesCount > 0 ? "destructive" : "outline"} className="rounded-full px-3 py-1">
+          <Badge
+            variant={runtimeIssuesCount > 0 ? "destructive" : "outline"}
+            className={cn(
+              "rounded-full px-3 py-1",
+              runtimeIssuesCount > 0
+                ? "dark:border-rose-900/70 dark:bg-rose-950/40 dark:text-rose-100"
+                : "border-slate-200/80 bg-white/85 text-slate-700 dark:border-slate-800/80 dark:bg-slate-950/55 dark:text-slate-200",
+            )}
+          >
             {runtimeIssuesCount > 0 ? `${runtimeIssuesCount} com divergencia` : "Runtime sincronizado"}
           </Badge>
           <Button onClick={() => void fetchJobs(true)} variant="outline">
@@ -265,158 +286,189 @@ export default function CronJobsPage() {
         </div>
       </div>
 
-      <Card className="border-dashed border-primary/30 bg-primary/5">
-        <CardContent className="flex flex-col gap-3 p-5 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1">
-            <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Sparkles className="h-4 w-4 text-primary" />
-              Alteracoes aplicadas em quente
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Ao salvar uma tarefa, o runtime e a proxima execucao estimada sao atualizados sem
-              reiniciar a aplicacao.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-primary/20 bg-background/70 px-4 py-3 text-xs text-muted-foreground">
-            O cron cru continua disponivel no modo avancado para casos especiais.
-          </div>
-        </CardContent>
-      </Card>
-
       <div className="grid gap-4">
         {jobs.map((job) => {
           const isBusy = savingKey === job.key;
           const presentation = getCronTaskPresentation(job);
           const scheduleSummary = describeCronSchedule(job.schedule);
+          const nextRunText = job.enabled
+            ? formatDateTime(job.nextRun || job.nextExpectedRunAt)
+            : "Agendamento pausado";
+          const hasIssue = job.runtimeRegistered === false || job.issue === "runtime_not_registered";
 
           return (
             <Card
               key={job.key}
-              className={
-                !job.enabled
-                  ? "border-dashed border-amber-300/70 bg-gradient-to-br from-amber-50 via-white to-slate-100 shadow-[0_0_0_1px_rgba(245,158,11,0.10),0_18px_40px_-28px_rgba(245,158,11,0.55)] dark:border-amber-900/60 dark:bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.14),transparent_42%),linear-gradient(135deg,rgba(51,65,85,0.88),rgba(15,23,42,0.92))]"
-                  : "border-sky-200/80 bg-gradient-to-br from-sky-50 via-white to-cyan-50 shadow-[0_0_0_1px_rgba(14,165,233,0.10),0_20px_44px_-30px_rgba(14,165,233,0.45)] dark:border-sky-900/60 dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.16),transparent_40%),linear-gradient(135deg,rgba(15,23,42,0.92),rgba(12,74,110,0.62))]"
-              }
+              className={cn(
+                "rounded-[28px] shadow-[0_20px_55px_-36px_rgba(15,23,42,0.35)] transition-shadow hover:shadow-[0_24px_60px_-36px_rgba(15,23,42,0.45)]",
+                hasIssue
+                  ? "border-rose-200/80 bg-gradient-to-br from-rose-50/90 via-white to-orange-50/85 dark:border-rose-900/60 dark:bg-gradient-to-br dark:from-rose-950/35 dark:via-slate-950/96 dark:to-orange-950/25"
+                  : "border-sky-200/80 bg-gradient-to-br from-sky-50/90 via-white to-cyan-50/85 dark:border-sky-900/60 dark:bg-gradient-to-br dark:from-sky-950/30 dark:via-slate-950/96 dark:to-cyan-950/20",
+              )}
             >
-              <CardHeader className="gap-3 border-b border-border/50 pb-3">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0 space-y-2.5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <CardTitle className="text-base font-semibold">{presentation.label}</CardTitle>
-                      <TaskInfoPopover description={presentation.description} />
-                      <Badge variant={job.enabled ? "default" : "secondary"}>
-                        {job.enabled ? "Ativa" : "Pausada"}
-                      </Badge>
-                      {renderStatusBadge(job)}
-                      <Badge variant={job.runtimeRegistered ? "outline" : "destructive"}>
-                        {job.runtimeRegistered ? "Aplicada em runtime" : "Nao carregada no runtime"}
-                      </Badge>
+              <CardContent className="p-3.5 sm:p-4">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="min-w-0 flex-1 space-y-2.5">
+                    <div className="flex flex-wrap items-start gap-3">
+                      <div className="rounded-2xl border border-slate-200/80 bg-white/85 p-2 shadow-sm dark:border-slate-800/80 dark:bg-slate-950/55">
+                        <Clock3 className="h-5 w-5 text-slate-700 dark:text-slate-300" />
+                      </div>
+
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <CardTitle className="truncate text-base font-semibold text-slate-950 dark:text-slate-50 sm:text-lg">
+                            {presentation.label}
+                          </CardTitle>
+                          <TaskInfoPopover description={presentation.description} />
+                          <Badge variant={job.enabled ? "default" : "secondary"}>
+                            {job.enabled ? "Ativa" : "Pausada"}
+                          </Badge>
+                          {renderStatusBadge(job)}
+                        </div>
+
+                        <p className="line-clamp-2 text-sm text-slate-600 dark:text-slate-300">
+                          {presentation.description}
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span className="rounded-full bg-background/90 px-2.5 py-1 shadow-sm">
-                        {job.origin === "modulo" ? "Origem: modulo" : "Origem: plataforma"}
-                      </span>
-                      <span className="rounded-full bg-background/90 px-2.5 py-1 shadow-sm">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline" className="rounded-full border-slate-200/80 bg-white/85 px-2.5 py-1 text-[11px] text-slate-700 dark:border-slate-800/80 dark:bg-slate-950/55 dark:text-slate-200">
+                        {scheduleSummary.label}
+                      </Badge>
+                      <Badge
+                        variant={hasIssue ? "destructive" : "outline"}
+                        className={cn(
+                          "rounded-full px-2.5 py-1 text-[11px]",
+                          hasIssue
+                            ? "dark:border-rose-900/70 dark:bg-rose-950/40 dark:text-rose-100"
+                            : "border-slate-200/80 bg-white/85 text-slate-700 dark:border-slate-800/80 dark:bg-slate-950/55 dark:text-slate-200",
+                        )}
+                      >
+                        {hasIssue ? "Runtime com divergencia" : "Runtime OK"}
+                      </Badge>
+                      <Badge variant="outline" className="rounded-full border-slate-200/80 bg-white/85 px-2.5 py-1 text-[11px] text-slate-700 dark:border-slate-800/80 dark:bg-slate-950/55 dark:text-slate-200">
+                        Proxima: {nextRunText}
+                      </Badge>
+                      {typeof job.consecutiveFailureCount === "number" &&
+                        job.consecutiveFailureCount > 0 && (
+                          <Badge
+                            variant="outline"
+                            className="rounded-full border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/35 dark:text-amber-100"
+                          >
+                            {job.consecutiveFailureCount} falha(s) seguidas
+                          </Badge>
+                        )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                      <span>{job.origin === "modulo" ? "Origem: modulo" : "Origem: plataforma"}</span>
+                      <span>
                         Fonte: {job.sourceOfTruth === "database" ? "configuracao persistida" : "runtime"}
                       </span>
-                      {job.editable === false && (
-                        <span className="rounded-full bg-background/90 px-2.5 py-1 shadow-sm">Cronograma fixo</span>
-                      )}
+                      <span>Chave: {job.key}</span>
+                      {job.editable === false && <span>Cronograma fixo</span>}
                     </div>
+
+                    {hasIssue && (
+                      <p className="text-xs text-destructive">
+                        Esta tarefa foi salva, mas o runtime atual ainda nao carregou essa configuracao.
+                      </p>
+                    )}
+
+                    {job.lastError && (
+                      <p className="line-clamp-1 text-xs text-amber-700 dark:text-amber-300">
+                        Ultimo erro: {job.lastError}
+                      </p>
+                    )}
                   </div>
 
-                  <div className="flex items-center gap-1 self-start">
+                  <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap xl:w-auto xl:justify-end">
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={isBusy}
-                      onClick={() => openEditor(job)}
-                      title="Editar tarefa"
-                      aria-label={`Editar tarefa ${presentation.label}`}
+                      variant="outline"
+                      className="w-full sm:w-auto"
+                      onClick={() => openDetails(job)}
                     >
-                      <Settings2 className="h-4 w-4" />
+                      <PanelRight className="mr-2 h-4 w-4" />
+                      Detalhes
                     </Button>
+
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={isBusy}
-                      onClick={() => void handleTrigger(job.key)}
-                      title="Executar agora"
-                      aria-label={`Executar agora ${presentation.label}`}
-                    >
-                      <Play className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
+                      variant={job.enabled ? "outline" : "default"}
+                      className={cn(
+                        "w-full sm:w-auto",
+                        !job.enabled && "bg-green-600 hover:bg-green-700",
+                      )}
                       disabled={isBusy}
                       onClick={() => void handleToggle(job.key, job.enabled)}
-                      title={job.enabled ? "Pausar tarefa" : "Ativar tarefa"}
-                      aria-label={job.enabled ? `Pausar tarefa ${presentation.label}` : `Ativar tarefa ${presentation.label}`}
                     >
-                      {job.enabled ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-3 pt-4">
-                <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
-                  <TaskDataItem label="Cronograma">
-                    <p className="font-medium text-foreground">{scheduleSummary.label}</p>
-                    <code className="mt-2 inline-flex rounded-md bg-muted px-2 py-1 font-mono text-[11px] text-muted-foreground">
-                      {job.schedule}
-                    </code>
-                  </TaskDataItem>
-
-                  <TaskDataItem label="Ultima execucao">
-                    {formatDateTime(job.lastStartedAt || job.lastRun)}
-                  </TaskDataItem>
-
-                  <TaskDataItem label="Ultimo sucesso">
-                    {formatDateTime(job.lastSucceededAt)}
-                  </TaskDataItem>
-
-                  <TaskDataItem label="Ultima falha">
-                    {formatDateTime(job.lastFailedAt)}
-                  </TaskDataItem>
-
-                  <TaskDataItem label="Proxima execucao">
-                    {job.enabled ? formatDateTime(job.nextRun || job.nextExpectedRunAt) : "Agendamento pausado"}
-                  </TaskDataItem>
-
-                  <TaskDataItem label="Duracao / heartbeat">
-                    <div className="space-y-1">
-                      <p>{formatDurationMs(job.lastDurationMs)}</p>
-                      {typeof job.consecutiveFailureCount === "number" && (
-                        <p className="text-xs text-muted-foreground">
-                          Falhas seguidas: {job.consecutiveFailureCount}
-                        </p>
+                      {isBusy ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : job.enabled ? (
+                        <Pause className="mr-2 h-4 w-4" />
+                      ) : (
+                        <Play className="mr-2 h-4 w-4" />
                       )}
-                    </div>
-                  </TaskDataItem>
+                      {job.enabled ? "Pausar" : "Ativar"}
+                    </Button>
 
-                  <TaskDataItem label="Proximo horario esperado">
-                    {formatDateTime(job.nextExpectedRunAt)}
-                  </TaskDataItem>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="icon" className="shrink-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                          <span className="sr-only">Mais acoes</span>
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        align="end"
+                        className="w-72 max-w-[calc(100vw-1.5rem)] rounded-[24px] border border-slate-200/90 bg-white p-2 text-slate-900 shadow-[0_20px_55px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800/90 dark:bg-slate-950 dark:text-slate-100"
+                      >
+                        <div className="space-y-1">
+                          <div className="px-2 py-1.5">
+                            <p className="text-sm font-medium text-slate-950 dark:text-slate-50">Acoes da tarefa</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                              Operacoes rapidas para {presentation.label}
+                            </p>
+                          </div>
 
-                  <TaskDataItem label="Chave tecnica">
-                    <code className="font-mono text-[11px] text-muted-foreground">{job.key}</code>
-                  </TaskDataItem>
+                          <Button
+                            variant="ghost"
+                            className="h-auto w-full justify-start rounded-xl px-3 py-2 text-left whitespace-normal"
+                            disabled={isBusy}
+                            onClick={() => openEditor(job)}
+                          >
+                            <Settings2 className="mr-3 h-4 w-4 shrink-0" />
+                            <span className="min-w-0 flex-1">
+                              <span className="block break-words text-sm font-medium">Editar tarefa</span>
+                              <span className="block break-words text-xs text-slate-500 dark:text-slate-400">
+                                Ajuste cronograma, modo simplificado e modo avancado.
+                              </span>
+                            </span>
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            className="h-auto w-full justify-start rounded-xl px-3 py-2 text-left whitespace-normal"
+                            disabled={isBusy}
+                            onClick={() => void handleTrigger(job.key)}
+                          >
+                            {isBusy ? (
+                              <Loader2 className="mr-3 h-4 w-4 shrink-0 animate-spin" />
+                            ) : (
+                              <Play className="mr-3 h-4 w-4 shrink-0" />
+                            )}
+                            <span className="min-w-0 flex-1">
+                              <span className="block break-words text-sm font-medium">Executar agora</span>
+                              <span className="block break-words text-xs text-slate-500 dark:text-slate-400">
+                                Dispara uma execucao manual imediata no runtime atual.
+                              </span>
+                            </span>
+                          </Button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
-
-                {job.issue === "runtime_not_registered" && (
-                  <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                    Esta tarefa foi salva na configuracao, mas ainda nao esta registrada no runtime atual.
-                  </div>
-                )}
-
-                {job.lastError && (
-                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
-                    <span className="font-medium">Ultimo erro:</span> {job.lastError}
-                  </div>
-                )}
               </CardContent>
             </Card>
           );
@@ -430,192 +482,265 @@ export default function CronJobsPage() {
         )}
       </div>
 
+      <Dialog open={Boolean(selectedJob)} onOpenChange={(open) => !open && closeDetails()}>
+        <DialogContent className="inset-0 h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 overflow-hidden gap-0 rounded-none border-0 bg-transparent p-0 shadow-none sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[min(760px,100vw)] sm:max-w-[760px] sm:border-l-0 sm:p-0">
+          {selectedJob && (
+            <div className="flex h-full min-h-0 flex-col bg-slate-100/95 text-slate-950 dark:bg-slate-950/98 dark:text-slate-50">
+              <DialogHeader className="shrink-0 border-b border-slate-200/80 bg-white/95 px-4 py-4 text-left backdrop-blur-sm dark:border-slate-800/80 dark:bg-slate-950/92 sm:px-6 sm:py-5">
+                <div className="pr-8">
+                  <DialogTitle className="flex flex-wrap items-center gap-2 text-xl text-slate-950 dark:text-slate-50">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-sky-200/80 bg-sky-50/80 shadow-sm dark:border-sky-900/60 dark:bg-sky-950/30">
+                      <Clock3 className="h-4 w-4 text-sky-700 dark:text-sky-300" />
+                    </span>
+                    {getCronTaskPresentation(selectedJob).label}
+                    <Badge variant={selectedJob.enabled ? "default" : "secondary"}>
+                      {selectedJob.enabled ? "Ativa" : "Pausada"}
+                    </Badge>
+                    {renderStatusBadge(selectedJob)}
+                  </DialogTitle>
+                  <DialogDescription className="mt-2 text-slate-600 dark:text-slate-300">
+                    {getCronTaskPresentation(selectedJob).description}
+                  </DialogDescription>
+                </div>
+              </DialogHeader>
+
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-5">
+                <div className="space-y-5">
+                  <section className="space-y-3">
+                    <div className="space-y-1">
+                      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Visao geral
+                      </h2>
+                      <p className="text-sm text-slate-600 dark:text-slate-300">
+                        Leitura rapida da configuracao e do agendamento principal.
+                      </p>
+                    </div>
+
+                    <Card className="rounded-[28px] border border-sky-200/80 bg-gradient-to-br from-sky-50/92 via-white to-cyan-50/78 shadow-[0_20px_55px_-36px_rgba(15,23,42,0.35)] backdrop-blur-sm dark:border-sky-900/60 dark:bg-gradient-to-br dark:from-sky-950/28 dark:via-slate-950/96 dark:to-slate-900/92">
+                      <CardContent className="space-y-3 p-4">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <TaskDataItem label="Cronograma">
+                            <div className="space-y-2">
+                              <p className="font-medium text-slate-950 dark:text-slate-50">
+                                {describeCronSchedule(selectedJob.schedule).label}
+                              </p>
+                              <code className="inline-flex break-all rounded-md bg-slate-100/90 px-2 py-1 font-mono text-[11px] text-slate-600 dark:bg-slate-900/90 dark:text-slate-300">
+                                {selectedJob.schedule}
+                              </code>
+                            </div>
+                          </TaskDataItem>
+                          <TaskDataItem label="Proxima execucao">
+                            {selectedJob.enabled
+                              ? formatDateTime(selectedJob.nextRun || selectedJob.nextExpectedRunAt)
+                              : "Agendamento pausado"}
+                          </TaskDataItem>
+                          <TaskDataItem label="Origem">
+                            {selectedJob.origin === "modulo" ? "Modulo" : "Plataforma"}
+                          </TaskDataItem>
+                          <TaskDataItem label="Fonte">
+                            {selectedJob.sourceOfTruth === "database"
+                              ? "Configuracao persistida"
+                              : "Runtime"}
+                          </TaskDataItem>
+                        </div>
+
+                        <div className="rounded-[22px] border border-slate-200/80 bg-white/90 p-4 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/70">
+                          <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            Chave tecnica
+                          </p>
+                          <code className="mt-2 inline-flex break-all rounded-md bg-slate-100 px-2 py-1 font-mono text-[11px] text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                            {selectedJob.key}
+                          </code>
+                          {selectedJob.editable === false && (
+                            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                              Esta tarefa usa um cronograma fixo, mas ainda pode ser ativada ou
+                              pausada.
+                            </p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </section>
+
+                  <section className="space-y-3">
+                    <div className="space-y-1">
+                      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Agenda e runtime
+                      </h2>
+                      <p className="text-sm text-slate-600 dark:text-slate-300">
+                        Historico recente, heartbeat e sinais de divergencia do runtime atual.
+                      </p>
+                    </div>
+
+                    <Card className="rounded-[28px] border border-slate-200/80 bg-white/92 shadow-[0_20px_55px_-36px_rgba(15,23,42,0.28)] backdrop-blur-sm dark:border-slate-800/80 dark:bg-slate-900/72">
+                      <CardContent className="space-y-4 p-4">
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                          <TaskDataItem label="Ultima execucao">
+                            {formatDateTime(selectedJob.lastStartedAt || selectedJob.lastRun)}
+                          </TaskDataItem>
+                          <TaskDataItem label="Ultimo sucesso">
+                            {formatDateTime(selectedJob.lastSucceededAt)}
+                          </TaskDataItem>
+                          <TaskDataItem label="Ultima falha">
+                            {formatDateTime(selectedJob.lastFailedAt)}
+                          </TaskDataItem>
+                          <TaskDataItem label="Duracao">
+                            {formatDurationMs(selectedJob.lastDurationMs)}
+                          </TaskDataItem>
+                          <TaskDataItem label="Proximo horario esperado">
+                            {formatDateTime(selectedJob.nextExpectedRunAt)}
+                          </TaskDataItem>
+                          <TaskDataItem label="Runtime">
+                            {selectedJob.runtimeRegistered ? "Registrada" : "Nao carregada"}
+                          </TaskDataItem>
+                        </div>
+
+                        {typeof selectedJob.consecutiveFailureCount === "number" &&
+                          selectedJob.consecutiveFailureCount > 0 && (
+                            <div className="rounded-xl border border-amber-300/60 bg-amber-50/90 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/35 dark:text-amber-100">
+                              Falhas consecutivas: {selectedJob.consecutiveFailureCount}
+                            </div>
+                          )}
+
+                        {selectedJob.issue === "runtime_not_registered" && (
+                          <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive dark:bg-destructive/10">
+                            Esta tarefa foi salva na configuracao, mas ainda nao esta registrada no runtime atual.
+                          </div>
+                        )}
+
+                        {selectedJob.lastError && (
+                          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/35 dark:text-amber-100">
+                            <span className="font-medium">Ultimo erro:</span> {selectedJob.lastError}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </section>
+                </div>
+              </div>
+
+              <DialogFooter className="shrink-0 border-t border-slate-200/80 bg-white/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-sm dark:border-slate-800/80 dark:bg-slate-950/92 sm:px-6 sm:pb-3">
+                <Button variant="outline" onClick={closeDetails}>
+                  Fechar
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={Boolean(editingJob && editorForm)} onOpenChange={(open) => !open && closeEditor()}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="inset-0 h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 gap-0 rounded-none border-0 bg-transparent p-0 shadow-none sm:left-[50%] sm:top-[50%] sm:right-auto sm:bottom-auto sm:h-auto sm:max-h-[90dvh] sm:w-[min(860px,calc(100vw-2rem))] sm:max-w-[860px] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-[28px] sm:border-0 sm:p-0">
           {editingJob && editorForm && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Editar tarefa</DialogTitle>
-                <DialogDescription>
+            <div className="flex h-full max-h-dvh flex-col bg-slate-100/95 text-slate-950 shadow-[0_24px_60px_-38px_rgba(15,23,42,0.4)] dark:bg-slate-950/98 dark:text-slate-50 sm:max-h-[90dvh] sm:rounded-[28px] sm:border sm:border-slate-200/80 dark:sm:border-slate-800/80">
+              <DialogHeader className="border-b border-slate-200/80 bg-white/95 px-6 pb-4 pt-6 text-left backdrop-blur-sm dark:border-slate-800/80 dark:bg-slate-950/92">
+                <DialogTitle className="text-slate-950 dark:text-slate-50">Editar tarefa</DialogTitle>
+                <DialogDescription className="text-slate-600 dark:text-slate-300">
                   Ajuste o cronograma, confirme a proxima execucao e aplique as alteracoes no runtime.
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-6">
-                <div className="grid gap-3 rounded-2xl border border-border/70 bg-muted/20 p-4 md:grid-cols-[1.4fr,1fr]">
+              <div className="flex-1 overflow-y-auto px-6 pb-6">
+                <div className="space-y-6">
+                <div className="grid gap-3 rounded-[28px] border border-sky-200/80 bg-gradient-to-br from-sky-50/92 via-white to-cyan-50/78 p-4 shadow-[0_20px_55px_-36px_rgba(15,23,42,0.35)] dark:border-sky-900/60 dark:bg-gradient-to-br dark:from-sky-950/28 dark:via-slate-950/96 dark:to-slate-900/92 md:grid-cols-[1.4fr,1fr]">
                   <div className="space-y-2">
-                    <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    <Label className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       Nome amigavel
                     </Label>
-                    <p className="text-sm font-semibold text-foreground">
+                    <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">
                       {getCronTaskPresentation(editingJob).label}
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-slate-600 dark:text-slate-300">
                       {getCronTaskPresentation(editingJob).description}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
                       Esse nome e apenas a identificacao amigavel exibida na interface. A chave tecnica abaixo continua fixa.
                     </p>
                   </div>
 
                   <div className="space-y-3">
                     <div className="space-y-2">
-                      <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                      <Label className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                         Chave tecnica
                       </Label>
-                      <code className="inline-flex rounded-md bg-background px-2 py-1 font-mono text-[11px] text-muted-foreground">
+                      <code className="inline-flex rounded-md bg-white/85 px-2 py-1 font-mono text-[11px] text-slate-600 dark:bg-slate-900 dark:text-slate-300">
                         {editingJob.key}
                       </code>
                     </div>
 
-                    <div className="flex items-center justify-between rounded-xl border border-border/70 bg-background px-3 py-3">
+                    <div className="flex items-center justify-between rounded-[22px] border border-slate-200/80 bg-white/85 px-3 py-3 shadow-sm dark:border-slate-800/80 dark:bg-slate-950/45">
                       <div className="space-y-1">
-                        <p className="text-sm font-medium text-foreground">Tarefa ativa</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-sm font-medium text-slate-950 dark:text-slate-50">Tarefa ativa</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
                           Desative apenas quando a rotina nao deve mais executar automaticamente.
                         </p>
                       </div>
-                      <Switch
-                        checked={editorEnabled}
-                        onCheckedChange={setEditorEnabled}
-                        aria-label="Ativar ou pausar tarefa"
-                      />
+                        <Switch
+                          checked={editorEnabled}
+                          onCheckedChange={setEditorEnabled}
+                          aria-label="Ativar ou pausar tarefa"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="space-y-4">
-                  {editingJob.editable !== false && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        type="button"
-                        variant={editorForm.mode === "simple" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() =>
-                          updateEditorForm((current) => ({
-                            ...current,
-                            mode: "simple",
-                            preset: current.preset === "custom" ? "every_hours" : current.preset,
-                          }))
-                        }
-                      >
-                        Modo simplificado
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={editorForm.mode === "advanced" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() =>
-                          updateEditorForm((current) => ({
-                            ...current,
-                            mode: "advanced",
-                            expression: buildCronExpressionFromForm(current),
-                          }))
-                        }
-                      >
-                        Modo avancado
-                      </Button>
-                    </div>
-                  )}
-
-                  {editingJob.editable === false ? (
-                    <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-                      Esta tarefa usa um cronograma fixo. Voce ainda pode ativar ou pausar a execucao.
-                    </div>
-                  ) : editorForm.mode === "simple" ? (
-                    <div className="grid gap-3 rounded-2xl border border-border/70 p-4 md:grid-cols-2">
-                      <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="cron-preset">Frequencia</Label>
-                        <Select
-                          value={editorForm.preset === "custom" ? "every_hours" : editorForm.preset}
-                          onValueChange={(value) =>
+                  <div className="space-y-4">
+                    {editingJob.editable !== false && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          variant={editorForm.mode === "simple" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() =>
                             updateEditorForm((current) => ({
                               ...current,
                               mode: "simple",
-                              preset: value as CronEditorForm["preset"],
+                              preset: current.preset === "custom" ? "every_hours" : current.preset,
                             }))
                           }
                         >
-                          <SelectTrigger id="cron-preset">
-                            <SelectValue placeholder="Selecione a frequencia" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {CRON_PRESET_OPTIONS.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          Modo simplificado
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={editorForm.mode === "advanced" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() =>
+                            updateEditorForm((current) => ({
+                              ...current,
+                              mode: "advanced",
+                              expression: buildCronExpressionFromForm(current),
+                            }))
+                          }
+                        >
+                          Modo avancado
+                        </Button>
                       </div>
+                    )}
 
-                      {(editorForm.preset === "every_minutes" || editorForm.preset === "every_hours") && (
-                        <NumberField
-                          id="cron-interval"
-                          label={editorForm.preset === "every_minutes" ? "Intervalo em minutos" : "Intervalo em horas"}
-                          value={editorForm.interval}
-                          min={1}
-                          max={editorForm.preset === "every_minutes" ? 59 : 23}
-                          onChange={(value) =>
-                            updateEditorForm((current) => ({ ...current, interval: value }))
-                          }
-                        />
-                      )}
-
-                      {editorForm.preset === "every_hours" && (
-                        <NumberField
-                          id="cron-hour-minute"
-                          label="Executar no minuto"
-                          value={editorForm.minute}
-                          min={0}
-                          max={59}
-                          onChange={(value) =>
-                            updateEditorForm((current) => ({ ...current, minute: value }))
-                          }
-                        />
-                      )}
-
-                      {(editorForm.preset === "daily" ||
-                        editorForm.preset === "weekly" ||
-                        editorForm.preset === "monthly") && (
-                        <>
-                          <NumberField
-                            id="cron-hour"
-                            label="Hora"
-                            value={editorForm.hour}
-                            min={0}
-                            max={23}
-                            onChange={(value) =>
-                              updateEditorForm((current) => ({ ...current, hour: value }))
-                            }
-                          />
-                          <NumberField
-                            id="cron-minute"
-                            label="Minuto"
-                            value={editorForm.minute}
-                            min={0}
-                            max={59}
-                            onChange={(value) =>
-                              updateEditorForm((current) => ({ ...current, minute: value }))
-                            }
-                          />
-                        </>
-                      )}
-
-                      {editorForm.preset === "weekly" && (
+                  {editingJob.editable === false ? (
+                    <div className="rounded-[22px] border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-100">
+                      Esta tarefa usa um cronograma fixo. Voce ainda pode ativar ou pausar a execucao.
+                    </div>
+                  ) : editorForm.mode === "simple" ? (
+                    <div className="grid gap-3 rounded-[28px] border border-slate-200/80 bg-white/92 p-4 shadow-[0_20px_55px_-36px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-slate-900/72 md:grid-cols-2">
                         <div className="space-y-2 md:col-span-2">
-                          <Label htmlFor="cron-weekday">Dia da semana</Label>
+                          <Label htmlFor="cron-preset">Frequencia</Label>
                           <Select
-                            value={editorForm.weekday}
+                            value={editorForm.preset === "custom" ? "every_hours" : editorForm.preset}
                             onValueChange={(value) =>
-                              updateEditorForm((current) => ({ ...current, weekday: value }))
+                              updateEditorForm((current) => ({
+                                ...current,
+                                mode: "simple",
+                                preset: value as CronEditorForm["preset"],
+                              }))
                             }
                           >
-                            <SelectTrigger id="cron-weekday">
-                              <SelectValue placeholder="Selecione o dia" />
+                            <SelectTrigger id="cron-preset" className="border-slate-200/80 bg-white/90 dark:border-slate-800/80 dark:bg-slate-900/70">
+                              <SelectValue placeholder="Selecione a frequencia" />
                             </SelectTrigger>
-                            <SelectContent>
-                              {CRON_WEEKDAY_OPTIONS.map((option) => (
+                            <SelectContent className="border-slate-200/80 bg-white/95 dark:border-slate-800/80 dark:bg-slate-950/95">
+                              {CRON_PRESET_OPTIONS.map((option) => (
                                 <SelectItem key={option.value} value={option.value}>
                                   {option.label}
                                 </SelectItem>
@@ -623,68 +748,144 @@ export default function CronJobsPage() {
                             </SelectContent>
                           </Select>
                         </div>
-                      )}
 
-                      {editorForm.preset === "monthly" && (
-                        <div className="space-y-2 md:col-span-2">
+                        {(editorForm.preset === "every_minutes" || editorForm.preset === "every_hours") && (
                           <NumberField
-                            id="cron-day-of-month"
-                            label="Dia do mes"
-                            value={editorForm.dayOfMonth}
+                            id="cron-interval"
+                            label={editorForm.preset === "every_minutes" ? "Intervalo em minutos" : "Intervalo em horas"}
+                            value={editorForm.interval}
                             min={1}
-                            max={31}
+                            max={editorForm.preset === "every_minutes" ? 59 : 23}
                             onChange={(value) =>
-                              updateEditorForm((current) => ({ ...current, dayOfMonth: value }))
+                              updateEditorForm((current) => ({ ...current, interval: value }))
                             }
                           />
-                        </div>
-                      )}
-                    </div>
+                        )}
+
+                        {editorForm.preset === "every_hours" && (
+                          <NumberField
+                            id="cron-hour-minute"
+                            label="Executar no minuto"
+                            value={editorForm.minute}
+                            min={0}
+                            max={59}
+                            onChange={(value) =>
+                              updateEditorForm((current) => ({ ...current, minute: value }))
+                            }
+                          />
+                        )}
+
+                        {(editorForm.preset === "daily" ||
+                          editorForm.preset === "weekly" ||
+                          editorForm.preset === "monthly") && (
+                            <>
+                              <NumberField
+                                id="cron-hour"
+                                label="Hora"
+                                value={editorForm.hour}
+                                min={0}
+                                max={23}
+                                onChange={(value) =>
+                                  updateEditorForm((current) => ({ ...current, hour: value }))
+                                }
+                              />
+                              <NumberField
+                                id="cron-minute"
+                                label="Minuto"
+                                value={editorForm.minute}
+                                min={0}
+                                max={59}
+                                onChange={(value) =>
+                                  updateEditorForm((current) => ({ ...current, minute: value }))
+                                }
+                              />
+                            </>
+                          )}
+
+                        {editorForm.preset === "weekly" && (
+                          <div className="space-y-2 md:col-span-2">
+                            <Label htmlFor="cron-weekday">Dia da semana</Label>
+                            <Select
+                              value={editorForm.weekday}
+                              onValueChange={(value) =>
+                                updateEditorForm((current) => ({ ...current, weekday: value }))
+                              }
+                            >
+                              <SelectTrigger id="cron-weekday" className="border-slate-200/80 bg-white/90 dark:border-slate-800/80 dark:bg-slate-900/70">
+                                <SelectValue placeholder="Selecione o dia" />
+                              </SelectTrigger>
+                              <SelectContent className="border-slate-200/80 bg-white/95 dark:border-slate-800/80 dark:bg-slate-950/95">
+                                {CRON_WEEKDAY_OPTIONS.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+
+                        {editorForm.preset === "monthly" && (
+                          <div className="space-y-2 md:col-span-2">
+                            <NumberField
+                              id="cron-day-of-month"
+                              label="Dia do mes"
+                              value={editorForm.dayOfMonth}
+                              min={1}
+                              max={31}
+                              onChange={(value) =>
+                                updateEditorForm((current) => ({ ...current, dayOfMonth: value }))
+                              }
+                            />
+                          </div>
+                        )}
+                      </div>
                   ) : (
-                    <div className="space-y-2 rounded-2xl border border-border/70 p-4">
+                    <div className="space-y-2 rounded-[28px] border border-slate-200/80 bg-white/92 p-4 shadow-[0_20px_55px_-36px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-slate-900/72">
                       <Label htmlFor="cron-expression">Expressao cron</Label>
                       <Input
-                        id="cron-expression"
-                        value={editorForm.expression}
-                        onChange={(event) =>
-                          updateEditorForm((current) => ({
-                            ...current,
-                            expression: event.target.value,
-                          }))
-                        }
-                        className="font-mono"
-                        placeholder="Ex: 0 */6 * * *"
-                      />
-                      <p className="text-xs text-muted-foreground">
+                          id="cron-expression"
+                          value={editorForm.expression}
+                          onChange={(event) =>
+                            updateEditorForm((current) => ({
+                              ...current,
+                              expression: event.target.value,
+                            }))
+                          }
+                          className="border-slate-200/80 bg-white/90 font-mono dark:border-slate-800/80 dark:bg-slate-900/70"
+                          placeholder="Ex: 0 */6 * * *"
+                        />
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         Use o modo avancado apenas quando o formato simplificado nao cobrir o caso.
                       </p>
                     </div>
                   )}
                 </div>
 
-                <div className="rounded-2xl border border-border/70 bg-muted/20 p-4">
+                <div className="rounded-[28px] border border-slate-200/80 bg-white/92 p-4 shadow-[0_20px_55px_-36px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-slate-900/72">
                   <div className="grid gap-3 md:grid-cols-3">
                     <TaskDataItem label="Expressao final">
-                      <code className="font-mono text-[11px] text-muted-foreground">{finalSchedule || "-"}</code>
+                      <code className="font-mono text-[11px] text-slate-600 dark:text-slate-300">{finalSchedule || "-"}</code>
                     </TaskDataItem>
                     <TaskDataItem label="Descricao">
                       {finalSchedule ? humanizeCronExpression(finalSchedule) : "-"}
-                    </TaskDataItem>
-                    <TaskDataItem label="Proxima execucao estimada">
-                      {previewNextRun ? formatDateTime(previewNextRun) : "Sera recalculada apos salvar"}
-                    </TaskDataItem>
-                  </div>
-
-                  {cronError && (
-                    <div className="mt-4 flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                      <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span>{cronError}</span>
+                      </TaskDataItem>
+                      <TaskDataItem label="Proxima execucao estimada">
+                        {previewNextRun ? formatDateTime(previewNextRun) : "Sera recalculada apos salvar"}
+                      </TaskDataItem>
                     </div>
-                  )}
+
+                    {cronError && (
+                      <div className="mt-4 flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive dark:bg-destructive/12">
+                        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>{cronError}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <DialogFooter>
+              <DialogFooter className="border-t border-slate-200/80 bg-white/95 px-6 py-4 backdrop-blur-sm dark:border-slate-800/80 dark:bg-slate-950/92">
                 <Button type="button" variant="outline" onClick={closeEditor} disabled={savingKey === editingJob.key}>
                   Cancelar
                 </Button>
@@ -703,7 +904,7 @@ export default function CronJobsPage() {
                   )}
                 </Button>
               </DialogFooter>
-            </>
+            </div>
           )}
         </DialogContent>
       </Dialog>
@@ -737,9 +938,9 @@ function TaskInfoPopover({ description }: { description: string }) {
           <Info className="h-4 w-4" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 space-y-2">
-        <p className="text-sm font-medium text-foreground">Sobre esta tarefa</p>
-        <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
+      <PopoverContent align="start" className="w-80 max-w-[calc(100vw-1.5rem)] space-y-2 rounded-[24px] border border-slate-200/90 bg-white p-4 text-slate-900 shadow-[0_20px_55px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800/90 dark:bg-slate-950 dark:text-slate-100">
+        <p className="text-sm font-medium text-slate-950 dark:text-slate-50">Sobre esta tarefa</p>
+        <p className="break-words text-sm leading-relaxed text-slate-600 dark:text-slate-300">{description}</p>
       </PopoverContent>
     </Popover>
   );
@@ -753,9 +954,9 @@ function TaskDataItem({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200/80 bg-white/90 px-3.5 py-2.5 shadow-sm dark:border-slate-800 dark:bg-slate-900/75">
-      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-      <div className="text-sm text-foreground">{children}</div>
+    <div className="rounded-[18px] border border-slate-200/80 bg-white/82 px-3 py-2.5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/72">
+      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</p>
+      <div className="min-w-0 break-words text-sm text-slate-900 dark:text-slate-100">{children}</div>
     </div>
   );
 }
@@ -785,6 +986,7 @@ function NumberField({
         min={min}
         max={max}
         value={value}
+        className="border-slate-200/80 bg-white/90 dark:border-slate-800/80 dark:bg-slate-900/70"
         onChange={(event) => onChange(sanitizeNumberInput(event.target.value, min, max))}
       />
     </div>
