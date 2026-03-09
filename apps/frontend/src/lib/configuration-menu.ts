@@ -10,21 +10,12 @@ export interface ConfigurationMenuItemDefinition {
 
 const configurationMenuDefinitions: ConfigurationMenuItemDefinition[] = [
   {
-    id: "configuracoes-visao-geral",
-    name: "Visão Geral",
-    href: "/configuracoes",
-    icon: "Settings",
-    description: "Configurações gerais do sistema",
-    order: 1,
-    show: () => true,
-  },
-  {
     id: "configuracoes-seguranca",
     name: "Segurança",
     href: "/configuracoes/seguranca",
     icon: "Shield",
     description: "Políticas de segurança e autenticação",
-    order: 2,
+    order: 1,
     show: (role) => role === "SUPER_ADMIN",
   },
   {
@@ -33,7 +24,7 @@ const configurationMenuDefinitions: ConfigurationMenuItemDefinition[] = [
     href: "/configuracoes/identidade",
     icon: "Building2",
     description: "Informações básicas da plataforma",
-    order: 3,
+    order: 2,
     show: (role) => role === "SUPER_ADMIN",
   },
   {
@@ -41,8 +32,8 @@ const configurationMenuDefinitions: ConfigurationMenuItemDefinition[] = [
     name: "Notificações Push",
     href: "/configuracoes/notificacoes-push",
     icon: "BellRing",
-    description: "Chaves VAPID para PWA/Windows",
-    order: 4,
+    description: "Chaves VAPID para PWA e Windows",
+    order: 3,
     show: (role) => role === "SUPER_ADMIN",
   },
   {
@@ -51,16 +42,16 @@ const configurationMenuDefinitions: ConfigurationMenuItemDefinition[] = [
     href: "/configuracoes/sistema/modulos",
     icon: "Package",
     description: "Instalar e gerenciar módulos",
-    order: 5,
+    order: 4,
     show: (role) => role === "SUPER_ADMIN",
   },
   {
     id: "configuracoes-diagnostico",
-    name: "Diagnostico Operacional",
+    name: "Diagnóstico Operacional",
     href: "/configuracoes/sistema/diagnostico",
     icon: "Activity",
-    description: "Visao unificada de saude, tarefas, alertas e auditoria",
-    order: 6,
+    description: "Visão unificada de saúde, tarefas, alertas e auditoria",
+    order: 5,
     show: (role) => role === "SUPER_ADMIN" || role === "ADMIN",
   },
   {
@@ -69,7 +60,7 @@ const configurationMenuDefinitions: ConfigurationMenuItemDefinition[] = [
     href: "/configuracoes/sistema/updates",
     icon: "Download",
     description: "Atualizações automáticas via Git",
-    order: 7,
+    order: 6,
     show: (role) => role === "SUPER_ADMIN",
   },
   {
@@ -78,7 +69,7 @@ const configurationMenuDefinitions: ConfigurationMenuItemDefinition[] = [
     href: "/configuracoes/empresa",
     icon: "Building2",
     description: "Informações da empresa",
-    order: 8,
+    order: 7,
     show: (role) => role === "ADMIN",
   },
   {
@@ -87,7 +78,7 @@ const configurationMenuDefinitions: ConfigurationMenuItemDefinition[] = [
     href: "/configuracoes/sistema/cron",
     icon: "Clock",
     description: "Gerenciar tarefas agendadas e cronogramas",
-    order: 9,
+    order: 8,
     show: (role) => role === "SUPER_ADMIN",
   },
 ];

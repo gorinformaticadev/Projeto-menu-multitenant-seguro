@@ -53,6 +53,14 @@ interface GroupConfig {
   order: number;
 }
 
+type RenderQueueItem =
+  | { type: "item"; order: number; data: ModuleMenuItem }
+  | {
+      type: "group";
+      order: number;
+      data: { groupId: string; items: ModuleMenuItem[]; config: GroupConfig };
+    };
+
 interface OpenSubmenuState {
   triggerKey: string;
   title: string;
@@ -94,7 +102,7 @@ const iconMap: Record<string, React.ElementType> = {
 const groupConfig: Record<string, GroupConfig> = {
   administration: {
     name: "Administração",
-    icon: Settings,
+    icon: Shield,
     order: 2,
   },
   sistema: {
@@ -113,6 +121,8 @@ const groupConfig: Record<string, GroupConfig> = {
     order: 15,
   },
 };
+
+const footerGroupIds = ["administration"];
 
 function calculatePanelPosition(
   anchorRect: DOMRect,
@@ -598,14 +608,6 @@ export function Sidebar() {
   );
 
   const renderQueue = useMemo(() => {
-    type RenderQueueItem =
-      | { type: "item"; order: number; data: ModuleMenuItem }
-      | {
-          type: "group";
-          order: number;
-          data: { groupId: string; items: ModuleMenuItem[]; config: GroupConfig };
-        };
-
     const queue: RenderQueueItem[] = [];
 
     groupedItems.ungrouped.forEach((item) => {
@@ -631,6 +633,139 @@ export function Sidebar() {
 
     return queue.sort((a, b) => a.order - b.order);
   }, [groupedItems]);
+
+  const mainRenderQueue = useMemo(
+    () =>
+      renderQueue.filter(
+        (queueItem) => queueItem.type !== "group" || !footerGroupIds.includes(queueItem.data.groupId),
+      ),
+    [renderQueue],
+  );
+
+  const footerRenderQueue = useMemo(
+    () =>
+      renderQueue.filter(
+        (queueItem) => queueItem.type === "group" && footerGroupIds.includes(queueItem.data.groupId),
+      ),
+    [renderQueue],
+  );
+
+  const renderQueueEntry = useCallback(
+    (queueItem: RenderQueueItem) => {
+      if (queueItem.type === "item") {
+        const item = queueItem.data;
+        const submenuItems = item.children ? getDirectSubmenuItems(item.children) : [];
+        const hasSubmenu = submenuItems.length > 0;
+        const triggerKey = `item:${item.id}`;
+        const isSubmenuOpen = openSubmenu?.triggerKey === triggerKey;
+        const isActive = hasSubmenu
+          ? submenuItems.some((submenuItem) => isRouteActive(submenuItem.route))
+          : isRouteActive(item.route);
+        const Icon = resolveIcon(item.icon);
+
+        if (hasSubmenu) {
+          return (
+            <Button
+              key={item.id}
+              variant="ghost"
+              ref={(element) => setTriggerRef(triggerKey, element)}
+              onClick={() => openFloatingSubmenu(triggerKey, item.label, submenuItems)}
+              aria-expanded={isSubmenuOpen}
+              aria-haspopup="menu"
+              className={cn(
+                "group h-auto w-full rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200",
+                isExpanded ? "justify-between" : "justify-center px-0",
+                isActive || isSubmenuOpen
+                  ? "border border-primary/15 bg-card text-primary shadow-sm"
+                  : "text-muted-foreground hover:bg-card/80 hover:text-foreground",
+              )}
+              title={!isExpanded ? item.label : undefined}
+            >
+              <span className={cn("flex items-center gap-2", !isExpanded && "justify-center")}>
+                <Icon className="h-5 w-5 flex-shrink-0 opacity-70 transition-opacity group-hover:opacity-100" />
+                {isExpanded && <span>{item.label}</span>}
+              </span>
+              {isExpanded && (
+                <ChevronRight
+                  className={cn(
+                    "h-4 w-4 transition-transform",
+                    isSubmenuOpen && "translate-x-0.5 text-primary",
+                  )}
+                />
+              )}
+            </Button>
+          );
+        }
+
+        return (
+          <Link
+            key={item.id}
+            href={item.route}
+            onClick={handleItemSelect}
+            className={cn(
+              "group relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200",
+              isActive
+                ? "border border-primary/15 bg-card text-primary shadow-sm"
+                : "text-muted-foreground hover:bg-card/80 hover:text-foreground",
+              !isExpanded && "justify-center px-0",
+            )}
+            title={!isExpanded ? item.label : undefined}
+          >
+            <Icon className="h-5 w-5 flex-shrink-0 opacity-70 transition-opacity group-hover:opacity-100" />
+            {isExpanded && <span>{item.label}</span>}
+          </Link>
+        );
+      }
+
+      const { groupId, items, config } = queueItem.data;
+      const submenuItems = getGroupSubmenuItems(items, config.name);
+      const triggerKey = `group:${groupId}`;
+      const isSubmenuOpen = openSubmenu?.triggerKey === triggerKey;
+      const hasActiveItem = submenuItems.some((item) => isRouteActive(item.route));
+
+      return (
+        <div key={groupId} className="pt-2">
+          <Button
+            variant="ghost"
+            ref={(element) => setTriggerRef(triggerKey, element)}
+            onClick={() => openFloatingSubmenu(triggerKey, config.name, submenuItems)}
+            aria-expanded={isSubmenuOpen}
+            aria-haspopup="menu"
+            className={cn(
+              "group h-auto w-full rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200",
+              isExpanded ? "justify-between" : "justify-center px-0",
+              hasActiveItem || isSubmenuOpen
+                ? "border border-primary/15 bg-card text-primary shadow-sm"
+                : "text-muted-foreground hover:bg-card/80 hover:text-foreground",
+            )}
+            title={!isExpanded ? config.name : undefined}
+          >
+            <span className={cn("flex items-center gap-3", !isExpanded && "justify-center")}>
+              <config.icon className="h-5 w-5 flex-shrink-0 opacity-80 transition-opacity group-hover:opacity-100" />
+              {isExpanded && <span>{config.name}</span>}
+            </span>
+            {isExpanded && (
+              <ChevronRight
+                className={cn(
+                  "h-4 w-4 transition-transform",
+                  isSubmenuOpen && "translate-x-0.5 text-primary",
+                )}
+              />
+            )}
+          </Button>
+        </div>
+      );
+    },
+    [
+      handleItemSelect,
+      isExpanded,
+      isRouteActive,
+      openFloatingSubmenu,
+      openSubmenu?.triggerKey,
+      resolveIcon,
+      setTriggerRef,
+    ],
+  );
 
   return (
     <div
@@ -660,111 +795,7 @@ export function Sidebar() {
 
       <div className="flex-1 overflow-y-auto p-1">
         <nav className="space-y-1">
-          {renderQueue.map((queueItem) => {
-            if (queueItem.type === "item") {
-              const item = queueItem.data;
-              const submenuItems = item.children ? getDirectSubmenuItems(item.children) : [];
-              const hasSubmenu = submenuItems.length > 0;
-              const triggerKey = `item:${item.id}`;
-              const isSubmenuOpen = openSubmenu?.triggerKey === triggerKey;
-              const isActive = hasSubmenu
-                ? submenuItems.some((submenuItem) => isRouteActive(submenuItem.route))
-                : isRouteActive(item.route);
-              const Icon = resolveIcon(item.icon);
-
-              if (hasSubmenu) {
-                return (
-                  <Button
-                    key={item.id}
-                    variant="ghost"
-                    ref={(element) => setTriggerRef(triggerKey, element)}
-                    onClick={() => openFloatingSubmenu(triggerKey, item.label, submenuItems)}
-                    aria-expanded={isSubmenuOpen}
-                    aria-haspopup="menu"
-                    className={cn(
-                      "group h-auto w-full rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200",
-                      isExpanded ? "justify-between" : "justify-center px-0",
-                      isActive || isSubmenuOpen
-                        ? "border border-primary/15 bg-card text-primary shadow-sm"
-                        : "text-muted-foreground hover:bg-card/80 hover:text-foreground",
-                    )}
-                    title={!isExpanded ? item.label : undefined}
-                  >
-                    <span className={cn("flex items-center gap-2", !isExpanded && "justify-center")}>
-                      <Icon className="h-5 w-5 flex-shrink-0 opacity-70 transition-opacity group-hover:opacity-100" />
-                      {isExpanded && <span>{item.label}</span>}
-                    </span>
-                    {isExpanded && (
-                      <ChevronRight
-                        className={cn(
-                          "h-4 w-4 transition-transform",
-                          isSubmenuOpen && "translate-x-0.5 text-primary",
-                        )}
-                      />
-                    )}
-                  </Button>
-                );
-              }
-
-              return (
-                <Link
-                  key={item.id}
-                  href={item.route}
-                  onClick={handleItemSelect}
-                  className={cn(
-                    "group relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200",
-                    isActive
-                      ? "border border-primary/15 bg-card text-primary shadow-sm"
-                      : "text-muted-foreground hover:bg-card/80 hover:text-foreground",
-                    !isExpanded && "justify-center px-0",
-                  )}
-                  title={!isExpanded ? item.label : undefined}
-                >
-                  <Icon className="h-5 w-5 flex-shrink-0 opacity-70 transition-opacity group-hover:opacity-100" />
-                  {isExpanded && <span>{item.label}</span>}
-                </Link>
-              );
-            }
-
-            const { groupId, items, config } = queueItem.data;
-            const submenuItems = getGroupSubmenuItems(items, config.name);
-            const triggerKey = `group:${groupId}`;
-            const isSubmenuOpen = openSubmenu?.triggerKey === triggerKey;
-            const hasActiveItem = submenuItems.some((item) => isRouteActive(item.route));
-
-            return (
-              <div key={groupId} className="pt-2">
-                <Button
-                  variant="ghost"
-                  ref={(element) => setTriggerRef(triggerKey, element)}
-                  onClick={() => openFloatingSubmenu(triggerKey, config.name, submenuItems)}
-                  aria-expanded={isSubmenuOpen}
-                  aria-haspopup="menu"
-                  className={cn(
-                    "group h-auto w-full rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200",
-                    isExpanded ? "justify-between" : "justify-center px-0",
-                    hasActiveItem || isSubmenuOpen
-                      ? "border border-primary/15 bg-card text-primary shadow-sm"
-                      : "text-muted-foreground hover:bg-card/80 hover:text-foreground",
-                  )}
-                  title={!isExpanded ? config.name : undefined}
-                >
-                  <span className={cn("flex items-center gap-3", !isExpanded && "justify-center")}>
-                    <config.icon className="h-5 w-5 flex-shrink-0 opacity-80 transition-opacity group-hover:opacity-100" />
-                    {isExpanded && <span>{config.name}</span>}
-                  </span>
-                  {isExpanded && (
-                    <ChevronRight
-                      className={cn(
-                        "h-4 w-4 transition-transform",
-                        isSubmenuOpen && "translate-x-0.5 text-primary",
-                      )}
-                    />
-                  )}
-                </Button>
-              </div>
-            );
-          })}
+          {mainRenderQueue.map(renderQueueEntry)}
         </nav>
       </div>
 
@@ -948,7 +979,13 @@ export function Sidebar() {
         </div>
       )}
 
-      <div className="p-1">
+      <div className="border-t border-border/70 p-1">
+        {footerRenderQueue.length > 0 && (
+          <nav className="space-y-1 pb-1">
+            {footerRenderQueue.map(renderQueueEntry)}
+          </nav>
+        )}
+
         <Button
           variant="ghost"
           className={cn("w-full", isExpanded ? "justify-start" : "justify-center px-1")}

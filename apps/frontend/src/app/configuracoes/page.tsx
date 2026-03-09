@@ -1,192 +1,110 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import {
-  Shield,
-  BellRing,
-  Building2,
-  Package,
-  Download,
-  ChevronRight,
-  Clock,
-  LayoutDashboard,
-  Cog,
-  Activity
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { getConfigurationPanelItems } from "@/lib/configuration-menu";
+import { ArrowRight, LayoutDashboard, Settings2, UserRound } from "lucide-react";
 
 export default function ConfiguracoesPage() {
   const { user } = useAuth();
-
-  const menuItems = [
-    {
-      name: "Segurança",
-      href: "/configuracoes/seguranca",
-      icon: Shield,
-      description: "Políticas de segurança, autenticação e controle de acesso",
-      show: user?.role === "SUPER_ADMIN",
-      color: "bg-red-50 text-red-600 border-red-100",
-      iconColor: "text-red-500"
-    },
-    {
-      name: "Identidade da Plataforma",
-      href: "/configuracoes/identidade",
-      icon: Building2,
-      description: "Logo, cores e informações básicas do sistema",
-      show: user?.role === "SUPER_ADMIN",
-      color: "bg-blue-50 text-blue-600 border-blue-100",
-      iconColor: "text-blue-500"
-    },
-    {
-      name: "Notificações Push",
-      href: "/configuracoes/notificacoes-push",
-      icon: BellRing,
-      description: "Gerencie chaves VAPID do PWA/Windows em background",
-      show: user?.role === "SUPER_ADMIN",
-      color: "bg-orange-50 text-orange-600 border-orange-100",
-      iconColor: "text-orange-500"
-    },
-    {
-      name: "Gerenciamento de Módulos",
-      href: "/configuracoes/sistema/modulos",
-      icon: Package,
-      description: "Instalar, remover e gerenciar extensões",
-      show: user?.role === "SUPER_ADMIN",
-      color: "bg-amber-50 text-amber-600 border-amber-100",
-      iconColor: "text-amber-500"
-    },
-    {
-      name: "Diagnóstico Operacional",
-      href: "/configuracoes/sistema/diagnostico",
-      icon: Activity,
-      description: "Estado geral, tarefas, alertas, auditoria e base de logs reaproveitada",
-      show: user?.role === "SUPER_ADMIN" || user?.role === "ADMIN",
-      color: "bg-sky-50 text-sky-600 border-sky-100",
-      iconColor: "text-sky-500"
-    },
-    {
-      name: "Sistema de Updates",
-      href: "/configuracoes/sistema/updates",
-      icon: Download,
-      description: "Gerenciar atualizações automáticas via repositório",
-      show: user?.role === "SUPER_ADMIN",
-      color: "bg-green-50 text-green-600 border-green-100",
-      iconColor: "text-green-500"
-    },
-    {
-      name: "Agendamento de Tarefas",
-      href: "/configuracoes/sistema/cron",
-      icon: Clock,
-      description: "Gerenciar tarefas agendadas, backups e cronogramas",
-      show: user?.role === "SUPER_ADMIN",
-      color: "bg-indigo-50 text-indigo-600 border-indigo-100",
-      iconColor: "text-indigo-500"
-    },
-    {
-      name: "Configurações da Empresa",
-      href: "/configuracoes/empresa",
-      icon: Building2,
-      description: "Informações cadastrais e faturamento",
-      show: user?.role === "ADMIN",
-      color: "bg-teal-50 text-teal-600 border-teal-100",
-      iconColor: "text-teal-500"
-    },
-  ];
-
-  const visibleItems = menuItems.filter(item => item.show);
+  const visibleItems = getConfigurationPanelItems(user?.role);
 
   return (
     <ProtectedRoute allowedRoles={["SUPER_ADMIN", "ADMIN"]}>
-      <div className="p-4 md:p-8 max-w-4xl mx-auto pb-24">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8">
+        <section className="rounded-[2rem] border border-border/70 bg-card p-6 shadow-sm md:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                <Settings2 className="h-4 w-4" />
+                Central de Configurações
+              </div>
 
-        {/* Header Superior Limpo */}
-        <div className="mb-10 text-center md:text-left">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-primary/10 text-primary mb-4">
-            <Cog className="h-8 w-8 animate-spin-slow" style={{ animationDuration: '8s' }} />
+              <h1 className="mt-4 text-3xl font-bold tracking-tight text-foreground">
+                Ajustes organizados em navegação rápida
+              </h1>
+
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground md:text-base">
+                O painel lateral interno foi removido desta página. Use o menu horizontal no topo para ir direto
+                para Segurança, Notificações Push, Identidade da Plataforma, Diagnóstico Operacional e as demais
+                áreas liberadas para o seu perfil.
+              </p>
+            </div>
+
+            <div className="grid min-w-0 gap-3 sm:min-w-[260px]">
+              <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <UserRound className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Perfil atual
+                    </p>
+                    <p className="truncate text-sm font-semibold text-foreground">{user?.name}</p>
+                    <p className="text-xs text-muted-foreground">{user?.role}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Áreas disponíveis
+                </p>
+                <p className="mt-2 text-3xl font-bold text-foreground">{visibleItems.length}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  seções acessíveis pelo menu horizontal superior.
+                </p>
+              </div>
+            </div>
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight">Configurações</h1>
-          <p className="text-muted-foreground mt-2 max-w-md mx-auto md:mx-0">
-            Gerencie as preferências e permissões do seu ecossistema SaaS.
-          </p>
-        </div>
+        </section>
 
-        {/* Hub de Opções Estilo Dashboard/Grid */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          {visibleItems.map((item) => {
-            const Icon = item.icon;
-            return (
+        <section className="grid gap-4 lg:grid-cols-[1.35fr_0.95fr]">
+          <div className="rounded-[2rem] border border-border/70 bg-card p-6 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Como navegar
+            </p>
+            <div className="mt-4 space-y-4 text-sm leading-6 text-muted-foreground">
+              <p>
+                As opções no topo ficam alinhadas lado a lado para acelerar o acesso entre telas sem abrir um
+                novo painel dentro da página.
+              </p>
+              <p>
+                O item ativo permanece destacado, e a barra horizontal pode ser rolada em telas menores sem
+                alterar a estrutura real das configurações disponíveis.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-[2rem] border border-border/70 bg-card p-6 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Atalhos úteis
+            </p>
+
+            <div className="mt-4 flex flex-col gap-3">
               <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "group relative flex flex-col p-6 rounded-[2rem] border-2 bg-card transition-all hover:shadow-xl hover:-translate-y-1 active:scale-95",
-                  "border-slate-100 hover:border-primary/20 shadow-sm"
-                )}
+                href="/perfil"
+                className="inline-flex items-center justify-between rounded-2xl border border-border/70 bg-background/70 px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:border-primary/30 hover:text-primary"
               >
-                <div className={cn(
-                  "w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110",
-                  item.color
-                )}>
-                  <Icon className="h-6 w-6" />
-                </div>
-
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold flex items-center gap-2 group-hover:text-primary transition-colors">
-                    {item.name}
-                    <ChevronRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-                    {item.description}
-                  </p>
-                </div>
-
-                {/* Badge de Acesso (Sutil) */}
-                <div className="absolute top-4 right-4 text-[10px] font-bold uppercase tracking-widest text-slate-300 opacity-40">
-                  SaaS Config
-                </div>
+                Ver perfil
+                <ArrowRight className="h-4 w-4" />
               </Link>
-            );
-          })}
-        </div>
 
-        {/* Card de Informações de Conta (Rodapé do Conteúdo) */}
-        <div className="mt-12 p-6 rounded-[2.5rem] bg-slate-50 border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-4 text-center md:text-left">
-            <div className="w-14 h-14 rounded-full bg-white shadow-sm flex items-center justify-center text-xl font-bold border border-slate-200">
-              {user?.name?.charAt(0)}
-            </div>
-            <div>
-              <h4 className="font-bold text-slate-800">{user?.name}</h4>
-              <p className="text-xs text-muted-foreground">{user?.email}</p>
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-between rounded-2xl border border-border/70 bg-background/70 px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:border-primary/30 hover:text-primary"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <LayoutDashboard className="h-4 w-4" />
+                  Voltar ao painel principal
+                </span>
+                <ArrowRight className="h-4 w-4" />
+              </Link>
             </div>
           </div>
-
-          <div className="flex gap-2">
-            <span className="px-4 py-2 bg-white rounded-full text-xs font-bold border border-slate-200 shadow-sm">
-              {user?.role} Access
-            </span>
-            <Link
-              href="/perfil"
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-full text-xs font-bold shadow-md hover:brightness-110 active:scale-95 transition-all"
-            >
-              Ver Perfil
-            </Link>
-          </div>
-        </div>
-
-        {/* Atalho para Dashboard rápido */}
-        <div className="mt-8 text-center">
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-primary transition-colors"
-          >
-            <LayoutDashboard className="h-3 w-3" />
-            Voltar para o Painel Principal
-          </Link>
-        </div>
-
+        </section>
       </div>
     </ProtectedRoute>
   );
