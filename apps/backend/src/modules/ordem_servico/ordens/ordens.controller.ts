@@ -2,7 +2,6 @@ import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Req,
 import { Request as ExpressRequest, Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import * as fs from 'fs';
-import * as path from 'path';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { OrdensService } from './ordens.service';
 import { PermissionGuard } from '../shared/guards/permission.guard';
@@ -12,6 +11,7 @@ import {
     buildTenantModuleUploadUrl,
     ORDEM_SERVICO_UPLOAD_OPTIONS,
     persistTenantModuleUpload,
+    removeTenantModuleUpload,
     resolveTenantModuleUploadPath,
 } from '../shared/utils/upload-security.util';
 import {
@@ -344,7 +344,11 @@ export class OrdensController {
     @UseGuards(PermissionGuard)
     @RequireOrdersPermission('edit')
     @UseInterceptors(FileInterceptor('file', ORDEM_SERVICO_UPLOAD_OPTIONS))
-    async uploadFile(@UploadedFile() file: Express.Multer.File, @Req() req: ExpressRequest & { user: any }): Promise<UploadResponseDTO> {
+    async uploadFile(
+        @UploadedFile() file: Express.Multer.File,
+        @Req() req: ExpressRequest & { user: any },
+        @Body() body: { ordemId?: string; ordemNumero?: string },
+    ): Promise<UploadResponseDTO> {
         try {
             if (!file) {
                 throw new BadRequestException('Nenhum arquivo enviado');
@@ -356,31 +360,19 @@ export class OrdensController {
                 throw new BadRequestException('Tenant invalido para upload');
             }
 
-            const persistedUpload = persistTenantModuleUpload('ordens', safeTenantId, file);
-            return { url: buildTenantModuleUploadUrl('ordens', safeTenantId, persistedUpload.fileName) };
+            const ordemDirectory = await this.resolveOrdemUploadDirectory(
+                safeTenantId,
+                body?.ordemId,
+                body?.ordemNumero,
+            );
+            const persistedUpload = persistTenantModuleUpload('ordens', safeTenantId, file, {
+                subdirectory: ordemDirectory,
+            });
+            return {
+                url: buildTenantModuleUploadUrl('ordens', safeTenantId, persistedUpload.relativePath),
+            };
 
 
-            const bufferData = file.buffer as any;
-            if (!Buffer.isBuffer(bufferData)) {
-                throw new Error('Falha crítica: Buffer inválido.');
-            }
-
-            // 2. Caminho Seguro e Isolado por Tenant
-            const tenantId = String(req.user?.tenantId || '').trim();
-            if (!tenantId) {
-                throw new BadRequestException('Tenant invalido para upload');
-            }
-            const uploadDir = path.resolve(process.cwd(), 'uploads', 'modules', 'ordem_servico', 'ordens', tenantId);
-
-            if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-            // 3. Salvar Arquivo
-            const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
-            const filePath = path.join(uploadDir, uniqueName);
-            fs.writeFileSync(filePath, bufferData);
-
-            // 4. Retornar URL Pública
-            return { url: `/api/ordem_servico/ordens/uploads/${tenantId}/${uniqueName}` };
         } catch (error: any) {
             this.logger.error('Erro no upload de foto do equipamento:', error);
             if (error instanceof HttpException) {
@@ -390,18 +382,19 @@ export class OrdensController {
         }
     }
 
-    @Get('uploads/:tenantId/:filename')
+    @Get('uploads/:tenantId/*filePath')
     @UseGuards(PermissionGuard)
     @RequireOrdersPermission('view')
     async serveFile(
-        @Param('filename') filename: string,
+        @Param('filePath') filePath: string | string[],
         @Param('tenantId') tenantId: string,
         @Req() req: ExpressRequest & { user: any },
         @Res() res: Response,
     ) {
         try {
             assertTenantUploadAccess(String(req.user?.tenantId || ''), tenantId);
-            const safeFilePath = resolveTenantModuleUploadPath('ordens', tenantId, filename);
+            const normalizedFilePath = Array.isArray(filePath) ? filePath.join('/') : filePath;
+            const safeFilePath = resolveTenantModuleUploadPath('ordens', tenantId, normalizedFilePath);
 
             if (fs.existsSync(safeFilePath)) {
                 res.setHeader('Cache-Control', 'private, max-age=300');
@@ -412,18 +405,6 @@ export class OrdensController {
             res.status(404).json({ message: 'Arquivo nÃ£o encontrado' });
             return;
 
-            const filePath = path.resolve(process.cwd(), 'uploads', 'modules', 'ordem_servico', 'ordens', tenantId, filename);
-
-            if (!filePath.startsWith(path.resolve(process.cwd(), 'uploads', 'modules', 'ordem_servico', 'ordens'))) {
-                return res.status(403).json({ message: 'Acesso negado' });
-            }
-
-            if (fs.existsSync(filePath)) {
-                res.setHeader('Cache-Control', 'private, max-age=300');
-                res.sendFile(filePath);
-            } else {
-                res.status(404).json({ message: 'Arquivo não encontrado' });
-            }
         } catch (error) {
             this.logger.error('Erro ao servir arquivo:', error);
             if (error instanceof HttpException) {
@@ -431,6 +412,102 @@ export class OrdensController {
             }
             res.status(500).json({ message: 'Erro interno ao buscar imagem' });
         }
+    }
+
+    @Post('uploads/cleanup')
+    @UseGuards(PermissionGuard)
+    @RequireOrdersPermission('edit')
+    async cleanupUploadedFiles(
+        @Req() req: ExpressRequest & { user: any },
+        @Body() body: { urls?: string[] },
+    ): Promise<{ deleted: number }> {
+        const safeTenantId = String(req.user?.tenantId || '').trim();
+        if (!safeTenantId) {
+            throw new BadRequestException('Tenant invalido para limpeza');
+        }
+
+        const urls = Array.isArray(body?.urls)
+            ? body.urls.filter((url) => typeof url === 'string' && url.trim().length > 0)
+            : [];
+
+        let deleted = 0;
+        for (const url of urls) {
+            const relativeFilePath = this.extractRelativeUploadPath(url, safeTenantId);
+            if (!relativeFilePath) {
+                continue;
+            }
+
+            if (removeTenantModuleUpload('ordens', safeTenantId, relativeFilePath)) {
+                deleted += 1;
+            }
+        }
+
+        return { deleted };
+    }
+
+    private async resolveOrdemUploadDirectory(
+        tenantId: string,
+        ordemId?: string,
+        ordemNumero?: string,
+    ): Promise<string | undefined> {
+        const safeOrdemId = String(ordemId || '').trim();
+        if (safeOrdemId) {
+            const ordem = await this.ordensService.findOne(tenantId, safeOrdemId);
+            if (!ordem) {
+                throw new NotFoundException('Ordem de serviço não encontrada para upload');
+            }
+
+            return this.normalizeOrdemDirectoryName(ordem.numero);
+        }
+
+        const safeOrdemNumero = String(ordemNumero || '').trim();
+        if (safeOrdemNumero) {
+            return this.normalizeOrdemDirectoryName(safeOrdemNumero);
+        }
+
+        return undefined;
+    }
+
+    private normalizeOrdemDirectoryName(ordemNumero: string): string {
+        const normalized = String(ordemNumero || '')
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9._-]/g, '');
+
+        if (!normalized) {
+            throw new BadRequestException('Numero da ordem invalido para diretorio de upload');
+        }
+
+        return normalized;
+    }
+
+    private extractRelativeUploadPath(url: string, tenantId: string): string | null {
+        const value = String(url || '').trim();
+        if (!value) {
+            return null;
+        }
+
+        let pathname = value;
+        try {
+            pathname = new URL(value, 'http://localhost').pathname;
+        } catch {
+            pathname = value;
+        }
+
+        const normalizedPath = pathname.replace(/\\/g, '/');
+        const marker = `/api/ordem_servico/ordens/uploads/${tenantId}/`;
+        const markerIndex = normalizedPath.toLowerCase().indexOf(marker.toLowerCase());
+
+        if (markerIndex < 0) {
+            return null;
+        }
+
+        const relativeFilePath = normalizedPath.slice(markerIndex + marker.length).trim();
+        if (!relativeFilePath) {
+            return null;
+        }
+
+        return relativeFilePath;
     }
 
     // ============================================

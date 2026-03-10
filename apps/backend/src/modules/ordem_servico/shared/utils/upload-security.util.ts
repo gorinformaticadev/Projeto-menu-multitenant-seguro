@@ -15,6 +15,9 @@ const ORDEM_SERVICO_UPLOAD_SEGMENT = ['modules', 'ordem_servico'] as const;
 const ALLOWED_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
 
 export type OrdemServicoUploadArea = 'clientes' | 'ordens' | 'produtos';
+type PersistTenantModuleUploadOptions = {
+  subdirectory?: string;
+};
 
 const IMAGE_TYPE_RULES: Record<
   string,
@@ -106,48 +109,64 @@ export function persistTenantModuleUpload(
   area: OrdemServicoUploadArea,
   tenantId: string,
   file: Express.Multer.File,
+  options: PersistTenantModuleUploadOptions = {},
 ) {
   const tenantAreaDir = resolveTenantAreaRoot(area, tenantId);
+  const safeSubdirectory = sanitizeRelativeDirectoryPath(options.subdirectory);
+  const targetDirectory = safeSubdirectory
+    ? path.resolve(tenantAreaDir, safeSubdirectory)
+    : tenantAreaDir;
+  assertPathInsideRoot(tenantAreaDir, targetDirectory);
+  fs.mkdirSync(targetDirectory, { recursive: true });
+
   const buffer = normalizeUploadedBuffer(file);
   const extension = validateUploadedImage(file, buffer);
   const fileName = `${Date.now()}-${randomUUID()}${extension}`;
-  const filePath = path.resolve(tenantAreaDir, fileName);
+  const filePath = path.resolve(targetDirectory, fileName);
+  const relativePath = safeSubdirectory ? `${safeSubdirectory}/${fileName}` : fileName;
 
   fs.writeFileSync(filePath, buffer, { mode: 0o600 });
-  return { fileName, filePath };
+  return { fileName, filePath, relativePath };
 }
 
-export function resolveTenantUploadPath(baseDir: string, tenantId: string, filename: string) {
-  const safeTenantId = sanitizeSegment(tenantId, 'tenant');
-  const safeFilename = sanitizeFilename(filename);
-  const tenantDir = path.resolve(baseDir, safeTenantId);
-  const resolvedPath = path.resolve(tenantDir, safeFilename);
+export function resolveTenantUploadPath(baseDir: string, tenantId: string, relativeFilePath: string) {
+  const safeTenantId = tenantId === '.' ? '.' : sanitizeSegment(tenantId, 'tenant');
+  const safeRelativeFilePath = sanitizeRelativeFilePath(relativeFilePath);
+  const tenantDir = safeTenantId === '.'
+    ? path.resolve(baseDir)
+    : path.resolve(baseDir, safeTenantId);
+  const resolvedPath = path.resolve(tenantDir, safeRelativeFilePath);
 
-  if (!resolvedPath.startsWith(`${tenantDir}${path.sep}`) && resolvedPath !== path.join(tenantDir, safeFilename)) {
-    throw new ForbiddenException('Acesso negado');
-  }
-
+  assertPathInsideRoot(tenantDir, resolvedPath);
   return resolvedPath;
 }
 
 export function resolveTenantModuleUploadPath(
   area: OrdemServicoUploadArea,
   tenantId: string,
-  filename: string,
+  relativeFilePath: string,
 ) {
-  const canonicalPath = resolveTenantUploadPath(resolveTenantAreaRoot(area, tenantId), '.', filename);
+  const canonicalPath = resolveTenantUploadPath(
+    resolveTenantAreaRoot(area, tenantId),
+    '.',
+    relativeFilePath,
+  );
 
   if (fs.existsSync(canonicalPath)) {
     return canonicalPath;
   }
 
-  const legacyModulePath = resolveTenantUploadPath(resolveLegacyModuleAreaRoot(area), tenantId, filename);
+  const legacyModulePath = resolveTenantUploadPath(
+    resolveLegacyModuleAreaRoot(area),
+    tenantId,
+    relativeFilePath,
+  );
   if (fs.existsSync(legacyModulePath)) {
     return legacyModulePath;
   }
 
   if (area === 'produtos') {
-    const legacyPath = resolveTenantUploadPath(resolveLegacyProductsRoot(), tenantId, filename);
+    const legacyPath = resolveTenantUploadPath(resolveLegacyProductsRoot(), tenantId, relativeFilePath);
 
     if (fs.existsSync(legacyPath)) {
       return legacyPath;
@@ -160,13 +179,30 @@ export function resolveTenantModuleUploadPath(
 export function buildTenantModuleUploadUrl(
   area: OrdemServicoUploadArea,
   tenantId: string,
-  fileName: string,
+  relativeFilePath: string,
 ) {
   const safeArea = sanitizeUploadArea(area);
   const safeTenantId = sanitizeSegment(tenantId, 'tenant');
-  const safeFileName = sanitizeFilename(fileName);
+  const safeRelativeFilePath = sanitizeRelativeFilePath(relativeFilePath);
 
-  return `/api/ordem_servico/${safeArea}/uploads/${safeTenantId}/${safeFileName}`;
+  return `/api/ordem_servico/${safeArea}/uploads/${safeTenantId}/${safeRelativeFilePath}`;
+}
+
+export function removeTenantModuleUpload(
+  area: OrdemServicoUploadArea,
+  tenantId: string,
+  relativeFilePath: string,
+) {
+  const canonicalRoot = resolveTenantAreaRoot(area, tenantId);
+  const targetPath = resolveTenantModuleUploadPath(area, tenantId, relativeFilePath);
+
+  if (!fs.existsSync(targetPath)) {
+    return false;
+  }
+
+  fs.unlinkSync(targetPath);
+  pruneEmptyDirectories(path.dirname(targetPath), canonicalRoot);
+  return true;
 }
 
 export function assertTenantUploadAccess(requestTenantId: string, routeTenantId: string) {
@@ -257,6 +293,73 @@ function sanitizeFilename(filename: string) {
   }
 
   return filename;
+}
+
+function sanitizeRelativeDirectoryPath(rawPath?: string) {
+  if (!rawPath) {
+    return '';
+  }
+
+  const normalized = String(rawPath).replace(/\\/g, '/').trim();
+  if (!normalized) {
+    return '';
+  }
+
+  const segments = normalized.split('/').filter(Boolean);
+  if (segments.length === 0) {
+    return '';
+  }
+
+  return segments.map((segment) => sanitizeSegment(segment, 'diretorio')).join('/');
+}
+
+function sanitizeRelativeFilePath(rawPath: string) {
+  const normalized = String(rawPath || '').replace(/\\/g, '/').trim();
+  if (!normalized) {
+    throw new BadRequestException('Nome de arquivo invalido');
+  }
+
+  const segments = normalized.split('/').filter(Boolean);
+  if (segments.length === 0) {
+    throw new BadRequestException('Nome de arquivo invalido');
+  }
+
+  const fileName = segments.pop() as string;
+  const safeFileName = sanitizeFilename(fileName);
+  const safeDirectories = segments.map((segment) => sanitizeSegment(segment, 'diretorio'));
+  return [...safeDirectories, safeFileName].join('/');
+}
+
+function assertPathInsideRoot(rootPath: string, targetPath: string) {
+  const normalizedRootPath = path.resolve(rootPath);
+  const normalizedTargetPath = path.resolve(targetPath);
+  const startsWithRoot = normalizedTargetPath.startsWith(`${normalizedRootPath}${path.sep}`);
+
+  if (!startsWithRoot && normalizedTargetPath !== normalizedRootPath) {
+    throw new ForbiddenException('Acesso negado');
+  }
+}
+
+function pruneEmptyDirectories(currentDirectory: string, stopDirectory: string) {
+  const normalizedStopDirectory = path.resolve(stopDirectory);
+  let cursor = path.resolve(currentDirectory);
+
+  while (cursor.startsWith(`${normalizedStopDirectory}${path.sep}`)) {
+    if (!fs.existsSync(cursor)) {
+      cursor = path.dirname(cursor);
+      continue;
+    }
+
+    if (fs.readdirSync(cursor).length > 0) {
+      break;
+    }
+
+    fs.rmdirSync(cursor);
+    if (cursor === normalizedStopDirectory) {
+      break;
+    }
+    cursor = path.dirname(cursor);
+  }
 }
 
 function sanitizeUploadArea(area: OrdemServicoUploadArea) {

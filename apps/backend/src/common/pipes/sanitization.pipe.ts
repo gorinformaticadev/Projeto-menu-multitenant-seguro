@@ -7,41 +7,37 @@ import * as sanitizeHtml from 'sanitize-html';
  */
 @Injectable()
 export class SanitizationPipe implements PipeTransform {
-  transform(value: unknown, metadata: ArgumentMetadata) {
-    if (!value) return value;
+  transform(value: unknown, _metadata: ArgumentMetadata) {
+    return this.sanitizeValue(value);
+  }
 
-    // Se for objeto, sanitiza recursivamente
-    if (typeof value === 'object' && !Array.isArray(value)) {
-      return this.sanitizeObject(value);
+  private sanitizeValue(value: unknown): unknown {
+    if (!value) {
+      return value;
     }
 
-    // Se for array, sanitiza cada item
-    if (Array.isArray(value)) {
-      return value.map((item) => this.transform(item, metadata));
-    }
-
-    // Se for string, sanitiza
     if (typeof value === 'string') {
       return this.sanitizeString(value);
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => this.sanitizeValue(item));
+    }
+
+    if (typeof value === 'object') {
+      return this.sanitizeObject(value as Record<string, unknown>);
     }
 
     return value;
   }
 
-  private sanitizeObject(obj: any): any {
-    const sanitized: any = {};
+  private sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
+    const sanitized: Record<string, unknown> = {};
 
     for (const key in obj) {
       if (Object.prototype.hasOwnProperty.call(obj, key)) {
         const value = obj[key];
-
-        if (typeof value === 'string') {
-          sanitized[key] = this.sanitizeString(value);
-        } else if (typeof value === 'object' && value !== null) {
-          sanitized[key] = this.sanitizeObject(value);
-        } else {
-          sanitized[key] = value;
-        }
+        sanitized[key] = this.sanitizeValue(value);
       }
     }
 
