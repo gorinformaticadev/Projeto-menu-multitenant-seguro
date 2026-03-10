@@ -14,7 +14,11 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import { Role } from '@prisma/client';
+import { Roles } from '@core/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
+import { RolesGuard } from '@core/common/guards/roles.guard';
 import { NotificationService } from './notification.service';
 import { NotificationGateway } from './notification.gateway';
 import { PushNotificationService } from './push-notification.service';
@@ -68,8 +72,11 @@ export class NotificationsController {
    * Cria uma nova notificação
    */
   @Post()
-  async create(@Body() createDto: CreateNotificationDto) {
-    const notification = await this.notificationService.create(createDto);
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  async create(@Body() createDto: CreateNotificationDto, @Request() req) {
+    const notification = await this.notificationService.create(createDto, req.user);
 
     // Emite via Socket.IO
     await this.notificationGateway.emitNewNotification(notification);
@@ -81,6 +88,9 @@ export class NotificationsController {
    * Envia notificação em massa (Broadcast)
    */
   @Post('broadcast')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async broadcast(@Body() body: BroadcastNotificationDto, @Request() req) {
     return this.notificationService.broadcast(body, req.user);
   }

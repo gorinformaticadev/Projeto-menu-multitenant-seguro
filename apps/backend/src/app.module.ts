@@ -51,7 +51,7 @@ import { SystemDiagnosticsModule } from './diagnostics/system-diagnostics.module
     CommonModule,
     SystemTelemetryModule,
     // ============================================
-    // Rate limiting global com limites por endpoint via @Throttle
+    // Rate limiting global com segmentacao por contexto no guard
     // ============================================
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
@@ -70,8 +70,8 @@ import { SystemDiagnosticsModule } from './diagnostics/system-diagnostics.module
           {
             name: 'default',
             ttl: 60000, // 60 segundos (1 minuto)
-            // Desenvolvimento: 10000 req/min (AUMENTADO DEBUG)
-            limit: 10000,
+            // O guard ajusta por IP, usuario, tenant, risco operacional e alto volume.
+            limit: 300,
           },
         ],
       }),
@@ -124,6 +124,8 @@ import { SystemDiagnosticsModule } from './diagnostics/system-diagnostics.module
       useClass: SecurityThrottlerGuard,
     },
     // CSRF Protection Global (TEMPORARIAMENTE DESABILITADO PARA RESOLVER 403 EM PRODUÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½O)
+    // Sem cookie autenticado, CSRF nao se aplica aos fluxos atuais.
+    // Se algum login por cookie/sessao for adicionado, esta guarda deve ser reativada.
     // {
     //   provide: APP_GUARD,
     //   useClass: CsrfGuard,

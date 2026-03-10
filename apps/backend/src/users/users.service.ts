@@ -1,37 +1,57 @@
-import { Injectable, ConflictException, BadRequestException, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { ChangePasswordDto } from './dto/change-password.dto';
-import { ThemeEnum } from './dto/update-preferences.dto';
 import * as bcrypt from 'bcrypt';
 import { Role } from '@prisma/client';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { CreateUserDto } from './dto/create-user.dto';
+import { ThemeEnum } from './dto/update-preferences.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+
+type UserScopeActor = {
+  id: string;
+  role: Role;
+  tenantId?: string | null;
+};
+
+type ScopedUser = {
+  id: string;
+  email: string;
+  role: Role;
+  tenantId?: string | null;
+  isLocked?: boolean;
+};
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) { }
+  private readonly logger = new Logger(UsersService.name);
+
+  constructor(private prisma: PrismaService) {}
 
   async create(createUserDto: CreateUserDto) {
     const { email, password, name, role, tenantId } = createUserDto;
 
-    // Verifica se já existe usuário com o mesmo email
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
     });
 
     if (existingUser) {
-      throw new ConflictException('Já existe um usuário com este email');
+      throw new ConflictException('Ja existe um usuario com este email');
     }
 
-    // Valida tenantId se não for SUPER_ADMIN
     if (role !== Role.SUPER_ADMIN && !tenantId) {
-      throw new BadRequestException('TenantId é obrigatório para usuários que não são SUPER_ADMIN');
+      throw new BadRequestException('TenantId e obrigatorio para usuarios que nao sao SUPER_ADMIN');
     }
 
-    // Hash da senha
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Cria o usuário
     const user = await this.prisma.user.create({
       data: {
         email,
@@ -45,19 +65,12 @@ export class UsersService {
       },
     });
 
-    // Remove a senha do retorno
-    const userWithoutPassword = { ...user };
-    delete userWithoutPassword.password;
-    return userWithoutPassword;
+    return this.sanitizeUser(user);
   }
 
-  async findAll(tenantId?: string) {
-    const where = tenantId ? { tenantId } : {
-      // Empty implementation
-    };
-
+  async findAll(tenantId?: string): Promise<any[]> {
     const users = await this.prisma.user.findMany({
-      where,
+      where: tenantId ? { tenantId } : {},
       orderBy: { createdAt: 'desc' },
       include: {
         tenant: {
@@ -69,17 +82,12 @@ export class UsersService {
       },
     });
 
-    // Remove password do retorno
-    return users.map((item) => {
-      const userWithoutPassword = { ...item };
-      delete userWithoutPassword.password;
-      return userWithoutPassword;
-    });
+    return users.map((item) => this.sanitizeUser(item));
   }
 
-  async findOne(id: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id },
+  async findOne(id: string, actor?: UserScopeActor): Promise<any> {
+    const user = await this.prisma.user.findFirst({
+      where: this.buildUserScopeWhere(id, actor),
       include: {
         tenant: {
           select: {
@@ -92,40 +100,34 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('Usuário não encontrado');
+      throw new NotFoundException('Usuario nao encontrado');
     }
 
-    const userWithoutPassword = { ...user };
-    delete userWithoutPassword.password;
-    return userWithoutPassword;
+    return this.sanitizeUser(user);
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto) {
-    // Verifica se o usuário existe
-    await this.findOne(id);
+  async update(id: string, updateUserDto: UpdateUserDto, actor: UserScopeActor) {
+    const existingUser = (await this.findOne(id, actor)) as unknown as ScopedUser;
+    this.assertActorCanManageTarget(actor, existingUser);
+    this.auditCrossTenantAction('update_user', actor, existingUser.id, existingUser.tenantId);
 
-    // Se está atualizando email, verifica duplicação
     if (updateUserDto.email) {
-      const existingUser = await this.prisma.user.findFirst({
+      const duplicatedUser = await this.prisma.user.findFirst({
         where: {
-          AND: [
-            { id: { not: id } },
-            { email: updateUserDto.email },
-          ],
+          AND: [{ id: { not: id } }, { email: updateUserDto.email }],
         },
       });
 
-      if (existingUser) {
-        throw new ConflictException('Já existe um usuário com este email');
+      if (duplicatedUser) {
+        throw new ConflictException('Ja existe um usuario com este email');
       }
     }
 
-    // Se está atualizando senha, faz o hash
-    const data: any = { ...updateUserDto };
+    const data: Record<string, any> = { ...updateUserDto };
     if (updateUserDto.password && updateUserDto.password.trim() !== '') {
       data.password = await bcrypt.hash(updateUserDto.password, 10);
+      data.lastPasswordChange = new Date();
     } else {
-      // Remove password do data se estiver vazio
       delete data.password;
     }
 
@@ -142,25 +144,23 @@ export class UsersService {
       },
     });
 
-    const userWithoutPassword = { ...user };
-    delete userWithoutPassword.password;
-    return userWithoutPassword;
+    return this.sanitizeUser(user);
   }
 
-  async remove(id: string) {
-    // Verifica se o usuário existe
-    const user = await this.findOne(id);
+  async remove(id: string, actor: UserScopeActor) {
+    const user = (await this.findOne(id, actor)) as unknown as ScopedUser;
+    this.assertActorCanManageTarget(actor, user);
+    this.auditCrossTenantAction('delete_user', actor, user.id, user.tenantId);
 
-    // Não permite deletar o SUPER_ADMIN padrão
     if (user.email === 'admin@system.com') {
-      throw new BadRequestException('O SUPER_ADMIN padrão não pode ser deletado');
+      throw new BadRequestException('O SUPER_ADMIN padrao nao pode ser deletado');
     }
 
     await this.prisma.user.delete({
       where: { id },
     });
 
-    return { message: 'Usuário deletado com sucesso' };
+    return { message: 'Usuario deletado com sucesso' };
   }
 
   async findByTenant(tenantId: string) {
@@ -169,71 +169,59 @@ export class UsersService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return users.map((item) => {
-      const userWithoutPassword = { ...item };
-      delete userWithoutPassword.password;
-      return userWithoutPassword;
-    });
+    return users.map((item) => this.sanitizeUser(item));
   }
 
-  /**
-   * Alterar senha do usuário
-   */
   async changePassword(userId: string, changePasswordDto: ChangePasswordDto) {
     const { currentPassword, newPassword } = changePasswordDto;
 
-    // Buscar usuário com senha
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
     if (!user) {
-      throw new NotFoundException('Usuário não encontrado');
+      throw new NotFoundException('Usuario nao encontrado');
     }
 
-    // Verificar senha atual
     const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
-
     if (!isPasswordValid) {
       throw new UnauthorizedException('Senha atual incorreta');
     }
 
-    // Verificar se a nova senha é diferente da atual
     const isSamePassword = await bcrypt.compare(newPassword, user.password);
-
     if (isSamePassword) {
       throw new BadRequestException('A nova senha deve ser diferente da senha atual');
     }
 
-    // Hash da nova senha
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Atualizar senha
     await this.prisma.user.update({
       where: { id: userId },
-      data: { password: hashedPassword },
+      data: {
+        password: hashedPassword,
+        lastPasswordChange: new Date(),
+        sessionVersion: {
+          increment: 1,
+        },
+      } as any,
+    });
+
+    await this.prisma.refreshToken.deleteMany({
+      where: { userId },
     });
 
     return { message: 'Senha alterada com sucesso' };
   }
 
-  /**
-   * Desbloquear usuário
-   */
-  async unlockUser(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new NotFoundException('Usuário não encontrado');
-    }
+  async unlockUser(userId: string, actor: UserScopeActor) {
+    const user = (await this.findOne(userId, actor)) as unknown as ScopedUser;
+    this.assertActorCanManageTarget(actor, user);
+    this.auditCrossTenantAction('unlock_user', actor, user.id, user.tenantId);
 
     if (!user.isLocked) {
-      throw new BadRequestException('Usuário não está bloqueado');
+      throw new BadRequestException('Usuario nao esta bloqueado');
     }
 
-    // Desbloquear e resetar tentativas
     await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -245,25 +233,20 @@ export class UsersService {
       },
     });
 
-    return { message: 'Usuário desbloqueado com sucesso' };
+    return { message: 'Usuario desbloqueado com sucesso' };
   }
 
-  /**
-   * Atualizar perfil do próprio usuário
-   */
   async updateProfile(userId: string, updateProfileDto: { name: string; email: string }) {
     const { name, email } = updateProfileDto;
 
-    // Verificar se o email já está em uso por outro usuário
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
     });
 
     if (existingUser && existingUser.id !== userId) {
-      throw new ConflictException('Este email já está em uso');
+      throw new ConflictException('Este email ja esta em uso');
     }
 
-    // Atualizar usuário
     const user = await this.prisma.user.update({
       where: { id: userId },
       data: { name, email },
@@ -272,15 +255,9 @@ export class UsersService {
       },
     });
 
-    // Remove a senha do retorno
-    const userWithoutPassword = { ...user };
-    delete userWithoutPassword.password;
-    return userWithoutPassword;
+    return this.sanitizeUser(user);
   }
 
-  /**
-   * Atualizar preferências do usuário (Tema)
-   */
   async updatePreferences(userId: string, theme: ThemeEnum) {
     return this.prisma.userPreferences.upsert({
       where: { userId },
@@ -288,5 +265,59 @@ export class UsersService {
       create: { userId, theme },
     });
   }
-}
 
+  private buildUserScopeWhere(id: string, actor?: UserScopeActor) {
+    if (!actor || actor.role === Role.SUPER_ADMIN) {
+      return { id };
+    }
+
+    return {
+      id,
+      tenantId: actor.tenantId || '__missing_tenant__',
+    };
+  }
+
+  private assertActorCanManageTarget(actor: UserScopeActor, targetUser: ScopedUser) {
+    if (actor.role === Role.SUPER_ADMIN) {
+      return;
+    }
+
+    if (!actor.tenantId || targetUser.tenantId !== actor.tenantId) {
+      throw new NotFoundException('Usuario nao encontrado');
+    }
+
+    if (targetUser.role === Role.SUPER_ADMIN || targetUser.role === Role.ADMIN) {
+      throw new ForbiddenException('ADMIN nao pode gerenciar usuarios administrativos');
+    }
+  }
+
+  private auditCrossTenantAction(
+    action: string,
+    actor: UserScopeActor,
+    targetUserId: string,
+    targetTenantId?: string | null,
+  ) {
+    if (actor.role !== Role.SUPER_ADMIN) {
+      return;
+    }
+
+    if (actor.tenantId === targetTenantId) {
+      return;
+    }
+
+    this.logger.warn(
+      JSON.stringify({
+        event: action,
+        actorId: actor.id,
+        actorTenantId: actor.tenantId ?? null,
+        targetUserId,
+        targetTenantId: targetTenantId ?? null,
+      }),
+    );
+  }
+
+  private sanitizeUser(user: any): any {
+    const { password: _password, ...safeUser } = user;
+    return safeUser;
+  }
+}

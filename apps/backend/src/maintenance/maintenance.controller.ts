@@ -12,8 +12,6 @@ export class MaintenanceController {
     const state = await this.maintenanceModeService.getState();
     return {
       enabled: state.enabled,
-      reason: state.reason,
-      startedAt: state.startedAt,
       etaSeconds: state.etaSeconds,
     };
   }

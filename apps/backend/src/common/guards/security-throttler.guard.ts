@@ -53,6 +53,8 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
   private readonly tenantLimitFloor = this.readEnvNumber('RATE_LIMIT_TENANT_LIMIT', 2000);
   private readonly apiKeyLimitFloor = this.readEnvNumber('RATE_LIMIT_API_KEY_LIMIT', 1500);
   private readonly dashboardLimitFloor = this.readEnvNumber('RATE_LIMIT_DASHBOARD_LIMIT', 2500);
+  private readonly highVolumeLimitFloor = this.readEnvNumber('RATE_LIMIT_HIGH_VOLUME_LIMIT', 5000);
+  private readonly sensitiveOperationLimitCap = this.readEnvNumber('RATE_LIMIT_SENSITIVE_OPERATION_LIMIT', 30);
 
   constructor(
     @InjectThrottlerOptions() options: ThrottlerModuleOptions,
@@ -95,7 +97,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
         ttl = this.toPositiveNumber(rateLimitConfig.window, 1) * 60000;
       }
 
-      limit = this.applyScopePolicy(limit, identity.scope, identity.path);
+      limit = this.applyScopePolicy(limit, identity.scope, identity.path, this.resolveRequestMethod(req));
     }
 
     const allowed = await super.handleRequest({
@@ -249,7 +251,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     }
   }
 
-  private applyScopePolicy(baseLimit: number, scope: ThrottleScope, path: string): number {
+  private applyScopePolicy(baseLimit: number, scope: ThrottleScope, path: string, method: string): number {
     let limit = baseLimit;
 
     if (scope === 'ip') {
@@ -262,8 +264,16 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
       limit = Math.max(limit, this.apiKeyLimitFloor);
     }
 
+    if (this.isHighVolumePath(path) && scope !== 'ip') {
+      limit = Math.max(limit, this.highVolumeLimitFloor);
+    }
+
     if (this.isDashboardLikePath(path) && scope !== 'ip') {
       limit = Math.max(limit, this.dashboardLimitFloor);
+    }
+
+    if (this.isSensitiveOperationalMutation(path, method)) {
+      limit = Math.min(limit, this.sensitiveOperationLimitCap);
     }
 
     return limit;
@@ -359,6 +369,40 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
       path.includes('/dashboard') ||
       path.includes('/notifications') ||
       path.includes('/audit-logs')
+    );
+  }
+
+  private isHighVolumePath(path: string): boolean {
+    return (
+      path.includes('/whatsapp') ||
+      path.includes('/messages') ||
+      path.includes('/webhook') ||
+      path.includes('/sync') ||
+      path.includes('/queue') ||
+      path.includes('/dispatch')
+    );
+  }
+
+  private isSensitiveOperationalMutation(path: string, method: string): boolean {
+    if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
+      return false;
+    }
+
+    return (
+      path.includes('/system/update') ||
+      path.includes('/update') ||
+      path.includes('/backups') ||
+      path.includes('/backup') ||
+      path.includes('/system/diagnostics') ||
+      path.includes('/system/audit') ||
+      path.includes('/system/notifications') ||
+      path.includes('/system/retention') ||
+      path.includes('/cron') ||
+      path.includes('/platform-config') ||
+      path.includes('/security-config') ||
+      path.includes('/email-config') ||
+      path.includes('/ordem_servico/permissions') ||
+      path.includes('/tenants')
     );
   }
 

@@ -16,13 +16,13 @@ describe('SystemDiagnosticsController', () => {
     jest.clearAllMocks();
   });
 
-  it('protects diagnostics with JWT + roles ADMIN/SUPER_ADMIN', () => {
+  it('protects diagnostics with JWT + role SUPER_ADMIN', () => {
     const guards = Reflect.getMetadata(GUARDS_METADATA, SystemDiagnosticsController) || [];
     const roles = Reflect.getMetadata(ROLES_KEY, SystemDiagnosticsController) || [];
 
     expect(guards).toContain(JwtAuthGuard);
     expect(guards).toContain(RolesGuard);
-    expect(roles).toEqual([Role.ADMIN, Role.SUPER_ADMIN]);
+    expect(roles).toEqual([Role.SUPER_ADMIN]);
   });
 
   it('delegates diagnostics query with normalized actor context', async () => {
@@ -32,7 +32,7 @@ describe('SystemDiagnosticsController', () => {
     await controller.getDiagnostics({
       user: {
         sub: 'user-1',
-        role: 'ADMIN',
+        role: 'SUPER_ADMIN',
         tenantId: 'tenant-1',
         name: 'Admin User',
         email: 'admin@example.com',
@@ -42,7 +42,7 @@ describe('SystemDiagnosticsController', () => {
 
     expect(diagnosticsServiceMock.getDiagnostics).toHaveBeenCalledWith({
       userId: 'user-1',
-      role: Role.ADMIN,
+      role: Role.SUPER_ADMIN,
       tenantId: 'tenant-1',
       name: 'Admin User',
       email: 'admin@example.com',

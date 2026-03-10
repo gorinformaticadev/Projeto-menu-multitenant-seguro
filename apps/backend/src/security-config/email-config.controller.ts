@@ -1,7 +1,8 @@
  import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { EmailConfigService } from './email-config.service';
 import { CreateEmailConfigDto, UpdateEmailConfigDto } from './dto/email-config.dto';
+import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
@@ -9,9 +10,8 @@ import { EmailService } from '../email/email.service';
 
 type AuthenticatedRequest = { user: { id: string; [key: string]: unknown } };
 
-@SkipThrottle()
 @Controller('email-config')
-@UseGuards(RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class EmailConfigController {
   constructor(
     private readonly emailConfigService: EmailConfigService,
@@ -25,9 +25,9 @@ export class EmailConfigController {
    * Obter lista de provedores de email pré-configurados
    * Apenas SUPER_ADMIN
    */
-  @SkipThrottle()
   @Get('providers')
   @Roles(Role.SUPER_ADMIN)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async getProviders() {
     return this.emailConfigService.getPredefinedProviders();
   }
@@ -37,9 +37,9 @@ export class EmailConfigController {
    * Obter todas as configurações de email
    * Apenas SUPER_ADMIN
    */
-  @SkipThrottle()
   @Get()
   @Roles(Role.SUPER_ADMIN)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async getAllConfigs() {
     return this.emailConfigService.getAllConfigs();
   }
@@ -49,8 +49,9 @@ export class EmailConfigController {
    * Obter configuração de email ativa
    * Público para uso no serviço de email
    */
-  @SkipThrottle()
   @Get('active')
+  @Roles(Role.SUPER_ADMIN)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async getActiveConfig() {
     return this.emailConfigService.getActiveConfig();
   }
@@ -60,9 +61,9 @@ export class EmailConfigController {
    * Obter credenciais SMTP do SecurityConfig
    * Apenas SUPER_ADMIN
    */
-  @SkipThrottle()
   @Get('smtp-credentials')
   @Roles(Role.SUPER_ADMIN)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async getSmtpCredentials() {
     return this.emailConfigService.getSmtpCredentials();
   }
@@ -72,9 +73,9 @@ export class EmailConfigController {
    * Criar nova configuração de email
    * Apenas SUPER_ADMIN
    */
-  @SkipThrottle()
   @Post()
   @Roles(Role.SUPER_ADMIN)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async createConfig(
     @Body() dto: CreateEmailConfigDto,
     @Req() req: AuthenticatedRequest,
@@ -87,9 +88,9 @@ export class EmailConfigController {
    * Atualizar configuração de email
    * Apenas SUPER_ADMIN
    */
-  @SkipThrottle()
   @Put(':id')
   @Roles(Role.SUPER_ADMIN)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async updateConfig(
     @Param('id') id: string,
     @Body() dto: UpdateEmailConfigDto,
@@ -103,9 +104,9 @@ export class EmailConfigController {
    * Ativar configuração de email
    * Apenas SUPER_ADMIN
    */
-  @SkipThrottle()
   @Put(':id/activate')
   @Roles(Role.SUPER_ADMIN)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async activateConfig(
     @Param('id') id: string,
     @Req() req: AuthenticatedRequest,
@@ -118,9 +119,9 @@ export class EmailConfigController {
    * Remover configuração de email
    * Apenas SUPER_ADMIN
    */
-  @SkipThrottle()
   @Delete(':id')
   @Roles(Role.SUPER_ADMIN)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async deleteConfig(@Param('id') id: string) {
     return this.emailConfigService.deleteConfig(id);
   }
@@ -130,9 +131,9 @@ export class EmailConfigController {
    * Testar configuração de email
    * Apenas SUPER_ADMIN
    */
-  @SkipThrottle()
   @Post('test')
   @Roles(Role.SUPER_ADMIN)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async testConfig(
     @Body('email') email: string,
     @Body('smtpUser') smtpUser: string,

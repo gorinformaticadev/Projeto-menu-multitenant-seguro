@@ -8,7 +8,7 @@ import { SystemDiagnosticsService } from './system-diagnostics.service';
 
 @Controller('system/diagnostics')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.SUPER_ADMIN)
+@Roles(Role.SUPER_ADMIN)
 export class SystemDiagnosticsController {
   constructor(private readonly diagnosticsService: SystemDiagnosticsService) {}
 

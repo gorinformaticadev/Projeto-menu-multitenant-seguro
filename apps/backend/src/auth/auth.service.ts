@@ -10,6 +10,14 @@ import * as crypto from 'crypto';
 import { LoginDto } from './dto/login.dto';
 import { Login2FADto } from './dto/login-2fa.dto';
 
+type TokenGenerationInput = {
+  userId: string;
+  email: string;
+  role: string;
+  tenantId: string | null;
+  sessionVersion: number;
+};
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -21,33 +29,27 @@ export class AuthService {
     @Inject(forwardRef(() => TwoFactorService))
     private twoFactorService: TwoFactorService,
     private tokenBlacklistService: TokenBlacklistService,
-  ) {
-    // Empty implementation
-  }
+  ) {}
 
   async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string) {
     const { email, password } = loginDto;
 
-    // Busca o usuário pelo email
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: { tenant: true },
     });
 
     if (!user) {
-      // Log de tentativa de login falha
       await this.auditService.log({
         action: 'LOGIN_FAILED',
         ipAddress,
         userAgent,
         details: { email, reason: 'user_not_found' },
       });
-      throw new UnauthorizedException('Credenciais inválidas');
+      throw new UnauthorizedException('Credenciais invalidas');
     }
 
-    // Verificar se o usuário está bloqueado
     if (user.isLocked) {
-      // Verificar se o bloqueio ainda está ativo
       if (user.lockedUntil && user.lockedUntil > new Date()) {
         const minutesRemaining = Math.ceil(
           (user.lockedUntil.getTime() - new Date().getTime()) / 60000,
@@ -63,41 +65,34 @@ export class AuthService {
         });
 
         throw new UnauthorizedException(
-          `Conta bloqueada por múltiplas tentativas de login. Tente novamente em ${minutesRemaining} minuto(s) ou contate um administrador.`,
+          `Conta bloqueada por multiplas tentativas de login. Tente novamente em ${minutesRemaining} minuto(s) ou contate um administrador.`,
         );
-      } else {
-        // Bloqueio expirou, desbloquear automaticamente
-        await this.prisma.user.update({
-          where: { id: user.id },
-          data: {
-            isLocked: false,
-            loginAttempts: 0,
-            lockedAt: null,
-            lockedUntil: null,
-          },
-        });
       }
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          isLocked: false,
+          loginAttempts: 0,
+          lockedAt: null,
+          lockedUntil: null,
+        },
+      });
     }
 
-    // Verifica a senha usando bcrypt.compare()
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
-      // Buscar configurações de segurança
       const securityConfig = await this.prisma.securityConfig.findFirst();
       const maxAttempts = securityConfig?.loginMaxAttempts || 5;
       const lockDurationMinutes = securityConfig?.loginLockDurationMinutes || 30;
-
-      // Incrementar tentativas de login
       const newAttempts = user.loginAttempts + 1;
 
-      // Atualizar tentativas
       const updateData: any = {
         loginAttempts: newAttempts,
         lastFailedLoginAt: new Date(),
       };
 
-      // Se atingiu o máximo de tentativas, bloquear
       if (newAttempts >= maxAttempts) {
         const lockedUntil = new Date();
         lockedUntil.setMinutes(lockedUntil.getMinutes() + lockDurationMinutes);
@@ -121,27 +116,24 @@ export class AuthService {
         });
 
         throw new UnauthorizedException(
-          `Conta bloqueada por múltiplas tentativas de login. Tente novamente em ${lockDurationMinutes} minutos ou contate um administrador.`,
+          `Conta bloqueada por multiplas tentativas de login. Tente novamente em ${lockDurationMinutes} minutos ou contate um administrador.`,
         );
       }
 
-      // Atualizar tentativas sem bloquear
       await this.prisma.user.update({
         where: { id: user.id },
         data: updateData,
       });
 
-      // Avisar se está próximo do bloqueio (1 tentativa restante)
       const attemptsRemaining = maxAttempts - newAttempts;
-      let errorMessage = 'Credenciais inválidas';
+      let errorMessage = 'Credenciais invalidas';
 
       if (attemptsRemaining === 1) {
-        errorMessage = `Credenciais inválidas. ATENÇÃO: Você tem apenas ${attemptsRemaining} tentativa restante antes de sua conta ser bloqueada por ${lockDurationMinutes} minutos.`;
+        errorMessage = `Credenciais invalidas. ATENCAO: Voce tem apenas ${attemptsRemaining} tentativa restante antes de sua conta ser bloqueada por ${lockDurationMinutes} minutos.`;
       } else if (attemptsRemaining <= 3) {
-        errorMessage = `Credenciais inválidas. Você tem ${attemptsRemaining} tentativas restantes.`;
+        errorMessage = `Credenciais invalidas. Voce tem ${attemptsRemaining} tentativas restantes.`;
       }
 
-      // Log de tentativa de login falha
       await this.auditService.log({
         action: 'LOGIN_FAILED',
         userId: user.id,
@@ -154,7 +146,6 @@ export class AuthService {
       throw new UnauthorizedException(errorMessage);
     }
 
-    // Login bem-sucedido - resetar tentativas
     if (user.loginAttempts > 0) {
       await this.prisma.user.update({
         where: { id: user.id },
@@ -165,15 +156,12 @@ export class AuthService {
       });
     }
 
-    // Verificar se 2FA é obrigatório para este usuário
     const securityConfig = await this.prisma.securityConfig.findFirst();
     const is2FARequired = securityConfig?.twoFactorRequired || false;
     const is2FARequiredForAdmins = securityConfig?.twoFactorRequiredForAdmins || false;
     const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN';
 
-    // Se 2FA é obrigatório e usuário não tem ativado
     if ((is2FARequired || (is2FARequiredForAdmins && isAdmin)) && !user.twoFactorEnabled) {
-      // Log de aviso
       await this.auditService.log({
         action: 'LOGIN_2FA_REQUIRED',
         userId: user.id,
@@ -183,19 +171,23 @@ export class AuthService {
         details: {
           email,
           reason: is2FARequired ? '2fa_globally_required' : '2fa_required_for_admins',
-          role: user.role
+          role: user.role,
         },
       });
 
       throw new UnauthorizedException(
-        '2FA é obrigatório para sua conta. Por favor, ative a autenticação de dois fatores antes de fazer login.',
+        '2FA e obrigatorio para sua conta. Por favor, ative a autenticacao de dois fatores antes de fazer login.',
       );
     }
 
-    // Gera tokens
-    const tokens = await this.generateTokens(user.id, user.email, user.role, user.tenantId);
+    const tokens = await this.generateTokens({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      tenantId: user.tenantId,
+      sessionVersion: this.readSessionVersion(user),
+    });
 
-    // Log de login bem-sucedido
     await this.auditService.log({
       action: 'LOGIN_SUCCESS',
       userId: user.id,
@@ -208,46 +200,32 @@ export class AuthService {
     return {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        tenantId: user.tenantId,
-        tenant: user.tenant,
-        // Remover dados sensíveis
-        twoFactorSecret: undefined,
-      },
+      user: this.toUserResponse(user),
     };
   }
 
-  /**
-   * Gera access token e refresh token
-   */
-  async generateTokens(userId: string, email: string, role: string, tenantId: string | null) {
+  async generateTokens(input: TokenGenerationInput) {
     const payload = {
-      sub: userId,
-      email,
-      role,
-      tenantId,
+      sub: input.userId,
+      email: input.email,
+      role: input.role,
+      tenantId: input.tenantId,
+      sessionVersion: input.sessionVersion,
+      jti: crypto.randomUUID(),
     };
 
-    // Access Token: 15 minutos (configurável)
     const accessToken = this.jwtService.sign(payload, {
       expiresIn: this.config.get('JWT_ACCESS_EXPIRES_IN', '15m'),
     });
 
-    // Refresh Token: token aleatório
     const refreshToken = crypto.randomBytes(64).toString('hex');
-
-    // Salvar refresh token no banco
     const expiresIn = this.config.get('JWT_REFRESH_EXPIRES_IN', '7d');
     const expiresAt = this.calculateExpirationDate(expiresIn);
 
     await this.prisma.refreshToken.create({
       data: {
         token: refreshToken,
-        userId,
+        userId: input.userId,
         expiresAt,
       },
     });
@@ -258,43 +236,39 @@ export class AuthService {
     };
   }
 
-  /**
-   * Renovar access token usando refresh token
-   */
   async refreshTokens(refreshToken: string, ipAddress?: string, userAgent?: string) {
-    // Buscar refresh token no banco
+    if (await this.tokenBlacklistService.isTokenBlacklisted(refreshToken)) {
+      throw new UnauthorizedException('Refresh token invalido');
+    }
+
     const storedToken = await this.prisma.refreshToken.findUnique({
       where: { token: refreshToken },
       include: { user: { include: { tenant: true } } },
     });
 
     if (!storedToken) {
-      throw new UnauthorizedException('Refresh token inválido');
+      throw new UnauthorizedException('Refresh token invalido');
     }
 
-    // Verificar se expirou
     if (storedToken.expiresAt < new Date()) {
-      // Remover token expirado
       await this.prisma.refreshToken.delete({
         where: { id: storedToken.id },
       });
       throw new UnauthorizedException('Refresh token expirado');
     }
 
-    // Gerar novos tokens
-    const tokens = await this.generateTokens(
-      storedToken.user.id,
-      storedToken.user.email,
-      storedToken.user.role,
-      storedToken.user.tenantId,
-    );
+    const tokens = await this.generateTokens({
+      userId: storedToken.user.id,
+      email: storedToken.user.email,
+      role: storedToken.user.role,
+      tenantId: storedToken.user.tenantId,
+      sessionVersion: this.readSessionVersion(storedToken.user),
+    });
 
-    // Remover refresh token antigo (rotação)
     await this.prisma.refreshToken.delete({
       where: { id: storedToken.id },
     });
 
-    // Log de refresh
     await this.auditService.log({
       action: 'TOKEN_REFRESHED',
       userId: storedToken.user.id,
@@ -307,43 +281,30 @@ export class AuthService {
     return {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      user: {
-        id: storedToken.user.id,
-        email: storedToken.user.email,
-        name: storedToken.user.name,
-        role: storedToken.user.role,
-        tenantId: storedToken.user.tenantId,
-        tenant: storedToken.user.tenant,
-        // Remover dados sensíveis
-        twoFactorSecret: undefined,
-      },
+      user: this.toUserResponse(storedToken.user),
     };
   }
 
-  /**
-   * Logout - invalida refresh token e adiciona à blacklist
-   */
-  async logout(refreshToken: string, userId: string, ipAddress?: string, userAgent?: string) {
-    // Buscar o refresh token para obter a data de expiração
+  async logout(
+    refreshToken: string,
+    userId: string,
+    accessToken?: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
     const storedToken = await this.prisma.refreshToken.findUnique({
       where: { token: refreshToken },
     });
 
-    if (storedToken) {
-      // Adicionar token à blacklist
-      await this.tokenBlacklistService.blacklistToken(
-        refreshToken,
-        storedToken.expiresAt,
-        userId
-      );
-
-      // Remover refresh token do banco
+    if (storedToken && storedToken.userId === userId) {
+      await this.tokenBlacklistService.blacklistToken(refreshToken, storedToken.expiresAt, userId);
       await this.prisma.refreshToken.delete({
         where: { id: storedToken.id },
       });
     }
 
-    // Log de logout
+    await this.blacklistAccessToken(accessToken, userId);
+
     await this.auditService.log({
       action: 'LOGOUT',
       userId,
@@ -354,42 +315,34 @@ export class AuthService {
     return { message: 'Logout realizado com sucesso' };
   }
 
-  /**
-   * Calcular data de expiração baseado em string (ex: "7d", "30d")
-   */
   private calculateExpirationDate(expiresIn: string): Date {
     const now = new Date();
     const match = expiresIn.match(/^(\d+)([smhd])$/);
 
     if (!match) {
-      // Padrão: 7 dias
       return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     }
 
-    const value = parseInt(match[1]);
+    const value = parseInt(match[1], 10);
     const unit = match[2];
 
     switch (unit) {
-      case 's': // segundos
+      case 's':
         return new Date(now.getTime() + value * 1000);
-      case 'm': // minutos
+      case 'm':
         return new Date(now.getTime() + value * 60 * 1000);
-      case 'h': // horas
+      case 'h':
         return new Date(now.getTime() + value * 60 * 60 * 1000);
-      case 'd': // dias
+      case 'd':
         return new Date(now.getTime() + value * 24 * 60 * 60 * 1000);
       default:
         return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     }
   }
 
-  /**
-   * Login com 2FA
-   */
   async login2FA(login2FADto: Login2FADto, ipAddress?: string, userAgent?: string) {
     const { email, password, twoFactorToken } = login2FADto;
 
-    // Busca o usuário
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: { tenant: true },
@@ -402,24 +355,19 @@ export class AuthService {
         userAgent,
         details: { email, reason: 'user_not_found' },
       });
-      throw new UnauthorizedException('Credenciais inválidas');
+      throw new UnauthorizedException('Credenciais invalidas');
     }
 
-    // Verificar se está bloqueado
-    if (user.isLocked) {
-      if (user.lockedUntil && user.lockedUntil > new Date()) {
-        const minutesRemaining = Math.ceil(
-          (user.lockedUntil.getTime() - new Date().getTime()) / 60000,
-        );
-        throw new UnauthorizedException(
-          `Conta bloqueada. Tente novamente em ${minutesRemaining} minuto(s).`,
-        );
-      }
+    if (user.isLocked && user.lockedUntil && user.lockedUntil > new Date()) {
+      const minutesRemaining = Math.ceil(
+        (user.lockedUntil.getTime() - new Date().getTime()) / 60000,
+      );
+      throw new UnauthorizedException(
+        `Conta bloqueada. Tente novamente em ${minutesRemaining} minuto(s).`,
+      );
     }
 
-    // Verificar senha
     const isPasswordValid = await bcrypt.compare(password, user.password);
-
     if (!isPasswordValid) {
       await this.auditService.log({
         action: 'LOGIN_2FA_FAILED',
@@ -429,17 +377,14 @@ export class AuthService {
         userAgent,
         details: { email, reason: 'invalid_password' },
       });
-      throw new UnauthorizedException('Credenciais inválidas');
+      throw new UnauthorizedException('Credenciais invalidas');
     }
 
-    // Verificar se 2FA está ativado
     if (!user.twoFactorEnabled || !user.twoFactorSecret) {
-      throw new UnauthorizedException('2FA não está ativado para este usuário');
+      throw new UnauthorizedException('2FA nao esta ativado para este usuario');
     }
 
-    // Verificar código 2FA
     const is2FAValid = this.twoFactorService.verify(user.twoFactorSecret, twoFactorToken);
-
     if (!is2FAValid) {
       await this.auditService.log({
         action: 'LOGIN_2FA_FAILED',
@@ -449,10 +394,9 @@ export class AuthService {
         userAgent,
         details: { email, reason: 'invalid_2fa_token' },
       });
-      throw new UnauthorizedException('Código 2FA inválido');
+      throw new UnauthorizedException('Codigo 2FA invalido');
     }
 
-    // Login bem-sucedido - resetar tentativas
     if (user.loginAttempts > 0) {
       await this.prisma.user.update({
         where: { id: user.id },
@@ -463,10 +407,14 @@ export class AuthService {
       });
     }
 
-    // Gerar tokens
-    const tokens = await this.generateTokens(user.id, user.email, user.role, user.tenantId);
+    const tokens = await this.generateTokens({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      tenantId: user.tenantId,
+      sessionVersion: this.readSessionVersion(user),
+    });
 
-    // Log de login bem-sucedido
     await this.auditService.log({
       action: 'LOGIN_2FA_SUCCESS',
       userId: user.id,
@@ -479,27 +427,14 @@ export class AuthService {
     return {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        tenantId: user.tenantId,
-        tenant: user.tenant,
-        // Remover dados sensíveis
-        twoFactorSecret: undefined,
-      },
+      user: this.toUserResponse(user),
     };
   }
 
   async hashPassword(password: string): Promise<string> {
-    const saltRounds = 10;
-    return bcrypt.hash(password, saltRounds);
+    return bcrypt.hash(password, 10);
   }
 
-  /**
-   * Buscar dados do perfil do usuário
-   */
   async getProfile(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -507,9 +442,41 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Usuário não encontrado');
+      throw new UnauthorizedException('Usuario nao encontrado');
     }
 
+    return {
+      ...this.toUserResponse(user),
+      twoFactorEnabled: user.twoFactorEnabled,
+    };
+  }
+
+  private async blacklistAccessToken(accessToken: string | undefined, userId: string): Promise<void> {
+    if (!accessToken) {
+      return;
+    }
+
+    const decoded = this.jwtService.decode(accessToken);
+    if (!decoded || typeof decoded !== 'object' || typeof decoded.exp !== 'number') {
+      return;
+    }
+
+    const expiry = new Date(decoded.exp * 1000);
+    if (expiry <= new Date()) {
+      return;
+    }
+
+    await this.tokenBlacklistService.blacklistToken(accessToken, expiry, userId);
+  }
+
+  private toUserResponse(user: {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    tenantId: string | null;
+    tenant?: unknown;
+  }) {
     return {
       id: user.id,
       email: user.email,
@@ -517,9 +484,12 @@ export class AuthService {
       role: user.role,
       tenantId: user.tenantId,
       tenant: user.tenant,
-      twoFactorEnabled: user.twoFactorEnabled,
-      // Remover dados sensíveis
       twoFactorSecret: undefined,
     };
+  }
+
+  private readSessionVersion(user: { sessionVersion?: number | null } | Record<string, unknown>) {
+    const rawValue = (user as { sessionVersion?: number | null }).sessionVersion;
+    return typeof rawValue === 'number' && Number.isFinite(rawValue) ? rawValue : 0;
   }
 }

@@ -2,7 +2,7 @@
  * NOTIFICATION SERVICE - Logica de negocio e persistencia
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { Observable, Subject } from 'rxjs';
 import {
@@ -397,23 +397,24 @@ export class NotificationService {
   /**
    * Cria uma nova notificacao
    */
-  async create(data: NotificationCreateData): Promise<Notification> {
+  async create(data: NotificationCreateData, authorInfo?: any): Promise<Notification> {
     try {
+      const scopedData = await this.applyNotificationAuthorScope(data, authorInfo);
       const severity = this.mapTypeToSeverity(data.type);
       const notification = await this.prisma.notification.create({
         data: {
           type: 'SYSTEM_ALERT',
-          title: data.title,
-          body: data.description,
-          message: data.description,
+          title: scopedData.title,
+          body: scopedData.description,
+          message: scopedData.description,
           severity,
-          audience: this.determineAudience(data.tenantId, data.userId),
+          audience: this.determineAudience(scopedData.tenantId, scopedData.userId),
           source: 'core',
-          tenantId: data.tenantId,
-          userId: data.userId,
-          targetRole: data.userId ? null : data.tenantId ? 'ADMIN' : 'SUPER_ADMIN',
-          targetUserId: data.userId,
-          data: this.sanitizeData(data.metadata || {}) as any,
+          tenantId: scopedData.tenantId,
+          userId: scopedData.userId,
+          targetRole: scopedData.userId ? null : scopedData.tenantId ? 'ADMIN' : 'SUPER_ADMIN',
+          targetUserId: scopedData.userId,
+          data: this.sanitizeData(scopedData.metadata || {}) as any,
           isRead: false,
           read: false,
         },
@@ -613,16 +614,25 @@ export class NotificationService {
   /**
    * Envia notificacao em massa (Broadcast)
    */
-  async broadcast(dto: BroadcastNotificationDto, _authorInfo: unknown): Promise<{ count: number }> {
+  async broadcast(dto: BroadcastNotificationDto, authorInfo: any): Promise<{ count: number }> {
+    const actor = this.normalizeNotificationActor(authorInfo);
     const where: any = {};
 
     if (dto.target === 'admins_only') {
-      where.role = { in: ['ADMIN', 'SUPER_ADMIN'] };
+      where.role = actor.role === 'SUPER_ADMIN' ? { in: ['ADMIN', 'SUPER_ADMIN'] } : 'ADMIN';
     } else if (dto.target === 'super_admins') {
+      if (actor.role !== 'SUPER_ADMIN') {
+        throw new ForbiddenException('ADMIN nao pode enviar broadcast para SUPER_ADMIN');
+      }
       where.role = 'SUPER_ADMIN';
     }
 
-    if (dto.scope === 'tenants' && dto.tenantIds && dto.tenantIds.length > 0) {
+    if (actor.role === 'ADMIN') {
+      if (!actor.tenantId) {
+        throw new ForbiddenException('ADMIN precisa de tenant valido para broadcast');
+      }
+      where.tenantId = actor.tenantId;
+    } else if (dto.scope === 'tenants' && dto.tenantIds && dto.tenantIds.length > 0) {
       where.tenantId = { in: dto.tenantIds };
     }
 
@@ -661,7 +671,7 @@ export class NotificationService {
       data: notificationsData,
     });
 
-    this.logger.log(`Broadcast enviado para ${result.count} usuarios. Scope: ${dto.scope}`);
+    this.logger.log(`Broadcast enviado para ${result.count} usuarios. Scope: ${actor.role === 'ADMIN' ? 'tenant-admin' : dto.scope}`);
 
     return { count: result.count };
   }
@@ -725,6 +735,69 @@ export class NotificationService {
     }
 
     return where;
+  }
+
+  private normalizeNotificationActor(authorInfo: any): { id: string | null; role: string; tenantId: string | null } {
+    return {
+      id: typeof authorInfo?.id === 'string' ? authorInfo.id : null,
+      role: String(authorInfo?.role || '').trim().toUpperCase(),
+      tenantId: typeof authorInfo?.tenantId === 'string' ? authorInfo.tenantId : null,
+    };
+  }
+
+  private async applyNotificationAuthorScope(data: NotificationCreateData, authorInfo?: any) {
+    const actor = this.normalizeNotificationActor(authorInfo);
+    if (!actor.role) {
+      return data;
+    }
+
+    if (actor.role !== 'ADMIN' && actor.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Usuario nao pode criar notificacoes arbitrarias');
+    }
+
+    const scopedData: NotificationCreateData = {
+      ...data,
+      tenantId: data.tenantId,
+      userId: data.userId,
+    };
+
+    if (actor.role === 'ADMIN') {
+      if (!actor.tenantId) {
+        throw new ForbiddenException('ADMIN precisa de tenant valido para criar notificacoes');
+      }
+
+      scopedData.tenantId = actor.tenantId;
+
+      if (data.userId) {
+        const targetUser = await this.prisma.user.findFirst({
+          where: {
+            id: data.userId,
+            tenantId: actor.tenantId,
+          },
+          select: { id: true },
+        });
+
+        if (!targetUser) {
+          throw new ForbiddenException('Destino fora do tenant do administrador');
+        }
+
+        scopedData.userId = targetUser.id;
+      }
+    } else if (data.userId) {
+      const targetUser = await this.prisma.user.findUnique({
+        where: { id: data.userId },
+        select: { id: true, tenantId: true },
+      });
+
+      if (!targetUser) {
+        throw new ForbiddenException('Usuario de destino nao encontrado');
+      }
+
+      scopedData.userId = targetUser.id;
+      scopedData.tenantId = targetUser.tenantId;
+    }
+
+    return scopedData;
   }
 
   private mapToEntity(notification: any): Notification {

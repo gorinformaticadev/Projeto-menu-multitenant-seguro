@@ -1,5 +1,5 @@
 import { Controller, Get, Put, Body, UseGuards, Request } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { PlatformConfigService } from './platform-config.service';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
@@ -24,7 +24,6 @@ export class UpdatePlatformConfigDto {
   platformPhone?: string;
 }
 
-@SkipThrottle()
 @Controller('platform-config')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PlatformConfigController {
@@ -36,7 +35,6 @@ export class PlatformConfigController {
    * Público para inicialização do frontend (Login Page etc)
    */
   @Public()
-  @SkipThrottle()
   @Get()
   async getPlatformConfig() {
     return this.platformConfigService.getPlatformConfig();
@@ -47,9 +45,9 @@ export class PlatformConfigController {
    * Atualizar configurações da plataforma
    * Apenas SUPER_ADMIN
    */
-  @SkipThrottle()
   @Put()
   @Roles(Role.SUPER_ADMIN)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async updatePlatformConfig(
     @Body() dto: UpdatePlatformConfigDto,
     @Request() req: AuthenticatedRequest,
@@ -68,7 +66,6 @@ export class PlatformConfigController {
    * Público (sem autenticação) para uso em templates
    */
   @Public()
-  @SkipThrottle()
   @Get('name')
   async getPlatformName() {
     return {
@@ -82,7 +79,6 @@ export class PlatformConfigController {
    * Público (sem autenticação) para uso em templates
    */
   @Public()
-  @SkipThrottle()
   @Get('email')
   async getPlatformEmail() {
     return {
@@ -96,7 +92,6 @@ export class PlatformConfigController {
    * Público (sem autenticação) para uso em templates
    */
   @Public()
-  @SkipThrottle()
   @Get('phone')
   async getPlatformPhone() {
     return {

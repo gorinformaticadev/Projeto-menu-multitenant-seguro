@@ -17,7 +17,7 @@ export class CronController {
   }
 
   @Get('runtime')
-  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  @Roles(Role.SUPER_ADMIN)
   async getRuntimeJobs() {
     return this.cronService.getRuntimeJobs();
   }

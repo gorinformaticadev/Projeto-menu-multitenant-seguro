@@ -1,5 +1,5 @@
 import { Controller, Get, Put, Body, UseGuards, Req } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { SecurityConfigService } from './security-config.service';
 import { UpdateSecurityConfigDto } from './dto/update-security-config.dto';
 import { UpdateWebPushConfigDto } from './dto/update-web-push-config.dto';
@@ -11,7 +11,6 @@ import { Role } from '@prisma/client';
 
 type AuthenticatedRequest = { user: { id: string; [key: string]: unknown } };
 
-@SkipThrottle()
 @Controller('security-config')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SecurityConfigController {
@@ -24,9 +23,9 @@ export class SecurityConfigController {
    * Obter configurações de segurança
    * Apenas SUPER_ADMIN
    */
-  @SkipThrottle()
   @Get()
   @Roles(Role.SUPER_ADMIN)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async getConfig() {
     return this.securityConfigService.getConfig();
   }
@@ -36,9 +35,9 @@ export class SecurityConfigController {
    * Atualizar configurações de segurança
    * Apenas SUPER_ADMIN
    */
-  @SkipThrottle()
   @Put()
   @Roles(Role.SUPER_ADMIN)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async updateConfig(
     @Body() dto: UpdateSecurityConfigDto,
     @Req() req: AuthenticatedRequest,
@@ -51,9 +50,9 @@ export class SecurityConfigController {
    * Obter configuração de Web Push (sem expor chave privada)
    * Apenas SUPER_ADMIN
    */
-  @SkipThrottle()
   @Get('web-push')
   @Roles(Role.SUPER_ADMIN)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async getWebPushConfig() {
     return this.securityConfigService.getWebPushConfig();
   }
@@ -63,9 +62,9 @@ export class SecurityConfigController {
    * Atualizar configuração de Web Push
    * Apenas SUPER_ADMIN
    */
-  @SkipThrottle()
   @Put('web-push')
   @Roles(Role.SUPER_ADMIN)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async updateWebPushConfig(
     @Body() dto: UpdateWebPushConfigDto,
     @Req() req: AuthenticatedRequest,
@@ -78,7 +77,6 @@ export class SecurityConfigController {
    * Obter política de senha (público para validação no frontend)
    */
   @Public()
-  @SkipThrottle()
   @Get('password-policy')
   async getPasswordPolicy() {
     return this.securityConfigService.getPasswordPolicy();
@@ -89,7 +87,6 @@ export class SecurityConfigController {
    * Verificar se 2FA está habilitado globalmente (público)
    */
   @Public()
-  @SkipThrottle()
   @Get('2fa-status')
   async get2FAStatus() {
     const config = await this.securityConfigService.getConfig();
@@ -104,7 +101,6 @@ export class SecurityConfigController {
    * Obter configurações de segurança completas (público para validação no frontend)
    */
   @Public()
-  @SkipThrottle()
   @Get('full')
   async getFullConfig() {
     const config = await this.securityConfigService.getConfig();

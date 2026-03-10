@@ -56,5 +56,19 @@ describe('SecurityThrottlerGuard identity resolution', () => {
     expect(identity.scope).toBe('ip');
     expect(identity.tracker.startsWith('ip:10.0.0.20:target:')).toBe(true);
   });
+
+  it('caps sensitive operational mutations even for authenticated admins', () => {
+    const guard = createGuard();
+    const limit = (guard as any).applyScopePolicy(1000, 'tenant-user', '/api/system/update/run', 'POST');
+
+    expect(limit).toBe(30);
+  });
+
+  it('keeps high-volume integration paths tolerant for authenticated tenants', () => {
+    const guard = createGuard();
+    const limit = (guard as any).applyScopePolicy(300, 'tenant-user', '/api/whatsapp/messages/send', 'POST');
+
+    expect(limit).toBe(5000);
+  });
 });
 

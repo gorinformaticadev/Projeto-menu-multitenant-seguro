@@ -4,32 +4,20 @@ import { SkipThrottle } from '@nestjs/throttler';
 @SkipThrottle()
 @Controller('health')
 export class HealthController {
-  // Empty constructor removed
-
   @Get('websocket')
   async websocketHealth() {
     try {
-      // Verificar conectividade Redis (se configurado)
-      const redisStatus = process.env.REDIS_HOST ? 'configured' : 'not_configured';
-
-      // Métricas básicas do processo
-      const memoryUsage = process.memoryUsage();
-      const uptime = process.uptime();
-
       return {
         status: 'ok',
         timestamp: new Date().toISOString(),
-        uptime,
-        redis: redisStatus,
-        memoryUsage,
-        pid: process.pid,
-        nodeVersion: process.version
+        uptimeSeconds: Math.floor(process.uptime()),
+        redisConfigured: Boolean(process.env.REDIS_HOST),
       };
-    } catch (error) {
+    } catch {
       return {
         status: 'error',
         timestamp: new Date().toISOString(),
-        error: error.message
+        error: 'health_check_failed',
       };
     }
   }
@@ -39,7 +27,7 @@ export class HealthController {
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
-      service: 'multitenant-backend'
+      service: 'backend',
     };
   }
 
@@ -47,7 +35,7 @@ export class HealthController {
   ping() {
     return {
       message: 'pong',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }

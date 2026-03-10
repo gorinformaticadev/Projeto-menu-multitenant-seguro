@@ -42,6 +42,7 @@ model User {
   emailVerificationExpires DateTime?
   passwordHistory          String?
   lastPasswordChange       DateTime?
+  sessionVersion           Int                  @default(0)
   loginAttempts            Int                  @default(0)
   isLocked                 Boolean              @default(false)
   lockedAt                 DateTime?

@@ -1,56 +1,67 @@
- import { IsEmail, IsString, IsOptional, MinLength, IsEnum, IsBoolean, registerDecorator, ValidationOptions, ValidationArguments } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsEnum,
+  IsOptional,
+  IsString,
+  MinLength,
+  ValidationArguments,
+  ValidationOptions,
+  registerDecorator,
+} from 'class-validator';
 import { Role } from '@prisma/client';
 import { PrismaService } from '@core/prisma/prisma.service';
 
-// Validador personalizado para senha baseado nas configurações
 function IsValidPassword(validationOptions?: ValidationOptions) {
   return function (object: object, propertyName: string) {
     registerDecorator({
       name: 'isValidPassword',
       target: object.constructor,
-      propertyName: propertyName,
+      propertyName,
       options: validationOptions,
       validator: {
         async validate(value: unknown, _args: ValidationArguments) {
-          if (!value || typeof value !== 'string' || value.trim() === '') return true; // Se não há senha, é válido (para edição)
+          if (!value || typeof value !== 'string' || value.trim() === '') {
+            return true;
+          }
 
           try {
-            // Buscar configurações de senha do banco
             const prisma = new PrismaService();
             const config = await prisma.securityConfig.findFirst();
 
             if (!config) {
-              // Usar valores padrão se não houver configuração
-              const minLength = 8;
-              const requireUppercase = true;
-              const requireLowercase = true;
-              const requireNumbers = true;
-              const requireSpecial = true;
-
-              if (value.length < minLength) return false;
-              if (requireUppercase && !/[A-Z]/.test(value)) return false;
-              if (requireLowercase && !/[a-z]/.test(value)) return false;
-              if (requireNumbers && !/\d/.test(value)) return false;
-              if (requireSpecial && !/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value)) return false;
-
-              return true;
+              return (
+                value.length >= 8 &&
+                /[A-Z]/.test(value) &&
+                /[a-z]/.test(value) &&
+                /\d/.test(value) &&
+                /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value)
+              );
             }
 
-            // Validar baseado nas configurações do banco
-            if (value.length < config.passwordMinLength) return false;
-            if (config.passwordRequireUppercase && !/[A-Z]/.test(value)) return false;
-            if (config.passwordRequireLowercase && !/[a-z]/.test(value)) return false;
-            if (config.passwordRequireNumbers && !/\d/.test(value)) return false;
-            if (config.passwordRequireSpecial && !/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value)) return false;
+            if (value.length < config.passwordMinLength) {
+              return false;
+            }
+            if (config.passwordRequireUppercase && !/[A-Z]/.test(value)) {
+              return false;
+            }
+            if (config.passwordRequireLowercase && !/[a-z]/.test(value)) {
+              return false;
+            }
+            if (config.passwordRequireNumbers && !/\d/.test(value)) {
+              return false;
+            }
+            if (config.passwordRequireSpecial && !/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value)) {
+              return false;
+            }
 
             return true;
           } catch {
-            // Em caso de erro, usar validação básica
             return value.length >= 8 && /[A-Z]/.test(value) && /[a-z]/.test(value) && /\d/.test(value);
           }
         },
         defaultMessage(_args: ValidationArguments) {
-          return 'A senha não atende aos requisitos de segurança configurados';
+          return 'A senha nao atende aos requisitos de seguranca configurados';
         },
       },
     });
@@ -59,18 +70,16 @@ function IsValidPassword(validationOptions?: ValidationOptions) {
 
 export class UpdateUserDto {
   @IsOptional()
-  @IsEmail({
-      // Empty implementation
-    }, { message: 'Email inválido' })
+  @IsEmail({}, { message: 'Email invalido' })
   email?: string;
 
   @IsOptional()
   @IsString()
-  @MinLength(3, { message: 'Nome deve ter no mínimo 3 caracteres' })
+  @MinLength(3, { message: 'Nome deve ter no minimo 3 caracteres' })
   name?: string;
 
   @IsOptional()
-  @IsEnum({ message: 'Role inválida' })
+  @IsEnum(Role, { message: 'Role invalida' })
   role?: Role;
 
   @IsOptional()

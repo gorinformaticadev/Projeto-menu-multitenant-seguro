@@ -640,7 +640,7 @@ show_final_report() {
     echo ""
     log_info "Domínio: https://$DOMAIN"
     log_info "Email: $EMAIL"
-    log_info "Senha Admin (Gerada): $(grep INSTALL_ADMIN_PASSWORD "$INSTALL_DIR/.env" | cut -d= -f2)"
+    log_info "Senha Admin (Gerada): [redacted - consulte o arquivo .env local]"
     log_info "Diretório: $INSTALL_DIR"
     
     if [[ "$USE_EXTERNAL_NGINX" == "true" ]]; then

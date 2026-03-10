@@ -9,6 +9,7 @@
   Request,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
@@ -23,7 +24,7 @@ import { extractAuditContext } from '../audit/audit-request-context.util';
 
 @Controller('system/update')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+@Roles(Role.SUPER_ADMIN)
 export class SystemUpdateController {
   constructor(private readonly systemUpdateAdminService: SystemUpdateAdminService) {}
 
@@ -35,6 +36,7 @@ export class SystemUpdateController {
   }
 
   @Post('run')
+  @Throttle({ default: { limit: 2, ttl: 3600000 } })
   async run(@Body() body: RunSystemUpdateDto, @Request() req: any) {
     const { actor, requestCtx } = extractAuditContext(req);
     const userId = actor.userId || 'unknown';
@@ -75,6 +77,7 @@ export class SystemUpdateController {
   }
 
   @Post('rollback')
+  @Throttle({ default: { limit: 2, ttl: 3600000 } })
   async rollback(@Body() body: RunSystemRollbackDto, @Request() req: any) {
     const { actor, requestCtx } = extractAuditContext(req);
     const userId = actor.userId || 'unknown';
@@ -102,4 +105,3 @@ export class SystemUpdateController {
     }
   }
 }
-

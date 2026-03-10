@@ -1,4 +1,5 @@
 // Forced reload to check module loading debug logs v3
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -9,6 +10,7 @@ import { SentryExceptionFilter } from './common/filters/sentry-exception.filter'
 import { validateSecurityConfig } from './common/utils/security.utils';
 import { SecretManagerService } from './common/services/secret-manager.nest.service';
 import { PathsService } from './core/common/paths/paths.service';
+import { SanitizationPipe } from './common/pipes/sanitization.pipe';
 
 async function bootstrap() {
   const requireSecretManager = process.env.REQUIRE_SECRET_MANAGER === 'true';
@@ -237,7 +239,7 @@ async function bootstrap() {
   }
 
   app.enableCors({
-    origin: allowedOrigins.length > 0 ? allowedOrigins : '*',
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     exposedHeaders: [
@@ -255,19 +257,18 @@ async function bootstrap() {
   // ============================================
   // 🧹 SANITIZAÇÃO - Remove espaços e caracteres perigosos
   // ============================================
-  // const { SafeSanitizationPipe } = await import('./common/pipes/safe-sanitization.pipe');
-  // app.useGlobalPipes(new SafeSanitizationPipe()); // TEMPORARIAMENTE DESABILITADO NOVAMENTE
+  app.useGlobalPipes(new SanitizationPipe());
 
   // ============================================
   // ✅ VALIDAÇÃO - Rigorosa em todos os endpoints
   // ============================================
-  // app.useGlobalPipes(
-  //   new ValidationPipe({
-  //     whitelist: true,
-  //     forbidNonWhitelisted: true,
-  //     transform: true,
-  //   }),
-  // ); // TEMPORARIAMENTE DESABILITADO
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
 
   const port = process.env.PORT || 4000;
   await app.listen(port, '0.0.0.0');

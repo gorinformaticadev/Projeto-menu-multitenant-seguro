@@ -28,7 +28,8 @@ export class TenantInterceptor implements NestInterceptor {
     );
 
     if (user && !skipIsolation) {
-      const payloadTenantId = request.body?.tenantId || request.query?.tenantId;
+      const payloadTenantId =
+        request.body?.tenantId || request.query?.tenantId || request.params?.tenantId;
 
       if (payloadTenantId && payloadTenantId !== user.tenantId && user.role !== 'SUPER_ADMIN') {
         this.systemTelemetryService.recordSecurityEvent({

@@ -1,16 +1,28 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, Put } from '@nestjs/common'; 
-import { UsersService } from './users.service';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { ChangePasswordDto } from './dto/change-password.dto';
-import { UpdateProfileDto } from './dto/update-profile.dto';
-import { UpdateUserPreferencesDto } from './dto/update-preferences.dto';
-import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
-import { RolesGuard } from '@core/common/guards/roles.guard';
-import { Roles } from '@core/common/decorators/roles.decorator';
-import { SkipTenantIsolation } from '@core/common/decorators/skip-tenant-isolation.decorator';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '@core/common/decorators/current-user.decorator';
+import { Roles } from '@core/common/decorators/roles.decorator';
+import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
+import { RolesGuard } from '@core/common/guards/roles.guard';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdateUserPreferencesDto } from './dto/update-preferences.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { UsersService } from './users.service';
 
 type AuthenticatedUser = {
   id: string;
@@ -21,50 +33,46 @@ type AuthenticatedUser = {
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) { }
+  constructor(private readonly usersService: UsersService) {}
 
   @Post()
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
-  @SkipTenantIsolation()
   create(@Body() createUserDto: CreateUserDto, @CurrentUser() user: AuthenticatedUser) {
-    // Se for ADMIN, força o tenantId do usuário logado
     if (user.role === Role.ADMIN) {
       createUserDto.tenantId = user.tenantId;
-      // ADMIN só pode criar USER ou CLIENT
+
       if (createUserDto.role === Role.SUPER_ADMIN || createUserDto.role === Role.ADMIN) {
-        throw new Error('ADMIN não pode criar SUPER_ADMIN ou ADMIN');
+        throw new ForbiddenException('ADMIN nao pode criar SUPER_ADMIN ou ADMIN');
       }
     }
+
+    if (user.role !== Role.SUPER_ADMIN && !user.tenantId) {
+      throw new BadRequestException('Usuario autenticado nao possui tenant valido');
+    }
+
     return this.usersService.create(createUserDto);
   }
 
   @Get()
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
-  @SkipTenantIsolation()
   findAll(@Query('tenantId') tenantId?: string, @CurrentUser() user?: AuthenticatedUser) {
-    // Se for ADMIN, força buscar apenas do seu tenant
     if (user?.role === Role.ADMIN) {
       return this.usersService.findAll(user.tenantId);
     }
+
     return this.usersService.findAll(tenantId);
   }
 
   @Get('tenant/:tenantId')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
-  @SkipTenantIsolation()
   findByTenant(@Param('tenantId') tenantId: string, @CurrentUser() user: AuthenticatedUser) {
-    // ADMIN só pode acessar o próprio tenant
     if (user.role === Role.ADMIN && user.tenantId !== tenantId) {
-      throw new Error('ADMIN não pode acessar usuários de outros tenants');
+      throw new ForbiddenException('ADMIN nao pode acessar usuarios de outros tenants');
     }
+
     return this.usersService.findByTenant(tenantId);
   }
 
-  /**
-   * PATCH /users/preferences
-   * Atualizar preferências do usuário (Tema)
-   * MOVED UP to avoid conflict with :id
-   */
   @Patch('preferences')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER, Role.CLIENT)
   updatePreferences(
@@ -74,56 +82,59 @@ export class UsersController {
     if (updateUserPreferencesDto.theme) {
       return this.usersService.updatePreferences(user.id, updateUserPreferencesDto.theme);
     }
+
     return { message: 'No preferences to update' };
   }
 
   @Get(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
-  @SkipTenantIsolation()
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() currentUser: AuthenticatedUser) {
+    return this.usersService.findOne(id, currentUser);
   }
 
   @Patch(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
-  @SkipTenantIsolation()
-  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto, @CurrentUser() currentUser: AuthenticatedUser) {
-    // Verificar se está tentando editar um SUPER_ADMIN
-    const targetUser = await this.usersService.findOne(id);
-    
+  async update(
+    @Param('id') id: string,
+    @Body() updateUserDto: UpdateUserDto,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ) {
+    const targetUser = (await this.usersService.findOne(id, currentUser)) as { role?: Role };
+    const adminAssignableRoles: Role[] = [Role.USER, Role.CLIENT];
+
     if (targetUser.role === Role.SUPER_ADMIN) {
-      // Impedir mudança de role de SUPER_ADMIN
       if (updateUserDto.role && updateUserDto.role !== Role.SUPER_ADMIN) {
-        throw new Error('Não é possível alterar a função de um SUPER_ADMIN');
+        throw new ForbiddenException('Nao e possivel alterar a funcao de um SUPER_ADMIN');
       }
-      
-      // Apenas SUPER_ADMIN pode editar outro SUPER_ADMIN
+
       if (currentUser.role !== Role.SUPER_ADMIN) {
-        throw new Error('Apenas SUPER_ADMIN pode editar outro SUPER_ADMIN');
+        throw new ForbiddenException('Apenas SUPER_ADMIN pode editar outro SUPER_ADMIN');
       }
     }
-    
-    return this.usersService.update(id, updateUserDto);
+
+    if (
+      currentUser.role === Role.ADMIN &&
+      updateUserDto.role &&
+      !adminAssignableRoles.includes(updateUserDto.role as Role)
+    ) {
+      throw new ForbiddenException('ADMIN nao pode atribuir papeis administrativos');
+    }
+
+    return this.usersService.update(id, updateUserDto, currentUser);
   }
 
   @Delete(':id')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
-  @SkipTenantIsolation()
-  async remove(@Param('id') id: string) {
-    // Verificar se está tentando deletar um SUPER_ADMIN
-    const targetUser = await this.usersService.findOne(id);
-    
+  async remove(@Param('id') id: string, @CurrentUser() currentUser: AuthenticatedUser) {
+    const targetUser = (await this.usersService.findOne(id, currentUser)) as { role?: Role };
+
     if (targetUser.role === Role.SUPER_ADMIN) {
-      throw new Error('Não é possível excluir um usuário SUPER_ADMIN');
+      throw new ForbiddenException('Nao e possivel excluir um usuario SUPER_ADMIN');
     }
-    
-    return this.usersService.remove(id);
+
+    return this.usersService.remove(id, currentUser);
   }
 
-  /**
-   * PUT /users/profile
-   * Atualizar perfil do usuário logado
-   */
   @Put('profile')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER, Role.CLIENT)
   updateProfile(
@@ -133,10 +144,6 @@ export class UsersController {
     return this.usersService.updateProfile(user.id, updateProfileDto);
   }
 
-  /**
-   * PUT /users/change-password
-   * Alterar senha do usuário logado
-   */
   @Put('change-password')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER, Role.CLIENT)
   changePassword(
@@ -146,16 +153,9 @@ export class UsersController {
     return this.usersService.changePassword(user.id, changePasswordDto);
   }
 
-  /**
-   * POST /users/:id/unlock
-   * Desbloquear usuário
-   * Apenas SUPER_ADMIN e ADMIN
-   */
   @Post(':id/unlock')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
-  @SkipTenantIsolation()
-  unlockUser(@Param('id') id: string) {
-    return this.usersService.unlockUser(id);
+  unlockUser(@Param('id') id: string, @CurrentUser() currentUser: AuthenticatedUser) {
+    return this.usersService.unlockUser(id, currentUser);
   }
-
 }

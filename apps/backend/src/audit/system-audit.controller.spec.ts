@@ -19,13 +19,13 @@ describe('SystemAuditController', () => {
     jest.clearAllMocks();
   });
 
-  it('protects endpoint with JWT + roles ADMIN/SUPER_ADMIN', () => {
+  it('protects endpoint with JWT + role SUPER_ADMIN', () => {
     const guards = Reflect.getMetadata(GUARDS_METADATA, SystemAuditController) || [];
     const roles = Reflect.getMetadata(ROLES_KEY, SystemAuditController) || [];
 
     expect(guards).toContain(JwtAuthGuard);
     expect(guards).toContain(RolesGuard);
-    expect(roles).toEqual([Role.ADMIN, Role.SUPER_ADMIN]);
+    expect(roles).toEqual([Role.SUPER_ADMIN]);
   });
 
   it('parses query and delegates list to audit service', async () => {

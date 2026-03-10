@@ -20,7 +20,8 @@ import { ExecuteUpdateDto, UpdateConfigDto } from './dto/update.dto';
 import { UpdateService } from './update.service';
 
 @Controller('update')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.SUPER_ADMIN)
 export class UpdateController {
   constructor(private updateService: UpdateService) {
     // Empty implementation
@@ -43,7 +44,6 @@ export class UpdateController {
   }
 
   @Get('config')
-  @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   async getConfig() {
     try {
@@ -54,7 +54,6 @@ export class UpdateController {
   }
 
   @Get('check')
-  @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async checkForUpdates(@Request() _req) {
@@ -73,7 +72,6 @@ export class UpdateController {
   }
 
   @Post('execute')
-  @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   @Throttle({ default: { limit: 3, ttl: 3600000 } })
   async executeUpdate(@Body() updateData: ExecuteUpdateDto, @Request() req) {
@@ -89,7 +87,6 @@ export class UpdateController {
   }
 
   @Put('config')
-  @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   async updateConfig(@Body() config: UpdateConfigDto, @Request() req) {
     try {
@@ -101,7 +98,6 @@ export class UpdateController {
   }
 
   @Get('logs')
-  @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   async getLogs(@Query('limit') limit?: string) {
     try {
@@ -122,7 +118,6 @@ export class UpdateController {
   }
 
   @Get('logs/:id')
-  @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   async getLogDetails(@Param('id') logId: string) {
     try {
@@ -137,7 +132,6 @@ export class UpdateController {
   }
 
   @Get('test-connection')
-  @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async testConnection() {

@@ -105,8 +105,6 @@ services:
     command: sh -c 'redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"'
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
     networks:

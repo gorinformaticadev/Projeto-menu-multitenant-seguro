@@ -158,7 +158,11 @@ export class PasswordResetService {
             // Resetar tentativas de login se houver
             loginAttempts: 0,
             lockedUntil: null,
-          },
+            lastPasswordChange: new Date(),
+            sessionVersion: {
+              increment: 1,
+            },
+          } as any,
         }),
         // Marcar token como usado
         this.prisma.passwordResetToken.update({
@@ -173,6 +177,9 @@ export class PasswordResetService {
             id: { not: resetTokenRecord.id },
           },
           data: { usedAt: new Date() },
+        }),
+        this.prisma.refreshToken.deleteMany({
+          where: { userId: resetTokenRecord.userId },
         }),
       ]);
 

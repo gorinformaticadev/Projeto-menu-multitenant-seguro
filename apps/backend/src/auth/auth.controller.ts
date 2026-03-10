@@ -73,7 +73,13 @@ export class AuthController {
     @Ip() ip: string,
   ) {
     const userAgent = req.headers['user-agent'] || 'Unknown';
-    return this.authService.logout(logoutDto.refreshToken, req.user.id, ip, userAgent);
+    return this.authService.logout(
+      logoutDto.refreshToken,
+      req.user.id,
+      this.extractBearerToken(req),
+      ip,
+      userAgent,
+    );
   }
 
   /**
@@ -204,5 +210,21 @@ export class AuthController {
       resetPasswordDto.token,
       resetPasswordDto.newPassword
     );
+  }
+
+  private extractBearerToken(req: Request): string | undefined {
+    const authorization = req.headers['authorization'];
+    const headerValue = Array.isArray(authorization) ? authorization[0] : authorization;
+
+    if (!headerValue) {
+      return undefined;
+    }
+
+    const [scheme, token] = headerValue.split(' ');
+    if (scheme?.toLowerCase() !== 'bearer' || !token) {
+      return undefined;
+    }
+
+    return token.trim();
   }
 }

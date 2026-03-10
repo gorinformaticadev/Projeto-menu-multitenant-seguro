@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch, Delete, UseInterceptors, UploadedFile, BadRequestException, Req } from '@nestjs/common';
 import { Request as ExpressRequest } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { SkipThrottle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { DuplicateRequestInterceptor } from '@core/common/interceptors/duplicate-request.interceptor';
 import { TenantsService } from './tenants.service';
 import { TenantModuleService } from '../core/modules/engine/backend/tenant-module.service';
@@ -26,7 +26,6 @@ type TenantRequest = ExpressRequest & {
   };
 };
 
-@SkipThrottle()
 @Controller('tenants')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class TenantsController {
@@ -110,6 +109,7 @@ export class TenantsController {
   @Post()
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async create(@Body() createTenantDto: CreateTenantDto) {
     return this.tenantsService.create(createTenantDto);
   }
@@ -117,12 +117,14 @@ export class TenantsController {
   @Put(':id')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async update(@Param('id') id: string, @Body() updateTenantDto: UpdateTenantDto) {
     return this.tenantsService.update(id, updateTenantDto);
   }
 
   @Put('my-tenant')
   @Roles(Role.ADMIN)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async updateMyTenant(@Body() updateTenantDto: UpdateTenantDto, @Req() req: TenantRequest) {
     return this.tenantsService.update(req.user.tenantId, updateTenantDto);
   }
@@ -130,6 +132,7 @@ export class TenantsController {
   @Post('my-tenant/upload-logo')
   @Roles(Role.ADMIN)
   @UseInterceptors(FileInterceptor('logo', multerConfig))
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async uploadMyTenantLogo(@Req() req: TenantRequest, @UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo foi enviado');
@@ -143,6 +146,7 @@ export class TenantsController {
 
   @Patch('my-tenant/remove-logo')
   @Roles(Role.ADMIN)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async removeMyTenantLogo(@Req() req: TenantRequest) {
     return this.tenantsService.removeLogo(req.user.tenantId);
   }
@@ -150,6 +154,7 @@ export class TenantsController {
   @Patch(':id/toggle-status')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async toggleStatus(@Param('id') id: string) {
     return this.tenantsService.toggleStatus(id);
   }
@@ -157,6 +162,7 @@ export class TenantsController {
   @Patch(':id/change-admin-password')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async changeAdminPassword(@Param('id') id: string, @Body() changePasswordDto: ChangeAdminPasswordDto) {
     return this.tenantsService.changeAdminPassword(id, changePasswordDto);
   }
@@ -165,6 +171,7 @@ export class TenantsController {
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
   @UseInterceptors(FileInterceptor('logo', multerConfig))
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async uploadLogo(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo foi enviado');
@@ -179,6 +186,7 @@ export class TenantsController {
   @Patch(':id/remove-logo')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async removeLogo(@Param('id') id: string) {
     return this.tenantsService.removeLogo(id);
   }
@@ -186,6 +194,7 @@ export class TenantsController {
   @Delete(':id')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async remove(@Param('id') id: string) {
     return this.tenantsService.remove(id);
   }
@@ -206,7 +215,6 @@ export class TenantsController {
 
   @Get('my-tenant/modules/active')
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
-  @SkipThrottle()
   async getMyTenantActiveModules(@Req() req: TenantRequest) {
     if (!req.user.tenantId) {
       if (req.user.role === Role.SUPER_ADMIN) {
@@ -227,7 +235,6 @@ export class TenantsController {
   @Get(':id/modules/active')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
-  @SkipThrottle()
   async getTenantActiveModules(@Param('id') id: string) {
     const modules = await this.tenantModuleService.getModulesForTenant(id);
     return {
@@ -242,7 +249,7 @@ export class TenantsController {
   @Post(':id/modules/:moduleName/activate')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
-  @SkipThrottle()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async activateModuleForTenant(@Param('id') id: string, @Param('moduleName') moduleName: string) {
     await this.tenantModuleService.activateModuleForTenant(moduleName, id);
     return { message: `Módulo ${moduleName} ativado para o tenant ${id}` };
@@ -251,7 +258,7 @@ export class TenantsController {
   @Post(':id/modules/:moduleName/deactivate')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
-  @SkipThrottle()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async deactivateModuleForTenant(@Param('id') id: string, @Param('moduleName') moduleName: string) {
     await this.tenantModuleService.deactivateModuleForTenant(moduleName, id);
     return { message: `Módulo ${moduleName} desativado para o tenant ${id}` };
@@ -259,8 +266,8 @@ export class TenantsController {
 
   @Post('my-tenant/modules/:moduleName/toggle')
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
-  @SkipThrottle()
   @UseInterceptors(DuplicateRequestInterceptor)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async toggleMyTenantModule(@Param('moduleName') moduleName: string, @Req() req: TenantRequest) {
     if (!req.user.tenantId) {
       if (req.user.role === Role.SUPER_ADMIN) {
@@ -274,8 +281,8 @@ export class TenantsController {
   @Post(':id/modules/:moduleName/toggle')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
-  @SkipThrottle()
   @UseInterceptors(DuplicateRequestInterceptor)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async toggleModuleForTenant(@Param('id') id: string, @Param('moduleName') moduleName: string) {
     return this.tenantsService.toggleModuleForTenant(id, moduleName);
   }
@@ -283,7 +290,7 @@ export class TenantsController {
   @Put(':id/modules/:moduleName/config')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
-  @SkipThrottle()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async configureTenantModule(
     @Param('id') id: string,
     @Param('moduleName') moduleName: string,

@@ -8,7 +8,7 @@ import { isSystemAuditAction, SYSTEM_AUDIT_ACTION_PREFIXES } from './system-audi
 
 @Controller('system/audit')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.SUPER_ADMIN)
+@Roles(Role.SUPER_ADMIN)
 export class SystemAuditController {
   constructor(private readonly auditService: AuditService) {}
 

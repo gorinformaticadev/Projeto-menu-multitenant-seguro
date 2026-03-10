@@ -7,6 +7,10 @@ export class SystemVersionController {
 
   @Get('version')
   getVersion() {
-    return this.systemVersionService.getVersionInfo();
+    const info = this.systemVersionService.getVersionInfo();
+    return {
+      version: info.version,
+      source: info.source,
+    };
   }
 }
