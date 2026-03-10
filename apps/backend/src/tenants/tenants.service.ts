@@ -1,11 +1,16 @@
 import { Injectable, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
-import { PathsService } from '@core/common/paths/paths.service';
+import {
+  PathsService,
+  resolveLogosDirPath,
+  resolveTenantLogoFilePath,
+  resolveTenantLogosDirPath,
+} from '@core/common/paths/paths.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import * as bcrypt from 'bcrypt';
 import { access, unlink } from 'fs/promises';
-import { basename, join } from 'path';
+import { basename, resolve } from 'path';
 
 @Injectable()
 export class TenantsService {
@@ -14,8 +19,8 @@ export class TenantsService {
     private readonly pathsService: PathsService,
   ) { }
 
-  private getLogosUploadDir(): string {
-    return this.pathsService.ensureDir(this.pathsService.getLogosDir());
+  private getTenantLogosUploadDir(tenantId: string): string {
+    return resolveTenantLogosDirPath(tenantId);
   }
 
   private getSafeLogoFilename(logoUrl?: string | null): string | null {
@@ -36,19 +41,68 @@ export class TenantsService {
     return safeName;
   }
 
-  private async resolveExistingLogo(logoUrl?: string | null): Promise<string | null> {
+  private buildTenantLogoPublicUrl(tenantId: string): string {
+    return `/api/tenants/public/${tenantId}/logo-file`;
+  }
+
+  private async resolveExistingLogo(tenantId: string, logoUrl?: string | null): Promise<string | null> {
     const safeName = this.getSafeLogoFilename(logoUrl);
     if (!safeName) {
       return null;
     }
 
     try {
-      const logoPath = join(this.getLogosUploadDir(), safeName);
+      const logoPath = resolveTenantLogoFilePath(tenantId, safeName);
       await access(logoPath);
-      return safeName;
+      return this.buildTenantLogoPublicUrl(tenantId);
     } catch {
+      try {
+        const legacyLogoPath = resolve(resolveLogosDirPath(), safeName);
+        await access(legacyLogoPath);
+        return `/uploads/logos/${safeName}`;
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  private async resolveExistingLogoFilePath(tenantId: string, logoUrl?: string | null): Promise<string | null> {
+    const safeName = this.getSafeLogoFilename(logoUrl);
+    if (!safeName) {
       return null;
     }
+
+    try {
+      const logoPath = resolveTenantLogoFilePath(tenantId, safeName);
+      await access(logoPath);
+      return logoPath;
+    } catch {
+      try {
+        const legacyLogoPath = resolve(resolveLogosDirPath(), safeName);
+        await access(legacyLogoPath);
+        return legacyLogoPath;
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  async getTenantLogoFilePath(id: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id },
+      select: { logoUrl: true },
+    });
+
+    if (!tenant || !tenant.logoUrl) {
+      throw new NotFoundException('Logo da empresa nao encontrado');
+    }
+
+    const logoPath = await this.resolveExistingLogoFilePath(id, tenant.logoUrl);
+    if (!logoPath) {
+      throw new NotFoundException('Arquivo de logo nao encontrado');
+    }
+
+    return logoPath;
   }
 
   async findAll() {
@@ -231,8 +285,10 @@ export class TenantsService {
     // Remove o logo antigo se existir
     if (tenant.logoUrl) {
       try {
-        const oldLogoPath = join(this.getLogosUploadDir(), tenant.logoUrl);
-        await unlink(oldLogoPath);
+        const oldLogoPath = await this.resolveExistingLogoFilePath(id, tenant.logoUrl);
+        if (oldLogoPath) {
+          await unlink(oldLogoPath);
+        }
       } catch {
         // Ignora erro se o arquivo não existir
       }
@@ -254,8 +310,10 @@ export class TenantsService {
 
     // Remove o arquivo físico
     try {
-      const logoPath = join(this.getLogosUploadDir(), tenant.logoUrl);
-      await unlink(logoPath);
+      const logoPath = await this.resolveExistingLogoFilePath(id, tenant.logoUrl);
+      if (logoPath) {
+        await unlink(logoPath);
+      }
     } catch {
       // Ignora erro se o arquivo não existir
     }
@@ -289,8 +347,10 @@ export class TenantsService {
     // Remove o logo se existir
     if (tenant.logoUrl) {
       try {
-        const logoPath = join(this.getLogosUploadDir(), tenant.logoUrl);
-        await unlink(logoPath);
+        const logoPath = await this.resolveExistingLogoFilePath(id, tenant.logoUrl);
+        if (logoPath) {
+          await unlink(logoPath);
+        }
       } catch {
         // Ignora erro se o arquivo não existir
       }
@@ -312,6 +372,7 @@ export class TenantsService {
         ativo: true,
       },
       select: {
+        id: true,
         logoUrl: true,
         nomeFantasia: true,
       },
@@ -323,19 +384,22 @@ export class TenantsService {
         where: { ativo: true },
         orderBy: { createdAt: 'asc' },
         select: {
+          id: true,
           logoUrl: true,
           nomeFantasia: true,
         },
       });
 
-      const validFallbackLogo = await this.resolveExistingLogo(fallbackTenant?.logoUrl);
+      const validFallbackLogo = fallbackTenant
+        ? await this.resolveExistingLogo(fallbackTenant.id, fallbackTenant.logoUrl)
+        : null;
       return {
         logoUrl: validFallbackLogo,
         nomeFantasia: fallbackTenant?.nomeFantasia || 'Sistema',
       };
     }
 
-    const validMasterLogo = await this.resolveExistingLogo(masterTenant.logoUrl);
+    const validMasterLogo = await this.resolveExistingLogo(masterTenant.id, masterTenant.logoUrl);
     return {
       logoUrl: validMasterLogo,
       nomeFantasia: masterTenant.nomeFantasia,
@@ -355,7 +419,7 @@ export class TenantsService {
       throw new NotFoundException('Empresa não encontrada');
     }
 
-    const validTenantLogo = await this.resolveExistingLogo(tenant.logoUrl);
+    const validTenantLogo = await this.resolveExistingLogo(id, tenant.logoUrl);
     return {
       logoUrl: validTenantLogo,
       nomeFantasia: tenant.nomeFantasia,

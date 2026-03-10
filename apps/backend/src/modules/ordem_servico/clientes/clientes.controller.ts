@@ -20,7 +20,6 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Request as ExpressRequest, Response } from 'express';
 import * as fs from 'fs';
-import * as path from 'path';
 import { Public } from '@core/common/decorators/public.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { ClientesService } from './clientes.service';
@@ -28,9 +27,10 @@ import { RequireClientsPermission } from '../shared/decorators/require-permissio
 import { PermissionGuard } from '../shared/guards/permission.guard';
 import {
   assertTenantUploadAccess,
+  buildTenantModuleUploadUrl,
   ORDEM_SERVICO_UPLOAD_OPTIONS,
-  persistTenantUpload,
-  resolveTenantUploadPath,
+  persistTenantModuleUpload,
+  resolveTenantModuleUploadPath,
 } from '../shared/utils/upload-security.util';
 
 @Controller('ordem_servico/clientes')
@@ -97,10 +97,9 @@ export class ClientesController {
       }
 
       const tenantId = String(req.user?.tenantId || '').trim();
-      const uploadRoot = path.resolve(process.cwd(), 'uploads', 'modules', 'ordem_servico', 'clientes');
-      const { fileName } = persistTenantUpload(uploadRoot, tenantId, file);
+      const { fileName } = persistTenantModuleUpload('clientes', tenantId, file);
 
-      return { url: `/api/ordem_servico/clientes/uploads/${tenantId}/${fileName}` };
+      return { url: buildTenantModuleUploadUrl('clientes', tenantId, fileName) };
     } catch (error) {
       this.logger.error('Erro no upload de foto do cliente', error as Error);
       if (error instanceof HttpException) {
@@ -120,8 +119,7 @@ export class ClientesController {
   ) {
     try {
       assertTenantUploadAccess(String(req.user?.tenantId || ''), tenantId);
-      const uploadRoot = path.resolve(process.cwd(), 'uploads', 'modules', 'ordem_servico', 'clientes');
-      const filePath = resolveTenantUploadPath(uploadRoot, tenantId, filename);
+      const filePath = resolveTenantModuleUploadPath('clientes', tenantId, filename);
 
       if (fs.existsSync(filePath)) {
         res.setHeader('Cache-Control', 'private, max-age=300');

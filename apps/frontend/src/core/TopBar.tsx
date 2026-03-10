@@ -3,27 +3,88 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
-import { usePlatformName } from "@/hooks/usePlatformConfig";
+import { usePlatformConfigContext } from "@/contexts/PlatformConfigContext";
 import { useSystemVersion } from "@/hooks/useSystemVersion";
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { Button } from "./ui/button";
 import { Bell, Search, User, LogOut, Info } from "lucide-react";
-import { API_URL } from "@/lib/api";
 import api from "@/lib/api";
+import { DEFAULT_TENANT_LOGO_PATH, resolveTenantLogoSrc } from "@/lib/tenant-logo";
 
 export function TopBar() {
   const { user, logout } = useAuth();
-  const { platformName } = usePlatformName();
+  const { config: platformConfig } = usePlatformConfigContext();
+  const platformName = platformConfig.platformName;
   const { version: systemVersion } = useSystemVersion();
   const [masterLogo, setMasterLogo] = useState<string | null>(null);
+  const [platformLogoCacheBuster, setPlatformLogoCacheBuster] = useState<number>(() => Date.now());
   const [userTenantLogo, setUserTenantLogo] = useState<string | null>(null);
+  const [userTenantLogoCacheBuster, setUserTenantLogoCacheBuster] = useState<number>(() => Date.now());
+  const [userAvatarCacheBuster, setUserAvatarCacheBuster] = useState<number>(() => Date.now());
+  const [userAvatarFailed, setUserAvatarFailed] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const masterLogoSrc = resolveTenantLogoSrc(masterLogo);
+  const platformLogoSrc = resolveTenantLogoSrc(platformConfig.platformLogoUrl, {
+    cacheBuster: platformLogoCacheBuster,
+  });
+  const userTenantLogoSrc = resolveTenantLogoSrc(userTenantLogo, {
+    cacheBuster: userTenantLogoCacheBuster,
+    tenantId: user?.tenantId,
+    fallbackToDefault: Boolean(user?.tenantId),
+  });
+  const userAvatarSrc = resolveTenantLogoSrc(user?.avatarUrl, {
+    cacheBuster: userAvatarCacheBuster,
+  });
+  const effectiveUserAvatarSrc = userAvatarFailed ? null : userAvatarSrc;
+  const userMenuImageSrc = effectiveUserAvatarSrc || userTenantLogoSrc;
+  const effectiveMainLogoSrc = platformLogoSrc || masterLogoSrc;
+  const tenantLogoEndpointSrc = user?.tenantId
+    ? resolveTenantLogoSrc(`/api/tenants/public/${encodeURIComponent(user.tenantId)}/logo-file`, {
+      cacheBuster: userTenantLogoCacheBuster,
+      tenantId: user.tenantId,
+      fallbackToDefault: false,
+    })
+    : null;
   const [notifications, setNotifications] = useState<{
     title: string;
     message: string;
     time: string;
   }[]>([]); // Lista de notificações
+
+  const setUserTenantLogoWithBuster = (logo: string | null) => {
+    setUserTenantLogo(logo);
+    setUserTenantLogoCacheBuster(Date.now());
+  };
+
+  useEffect(() => {
+    setPlatformLogoCacheBuster(Date.now());
+  }, [platformConfig.platformLogoUrl]);
+
+  useEffect(() => {
+    setUserAvatarFailed(false);
+    setUserAvatarCacheBuster(Date.now());
+  }, [user?.avatarUrl]);
+
+  const tryTenantImageFallback = (target: HTMLImageElement) => {
+    if (!tenantLogoEndpointSrc) {
+      return false;
+    }
+
+    if (target.dataset.tenantFallbackTried === '1') {
+      return false;
+    }
+
+    const currentSrc = target.getAttribute('src') || '';
+    const isDefaultLogo = currentSrc.includes(DEFAULT_TENANT_LOGO_PATH);
+    if (!isDefaultLogo) {
+      return false;
+    }
+
+    target.dataset.tenantFallbackTried = '1';
+    target.src = tenantLogoEndpointSrc;
+    return true;
+  };
 
 
 
@@ -45,16 +106,14 @@ export function TopBar() {
       try {
         const { logoUrl, timestamp } = JSON.parse(cached);
         if (Date.now() - timestamp < 10 * 60 * 1000) { // 10 minutos
-          console.log('🎨 Usando cache master logo:', logoUrl);
           setMasterLogo(logoUrl);
           return;
         }
-      } catch (e) {
+      } catch {
         localStorage.removeItem(cacheKey);
       }
     }
 
-    console.log('🌐 Buscando master logo da API');
     api.get("/api/tenants/public/master-logo")
       .then(response => {
         const logoUrl = response.data?.logoUrl;
@@ -64,57 +123,66 @@ export function TopBar() {
             logoUrl,
             timestamp: Date.now()
           }));
-          console.log('💾 Master logo cacheado:', logoUrl);
         }
       })
-      .catch(error => {
-        console.error("❌ Erro ao buscar master logo:", error);
-      });
+      .catch(() => {});
   }, []);
 
   // Busca logo do tenant do usuário logado
   useEffect(() => {
     async function fetchUserTenantLogo() {
-      if (user?.tenantId) {
-        // Usuário tem tenant (ADMIN, USER, CLIENT) - usa endpoint público
-        const cacheKey = `tenant-logo-${user.tenantId}`;
-        const cacheTTL = 10 * 60 * 1000; // 10 minutos
+      const tenantId = user?.tenantId;
+      if (!tenantId) {
+        setUserTenantLogoWithBuster(null);
+        return;
+      }
 
-        // Verificar cache
-        const cached = localStorage.getItem(cacheKey);
-        if (cached) {
-          try {
-            const { logoUrl, timestamp } = JSON.parse(cached);
-            if (Date.now() - timestamp < cacheTTL) {
-              setUserTenantLogo(logoUrl);
-              return;
-            }
-          } catch (e) {
-            // Cache inválido, continua
-          }
-        }
+      const cacheKey = `tenant-logo-${tenantId}`;
+      const cacheTTL = 10 * 60 * 1000; // 10 minutos
 
+      const tenantLogoFromUser = user?.tenant?.logoUrl?.trim();
+      if (tenantLogoFromUser) {
+        setUserTenantLogoWithBuster(tenantLogoFromUser);
+        localStorage.setItem(cacheKey, JSON.stringify({
+          logoUrl: tenantLogoFromUser,
+          timestamp: Date.now(),
+        }));
+        return;
+      }
+
+      // Verificar cache
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
         try {
-          const response = await api.get(`/tenants/public/${user.tenantId}/logo`);
-          const logoUrl = response.data?.logoUrl;
-          if (logoUrl) {
-            setUserTenantLogo(logoUrl);
-            // Cache o resultado
-            localStorage.setItem(cacheKey, JSON.stringify({
-              logoUrl,
-              timestamp: Date.now()
-            }));
+          const { logoUrl, timestamp } = JSON.parse(cached);
+          if (Date.now() - timestamp < cacheTTL) {
+            setUserTenantLogoWithBuster(logoUrl);
+            return;
           }
-        } catch (error) {
-          console.error("Erro ao buscar logo do tenant:", error);
+        } catch {
+          localStorage.removeItem(cacheKey);
         }
-      } else if (user?.role === "SUPER_ADMIN") {
-        // SUPER_ADMIN usa o logo master
-        setUserTenantLogo(masterLogo);
+      }
+
+      try {
+        const response = await api.get(`/tenants/public/${tenantId}/logo`);
+        const logoUrl = response.data?.logoUrl;
+        if (logoUrl) {
+          setUserTenantLogoWithBuster(logoUrl);
+          // Cache o resultado
+          localStorage.setItem(cacheKey, JSON.stringify({
+            logoUrl,
+            timestamp: Date.now()
+          }));
+        } else {
+          setUserTenantLogoWithBuster(null);
+        }
+      } catch {
+        setUserTenantLogoWithBuster(null);
       }
     }
     fetchUserTenantLogo();
-  }, [user, masterLogo]);
+  }, [user?.tenantId, user?.tenant?.logoUrl]);
 
   // Simular notificações (remover em produção e conectar com dados reais)
   useEffect(() => {
@@ -145,16 +213,13 @@ export function TopBar() {
         {/* Logo e Nome do Sistema */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            {masterLogo ? (
-              <div className="relative h-10 w-32">
-                <Image
-                  src={`/uploads/logos/${masterLogo}`}
-                  alt="Logo"
-                  fill
-                  className="object-contain object-left"
-                  unoptimized
-                />
-              </div>
+            {effectiveMainLogoSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={effectiveMainLogoSrc}
+                alt="Logo"
+                className="h-10 w-auto max-w-32 object-contain object-left"
+              />
             ) : (
               <div className="h-10 w-10 bg-primary rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-lg">S</span>
@@ -263,16 +328,22 @@ export function TopBar() {
               onClick={() => setShowUserMenu(!showUserMenu)}
             >
               {/* Logo do Tenant do Usuário */}
-              {userTenantLogo ? (
+              {userMenuImageSrc ? (
                 <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 relative">
                   <Image
-                    src={`/uploads/logos/${userTenantLogo}?t=${Date.now()}`}
+                    src={userMenuImageSrc}
                     alt="Logo Tenant"
                     fill
                     className="object-cover"
                     unoptimized
                     onError={(e) => {
-                      console.error('Erro ao carregar logo do tenant no menu:', userTenantLogo);
+                      if (effectiveUserAvatarSrc) {
+                        setUserAvatarFailed(true);
+                        return;
+                      }
+                      if (tryTenantImageFallback(e.currentTarget)) {
+                        return;
+                      }
                       const target = e.currentTarget;
                       target.style.display = 'none';
                       const fallback = target.parentElement?.parentElement?.querySelector('.fallback-avatar');
@@ -305,16 +376,22 @@ export function TopBar() {
                 <div className="px-4 py-2 border-b border-gray-200">
                   <div className="flex items-center gap-3 mb-2">
                     {/* Logo da Tenant no Menu */}
-                    {userTenantLogo ? (
+                    {userMenuImageSrc ? (
                       <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 flex-shrink-0 relative">
                         <Image
-                          src={`/uploads/logos/${userTenantLogo}?t=${Date.now()}`}
+                          src={userMenuImageSrc}
                           alt="Logo Tenant"
                           fill
                           className="object-cover"
                           unoptimized
                           onError={(e) => {
-                            console.error('Erro ao carregar logo do tenant no dropdown:', userTenantLogo);
+                            if (effectiveUserAvatarSrc) {
+                              setUserAvatarFailed(true);
+                              return;
+                            }
+                            if (tryTenantImageFallback(e.currentTarget)) {
+                              return;
+                            }
                             const target = e.currentTarget;
                             target.style.display = 'none';
                             const fallback = target.parentElement?.parentElement?.querySelector('.fallback-avatar-dropdown');

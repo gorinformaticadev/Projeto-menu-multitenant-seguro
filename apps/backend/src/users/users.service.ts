@@ -7,7 +7,14 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import { access, unlink, writeFile } from 'fs/promises';
+import { basename } from 'path';
 import { PrismaService } from '@core/prisma/prisma.service';
+import {
+  resolveTenantUserAvatarDirPath,
+  resolveTenantUserAvatarFilePath,
+} from '@core/common/paths/paths.service';
 import * as bcrypt from 'bcrypt';
 import { Role } from '@prisma/client';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -266,6 +273,125 @@ export class UsersService {
     });
   }
 
+  async updateProfileAvatar(userId: string, upload: { buffer: Buffer; extension: string }) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        tenantId: true,
+        avatarUrl: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuario nao encontrado');
+    }
+
+    const storageTenantId = this.resolveStorageTenantId(user.tenantId);
+    resolveTenantUserAvatarDirPath(storageTenantId, user.id);
+
+    const fileName = `${Date.now()}-${randomUUID()}${upload.extension}`;
+    const avatarPath = resolveTenantUserAvatarFilePath(storageTenantId, user.id, fileName);
+    await writeFile(avatarPath, upload.buffer, { mode: 0o600 });
+
+    const previousAvatarPath = await this.resolveExistingAvatarFilePath(
+      storageTenantId,
+      user.id,
+      user.avatarUrl,
+    );
+
+    if (previousAvatarPath) {
+      try {
+        await unlink(previousAvatarPath);
+      } catch {
+        // noop
+      }
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: user.id },
+      data: { avatarUrl: fileName },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            nomeFantasia: true,
+          },
+        },
+      },
+    });
+
+    return this.sanitizeUser(updatedUser);
+  }
+
+  async removeProfileAvatar(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        tenantId: true,
+        avatarUrl: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuario nao encontrado');
+    }
+
+    if (!user.avatarUrl) {
+      throw new BadRequestException('Usuario nao possui avatar');
+    }
+
+    const storageTenantId = this.resolveStorageTenantId(user.tenantId);
+    const avatarPath = await this.resolveExistingAvatarFilePath(storageTenantId, user.id, user.avatarUrl);
+
+    if (avatarPath) {
+      try {
+        await unlink(avatarPath);
+      } catch {
+        // noop
+      }
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: user.id },
+      data: { avatarUrl: null },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            nomeFantasia: true,
+          },
+        },
+      },
+    });
+
+    return this.sanitizeUser(updatedUser);
+  }
+
+  async getProfileAvatarFilePath(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        tenantId: true,
+        avatarUrl: true,
+      },
+    });
+
+    if (!user || !user.avatarUrl) {
+      throw new NotFoundException('Avatar do usuario nao encontrado');
+    }
+
+    const storageTenantId = this.resolveStorageTenantId(user.tenantId);
+    const avatarPath = await this.resolveExistingAvatarFilePath(storageTenantId, user.id, user.avatarUrl);
+    if (!avatarPath) {
+      throw new NotFoundException('Arquivo de avatar nao encontrado');
+    }
+
+    return avatarPath;
+  }
+
   private buildUserScopeWhere(id: string, actor?: UserScopeActor) {
     if (!actor || actor.role === Role.SUPER_ADMIN) {
       return { id };
@@ -316,8 +442,60 @@ export class UsersService {
     );
   }
 
+  private resolveStorageTenantId(tenantId?: string | null) {
+    const normalized = String(tenantId || '').trim();
+    return normalized || 'platform';
+  }
+
+  private getSafeAssetFilename(value?: string | null): string | null {
+    if (!value || typeof value !== 'string') {
+      return null;
+    }
+
+    const normalized = value.trim();
+    if (!normalized) {
+      return null;
+    }
+
+    const safeName = basename(normalized);
+    if (safeName !== normalized) {
+      return null;
+    }
+
+    return safeName;
+  }
+
+  private async resolveExistingAvatarFilePath(
+    storageTenantId: string,
+    userId: string,
+    avatarUrl?: string | null,
+  ): Promise<string | null> {
+    const safeName = this.getSafeAssetFilename(avatarUrl);
+    if (!safeName) {
+      return null;
+    }
+
+    try {
+      const avatarPath = resolveTenantUserAvatarFilePath(storageTenantId, userId, safeName);
+      await access(avatarPath);
+      return avatarPath;
+    } catch {
+      return null;
+    }
+  }
+
+  private buildUserAvatarPublicUrl(userId: string) {
+    return `/api/users/public/${encodeURIComponent(userId)}/avatar-file`;
+  }
+
   private sanitizeUser(user: any): any {
-    const { password: _password, ...safeUser } = user;
+    const safeUser = { ...user };
+    delete safeUser.password;
+    if (safeUser?.id) {
+      safeUser.avatarUrl = safeUser.avatarUrl
+        ? this.buildUserAvatarPublicUrl(String(safeUser.id))
+        : null;
+    }
     return safeUser;
   }
 }

@@ -3,6 +3,7 @@ import api from '@/lib/api';
 
 export interface PlatformConfig {
   platformName: string;
+  platformLogoUrl: string | null;
   platformEmail: string;
   platformPhone: string;
 }
@@ -10,6 +11,7 @@ export interface PlatformConfig {
 // Default values as constants
 export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
   platformName: 'Sistema Multitenant',
+  platformLogoUrl: null,
   platformEmail: 'contato@sistema.com',
   platformPhone: '(11) 99999-9999',
 };
@@ -24,8 +26,18 @@ let configPromise: Promise<PlatformConfig> | null = null;
 async function fetchPlatformConfig(): Promise<PlatformConfig> {
   try {
     const response = await api.get('/api/platform-config');
-    globalPlatformConfig = response.data;
-    return response.data;
+    const responseData = response.data || {};
+    const normalizedConfig: PlatformConfig = {
+      platformName: String(responseData.platformName || DEFAULT_PLATFORM_CONFIG.platformName),
+      platformLogoUrl:
+        typeof responseData.platformLogoUrl === 'string' && responseData.platformLogoUrl.trim()
+          ? responseData.platformLogoUrl
+          : null,
+      platformEmail: String(responseData.platformEmail || DEFAULT_PLATFORM_CONFIG.platformEmail),
+      platformPhone: String(responseData.platformPhone || DEFAULT_PLATFORM_CONFIG.platformPhone),
+    };
+    globalPlatformConfig = normalizedConfig;
+    return normalizedConfig;
   } catch (error) {
     console.warn('Failed to fetch platform config, using defaults:', error);
     globalPlatformConfig = DEFAULT_PLATFORM_CONFIG;

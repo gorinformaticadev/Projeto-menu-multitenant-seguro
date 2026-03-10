@@ -33,6 +33,7 @@ model User {
   email                    String               @unique
   password                 String
   name                     String
+  avatarUrl                String?
   role                     Role                 @default(USER)
   tenantId                 String?
   twoFactorSecret          String?
@@ -200,6 +201,7 @@ model SecurityConfig {
   smtpUsername               String?
   smtpPassword               String?
   platformName               String?  @default("Sistema Multitenant")
+  platformLogoUrl            String?
   platformEmail              String?
   platformPhone              String?
   webPushPublicKey           String?

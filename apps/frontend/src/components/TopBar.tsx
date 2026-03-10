@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { usePlatformName } from "@/hooks/usePlatformConfig";
+import { usePlatformConfigContext } from "@/contexts/PlatformConfigContext";
 import { useSystemVersion } from "@/hooks/useSystemVersion";
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { Button } from "./ui/button";
@@ -14,15 +14,57 @@ import Image from "next/image";
 import { GlobalSearch } from "./GlobalSearch";
 import { SystemNotificationsBell } from "@/components/system-notifications/SystemNotificationsBell";
 import { SystemNotificationsDrawer } from "@/components/system-notifications/SystemNotificationsDrawer";
+import { DEFAULT_TENANT_LOGO_PATH, resolveTenantLogoSrc } from "@/lib/tenant-logo";
 
 export function TopBar() {
   const { user, logout } = useAuth();
-  const { platformName } = usePlatformName();
+  const { config: platformConfig } = usePlatformConfigContext();
+  const platformName = platformConfig.platformName;
   const { version: systemVersion } = useSystemVersion();
   const [masterLogo, setMasterLogo] = useState<string | null>(null);
+  const [platformLogoCacheBuster, setPlatformLogoCacheBuster] = useState<number>(() => Date.now());
   const [userTenantLogo, setUserTenantLogo] = useState<string | null>(null);
+  const [userTenantLogoCacheBuster, setUserTenantLogoCacheBuster] = useState<number>(() => Date.now());
+  const [userAvatarCacheBuster, setUserAvatarCacheBuster] = useState<number>(() => Date.now());
+  const [userAvatarFailed, setUserAvatarFailed] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false); // Adicionado estado
+  const masterLogoSrc = resolveTenantLogoSrc(masterLogo);
+  const platformLogoSrc = resolveTenantLogoSrc(platformConfig.platformLogoUrl, {
+    cacheBuster: platformLogoCacheBuster,
+  });
+  const userTenantLogoSrc = resolveTenantLogoSrc(userTenantLogo, {
+    cacheBuster: userTenantLogoCacheBuster,
+    tenantId: user?.tenantId,
+    fallbackToDefault: Boolean(user?.tenantId),
+  });
+  const userAvatarSrc = resolveTenantLogoSrc(user?.avatarUrl, {
+    cacheBuster: userAvatarCacheBuster,
+  });
+  const effectiveUserAvatarSrc = userAvatarFailed ? null : userAvatarSrc;
+  const userMenuImageSrc = effectiveUserAvatarSrc || userTenantLogoSrc;
+  const effectiveMainLogoSrc = platformLogoSrc || masterLogoSrc;
+  const tenantLogoEndpointSrc = user?.tenantId
+    ? resolveTenantLogoSrc(`/api/tenants/public/${encodeURIComponent(user.tenantId)}/logo-file`, {
+      cacheBuster: userTenantLogoCacheBuster,
+      tenantId: user.tenantId,
+      fallbackToDefault: false,
+    })
+    : null;
+
+  const setUserTenantLogoWithBuster = (logo: string | null) => {
+    setUserTenantLogo(logo);
+    setUserTenantLogoCacheBuster(Date.now());
+  };
+
+  useEffect(() => {
+    setPlatformLogoCacheBuster(Date.now());
+  }, [platformConfig.platformLogoUrl]);
+
+  useEffect(() => {
+    setUserAvatarFailed(false);
+    setUserAvatarCacheBuster(Date.now());
+  }, [user?.avatarUrl]);
 
   // Hook para fechar menu ao clicar fora
   const userMenuRef = useClickOutside<HTMLDivElement>(() => {
@@ -57,62 +99,70 @@ export function TopBar() {
           }));
         }
       })
-      .catch(error => {
-        console.error("Erro ao buscar master logo:", error);
-      });
+      .catch(() => {});
   }, []);
 
   // Busca logo do tenant do usuario logado
   useEffect(() => {
     async function fetchUserTenantLogo() {
-      if (user?.tenantId) {
-        const cacheKey = `tenant-logo-${user.tenantId}`;
+      const tenantId = user?.tenantId;
+      if (!tenantId) {
+        setUserTenantLogoWithBuster(null);
+        return;
+      }
 
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith('tenant-logo-') && key !== cacheKey) {
-            localStorage.removeItem(key);
-          }
-        });
+      const cacheKey = `tenant-logo-${tenantId}`;
 
-        const cached = localStorage.getItem(cacheKey);
-        if (cached) {
-          try {
-            const { logoUrl, timestamp } = JSON.parse(cached);
-            if (Date.now() - timestamp < 10 * 60 * 1000) { // 10 minutos
-              setUserTenantLogo(logoUrl);
-              return;
-            }
-          } catch {
-            localStorage.removeItem(cacheKey);
-          }
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('tenant-logo-') && key !== cacheKey) {
+          localStorage.removeItem(key);
         }
+      });
 
+      const tenantLogoFromUser = user?.tenant?.logoUrl?.trim();
+      if (tenantLogoFromUser) {
+        setUserTenantLogoWithBuster(tenantLogoFromUser);
+        localStorage.setItem(cacheKey, JSON.stringify({
+          logoUrl: tenantLogoFromUser,
+          timestamp: Date.now(),
+        }));
+        return;
+      }
+
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
         try {
-          const response = await api.get(`/tenants/public/${user.tenantId}/logo`);
-          const logoUrl = response.data?.logoUrl;
-
-          if (logoUrl) {
-            setUserTenantLogo(logoUrl);
-            localStorage.setItem(cacheKey, JSON.stringify({
-              logoUrl,
-              timestamp: Date.now()
-            }));
-          } else {
-            setUserTenantLogo(null);
+          const { logoUrl, timestamp } = JSON.parse(cached);
+          if (Date.now() - timestamp < 10 * 60 * 1000) { // 10 minutos
+            setUserTenantLogoWithBuster(logoUrl);
+            return;
           }
-        } catch (error) {
-          console.error("Erro ao buscar logo do tenant:", error);
-          if (!cached) setUserTenantLogo(null);
+        } catch {
+          localStorage.removeItem(cacheKey);
         }
-      } else if (user?.role === "SUPER_ADMIN") {
-        setUserTenantLogo(masterLogo);
+      }
+
+      try {
+        const response = await api.get(`/tenants/public/${tenantId}/logo`);
+        const logoUrl = response.data?.logoUrl;
+
+        if (logoUrl) {
+          setUserTenantLogoWithBuster(logoUrl);
+          localStorage.setItem(cacheKey, JSON.stringify({
+            logoUrl,
+            timestamp: Date.now()
+          }));
+        } else {
+          setUserTenantLogoWithBuster(null);
+        }
+      } catch {
+        if (!cached) setUserTenantLogoWithBuster(null);
       }
     }
     fetchUserTenantLogo();
-  }, [user, masterLogo]);
+  }, [user?.tenantId, user?.tenant?.logoUrl]);
 
   const handleTenantLogoError = (target: HTMLImageElement, place: 'menu' | 'dropdown') => {
-    console.error(`Erro ao carregar logo do tenant no ${place}:`, userTenantLogo);
     target.style.display = 'none';
     const fallbackClass = place === 'menu' ? '.fallback-avatar' : '.fallback-avatar-dropdown';
     const fallback = target.parentElement?.querySelector(fallbackClass);
@@ -123,7 +173,27 @@ export function TopBar() {
     if (user?.tenantId) {
       localStorage.removeItem(`tenant-logo-${user.tenantId}`);
     }
-    setUserTenantLogo(null);
+    setUserTenantLogoWithBuster(null);
+  };
+
+  const tryTenantImageFallback = (target: HTMLImageElement) => {
+    if (!tenantLogoEndpointSrc) {
+      return false;
+    }
+
+    if (target.dataset.tenantFallbackTried === '1') {
+      return false;
+    }
+
+    const currentSrc = target.getAttribute('src') || '';
+    const isDefaultLogo = currentSrc.includes(DEFAULT_TENANT_LOGO_PATH);
+    if (!isDefaultLogo) {
+      return false;
+    }
+
+    target.dataset.tenantFallbackTried = '1';
+    target.src = tenantLogoEndpointSrc;
+    return true;
   };
 
   // Icone de seta para voltar (usado na busca mobile)
@@ -154,14 +224,12 @@ export function TopBar() {
         {/* Logo e Nome do Sistema */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            {masterLogo ? (
-              <Image
-                src={`/uploads/logos/${masterLogo}`}
+            {effectiveMainLogoSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={effectiveMainLogoSrc}
                 alt="Logo"
-                width={160}
-                height={40}
-                unoptimized
-                className="h-10 w-auto object-contain"
+                className="h-10 w-auto max-w-40 object-contain"
               />
             ) : (
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-[0_10px_24px_rgba(37,99,235,0.18)]">
@@ -210,16 +278,23 @@ export function TopBar() {
               onClick={() => setShowUserMenu(!showUserMenu)}
             >
               {/* Logo do Tenant do Usuario */}
-              {userTenantLogo ? (
+              {userMenuImageSrc ? (
                 <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-border bg-secondary">
                   <Image
-                    src={`/uploads/logos/${userTenantLogo}`}
+                    src={userMenuImageSrc}
                     alt="Logo Tenant"
                     width={32}
                     height={32}
                     unoptimized
                     className="w-full h-full object-cover"
                     onError={(e) => {
+                      if (effectiveUserAvatarSrc) {
+                        setUserAvatarFailed(true);
+                        return;
+                      }
+                      if (tryTenantImageFallback(e.currentTarget)) {
+                        return;
+                      }
                       handleTenantLogoError(e.currentTarget, 'menu');
                     }}
                   />
@@ -247,19 +322,26 @@ export function TopBar() {
                 <div className="border-b border-border px-4 py-2">
                   <div className="flex items-center gap-3 mb-2">
                     {/* Logo da Tenant no Menu */}
-                    {userTenantLogo ? (
+                    {userMenuImageSrc ? (
                       <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-secondary">
                         <Image
-                          src={`/uploads/logos/${userTenantLogo}`}
+                          src={userMenuImageSrc}
                           alt="Logo Tenant"
                           width={40}
                           height={40}
                           unoptimized
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            handleTenantLogoError(e.currentTarget, 'dropdown');
-                          }}
-                        />
+                           className="w-full h-full object-cover"
+                           onError={(e) => {
+                             if (effectiveUserAvatarSrc) {
+                               setUserAvatarFailed(true);
+                               return;
+                             }
+                             if (tryTenantImageFallback(e.currentTarget)) {
+                               return;
+                             }
+                             handleTenantLogoError(e.currentTarget, 'dropdown');
+                           }}
+                         />
                         <div className="w-full h-full rounded-full bg-primary flex items-center justify-center text-white font-semibold fallback-avatar-dropdown hidden">
                           {user?.name?.charAt(0).toUpperCase()}
                         </div>

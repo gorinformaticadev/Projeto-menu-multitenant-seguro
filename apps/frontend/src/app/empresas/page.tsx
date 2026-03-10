@@ -9,7 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import api, { API_URL } from "@/lib/api";
+import api from "@/lib/api";
+import { DEFAULT_TENANT_LOGO_PATH, resolveTenantLogoSrc } from "@/lib/tenant-logo";
 import { Plus, Building2, Mail, Phone, User, Eye, Edit, Power, Lock, UserPlus, Image as ImageIcon, Upload, X, Users, Trash2, Package } from "lucide-react";
 import { CPFCNPJInput } from "@/components/ui/cpf-cnpj-input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -66,11 +67,6 @@ export default function EmpresasPage() {
   const [activeTab, setActiveTab] = useState("details");
   const { toast } = useToast();
 
-  // Debug: Log do estado submitting
-  useEffect(() => {
-    console.log('🔍 Estado submitting alterado:', submitting);
-  }, [submitting]);
-
   const [formData, setFormData] = useState({
     email: "",
     cnpjCpf: "",
@@ -81,11 +77,6 @@ export default function EmpresasPage() {
     adminPassword: "",
     adminName: "",
   });
-
-  // Debug: Log das mudanças no formData
-  useEffect(() => {
-    console.log('📝 FormData atualizado:', formData);
-  }, [formData]);
 
   const [passwordData, setPasswordData] = useState({
     newPassword: "",
@@ -104,7 +95,6 @@ export default function EmpresasPage() {
       if (cached) {
         const { data, timestamp } = JSON.parse(cached);
         if (Date.now() - timestamp < cacheTTL) {
-          console.log('🎯 Usando cache de tenants');
           setTenants(data);
           setLoading(false);
           return;
@@ -137,8 +127,6 @@ export default function EmpresasPage() {
         return a.nomeFantasia.localeCompare(b.nomeFantasia);
       });
 
-      console.log('Tenants carregados:', sortedTenants);
-      console.log('API_URL:', API_URL);
       setTenants(sortedTenants);
 
       // Salvar no cache
@@ -571,10 +559,7 @@ export default function EmpresasPage() {
                           placeholder="empresa@example.com"
                           className="pl-10"
                           value={formData.email}
-                          onChange={(e) => {
-                            console.log('📧 Email alterado:', e.target.value);
-                            setFormData({ ...formData, email: e.target.value });
-                          }}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                           disabled={submitting}
                         />
                       </div>
@@ -598,10 +583,7 @@ export default function EmpresasPage() {
                           placeholder="Empresa LTDA"
                           className="pl-10"
                           value={formData.nomeFantasia}
-                          onChange={(e) => {
-                            console.log('🏢 Nome fantasia alterado:', e.target.value);
-                            setFormData({ ...formData, nomeFantasia: e.target.value });
-                          }}
+                          onChange={(e) => setFormData({ ...formData, nomeFantasia: e.target.value })}
                           disabled={submitting}
                         />
                       </div>
@@ -686,7 +668,6 @@ export default function EmpresasPage() {
                           placeholder="Digite a senha do administrador"
                           value={formData.adminPassword}
                           onChange={(e) => {
-                            console.log('🔑 Senha alterada:', e.target.value);
                             setFormData({ ...formData, adminPassword: e.target.value });
                             setIsAdminPasswordValid(e.target.value.length >= 8);
                           }}
@@ -712,28 +693,6 @@ export default function EmpresasPage() {
                   >
                     Cancelar
                   </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      console.log('🧪 Teste de formulário:');
-                      console.log('- Submitting:', submitting);
-                      console.log('- FormData:', formData);
-                      console.log('- Inputs disabled:', document.querySelectorAll('input[disabled]').length);
-
-                      // Força habilitar todos os inputs para teste
-                      document.querySelectorAll('input').forEach(input => {
-                        input.disabled = false;
-                      });
-
-                      toast({
-                        title: "Debug",
-                        description: "Verifique o console para informações de debug",
-                      });
-                    }}
-                  >
-                    🧪 Debug
-                  </Button>
                 </div>
               </form>
             </CardContent>
@@ -751,29 +710,22 @@ export default function EmpresasPage() {
                 <CardHeader className="pb-3">
                   <div className="flex items-start gap-3">
                     <div className={`rounded-full shadow-sm ${tenant.ativo ? 'bg-gradient-to-br from-primary to-primary/80' : 'bg-gray-400'} relative overflow-hidden flex items-center justify-center w-12 h-12 p-0`}>
-                      {tenant.logoUrl ? (
-                        <>
-                          <Image
-                                                    src={`/uploads/logos/${tenant.logoUrl}?t=${Date.now()}`}
-                            alt={tenant.nomeFantasia}
-                            fill
-                            className="object-cover rounded-full logo-image"
-                            unoptimized
-                            onError={(e) => {
-                                                    console.error(`Erro ao carregar logo: ${tenant.nomeFantasia} - /uploads/logos/${tenant.logoUrl}`);
-                              const target = e.currentTarget;
-                              target.style.display = 'none';
-                              const fallback = target.parentElement?.querySelector('.fallback-icon');
-                              if (fallback) {
-                                fallback.classList.remove('hidden');
-                              }
-                            }}
-                          />
-                          <Building2 className="h-6 w-6 text-white fallback-icon hidden absolute" />
-                        </>
-                      ) : (
-                        <Building2 className="h-6 w-6 text-white" />
-                      )}
+                      <Image
+                        src={
+                          resolveTenantLogoSrc(tenant.logoUrl, {
+                            cacheBuster: logoTimestamp,
+                            tenantId: tenant.id,
+                            fallbackToDefault: true,
+                          }) || DEFAULT_TENANT_LOGO_PATH
+                        }
+                        alt={tenant.nomeFantasia}
+                        fill
+                        className="object-cover rounded-full logo-image"
+                        unoptimized
+                        onError={(e) => {
+                          e.currentTarget.src = DEFAULT_TENANT_LOGO_PATH;
+                        }}
+                      />
                     </div>
                     <div className="flex-1 min-w-0">
                       <CardTitle className="text-lg font-bold truncate">
@@ -1143,37 +1095,44 @@ export default function EmpresasPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              {selectedTenant?.logoUrl && !logoPreview && (
+              {selectedTenant && !logoPreview && (
                 <div className="space-y-2">
-                  <Label>Logo Atual</Label>
+                  <Label>{selectedTenant?.logoUrl?.trim() ? "Logo Atual" : "Logo Padrão"}</Label>
                   <div className="flex items-center justify-center p-4 border rounded-lg bg-muted">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                                            src={`/uploads/logos/${selectedTenant.logoUrl}?t=${logoTimestamp}`}
+                      src={
+                        resolveTenantLogoSrc(selectedTenant.logoUrl, {
+                          cacheBuster: logoTimestamp,
+                          tenantId: selectedTenant.id,
+                          fallbackToDefault: true,
+                        }) || DEFAULT_TENANT_LOGO_PATH
+                      }
                       alt="Logo atual"
                       className="max-h-32 object-contain"
                       onError={(e) => {
-                        console.error('Erro ao carregar logo atual:', selectedTenant.logoUrl);
-                        e.currentTarget.src = '/placeholder-logo.png';
+                        e.currentTarget.src = DEFAULT_TENANT_LOGO_PATH;
                       }}
                     />
                   </div>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleRemoveLogo}
-                    disabled={submitting}
-                    className="w-full"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    {submitting ? "Removendo..." : "Remover Logo"}
-                  </Button>
+                  {selectedTenant?.logoUrl?.trim() && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleRemoveLogo}
+                      disabled={submitting}
+                      className="w-full"
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      {submitting ? "Removendo..." : "Remover Logo"}
+                    </Button>
+                  )}
                 </div>
               )}
 
               <div className="space-y-2">
                 <Label htmlFor="logo-upload">
-                  {selectedTenant?.logoUrl ? "Novo Logo" : "Upload de Logo"}
+                  {selectedTenant?.logoUrl?.trim() ? "Novo Logo" : "Upload de Logo"}
                 </Label>
                 <Input
                   id="logo-upload"

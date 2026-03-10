@@ -475,14 +475,20 @@ export class AuthService {
     name: string;
     role: string;
     tenantId: string | null;
+    avatarUrl?: string | null;
     tenant?: unknown;
   }) {
+    const avatarUrl = user.avatarUrl
+      ? `/api/users/public/${encodeURIComponent(user.id)}/avatar-file`
+      : null;
+
     return {
       id: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
       tenantId: user.tenantId,
+      avatarUrl,
       tenant: user.tenant,
       twoFactorSecret: undefined,
     };

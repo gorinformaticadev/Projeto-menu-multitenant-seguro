@@ -1,6 +1,10 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { resolveTenantUserAvatarFilePath } from '@core/common/paths/paths.service';
 import { UsersService } from './users.service';
 
 describe('UsersService security boundaries', () => {
@@ -17,9 +21,23 @@ describe('UsersService security boundaries', () => {
   };
 
   const createService = () => new UsersService(prismaMock as any);
+  let tempUploadsDir: string;
+  let previousUploadsDir: string | undefined;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    tempUploadsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'users-avatar-'));
+    previousUploadsDir = process.env.UPLOADS_DIR;
+    process.env.UPLOADS_DIR = tempUploadsDir;
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempUploadsDir, { recursive: true, force: true });
+    if (previousUploadsDir === undefined) {
+      delete process.env.UPLOADS_DIR;
+    } else {
+      process.env.UPLOADS_DIR = previousUploadsDir;
+    }
   });
 
   it('blocks tenant ADMIN from reading a user outside the tenant scope', async () => {
@@ -98,5 +116,71 @@ describe('UsersService security boundaries', () => {
     expect(prismaMock.refreshToken.deleteMany).toHaveBeenCalledWith({
       where: { userId: 'user-1' },
     });
+  });
+
+  it('stores user avatar in a tenant-scoped directory and exposes a public avatar URL', async () => {
+    const service = createService();
+    const jpegBuffer = Buffer.from([
+      0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+    ]);
+
+    prismaMock.user.findUnique.mockResolvedValueOnce({
+      id: 'user-1',
+      tenantId: 'tenant-1',
+      avatarUrl: null,
+    });
+    prismaMock.user.update.mockImplementation(async (args: any) => ({
+      id: 'user-1',
+      email: 'user@example.com',
+      name: 'User One',
+      role: Role.USER,
+      tenantId: 'tenant-1',
+      avatarUrl: args.data.avatarUrl,
+      tenant: null,
+    }));
+
+    const updated = await service.updateProfileAvatar('user-1', {
+      buffer: jpegBuffer,
+      extension: '.jpg',
+    });
+
+    const avatarDir = path.join(
+      tempUploadsDir,
+      'tenants',
+      'tenant-1',
+      'users',
+      'user-1',
+      'avatar',
+    );
+
+    expect(fs.existsSync(avatarDir)).toBe(true);
+    expect(fs.readdirSync(avatarDir).length).toBe(1);
+    expect(updated.avatarUrl).toBe('/api/users/public/user-1/avatar-file');
+  });
+
+  it('removes avatar file and clears avatarUrl from profile', async () => {
+    const service = createService();
+    const avatarFilePath = resolveTenantUserAvatarFilePath('tenant-1', 'user-1', 'avatar-test.jpg');
+    fs.writeFileSync(avatarFilePath, Buffer.from([0xff, 0xd8, 0xff]), { mode: 0o600 });
+
+    prismaMock.user.findUnique.mockResolvedValueOnce({
+      id: 'user-1',
+      tenantId: 'tenant-1',
+      avatarUrl: 'avatar-test.jpg',
+    });
+    prismaMock.user.update.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      name: 'User One',
+      role: Role.USER,
+      tenantId: 'tenant-1',
+      avatarUrl: null,
+      tenant: null,
+    });
+
+    const updated = await service.removeProfileAvatar('user-1');
+
+    expect(fs.existsSync(avatarFilePath)).toBe(false);
+    expect(updated.avatarUrl).toBeNull();
   });
 });

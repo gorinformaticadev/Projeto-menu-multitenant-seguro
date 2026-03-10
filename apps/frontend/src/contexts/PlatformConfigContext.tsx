@@ -31,18 +31,36 @@ export function PlatformConfigProvider({ children }: { children: ReactNode }) {
       if (cached) {
         const { data, timestamp } = JSON.parse(cached);
         if (Date.now() - timestamp < cacheTTL) {
-          setConfig(data);
+          setConfig({
+            platformName: String(data?.platformName || DEFAULT_PLATFORM_CONFIG.platformName),
+            platformLogoUrl:
+              typeof data?.platformLogoUrl === 'string' && data.platformLogoUrl.trim()
+                ? data.platformLogoUrl
+                : null,
+            platformEmail: String(data?.platformEmail || DEFAULT_PLATFORM_CONFIG.platformEmail),
+            platformPhone: String(data?.platformPhone || DEFAULT_PLATFORM_CONFIG.platformPhone),
+          });
           setLoading(false);
           return;
         }
       }
 
       const response = await api.get('/api/platform-config');
-      setConfig(response.data);
+      const responseData = response.data || {};
+      const normalizedConfig: PlatformConfig = {
+        platformName: String(responseData.platformName || DEFAULT_PLATFORM_CONFIG.platformName),
+        platformLogoUrl:
+          typeof responseData.platformLogoUrl === 'string' && responseData.platformLogoUrl.trim()
+            ? responseData.platformLogoUrl
+            : null,
+        platformEmail: String(responseData.platformEmail || DEFAULT_PLATFORM_CONFIG.platformEmail),
+        platformPhone: String(responseData.platformPhone || DEFAULT_PLATFORM_CONFIG.platformPhone),
+      };
+      setConfig(normalizedConfig);
 
       // Salvar no cache
       localStorage.setItem(cacheKey, JSON.stringify({
-        data: response.data,
+        data: normalizedConfig,
         timestamp: Date.now()
       }));
 

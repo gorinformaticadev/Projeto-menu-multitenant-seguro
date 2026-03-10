@@ -10,15 +10,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { TwoFactorLogin } from "@/components/TwoFactorLogin";
 import { use2FALogin } from "@/hooks/use2FALogin";
-import { PlatformName } from "@/components/PlatformInfo";
+import { usePlatformConfigContext } from "@/contexts/PlatformConfigContext";
 import { Building2 } from "lucide-react";
-import { API_URL } from "@/lib/api";
+import { resolveTenantLogoSrc } from "@/lib/tenant-logo";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
-  const [masterLogo, setMasterLogo] = useState<string | null>(null);
+  const { config: platformConfig } = usePlatformConfigContext();
+  const platformLogoSrc = resolveTenantLogoSrc(platformConfig.platformLogoUrl);
   const currentYear = new Date().getFullYear();
   const { toast } = useToast();
   const {
@@ -32,21 +33,6 @@ export default function LoginPage() {
   } = use2FALogin();
 
   useEffect(() => {
-    async function fetchMasterLogo() {
-      try {
-        const response = await fetch(`${API_URL}/tenants/public/master-logo`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.logoUrl) {
-            setMasterLogo(data.logoUrl);
-          }
-        }
-      } catch (error) {
-        console.error("Erro ao buscar logo:", error);
-      }
-    }
-    fetchMasterLogo();
-
     const savedCredentials = localStorage.getItem("loginCredentials");
     if (savedCredentials) {
       try {
@@ -56,8 +42,7 @@ export default function LoginPage() {
           setPassword(savedPassword || "");
           setRememberMe(true);
         }
-      } catch (error) {
-        console.error("Erro ao carregar credenciais salvas:", error);
+      } catch {
         localStorage.removeItem("loginCredentials");
       }
     }
@@ -150,11 +135,11 @@ export default function LoginPage() {
 
         <div className="flex flex-col items-center justify-center mb-2 space-y-4">
           {/* Logo Container - Glass Pop-out */}
-          {masterLogo ? (
+          {platformLogoSrc ? (
             <div className="inline-flex items-center justify-center relative rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 shadow-[8px_8px_16px_rgba(0,0,0,0.3),-4px_-4px_8px_rgba(255,255,255,0.05)]">
               <Image
-                src={`/uploads/logos/${masterLogo}`}
-                alt="Logo do Tenant"
+                src={platformLogoSrc}
+                alt="Logo da Plataforma"
                 width={80}
                 height={80}
                 className="h-20 w-auto object-contain relative z-10 drop-shadow-xl"
@@ -180,7 +165,7 @@ export default function LoginPage() {
 
           <div className="text-center space-y-1">
             <div className="text-xl font-bold tracking-tight text-white drop-shadow-md">
-              <PlatformName />
+              {platformConfig.platformName}
             </div>
             <p className="text-sm text-slate-400 font-medium tracking-wide">BEM-VINDO DE VOLTA</p>
           </div>

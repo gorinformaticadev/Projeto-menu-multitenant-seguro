@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch, Delete, UseInterceptors, UploadedFile, BadRequestException, Req } from '@nestjs/common';
-import { Request as ExpressRequest } from 'express';
+import { Controller, Get, Post, Body, UseGuards, Param, Put, Patch, Delete, UseInterceptors, UploadedFile, BadRequestException, Req, Res } from '@nestjs/common';
+import { Request as ExpressRequest, Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { DuplicateRequestInterceptor } from '@core/common/interceptors/duplicate-request.interceptor';
@@ -15,7 +15,7 @@ import { SkipTenantIsolation } from '@core/common/decorators/skip-tenant-isolati
 import { Public } from '@core/common/decorators/public.decorator';
 import { Role } from '@prisma/client';
 import { multerConfig } from '@core/common/config/multer.config';
-import { resolveLogosDirPath } from '@core/common/paths/paths.service';
+import { resolveTenantLogoFilePath } from '@core/common/paths/paths.service';
 
 type TenantRequest = ExpressRequest & {
   user: {
@@ -39,7 +39,10 @@ export class TenantsController {
   // Assinaturas de arquivos válidas (magic numbers)
   private readonly FILE_SIGNATURES = {
     'image/jpeg': [0xFF, 0xD8, 0xFF],
+    'image/jpg': [0xFF, 0xD8, 0xFF],
+    'image/pjpeg': [0xFF, 0xD8, 0xFF],
     'image/png': [0x89, 0x50, 0x4E, 0x47],
+    'image/x-png': [0x89, 0x50, 0x4E, 0x47],
     'image/webp': [0x52, 0x49, 0x46, 0x46],
     'image/gif': [0x47, 0x49, 0x46]
   };
@@ -47,13 +50,12 @@ export class TenantsController {
   /**
    * Valida a assinatura real do arquivo para prevenir upload de arquivos maliciosos
    */
-  private async validateFileSignature(file: Express.Multer.File): Promise<void> {
+  private async validateFileSignature(tenantId: string, file: Express.Multer.File): Promise<void> {
     const fs = await import('fs');
-    const path = await import('path');
 
     try {
       // Ler os primeiros bytes do arquivo
-      const filePath = path.join(resolveLogosDirPath(), file.filename);
+      const filePath = resolveTenantLogoFilePath(tenantId, file.filename);
       const buffer = fs.readFileSync(filePath);
 
       const signature = this.FILE_SIGNATURES[file.mimetype];
@@ -139,7 +141,7 @@ export class TenantsController {
     }
 
     // Validação adicional de segurança: verificar assinatura do arquivo
-    await this.validateFileSignature(file);
+    await this.validateFileSignature(String(req.user.tenantId || ''), file);
 
     return this.tenantsService.updateLogo(req.user.tenantId, file.filename);
   }
@@ -178,7 +180,7 @@ export class TenantsController {
     }
 
     // Validação adicional de segurança: verificar assinatura do arquivo
-    await this.validateFileSignature(file);
+    await this.validateFileSignature(id, file);
 
     return this.tenantsService.updateLogo(id, file.filename);
   }
@@ -211,6 +213,17 @@ export class TenantsController {
   @Get('public/:id/logo')
   async getTenantLogo(@Param('id') id: string) {
     return this.tenantsService.getTenantLogo(id);
+  }
+
+  @Public()
+  @SkipThrottle()
+  @Get('public/:id/logo-file')
+  async getTenantLogoFile(@Param('id') id: string, @Res() res: Response) {
+    const logoFilePath = await this.tenantsService.getTenantLogoFilePath(id);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.sendFile(logoFilePath);
   }
 
   @Get('my-tenant/modules/active')

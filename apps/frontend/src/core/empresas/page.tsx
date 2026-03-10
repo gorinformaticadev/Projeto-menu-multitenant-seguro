@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import api, { API_URL } from "@/lib/api";
+import api from "@/lib/api";
+import { DEFAULT_TENANT_LOGO_PATH, resolveTenantLogoSrc } from "@/lib/tenant-logo";
 import { Plus, Building2, Mail, Phone, User, FileText, Eye, Edit, Power, Lock, UserPlus, Image as ImageIcon, Upload, X, Users, Trash2, Package } from "lucide-react";
 import { CPFCNPJInput } from "@/components/ui/cpf-cnpj-input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -87,7 +88,6 @@ export default function EmpresasPage() {
       if (cached) {
         const { data, timestamp } = JSON.parse(cached);
         if (Date.now() - timestamp < cacheTTL) {
-          console.log('🎯 Usando cache de tenants');
           setTenants(data);
           setLoading(false);
           return;
@@ -95,8 +95,6 @@ export default function EmpresasPage() {
       }
       
       const response = await api.get("/tenants");
-      console.log('Tenants carregados:', response.data);
-      console.log('API_URL:', API_URL);
       setTenants(response.data);
       
       // Salvar no cache
@@ -658,30 +656,21 @@ export default function EmpresasPage() {
                 <CardHeader className="pb-3">
                   <div className="flex items-start gap-3">
                     <div className={`rounded-full shadow-sm ${tenant.ativo ? 'bg-gradient-to-br from-primary to-primary/80' : 'bg-gray-400'} relative overflow-hidden flex items-center justify-center w-12 h-12 p-0`}>
-                      {tenant.logoUrl ? (
-                        <>
-                          <img 
-                                                    src={`/uploads/logos/${tenant.logoUrl}?t=${logoTimestamp}`}
-                            alt={tenant.nomeFantasia}
-                            className="w-full h-full object-cover rounded-full logo-image"
-                            onLoad={() => {
-                              console.log(`Logo carregado: ${tenant.nomeFantasia} - ${tenant.logoUrl}`);
-                            }}
-                            onError={(e) => {
-                                                    console.error(`Erro ao carregar logo: ${tenant.nomeFantasia} - /uploads/logos/${tenant.logoUrl}`);
-                              const target = e.currentTarget;
-                              target.style.display = 'none';
-                              const fallback = target.parentElement?.querySelector('.fallback-icon');
-                              if (fallback) {
-                                fallback.classList.remove('hidden');
-                              }
-                            }}
-                          />
-                          <Building2 className="h-6 w-6 text-white fallback-icon hidden absolute" />
-                        </>
-                      ) : (
-                        <Building2 className="h-6 w-6 text-white" />
-                      )}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={
+                          resolveTenantLogoSrc(tenant.logoUrl, {
+                            cacheBuster: logoTimestamp,
+                            tenantId: tenant.id,
+                            fallbackToDefault: true,
+                          }) || DEFAULT_TENANT_LOGO_PATH
+                        }
+                        alt={tenant.nomeFantasia}
+                        className="w-full h-full object-cover rounded-full logo-image"
+                        onError={(e) => {
+                          e.currentTarget.src = DEFAULT_TENANT_LOGO_PATH;
+                        }}
+                      />
                     </div>
                     <div className="flex-1 min-w-0">
                       <CardTitle className="text-lg font-bold truncate">
@@ -1019,36 +1008,43 @@ export default function EmpresasPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              {selectedTenant?.logoUrl && !logoPreview && (
+              {selectedTenant && !logoPreview && (
                 <div className="space-y-2">
-                  <Label>Logo Atual</Label>
+                  <Label>{selectedTenant?.logoUrl?.trim() ? "Logo Atual" : "Logo Padrão"}</Label>
                   <div className="flex items-center justify-center p-4 border rounded-lg bg-muted">
                     <img 
-                                            src={`/uploads/logos/${selectedTenant.logoUrl}?t=${logoTimestamp}`}
+                      src={
+                        resolveTenantLogoSrc(selectedTenant.logoUrl, {
+                          cacheBuster: logoTimestamp,
+                          tenantId: selectedTenant.id,
+                          fallbackToDefault: true,
+                        }) || DEFAULT_TENANT_LOGO_PATH
+                      }
                       alt="Logo atual"
                       className="max-h-32 object-contain"
                       onError={(e) => {
-                        console.error('Erro ao carregar logo atual:', selectedTenant.logoUrl);
-                        e.currentTarget.src = '/placeholder-logo.png';
+                        e.currentTarget.src = DEFAULT_TENANT_LOGO_PATH;
                       }}
                     />
                   </div>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleRemoveLogo}
-                    disabled={submitting}
-                    className="w-full"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    {submitting ? "Removendo..." : "Remover Logo"}
-                  </Button>
+                  {selectedTenant?.logoUrl?.trim() && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleRemoveLogo}
+                      disabled={submitting}
+                      className="w-full"
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      {submitting ? "Removendo..." : "Remover Logo"}
+                    </Button>
+                  )}
                 </div>
               )}
 
               <div className="space-y-2">
                 <Label htmlFor="logo-upload">
-                  {selectedTenant?.logoUrl ? "Novo Logo" : "Upload de Logo"}
+                  {selectedTenant?.logoUrl?.trim() ? "Novo Logo" : "Upload de Logo"}
                 </Label>
                 <Input
                   id="logo-upload"

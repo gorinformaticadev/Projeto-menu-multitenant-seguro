@@ -3,9 +3,19 @@ import { randomUUID } from 'crypto';
 import * as fs from 'fs';
 import { memoryStorage, Options } from 'multer';
 import * as path from 'path';
+import {
+  resolveCanonicalPaths,
+  resolveTenantModuleAreaPath,
+} from '@core/common/paths/paths.service';
 
 const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
 const SAFE_SEGMENT_REGEX = /^[a-zA-Z0-9._-]+$/;
+const INVALID_UPLOAD_NAME_REGEX = /[\\/\u0000-\u001f]/;
+const ORDEM_SERVICO_UPLOAD_SEGMENT = ['modules', 'ordem_servico'] as const;
+const ALLOWED_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
+
+export type OrdemServicoUploadArea = 'clientes' | 'ordens' | 'produtos';
+
 const IMAGE_TYPE_RULES: Record<
   string,
   {
@@ -20,7 +30,19 @@ const IMAGE_TYPE_RULES: Record<
     extensions: ['.jpg', '.jpeg'],
     signatures: [{ offset: 0, bytes: [0xff, 0xd8, 0xff] }],
   },
+  'image/jpg': {
+    extensions: ['.jpg', '.jpeg'],
+    signatures: [{ offset: 0, bytes: [0xff, 0xd8, 0xff] }],
+  },
+  'image/pjpeg': {
+    extensions: ['.jpg', '.jpeg'],
+    signatures: [{ offset: 0, bytes: [0xff, 0xd8, 0xff] }],
+  },
   'image/png': {
+    extensions: ['.png'],
+    signatures: [{ offset: 0, bytes: [0x89, 0x50, 0x4e, 0x47] }],
+  },
+  'image/x-png': {
     extensions: ['.png'],
     signatures: [{ offset: 0, bytes: [0x89, 0x50, 0x4e, 0x47] }],
   },
@@ -48,20 +70,16 @@ export const ORDEM_SERVICO_UPLOAD_OPTIONS: Options = {
   },
   fileFilter: (_req, file, callback) => {
     const rule = IMAGE_TYPE_RULES[file.mimetype];
-    const extension = path.extname(file.originalname || '').toLowerCase();
 
     if (!rule) {
       callback(new BadRequestException('Tipo de arquivo nao permitido') as any, false);
       return;
     }
 
-    if (!SAFE_SEGMENT_REGEX.test(file.originalname || '')) {
-      callback(new BadRequestException('Nome de arquivo invalido') as any, false);
-      return;
-    }
-
-    if (!rule.extensions.includes(extension)) {
-      callback(new BadRequestException('Extensao de arquivo nao permitida') as any, false);
+    try {
+      sanitizeOriginalUploadName(file.originalname || '');
+    } catch (error) {
+      callback(error as any, false);
       return;
     }
 
@@ -84,6 +102,21 @@ export function persistTenantUpload(baseDir: string, tenantId: string, file: Exp
   return { fileName, filePath };
 }
 
+export function persistTenantModuleUpload(
+  area: OrdemServicoUploadArea,
+  tenantId: string,
+  file: Express.Multer.File,
+) {
+  const tenantAreaDir = resolveTenantAreaRoot(area, tenantId);
+  const buffer = normalizeUploadedBuffer(file);
+  const extension = validateUploadedImage(file, buffer);
+  const fileName = `${Date.now()}-${randomUUID()}${extension}`;
+  const filePath = path.resolve(tenantAreaDir, fileName);
+
+  fs.writeFileSync(filePath, buffer, { mode: 0o600 });
+  return { fileName, filePath };
+}
+
 export function resolveTenantUploadPath(baseDir: string, tenantId: string, filename: string) {
   const safeTenantId = sanitizeSegment(tenantId, 'tenant');
   const safeFilename = sanitizeFilename(filename);
@@ -97,6 +130,45 @@ export function resolveTenantUploadPath(baseDir: string, tenantId: string, filen
   return resolvedPath;
 }
 
+export function resolveTenantModuleUploadPath(
+  area: OrdemServicoUploadArea,
+  tenantId: string,
+  filename: string,
+) {
+  const canonicalPath = resolveTenantUploadPath(resolveTenantAreaRoot(area, tenantId), '.', filename);
+
+  if (fs.existsSync(canonicalPath)) {
+    return canonicalPath;
+  }
+
+  const legacyModulePath = resolveTenantUploadPath(resolveLegacyModuleAreaRoot(area), tenantId, filename);
+  if (fs.existsSync(legacyModulePath)) {
+    return legacyModulePath;
+  }
+
+  if (area === 'produtos') {
+    const legacyPath = resolveTenantUploadPath(resolveLegacyProductsRoot(), tenantId, filename);
+
+    if (fs.existsSync(legacyPath)) {
+      return legacyPath;
+    }
+  }
+
+  return canonicalPath;
+}
+
+export function buildTenantModuleUploadUrl(
+  area: OrdemServicoUploadArea,
+  tenantId: string,
+  fileName: string,
+) {
+  const safeArea = sanitizeUploadArea(area);
+  const safeTenantId = sanitizeSegment(tenantId, 'tenant');
+  const safeFileName = sanitizeFilename(fileName);
+
+  return `/api/ordem_servico/${safeArea}/uploads/${safeTenantId}/${safeFileName}`;
+}
+
 export function assertTenantUploadAccess(requestTenantId: string, routeTenantId: string) {
   const safeRequestTenantId = sanitizeSegment(requestTenantId, 'tenant');
   const safeRouteTenantId = sanitizeSegment(routeTenantId, 'tenant');
@@ -108,14 +180,10 @@ export function assertTenantUploadAccess(requestTenantId: string, routeTenantId:
 
 function validateUploadedImage(file: Express.Multer.File, buffer: Buffer) {
   const rule = IMAGE_TYPE_RULES[file.mimetype];
-  const extension = path.extname(file.originalname || '').toLowerCase();
+  sanitizeOriginalUploadName(file.originalname || '');
 
   if (!rule) {
     throw new BadRequestException('Tipo de arquivo nao permitido');
-  }
-
-  if (!rule.extensions.includes(extension)) {
-    throw new BadRequestException('Extensao de arquivo nao permitida');
   }
 
   const signatureValid = rule.signatures.some((signature) =>
@@ -159,6 +227,21 @@ function sanitizeSegment(value: string, label: string) {
   return value;
 }
 
+function sanitizeOriginalUploadName(filename: string) {
+  const normalizedFilename = String(filename || '').trim();
+
+  if (!normalizedFilename || INVALID_UPLOAD_NAME_REGEX.test(normalizedFilename)) {
+    throw new BadRequestException('Nome de arquivo invalido');
+  }
+
+  const extension = path.extname(path.basename(normalizedFilename)).toLowerCase();
+  if (!extension || !ALLOWED_IMAGE_EXTENSIONS.has(extension)) {
+    throw new BadRequestException('Extensao de arquivo nao permitida');
+  }
+
+  return normalizedFilename;
+}
+
 function sanitizeFilename(filename: string) {
   if (!filename || !SAFE_SEGMENT_REGEX.test(filename)) {
     throw new BadRequestException('Nome de arquivo invalido');
@@ -174,4 +257,32 @@ function sanitizeFilename(filename: string) {
   }
 
   return filename;
+}
+
+function sanitizeUploadArea(area: OrdemServicoUploadArea) {
+  if (area !== 'clientes' && area !== 'ordens' && area !== 'produtos') {
+    throw new BadRequestException('Area de upload invalida');
+  }
+
+  return area;
+}
+
+function resolveTenantAreaRoot(area: OrdemServicoUploadArea, tenantId: string) {
+  const safeArea = sanitizeUploadArea(area);
+  return resolveTenantModuleAreaPath(
+    sanitizeSegment(tenantId, 'tenant'),
+    ORDEM_SERVICO_UPLOAD_SEGMENT[1],
+    safeArea,
+  );
+}
+
+function resolveLegacyModuleAreaRoot(area: OrdemServicoUploadArea) {
+  const safeArea = sanitizeUploadArea(area);
+  const canonicalPaths = resolveCanonicalPaths();
+
+  return path.resolve(canonicalPaths.uploadsDir, ...ORDEM_SERVICO_UPLOAD_SEGMENT, safeArea);
+}
+
+function resolveLegacyProductsRoot() {
+  return path.resolve(resolveCanonicalPaths().uploadsDir, 'produtos');
 }

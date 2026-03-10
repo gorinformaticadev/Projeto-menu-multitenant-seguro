@@ -6,11 +6,14 @@ import * as path from 'path';
 export interface CanonicalPaths {
   projectRoot: string;
   uploadsDir: string;
+  tenantsDir: string;
   logosDir: string;
   tempDir: string;
   secureDir: string;
   backupsDir: string;
 }
+
+const SAFE_STORAGE_SEGMENT_REGEX = /^[a-zA-Z0-9._-]+$/;
 
 export function ensureDirectory(dirPath: string): string {
   const target = path.resolve(dirPath);
@@ -107,6 +110,7 @@ export function resolveCanonicalPaths(options?: {
       : configuredLogosDir || path.join(rawUploads, 'logos');
 
   const uploadsDir = path.resolve(rawUploads);
+  const tenantsDir = path.resolve(path.join(uploadsDir, 'tenants'));
   const backupsDir = path.resolve(rawBackups);
   const logosDir = path.resolve(rawLogos);
   const tempDir = path.resolve(path.join(uploadsDir, 'temp'));
@@ -115,6 +119,7 @@ export function resolveCanonicalPaths(options?: {
   return {
     projectRoot,
     uploadsDir,
+    tenantsDir,
     logosDir,
     tempDir,
     secureDir,
@@ -130,8 +135,68 @@ export function resolveUploadsDirPath(): string {
   return ensureDirectory(resolveCanonicalPaths().uploadsDir);
 }
 
+export function resolveTenantsDirPath(): string {
+  return ensureDirectory(resolveCanonicalPaths().tenantsDir);
+}
+
+export function resolveTenantUploadsRootPath(tenantId: string): string {
+  return ensureDirectory(path.join(resolveTenantsDirPath(), sanitizeStorageSegment(tenantId, 'tenant')));
+}
+
+export function resolveTenantLogosDirPath(tenantId: string): string {
+  return ensureDirectory(path.join(resolveTenantUploadsRootPath(tenantId), 'logos'));
+}
+
+export function resolveTenantLogoFilePath(tenantId: string, filename: string): string {
+  const logosDir = resolveTenantLogosDirPath(tenantId);
+  const safeFilename = sanitizeStorageSegment(path.basename(filename), 'arquivo');
+  return path.resolve(logosDir, safeFilename);
+}
+
+export function resolveTenantUsersDirPath(tenantId: string): string {
+  return ensureDirectory(path.join(resolveTenantUploadsRootPath(tenantId), 'users'));
+}
+
+export function resolveTenantUserAvatarDirPath(tenantId: string, userId: string): string {
+  const safeUserId = sanitizeStorageSegment(userId, 'usuario');
+  return ensureDirectory(path.join(resolveTenantUsersDirPath(tenantId), safeUserId, 'avatar'));
+}
+
+export function resolveTenantUserAvatarFilePath(
+  tenantId: string,
+  userId: string,
+  filename: string,
+): string {
+  const avatarDir = resolveTenantUserAvatarDirPath(tenantId, userId);
+  const safeFilename = sanitizeStorageSegment(path.basename(filename), 'arquivo');
+  return path.resolve(avatarDir, safeFilename);
+}
+
+export function resolveTenantModuleAreaPath(
+  tenantId: string,
+  ...segments: string[]
+): string {
+  const safeSegments = segments.map((segment, index) =>
+    sanitizeStorageSegment(segment, `segmento_${index + 1}`),
+  );
+  return ensureDirectory(path.join(resolveTenantUploadsRootPath(tenantId), 'modules', ...safeSegments));
+}
+
 export function resolveBackupsDirPath(): string {
   return ensureDirectory(resolveCanonicalPaths().backupsDir);
+}
+
+export function resolvePlatformAssetsRootPath(): string {
+  return ensureDirectory(path.join(resolveUploadsDirPath(), 'platform'));
+}
+
+export function resolvePlatformLogosDirPath(): string {
+  return ensureDirectory(path.join(resolvePlatformAssetsRootPath(), 'logos'));
+}
+
+export function resolvePlatformLogoFilePath(filename: string): string {
+  const safeFilename = sanitizeStorageSegment(path.basename(filename), 'arquivo');
+  return path.resolve(resolvePlatformLogosDirPath(), safeFilename);
 }
 
 @Injectable()
@@ -150,12 +215,14 @@ export class PathsService implements OnModuleInit {
 
   onModuleInit(): void {
     this.ensureDir(this.paths.uploadsDir);
+    this.ensureDir(this.paths.tenantsDir);
     this.ensureDir(this.paths.logosDir);
     this.ensureDir(this.paths.tempDir);
     this.ensureDir(this.paths.secureDir);
     this.ensureDir(this.paths.backupsDir);
 
     this.logger.log(`UPLOADS_DIR=${this.paths.uploadsDir}`);
+    this.logger.log(`TENANTS_DIR=${this.paths.tenantsDir}`);
     this.logger.log(`BACKUP_DIR=${this.paths.backupsDir}`);
     this.logger.log(`LOGOS_DIR=${this.paths.logosDir}`);
     this.logger.log(`TEMP_DIR=${this.paths.tempDir}`);
@@ -168,6 +235,10 @@ export class PathsService implements OnModuleInit {
 
   getUploadsDir(): string {
     return this.paths.uploadsDir;
+  }
+
+  getTenantsDir(): string {
+    return this.paths.tenantsDir;
   }
 
   getLogosDir(): string {
@@ -189,4 +260,13 @@ export class PathsService implements OnModuleInit {
   ensureDir(dirPath: string): string {
     return ensureDirectory(dirPath);
   }
+}
+
+function sanitizeStorageSegment(value: string, label: string): string {
+  const normalized = String(value || '').trim();
+  if (!normalized || !SAFE_STORAGE_SEGMENT_REGEX.test(normalized)) {
+    throw new Error(`${label} invalido para armazenamento`);
+  }
+
+  return normalized;
 }

@@ -9,9 +9,10 @@ import { PermissionGuard } from '../shared/guards/permission.guard';
 import { RequireOrdersPermission } from '../shared/decorators/require-permission.decorator';
 import {
     assertTenantUploadAccess,
+    buildTenantModuleUploadUrl,
     ORDEM_SERVICO_UPLOAD_OPTIONS,
-    persistTenantUpload,
-    resolveTenantUploadPath,
+    persistTenantModuleUpload,
+    resolveTenantModuleUploadPath,
 } from '../shared/utils/upload-security.util';
 import {
     CreateOrdemServicoDTO,
@@ -355,25 +356,11 @@ export class OrdensController {
                 throw new BadRequestException('Tenant invalido para upload');
             }
 
-            const uploadRoot = path.resolve(process.cwd(), 'uploads', 'modules', 'ordem_servico', 'ordens');
-            const persistedUpload = persistTenantUpload(uploadRoot, safeTenantId, file);
-            return { url: `/api/ordem_servico/ordens/uploads/${safeTenantId}/${persistedUpload.fileName}` };
+            const persistedUpload = persistTenantModuleUpload('ordens', safeTenantId, file);
+            return { url: buildTenantModuleUploadUrl('ordens', safeTenantId, persistedUpload.fileName) };
 
-            let bufferData = file.buffer as any;
 
-            if (bufferData && typeof bufferData === 'object' && !Buffer.isBuffer(bufferData)) {
-                if (bufferData.type === 'Buffer' && Array.isArray(bufferData.data)) {
-                    bufferData = Buffer.from(bufferData.data);
-                } else {
-                    const values = Object.values(bufferData) as number[];
-                    bufferData = Buffer.from(values);
-                }
-            }
-
-            if ((!bufferData || !Buffer.isBuffer(bufferData)) && file.path) {
-                bufferData = fs.readFileSync(file.path);
-            }
-
+            const bufferData = file.buffer as any;
             if (!Buffer.isBuffer(bufferData)) {
                 throw new Error('Falha crítica: Buffer inválido.');
             }
@@ -414,8 +401,7 @@ export class OrdensController {
     ) {
         try {
             assertTenantUploadAccess(String(req.user?.tenantId || ''), tenantId);
-            const uploadRoot = path.resolve(process.cwd(), 'uploads', 'modules', 'ordem_servico', 'ordens');
-            const safeFilePath = resolveTenantUploadPath(uploadRoot, tenantId, filename);
+            const safeFilePath = resolveTenantModuleUploadPath('ordens', tenantId, filename);
 
             if (fs.existsSync(safeFilePath)) {
                 res.setHeader('Cache-Control', 'private, max-age=300');

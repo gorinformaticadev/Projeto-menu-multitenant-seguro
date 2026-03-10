@@ -10,13 +10,23 @@ import {
   Post,
   Put,
   Query,
+  Res,
+  UploadedFile,
+  UseInterceptors,
   UseGuards,
 } from '@nestjs/common';
+import { Response } from 'express';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '@core/common/decorators/current-user.decorator';
+import { Public } from '@core/common/decorators/public.decorator';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
+import {
+  createImageMulterOptions,
+  validateUploadedImageBuffer,
+} from '@core/common/utils/image-upload.util';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -29,6 +39,8 @@ type AuthenticatedUser = {
   role: Role;
   tenantId?: string | null;
 };
+
+const USER_AVATAR_UPLOAD_OPTIONS = createImageMulterOptions();
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -144,6 +156,27 @@ export class UsersController {
     return this.usersService.updateProfile(user.id, updateProfileDto);
   }
 
+  @Post('profile/avatar')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER, Role.CLIENT)
+  @UseInterceptors(FileInterceptor('avatar', USER_AVATAR_UPLOAD_OPTIONS))
+  updateProfileAvatar(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Nenhum arquivo foi enviado');
+    }
+
+    const validatedUpload = validateUploadedImageBuffer(file);
+    return this.usersService.updateProfileAvatar(user.id, validatedUpload);
+  }
+
+  @Patch('profile/avatar/remove')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER, Role.CLIENT)
+  removeProfileAvatar(@CurrentUser() user: AuthenticatedUser) {
+    return this.usersService.removeProfileAvatar(user.id);
+  }
+
   @Put('change-password')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER, Role.CLIENT)
   changePassword(
@@ -157,5 +190,15 @@ export class UsersController {
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   unlockUser(@Param('id') id: string, @CurrentUser() currentUser: AuthenticatedUser) {
     return this.usersService.unlockUser(id, currentUser);
+  }
+
+  @Public()
+  @Get('public/:id/avatar-file')
+  async getPublicAvatarFile(@Param('id') id: string, @Res() res: Response) {
+    const avatarFilePath = await this.usersService.getProfileAvatarFilePath(id);
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.sendFile(avatarFilePath);
   }
 }

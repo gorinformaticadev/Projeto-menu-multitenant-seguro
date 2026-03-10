@@ -13,6 +13,7 @@ export interface User {
   name: string;
   role: Role;
   tenantId: string | null;
+  avatarUrl?: string | null;
   tenant?: {
     id: string;
     nomeFantasia: string;

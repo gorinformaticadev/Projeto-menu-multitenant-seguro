@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 import { TwoFactorSetup } from "@/components/TwoFactorSetup";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,8 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
-import { User, Mail, Shield, Key, Edit } from "lucide-react";
+import { User, Mail, Shield, Key, Edit, Upload, Trash2 } from "lucide-react";
 import { PasswordInput } from "@/components/ui/password-input";
+import { DEFAULT_TENANT_LOGO_PATH, resolveTenantLogoSrc } from "@/lib/tenant-logo";
 
 export default function PerfilPage() {
   const { user, updateUser } = useAuth();
@@ -36,14 +38,27 @@ export default function PerfilPage() {
     cnpjCpf: "",
     telefone: "",
   });
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarSubmitting, setAvatarSubmitting] = useState(false);
+  const [avatarCacheBuster, setAvatarCacheBuster] = useState<number>(() => Date.now());
+
+  const tenantLogoFallbackSrc =
+    resolveTenantLogoSrc(user?.tenant?.logoUrl, {
+      tenantId: user?.tenantId,
+      fallbackToDefault: true,
+    }) || DEFAULT_TENANT_LOGO_PATH;
+  const userAvatarSrc = resolveTenantLogoSrc(user?.avatarUrl, {
+    cacheBuster: avatarCacheBuster,
+  });
+  const currentAvatarSrc = avatarPreview || userAvatarSrc || tenantLogoFallbackSrc;
 
   const loadUserData = useCallback(async (force = false) => {
     if (!user?.id) return;
 
     const cacheKey = `user-profile-${user.id}`;
-    const cacheTTL = 2 * 60 * 1000; // 2 minutos
+    const cacheTTL = 2 * 60 * 1000;
 
-    // Verificar cache se não for forçado
     if (!force) {
       const cached = localStorage.getItem(cacheKey);
       if (cached) {
@@ -58,7 +73,7 @@ export default function PerfilPage() {
             return;
           }
         } catch {
-          // Cache inválido, continua
+          // noop
         }
       }
     }
@@ -73,13 +88,12 @@ export default function PerfilPage() {
         email: userData.email || "",
       });
 
-      // Cache o resultado
       localStorage.setItem(cacheKey, JSON.stringify({
         data: userData,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       }));
-    } catch (error) {
-      console.error("Erro ao carregar dados:", error);
+    } catch {
+      // noop
     }
   }, [user?.id]);
 
@@ -91,7 +105,6 @@ export default function PerfilPage() {
         email: user.email || "",
       });
 
-      // Inicializar dados da tenant se for ADMIN
       if (user.role === "ADMIN" && user.tenant) {
         setTenantData({
           nomeFantasia: user.tenant.nomeFantasia || "",
@@ -108,7 +121,7 @@ export default function PerfilPage() {
     if (!profileData.name || !profileData.email) {
       toast({
         title: "Erro",
-        description: "Nome e email são obrigatórios",
+        description: "Nome e email sao obrigatorios",
         variant: "destructive",
       });
       return;
@@ -116,22 +129,20 @@ export default function PerfilPage() {
 
     try {
       setLoading(true);
-      await api.put('/users/profile', {
+      await api.put("/users/profile", {
         name: profileData.name,
         email: profileData.email,
       });
-      // Atualizar contexto de autenticação
       updateUser({
         name: profileData.name,
         email: profileData.email,
       });
 
       toast({
-        title: "Perfil atualizado!",
-        description: "Suas informações foram atualizadas com sucesso",
+        title: "Perfil atualizado",
+        description: "Suas informacoes foram atualizadas com sucesso",
       });
       setShowEditProfile(false);
-      // Recarregar dados do usuário (forçar refresh do cache)
       await loadUserData(true);
     } catch (error: unknown) {
       toast({
@@ -150,7 +161,7 @@ export default function PerfilPage() {
     if (!isNewPasswordValid) {
       toast({
         title: "Erro",
-        description: "A nova senha não atende aos requisitos de segurança",
+        description: "A nova senha nao atende aos requisitos de seguranca",
         variant: "destructive",
       });
       return;
@@ -159,7 +170,7 @@ export default function PerfilPage() {
     if (!passwordsMatch) {
       toast({
         title: "Erro",
-        description: "As senhas não coincidem",
+        description: "As senhas nao coincidem",
         variant: "destructive",
       });
       return;
@@ -172,7 +183,7 @@ export default function PerfilPage() {
         newPassword: passwordData.newPassword,
       });
       toast({
-        title: "Senha alterada!",
+        title: "Senha alterada",
         description: "Sua senha foi alterada com sucesso",
       });
       setPasswordData({
@@ -200,7 +211,7 @@ export default function PerfilPage() {
     if (!tenantData.nomeFantasia || !tenantData.cnpjCpf) {
       toast({
         title: "Erro",
-        description: "Nome fantasia e CNPJ/CPF são obrigatórios",
+        description: "Nome fantasia e CNPJ/CPF sao obrigatorios",
         variant: "destructive",
       });
       return;
@@ -210,13 +221,12 @@ export default function PerfilPage() {
 
     try {
       setLoading(true);
-      await api.put('/tenants/my-tenant', {
+      await api.put("/tenants/my-tenant", {
         nomeFantasia: tenantData.nomeFantasia,
         cnpjCpf: tenantData.cnpjCpf,
         telefone: tenantData.telefone,
       });
 
-      // Atualizar contexto de autenticação
       updateUser({
         tenant: {
           ...user.tenant,
@@ -227,7 +237,7 @@ export default function PerfilPage() {
       });
 
       toast({
-        title: "Empresa atualizada!",
+        title: "Empresa atualizada",
         description: "Os dados da empresa foram atualizados com sucesso",
       });
       setShowEditTenant(false);
@@ -242,23 +252,183 @@ export default function PerfilPage() {
     }
   }
 
+  function handleAvatarFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Arquivo invalido",
+        description: "Selecione um arquivo de imagem",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "Arquivo muito grande",
+        description: "A imagem deve ter no maximo 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setAvatarFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function handleUploadAvatar() {
+    if (!avatarFile) return;
+
+    try {
+      setAvatarSubmitting(true);
+      const formData = new FormData();
+      formData.append("avatar", avatarFile);
+
+      const response = await api.post("/users/profile/avatar", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      updateUser({
+        avatarUrl: response.data?.avatarUrl || null,
+      });
+      setAvatarFile(null);
+      setAvatarPreview(null);
+      setAvatarCacheBuster(Date.now());
+
+      toast({
+        title: "Imagem atualizada",
+        description: "A foto do menu do usuario foi atualizada com sucesso",
+      });
+    } catch (error: unknown) {
+      toast({
+        title: "Erro ao atualizar imagem",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setAvatarSubmitting(false);
+    }
+  }
+
+  async function handleRemoveAvatar() {
+    if (!user?.avatarUrl) return;
+
+    try {
+      setAvatarSubmitting(true);
+      await api.patch("/users/profile/avatar/remove");
+
+      updateUser({ avatarUrl: null });
+      setAvatarFile(null);
+      setAvatarPreview(null);
+      setAvatarCacheBuster(Date.now());
+
+      toast({
+        title: "Imagem removida",
+        description: "Voltamos para a imagem padrao do tenant",
+      });
+    } catch (error: unknown) {
+      toast({
+        title: "Erro ao remover imagem",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setAvatarSubmitting(false);
+    }
+  }
+
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold flex items-center gap-2">
           <User className="h-8 w-8" />
           Meu Perfil
         </h1>
         <p className="text-muted-foreground mt-2">
-          Gerencie suas informações e configurações de segurança
+          Gerencie suas informacoes e configuracoes de seguranca
         </p>
       </div>
 
-      {/* Informações do Usuário */}
       <Card>
         <CardHeader>
-          <CardTitle>Informações Pessoais</CardTitle>
+          <CardTitle>Imagem do Menu de Usuario</CardTitle>
+          <CardDescription>
+            Esta imagem aparece no menu de usuario no TopBar
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="relative h-20 w-20 overflow-hidden rounded-full border bg-muted">
+              <Image
+                src={currentAvatarSrc}
+                alt="Avatar do usuario"
+                fill
+                className="object-cover"
+                unoptimized
+                onError={(e) => {
+                  e.currentTarget.src = tenantLogoFallbackSrc;
+                }}
+              />
+            </div>
+            <div className="text-sm text-muted-foreground">
+              <p>
+                {user?.avatarUrl
+                  ? "Imagem personalizada ativa"
+                  : "Sem imagem personalizada. Usando fallback do tenant."}
+              </p>
+              <p>Formatos aceitos: JPG, PNG, GIF e WEBP (maximo 5MB)</p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="avatar-upload">Selecionar nova imagem</Label>
+            <Input
+              id="avatar-upload"
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarFileChange}
+              disabled={avatarSubmitting}
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              onClick={handleUploadAvatar}
+              disabled={!avatarFile || avatarSubmitting}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              {avatarSubmitting ? "Enviando..." : "Salvar Imagem"}
+            </Button>
+
+            {user?.avatarUrl && (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleRemoveAvatar}
+                disabled={avatarSubmitting}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {avatarSubmitting ? "Removendo..." : "Remover Imagem"}
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Informacoes Pessoais</CardTitle>
           <CardDescription>
             Atualize seu nome e email
           </CardDescription>
@@ -282,7 +452,7 @@ export default function PerfilPage() {
                   </div>
                 </div>
                 <div>
-                  <Label>Função</Label>
+                  <Label>Funcao</Label>
                   <div className="flex items-center gap-2 mt-1">
                     <Shield className="h-4 w-4 text-muted-foreground" />
                     <span className="px-2 py-1 bg-primary/10 text-primary rounded text-sm">
@@ -300,7 +470,7 @@ export default function PerfilPage() {
                 )}
               </div>
               <Button onClick={() => setShowEditProfile(true)}>
-                Editar Informações
+                Editar Informacoes
               </Button>
             </div>
           ) : (
@@ -345,7 +515,7 @@ export default function PerfilPage() {
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={loading}>
-                  {loading ? "Salvando..." : "Salvar Alterações"}
+                  {loading ? "Salvando..." : "Salvar Alteracoes"}
                 </Button>
               </div>
             </form>
@@ -353,7 +523,6 @@ export default function PerfilPage() {
         </CardContent>
       </Card>
 
-      {/* Alterar Senha */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -429,11 +598,10 @@ export default function PerfilPage() {
         </CardContent>
       </Card>
 
-      {/* Editar Empresa (apenas para ADMIN) */}
       {user?.role === "ADMIN" && user?.tenant && (
         <Card>
           <CardHeader>
-            <CardTitle>Informações da Empresa</CardTitle>
+            <CardTitle>Informacoes da Empresa</CardTitle>
             <CardDescription>
               Gerencie os dados da sua empresa
             </CardDescription>
@@ -460,7 +628,7 @@ export default function PerfilPage() {
                     <Label>Telefone</Label>
                     <div className="flex items-center gap-2 mt-1">
                       <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span>{user.tenant.telefone || "Não informado"}</span>
+                      <span>{user.tenant.telefone || "Nao informado"}</span>
                     </div>
                   </div>
                 </div>
@@ -523,7 +691,7 @@ export default function PerfilPage() {
                     Cancelar
                   </Button>
                   <Button type="submit" disabled={loading}>
-                    {loading ? "Salvando..." : "Salvar Alterações"}
+                    {loading ? "Salvando..." : "Salvar Alteracoes"}
                   </Button>
                 </div>
               </form>
@@ -532,7 +700,6 @@ export default function PerfilPage() {
         </Card>
       )}
 
-      {/* 2FA Setup */}
       <TwoFactorSetup
         isEnabled={twoFactorEnabled}
         onStatusChange={loadUserData}
