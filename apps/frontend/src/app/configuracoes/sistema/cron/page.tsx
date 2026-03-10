@@ -86,6 +86,15 @@ type SaveError = {
   };
 };
 
+const cronModalPopoverClassName =
+  "rounded-[24px] border border-border/70 bg-popover/95 text-popover-foreground shadow-[0_20px_55px_-36px_rgba(15,23,42,0.35)] backdrop-blur-sm";
+const cronModalSurfaceClassName = "bg-background text-foreground";
+const cronModalChromeClassName = "border-border/70 bg-background/95 backdrop-blur-sm";
+const cronModalCardClassName =
+  "rounded-[28px] border border-border/70 bg-card/95 shadow-[0_20px_55px_-36px_rgba(15,23,42,0.28)] backdrop-blur-sm";
+const cronModalMutedCardClassName = "rounded-[22px] border border-border/70 bg-muted/30 shadow-sm";
+const cronModalFieldClassName = "border-border/70 bg-background/95 dark:bg-background/80";
+
 export default function CronJobsPage() {
   const { toast } = useToast();
   const [jobs, setJobs] = useState<CronJob[]>([]);
@@ -421,12 +430,15 @@ export default function CronJobsPage() {
                       </PopoverTrigger>
                       <PopoverContent
                         align="end"
-                        className="w-72 max-w-[calc(100vw-1.5rem)] rounded-[24px] border border-slate-200/90 bg-white p-2 text-slate-900 shadow-[0_20px_55px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800/90 dark:bg-slate-950 dark:text-slate-100"
+                        className={cn(
+                          "w-72 max-w-[calc(100vw-1.5rem)] p-2",
+                          cronModalPopoverClassName,
+                        )}
                       >
                         <div className="space-y-1">
                           <div className="px-2 py-1.5">
-                            <p className="text-sm font-medium text-slate-950 dark:text-slate-50">Acoes da tarefa</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                            <p className="text-sm font-medium">Acoes da tarefa</p>
+                            <p className="text-xs text-muted-foreground">
                               Operacoes rapidas para {presentation.label}
                             </p>
                           </div>
@@ -440,7 +452,7 @@ export default function CronJobsPage() {
                             <Settings2 className="mr-3 h-4 w-4 shrink-0" />
                             <span className="min-w-0 flex-1">
                               <span className="block break-words text-sm font-medium">Editar tarefa</span>
-                              <span className="block break-words text-xs text-slate-500 dark:text-slate-400">
+                              <span className="block break-words text-xs text-muted-foreground">
                                 Ajuste cronograma, modo simplificado e modo avancado.
                               </span>
                             </span>
@@ -459,7 +471,7 @@ export default function CronJobsPage() {
                             )}
                             <span className="min-w-0 flex-1">
                               <span className="block break-words text-sm font-medium">Executar agora</span>
-                              <span className="block break-words text-xs text-slate-500 dark:text-slate-400">
+                              <span className="block break-words text-xs text-muted-foreground">
                                 Dispara uma execucao manual imediata no runtime atual.
                               </span>
                             </span>
@@ -485,10 +497,10 @@ export default function CronJobsPage() {
       <Dialog open={Boolean(selectedJob)} onOpenChange={(open) => !open && closeDetails()}>
         <DialogContent className="inset-0 h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 overflow-hidden gap-0 rounded-none border-0 bg-transparent p-0 shadow-none sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[min(760px,100vw)] sm:max-w-[760px] sm:border-l-0 sm:p-0">
           {selectedJob && (
-            <div className="flex h-full min-h-0 flex-col bg-slate-100/95 text-slate-950 dark:bg-slate-950/98 dark:text-slate-50">
-              <DialogHeader className="shrink-0 border-b border-slate-200/80 bg-white/95 px-4 py-4 text-left backdrop-blur-sm dark:border-slate-800/80 dark:bg-slate-950/92 sm:px-6 sm:py-5">
+            <div className={cn("flex h-full min-h-0 flex-col", cronModalSurfaceClassName)}>
+              <DialogHeader className={cn("shrink-0 border-b px-4 py-4 text-left sm:px-6 sm:py-5", cronModalChromeClassName)}>
                 <div className="pr-8">
-                  <DialogTitle className="flex flex-wrap items-center gap-2 text-xl text-slate-950 dark:text-slate-50">
+                  <DialogTitle className="flex flex-wrap items-center gap-2 text-xl">
                     <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-sky-200/80 bg-sky-50/80 shadow-sm dark:border-sky-900/60 dark:bg-sky-950/30">
                       <Clock3 className="h-4 w-4 text-sky-700 dark:text-sky-300" />
                     </span>
@@ -498,7 +510,7 @@ export default function CronJobsPage() {
                     </Badge>
                     {renderStatusBadge(selectedJob)}
                   </DialogTitle>
-                  <DialogDescription className="mt-2 text-slate-600 dark:text-slate-300">
+                  <DialogDescription className="mt-2 text-muted-foreground">
                     {getCronTaskPresentation(selectedJob).description}
                   </DialogDescription>
                 </div>
@@ -508,23 +520,23 @@ export default function CronJobsPage() {
                 <div className="space-y-5">
                   <section className="space-y-3">
                     <div className="space-y-1">
-                      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                         Visao geral
                       </h2>
-                      <p className="text-sm text-slate-600 dark:text-slate-300">
+                      <p className="text-sm text-muted-foreground">
                         Leitura rapida da configuracao e do agendamento principal.
                       </p>
                     </div>
 
-                    <Card className="rounded-[28px] border border-sky-200/80 bg-gradient-to-br from-sky-50/92 via-white to-cyan-50/78 shadow-[0_20px_55px_-36px_rgba(15,23,42,0.35)] backdrop-blur-sm dark:border-sky-900/60 dark:bg-gradient-to-br dark:from-sky-950/28 dark:via-slate-950/96 dark:to-slate-900/92">
+                    <Card className={cronModalCardClassName}>
                       <CardContent className="space-y-3 p-4">
                         <div className="grid gap-3 sm:grid-cols-2">
                           <TaskDataItem label="Cronograma">
                             <div className="space-y-2">
-                              <p className="font-medium text-slate-950 dark:text-slate-50">
+                              <p className="font-medium">
                                 {describeCronSchedule(selectedJob.schedule).label}
                               </p>
-                              <code className="inline-flex break-all rounded-md bg-slate-100/90 px-2 py-1 font-mono text-[11px] text-slate-600 dark:bg-slate-900/90 dark:text-slate-300">
+                              <code className="inline-flex break-all rounded-md bg-muted/70 px-2 py-1 font-mono text-[11px] text-muted-foreground">
                                 {selectedJob.schedule}
                               </code>
                             </div>
@@ -544,15 +556,15 @@ export default function CronJobsPage() {
                           </TaskDataItem>
                         </div>
 
-                        <div className="rounded-[22px] border border-slate-200/80 bg-white/90 p-4 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/70">
-                          <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        <div className={cn("p-4", cronModalMutedCardClassName)}>
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">
                             Chave tecnica
                           </p>
-                          <code className="mt-2 inline-flex break-all rounded-md bg-slate-100 px-2 py-1 font-mono text-[11px] text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                          <code className="mt-2 inline-flex break-all rounded-md bg-muted px-2 py-1 font-mono text-[11px] text-muted-foreground">
                             {selectedJob.key}
                           </code>
                           {selectedJob.editable === false && (
-                            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                            <p className="mt-3 text-xs text-muted-foreground">
                               Esta tarefa usa um cronograma fixo, mas ainda pode ser ativada ou
                               pausada.
                             </p>
@@ -564,15 +576,15 @@ export default function CronJobsPage() {
 
                   <section className="space-y-3">
                     <div className="space-y-1">
-                      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                         Agenda e runtime
                       </h2>
-                      <p className="text-sm text-slate-600 dark:text-slate-300">
+                      <p className="text-sm text-muted-foreground">
                         Historico recente, heartbeat e sinais de divergencia do runtime atual.
                       </p>
                     </div>
 
-                    <Card className="rounded-[28px] border border-slate-200/80 bg-white/92 shadow-[0_20px_55px_-36px_rgba(15,23,42,0.28)] backdrop-blur-sm dark:border-slate-800/80 dark:bg-slate-900/72">
+                    <Card className={cronModalCardClassName}>
                       <CardContent className="space-y-4 p-4">
                         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                           <TaskDataItem label="Ultima execucao">
@@ -619,7 +631,7 @@ export default function CronJobsPage() {
                 </div>
               </div>
 
-              <DialogFooter className="shrink-0 border-t border-slate-200/80 bg-white/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-sm dark:border-slate-800/80 dark:bg-slate-950/92 sm:px-6 sm:pb-3">
+              <DialogFooter className={cn("shrink-0 border-t px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:pb-3", cronModalChromeClassName)}>
                 <Button variant="outline" onClick={closeDetails}>
                   Fechar
                 </Button>
@@ -632,46 +644,46 @@ export default function CronJobsPage() {
       <Dialog open={Boolean(editingJob && editorForm)} onOpenChange={(open) => !open && closeEditor()}>
         <DialogContent className="inset-0 h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 gap-0 rounded-none border-0 bg-transparent p-0 shadow-none sm:left-[50%] sm:top-[50%] sm:right-auto sm:bottom-auto sm:h-auto sm:max-h-[90dvh] sm:w-[min(860px,calc(100vw-2rem))] sm:max-w-[860px] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-[28px] sm:border-0 sm:p-0">
           {editingJob && editorForm && (
-            <div className="flex h-full max-h-dvh flex-col bg-slate-100/95 text-slate-950 shadow-[0_24px_60px_-38px_rgba(15,23,42,0.4)] dark:bg-slate-950/98 dark:text-slate-50 sm:max-h-[90dvh] sm:rounded-[28px] sm:border sm:border-slate-200/80 dark:sm:border-slate-800/80">
-              <DialogHeader className="border-b border-slate-200/80 bg-white/95 px-6 pb-4 pt-6 text-left backdrop-blur-sm dark:border-slate-800/80 dark:bg-slate-950/92">
-                <DialogTitle className="text-slate-950 dark:text-slate-50">Editar tarefa</DialogTitle>
-                <DialogDescription className="text-slate-600 dark:text-slate-300">
+            <div className={cn("flex h-full max-h-dvh flex-col shadow-[0_24px_60px_-38px_rgba(15,23,42,0.4)] sm:max-h-[90dvh] sm:rounded-[28px] sm:border", cronModalSurfaceClassName, "sm:border-border/70")}>
+              <DialogHeader className={cn("border-b px-6 pb-4 pt-6 text-left", cronModalChromeClassName)}>
+                <DialogTitle>Editar tarefa</DialogTitle>
+                <DialogDescription className="text-muted-foreground">
                   Ajuste o cronograma, confirme a proxima execucao e aplique as alteracoes no runtime.
                 </DialogDescription>
               </DialogHeader>
 
               <div className="flex-1 overflow-y-auto px-6 pb-6">
                 <div className="space-y-6">
-                <div className="grid gap-3 rounded-[28px] border border-sky-200/80 bg-gradient-to-br from-sky-50/92 via-white to-cyan-50/78 p-4 shadow-[0_20px_55px_-36px_rgba(15,23,42,0.35)] dark:border-sky-900/60 dark:bg-gradient-to-br dark:from-sky-950/28 dark:via-slate-950/96 dark:to-slate-900/92 md:grid-cols-[1.4fr,1fr]">
+                <div className={cn("grid gap-3 p-4 md:grid-cols-[1.4fr,1fr]", cronModalCardClassName)}>
                   <div className="space-y-2">
-                    <Label className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                       Nome amigavel
                     </Label>
-                    <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">
+                    <p className="text-sm font-semibold">
                       {getCronTaskPresentation(editingJob).label}
                     </p>
-                    <p className="text-sm text-slate-600 dark:text-slate-300">
+                    <p className="text-sm text-muted-foreground">
                       {getCronTaskPresentation(editingJob).description}
                     </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="text-xs text-muted-foreground">
                       Esse nome e apenas a identificacao amigavel exibida na interface. A chave tecnica abaixo continua fixa.
                     </p>
                   </div>
 
                   <div className="space-y-3">
                     <div className="space-y-2">
-                      <Label className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                         Chave tecnica
                       </Label>
-                      <code className="inline-flex rounded-md bg-white/85 px-2 py-1 font-mono text-[11px] text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                      <code className="inline-flex rounded-md bg-muted px-2 py-1 font-mono text-[11px] text-muted-foreground">
                         {editingJob.key}
                       </code>
                     </div>
 
-                    <div className="flex items-center justify-between rounded-[22px] border border-slate-200/80 bg-white/85 px-3 py-3 shadow-sm dark:border-slate-800/80 dark:bg-slate-950/45">
+                    <div className={cn("flex items-center justify-between px-3 py-3", cronModalMutedCardClassName)}>
                       <div className="space-y-1">
-                        <p className="text-sm font-medium text-slate-950 dark:text-slate-50">Tarefa ativa</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                        <p className="text-sm font-medium">Tarefa ativa</p>
+                        <p className="text-xs text-muted-foreground">
                           Desative apenas quando a rotina nao deve mais executar automaticamente.
                         </p>
                       </div>
@@ -723,7 +735,7 @@ export default function CronJobsPage() {
                       Esta tarefa usa um cronograma fixo. Voce ainda pode ativar ou pausar a execucao.
                     </div>
                   ) : editorForm.mode === "simple" ? (
-                    <div className="grid gap-3 rounded-[28px] border border-slate-200/80 bg-white/92 p-4 shadow-[0_20px_55px_-36px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-slate-900/72 md:grid-cols-2">
+                    <div className={cn("grid gap-3 p-4 md:grid-cols-2", cronModalCardClassName)}>
                         <div className="space-y-2 md:col-span-2">
                           <Label htmlFor="cron-preset">Frequencia</Label>
                           <Select
@@ -736,10 +748,10 @@ export default function CronJobsPage() {
                               }))
                             }
                           >
-                            <SelectTrigger id="cron-preset" className="border-slate-200/80 bg-white/90 dark:border-slate-800/80 dark:bg-slate-900/70">
+                            <SelectTrigger id="cron-preset" className={cronModalFieldClassName}>
                               <SelectValue placeholder="Selecione a frequencia" />
                             </SelectTrigger>
-                            <SelectContent className="border-slate-200/80 bg-white/95 dark:border-slate-800/80 dark:bg-slate-950/95">
+                            <SelectContent className={cn("backdrop-blur-sm", cronModalPopoverClassName)}>
                               {CRON_PRESET_OPTIONS.map((option) => (
                                 <SelectItem key={option.value} value={option.value}>
                                   {option.label}
@@ -811,10 +823,10 @@ export default function CronJobsPage() {
                                 updateEditorForm((current) => ({ ...current, weekday: value }))
                               }
                             >
-                              <SelectTrigger id="cron-weekday" className="border-slate-200/80 bg-white/90 dark:border-slate-800/80 dark:bg-slate-900/70">
+                              <SelectTrigger id="cron-weekday" className={cronModalFieldClassName}>
                                 <SelectValue placeholder="Selecione o dia" />
                               </SelectTrigger>
-                              <SelectContent className="border-slate-200/80 bg-white/95 dark:border-slate-800/80 dark:bg-slate-950/95">
+                              <SelectContent className={cn("backdrop-blur-sm", cronModalPopoverClassName)}>
                                 {CRON_WEEKDAY_OPTIONS.map((option) => (
                                   <SelectItem key={option.value} value={option.value}>
                                     {option.label}
@@ -841,7 +853,7 @@ export default function CronJobsPage() {
                         )}
                       </div>
                   ) : (
-                    <div className="space-y-2 rounded-[28px] border border-slate-200/80 bg-white/92 p-4 shadow-[0_20px_55px_-36px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-slate-900/72">
+                    <div className={cn("space-y-2 p-4", cronModalCardClassName)}>
                       <Label htmlFor="cron-expression">Expressao cron</Label>
                       <Input
                           id="cron-expression"
@@ -852,20 +864,20 @@ export default function CronJobsPage() {
                               expression: event.target.value,
                             }))
                           }
-                          className="border-slate-200/80 bg-white/90 font-mono dark:border-slate-800/80 dark:bg-slate-900/70"
+                          className={cn("font-mono", cronModalFieldClassName)}
                           placeholder="Ex: 0 */6 * * *"
                         />
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-muted-foreground">
                         Use o modo avancado apenas quando o formato simplificado nao cobrir o caso.
                       </p>
                     </div>
                   )}
                 </div>
 
-                <div className="rounded-[28px] border border-slate-200/80 bg-white/92 p-4 shadow-[0_20px_55px_-36px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-slate-900/72">
+                <div className={cn("p-4", cronModalCardClassName)}>
                   <div className="grid gap-3 md:grid-cols-3">
                     <TaskDataItem label="Expressao final">
-                      <code className="font-mono text-[11px] text-slate-600 dark:text-slate-300">{finalSchedule || "-"}</code>
+                      <code className="font-mono text-[11px] text-muted-foreground">{finalSchedule || "-"}</code>
                     </TaskDataItem>
                     <TaskDataItem label="Descricao">
                       {finalSchedule ? humanizeCronExpression(finalSchedule) : "-"}
@@ -885,7 +897,7 @@ export default function CronJobsPage() {
                 </div>
               </div>
 
-              <DialogFooter className="border-t border-slate-200/80 bg-white/95 px-6 py-4 backdrop-blur-sm dark:border-slate-800/80 dark:bg-slate-950/92">
+              <DialogFooter className={cn("border-t px-6 py-4", cronModalChromeClassName)}>
                 <Button type="button" variant="outline" onClick={closeEditor} disabled={savingKey === editingJob.key}>
                   Cancelar
                 </Button>
@@ -938,9 +950,12 @@ function TaskInfoPopover({ description }: { description: string }) {
           <Info className="h-4 w-4" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 max-w-[calc(100vw-1.5rem)] space-y-2 rounded-[24px] border border-slate-200/90 bg-white p-4 text-slate-900 shadow-[0_20px_55px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800/90 dark:bg-slate-950 dark:text-slate-100">
-        <p className="text-sm font-medium text-slate-950 dark:text-slate-50">Sobre esta tarefa</p>
-        <p className="break-words text-sm leading-relaxed text-slate-600 dark:text-slate-300">{description}</p>
+      <PopoverContent
+        align="start"
+        className={cn("w-80 max-w-[calc(100vw-1.5rem)] space-y-2 p-4", cronModalPopoverClassName)}
+      >
+        <p className="text-sm font-medium">Sobre esta tarefa</p>
+        <p className="break-words text-sm leading-relaxed text-muted-foreground">{description}</p>
       </PopoverContent>
     </Popover>
   );
@@ -954,9 +969,9 @@ function TaskDataItem({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-[18px] border border-slate-200/80 bg-white/82 px-3 py-2.5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/72">
-      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</p>
-      <div className="min-w-0 break-words text-sm text-slate-900 dark:text-slate-100">{children}</div>
+    <div className="rounded-[18px] border border-border/70 bg-muted/30 px-3 py-2.5 shadow-sm">
+      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <div className="min-w-0 break-words text-sm text-foreground">{children}</div>
     </div>
   );
 }
@@ -986,7 +1001,7 @@ function NumberField({
         min={min}
         max={max}
         value={value}
-        className="border-slate-200/80 bg-white/90 dark:border-slate-800/80 dark:bg-slate-900/70"
+        className={cronModalFieldClassName}
         onChange={(event) => onChange(sanitizeNumberInput(event.target.value, min, max))}
       />
     </div>
