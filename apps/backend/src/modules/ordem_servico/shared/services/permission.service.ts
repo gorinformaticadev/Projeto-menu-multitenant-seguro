@@ -16,11 +16,23 @@ import {
 } from '../interfaces/permission.interface';
 import { AVAILABLE_PERMISSIONS } from '../constants/available-permissions';
 
+type ModuleProfile = 'admin' | 'technician' | 'attendant';
+
 @Injectable()
 export class PermissionService implements IPermissionService {
   private readonly logger = new Logger(PermissionService.name);
   private permissionCache = new Map<string, UserPermission[]>();
   private readonly CACHE_TTL = 5 * 60 * 1000;
+  private readonly profilePermissionCache = new Map<string, Record<string, Record<ModuleProfile, boolean>>>();
+  private readonly PROFILE_CACHE_TTL = 5 * 60 * 1000;
+
+  private readonly LEGACY_PROFILE_PERMISSION_MAP: Record<string, string> = {
+    dashboard_export: 'dashboard_view_statistics',
+    orders_assign: 'orders_change_status',
+    config_users: 'config_manage_permissions',
+    config_permissions: 'config_manage_permissions',
+    config_system: 'config_edit',
+  };
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -30,13 +42,10 @@ export class PermissionService implements IPermissionService {
 
     const cacheKey = `${tenantId}:${userId}`;
     if (this.permissionCache.has(cacheKey)) {
-      this.logger.log(`Permissoes encontradas no cache para usuario ${userId}`);
       return this.permissionCache.get(cacheKey)!;
     }
 
     try {
-      this.logger.log(`Buscando permissoes para usuario ${userId} no tenant ${tenantId}`);
-
       const permissions = await this.prisma.$queryRawUnsafe<any[]>(
         `SELECT
           id, user_id, tenant_id, resource, action, allowed,
@@ -65,7 +74,6 @@ export class PermissionService implements IPermissionService {
         this.permissionCache.delete(cacheKey);
       }, this.CACHE_TTL);
 
-      this.logger.log(`Permissoes carregadas para usuario ${userId}: ${userPermissions.length}`);
       return userPermissions;
     } catch (error) {
       this.logger.error(`Erro ao buscar permissoes do usuario ${userId}`, error as Error);
@@ -86,8 +94,6 @@ export class PermissionService implements IPermissionService {
       if (targetUser.role === 'ADMIN' || targetUser.role === 'SUPER_ADMIN') {
         throw new ForbiddenException('Permissoes explicitas nao podem sobrescrever papeis administrativos');
       }
-
-      this.logger.log(`Atualizando ${permissions.length} permissoes para usuario ${userId}`);
 
       const currentPermissions = await this.getUserPermissions(tenantId, userId);
 
@@ -145,7 +151,7 @@ export class PermissionService implements IPermissionService {
       }
 
       this.permissionCache.delete(`${tenantId}:${userId}`);
-      this.logger.log(`Permissoes atualizadas com sucesso para usuario ${userId}`);
+      this.profilePermissionCache.delete(tenantId);
     } catch (error) {
       this.logger.error(`Erro ao atualizar permissoes do usuario ${userId}`, error as Error);
       throw error;
@@ -155,22 +161,43 @@ export class PermissionService implements IPermissionService {
   async hasPermission(tenantId: string, userId: string, resource: string, action: string): Promise<boolean> {
     try {
       const users = await this.prisma.$queryRawUnsafe<any[]>(
-        `SELECT role, name, email FROM users WHERE id = $1`,
+        `SELECT role, name, email
+         FROM users
+         WHERE id = $1 AND "tenantId" = $2`,
         userId,
+        tenantId,
       );
 
       const user = users[0];
-      if (user && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN')) {
-        this.logger.log(`Bypass admin para ${resource}:${action} por ${user.email}`);
+      if (!user) {
+        return false;
+      }
+
+      if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
         return true;
       }
 
       const permissions = await this.getUserPermissions(tenantId, userId);
-      const permission = permissions.find((item) => item.resource === resource && item.action === action);
-      const hasAccess = permission?.allowed || false;
+      const explicitPermission = permissions.find(
+        (item) => item.resource === resource && item.action === action,
+      );
+
+      if (explicitPermission) {
+        if (!explicitPermission.allowed) {
+          await this.logAccessDenied(tenantId, userId, resource, action);
+        }
+        return explicitPermission.allowed;
+      }
+
+      const permissionKey = this.buildProfilePermissionKey(resource, action);
+      const profilePermissions = await this.getProfilePermissionsMatrix(tenantId);
+      const userProfiles = await this.resolveUserProfiles(tenantId, userId);
+      const permissionConfig = profilePermissions[permissionKey];
+      const hasAccess = permissionConfig
+        ? userProfiles.some((profile) => permissionConfig[profile] === true)
+        : false;
 
       if (!hasAccess) {
-        this.logger.warn(`Acesso negado para usuario ${userId} em ${resource}:${action}`);
         await this.logAccessDenied(tenantId, userId, resource, action);
       }
 
@@ -188,39 +215,48 @@ export class PermissionService implements IPermissionService {
   async getUsersWithPermissions(tenantId: string): Promise<UserWithPermissions[]> {
     try {
       await this.assertTenantContext(tenantId);
-      this.logger.log(`Buscando usuarios com permissoes para tenant ${tenantId}`);
 
       const users = await this.prisma.$queryRawUnsafe<any[]>(
         `SELECT id, name, email, role
          FROM users
-         WHERE tenant_id = $1
+         WHERE "tenantId" = $1
          ORDER BY name ASC`,
         tenantId,
+      );
+
+      const allPermissionActions = AVAILABLE_PERMISSIONS.flatMap((group) =>
+        group.actions.map((action) => ({ resource: group.resource, action: action.action })),
       );
 
       const usersWithPermissions: UserWithPermissions[] = [];
 
       for (const user of users) {
         const permissions = await this.getUserPermissions(tenantId, user.id);
+        const totalAvailablePermissions = allPermissionActions.length;
 
-        let permissionSummary;
         if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
-          const totalAvailablePermissions = AVAILABLE_PERMISSIONS.reduce(
-            (total, group) => total + group.actions.length,
-            0,
-          );
+          usersWithPermissions.push({
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            permissions,
+            permissionSummary: {
+              total: totalAvailablePermissions,
+              allowed: totalAvailablePermissions,
+              denied: 0,
+            },
+          });
+          continue;
+        }
 
-          permissionSummary = {
-            total: totalAvailablePermissions,
-            allowed: totalAvailablePermissions,
-            denied: 0,
-          };
-        } else {
-          permissionSummary = {
-            total: permissions.length,
-            allowed: permissions.filter((item) => item.allowed).length,
-            denied: permissions.filter((item) => !item.allowed).length,
-          };
+        let allowed = 0;
+        for (const permission of allPermissionActions) {
+          // eslint-disable-next-line no-await-in-loop
+          const granted = await this.hasPermission(tenantId, user.id, permission.resource, permission.action);
+          if (granted) {
+            allowed += 1;
+          }
         }
 
         usersWithPermissions.push({
@@ -229,7 +265,11 @@ export class PermissionService implements IPermissionService {
           email: user.email,
           role: user.role,
           permissions,
-          permissionSummary,
+          permissionSummary: {
+            total: totalAvailablePermissions,
+            allowed,
+            denied: totalAvailablePermissions - allowed,
+          },
         });
       }
 
@@ -351,6 +391,152 @@ export class PermissionService implements IPermissionService {
   private async assertTenantContext(tenantId: string): Promise<void> {
     if (!tenantId) {
       throw new BadRequestException('Operacao exige tenant valido');
+    }
+  }
+
+  private buildProfilePermissionKey(resource: string, action: string): string {
+    return `${String(resource || '').trim()}_${String(action || '').trim()}`;
+  }
+
+  private normalizeProfilePermissionKey(rawKey: string): string {
+    const key = String(rawKey || '').trim();
+    return this.LEGACY_PROFILE_PERMISSION_MAP[key] || key;
+  }
+
+  private getDefaultProfilePermissions(): Record<string, Record<ModuleProfile, boolean>> {
+    const defaults: Record<string, Record<ModuleProfile, boolean>> = {};
+
+    const technicianDefaults = new Set<string>([
+      'dashboard_view',
+      'dashboard_view_statistics',
+      'orders_view',
+      'orders_view_details',
+      'orders_create',
+      'orders_edit',
+      'orders_change_status',
+      'orders_view_history',
+      'clients_view',
+      'clients_view_details',
+      'clients_create',
+      'clients_edit',
+      'clients_upload_images',
+      'products_view',
+      'products_create',
+      'products_edit',
+      'products_upload_images',
+      'config_view',
+    ]);
+
+    const attendantDefaults = new Set<string>([
+      'dashboard_view',
+      'orders_view',
+      'orders_view_details',
+      'orders_create',
+      'clients_view',
+      'clients_view_details',
+      'clients_create',
+      'clients_edit',
+      'clients_upload_images',
+      'products_view',
+      'products_create',
+      'products_edit',
+      'products_upload_images',
+    ]);
+
+    for (const group of AVAILABLE_PERMISSIONS) {
+      for (const action of group.actions) {
+        const key = this.buildProfilePermissionKey(group.resource, action.action);
+        defaults[key] = {
+          admin: true,
+          technician: technicianDefaults.has(key),
+          attendant: attendantDefaults.has(key),
+        };
+      }
+    }
+
+    return defaults;
+  }
+
+  private async getProfilePermissionsMatrix(
+    tenantId: string,
+  ): Promise<Record<string, Record<ModuleProfile, boolean>>> {
+    const cached = this.profilePermissionCache.get(tenantId);
+    if (cached) {
+      return cached;
+    }
+
+    const defaults = this.getDefaultProfilePermissions();
+
+    try {
+      const rows = await this.prisma.$queryRawUnsafe<any[]>(
+        `SELECT tenant_id, profile, permission_id, allowed
+         FROM mod_ordem_servico_profile_permissions
+         WHERE tenant_id = $1 OR tenant_id = 'default'
+         ORDER BY CASE WHEN tenant_id = 'default' THEN 0 ELSE 1 END, profile ASC, permission_id ASC`,
+        tenantId,
+      );
+
+      const merged: Record<string, Record<ModuleProfile, boolean>> = { ...defaults };
+
+      for (const row of rows) {
+        const key = this.normalizeProfilePermissionKey(String(row.permission_id || ''));
+        if (!key) {
+          continue;
+        }
+
+        if (!merged[key]) {
+          merged[key] = { admin: true, technician: false, attendant: false };
+        }
+
+        const profile = String(row.profile || '').toLowerCase();
+        if (profile === 'admin' || profile === 'technician' || profile === 'attendant') {
+          merged[key][profile] = Boolean(row.allowed);
+        }
+      }
+
+      this.profilePermissionCache.set(tenantId, merged);
+      setTimeout(() => {
+        this.profilePermissionCache.delete(tenantId);
+      }, this.PROFILE_CACHE_TTL);
+
+      return merged;
+    } catch (error) {
+      this.logger.error(
+        `Erro ao carregar permissoes por perfil do tenant ${tenantId}. Usando defaults.`,
+        error as Error,
+      );
+      return defaults;
+    }
+  }
+
+  private async resolveUserProfiles(tenantId: string, userId: string): Promise<ModuleProfile[]> {
+    try {
+      const roles = await this.prisma.$queryRawUnsafe<any[]>(
+        `SELECT is_admin, is_technician, is_attendant
+         FROM mod_ordem_servico_user_roles
+         WHERE tenant_id = $1 AND user_id = $2
+         LIMIT 1`,
+        tenantId,
+        userId,
+      );
+
+      const role = roles[0];
+      if (!role) {
+        return ['attendant'];
+      }
+
+      const profiles: ModuleProfile[] = [];
+      if (Boolean(role.is_admin)) profiles.push('admin');
+      if (Boolean(role.is_technician)) profiles.push('technician');
+      if (Boolean(role.is_attendant) || profiles.length === 0) profiles.push('attendant');
+
+      return profiles;
+    } catch (error) {
+      this.logger.error(
+        `Erro ao resolver perfis do usuario ${userId} no tenant ${tenantId}. Aplicando fallback.`,
+        error as Error,
+      );
+      return ['attendant'];
     }
   }
 

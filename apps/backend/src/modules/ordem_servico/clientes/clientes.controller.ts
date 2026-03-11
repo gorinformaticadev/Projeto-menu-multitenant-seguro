@@ -88,7 +88,7 @@ export class ClientesController {
   }
 
   @Post('upload')
-  @RequireClientsPermission('edit')
+  @RequireClientsPermission('upload_images')
   @UseInterceptors(FileInterceptor('file', ORDEM_SERVICO_UPLOAD_OPTIONS))
   async uploadFile(@UploadedFile() file: Express.Multer.File, @Req() req: ExpressRequest & { user: any }) {
     try {

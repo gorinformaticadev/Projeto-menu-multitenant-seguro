@@ -42,7 +42,7 @@ import {
 } from '../shared/dto/ordem-servico.dto';
 
 @Controller('ordem_servico/ordens')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class OrdensController {
     private readonly logger = new Logger(OrdensController.name);
 
@@ -51,6 +51,7 @@ export class OrdensController {
     }
 
     @Get()
+    @RequireOrdersPermission('view')
     async findAll(
         @Req() req: ExpressRequest & { user: any },
         @Query() filters: OrdemServicoFilters
@@ -74,6 +75,7 @@ export class OrdensController {
     }
 
     @Get('dashboard')
+    @RequireOrdersPermission('view')
     async getDashboardData(@Req() req: ExpressRequest & { user: any }): Promise<DashboardDataResponseDTO[]> {
         try {
             this.logger.log(`Buscando dados do dashboard. Tenant: ${req.user?.tenantId}`);
@@ -85,6 +87,7 @@ export class OrdensController {
     }
 
     @Get('tipos-servico')
+    @RequireOrdersPermission('view')
     async getTiposServico(@Req() req: ExpressRequest & { user: any }): Promise<TipoServicoResponseDTO[]> {
         try {
             this.logger.log(`Buscando tipos de serviço. Tenant: ${req.user?.tenantId}`);
@@ -96,6 +99,7 @@ export class OrdensController {
     }
 
     @Get('tipos-equipamento')
+    @RequireOrdersPermission('view')
     async getTiposEquipamento(@Req() req: ExpressRequest & { user: any }): Promise<TipoEquipamentoResponseDTO[]> {
         try {
             this.logger.log(`Buscando tipos de equipamento. Tenant: ${req.user?.tenantId}`);
@@ -107,6 +111,7 @@ export class OrdensController {
     }
 
     @Get('technicians')
+    @RequireOrdersPermission('view')
     async getTechnicians(@Req() req: ExpressRequest & { user: any }): Promise<TechnicianResponseDTO[]> {
         try {
             this.logger.log(`Buscando técnicos. Tenant: ${req.user?.tenantId}`);
@@ -119,6 +124,7 @@ export class OrdensController {
 
     // IMPORTANTE: Rota estática DEVE vir antes de rotas com parâmetros (:id)
     @Get('alertas-retirada')
+    @RequireOrdersPermission('view')
     async getAlertasRetirada(
         @Req() req: ExpressRequest & { user: any }
     ): Promise<AlertaRetiradaResponseDTO> {
@@ -132,6 +138,7 @@ export class OrdensController {
     }
 
     @Get(':id')
+    @RequireOrdersPermission('view_details')
     async findOne(
         @Req() req: ExpressRequest & { user: any },
         @Param('id') id: string
@@ -152,6 +159,7 @@ export class OrdensController {
     }
 
     @Get(':id/historico')
+    @RequireOrdersPermission('view_history')
     async getHistorico(
         @Req() req: ExpressRequest & { user: any },
         @Param('id') id: string
@@ -166,6 +174,7 @@ export class OrdensController {
     }
 
     @Get(':id/pdf')
+    @RequireOrdersPermission('view_details')
     async downloadPdf(
         @Req() req: ExpressRequest & { user: any },
         @Param('id') id: string,
@@ -190,6 +199,7 @@ export class OrdensController {
     }
 
     @Post()
+    @RequireOrdersPermission('create')
     @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
     async create(
         @Req() req: ExpressRequest & { user: any },
@@ -212,6 +222,7 @@ export class OrdensController {
     }
 
     @Put(':id')
+    @RequireOrdersPermission('edit')
     @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
     async update(
         @Req() req: ExpressRequest & { user: any },
@@ -240,6 +251,7 @@ export class OrdensController {
     }
 
     @Put(':id/status')
+    @RequireOrdersPermission('change_status')
     @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
     async updateStatus(
         @Req() req: ExpressRequest & { user: any },
@@ -291,6 +303,7 @@ export class OrdensController {
     }
 
     @Delete(':id')
+    @RequireOrdersPermission('delete')
     async remove(
         @Req() req: ExpressRequest & { user: any },
         @Param('id') id: string
@@ -317,6 +330,7 @@ export class OrdensController {
     }
 
     @Post(':id/aprovar-orcamento')
+    @RequireOrdersPermission('approve_budget')
     async aprovarOrcamento(
         @Req() req: ExpressRequest & { user: any },
         @Param('id') id: string
@@ -384,7 +398,7 @@ export class OrdensController {
 
     @Get('uploads/:tenantId/*filePath')
     @UseGuards(PermissionGuard)
-    @RequireOrdersPermission('view')
+    @RequireOrdersPermission('view_details')
     async serveFile(
         @Param('filePath') filePath: string | string[],
         @Param('tenantId') tenantId: string,
@@ -515,6 +529,7 @@ export class OrdensController {
     // ============================================
 
     @Get(':id/status-historico')
+    @RequireOrdersPermission('view_history')
     async getStatusHistorico(
         @Req() req: ExpressRequest & { user: any },
         @Param('id') id: string
@@ -533,6 +548,7 @@ export class OrdensController {
     // ============================================
 
     @Get(':id/conservacao')
+    @RequireOrdersPermission('view_details')
     async getConservacao(
         @Req() req: ExpressRequest & { user: any },
         @Param('id') id: string
@@ -547,6 +563,7 @@ export class OrdensController {
     }
 
     @Put(':id/conservacao')
+    @RequireOrdersPermission('edit')
     @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
     async atualizarConservacao(
         @Req() req: ExpressRequest & { user: any },
@@ -573,6 +590,7 @@ export class OrdensController {
     // ============================================
 
     @Get(':id/pagamentos')
+    @RequireOrdersPermission('view_details')
     async getPagamentos(
         @Req() req: ExpressRequest & { user: any },
         @Param('id') id: string
@@ -587,6 +605,7 @@ export class OrdensController {
     }
 
     @Post(':id/retirada')
+    @RequireOrdersPermission('change_status')
     @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
     async registrarRetirada(
         @Req() req: ExpressRequest & { user: any },
@@ -619,6 +638,7 @@ export class OrdensController {
     // ============================================
 
     @Get(':id/alertas-abandono')
+    @RequireOrdersPermission('view_history')
     async getAlertasAbandono(
         @Req() req: ExpressRequest & { user: any },
         @Param('id') id: string
@@ -633,6 +653,7 @@ export class OrdensController {
     }
 
     @Post(':id/alertas-abandono')
+    @RequireOrdersPermission('edit')
     @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
     async registrarAlertaAbandono(
         @Req() req: ExpressRequest & { user: any },
@@ -661,6 +682,7 @@ export class OrdensController {
     }
 
     @Post(':id/alertas-abandono/:alertaId/anexos')
+    @RequireOrdersPermission('edit')
     @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
     async registrarAnexoAlerta(
         @Req() req: ExpressRequest & { user: any },
@@ -678,6 +700,7 @@ export class OrdensController {
     }
 
     @Post(':id/marcar-abandonado')
+    @RequireOrdersPermission('change_status')
     @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
     async marcarComoAbandonado(
         @Req() req: ExpressRequest & { user: any },

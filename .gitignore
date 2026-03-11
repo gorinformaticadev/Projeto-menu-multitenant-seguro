@@ -159,3 +159,9 @@ uploads/tenants/76072661-7548-4490-a095-b636e2f92788/users/3c6adb53-2ba6-4e79-9a
 /uploads/tenants/76072661-7548-4490-a095-b636e2f92788/modules/ordem_servico
 /apps/backend/src/modules/ordem_servico
 /apps/backend/src/modules/ordem_servico
+apps/backend/src/modules/ordem_servico/ordens/ordens.controller.ts
+/apps/backend/src/modules/ordem_servico
+apps/backend/src/modules/ordem_servico/clientes/clientes.controller.ts
+apps/backend/src/modules/ordem_servico/ordens/ordens.controller.ts
+apps/backend/src/modules/ordem_servico/shared/controllers/permission.controller.ts
+apps/backend/src/modules/ordem_servico/shared/services/permission.service.ts

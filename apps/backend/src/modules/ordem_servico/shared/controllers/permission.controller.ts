@@ -5,6 +5,7 @@ import {
   Get,
   Logger,
   Param,
+  Query,
   Put,
   Req,
   UseGuards,
@@ -100,15 +101,39 @@ export class PermissionController {
     }
   }
 
+  @Get('check/:resource/:action')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.USER, Role.CLIENT)
+  async checkPermission(
+    @Req() req: ExpressRequest & { user: PermissionRequestUser },
+    @Param('resource') resource: string,
+    @Param('action') action: string,
+  ) {
+    const hasPermission = await this.permissionService.hasPermission(
+      req.user.tenantId || '',
+      req.user.id,
+      resource,
+      action,
+    );
+
+    return { hasPermission };
+  }
+
   @Get('audit')
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   async getPermissionAudit(
     @Req() req: ExpressRequest & { user: PermissionRequestUser },
-    @Param('userId') userId?: string,
+    @Query('userId') userId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
     try {
       this.logger.log(`Buscando auditoria de permissoes. Tenant: ${req.user?.tenantId}`);
-      return await this.permissionService.getPermissionAudit(req.user.tenantId || '', userId);
+      return await this.permissionService.getPermissionAudit(
+        req.user.tenantId || '',
+        userId,
+        startDate ? new Date(startDate) : undefined,
+        endDate ? new Date(endDate) : undefined,
+      );
     } catch (error) {
       this.logger.error('Erro ao buscar auditoria de permissoes', error as Error);
       throw error;
