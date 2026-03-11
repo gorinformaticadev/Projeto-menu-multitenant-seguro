@@ -25,7 +25,7 @@ export function PlatformConfigProvider({ children }: { children: ReactNode }) {
 
       // Cache simples para evitar múltiplas chamadas
       const cacheKey = 'platform-config-cache';
-      const cacheTTL = 5 * 60 * 1000; // 5 minutos
+      const cacheTTL = 60 * 1000; // 1 minuto (reduzido para atualização mais rápida)
       const cached = localStorage.getItem(cacheKey);
 
       if (cached) {
@@ -92,12 +92,36 @@ export function PlatformConfigProvider({ children }: { children: ReactNode }) {
     await fetchConfig();
   };
 
-  // Update document title when config changes
+  // Update document title and favicon when config changes
   useEffect(() => {
-    if (!loading && config.platformName) {
-      document.title = config.platformName;
+    if (!loading && config) {
+      // Atualizar título
+      if (config.platformName) {
+        document.title = config.platformName;
+      }
+
+      // Atualizar favicon se houver URL
+      if (config.platformLogoUrl) {
+        const updateFavicon = (url: string) => {
+          let link = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
+          if (!link) {
+            link = document.createElement('link');
+            link.rel = 'icon';
+            document.head.appendChild(link);
+          }
+          link.href = url;
+
+          // Atualizar outros tamanhos de ícone se existirem
+          const iconLinks = document.querySelectorAll("link[rel='icon']");
+          iconLinks.forEach(iconLink => {
+            (iconLink as HTMLLinkElement).href = url;
+          });
+        };
+
+        updateFavicon(config.platformLogoUrl);
+      }
     }
-  }, [config.platformName, loading]);
+  }, [config, loading]);
 
   return (
     <PlatformConfigContext.Provider value={{
