@@ -83,7 +83,7 @@ export class ModuleInstallerController {
             fileSize: 50 * 1024 * 1024,
         }
     }))
-    async uploadModule(@UploadedFile() file: Express.Multer.File, @Request() req) {
+    async uploadModule(@UploadedFile() file: Express.Multer.File, @Request() req): Promise<unknown> {
         this.ensureMutableModuleOpsAllowed();
 
         if (!file) {

@@ -13,7 +13,18 @@ interface SystemModule {
   name: string;
   version: string;
   description: string | null;
-  status: 'detected' | 'installed' | 'db_ready' | 'active' | 'disabled' | 'corrupted';
+  status:
+    | 'detected'
+    | 'installed'
+    | 'uploaded'
+    | 'pending_dependencies'
+    | 'dependencies_installed'
+    | 'dependency_conflict'
+    | 'db_ready'
+    | 'ready'
+    | 'active'
+    | 'disabled'
+    | 'corrupted';
   hasBackend: boolean;
   hasFrontend: boolean;
   installedAt: string;

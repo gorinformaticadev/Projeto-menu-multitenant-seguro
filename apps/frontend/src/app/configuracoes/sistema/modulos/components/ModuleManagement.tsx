@@ -165,8 +165,24 @@ function getLifecycleSummaryText(module: InstalledModule) {
     return module.lifecycle.blockers[0];
   }
 
+  if (module.lifecycle.current === "dependency_conflict") {
+    return "Existem conflitos de dependencias NPM que bloqueiam a ativacao.";
+  }
+
+  if (module.lifecycle.current === "pending_dependencies") {
+    return "Dependencias NPM ainda pendentes para este modulo.";
+  }
+
+  if (module.lifecycle.current === "dependencies_installed") {
+    return "Dependencias instaladas. Falta preparar o banco do modulo.";
+  }
+
   if (module.lifecycle.current === "active") {
     return "Modulo operacional e disponivel para ativacao por tenant.";
+  }
+
+  if (module.lifecycle.current === "ready") {
+    return "Modulo pronto para ativacao global.";
   }
 
   if (module.lifecycle.current === "db_ready") {
@@ -904,8 +920,9 @@ export function ModuleManagement() {
                     opcionais
                   </p>
                   <p>
-                    - <code className="rounded bg-muted px-1">package.json</code> - dependencias
-                    opcionais
+                    - <code className="rounded bg-muted px-1">npmDependencies</code> dentro do{" "}
+                    <code className="rounded bg-muted px-1">module.json</code> para declarar
+                    dependencias NPM de backend/frontend
                   </p>
                   <p>- Demais arquivos do modulo, como componentes e assets.</p>
                 </div>
@@ -1346,6 +1363,83 @@ export function ModuleManagement() {
                                       : "Validacao estrutural realizada no filesystem do frontend."}
                                 </p>
                               </div>
+                            </div>
+
+                            <div className="rounded-2xl border bg-muted/20 p-4">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-sm font-medium">Dependencias NPM declaradas</p>
+                                <div className="flex items-center gap-2 text-xs">
+                                  <Badge variant="outline" className="bg-white/70">
+                                    Total {selectedModule.npmDependencies?.total ?? 0}
+                                  </Badge>
+                                  <Badge variant="outline" className="bg-green-50 text-green-800">
+                                    Instaladas {selectedModule.npmDependencies?.installed ?? 0}
+                                  </Badge>
+                                  <Badge variant="outline" className="bg-amber-50 text-amber-900">
+                                    Pendentes {selectedModule.npmDependencies?.pending ?? 0}
+                                  </Badge>
+                                  <Badge variant="outline" className="bg-red-50 text-red-800">
+                                    Conflitos {selectedModule.npmDependencies?.conflicts ?? 0}
+                                  </Badge>
+                                </div>
+                              </div>
+
+                              {(selectedModule.npmDependencies?.total ?? 0) > 0 ? (
+                                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                  {([
+                                    ["Backend", selectedModule.npmDependencies?.backend ?? []],
+                                    ["Frontend", selectedModule.npmDependencies?.frontend ?? []],
+                                  ] as const).map(([label, deps]) => (
+                                    <div key={label} className="rounded-xl border bg-background/80 p-3">
+                                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                        {label}
+                                      </p>
+                                      {deps.length === 0 ? (
+                                        <p className="mt-2 text-xs text-muted-foreground">
+                                          Nenhuma dependencia declarada.
+                                        </p>
+                                      ) : (
+                                        <ul className="mt-2 space-y-2">
+                                          {deps.map((dep) => (
+                                            <li
+                                              key={`${label}-${dep.packageName}`}
+                                              className="rounded-lg border px-2 py-1.5 text-xs"
+                                            >
+                                              <div className="flex items-center justify-between gap-2">
+                                                <span className="font-mono">{dep.packageName}</span>
+                                                <Badge
+                                                  variant="outline"
+                                                  className={cn(
+                                                    "text-[10px]",
+                                                    dep.status === "installed" &&
+                                                      "bg-green-50 text-green-800 border-green-200",
+                                                    dep.status === "pending" &&
+                                                      "bg-amber-50 text-amber-900 border-amber-200",
+                                                    dep.status === "conflict" &&
+                                                      "bg-red-50 text-red-800 border-red-200",
+                                                  )}
+                                                >
+                                                  {dep.status}
+                                                </Badge>
+                                              </div>
+                                              <p className="mt-1 font-mono text-muted-foreground">
+                                                {dep.version}
+                                              </p>
+                                              {dep.note && (
+                                                <p className="mt-1 text-muted-foreground">{dep.note}</p>
+                                              )}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="mt-3 text-xs text-muted-foreground">
+                                  Este modulo nao declara dependencias NPM extras.
+                                </p>
+                              )}
                             </div>
 
                             {selectedModule.lifecycle.blockers.length > 0 && (

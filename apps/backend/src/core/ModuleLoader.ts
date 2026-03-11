@@ -230,8 +230,8 @@ export class ModuleLoader implements OnModuleInit {
     }
 
     /**
-     * Ativa um módulo (chamado pelo instalador após migrations)
-     * Aceita módulos com status 'db_ready' ou 'disabled' (reativação)
+     * Ativa um módulo (chamado pelo instalador após preparação de banco)
+     * Aceita módulos em status "ready" (novo fluxo), "db_ready" (legado) ou "disabled" (reativação)
      */
     async activateModule(slug: string): Promise<boolean> {
         try {
@@ -239,9 +239,13 @@ export class ModuleLoader implements OnModuleInit {
                 where: { slug }
             });
 
-            // Permite ativação de módulos db_ready ou disabled
+            // Permite ativação de módulos ready/db_ready ou disabled
             if (!moduleData ||
-                (moduleData.status !== ModuleStatus.db_ready && moduleData.status !== ModuleStatus.disabled)) {
+                (
+                    moduleData.status !== ModuleStatus.ready &&
+                    moduleData.status !== ModuleStatus.db_ready &&
+                    moduleData.status !== ModuleStatus.disabled
+                )) {
                 this.logger.warn(`⚠️ Não é possível ativar módulo ${slug} com status: ${moduleData?.status}`);
                 return false;
             }

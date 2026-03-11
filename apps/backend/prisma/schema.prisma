@@ -301,6 +301,7 @@ model Module {
   updatedAt     DateTime          @updatedAt
   menus         ModuleMenu[]
   migrations    ModuleMigration[]
+  npmDependencies ModuleNpmDependency[]
   tenantModules ModuleTenant[]
 
   @@index([status])
@@ -362,6 +363,28 @@ model ModuleMigration {
   @@index([type])
   @@index([executedAt])
   @@map("module_migrations")
+}
+
+model ModuleNpmDependency {
+  id          String                    @id @default(uuid())
+  moduleId    String
+  moduleSlug  String
+  packageName String
+  version     String
+  target      ModuleNpmDependencyTarget
+  status      ModuleNpmDependencyStatus @default(pending)
+  note        String?
+  createdBy   String?
+  installedAt DateTime?
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+  module      Module                    @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([moduleId, packageName, target])
+  @@index([moduleSlug])
+  @@index([status])
+  @@index([target])
+  @@map("module_npm_dependencies")
 }
 
 model Notification {
@@ -518,8 +541,24 @@ enum ModuleStatus {
   detected
   installed
   db_ready
+  uploaded
+  pending_dependencies
+  dependencies_installed
+  dependency_conflict
+  ready
   active
   disabled
+}
+
+enum ModuleNpmDependencyTarget {
+  backend
+  frontend
+}
+
+enum ModuleNpmDependencyStatus {
+  pending
+  installed
+  conflict
 }
 
 enum MigrationType {

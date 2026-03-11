@@ -71,7 +71,50 @@ O sistema remove o prefixo `backend/` e copia todo o conteúdo para a pasta de m
 
 ---
 
-## 5. Perguntas Frequentes (FAQ)
+## 5. Dependencias NPM por Modulo
+
+O campo `dependencies` do `module.json` continua reservado para dependencia entre modulos.
+
+Para declarar pacotes NPM, use `npmDependencies`:
+
+```json
+{
+  "dependencies": ["core-crm"],
+  "npmDependencies": {
+    "backend": {
+      "axios": "^1.7.2"
+    },
+    "frontend": {
+      "@tanstack/react-query": "^5.59.0"
+    }
+  }
+}
+```
+
+### Regras importantes
+
+- Nao usar `package.json` dentro do ZIP para esse controle.
+- O instalador faz merge somente em:
+  - `apps/backend/package.json`
+  - `apps/frontend/package.json`
+- O instalador bloqueia versoes inseguras (`latest`, `*`, `git:`, `file:`, `link:`, `workspace:`, `http:`, `https:`).
+- Se houver conflito de versao com o projeto, o modulo vai para `dependency_conflict`.
+
+### Fluxo resumido
+
+1. Upload e validacao do manifesto.
+2. Validacao de `npmDependencies`.
+3. Registro das dependencias para auditoria.
+4. Deteccao de conflitos.
+5. Merge em `apps/backend/package.json` e `apps/frontend/package.json`.
+6. Execucao de `pnpm install`.
+7. Status do modulo:
+   - sucesso: `dependencies_installed`
+   - conflito: `dependency_conflict`
+
+---
+
+## 6. Perguntas Frequentes (FAQ)
 
 **1. Posso colocar meu controller na raiz do backend?**
 Sim. Se você colocar em `/backend/meu.controller.ts`, ele irá para `.../modules/[slug]/meu.controller.ts`. O importante é atualizar o `import` dentro do seu arquivo `.module.ts`.

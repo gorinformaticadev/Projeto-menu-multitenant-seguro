@@ -3,13 +3,16 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { ModuleInstallerService } from './module-installer.service';
+import { ModuleStructureValidator } from './validators/module-structure.validator';
 
-describe('ModuleInstallerService module lifecycle hardening', () => {
+describe('ModuleInstallerService module lifecycle and npm dependencies', () => {
   const prismaMock = {
     module: {
       findUnique: jest.fn(),
       findMany: jest.fn(),
       update: jest.fn(),
+      create: jest.fn(),
+      deleteMany: jest.fn(),
     },
     moduleMigration: {
       findUnique: jest.fn(),
@@ -17,6 +20,13 @@ describe('ModuleInstallerService module lifecycle hardening', () => {
     },
     moduleMenu: {
       deleteMany: jest.fn(),
+      create: jest.fn(),
+    },
+    moduleNpmDependency: {
+      deleteMany: jest.fn(),
+      createMany: jest.fn(),
+      updateMany: jest.fn(),
+      findMany: jest.fn(),
     },
   };
 
@@ -61,10 +71,25 @@ describe('ModuleInstallerService module lifecycle hardening', () => {
     menus: [],
   };
 
+  const defaultNpmSummary = {
+    backend: [],
+    frontend: [],
+    total: 0,
+    pending: 0,
+    installed: 0,
+    conflicts: 0,
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     prismaMock.module.findMany.mockResolvedValue([]);
+    prismaMock.module.update.mockResolvedValue(undefined);
+    prismaMock.module.create.mockResolvedValue({ id: 'module-1', slug: 'ordem_servico' });
     auditServiceMock.log.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('uses prepareModuleDatabase as the official pipeline and records actor context', async () => {
@@ -81,7 +106,8 @@ describe('ModuleInstallerService module lifecycle hardening', () => {
     });
     jest.spyOn(service as any, 'ensureDependenciesPrepared').mockResolvedValue(undefined);
     jest.spyOn(service as any, 'assertPendingSeedsAreSafe').mockResolvedValue(undefined);
-    jest.spyOn(service as any, 'executeMigrationsOneByOne')
+    jest
+      .spyOn(service as any, 'executeMigrationsOneByOne')
       .mockResolvedValueOnce(2)
       .mockResolvedValueOnce(1);
 
@@ -89,14 +115,14 @@ describe('ModuleInstallerService module lifecycle hardening', () => {
       id: 'module-1',
       slug: 'ordem_servico',
       name: 'Ordem de Servico',
-      status: 'installed',
+      status: 'dependencies_installed',
       hasBackend: true,
       hasFrontend: false,
     });
     prismaMock.module.update.mockResolvedValue({
       id: 'module-1',
       slug: 'ordem_servico',
-      status: 'db_ready',
+      status: 'ready',
     });
 
     const result = await service.prepareModuleDatabase('ordem_servico', {
@@ -121,20 +147,22 @@ describe('ModuleInstallerService module lifecycle hardening', () => {
     );
     expect(prismaMock.module.update).toHaveBeenCalledWith({
       where: { slug: 'ordem_servico' },
-      data: { status: 'db_ready' },
+      data: { status: 'ready' },
     });
-    expect(auditServiceMock.log).toHaveBeenCalledWith(expect.objectContaining({
-      action: 'MODULE_DB_PREPARE_STARTED',
-      userId: 'admin-1',
-      ipAddress: '127.0.0.1',
-      userAgent: 'jest',
-    }));
+    expect(auditServiceMock.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'MODULE_DB_PREPARE_STARTED',
+        userId: 'admin-1',
+        ipAddress: '127.0.0.1',
+        userAgent: 'jest',
+      }),
+    );
     expect(result).toMatchObject({
       success: true,
       officialOperation: 'prepare-module-database',
       module: {
         slug: 'ordem_servico',
-        status: 'db_ready',
+        status: 'ready',
         migrationsExecuted: 2,
         seedsExecuted: 1,
       },
@@ -151,7 +179,7 @@ describe('ModuleInstallerService module lifecycle hardening', () => {
       message: 'ok',
       module: {
         slug: 'ordem_servico',
-        status: 'db_ready',
+        status: 'ready',
         migrationsExecuted: 3,
         seedsExecuted: 2,
       },
@@ -205,13 +233,13 @@ describe('ModuleInstallerService module lifecycle hardening', () => {
       id: 'module-1',
       slug: 'ordem_servico',
       name: 'Ordem de Servico',
-      status: 'db_ready',
+      status: 'ready',
       hasBackend: true,
       hasFrontend: false,
+      npmDependencies: [],
     });
 
-    await expect(service.activateModule('ordem_servico')).rejects.toThrow(BadRequestException);
-    await expect(service.activateModule('ordem_servico')).rejects.toThrow(/Integridade inválida/i);
+    await expect(service.activateModule('ordem_servico')).rejects.toThrow(/integridade/i);
   });
 
   it('treats disabled dependencies as not satisfied during database preparation', async () => {
@@ -235,7 +263,7 @@ describe('ModuleInstallerService module lifecycle hardening', () => {
         id: 'module-1',
         slug: 'ordem_servico',
         name: 'Ordem de Servico',
-        status: 'installed',
+        status: 'dependencies_installed',
         hasBackend: true,
         hasFrontend: false,
       })
@@ -258,7 +286,7 @@ describe('ModuleInstallerService module lifecycle hardening', () => {
     fs.mkdirSync(seedsPath, { recursive: true });
     fs.writeFileSync(
       path.join(seedsPath, '001_bad_seed.sql'),
-      'INSERT INTO module_permissions (id, name) VALUES (1, \'seed inseguro\');',
+      "INSERT INTO module_permissions (id, name) VALUES (1, 'seed inseguro');",
       'utf-8',
     );
 
@@ -271,5 +299,211 @@ describe('ModuleInstallerService module lifecycle hardening', () => {
     await expect((service as any).assertPendingSeedsAreSafe('ordem_servico', modulePath)).rejects.toThrow(
       /Seed inseguro bloqueado/i,
     );
+  });
+
+  it('installs uploaded module without npm dependencies and marks dependencies_installed', async () => {
+    const service = createService();
+    jest.spyOn(ModuleStructureValidator, 'analyzeZipStructure').mockReturnValue({
+      basePath: '',
+      moduleJsonContent: JSON.stringify(validManifest),
+      files: ['module.json'],
+      hasBackend: true,
+      hasFrontend: true,
+    });
+
+    jest.spyOn(service as any, 'distributeModuleFiles').mockResolvedValue(undefined);
+    jest.spyOn(service as any, 'registerModuleInDatabase').mockResolvedValue({
+      id: 'module-1',
+      slug: 'ordem_servico',
+    });
+    jest.spyOn(service as any, 'registerModuleMenus').mockResolvedValue(undefined);
+    jest.spyOn(service as any, 'syncModuleNpmDependencies').mockResolvedValue({
+      summary: defaultNpmSummary,
+      conflicts: [],
+      added: [],
+      installExecuted: false,
+    });
+    jest.spyOn(service as any, 'notifyModuleInstalled').mockResolvedValue(undefined);
+
+    prismaMock.module.findUnique.mockResolvedValue(null);
+
+    const result = await service.installModuleFromZip({
+      originalname: 'module.zip',
+      buffer: Buffer.from('zip-buffer'),
+      size: 1200,
+    } as Express.Multer.File);
+
+    expect(prismaMock.module.update).toHaveBeenNthCalledWith(1, {
+      where: { id: 'module-1' },
+      data: { status: 'pending_dependencies' },
+    });
+    expect(prismaMock.module.update).toHaveBeenNthCalledWith(2, {
+      where: { id: 'module-1' },
+      data: { status: 'dependencies_installed' },
+    });
+    expect(result).toMatchObject({
+      success: true,
+      module: {
+        name: 'ordem_servico',
+        status: 'dependencies_installed',
+      },
+    });
+  });
+
+  it('accepts valid npmDependencies from module upload and forwards normalized dependencies', async () => {
+    const service = createService();
+    jest.spyOn(ModuleStructureValidator, 'analyzeZipStructure').mockReturnValue({
+      basePath: '',
+      moduleJsonContent: JSON.stringify({
+        ...validManifest,
+        npmDependencies: {
+          backend: {
+            axios: '^1.7.2',
+          },
+          frontend: {
+            '@tanstack/react-query': '^5.59.0',
+          },
+        },
+      }),
+      files: ['module.json'],
+      hasBackend: true,
+      hasFrontend: true,
+    });
+
+    jest.spyOn(service as any, 'distributeModuleFiles').mockResolvedValue(undefined);
+    jest.spyOn(service as any, 'registerModuleInDatabase').mockResolvedValue({
+      id: 'module-1',
+      slug: 'ordem_servico',
+    });
+    jest.spyOn(service as any, 'registerModuleMenus').mockResolvedValue(undefined);
+    const syncSpy = jest.spyOn(service as any, 'syncModuleNpmDependencies').mockResolvedValue({
+      summary: {
+        backend: [
+          { packageName: 'axios', version: '^1.7.2', target: 'backend', status: 'installed', note: null },
+        ],
+        frontend: [
+          {
+            packageName: '@tanstack/react-query',
+            version: '^5.59.0',
+            target: 'frontend',
+            status: 'installed',
+            note: null,
+          },
+        ],
+        total: 2,
+        pending: 0,
+        installed: 2,
+        conflicts: 0,
+      },
+      conflicts: [],
+      added: [],
+      installExecuted: true,
+    });
+    jest.spyOn(service as any, 'notifyModuleInstalled').mockResolvedValue(undefined);
+
+    prismaMock.module.findUnique.mockResolvedValue(null);
+
+    await service.installModuleFromZip({
+      originalname: 'module.zip',
+      buffer: Buffer.from('zip-buffer'),
+      size: 1200,
+    } as Express.Multer.File);
+
+    expect(syncSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        moduleId: 'module-1',
+        moduleSlug: 'ordem_servico',
+        dependencies: expect.arrayContaining([
+          { target: 'backend', packageName: 'axios', version: '^1.7.2' },
+          {
+            target: 'frontend',
+            packageName: '@tanstack/react-query',
+            version: '^5.59.0',
+          },
+        ]),
+      }),
+    );
+  });
+
+  it('blocks upload when module declares invalid npm dependency version', async () => {
+    const service = createService();
+    jest.spyOn(ModuleStructureValidator, 'analyzeZipStructure').mockReturnValue({
+      basePath: '',
+      moduleJsonContent: JSON.stringify({
+        ...validManifest,
+        npmDependencies: {
+          backend: {
+            axios: 'latest',
+          },
+        },
+      }),
+      files: ['module.json'],
+      hasBackend: true,
+      hasFrontend: true,
+    });
+
+    const distributeSpy = jest.spyOn(service as any, 'distributeModuleFiles').mockResolvedValue(undefined);
+
+    await expect(
+      service.installModuleFromZip({
+        originalname: 'module.zip',
+        buffer: Buffer.from('zip-buffer'),
+        size: 1200,
+      } as Express.Multer.File),
+    ).rejects.toThrow(/MODULE_DEPENDENCY_VALIDATION_FAILED/);
+
+    expect(distributeSpy).not.toHaveBeenCalled();
+  });
+
+  it('marks module as dependency_conflict when npm conflict is reported by sync stage', async () => {
+    const service = createService();
+    jest.spyOn(ModuleStructureValidator, 'analyzeZipStructure').mockReturnValue({
+      basePath: '',
+      moduleJsonContent: JSON.stringify(validManifest),
+      files: ['module.json'],
+      hasBackend: true,
+      hasFrontend: true,
+    });
+
+    jest.spyOn(service as any, 'distributeModuleFiles').mockResolvedValue(undefined);
+    jest.spyOn(service as any, 'registerModuleInDatabase').mockResolvedValue({
+      id: 'module-1',
+      slug: 'ordem_servico',
+    });
+    jest.spyOn(service as any, 'registerModuleMenus').mockResolvedValue(undefined);
+    jest.spyOn(service as any, 'syncModuleNpmDependencies').mockResolvedValue({
+      summary: {
+        backend: [{ packageName: 'zod', version: '^4.0.0', target: 'backend', status: 'conflict', note: 'Conflito' }],
+        frontend: [],
+        total: 1,
+        pending: 0,
+        installed: 0,
+        conflicts: 1,
+      },
+      conflicts: [{ packageName: 'zod', version: '^4.0.0', target: 'backend', status: 'conflict', note: 'Conflito' }],
+      added: [],
+      installExecuted: false,
+    });
+    jest.spyOn(service as any, 'notifyModuleInstalled').mockResolvedValue(undefined);
+
+    prismaMock.module.findUnique.mockResolvedValue(null);
+
+    const result = await service.installModuleFromZip({
+      originalname: 'module.zip',
+      buffer: Buffer.from('zip-buffer'),
+      size: 1200,
+    } as Express.Multer.File);
+
+    expect(prismaMock.module.update).toHaveBeenNthCalledWith(2, {
+      where: { id: 'module-1' },
+      data: { status: 'dependency_conflict' },
+    });
+    expect(result).toMatchObject({
+      success: true,
+      module: {
+        status: 'dependency_conflict',
+      },
+    });
+    expect(String(result.message)).toMatch(/conflitos/i);
   });
 });

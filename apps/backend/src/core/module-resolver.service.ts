@@ -149,7 +149,17 @@ export class ModuleResolverService {
         const modules = await this.prisma.module.findMany({
             where: {
                 status: {
-                    in: ['installed', 'db_ready', 'active']
+                    in: [
+                        'installed',
+                        'uploaded',
+                        'pending_dependencies',
+                        'dependencies_installed',
+                        'dependency_conflict',
+                        'db_ready',
+                        'ready',
+                        'active',
+                        'disabled',
+                    ]
                 }
             }
         });

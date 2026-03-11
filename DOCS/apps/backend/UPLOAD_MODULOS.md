@@ -1,263 +1,133 @@
-# 📦 Sistema de Upload de Módulos - Documentação Completa
+# Upload de Modulos com Dependencias NPM
 
-## 🎯 Funcionalidades Implementadas
+Este documento define o fluxo oficial de instalacao de modulos com suporte a `npmDependencies`, mantendo o campo `dependencies` como dependencia entre modulos.
 
-### 🔧 Backend
-- ✅ **ModuleInstallerService**: Serviço completo para instalação/remoção de módulos
-- ✅ **Upload de ZIP**: Processamento de arquivos ZIP com validação
-- ✅ **Migrações Automáticas**: Execução automática de scripts SQL
-- ✅ **Dependências NPM**: Instalação automática de dependências
-- ✅ **Validação de Estrutura**: Verificação de module.json obrigatório
-- ✅ **Backup e Rollback**: Sistema de backup para atualizações seguras
+## Estrutura obrigatoria do `module.json`
 
-### 🎨 Frontend
-- ✅ **ModuleUploadTab**: Interface completa para upload/gerenciamento
-- ✅ **Drag & Drop**: Interface intuitiva para upload de arquivos
-- ✅ **Lista de Módulos**: Visualização de módulos instalados
-- ✅ **Informações Detalhadas**: Dialog com detalhes técnicos
-- ✅ **Remoção Segura**: Confirmação antes de remover módulos
-
-## 🔌 Endpoints Implementados
-
-### Upload e Instalação
-```http
-POST /modules/upload
-Content-Type: multipart/form-data
-Authorization: Bearer <token>
-Role: SUPER_ADMIN
-
-Body: FormData com arquivo 'module' (ZIP, máx 50MB)
-```
-
-### Remoção de Módulo
-```http
-DELETE /modules/{name}/uninstall
-Authorization: Bearer <token>
-Role: SUPER_ADMIN
-```
-
-### Listar Módulos Instalados
-```http
-GET /modules/installed
-Authorization: Bearer <token>
-Role: SUPER_ADMIN
-```
-
-### Informações do Módulo
-```http
-GET /modules/{name}/info
-Authorization: Bearer <token>
-Role: SUPER_ADMIN
-```
-
-## 📁 Estrutura do Módulo ZIP
-
-### Arquivos Obrigatórios
-```
-module.zip
-├── module.json          # Configuração principal (OBRIGATÓRIO)
-├── migrations/          # Scripts SQL (opcional)
-│   ├── 001_create_tables.sql
-│   └── 002_add_indexes.sql
-├── package.json         # Dependências NPM (opcional)
-└── README.md           # Documentação (opcional)
-```
-
-### Exemplo de module.json
 ```json
 {
-  "name": "example_module",
-  "displayName": "Módulo de Exemplo",
-  "description": "Descrição do módulo",
+  "name": "crm-whatsapp",
+  "displayName": "CRM WhatsApp",
   "version": "1.0.0",
-  "author": "Desenvolvedor",
-  "dependencies": ["other_module"],
-  "config": {
-    "features": ["feature1", "feature2"],
-    "permissions": ["view_example", "manage_example"],
-    "settings": {
-      "enableNotifications": true,
-      "maxItems": 100
+  "dependencies": ["core-crm", "notificacoes"],
+  "npmDependencies": {
+    "backend": {
+      "axios": "^1.7.2",
+      "zod": "^3.23.8"
+    },
+    "frontend": {
+      "@tanstack/react-query": "^5.59.0",
+      "react-hook-form": "^7.53.0"
     }
   }
 }
 ```
 
-## 🔄 Fluxo de Instalação
+### Semantica dos campos
 
-### 1. Upload do Arquivo
-1. Usuário seleciona arquivo ZIP
-2. Validação de formato e tamanho (máx 50MB)
-3. Upload para servidor
+- `dependencies`: dependencia entre modulos.
+- `npmDependencies.backend`: pacotes para `apps/backend/package.json`.
+- `npmDependencies.frontend`: pacotes para `apps/frontend/package.json`.
 
-### 2. Validação e Extração
-1. Verificação de arquivo ZIP válido
-2. Busca por `module.json` obrigatório
-3. Validação de campos obrigatórios
-4. Verificação de nome do módulo (apenas letras, números, _, -)
+## Politica de seguranca para NPM
 
-### 3. Instalação/Atualização
-1. **Novo Módulo**:
-   - Criação de diretório
-   - Extração de arquivos
-   - Execução de migrações
-   - Instalação de dependências NPM
-   - Registro no banco de dados
+### Bloqueado automaticamente
 
-2. **Atualização**:
-   - Backup do módulo atual
-   - Substituição de arquivos
-   - Execução de novas migrações
-   - Atualização do registro
-   - Remoção do backup (se sucesso)
+- `latest`
+- `*`
+- prefixos: `github:`, `git:`, `git+`, `file:`, `link:`, `workspace:`, `http:`, `https:`
 
-### 4. Execução de Migrações
-1. Busca por pasta `migrations/`
-2. Ordenação de arquivos `.sql`
-3. Execução sequencial no banco
-4. Log de sucesso/erro para cada migração
+### Permitido
 
-### 5. Dependências NPM
-1. Verificação de `package.json`
-2. Execução de `npm install` no diretório do módulo
-3. Log de avisos (não falha a instalação)
+- nomes validos de pacote NPM.
+- versoes semver seguras: `^x.y.z`, `~x.y.z`, `x.y.z`.
 
-## 🛡️ Segurança e Validações
+Ao encontrar valor invalido:
 
-### Validações de Arquivo
-- ✅ Apenas arquivos `.zip` aceitos
-- ✅ Tamanho máximo de 50MB
-- ✅ Verificação de estrutura interna
-- ✅ Validação de `module.json` obrigatório
+- instalacao interrompida com erro `MODULE_DEPENDENCY_VALIDATION_FAILED`.
+- modulo nao e instalado/ativado.
 
-### Validações de Conteúdo
-- ✅ Nome do módulo: apenas `[a-zA-Z0-9_-]`
-- ✅ Campos obrigatórios: `name`, `displayName`, `version`
-- ✅ Verificação de módulo já existente
-- ✅ Verificação de uso por tenants antes da remoção
+## Fluxo de instalacao
 
-### Segurança de Execução
-- ✅ Backup automático antes de atualizações
-- ✅ Rollback em caso de erro
-- ✅ Execução isolada de migrações
-- ✅ Logs detalhados de todas as operações
+1. Upload do ZIP.
+2. Leitura e validacao de `module.json`.
+3. Validacao de `npmDependencies`.
+4. Registro do modulo com status `uploaded`.
+5. Transicao para `pending_dependencies`.
+6. Registro em `module_npm_dependencies`.
+7. Deteccao de conflitos de versao com `apps/backend/package.json` e `apps/frontend/package.json`.
+8. Merge controlado em `dependencies` dos dois `package.json`.
+9. Execucao de `pnpm install --no-frozen-lockfile` na raiz do workspace.
+10. Se sucesso, dependencias ficam `installed` e modulo vai para `dependencies_installed`.
+11. Se conflito, modulo vai para `dependency_conflict` (ativacao bloqueada).
+12. Preparacao de banco (`prepare-database`) muda para `ready`.
+13. Ativacao global muda para `active`.
 
-## 🎨 Interface do Usuário
+## Estados de modulo
 
-### Aba "Upload" no Dialog de Empresas
-1. **Área de Upload**:
-   - Drag & drop visual
-   - Seleção de arquivo
-   - Indicador de progresso
-   - Validação em tempo real
+- `uploaded`
+- `pending_dependencies`
+- `dependencies_installed`
+- `dependency_conflict`
+- `ready`
+- `active`
 
-2. **Lista de Módulos Instalados**:
-   - Status (Ativo/Inativo)
-   - Indicador de instalação
-   - Versão e informações básicas
-   - Botões de ação (Info/Remover)
+Estados legados (`installed`, `db_ready`, `detected`, `disabled`) continuam aceitos para retrocompatibilidade.
 
-3. **Dialog de Informações**:
-   - Detalhes técnicos
-   - Configurações JSON
-   - Status de instalação
+## Persistencia e auditoria
 
-4. **Dialog de Remoção**:
-   - Confirmação de segurança
-   - Avisos sobre impacto
-   - Verificação de uso por tenants
+Tabela: `module_npm_dependencies`
 
-## 📊 Exemplo Prático
+Campos principais:
 
-### Módulo de Exemplo Criado
-- ✅ **Nome**: `example_module`
-- ✅ **Funcionalidade**: Demonstração do sistema
-- ✅ **Migração**: Cria tabela `example_items`
-- ✅ **Dependências**: Lodash como exemplo
-- ✅ **Arquivo ZIP**: `backend/uploads/modules/example-module.zip`
+- `moduleId`
+- `moduleSlug`
+- `packageName`
+- `version`
+- `target` (`backend` | `frontend`)
+- `status` (`pending` | `installed` | `conflict`)
+- `createdBy`
+- `installedAt`
+- `note`
 
-### Como Testar
-1. Acesse `/empresas` no frontend
-2. Clique em "Gerenciar Módulos" em qualquer empresa
-3. Vá para a aba "Upload"
-4. Faça upload do arquivo `example-module.zip`
-5. Verifique a instalação na lista de módulos
+Eventos de auditoria relevantes:
 
-## 🔧 Scripts Utilitários
+- `MODULE_UPLOAD`
+- `MODULE_DEPENDENCY_CONFLICT`
+- `MODULE_DEPENDENCY_INSTALL_STARTED`
+- `MODULE_DEPENDENCY_INSTALL_SUCCESS`
+- `MODULE_DEPENDENCY_INSTALL_FAILED`
 
-### Criar Módulo de Exemplo
-```bash
-cd backend
-node create-example-module.js
-```
+## Conflitos de versao
 
-### Verificar Módulos Instalados
-```bash
-cd backend
-ls -la modules/
-```
+Quando modulo solicita versao incompativel com o projeto:
 
-### Logs de Instalação
-Os logs são exibidos no console do backend durante a instalação.
+- dependencia recebe status `conflict`.
+- modulo recebe status `dependency_conflict`.
+- ativacao e preparo de banco ficam bloqueados ate resolucao.
 
-## 🚀 Próximas Funcionalidades
+Erro esperado:
 
-### Melhorias Planejadas
-1. **Marketplace**: Loja de módulos online
-2. **Versionamento**: Controle de versões e downgrades
-3. **Dependências**: Sistema de dependências entre módulos
-4. **Templates**: Templates para criação de módulos
-5. **Testes**: Validação automática de módulos
-6. **Assinatura Digital**: Verificação de integridade
-7. **Rollback Automático**: Rollback em caso de erro crítico
+- `MODULE_DEPENDENCY_CONFLICT`
 
-### Melhorias de UX
-1. **Preview**: Visualização do conteúdo antes da instalação
-2. **Progress Bar**: Indicador de progresso detalhado
-3. **Logs em Tempo Real**: Visualização dos logs de instalação
-4. **Validação Prévia**: Verificação de compatibilidade
-5. **Backup Manual**: Opção de criar backup antes da instalação
+## Rollback de instalacao
 
-## 📝 Considerações Técnicas
+Se `pnpm install` falhar:
 
-### Performance
-- Upload limitado a 50MB para evitar timeouts
-- Processamento assíncrono de instalação
-- Cache de informações de módulos
-- Limpeza automática de arquivos temporários
+- `apps/backend/package.json` e `apps/frontend/package.json` sao restaurados por snapshot.
+- `pnpm-lock.yaml` e restaurado por snapshot.
+- notas de falha sao registradas em `module_npm_dependencies`.
+- modulo permanece bloqueado para nova tentativa controlada.
 
-### Manutenibilidade
-- Logs detalhados para debugging
-- Estrutura modular e extensível
-- Separação clara de responsabilidades
-- Documentação completa de APIs
+## Escopo de escrita
 
-### Escalabilidade
-- Suporte a múltiplos módulos simultâneos
-- Isolamento de dependências por módulo
-- Sistema de backup eficiente
-- Gerenciamento de espaço em disco
+Somente estes arquivos sao alterados automaticamente:
 
-## ✅ Status da Implementação
+- `apps/backend/package.json`
+- `apps/frontend/package.json`
+- `pnpm-lock.yaml` (indiretamente pelo `pnpm install`)
 
-### Backend: 100% Completo
-- ✅ ModuleInstallerService
-- ✅ Endpoints de API
-- ✅ Validações de segurança
-- ✅ Sistema de migrações
-- ✅ Gerenciamento de dependências
+Nunca alteramos manualmente:
 
-### Frontend: 100% Completo
-- ✅ ModuleUploadTab
-- ✅ Interface de upload
-- ✅ Gerenciamento de módulos
-- ✅ Dialogs informativos
-- ✅ Validações de cliente
-
-### Testes: Pronto para Uso
-- ✅ Módulo de exemplo criado
-- ✅ Scripts de teste disponíveis
-- ✅ Documentação completa
-- ✅ Validações implementadas
-
-O sistema de upload de módulos está **100% funcional** e pronto para uso em produção! 🚀
+- `package.json` da raiz
+- `pnpm-lock.yaml` por escrita direta

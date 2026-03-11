@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { normalizeModuleNpmDependencies } from '../module-npm-dependencies.util';
 
 /**
  * Interface do module.json - formato correto especificado
@@ -12,6 +13,10 @@ export interface ModuleJson {
     category?: string;
     enabled?: boolean;
     dependencies?: string[] | null;  // string[] | null conforme especificado
+    npmDependencies?: {
+        backend?: Record<string, string> | null;
+        frontend?: Record<string, string> | null;
+    } | null;
     defaultConfig?: unknown;
     menus?: unknown[];
     [key: string]: unknown;
@@ -111,6 +116,13 @@ export class ModuleJsonValidator {
             throw new BadRequestException('Campo "dependencies" deve ser array de strings ou null');
         }
 
+        // npmDependencies: objeto opcional no formato backend/frontend
+        if (json.npmDependencies !== undefined &&
+            json.npmDependencies !== null &&
+            (typeof json.npmDependencies !== 'object' || Array.isArray(json.npmDependencies))) {
+            throw new BadRequestException('Campo "npmDependencies" deve ser objeto ou null');
+        }
+
         // Validar se dependencies é array de strings
         if (json.dependencies && Array.isArray(json.dependencies)) {
             for (let i = 0; i < json.dependencies.length; i++) {
@@ -193,6 +205,11 @@ export class ModuleJsonValidator {
                 }
                 seenDependencies.add(normalizedSlug);
             }
+        }
+
+        // Validação de segurança das dependências NPM declaradas
+        if (json.npmDependencies !== undefined && json.npmDependencies !== null) {
+            normalizeModuleNpmDependencies(json.npmDependencies);
         }
     }
 
