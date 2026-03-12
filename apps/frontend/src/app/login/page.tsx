@@ -11,12 +11,14 @@ import { useToast } from "@/hooks/use-toast";
 import { TwoFactorLogin } from "@/components/TwoFactorLogin";
 import { use2FALogin } from "@/hooks/use2FALogin";
 import { usePlatformConfigContext } from "@/contexts/PlatformConfigContext";
-import { Building2 } from "lucide-react";
+import { Building2, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import { resolveTenantLogoSrc } from "@/lib/tenant-logo";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [capsLockActive, setCapsLockActive] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const { config: platformConfig } = usePlatformConfigContext();
   const platformLogoSrc = resolveTenantLogoSrc(platformConfig.platformLogoUrl);
@@ -91,7 +93,17 @@ export default function LoginPage() {
     reset();
     setEmail("");
     setPassword("");
+    setShowPassword(false);
+    setCapsLockActive(false);
     setRememberMe(false);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.getModifierState('CapsLock')) {
+      setCapsLockActive(true);
+    } else {
+      setCapsLockActive(false);
+    }
   }
 
   // Wrapper with Glassmorphism Context
@@ -191,15 +203,37 @@ export default function LoginPage() {
             <div className="flex items-center justify-between ml-2 mr-1">
               <Label htmlFor="password" className="text-xs font-bold text-slate-400 uppercase tracking-wider">Senha</Label>
             </div>
-            {/* Glassy Inset Input */}
-            <Input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="bg-black/20 border border-white/5 rounded-xl h-10 px-4 shadow-[inset_2px_2px_4px_rgba(0,0,0,0.5),inset_-1px_-1px_3px_rgba(255,255,255,0.05)] focus-visible:ring-1 focus-visible:ring-indigo-500/50 focus-visible:bg-black/30 transition-all placeholder:text-slate-600 text-slate-200"
-            />
+            <div className="relative group">
+              {/* Glassy Inset Input */}
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onKeyUp={handleKeyDown}
+                className="bg-black/20 border border-white/5 rounded-xl h-10 px-4 pr-10 shadow-[inset_2px_2px_4px_rgba(0,0,0,0.5),inset_-1px_-1px_3px_rgba(255,255,255,0.05)] focus-visible:ring-1 focus-visible:ring-indigo-500/50 focus-visible:bg-black/30 transition-all placeholder:text-slate-600 text-slate-200"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+            {capsLockActive && (
+              <div className="flex items-center gap-1.5 ml-2 mt-1 text-amber-500 animate-pulse">
+                <AlertTriangle className="h-3 w-3" />
+                <span className="text-[10px] font-bold uppercase tracking-wider">CAPSLOOCK ATIVADO</span>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between pt-2 px-2">
