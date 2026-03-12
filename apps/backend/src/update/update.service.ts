@@ -10,18 +10,73 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { Prisma, SystemSettings, UpdateLog } from '@prisma/client';
 import { SystemVersionService } from '@common/services/system-version.service';
+import { SystemUpdateAdminService } from './system-update-admin.service';
 
 type UpdateExecutionResult = { stdout: string; stderr: string };
 type UpdateLogListItem = Pick<
   UpdateLog,
   'id' | 'version' | 'status' | 'startedAt' | 'completedAt' | 'duration' | 'packageManager' | 'errorMessage' | 'rollbackReason' | 'executedBy'
 >;
+type UpdateExecutionStatus = 'starting' | 'completed';
+type UpdateLifecycleStatus =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'not_available'
+  | 'pending_confirmation'
+  | 'starting'
+  | 'running'
+  | 'restarting_services'
+  | 'completed'
+  | 'failed';
 type UpdateExecutionError = Error & {
   stdout?: string;
   stderr?: string;
   status?: number;
   code?: number | string;
   exitCode?: number;
+};
+
+type SystemUpdateStateSnapshot = {
+  status: 'idle' | 'running' | 'success' | 'failed' | 'rolled_back';
+  mode: 'docker' | 'native';
+  startedAt: string | null;
+  finishedAt: string | null;
+  fromVersion: string;
+  toVersion: string;
+  step: string;
+  progress: number;
+  lock: boolean;
+  lastError: string | null;
+  errorCode: string | null;
+  errorCategory: string | null;
+  errorStage: string | null;
+  exitCode: number | null;
+  userMessage: string | null;
+  technicalMessage: string | null;
+  rollback: {
+    attempted: boolean;
+    completed: boolean;
+    reason: string | null;
+  };
+  operation: {
+    active: boolean;
+    operationId: string | null;
+    type: 'update' | 'rollback' | null;
+  };
+  stale?: boolean;
+};
+
+type StructuredUpdateErrorPayload = {
+  message: string;
+  code: string;
+  category: string;
+  stage: string;
+  userMessage: string;
+  technicalMessage: string;
+  operationId: string | null;
+  updateLogId: string | null;
+  exitCode: number | null;
 };
 
 @Injectable()
@@ -35,6 +90,7 @@ export class UpdateService implements OnModuleInit {
     private prisma: PrismaService,
     private auditService: AuditService,
     private readonly systemVersionService: SystemVersionService,
+    private readonly systemUpdateAdminService: SystemUpdateAdminService,
   ) {
     this.encryptionKey = this.resolveEncryptionKey();
   }
@@ -118,50 +174,56 @@ export class UpdateService implements OnModuleInit {
     executedBy: string,
     ipAddress?: string,
     userAgent?: string,
-  ): Promise<{ success: boolean; logId: string; message: string }> {
+  ): Promise<{ success: boolean; logId: string; operationId?: string; status: UpdateExecutionStatus; message: string }> {
     let updateLog: UpdateLog | null = null;
-    let requestedVersion = updateData.version;
+    const normalizedCleanVersion = semver.clean(updateData.version);
+    if (!normalizedCleanVersion) {
+      throw new HttpException(
+        {
+          message: 'Versao invalida',
+          code: 'UPDATE_UNEXPECTED_ERROR',
+          category: 'UPDATE_UNEXPECTED_ERROR',
+          stage: 'validation',
+          userMessage: 'Versao invalida. Informe uma versao semver valida.',
+          technicalMessage: `version=${String(updateData.version || '')}`,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const normalizedVersion = this.formatVersion(normalizedCleanVersion);
+    const mode = this.getInstallationMode();
+    const startedAtIso = new Date().toISOString();
 
     try {
+      await this.reconcileRunningUpdateLogWithSystemState();
+
       const runningUpdate = await this.prisma.updateLog.findFirst({
         where: { status: 'STARTED' },
         orderBy: { startedAt: 'asc' },
       });
 
       if (runningUpdate) {
-        const startedAt = runningUpdate.startedAt ? new Date(runningUpdate.startedAt) : new Date();
-        const ageMs = Date.now() - startedAt.getTime();
-        if (ageMs > 60 * 60 * 1000) {
-          await this.prisma.updateLog.update({
-            where: { id: runningUpdate.id },
-            data: {
-              status: 'FAILED',
-              completedAt: new Date(),
-              rollbackReason: 'stale lock',
-              errorMessage: 'Update lock stale detectado (>60 minutos)',
-            },
-          });
-        } else {
-          throw new HttpException('Já existe uma atualização em andamento', HttpStatus.CONFLICT);
-        }
+        throw new HttpException(
+          {
+            message: 'Ja existe uma atualizacao em andamento',
+            code: 'UPDATE_CONFLICT_ERROR',
+            category: 'UPDATE_UNEXPECTED_ERROR',
+            stage: 'lock',
+            userMessage: 'Ja existe uma atualizacao em andamento. Aguarde a conclusao para iniciar outra.',
+            technicalMessage: `updateLogId=${runningUpdate.id}`,
+            updateLogId: runningUpdate.id,
+          },
+          HttpStatus.CONFLICT,
+        );
       }
 
-      const normalizedCleanVersion = semver.clean(updateData.version);
-      if (!normalizedCleanVersion) {
-        throw new HttpException('Versão inválida', HttpStatus.BAD_REQUEST);
-      }
-      const normalizedVersion = this.formatVersion(normalizedCleanVersion);
-      requestedVersion = normalizedVersion;
-
-      const settings = await this.getSystemSettings();
       const currentVersion = this.getComparableVersion(this.getRuntimeVersionInfo().version);
-
       if (!semver.gt(normalizedCleanVersion, currentVersion)) {
         updateLog = await this.prisma.updateLog.create({
           data: {
             version: normalizedVersion,
             status: 'SUCCESS',
-            packageManager: 'docker',
+            packageManager: mode,
             executedBy,
             ipAddress,
             userAgent,
@@ -169,7 +231,10 @@ export class UpdateService implements OnModuleInit {
             duration: 0,
             executionLogs: JSON.stringify({
               idempotent: true,
-              message: `Versão ${normalizedVersion} já aplicada (atual: ${currentVersion})`,
+              message: `Versao ${normalizedVersion} ja aplicada (atual: ${currentVersion})`,
+              version: normalizedVersion,
+              currentVersion,
+              mode,
             }),
           },
         });
@@ -180,13 +245,14 @@ export class UpdateService implements OnModuleInit {
           tenantId: null,
           ipAddress,
           userAgent,
-          details: { version: normalizedVersion, currentVersion, reason: 'idempotent-skip' },
+          details: { version: normalizedVersion, currentVersion, reason: 'idempotent-skip', mode },
         });
 
         return {
           success: true,
           logId: updateLog.id,
-          message: `Versão ${normalizedVersion} já aplicada. Nenhum redeploy executado.`,
+          status: 'completed',
+          message: `Versao ${normalizedVersion} ja aplicada. Nenhum redeploy executado.`,
         };
       }
 
@@ -194,10 +260,39 @@ export class UpdateService implements OnModuleInit {
         data: {
           version: normalizedVersion,
           status: 'STARTED',
-          packageManager: 'docker',
+          packageManager: mode,
           executedBy,
           ipAddress,
           userAgent,
+          executionLogs: JSON.stringify({
+            mode,
+            phase: 'starting',
+            step: 'api-triggered',
+            requestedVersion: normalizedVersion,
+            startedAt: startedAtIso,
+            operationId: null,
+          }),
+        },
+      });
+
+      const startResult = await this.systemUpdateAdminService.runUpdate({
+        version: normalizedVersion,
+        userId: executedBy,
+        ipAddress,
+        userAgent,
+      });
+
+      await this.prisma.updateLog.update({
+        where: { id: updateLog.id },
+        data: {
+          executionLogs: JSON.stringify({
+            mode,
+            phase: 'running',
+            step: 'job-started',
+            requestedVersion: normalizedVersion,
+            startedAt: startedAtIso,
+            operationId: startResult.operationId,
+          }),
         },
       });
 
@@ -207,86 +302,45 @@ export class UpdateService implements OnModuleInit {
         tenantId: null,
         ipAddress,
         userAgent,
-        details: { version: normalizedVersion, logId: updateLog.id },
-      });
-
-      const startTime = Date.now();
-      const mode = this.getInstallationMode();
-
-      const deployResult = mode === 'docker'
-        ? await this.runSafeImageDeploy(normalizedVersion, settings)
-        : await this.runSafeNativeDeploy(normalizedVersion, settings);
-
-      const combinedOutput = `${deployResult.stdout || ''}\n${deployResult.stderr || ''}`;
-      if (combinedOutput.includes('ROLLBACK_COMPLETED')) {
-        const rollbackError = this.asUpdateExecutionError(
-          new Error('Deploy reportou rollback automático; versão anterior foi mantida'),
-        );
-        rollbackError.stdout = deployResult.stdout || '';
-        rollbackError.stderr = deployResult.stderr || '';
-        rollbackError.exitCode = 2;
-        rollbackError.status = HttpStatus.INTERNAL_SERVER_ERROR;
-        throw rollbackError;
-      }
-      const duration = Math.floor((Date.now() - startTime) / 1000);
-
-      await this.prisma.updateLog.update({
-        where: { id: updateLog.id },
-        data: {
-          status: 'SUCCESS',
-          completedAt: new Date(),
-          duration,
-          executionLogs: JSON.stringify(deployResult),
-        },
-      });
-
-      await this.updateSystemSettings({
-        appVersion: normalizedVersion,
-        releaseTag: normalizedVersion,
-        updateAvailable: false,
-      });
-
-      await this.auditService.log({
-        action: 'UPDATE_SUCCESS',
-        userId: executedBy,
-        tenantId: null,
-        ipAddress,
-        userAgent,
-        details: { version: normalizedVersion, duration, logId: updateLog.id },
+        details: { version: normalizedVersion, logId: updateLog.id, operationId: startResult.operationId, mode },
       });
 
       return {
         success: true,
         logId: updateLog.id,
-        message: `Atualização para ${normalizedVersion} concluída com sucesso`,
+        operationId: startResult.operationId,
+        status: 'starting',
+        message: startResult.message || `Atualizacao para ${normalizedVersion} iniciada.`,
       };
     } catch (error: unknown) {
-      const parsedError = this.asUpdateExecutionError(error);
-      const stdoutRaw = typeof parsedError.stdout === 'string' ? parsedError.stdout : '';
-      const stderrRaw = typeof parsedError.stderr === 'string' ? parsedError.stderr : '';
-      const errorMessageRaw = String(parsedError.message || 'Erro desconhecido durante atualização');
-      const stdout = this.sanitizeGitError(stdoutRaw);
-      const stderr = this.sanitizeGitError(stderrRaw);
-      const errorMessage = this.sanitizeGitError(errorMessageRaw);
-      this.logger.error(`Erro durante atualização: ${errorMessage}`);
-      const combinedErrorOutput = `${stdout}\n${stderr}\n${errorMessage}`;
-      const exitCode = Number(parsedError.code ?? parsedError.exitCode ?? -1);
-      const rollbackDetected =
-        combinedErrorOutput.includes('ROLLBACK_COMPLETED') || exitCode === 2;
+      const mappedError = this.mapExecuteStartError(error, {
+        updateLogId: updateLog?.id || null,
+        requestedVersion: normalizedVersion,
+        operationId: null,
+      });
 
       if (updateLog) {
+        const startedAt = updateLog.startedAt ? new Date(updateLog.startedAt).getTime() : Date.now();
+        const duration = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
         await this.prisma.updateLog.update({
           where: { id: updateLog.id },
           data: {
             status: 'FAILED',
             completedAt: new Date(),
-            errorMessage,
-            rollbackReason: rollbackDetected ? 'automatic rollback executed' : undefined,
+            duration,
+            errorMessage: mappedError.userMessage,
+            rollbackReason:
+              mappedError.code === 'UPDATE_RESTART_ERROR' || mappedError.code === 'UPDATE_PM2_ERROR'
+                ? 'automatic rollback executed'
+                : undefined,
             executionLogs: JSON.stringify({
-              error: errorMessage,
-              stdout,
-              stderr,
-              rollbackDetected,
+              mode,
+              phase: 'failed',
+              step: mappedError.stage,
+              requestedVersion: normalizedVersion,
+              startedAt: startedAtIso,
+              operationId: null,
+              error: mappedError,
             }),
           },
         });
@@ -297,22 +351,42 @@ export class UpdateService implements OnModuleInit {
           tenantId: null,
           ipAddress,
           userAgent,
-          details: { version: requestedVersion, error: errorMessage, rollbackDetected, logId: updateLog.id },
+          details: {
+            version: normalizedVersion,
+            error: mappedError.technicalMessage,
+            code: mappedError.code,
+            category: mappedError.category,
+            stage: mappedError.stage,
+            logId: updateLog.id,
+          },
         });
       }
 
       throw new HttpException(
-        rollbackDetected
-          ? `Erro durante atualização: ${errorMessage}. Rollback automático executado.`
-          : `Erro durante atualização: ${errorMessage}`,
-        parsedError.status || HttpStatus.INTERNAL_SERVER_ERROR,
+        {
+          message: mappedError.userMessage,
+          code: mappedError.code,
+          category: mappedError.category,
+          stage: mappedError.stage,
+          userMessage: mappedError.userMessage,
+          technicalMessage: mappedError.technicalMessage,
+          operationId: mappedError.operationId,
+          updateLogId: mappedError.updateLogId,
+          exitCode: mappedError.exitCode,
+        },
+        mappedError.httpStatus,
       );
     }
   }
 
   async getUpdateStatus(): Promise<UpdateStatusDto> {
     const settings = await this.getSystemSettings();
+    const systemState = await this.safeGetSystemUpdateState();
+    await this.reconcileRunningUpdateLogWithSystemState(systemState);
+    const lifecycle = this.buildLifecycleState(settings, systemState);
     const runtimeVersion = this.getRuntimeVersionInfo().version;
+
+    const mode = systemState?.mode || this.getInstallationMode();
     return {
       currentVersion: this.formatVersion(runtimeVersion),
       availableVersion: settings.availableVersion ? this.formatVersion(settings.availableVersion) : undefined,
@@ -320,7 +394,8 @@ export class UpdateService implements OnModuleInit {
       lastCheck: settings.lastUpdateCheck || undefined,
       isConfigured: !!(settings.gitUsername && settings.gitRepository),
       checkEnabled: settings.updateCheckEnabled || false,
-      mode: this.getInstallationMode(),
+      mode,
+      updateLifecycle: lifecycle,
     };
   }
 
@@ -429,6 +504,321 @@ export class UpdateService implements OnModuleInit {
     return log;
   }
 
+  private async safeGetSystemUpdateState(): Promise<SystemUpdateStateSnapshot | null> {
+    try {
+      const state = await this.systemUpdateAdminService.getStatus();
+      return state as SystemUpdateStateSnapshot;
+    } catch (error) {
+      this.logger.warn(`Falha ao obter status do update admin: ${String(error)}`);
+      return null;
+    }
+  }
+
+  private async reconcileRunningUpdateLogWithSystemState(
+    preloadedSystemState?: SystemUpdateStateSnapshot | null,
+  ): Promise<void> {
+    const runningLogs = await this.prisma.updateLog.findMany({
+      where: { status: 'STARTED' },
+      orderBy: { startedAt: 'asc' },
+      take: 5,
+    });
+    if (runningLogs.length === 0) {
+      return;
+    }
+
+    const systemState = preloadedSystemState ?? (await this.safeGetSystemUpdateState());
+    if (!systemState) {
+      return;
+    }
+
+    const stillRunning =
+      systemState.status === 'running' ||
+      systemState.lock === true ||
+      systemState.operation?.active === true;
+
+    if (stillRunning) {
+      return;
+    }
+
+    const normalizedFinalStatus = this.mapSystemStateToUpdateLogStatus(systemState.status);
+    if (!normalizedFinalStatus) {
+      return;
+    }
+
+    const completedAt = systemState.finishedAt ? new Date(systemState.finishedAt) : new Date();
+    const completedAtSafe = Number.isFinite(completedAt.getTime()) ? completedAt : new Date();
+
+    for (const log of runningLogs) {
+      const startedAtMs = new Date(log.startedAt).getTime();
+      const completedAtMs = completedAtSafe.getTime();
+      const duration = Number.isFinite(startedAtMs) && completedAtMs >= startedAtMs
+        ? Math.floor((completedAtMs - startedAtMs) / 1000)
+        : null;
+
+      const executionLog = this.parseExecutionLogs(log.executionLogs);
+      const mergedExecutionLog = {
+        ...executionLog,
+        reconciled: true,
+        reconciledAt: new Date().toISOString(),
+        finalState: {
+          status: systemState.status,
+          mode: systemState.mode,
+          step: systemState.step,
+          progress: systemState.progress,
+          finishedAt: systemState.finishedAt,
+          operation: systemState.operation,
+          stale: Boolean(systemState.stale),
+          errorCode: systemState.errorCode,
+          errorCategory: systemState.errorCategory,
+          errorStage: systemState.errorStage,
+          exitCode: systemState.exitCode,
+          userMessage: systemState.userMessage,
+          technicalMessage: systemState.technicalMessage,
+          rollback: systemState.rollback,
+        },
+      };
+
+      await this.prisma.updateLog.update({
+        where: { id: log.id },
+        data: {
+          status: normalizedFinalStatus,
+          completedAt: completedAtSafe,
+          duration: duration ?? undefined,
+          errorMessage: systemState.userMessage || systemState.lastError || undefined,
+          rollbackReason:
+            normalizedFinalStatus === 'ROLLED_BACK'
+              ? systemState.rollback?.reason || 'automatic rollback executed'
+              : undefined,
+          executionLogs: JSON.stringify(mergedExecutionLog),
+        },
+      });
+    }
+
+    if (normalizedFinalStatus === 'SUCCESS' && systemState.toVersion && systemState.toVersion !== 'unknown') {
+      await this.updateSystemSettings({
+        appVersion: this.formatVersion(systemState.toVersion),
+        releaseTag: this.formatVersion(systemState.toVersion),
+        updateAvailable: false,
+      });
+    }
+  }
+
+  private mapSystemStateToUpdateLogStatus(status: SystemUpdateStateSnapshot['status']): string | null {
+    if (status === 'success') {
+      return 'SUCCESS';
+    }
+    if (status === 'failed') {
+      return 'FAILED';
+    }
+    if (status === 'rolled_back') {
+      return 'ROLLED_BACK';
+    }
+    return null;
+  }
+
+  private buildLifecycleState(
+    settings: SystemSettings,
+    systemState: SystemUpdateStateSnapshot | null,
+  ): UpdateStatusDto['updateLifecycle'] {
+    const rawStatus = systemState?.status || 'idle';
+    const step = systemState?.step || 'idle';
+    const progress = Number.isFinite(Number(systemState?.progress)) ? Number(systemState?.progress) : 0;
+    const hasStructuredError = Boolean(
+      systemState?.errorCode || systemState?.errorCategory || systemState?.errorStage || systemState?.lastError,
+    );
+
+    const lifecycleStatus = this.resolveLifecycleStatus(settings, systemState);
+
+    return {
+      status: lifecycleStatus,
+      availabilityStatus: settings.updateAvailable ? 'available' : 'not_available',
+      rawStatus,
+      step,
+      progress: progress < 0 ? 0 : progress > 100 ? 100 : Math.floor(progress),
+      startedAt: systemState?.startedAt || null,
+      finishedAt: systemState?.finishedAt || null,
+      mode: systemState?.mode || this.getInstallationMode(),
+      lock: Boolean(systemState?.lock),
+      stale: Boolean(systemState?.stale),
+      operation: {
+        active: Boolean(systemState?.operation?.active),
+        operationId: systemState?.operation?.operationId || null,
+        type: systemState?.operation?.type || null,
+      },
+      rollback: {
+        attempted: Boolean(systemState?.rollback?.attempted),
+        completed: Boolean(systemState?.rollback?.completed),
+        reason: systemState?.rollback?.reason || null,
+      },
+      error: hasStructuredError
+        ? {
+            code: systemState?.errorCode || 'UPDATE_UNEXPECTED_ERROR',
+            category: systemState?.errorCategory || 'UPDATE_UNEXPECTED_ERROR',
+            stage: systemState?.errorStage || step || 'unknown',
+            userMessage: systemState?.userMessage || 'Falha durante atualizacao.',
+            technicalMessage: systemState?.technicalMessage || systemState?.lastError || null,
+            exitCode: systemState?.exitCode ?? null,
+          }
+        : null,
+    };
+  }
+
+  private resolveLifecycleStatus(
+    settings: SystemSettings,
+    systemState: SystemUpdateStateSnapshot | null,
+  ): UpdateLifecycleStatus {
+    const step = String(systemState?.step || '').trim().toLowerCase();
+    const running =
+      systemState?.status === 'running' ||
+      systemState?.lock === true ||
+      systemState?.operation?.active === true;
+
+    if (running) {
+      if (this.isRestartingStep(step)) {
+        return 'restarting_services';
+      }
+      if (this.isStartingStep(step)) {
+        return 'starting';
+      }
+      return 'running';
+    }
+
+    if (systemState?.status === 'success') {
+      return 'completed';
+    }
+
+    if (systemState?.status === 'failed' || systemState?.status === 'rolled_back') {
+      return 'failed';
+    }
+
+    if (settings.updateAvailable) {
+      return 'pending_confirmation';
+    }
+
+    if (settings.lastUpdateCheck) {
+      return 'not_available';
+    }
+
+    return 'idle';
+  }
+
+  private isStartingStep(step: string): boolean {
+    return /^(starting|init|prepare|precheck|backup|download|checkout|build|migrate|seed)/i.test(step);
+  }
+
+  private isRestartingStep(step: string): boolean {
+    return /(restart|health|swap|switch|rollback|pm2|systemd|container|compose)/i.test(step);
+  }
+
+  private parseExecutionLogs(raw: string | null | undefined): Record<string, unknown> {
+    if (!raw) {
+      return {};
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return parsed as Record<string, unknown>;
+      }
+      return {};
+    } catch {
+      return { raw };
+    }
+  }
+
+  private mapExecuteStartError(
+    error: unknown,
+    context: {
+      updateLogId: string | null;
+      requestedVersion: string;
+      operationId: string | null;
+    },
+  ): StructuredUpdateErrorPayload & { httpStatus: number } {
+    if (error instanceof HttpException) {
+      const response = error.getResponse();
+      const status = this.normalizeHttpStatus(error.getStatus(), HttpStatus.INTERNAL_SERVER_ERROR);
+      const responseObj =
+        typeof response === 'string'
+          ? ({ message: response } as Record<string, unknown>)
+          : ((response || {}) as Record<string, unknown>);
+      const message = String(responseObj.message || responseObj.userMessage || 'Falha ao iniciar atualizacao');
+      const technicalMessage = String(
+        responseObj.technicalMessage ||
+          responseObj.detail ||
+          responseObj.error ||
+          `HttpException status=${status}`,
+      );
+      return {
+        message,
+        code: String(responseObj.code || 'UPDATE_UNEXPECTED_ERROR'),
+        category: String(responseObj.category || 'UPDATE_UNEXPECTED_ERROR'),
+        stage: String(responseObj.stage || 'starting'),
+        userMessage: String(responseObj.userMessage || message),
+        technicalMessage,
+        operationId: (responseObj.operationId as string) || context.operationId,
+        updateLogId: (responseObj.updateLogId as string) || context.updateLogId,
+        exitCode: Number.isFinite(Number(responseObj.exitCode)) ? Number(responseObj.exitCode) : null,
+        httpStatus: status,
+      };
+    }
+
+    const rawObject = error && typeof error === 'object' ? (error as Record<string, unknown>) : {};
+    const parsedError = this.asUpdateExecutionError(error);
+    const rawStatus = Number(rawObject.status ?? (parsedError as { status?: unknown }).status);
+    const httpStatus = this.normalizeHttpStatus(
+      Number.isFinite(rawStatus) ? rawStatus : HttpStatus.INTERNAL_SERVER_ERROR,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+
+    const technicalMessage = this.sanitizeGitError(
+      String(parsedError.stderr || parsedError.message || 'Erro desconhecido ao iniciar update'),
+    );
+    const technicalNormalized = technicalMessage.toLowerCase();
+
+    let code = 'UPDATE_UNEXPECTED_ERROR';
+    let category = 'UPDATE_UNEXPECTED_ERROR';
+    let stage = 'starting';
+    let userMessage = 'Falha inesperada ao iniciar a atualizacao.';
+
+    if (/timeout|timed out|etimedout/.test(technicalNormalized)) {
+      code = 'UPDATE_TIMEOUT';
+      category = 'UPDATE_TIMEOUT';
+      stage = 'timeout';
+      userMessage = 'A inicializacao da atualizacao excedeu o tempo limite.';
+    } else if (/github|rate limit|eai_again|enotfound|network|fetch/i.test(technicalNormalized)) {
+      code = 'UPDATE_NETWORK_ERROR';
+      category = 'UPDATE_NETWORK_ERROR';
+      stage = 'github';
+      userMessage = 'Falha de rede ao consultar origem de atualizacao.';
+    } else if (/permission denied|eacces|operation not permitted/.test(technicalNormalized)) {
+      code = 'UPDATE_SCRIPT_ERROR';
+      category = 'UPDATE_SCRIPT_ERROR';
+      stage = 'permissions';
+      userMessage = 'Falha de permissao para iniciar o processo de atualizacao.';
+    }
+
+    return {
+      message: userMessage,
+      code,
+      category,
+      stage,
+      userMessage,
+      technicalMessage,
+      operationId: context.operationId,
+      updateLogId: context.updateLogId,
+      exitCode: Number.isFinite(Number(rawObject.exitCode ?? rawObject.code ?? parsedError.exitCode ?? parsedError.code))
+        ? Number(rawObject.exitCode ?? rawObject.code ?? parsedError.exitCode ?? parsedError.code)
+        : null,
+      httpStatus,
+    };
+  }
+
+  private normalizeHttpStatus(statusLike: unknown, fallback: number = HttpStatus.INTERNAL_SERVER_ERROR): number {
+    const status = Number(statusLike);
+    if (Number.isInteger(status) && status >= 100 && status <= 599) {
+      return status;
+    }
+    return fallback;
+  }
   private async getSystemSettings(): Promise<SystemSettings> {
     let settings = await this.prisma.systemSettings.findFirst();
 
@@ -745,3 +1135,5 @@ export class UpdateService implements OnModuleInit {
     return new Error(String(error)) as UpdateExecutionError;
   }
 }
+
+

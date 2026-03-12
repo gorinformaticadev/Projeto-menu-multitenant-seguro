@@ -1,24 +1,24 @@
 import { IsString, IsOptional, IsEnum, Matches } from 'class-validator';
 
 /**
- * DTO para execução de atualização
+ * DTO para execucao de atualizacao
  */
 export class ExecuteUpdateDto {
   @IsString()
   @Matches(/^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.-]+)?$/, {
-    message: 'Versão deve seguir o formato semver (ex: v1.2.3 ou 1.2.3)',
+    message: 'Versao deve seguir o formato semver (ex: v1.2.3 ou 1.2.3)',
   })
   version: string;
 
   // Campo mantido apenas por compatibilidade de payload da UI.
-  // O backend ignora este valor e sempre executa update com fluxo Docker controlado.
+  // O backend ignora este valor e detecta automaticamente o modo de instalacao.
   @IsOptional()
   @IsString()
   packageManager?: string;
 }
 
 /**
- * DTO para configuração do sistema de updates
+ * DTO para configuracao do sistema de updates
  */
 export class UpdateConfigDto {
   @IsOptional()
@@ -54,14 +54,14 @@ export class UpdateConfigDto {
   @IsOptional()
   @IsString()
   @Matches(/^(docker-compose\.prod\.yml|docker-compose\.prod\.external\.yml)$/, {
-    message: 'composeFile inválido. Use docker-compose.prod.yml ou docker-compose.prod.external.yml',
+    message: 'composeFile invalido. Use docker-compose.prod.yml ou docker-compose.prod.external.yml',
   })
   composeFile?: string;
 
   @IsOptional()
   @IsString()
   @Matches(/^(install\/\.env\.production|\.env\.production|\.env)$/, {
-    message: 'envFile inválido. Use install/.env.production, .env.production ou .env',
+    message: 'envFile invalido. Use install/.env.production, .env.production ou .env',
   })
   envFile?: string;
 }
@@ -77,10 +77,50 @@ export class UpdateStatusDto {
   isConfigured: boolean;
   checkEnabled: boolean;
   mode: 'docker' | 'native';
+  updateLifecycle?: {
+    status:
+      | 'idle'
+      | 'checking'
+      | 'available'
+      | 'not_available'
+      | 'pending_confirmation'
+      | 'starting'
+      | 'running'
+      | 'restarting_services'
+      | 'completed'
+      | 'failed';
+    availabilityStatus: 'available' | 'not_available';
+    rawStatus: 'idle' | 'running' | 'success' | 'failed' | 'rolled_back';
+    step: string;
+    progress: number;
+    startedAt: string | null;
+    finishedAt: string | null;
+    mode: 'docker' | 'native';
+    lock: boolean;
+    stale: boolean;
+    operation: {
+      active: boolean;
+      operationId: string | null;
+      type: 'update' | 'rollback' | null;
+    };
+    rollback: {
+      attempted: boolean;
+      completed: boolean;
+      reason: string | null;
+    };
+    error: {
+      code: string;
+      category: string;
+      stage: string;
+      userMessage: string;
+      technicalMessage: string | null;
+      exitCode: number | null;
+    } | null;
+  };
 }
 
 /**
- * DTO de resposta para logs de atualização
+ * DTO de resposta para logs de atualizacao
  */
 export class UpdateLogDto {
   id: string;

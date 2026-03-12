@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   HttpException,
   HttpStatus,
   Param,
@@ -74,6 +75,7 @@ export class UpdateController {
   @Post('execute')
   @Roles(Role.SUPER_ADMIN)
   @Throttle({ default: { limit: 3, ttl: 3600000 } })
+  @HttpCode(HttpStatus.ACCEPTED)
   async executeUpdate(@Body() updateData: ExecuteUpdateDto, @Request() req) {
     try {
       const userId = req.user.sub;

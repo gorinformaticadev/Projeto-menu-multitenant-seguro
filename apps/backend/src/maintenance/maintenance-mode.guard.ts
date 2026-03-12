@@ -90,7 +90,15 @@ export class MaintenanceModeGuard implements CanActivate {
       return true;
     }
 
+    if (method === 'GET' && this.matchesPath(requestPath, '/api/update/status')) {
+      return true;
+    }
+
     if (method === 'GET' && this.matchesPath(requestPath, '/api/system/update/log')) {
+      return true;
+    }
+
+    if (method === 'GET' && this.matchesPath(requestPath, '/api/update/logs')) {
       return true;
     }
 

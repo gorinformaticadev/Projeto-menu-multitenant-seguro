@@ -26,6 +26,13 @@ import { RestoreSection } from './components/RestoreSection';
 import { useSystemVersion } from '@/hooks/useSystemVersion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMaintenance } from '@/contexts/MaintenanceContext';
+import {
+  formatUpdateLifecycleStatus,
+  formatUpdateStage,
+  isUpdateLifecycleRunning,
+  parseUpdateApiError,
+  UpdateLifecycleStatus,
+} from './update-flow.utils';
 
 /**
  * Página de Gerenciamento do Sistema de Atualizações
@@ -46,6 +53,36 @@ interface UpdateStatus {
   isConfigured: boolean;
   checkEnabled: boolean;
   mode: 'docker' | 'native';
+  updateLifecycle?: {
+    status: UpdateLifecycleStatus;
+    availabilityStatus: 'available' | 'not_available';
+    rawStatus: 'idle' | 'running' | 'success' | 'failed' | 'rolled_back';
+    step: string;
+    progress: number;
+    startedAt: string | null;
+    finishedAt: string | null;
+    mode: 'docker' | 'native';
+    lock: boolean;
+    stale: boolean;
+    operation: {
+      active: boolean;
+      operationId: string | null;
+      type: 'update' | 'rollback' | null;
+    };
+    rollback: {
+      attempted: boolean;
+      completed: boolean;
+      reason: string | null;
+    };
+    error: {
+      code: string;
+      category: string;
+      stage: string;
+      userMessage: string;
+      technicalMessage: string | null;
+      exitCode: number | null;
+    } | null;
+  };
 }
 
 interface UpdateLog {
@@ -91,26 +128,14 @@ interface BackupLog {
   errorMessage?: string;
 }
 
-interface ApiErrorMessage {
-  response?: {
-    data?: {
-      message?: string;
-    };
-  };
-  message?: string;
-}
-
 function normalizeVersionTag(version: string): string {
   const value = (version || '').trim();
   if (!value) return value;
   return value.startsWith('v') ? value : `v${value}`;
 }
 
-function getApiErrorMessage(error: unknown): string {
-  return (
-    (error as ApiErrorMessage).response?.data?.message ||
-    (error instanceof Error ? error.message : 'Erro interno do servidor')
-  );
+function getApiErrorMessage(error: unknown, fallback = 'Erro interno do servidor'): string {
+  return parseUpdateApiError(error, fallback).userMessage;
 }
 
 function formatBuildDate(value?: string): string {
@@ -159,6 +184,9 @@ export default function UpdatesPage() {
   const [activeTab, setActiveTab] = useState('status');
   const [backupLogs, setBackupLogs] = useState<BackupLog[]>([]);
   const [hasSavedGitToken, setHasSavedGitToken] = useState(false);
+  const lifecycle = status?.updateLifecycle;
+  const lifecycleStatus = lifecycle?.status || 'idle';
+  const isUpdateRunning = isUpdateLifecycleRunning(lifecycleStatus) || loading.update;
 
   useEffect(() => {
     const requestedTab = (searchParams.get('tab') || '').trim().toLowerCase();
@@ -242,7 +270,7 @@ export default function UpdatesPage() {
    * Executa atualização para versão disponível
    */
   const executeUpdate = async () => {
-    if (!status?.availableVersion) return;
+    if (!status?.availableVersion || isUpdateRunning) return;
 
     try {
       setLoading(prev => ({ ...prev, update: true }));
@@ -253,23 +281,18 @@ export default function UpdatesPage() {
       });
 
       toast({
-        title: 'Atualização iniciada',
+        title: 'Atualizacao iniciada',
         description: response.data.message,
         variant: 'default',
       });
 
       setShowUpdateConfirm(false);
-
-      // Recarregar dados após alguns segundos
-      setTimeout(() => {
-        loadStatus();
-        loadLogs();
-      }, 3000);
-
+      await Promise.all([loadStatus(), loadLogs()]);
     } catch (error: unknown) {
+      const parsed = parseUpdateApiError(error, 'Falha ao iniciar atualizacao');
       toast({
-        title: 'Erro na atualização',
-        description: getApiErrorMessage(error),
+        title: 'Erro na atualizacao',
+        description: `${parsed.userMessage} (etapa: ${formatUpdateStage(parsed.stage)})`,
         variant: 'destructive',
       });
     } finally {
@@ -372,6 +395,19 @@ export default function UpdatesPage() {
     loadBackupLogs();
     refreshVersion();
   }, [loadStatus, loadConfig, loadLogs, loadBackupLogs, refreshVersion]);
+
+  useEffect(() => {
+    if (!isUpdateLifecycleRunning(lifecycleStatus)) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void loadStatus();
+      void loadLogs();
+    }, 3000);
+
+    return () => window.clearInterval(intervalId);
+  }, [lifecycleStatus, loadLogs, loadStatus]);
 
   /**
    * Testa conectividade com repositório
@@ -601,6 +637,48 @@ export default function UpdatesPage() {
             </Card>
 
             {/* Alertas e Ações */}
+            {status?.updateLifecycle && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Fluxo de Atualizacao</CardTitle>
+                  <CardDescription>
+                    Estado atual: {formatUpdateLifecycleStatus(status.updateLifecycle.status)}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      Etapa: {formatUpdateStage(status.updateLifecycle.step)}
+                    </span>
+                    <span className="font-medium">{Math.max(0, Math.min(100, status.updateLifecycle.progress || 0))}%</span>
+                  </div>
+                  <div className="h-2 w-full rounded bg-slate-200 overflow-hidden">
+                    <div
+                      className="h-2 rounded bg-blue-600 transition-all duration-300"
+                      style={{ width: `${Math.max(0, Math.min(100, status.updateLifecycle.progress || 0))}%` }}
+                    />
+                  </div>
+                  {status.updateLifecycle.operation?.operationId && (
+                    <div className="text-xs text-muted-foreground font-mono break-all">
+                      operationId: {status.updateLifecycle.operation.operationId}
+                    </div>
+                  )}
+                  {status.updateLifecycle.error && (
+                    <div className="flex items-start gap-2 p-3 border border-red-200 bg-red-50 rounded-lg">
+                      <XCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-red-800 space-y-1">
+                        <div>
+                          <strong>Falha:</strong> {status.updateLifecycle.error.userMessage}
+                        </div>
+                        <div className="text-xs">
+                          Codigo: {status.updateLifecycle.error.code} | Etapa: {formatUpdateStage(status.updateLifecycle.error.stage)}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
             {!status?.isConfigured && (
               <div className="flex items-start gap-3 p-4 border border-yellow-200 bg-yellow-50 rounded-lg">
                 <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
@@ -624,7 +702,7 @@ export default function UpdatesPage() {
             <div className="flex gap-4">
               <Button
                 onClick={checkForUpdates}
-                disabled={loading.check || !status?.isConfigured || isMaintenanceActive}
+                disabled={loading.check || !status?.isConfigured || isMaintenanceActive || isUpdateRunning}
                 variant="outline"
               >
                 <RefreshCw className={`w-4 h-4 mr-2 ${loading.check ? 'animate-spin' : ''}`} />
@@ -634,7 +712,7 @@ export default function UpdatesPage() {
               {status?.updateAvailable && (
                 <Button
                   onClick={() => setShowUpdateConfirm(true)}
-                  disabled={loading.update || isMaintenanceActive}
+                  disabled={isUpdateRunning || isMaintenanceActive}
                   className="bg-green-600 hover:bg-green-700"
                 >
                   <Download className="w-4 h-4 mr-2" />
@@ -665,7 +743,7 @@ export default function UpdatesPage() {
                     <div className="flex gap-2 pt-2">
                       <Button
                         onClick={executeUpdate}
-                        disabled={loading.update || isMaintenanceActive}
+                        disabled={isUpdateRunning || isMaintenanceActive}
                         size="sm"
                         className="bg-green-600 hover:bg-green-700"
                       >
@@ -1085,3 +1163,6 @@ export default function UpdatesPage() {
     </div>
   );
 }
+
+
+

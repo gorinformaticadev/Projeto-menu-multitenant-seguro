@@ -8,9 +8,11 @@ import { NotificationService } from '../notifications/notification.service';
 import { PathsService } from '@core/common/paths/paths.service';
 
 type UpdateStateStatus = 'idle' | 'running' | 'success' | 'failed' | 'rolled_back';
+type UpdateMode = 'docker' | 'native';
 
 type UpdateState = {
   status: UpdateStateStatus;
+  mode: UpdateMode;
   startedAt: string | null;
   finishedAt: string | null;
   fromVersion: string;
@@ -19,6 +21,12 @@ type UpdateState = {
   progress: number;
   lock: boolean;
   lastError: string | null;
+  errorCode: string | null;
+  errorCategory: string | null;
+  errorStage: string | null;
+  exitCode: number | null;
+  userMessage: string | null;
+  technicalMessage: string | null;
   rollback: {
     attempted: boolean;
     completed: boolean;
@@ -48,10 +56,19 @@ type RuntimePaths = {
   lockPath: string;
   updateScriptPath: string;
   rollbackScriptPath: string;
+  mode: UpdateMode;
+};
+
+type UpdateFailureDescriptor = {
+  code: string;
+  category: string;
+  stage: string;
+  userMessage: string;
 };
 
 const DEFAULT_UPDATE_STATE: UpdateState = {
   status: 'idle',
+  mode: 'native',
   startedAt: null,
   finishedAt: null,
   fromVersion: 'unknown',
@@ -60,6 +77,12 @@ const DEFAULT_UPDATE_STATE: UpdateState = {
   progress: 0,
   lock: false,
   lastError: null,
+  errorCode: null,
+  errorCategory: null,
+  errorStage: null,
+  exitCode: null,
+  userMessage: null,
+  technicalMessage: null,
   rollback: {
     attempted: false,
     completed: false,
@@ -90,13 +113,20 @@ export class SystemUpdateAdminService {
       throw new HttpException('Versao obrigatoria para iniciar update', HttpStatus.BAD_REQUEST);
     }
 
-    const runtime = this.resolveRuntimePaths();
-    this.ensureNativeMode();
-    this.ensureScriptExists(runtime.updateScriptPath, 'update-native.sh');
+    const mode = this.detectInstallationMode();
+    const runtime = this.resolveRuntimePaths(mode);
+    this.ensureScriptExists(runtime.updateScriptPath, mode === 'docker' ? 'update-images.sh' : 'update-native.sh');
     await this.assertNoRunningOperation(runtime, true);
     const fromVersion = await this.resolveCurrentVersion(runtime.baseDir);
 
-    if (request.legacyInplace) {
+    if (request.legacyInplace && mode !== 'native') {
+      throw new HttpException(
+        'Modo --legacy-inplace disponivel apenas para instalacao nativa.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (request.legacyInplace && mode === 'native') {
       const allowLegacyApi = process.env.UPDATE_ALLOW_LEGACY_INPLACE_API === 'true';
       if (!allowLegacyApi) {
         throw new HttpException(
@@ -106,13 +136,23 @@ export class SystemUpdateAdminService {
       }
     }
 
-    const args = [runtime.updateScriptPath, '--tag', version];
-    if (request.legacyInplace) {
+    const args = [runtime.updateScriptPath];
+    if (mode === 'native') {
+      args.push('--tag', version);
+    }
+    if (request.legacyInplace && mode === 'native') {
       args.push('--legacy-inplace');
     }
 
+    await this.writeUpdateRunningState(runtime, fromVersion, version);
+    await this.appendLog(runtime.logPath, 'update', `Update solicitado para versao ${version} (mode=${mode}).`);
+
     const operationId = this.createOperationId('update');
-    const child = this.spawnOperation('update', operationId, 'bash', args, runtime);
+    const child = this.spawnOperation('update', operationId, 'bash', args, runtime, {
+      TARGET_TAG: version,
+      RELEASE_TAG: version,
+      PROJECT_ROOT: runtime.baseDir,
+    });
 
     await this.auditService.log({
       action: 'UPDATE_RUN_REQUESTED',
@@ -132,6 +172,7 @@ export class SystemUpdateAdminService {
         operationId,
         fromVersion,
         toVersion: version,
+        mode,
         source: 'panel',
         legacyInplace: !!request.legacyInplace,
       },
@@ -155,6 +196,7 @@ export class SystemUpdateAdminService {
         operationId,
         fromVersion,
         toVersion: version,
+        mode,
         source: 'panel',
       },
     });
@@ -167,6 +209,7 @@ export class SystemUpdateAdminService {
       data: {
         operationId,
         toVersion: version,
+        mode,
       },
       module: 'update',
     });
@@ -178,11 +221,12 @@ export class SystemUpdateAdminService {
       requestedByEmail: request.userEmail,
       requestedByRole: request.userRole,
       requestedFromVersion: fromVersion,
-      requestedVersion: version,
-      ipAddress: request.ipAddress,
-      userAgent: request.userAgent,
-      requestedAt: this.nowIso(),
-    });
+          requestedVersion: version,
+          mode,
+          ipAddress: request.ipAddress,
+          userAgent: request.userAgent,
+          requestedAt: this.nowIso(),
+        });
 
     return {
       success: true,
@@ -196,7 +240,7 @@ export class SystemUpdateAdminService {
     operationId: string;
     message: string;
   }> {
-    const runtime = this.resolveRuntimePaths();
+    const runtime = this.resolveRuntimePaths('native');
     this.ensureNativeMode();
     this.ensureScriptExists(runtime.rollbackScriptPath, 'rollback-native.sh');
     await this.assertNoRunningOperation(runtime, true);
@@ -241,6 +285,7 @@ export class SystemUpdateAdminService {
       requestedByRole: request.userRole,
       requestedFromVersion: fromVersion,
       requestedVersion: target,
+      mode: 'native',
       ipAddress: request.ipAddress,
       userAgent: request.userAgent,
       requestedAt: this.nowIso(),
@@ -380,7 +425,7 @@ export class SystemUpdateAdminService {
     };
   }
 
-  private resolveRuntimePaths(): RuntimePaths {
+  private resolveRuntimePaths(mode: UpdateMode = this.detectInstallationMode()): RuntimePaths {
     const baseDir = this.resolveBaseDir();
     const sharedDir = path.join(baseDir, 'shared');
     const releasesDir = path.join(baseDir, 'releases');
@@ -388,11 +433,18 @@ export class SystemUpdateAdminService {
     const logPath = path.join(sharedDir, 'logs', 'update.log');
     const lockPath = path.join(sharedDir, 'locks', 'update.lock');
 
-    const updateScriptCandidates = [
-      path.join(baseDir, 'current', 'install', 'update-native.sh'),
-      path.join(this.pathsService.getProjectRoot(), 'install', 'update-native.sh'),
-      path.join(baseDir, 'install', 'update-native.sh'),
-    ];
+    const updateScriptCandidates =
+      mode === 'docker'
+        ? [
+            path.join(baseDir, 'current', 'install', 'update-images.sh'),
+            path.join(this.pathsService.getProjectRoot(), 'install', 'update-images.sh'),
+            path.join(baseDir, 'install', 'update-images.sh'),
+          ]
+        : [
+            path.join(baseDir, 'current', 'install', 'update-native.sh'),
+            path.join(this.pathsService.getProjectRoot(), 'install', 'update-native.sh'),
+            path.join(baseDir, 'install', 'update-native.sh'),
+          ];
     const rollbackScriptCandidates = [
       path.join(baseDir, 'current', 'install', 'rollback-native.sh'),
       path.join(this.pathsService.getProjectRoot(), 'install', 'rollback-native.sh'),
@@ -408,7 +460,29 @@ export class SystemUpdateAdminService {
       lockPath,
       updateScriptPath: this.pickExistingPath(updateScriptCandidates),
       rollbackScriptPath: this.pickExistingPath(rollbackScriptCandidates),
+      mode,
     };
+  }
+
+  private detectInstallationMode(): UpdateMode {
+    try {
+      if (process.env.IS_DOCKER === 'true') {
+        return 'docker';
+      }
+      if (fs.existsSync('/.dockerenv')) {
+        return 'docker';
+      }
+      const cgroupPath = '/proc/1/cgroup';
+      if (fs.existsSync(cgroupPath)) {
+        const cgroup = fs.readFileSync(cgroupPath, 'utf8');
+        if (/docker|containerd|kubepods/i.test(cgroup)) {
+          return 'docker';
+        }
+      }
+    } catch (error) {
+      this.logger.warn(`Falha ao detectar modo de instalacao automaticamente: ${String(error)}`);
+    }
+    return 'native';
   }
 
   private resolveBaseDir(): string {
@@ -446,9 +520,9 @@ export class SystemUpdateAdminService {
   }
 
   private ensureNativeMode(): void {
-    if (process.env.IS_DOCKER === 'true') {
+    if (this.detectInstallationMode() === 'docker') {
       throw new HttpException(
-        'Endpoints /api/system/update/* estao disponiveis somente para instalacao nativa.',
+        'Operacao disponivel somente para instalacao nativa.',
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -458,6 +532,25 @@ export class SystemUpdateAdminService {
     const state = await this.readState(runtime.statePath);
     const runningByState = state.status === 'running' && state.lock;
     const runningInMemory = this.activeProcess !== null;
+    const staleState = runningByState && this.isStaleRunningState(state) && !runningInMemory;
+
+    if (staleState) {
+      await this.mergeState(runtime.statePath, {
+        status: 'failed',
+        finishedAt: this.nowIso(),
+        step: 'stale-lock-recovered',
+        progress: 100,
+        lock: false,
+        lastError: state.lastError || 'Lock de atualizacao stale detectado e liberado automaticamente.',
+        errorCode: 'UPDATE_STATUS_PERSISTENCE_ERROR',
+        errorCategory: 'UPDATE_STATUS_PERSISTENCE_ERROR',
+        errorStage: 'lock',
+        exitCode: null,
+        userMessage: 'Uma atualizacao anterior ficou presa e o lock foi recuperado.',
+        technicalMessage: state.lastError || 'stale lock auto-recovered',
+      });
+      return;
+    }
 
     if (!runningByState && !runningInMemory) {
       return;
@@ -487,12 +580,14 @@ export class SystemUpdateAdminService {
     command: string,
     args: string[],
     runtime: RuntimePaths,
+    extraEnv: NodeJS.ProcessEnv = {},
   ): ChildProcessWithoutNullStreams {
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       APP_BASE_DIR: runtime.baseDir,
       UPLOADS_DIR: path.join(runtime.sharedDir, 'uploads'),
       BACKUP_DIR: path.join(runtime.sharedDir, 'backups'),
+      ...extraEnv,
     };
 
     const child = spawn(command, args, {
@@ -519,6 +614,7 @@ export class SystemUpdateAdminService {
       requestedByRole?: string;
       requestedFromVersion?: string;
       requestedVersion: string;
+      mode: UpdateMode;
       ipAddress?: string;
       userAgent?: string;
       requestedAt: string;
@@ -529,6 +625,7 @@ export class SystemUpdateAdminService {
       operationType: meta.operationType,
       fromVersion: meta.requestedFromVersion || null,
       toVersion: meta.requestedVersion,
+      mode: meta.mode,
       source: 'panel',
     };
 
@@ -554,9 +651,26 @@ export class SystemUpdateAdminService {
 
     child.on('error', async (error) => {
       const errorMessage = String(error);
+      const descriptor = this.resolveFailureDescriptor(meta.operationType, 40, meta.operationType);
       if (meta.operationType === 'rollback') {
         await this.writeRollbackFailedState(runtime, `Falha ao executar rollback: ${errorMessage}`);
         await this.appendLog(runtime.logPath, 'rollback', `ERROR: Falha ao executar rollback: ${errorMessage}`);
+      } else {
+        await this.mergeState(runtime.statePath, {
+          status: 'failed',
+          finishedAt: this.nowIso(),
+          step: meta.operationType,
+          progress: 100,
+          lock: false,
+          lastError: errorMessage,
+          errorCode: descriptor.code,
+          errorCategory: descriptor.category,
+          errorStage: descriptor.stage,
+          exitCode: null,
+          userMessage: descriptor.userMessage,
+          technicalMessage: errorMessage,
+        });
+        await this.appendLog(runtime.logPath, 'update', `ERROR: Falha ao executar script: ${errorMessage}`);
       }
 
       this.logger.error(
@@ -571,6 +685,9 @@ export class SystemUpdateAdminService {
         stateStatus: 'failed',
         stateStep: meta.operationType,
         lastError: this.sanitizeAuditError(errorMessage),
+        errorCode: descriptor.code,
+        errorCategory: descriptor.category,
+        errorStage: descriptor.stage,
         rollbackAttempted: false,
         rollbackCompleted: false,
       };
@@ -607,6 +724,7 @@ export class SystemUpdateAdminService {
     child.on('close', async (code) => {
       const exitCode = Number(code ?? -1);
       const hint = this.mapExitCodeToHint(exitCode);
+      const descriptor = this.resolveFailureDescriptor(meta.operationType, exitCode, meta.operationType);
 
       if (meta.operationType === 'rollback') {
         if (exitCode === 0) {
@@ -619,7 +737,41 @@ export class SystemUpdateAdminService {
         }
       }
 
-      const state = await this.readState(runtime.statePath);
+      let state = await this.readState(runtime.statePath);
+      if (meta.operationType === 'update') {
+        if (exitCode === 0 && state.status !== 'success' && state.status !== 'rolled_back') {
+          state = await this.mergeState(runtime.statePath, {
+            status: 'success',
+            finishedAt: this.nowIso(),
+            step: 'completed',
+            progress: 100,
+            lock: false,
+            lastError: null,
+            errorCode: null,
+            errorCategory: null,
+            errorStage: null,
+            exitCode,
+            userMessage: null,
+            technicalMessage: null,
+          });
+        } else if (exitCode !== 0) {
+          const isRolledBack = state.status === 'rolled_back' || exitCode === 50 || exitCode === 2;
+          state = await this.mergeState(runtime.statePath, {
+            status: isRolledBack ? 'rolled_back' : 'failed',
+            finishedAt: this.nowIso(),
+            step: isRolledBack ? 'rollback' : state.step || 'failed',
+            progress: 100,
+            lock: false,
+            lastError: state.lastError || hint || `Atualizacao finalizada com erro (code=${exitCode})`,
+            errorCode: descriptor.code,
+            errorCategory: descriptor.category,
+            errorStage: descriptor.stage,
+            exitCode,
+            userMessage: descriptor.userMessage,
+            technicalMessage: state.lastError || hint || `exitCode=${exitCode}`,
+          });
+        }
+      }
 
       if (exitCode === 0) {
         this.logger.log(
@@ -669,6 +821,9 @@ export class SystemUpdateAdminService {
         stateStatus: state.status,
         stateStep: state.step,
         lastError: this.sanitizeAuditError(state.lastError),
+        errorCode: state.errorCode,
+        errorCategory: state.errorCategory,
+        errorStage: state.errorStage,
         rollbackAttempted: Boolean(state.rollback?.attempted),
         rollbackCompleted: Boolean(state.rollback?.completed),
       };
@@ -722,6 +877,7 @@ export class SystemUpdateAdminService {
       const status = this.normalizeStateStatus(parsed.status);
       return {
         status,
+        mode: this.normalizeMode(parsed.mode),
         startedAt: this.normalizeNullableString(parsed.startedAt),
         finishedAt: this.normalizeNullableString(parsed.finishedAt),
         fromVersion: this.normalizeString(parsed.fromVersion, 'unknown'),
@@ -730,6 +886,12 @@ export class SystemUpdateAdminService {
         progress: this.normalizeProgress(parsed.progress),
         lock: Boolean(parsed.lock),
         lastError: this.normalizeNullableString(parsed.lastError),
+        errorCode: this.normalizeNullableString(parsed.errorCode),
+        errorCategory: this.normalizeNullableString(parsed.errorCategory),
+        errorStage: this.normalizeNullableString(parsed.errorStage),
+        exitCode: this.normalizeNullableNumber(parsed.exitCode),
+        userMessage: this.normalizeNullableString(parsed.userMessage),
+        technicalMessage: this.normalizeNullableString(parsed.technicalMessage),
         rollback: {
           attempted: Boolean(parsed.rollback?.attempted),
           completed: Boolean(parsed.rollback?.completed),
@@ -741,6 +903,11 @@ export class SystemUpdateAdminService {
         ...DEFAULT_UPDATE_STATE,
         status: 'failed',
         lastError: 'update-state.json invalido',
+        errorCode: 'UPDATE_STATUS_PERSISTENCE_ERROR',
+        errorCategory: 'UPDATE_STATUS_PERSISTENCE_ERROR',
+        errorStage: 'state-read',
+        technicalMessage: 'Arquivo update-state.json invalido',
+        userMessage: 'Falha ao ler o estado persistido da atualizacao.',
       };
     }
   }
@@ -754,6 +921,14 @@ export class SystemUpdateAdminService {
     return 'idle';
   }
 
+  private normalizeMode(value: unknown): UpdateMode {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'docker' || normalized === 'native') {
+      return normalized;
+    }
+    return this.detectInstallationMode();
+  }
+
   private normalizeString(value: unknown, fallback: string): string {
     const normalized = String(value || '').trim();
     return normalized || fallback;
@@ -762,6 +937,14 @@ export class SystemUpdateAdminService {
   private normalizeNullableString(value: unknown): string | null {
     const normalized = String(value || '').trim();
     return normalized || null;
+  }
+
+  private normalizeNullableNumber(value: unknown): number | null {
+    const normalized = Number(value);
+    if (!Number.isFinite(normalized)) {
+      return null;
+    }
+    return normalized;
   }
 
   private normalizeProgress(value: unknown): number {
@@ -843,10 +1026,41 @@ export class SystemUpdateAdminService {
     return merged;
   }
 
+  private async writeUpdateRunningState(
+    runtime: RuntimePaths,
+    fromVersion: string,
+    toVersion: string,
+  ): Promise<void> {
+    await this.mergeState(runtime.statePath, {
+      status: 'running',
+      mode: runtime.mode,
+      startedAt: this.nowIso(),
+      finishedAt: null,
+      fromVersion,
+      toVersion,
+      step: 'starting',
+      progress: 2,
+      lock: true,
+      lastError: null,
+      errorCode: null,
+      errorCategory: null,
+      errorStage: null,
+      exitCode: null,
+      userMessage: null,
+      technicalMessage: null,
+      rollback: {
+        attempted: false,
+        completed: false,
+        reason: null,
+      },
+    });
+  }
+
   private async writeRollbackRunningState(runtime: RuntimePaths, target: string): Promise<void> {
     const fromVersion = await this.resolveCurrentVersion(runtime.baseDir);
     await this.mergeState(runtime.statePath, {
       status: 'running',
+      mode: 'native',
       startedAt: this.nowIso(),
       finishedAt: null,
       fromVersion,
@@ -855,6 +1069,12 @@ export class SystemUpdateAdminService {
       progress: 10,
       lock: true,
       lastError: null,
+      errorCode: null,
+      errorCategory: null,
+      errorStage: null,
+      exitCode: null,
+      userMessage: null,
+      technicalMessage: null,
       rollback: {
         attempted: true,
         completed: false,
@@ -866,12 +1086,19 @@ export class SystemUpdateAdminService {
   private async writeRollbackSuccessState(runtime: RuntimePaths, target: string): Promise<void> {
     await this.mergeState(runtime.statePath, {
       status: 'rolled_back',
+      mode: 'native',
       finishedAt: this.nowIso(),
       toVersion: target,
       step: 'rollback',
       progress: 100,
       lock: false,
       lastError: null,
+      errorCode: 'UPDATE_ROLLBACK_COMPLETED',
+      errorCategory: 'UPDATE_RESTART_ERROR',
+      errorStage: 'rollback',
+      exitCode: 0,
+      userMessage: 'Rollback concluido com sucesso.',
+      technicalMessage: 'Rollback manual concluido.',
       rollback: {
         attempted: true,
         completed: true,
@@ -883,11 +1110,18 @@ export class SystemUpdateAdminService {
   private async writeRollbackFailedState(runtime: RuntimePaths, reason: string): Promise<void> {
     await this.mergeState(runtime.statePath, {
       status: 'failed',
+      mode: 'native',
       finishedAt: this.nowIso(),
       step: 'rollback',
       progress: 88,
       lock: false,
       lastError: reason,
+      errorCode: 'UPDATE_ROLLBACK_ERROR',
+      errorCategory: 'UPDATE_RESTART_ERROR',
+      errorStage: 'rollback',
+      exitCode: 60,
+      userMessage: 'Rollback manual falhou e requer intervencao.',
+      technicalMessage: reason,
       rollback: {
         attempted: true,
         completed: false,
@@ -954,8 +1188,78 @@ export class SystemUpdateAdminService {
         return 'Healthcheck falhou e rollback automatico foi aplicado.';
       case 60:
         return 'Healthcheck falhou e rollback automatico tambem falhou.';
+      case 2:
+        return 'Deploy reportou rollback automatico.';
       default:
         return '';
+    }
+  }
+
+  private resolveFailureDescriptor(
+    operationType: UpdateOperationType,
+    exitCode: number,
+    step: string,
+  ): UpdateFailureDescriptor {
+    if (operationType === 'rollback') {
+      return {
+        code: 'UPDATE_RESTART_ERROR',
+        category: 'UPDATE_RESTART_ERROR',
+        stage: 'rollback',
+        userMessage: 'Rollback manual falhou e requer intervencao manual.',
+      };
+    }
+
+    switch (exitCode) {
+      case 10:
+        return {
+          code: 'UPDATE_CONFLICT_ERROR',
+          category: 'UPDATE_UNEXPECTED_ERROR',
+          stage: 'lock',
+          userMessage: 'Ja existe uma atualizacao em andamento.',
+        };
+      case 20:
+        return {
+          code: 'UPDATE_BACKUP_ERROR',
+          category: 'UPDATE_SCRIPT_ERROR',
+          stage: 'backup',
+          userMessage: 'Falha ao criar backup antes da atualizacao.',
+        };
+      case 30:
+        return {
+          code: 'UPDATE_GIT_PULL_ERROR',
+          category: 'UPDATE_GIT_PULL_ERROR',
+          stage: 'download',
+          userMessage: 'Falha ao baixar a release do repositiorio.',
+        };
+      case 40:
+        return {
+          code: 'UPDATE_SCRIPT_ERROR',
+          category: 'UPDATE_SCRIPT_ERROR',
+          stage: step || 'build',
+          userMessage: 'Falha durante build, migracao ou seed da atualizacao.',
+        };
+      case 50:
+      case 2:
+        return {
+          code: 'UPDATE_RESTART_ERROR',
+          category: 'UPDATE_RESTART_ERROR',
+          stage: 'healthcheck',
+          userMessage: 'A nova versao falhou no healthcheck e o sistema voltou para a versao anterior.',
+        };
+      case 60:
+        return {
+          code: 'UPDATE_RESTART_ERROR',
+          category: 'UPDATE_RESTART_ERROR',
+          stage: 'rollback',
+          userMessage: 'A nova versao e o rollback falharam. Intervencao manual obrigatoria.',
+        };
+      default:
+        return {
+          code: 'UPDATE_UNEXPECTED_ERROR',
+          category: 'UPDATE_UNEXPECTED_ERROR',
+          stage: step || 'unknown',
+          userMessage: 'A atualizacao falhou por um erro inesperado.',
+        };
     }
   }
 }
