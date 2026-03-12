@@ -14,8 +14,8 @@ import * as fs from 'fs';
 @Injectable()
 export class ModuleResolverService {
     private readonly logger = new Logger(ModuleResolverService.name);
-    // Caminho dos módulos de backend: apps/backend/modules
-    private readonly modulesBasePath = path.resolve(process.cwd(), 'modules');
+    // Caminho dos módulos de backend: apps/backend/src/modules
+    private readonly modulesBasePath = path.resolve(process.cwd(), 'src', 'modules');
     // Caminho dos módulos de frontend: apps/frontend/src/app/modules
     private readonly frontendModulesPath = path.resolve(process.cwd(), '..', 'frontend', 'src', 'app', 'modules');
 
@@ -176,3 +176,4 @@ export class ModuleResolverService {
         });
     }
 }
+

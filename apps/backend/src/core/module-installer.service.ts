@@ -134,7 +134,7 @@ const execFileAsync = promisify(execFile);
  * 
  * ESTRUTURA:
  * - Frontend: apps/frontend/src/app/modules/{slug} (páginas e lógica de UI)
- * - Backend: apps/backend/modules/{slug} (controllers, services, entities)
+ * - Backend: apps/backend/src/modules/{slug} (controllers, services, entities)
  */
 @Injectable()
 export class ModuleInstallerService {
@@ -1787,3 +1787,4 @@ export class ModuleInstallerService {
         if (!fs.existsSync(this.uploadsPath)) fs.mkdirSync(this.uploadsPath, { recursive: true });
     }
 }
+

@@ -13,7 +13,7 @@ import { ModuleStatus } from '@prisma/client';
 @Injectable()
 export class ModuleLoader implements OnModuleInit {
     private readonly logger = new Logger(ModuleLoader.name);
-    private readonly modulesPath = path.resolve(process.cwd(), 'modules');
+    private readonly modulesPath = path.resolve(process.cwd(), 'src', 'modules');
     private loadedModules: Map<string, RegisteredModule> = new Map();
     private coreContext: CoreContext;
 
@@ -297,3 +297,4 @@ export class ModuleLoader implements OnModuleInit {
         }
     }
 }
+
