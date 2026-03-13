@@ -5,9 +5,16 @@ import { SystemSettingsBootstrapService } from './system-settings-bootstrap.serv
 describe('SystemSettingsBootstrapService', () => {
   const registry = new SettingsRegistry();
   const originalEnv = { ...process.env };
+  const registryEnvKeys = registry
+    .getAll()
+    .map((definition) => definition.envKey)
+    .filter((value): value is string => Boolean(value));
 
   beforeEach(() => {
     process.env = { ...originalEnv };
+    for (const envKey of registryEnvKeys) {
+      delete process.env[envKey];
+    }
   });
 
   afterEach(() => {

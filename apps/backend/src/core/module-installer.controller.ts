@@ -20,13 +20,25 @@ import { Role } from '@prisma/client';
 import { ModuleInstallerService } from './module-installer.service';
 import { memoryStorage } from 'multer';
 import { SkipThrottle } from '@nestjs/throttler';
+import { ConfigResolverService } from '../system-settings/config-resolver.service';
+
+type MutableModuleOpsStatus = {
+    environment: string;
+    overrideEnabled: boolean;
+    mutableModuleOpsAllowed: boolean;
+    reason: 'development' | 'explicit_override' | 'blocked';
+    message: string;
+};
 
 @SkipThrottle()
 @Controller('configuracoes/sistema/modulos')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.SUPER_ADMIN)
 export class ModuleInstallerController {
-    constructor(private readonly installer: ModuleInstallerService) { }
+    constructor(
+        private readonly installer: ModuleInstallerService,
+        private readonly configResolver: ConfigResolverService,
+    ) { }
 
     private buildActorContext(req: Record<string, any> | undefined) {
         return {
@@ -36,9 +48,10 @@ export class ModuleInstallerController {
         };
     }
 
-    private getMutableModuleOpsStatus() {
+    private async getMutableModuleOpsStatus(): Promise<MutableModuleOpsStatus> {
         const environment = (process.env.NODE_ENV || 'development').trim().toLowerCase();
-        const overrideEnabled = process.env.ENABLE_MODULE_UPLOAD === 'true';
+        const resolvedOverride = await this.configResolver.getResolved<boolean>('security.module_upload.enabled');
+        const overrideEnabled = resolvedOverride?.value === true;
         const isDevelopment = environment === 'development';
         const mutableModuleOpsAllowed = isDevelopment || overrideEnabled;
 
@@ -54,13 +67,15 @@ export class ModuleInstallerController {
             message: isDevelopment
                 ? 'Operacoes mutaveis de modulos liberadas automaticamente em development.'
                 : overrideEnabled
-                    ? 'Operacoes mutaveis de modulos liberadas por ENABLE_MODULE_UPLOAD=true.'
-                    : 'Upload/uninstall/reload de modulos desabilitado fora de development. Defina ENABLE_MODULE_UPLOAD=true para liberar explicitamente.'
+                    ? resolvedOverride?.source === 'database'
+                        ? 'Operacoes mutaveis de modulos liberadas por override dinamico salvo no painel.'
+                        : 'Operacoes mutaveis de modulos liberadas por ENABLE_MODULE_UPLOAD=true.'
+                    : 'Upload/uninstall/reload de modulos desabilitado fora de development. Defina ENABLE_MODULE_UPLOAD=true ou use o painel para liberar explicitamente.'
         };
     }
 
-    private ensureMutableModuleOpsAllowed() {
-        const status = this.getMutableModuleOpsStatus();
+    private async ensureMutableModuleOpsAllowed(): Promise<void> {
+        const status = await this.getMutableModuleOpsStatus();
         if (!status.mutableModuleOpsAllowed) {
             throw new ForbiddenException(status.message);
         }
@@ -72,7 +87,7 @@ export class ModuleInstallerController {
     }
 
     @Get('capabilities')
-    getCapabilities() {
+    async getCapabilities() {
         return this.getMutableModuleOpsStatus();
     }
 
@@ -84,7 +99,7 @@ export class ModuleInstallerController {
         }
     }))
     async uploadModule(@UploadedFile() file: Express.Multer.File, @Request() req): Promise<unknown> {
-        this.ensureMutableModuleOpsAllowed();
+        await this.ensureMutableModuleOpsAllowed();
 
         if (!file) {
             throw new BadRequestException('Arquivo nao fornecido');
@@ -161,13 +176,13 @@ export class ModuleInstallerController {
             confirmationName: string;
         }
     ) {
-        this.ensureMutableModuleOpsAllowed();
+        await this.ensureMutableModuleOpsAllowed();
         return await this.installer.uninstallModule(slug, body);
     }
 
     @Post(':slug/reload-config')
     async reloadConfig(@Param('slug') slug: string) {
-        this.ensureMutableModuleOpsAllowed();
+        await this.ensureMutableModuleOpsAllowed();
         return await this.installer.reloadModuleConfig(slug);
     }
 
