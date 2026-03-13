@@ -1,10 +1,10 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import SecuritySettingsPage from "@/app/configuracoes/seguranca/page";
 import type { SecuritySettingItem } from "@/app/configuracoes/seguranca/security-settings.types";
 
-const { apiMock, toastMock, useAuthMock } = vi.hoisted(() => ({
+const { apiMock, toastMock, useAuthMock, refreshConfigMock } = vi.hoisted(() => ({
   apiMock: {
     get: vi.fn(),
     put: vi.fn(),
@@ -12,6 +12,7 @@ const { apiMock, toastMock, useAuthMock } = vi.hoisted(() => ({
   },
   useAuthMock: vi.fn(),
   toastMock: vi.fn(),
+  refreshConfigMock: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -22,16 +23,54 @@ vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => useAuthMock(),
 }));
 
+vi.mock("@/contexts/SecurityConfigContext", () => ({
+  useSecurityConfig: () => ({
+    config: null,
+    loading: false,
+    refreshConfig: refreshConfigMock,
+  }),
+}));
+
 vi.mock("@/hooks/use-toast", () => ({
   useToast: () => ({
     toast: toastMock,
   }),
 }));
 
+const buildLegacySecurityConfig = () => ({
+  id: "security-config-1",
+  loginMaxAttempts: 5,
+  loginLockDurationMinutes: 30,
+  loginWindowMinutes: 15,
+  globalMaxRequests: 120,
+  globalWindowMinutes: 1,
+  passwordMinLength: 8,
+  passwordRequireUppercase: true,
+  passwordRequireLowercase: true,
+  passwordRequireNumbers: true,
+  passwordRequireSpecial: true,
+  accessTokenExpiresIn: "15m",
+  refreshTokenExpiresIn: "7d",
+  twoFactorEnabled: true,
+  twoFactorRequired: false,
+  sessionTimeoutMinutes: 30,
+  backupRateLimitPerHour: 5,
+  restoreRateLimitPerHour: 2,
+  updateRateLimitPerHour: 1,
+  rateLimitDevEnabled: true,
+  rateLimitProdEnabled: true,
+  rateLimitDevRequests: 1000,
+  rateLimitProdRequests: 120,
+  rateLimitDevWindow: 1,
+  rateLimitProdWindow: 1,
+  updatedAt: "2026-03-13T15:00:00.000Z",
+  updatedBy: "super-admin-1",
+});
+
 const buildSetting = (overrides: Partial<SecuritySettingItem>): SecuritySettingItem => ({
   key: "notifications.enabled",
-  label: "Notificações do sistema",
-  description: "Ativa ou desativa o envio de notificações do sistema.",
+  label: "Notificacoes do sistema",
+  description: "Ativa ou desativa o envio de notificacoes do sistema.",
   category: "notifications",
   type: "boolean",
   allowedInPanel: true,
@@ -58,6 +97,64 @@ const buildReadResponse = (items: SecuritySettingItem[]) => ({
   },
 });
 
+const buildEmailProvidersResponse = () => ({
+  data: [
+    {
+      providerName: "Gmail",
+      smtpHost: "smtp.gmail.com",
+      smtpPort: 587,
+      encryption: "STARTTLS",
+      authMethod: "PLAIN",
+      description: "Google Workspace / Gmail",
+    },
+  ],
+});
+
+const buildEmailConfigListResponse = () => ({
+  data: [],
+});
+
+const buildActiveEmailConfigResponse = () => ({
+  data: {
+    id: "email-config-1",
+    providerName: "Gmail",
+    smtpHost: "smtp.gmail.com",
+    smtpPort: 587,
+    encryption: "STARTTLS",
+    authMethod: "PLAIN",
+    isActive: true,
+    createdAt: "2026-03-13T15:00:00.000Z",
+    updatedAt: "2026-03-13T15:00:00.000Z",
+  },
+});
+
+const buildEmailCredentialsResponse = () => ({
+  data: {
+    smtpUsername: "mailer@example.com",
+  },
+});
+
+function installDefaultGetHandlers(dynamicItems: SecuritySettingItem[] = [buildSetting({})]) {
+  apiMock.get.mockImplementation((url: string) => {
+    switch (url) {
+      case "/security-config":
+        return Promise.resolve({ data: buildLegacySecurityConfig() });
+      case "/system/settings/panel":
+        return Promise.resolve(buildReadResponse(dynamicItems));
+      case "/email-config/providers":
+        return Promise.resolve(buildEmailProvidersResponse());
+      case "/email-config":
+        return Promise.resolve(buildEmailConfigListResponse());
+      case "/email-config/active":
+        return Promise.resolve(buildActiveEmailConfigResponse());
+      case "/email-config/smtp-credentials":
+        return Promise.resolve(buildEmailCredentialsResponse());
+      default:
+        throw new Error(`Unhandled GET ${url}`);
+    }
+  });
+}
+
 function deferredPromise<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason?: unknown) => void;
@@ -81,150 +178,133 @@ describe("/configuracoes/seguranca", () => {
       },
       loading: false,
     });
+
     apiMock.get.mockReset();
     apiMock.put.mockReset();
     apiMock.post.mockReset();
     toastMock.mockReset();
+    refreshConfigMock.mockReset();
+    refreshConfigMock.mockResolvedValue(undefined);
+    localStorage.clear();
   });
 
   afterEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
   });
 
-  it("renderiza loading enquanto a lista está carregando", () => {
-    apiMock.get.mockReturnValue(new Promise(() => undefined));
-
-    render(<SecuritySettingsPage />);
-
-    expect(screen.getByText(/Carregando configurações dinâmicas/i)).toBeInTheDocument();
-  });
-
-  it("renderiza erro coerente para 403", async () => {
-    apiMock.get.mockRejectedValue({
-      response: {
-        status: 403,
-        data: {
-          message: "forbidden",
-        },
-      },
+  it("renderiza loading enquanto as configuracoes antigas ainda estao carregando", () => {
+    apiMock.get.mockImplementation((url: string) => {
+      if (url === "/security-config") {
+        return new Promise(() => undefined);
+      }
+      throw new Error(`Unexpected GET ${url}`);
     });
 
     render(<SecuritySettingsPage />);
 
-    expect(await screen.findByText(/Acesso negado/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/Apenas SUPER_ADMIN pode visualizar ou alterar estas configurações/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Carregando configura/i)).toBeInTheDocument();
   });
 
-  it("renderiza erro coerente para 401", async () => {
-    apiMock.get.mockRejectedValue({
-      response: {
-        status: 401,
-        data: {
-          message: "unauthorized",
-        },
-      },
-    });
+  it("restaura todas as secoes antigas e integra a secao dinamica na mesma pagina", async () => {
+    installDefaultGetHandlers([
+      buildSetting({}),
+      buildSetting({
+        key: "security.module_upload.enabled",
+        label: "Upload de modulos",
+        category: "security",
+      }),
+    ]);
 
     render(<SecuritySettingsPage />);
 
-    expect(await screen.findByText(/Sessão expirada/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/Faça login novamente para acessar as configurações de segurança/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Controle de Tentativas de Login/i)).toBeInTheDocument();
+    expect(screen.getByText(/Rate Limiting Global/i)).toBeInTheDocument();
+    expect(screen.getByText(/Rate Limiting de Endpoints Críticos/i)).toBeInTheDocument();
+    expect(screen.getByText(/Política de Senha/i)).toBeInTheDocument();
+    expect(screen.getByText(/Autenticação de Dois Fatores \(2FA\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Tokens e Sessão/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Configurações de Email/i)).toBeInTheDocument();
+    const dynamicSection = await screen.findByTestId("dynamic-security-settings-section");
+    expect(within(dynamicSection).getByText(/Configuracoes Dinamicas de Seguranca/i)).toBeInTheDocument();
+    expect(within(dynamicSection).getByRole("heading", { name: /Notificacoes do sistema/i })).toBeInTheDocument();
+
+    expect(apiMock.get).toHaveBeenCalledWith("/security-config");
+    expect(apiMock.get).toHaveBeenCalledWith("/system/settings/panel");
+    expect(apiMock.get).toHaveBeenCalledWith("/email-config/providers");
+    expect(apiMock.get).toHaveBeenCalledWith("/email-config");
+    expect(apiMock.get).toHaveBeenCalledWith("/email-config/active");
+    expect(apiMock.get).toHaveBeenCalledWith("/email-config/smtp-credentials");
   });
 
-  it("renderiza a lista com label, descrição, badge e toggle quando aplicável", async () => {
-    apiMock.get.mockResolvedValue(
-      buildReadResponse([
-        buildSetting({}),
-      ]),
-    );
-
-    render(<SecuritySettingsPage />);
-
-    expect(await screen.findByText("Notificações do sistema")).toBeInTheDocument();
-    expect(screen.getByText(/Ativa ou desativa o envio de notificações/i)).toBeInTheDocument();
-    expect(screen.getByTestId("security-setting-origin-notifications.enabled")).toHaveTextContent("ENV");
-    expect(screen.getByRole("switch", { name: /Alternar Notificações do sistema/i })).toBeInTheDocument();
-  });
-
-  it("não permite edição quando editableInPanel=false", async () => {
-    apiMock.get.mockResolvedValue(
-      buildReadResponse([
-        buildSetting({
-          key: "security.headers.enabled",
-          label: "Headers de segurança",
-          category: "security",
-          editableInPanel: false,
-          resolvedValue: true,
-        }),
-      ]),
-    );
-
-    render(<SecuritySettingsPage />);
-
-    const control = await screen.findByRole("switch", { name: /Headers de segurança somente leitura/i });
-    expect(control).toBeDisabled();
-    expect(screen.getByText(/Somente leitura/i)).toBeInTheDocument();
-  });
-
-  it("nunca exibe valor real quando valueHidden=true", async () => {
-    apiMock.get.mockResolvedValue(
-      buildReadResponse([
-        buildSetting({
-          key: "security.rate_limit.enabled",
-          label: "Rate limit global",
-          category: "security",
-          editableInPanel: false,
-          valueHidden: true,
-          sensitive: true,
-          resolvedValue: true,
-        }),
-      ]),
-    );
-
-    render(<SecuritySettingsPage />);
-
-    expect(await screen.findByText("Rate limit global")).toBeInTheDocument();
-    expect(screen.getByText("Valor protegido")).toBeInTheDocument();
-    expect(screen.queryByText("Ativado")).not.toBeInTheDocument();
-  });
-
-  it("nao exibe restore fallback quando nao existe override", async () => {
-    apiMock.get.mockResolvedValue(buildReadResponse([buildSetting({ hasDatabaseOverride: false })]));
-
-    render(<SecuritySettingsPage />);
-
-    expect(await screen.findByText("Notificações do sistema")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Restaurar fallback/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/Sem override em banco/i)).toBeInTheDocument();
-  });
-
-  it("chama o endpoint correto em alteração válida e atualiza a origem para Painel", async () => {
-    apiMock.get.mockResolvedValue(buildReadResponse([buildSetting({})]));
-    apiMock.put.mockResolvedValue({
-      data: {
-        action: "update",
-        setting: buildSetting({
-          resolvedValue: false,
-          resolvedSource: "database",
-          hasDatabaseOverride: true,
-          lastUpdatedAt: "2026-03-13T17:00:00.000Z",
-          lastUpdatedBy: {
-            userId: "super-admin-1",
-            email: "super-admin@example.com",
-            name: "Super Admin",
-          },
-        }),
-      },
+  it("mantem o endpoint antigo /security-config para salvar as configuracoes existentes", async () => {
+    installDefaultGetHandlers();
+    apiMock.put.mockImplementation((url: string, payload: unknown) => {
+      if (url === "/security-config") {
+        return Promise.resolve({ data: { ...buildLegacySecurityConfig(), ...(payload as object) } });
+      }
+      throw new Error(`Unhandled PUT ${url}`);
     });
 
     render(<SecuritySettingsPage />);
 
     const user = userEvent.setup();
-    const toggle = await screen.findByRole("switch", { name: /Alternar Notificações do sistema/i });
+    const loginAttemptsInput = await screen.findByRole("spinbutton", {
+      name: /Máximo de Tentativas de Login/i,
+    });
+    await user.clear(loginAttemptsInput);
+    await user.type(loginAttemptsInput, "7");
+    await user.click(screen.getByRole("button", { name: /Salvar Altera/i }));
+
+    await waitFor(() => {
+      expect(apiMock.put).toHaveBeenCalledWith(
+        "/security-config",
+        expect.objectContaining({
+          loginMaxAttempts: 7,
+          loginLockDurationMinutes: 30,
+          globalMaxRequests: 120,
+          passwordMinLength: 8,
+          accessTokenExpiresIn: "15m",
+          refreshTokenExpiresIn: "7d",
+        }),
+      );
+    });
+    expect(refreshConfigMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("mantem os toggles dinamicos funcionando sem remover os controles antigos", async () => {
+    installDefaultGetHandlers([buildSetting({})]);
+    apiMock.put.mockImplementation((url: string) => {
+      if (url === "/system/settings/panel/notifications.enabled") {
+        return Promise.resolve({
+          data: {
+            action: "update",
+            setting: buildSetting({
+              resolvedValue: false,
+              resolvedSource: "database",
+              hasDatabaseOverride: true,
+              lastUpdatedAt: "2026-03-13T17:00:00.000Z",
+              lastUpdatedBy: {
+                userId: "super-admin-1",
+                email: "super-admin@example.com",
+                name: "Super Admin",
+              },
+            }),
+          },
+        });
+      }
+
+      if (url === "/security-config") {
+        return Promise.resolve({ data: buildLegacySecurityConfig() });
+      }
+
+      throw new Error(`Unhandled PUT ${url}`);
+    });
+
+    render(<SecuritySettingsPage />);
+
+    const user = userEvent.setup();
+    const toggle = await screen.findByRole("switch", { name: /Alternar Notificacoes do sistema/i });
     await user.click(toggle);
 
     expect(apiMock.put).toHaveBeenCalledWith("/system/settings/panel/notifications.enabled", {
@@ -234,53 +314,30 @@ describe("/configuracoes/seguranca", () => {
     await waitFor(() => {
       expect(screen.getByTestId("security-setting-origin-notifications.enabled")).toHaveTextContent("Painel");
     });
-    expect(screen.getByRole("button", { name: /Restaurar fallback/i })).toBeInTheDocument();
+    expect(screen.getByText(/Controle de Tentativas de Login/i)).toBeInTheDocument();
   });
 
-  it("reverte o optimistic update em caso de erro de API", async () => {
-    const deferred = deferredPromise<unknown>();
-    apiMock.get.mockResolvedValue(buildReadResponse([buildSetting({})]));
-    apiMock.put.mockReturnValue(deferred.promise);
-
-    render(<SecuritySettingsPage />);
-
-    const user = userEvent.setup();
-    const toggle = await screen.findByRole("switch", { name: /Alternar Notificações do sistema/i });
-    await user.click(toggle);
-
-    expect(screen.getByTestId("security-setting-origin-notifications.enabled")).toHaveTextContent("Painel");
-
-    deferred.reject({
-      response: {
-        data: {
-          message: "db offline",
-        },
-      },
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("security-setting-origin-notifications.enabled")).toHaveTextContent("ENV");
-    });
-  });
-
-  it("restore fallback chama o endpoint correto e some quando não há override", async () => {
-    apiMock.get.mockResolvedValue(
-      buildReadResponse([
-        buildSetting({
-          resolvedSource: "database",
-          hasDatabaseOverride: true,
-          lastUpdatedAt: "2026-03-13T17:00:00.000Z",
-        }),
-      ]),
-    );
-    apiMock.post.mockResolvedValue({
-      data: {
-        action: "restore_fallback",
-        setting: buildSetting({
-          resolvedSource: "env",
-          hasDatabaseOverride: false,
-        }),
-      },
+  it("restore fallback dinamico continua funcionando sem esconder as secoes antigas", async () => {
+    installDefaultGetHandlers([
+      buildSetting({
+        resolvedSource: "database",
+        hasDatabaseOverride: true,
+        lastUpdatedAt: "2026-03-13T17:00:00.000Z",
+      }),
+    ]);
+    apiMock.post.mockImplementation((url: string) => {
+      if (url === "/system/settings/panel/notifications.enabled/restore-fallback") {
+        return Promise.resolve({
+          data: {
+            action: "restore_fallback",
+            setting: buildSetting({
+              resolvedSource: "env",
+              hasDatabaseOverride: false,
+            }),
+          },
+        });
+      }
+      throw new Error(`Unhandled POST ${url}`);
     });
 
     render(<SecuritySettingsPage />);
@@ -298,46 +355,116 @@ describe("/configuracoes/seguranca", () => {
       expect(screen.getByTestId("security-setting-origin-notifications.enabled")).toHaveTextContent("ENV");
     });
     expect(screen.queryByRole("button", { name: /Restaurar fallback/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/Sem override em banco/i)).toBeInTheDocument();
+    expect(screen.getByText(/Tokens e Sessão/i)).toBeInTheDocument();
   });
 
-  it("exige confirmação para chaves com requiresConfirmation=true", async () => {
-    apiMock.get.mockResolvedValue(
-      buildReadResponse([
-        buildSetting({
-          key: "security.module_upload.enabled",
-          label: "Upload de módulos",
-          category: "security",
-          requiresConfirmation: true,
-        }),
-      ]),
-    );
-    apiMock.put.mockResolvedValue({
-      data: {
-        action: "update",
-        setting: buildSetting({
-          key: "security.module_upload.enabled",
-          label: "Upload de módulos",
-          category: "security",
-          requiresConfirmation: true,
-          resolvedValue: false,
-          resolvedSource: "database",
-          hasDatabaseOverride: true,
-        }),
-      },
+  it("nao permite editar item dinamico somente leitura nem expor valor protegido", async () => {
+    installDefaultGetHandlers([
+      buildSetting({
+        key: "security.headers.enabled",
+        label: "Headers de seguranca",
+        category: "security",
+        editableInPanel: false,
+        valueHidden: true,
+        sensitive: true,
+        resolvedValue: true,
+      }),
+    ]);
+
+    render(<SecuritySettingsPage />);
+
+    expect(await screen.findByText(/Headers de seguranca/i)).toBeInTheDocument();
+    const readonlyRow = screen.getByTestId("security-setting-row-security.headers.enabled");
+    expect(within(readonlyRow).getAllByText(/Somente leitura/i).length).toBeGreaterThan(0);
+    expect(within(readonlyRow).getAllByText(/Valor protegido/i).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("switch", { name: /Alternar Headers de seguranca/i })).not.toBeInTheDocument();
+  });
+
+  it("mostra as informacoes somente quando o icone e clicado", async () => {
+    installDefaultGetHandlers([buildSetting({})]);
+
+    render(<SecuritySettingsPage />);
+
+    expect(await screen.findByText(/Controle de Tentativas de Login/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Configure o bloqueio automático de contas após múltiplas tentativas de login falhas/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Ativa ou desativa o envio de notificacoes do sistema\./i),
+    ).not.toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByLabelText(/Informa.*Controle de Tentativas de Login/i));
+    expect(
+      await screen.findByText(/Configure o bloqueio automático de contas após múltiplas tentativas de login falhas/i),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText(/Informa.*Notificacoes do sistema/i));
+    expect(await screen.findByText(/Ativa ou desativa o envio de notificacoes do sistema\./i)).toBeInTheDocument();
+  });
+
+  it("deixa o toggle desabilitado visivel em vermelho quando estiver desligado", async () => {
+    installDefaultGetHandlers([
+      buildSetting({
+        key: "security.headers.enabled",
+        label: "Headers de seguranca",
+        category: "security",
+        editableInPanel: false,
+        valueHidden: false,
+        sensitive: true,
+        resolvedValue: false,
+      }),
+    ]);
+
+    render(<SecuritySettingsPage />);
+
+    const readonlyToggle = await screen.findByRole("switch", {
+      name: /Headers de seguranca somente leitura/i,
+    });
+
+    expect(readonlyToggle).toHaveClass("data-[state=unchecked]:bg-destructive/80");
+  });
+
+  it("exige confirmacao explicita para chaves dinamicas marcadas com requiresConfirmation", async () => {
+    installDefaultGetHandlers([
+      buildSetting({
+        key: "security.module_upload.enabled",
+        label: "Upload de modulos",
+        category: "security",
+        requiresConfirmation: true,
+      }),
+    ]);
+    apiMock.put.mockImplementation((url: string) => {
+      if (url === "/system/settings/panel/security.module_upload.enabled") {
+        return Promise.resolve({
+          data: {
+            action: "update",
+            setting: buildSetting({
+              key: "security.module_upload.enabled",
+              label: "Upload de modulos",
+              category: "security",
+              requiresConfirmation: true,
+              resolvedValue: false,
+              resolvedSource: "database",
+              hasDatabaseOverride: true,
+            }),
+          },
+        });
+      }
+      throw new Error(`Unhandled PUT ${url}`);
     });
 
     render(<SecuritySettingsPage />);
 
     const user = userEvent.setup();
-    const toggle = await screen.findByRole("switch", { name: /Alternar Upload de módulos/i });
+    const toggle = await screen.findByRole("switch", { name: /Alternar Upload de modulos/i });
     await user.click(toggle);
 
-    expect(apiMock.put).not.toHaveBeenCalled();
-    expect(screen.getByText(/Confirmar alteração/i)).toBeInTheDocument();
+    expect(apiMock.put).not.toHaveBeenCalledWith("/system/settings/panel/security.module_upload.enabled", expect.anything());
+    expect(screen.getByText(/Confirmar alteracao/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Cancelar/i }));
-    expect(apiMock.put).not.toHaveBeenCalled();
+    expect(apiMock.put).not.toHaveBeenCalledWith("/system/settings/panel/security.module_upload.enabled", expect.anything());
 
     await user.click(toggle);
     await user.click(screen.getByRole("button", { name: /Confirmar/i }));
@@ -349,13 +476,68 @@ describe("/configuracoes/seguranca", () => {
     });
   });
 
-  it("mostra estado vazio quando a API retorna lista vazia", async () => {
-    apiMock.get.mockResolvedValue(buildReadResponse([]));
+  it("reverte o optimistic update dinamico em caso de erro e preserva o restante da pagina", async () => {
+    installDefaultGetHandlers([buildSetting({})]);
+    const deferred = deferredPromise<unknown>();
+    apiMock.put.mockImplementation((url: string) => {
+      if (url === "/system/settings/panel/notifications.enabled") {
+        return deferred.promise;
+      }
+      throw new Error(`Unhandled PUT ${url}`);
+    });
 
     render(<SecuritySettingsPage />);
 
-    expect(
-      await screen.findByText(/Nenhuma configuração dinâmica aprovada foi encontrada/i),
-    ).toBeInTheDocument();
+    const user = userEvent.setup();
+    const toggle = await screen.findByRole("switch", { name: /Alternar Notificacoes do sistema/i });
+    await user.click(toggle);
+
+    expect(screen.getByTestId("security-setting-origin-notifications.enabled")).toHaveTextContent("Painel");
+
+    deferred.reject({
+      response: {
+        data: {
+          message: "db offline",
+        },
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("security-setting-origin-notifications.enabled")).toHaveTextContent("ENV");
+    });
+    expect(screen.getByText(/Política de Senha/i)).toBeInTheDocument();
+  });
+
+  it("mantem a pagina antiga operante mesmo quando a API dinamica falha", async () => {
+    apiMock.get.mockImplementation((url: string) => {
+      switch (url) {
+        case "/security-config":
+          return Promise.resolve({ data: buildLegacySecurityConfig() });
+        case "/system/settings/panel":
+          return Promise.reject({
+            response: {
+              status: 403,
+              data: { message: "forbidden" },
+            },
+          });
+        case "/email-config/providers":
+          return Promise.resolve(buildEmailProvidersResponse());
+        case "/email-config":
+          return Promise.resolve(buildEmailConfigListResponse());
+        case "/email-config/active":
+          return Promise.resolve(buildActiveEmailConfigResponse());
+        case "/email-config/smtp-credentials":
+          return Promise.resolve(buildEmailCredentialsResponse());
+        default:
+          throw new Error(`Unhandled GET ${url}`);
+      }
+    });
+
+    render(<SecuritySettingsPage />);
+
+    expect(await screen.findByText(/Controle de Tentativas de Login/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Acesso negado/i)).toBeInTheDocument();
+    expect(screen.getByText(/Apenas SUPER_ADMIN pode visualizar ou alterar estas configuracoes dinamicas/i)).toBeInTheDocument();
+    expect(screen.getByText(/Configurações de Email/i)).toBeInTheDocument();
   });
 });

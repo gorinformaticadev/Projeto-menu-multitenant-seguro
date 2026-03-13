@@ -17,6 +17,7 @@ import {
   SecureFileUploadResponse,
 } from './interfaces/secure-file.interface';
 import { sanitizeFileName, validateFileSignature } from './config/secure-multer.config';
+import { ConfigResolverService } from '../../system-settings/config-resolver.service';
 
 @Injectable()
 export class SecureFilesService {
@@ -28,6 +29,7 @@ export class SecureFilesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pathsService: PathsService,
+    private readonly configResolver: ConfigResolverService,
   ) {
     this.uploadsRoot = this.pathsService.ensureDir(this.pathsService.getUploadsDir());
     this.tempDir = this.pathsService.ensureDir(this.pathsService.getTempDir());
@@ -403,7 +405,10 @@ export class SecureFilesService {
   private async validateFileContent(file: Express.Multer.File): Promise<void> {
     const buffer = await fsPromises.readFile(file.path);
 
-    if (!validateFileSignature(buffer, file.mimetype)) {
+    const signatureValidationEnabled =
+      (await this.configResolver.getBoolean('security.file_signature_validation.enabled')) !== false;
+
+    if (signatureValidationEnabled && !validateFileSignature(buffer, file.mimetype)) {
       await fsPromises.unlink(file.path);
       throw new BadRequestException('Invalid file signature');
     }

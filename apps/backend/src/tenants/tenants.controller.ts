@@ -16,6 +16,7 @@ import { Public } from '@core/common/decorators/public.decorator';
 import { Role } from '@prisma/client';
 import { multerConfig } from '@core/common/config/multer.config';
 import { resolveTenantLogoFilePath } from '@core/common/paths/paths.service';
+import { ConfigResolverService } from '../system-settings/config-resolver.service';
 
 type TenantRequest = ExpressRequest & {
   user: {
@@ -31,7 +32,8 @@ type TenantRequest = ExpressRequest & {
 export class TenantsController {
   constructor(
     private tenantsService: TenantsService,
-    private tenantModuleService: TenantModuleService
+    private tenantModuleService: TenantModuleService,
+    private readonly configResolver: ConfigResolverService
   ) {
     // Empty implementation
   }
@@ -58,19 +60,24 @@ export class TenantsController {
       const filePath = resolveTenantLogoFilePath(tenantId, file.filename);
       const buffer = fs.readFileSync(filePath);
 
-      const signature = this.FILE_SIGNATURES[file.mimetype];
-      if (!signature) {
-        // Remover arquivo inválido
-        fs.unlinkSync(filePath);
-        throw new BadRequestException('Tipo de arquivo não suportado');
-      }
+      const signatureValidationEnabled =
+        (await this.configResolver.getBoolean('security.file_signature_validation.enabled')) !== false;
 
-      // Verificar assinatura
-      for (let i = 0; i < signature.length; i++) {
-        if (buffer[i] !== signature[i]) {
-          // Remover arquivo com assinatura inválida
+      if (signatureValidationEnabled) {
+        const signature = this.FILE_SIGNATURES[file.mimetype];
+        if (!signature) {
+          // Remover arquivo inválido
           fs.unlinkSync(filePath);
-          throw new BadRequestException('Arquivo corrompido ou tipo inválido');
+          throw new BadRequestException('Tipo de arquivo não suportado');
+        }
+
+        // Verificar assinatura
+        for (let i = 0; i < signature.length; i++) {
+          if (buffer[i] !== signature[i]) {
+            // Remover arquivo com assinatura inválida
+            fs.unlinkSync(filePath);
+            throw new BadRequestException('Arquivo corrompido ou tipo inválido');
+          }
         }
       }
 
