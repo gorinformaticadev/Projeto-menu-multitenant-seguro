@@ -40,6 +40,7 @@ import {
   ShieldAlert,
   ShieldOff,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type PendingAction = "update" | "restore";
 
@@ -69,8 +70,35 @@ const EMPTY_CONFIRMATION: ConfirmationState = {
   action: null,
 };
 
-const disabledUncheckedSwitchClassName =
-  "disabled:opacity-100 data-[state=unchecked]:bg-destructive/80 disabled:data-[state=unchecked]:bg-destructive/80";
+const uncheckedSwitchClassName =
+  "data-[state=unchecked]:bg-destructive/80 disabled:opacity-100 disabled:data-[state=unchecked]:bg-destructive/80";
+
+const dashboardCardBaseClassName =
+  "rounded-[28px] border shadow-[0_20px_55px_-36px_rgba(15,23,42,0.35)] backdrop-blur-sm";
+
+const dashboardCardToneClassName = {
+  neutral:
+    "border-slate-200/80 bg-white/85 dark:border-slate-800/80 dark:bg-slate-950/45",
+  info:
+    "border-sky-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.08),_transparent_42%),linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(248,250,252,0.96))] dark:border-sky-900/60 dark:bg-gradient-to-br dark:from-sky-950/35 dark:via-slate-950/65 dark:to-slate-950/55",
+  warn:
+    "border-amber-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.1),_transparent_42%),linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(255,251,235,0.96))] dark:border-amber-900/60 dark:bg-gradient-to-br dark:from-amber-950/40 dark:via-slate-950/65 dark:to-slate-950/55",
+  accent:
+    "border-violet-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(139,92,246,0.08),_transparent_42%),linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(245,243,255,0.96))] dark:border-violet-900/60 dark:bg-gradient-to-br dark:from-violet-950/35 dark:via-slate-950/65 dark:to-slate-950/55",
+} as const;
+
+function getDynamicCategoryClassName(category: string) {
+  switch (category) {
+    case "security":
+      return dashboardCardToneClassName.info;
+    case "notifications":
+      return dashboardCardToneClassName.accent;
+    case "operations":
+      return dashboardCardToneClassName.warn;
+    default:
+      return dashboardCardToneClassName.neutral;
+  }
+}
 
 function InfoButton({
   label,
@@ -147,12 +175,15 @@ function SettingRow({
   const lastUpdated = formatLastUpdated(item);
 
   return (
-    <article data-testid={`security-setting-row-${item.key}`} className="rounded-xl border p-4">
+    <article
+      data-testid={`security-setting-row-${item.key}`}
+      className="rounded-[22px] border border-slate-200/80 bg-white/80 p-4 shadow-sm dark:border-slate-800/80 dark:bg-slate-950/45"
+    >
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 flex-1 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-semibold text-foreground">{item.label}</h3>
-            <InfoButton label={`Informacoes sobre ${item.label}`}>
+            <InfoButton label={`Ajuda da configuracao dinamica ${item.label}`}>
               <p>{item.description}</p>
             </InfoButton>
 
@@ -178,6 +209,7 @@ function SettingRow({
               <Switch
                 aria-label={`Alternar ${item.label}`}
                 checked={Boolean(item.resolvedValue)}
+                className={uncheckedSwitchClassName}
                 disabled={isBusy}
                 onCheckedChange={(checked) => onToggle(item, checked)}
               />
@@ -186,7 +218,7 @@ function SettingRow({
                 aria-label={`${item.label} somente leitura`}
                 checked={Boolean(item.resolvedValue)}
                 disabled
-                className={disabledUncheckedSwitchClassName}
+                className={uncheckedSwitchClassName}
               />
             ) : (
               <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs text-muted-foreground">
@@ -338,20 +370,23 @@ export function DynamicSecuritySettingsSection() {
 
   return (
     <>
-      <Card data-testid="dynamic-security-settings-section">
+      <Card
+        data-testid="dynamic-security-settings-section"
+        className={cn(dashboardCardBaseClassName, dashboardCardToneClassName.accent)}
+      >
         <CardHeader>
           <div className="flex items-center gap-2">
             <CardTitle>Configuracoes Dinamicas de Seguranca</CardTitle>
-            <InfoButton label="Informacoes sobre Configuracoes Dinamicas de Seguranca">
+            <InfoButton label="Ajuda da secao de configuracoes dinamicas de seguranca">
               <p>Esta secao complementa as configuracoes tradicionais acima com toggles administraveis por painel.</p>
             </InfoButton>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-2 rounded-lg border p-3 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 rounded-[18px] border border-slate-200/80 bg-slate-50/70 p-3 text-sm text-muted-foreground dark:border-slate-800/80 dark:bg-slate-900/45">
             <AlertTriangle className="h-4 w-4" />
             <span className="font-medium text-foreground">Alteracoes por item</span>
-            <InfoButton label="Informacoes sobre Alteracoes por item">
+            <InfoButton label="Ajuda das alteracoes por item nas configuracoes dinamicas">
               <p>Cada mudanca e salva individualmente, com auditoria no backend e restore para ENV ou Padrao quando necessario.</p>
             </InfoButton>
           </div>
@@ -373,10 +408,17 @@ export function DynamicSecuritySettingsSection() {
             </div>
           ) : (
             groups.map((group) => (
-              <section key={group.category} className="space-y-4 rounded-lg border p-4">
+              <section
+                key={group.category}
+                className={cn(
+                  dashboardCardBaseClassName,
+                  getDynamicCategoryClassName(group.category),
+                  "space-y-4 p-4 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.18)]",
+                )}
+              >
                 <div className="flex items-center gap-2">
                   <h3 className="text-base font-semibold">{group.label}</h3>
-                  <InfoButton label={`Informacoes sobre ${group.label}`}>
+                  <InfoButton label={`Ajuda da categoria dinamica ${group.label}`}>
                     <p>Ajustes dinamicos agrupados por categoria, respeitando as restricoes enviadas pelo backend.</p>
                   </InfoButton>
                 </div>

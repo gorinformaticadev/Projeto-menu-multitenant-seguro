@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Shield, Save, AlertTriangle, HelpCircle } from "lucide-react";
 import EmailConfigSection from "@/components/EmailConfigSection";
 import { DynamicSecuritySettingsSection } from "@/app/configuracoes/seguranca/DynamicSecuritySettingsSection";
+import { cn } from "@/lib/utils";
 
 
 interface SecurityConfig {
@@ -46,8 +47,29 @@ interface SecurityConfig {
   updatedBy: string | null;
 }
 
-const disabledUncheckedSwitchClassName =
-  "disabled:opacity-100 data-[state=unchecked]:bg-destructive/80 disabled:data-[state=unchecked]:bg-destructive/80";
+const uncheckedSwitchClassName =
+  "data-[state=unchecked]:bg-destructive/80 disabled:opacity-100 disabled:data-[state=unchecked]:bg-destructive/80";
+
+const dashboardCardBaseClassName =
+  "rounded-[28px] border shadow-[0_20px_55px_-36px_rgba(15,23,42,0.35)] backdrop-blur-sm";
+
+const dashboardCardToneClassName = {
+  neutral:
+    "border-slate-200/80 bg-white/85 dark:border-slate-800/80 dark:bg-slate-950/45",
+  info:
+    "border-sky-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.08),_transparent_42%),linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(248,250,252,0.96))] dark:border-sky-900/60 dark:bg-gradient-to-br dark:from-sky-950/35 dark:via-slate-950/65 dark:to-slate-950/55",
+  warn:
+    "border-amber-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.1),_transparent_42%),linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(255,251,235,0.96))] dark:border-amber-900/60 dark:bg-gradient-to-br dark:from-amber-950/40 dark:via-slate-950/65 dark:to-slate-950/55",
+  success:
+    "border-emerald-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.08),_transparent_42%),linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(236,253,245,0.96))] dark:border-emerald-900/60 dark:bg-gradient-to-br dark:from-emerald-950/35 dark:via-slate-950/65 dark:to-slate-950/55",
+  accent:
+    "border-violet-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(139,92,246,0.08),_transparent_42%),linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(245,243,255,0.96))] dark:border-violet-900/60 dark:bg-gradient-to-br dark:from-violet-950/35 dark:via-slate-950/65 dark:to-slate-950/55",
+  danger:
+    "border-rose-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(244,63,94,0.08),_transparent_42%),linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(255,241,242,0.96))] dark:border-rose-900/60 dark:bg-gradient-to-br dark:from-rose-950/40 dark:via-slate-950/65 dark:to-slate-950/55",
+} as const;
+
+const dashboardInsetPanelClassName =
+  "rounded-[18px] border border-slate-200/80 bg-slate-50/70 px-3 py-2.5 dark:border-slate-800/80 dark:bg-slate-900/45";
 
 function InfoButton({
   label,
@@ -80,6 +102,7 @@ export default function SecurityConfigPage() {
   const { refreshConfig } = useSecurityConfig();
   const [config, setConfig] = useState<SecurityConfig | null>(null);
   const [loading, setLoading] = useState(true);
+  const [legacyError, setLegacyError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Redirecionar se não for SUPER_ADMIN
@@ -102,6 +125,7 @@ export default function SecurityConfigPage() {
           const { data, timestamp } = JSON.parse(cached);
           if (Date.now() - timestamp < cacheTTL) {
             setConfig(data);
+            setLegacyError(null);
             setLoading(false);
             return;
           }
@@ -112,6 +136,7 @@ export default function SecurityConfigPage() {
 
       try {
         setLoading(true);
+        setLegacyError(null);
         const response = await api.get("/security-config");
         setConfig(response.data);
 
@@ -121,6 +146,11 @@ export default function SecurityConfigPage() {
           timestamp: Date.now()
         }));
       } catch (error: unknown) {
+        setConfig(null);
+        setLegacyError(
+          (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+            "Erro desconhecido",
+        );
         toast({
           title: "Erro ao carregar configurações",
           description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Erro desconhecido",
@@ -230,45 +260,35 @@ export default function SecurityConfigPage() {
     return null;
   }
 
-  if (loading) {
-    return (
-      <div className="p-6 flex items-center justify-center h-64">
-        <div className="text-center">Carregando configurações...</div>
-      </div>
-    );
-  }
-
-  if (!config) {
-    return (
-      <div className="p-6 flex items-center justify-center h-64">
-        <div className="text-center text-muted-foreground">
-          Erro ao carregar configurações
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-6 space-y-6">
+    <div className="mx-auto max-w-[1600px] space-y-6 p-4 md:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div
+        className={cn(
+          dashboardCardBaseClassName,
+          dashboardCardToneClassName.neutral,
+          "flex flex-col gap-4 px-5 py-5 lg:flex-row lg:items-start lg:justify-between",
+        )}
+      >
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Shield className="h-6 w-6" />
             Configurações de Segurança
-            <InfoButton label="Informações sobre Configurações de Segurança">
+            <InfoButton label="Ajuda da seção principal de configurações de segurança">
               <p>Gerencie as políticas de segurança do sistema em um painel centralizado.</p>
             </InfoButton>
           </h1>
         </div>
-        <Button onClick={handleSave} disabled={saving}>
-          <Save className="h-4 w-4 mr-2" />
-          {saving ? "Salvando..." : "Salvar Alterações"}
-        </Button>
+        {config ? (
+          <Button onClick={handleSave} disabled={saving}>
+            <Save className="h-4 w-4 mr-2" />
+            {saving ? "Salvando..." : "Salvar Alterações"}
+          </Button>
+        ) : null}
       </div>
 
       {/* Aviso */}
-      <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-900/70 dark:bg-yellow-950/30">
+      <Card className={cn(dashboardCardBaseClassName, dashboardCardToneClassName.warn)}>
         <CardContent className="pt-6">
           <div className="flex gap-3">
             <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
@@ -282,15 +302,36 @@ export default function SecurityConfigPage() {
           </div>
         </CardContent>
       </Card>
-
-
-
+      {loading ? (
+        <Card
+          data-testid="legacy-security-section-loading"
+          className={cn(dashboardCardBaseClassName, dashboardCardToneClassName.neutral)}
+        >
+          <CardContent className="flex min-h-[120px] items-center justify-center pt-6 text-sm text-muted-foreground">
+            Carregando configurações principais de segurança...
+          </CardContent>
+        </Card>
+      ) : !config ? (
+        <Card
+          data-testid="legacy-security-section-error"
+          className={cn(dashboardCardBaseClassName, dashboardCardToneClassName.danger)}
+        >
+          <CardHeader>
+            <CardTitle className="text-destructive">Falha ao carregar configurações principais</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-muted-foreground">
+            <p>As configurações antigas baseadas em /security-config não puderam ser carregadas.</p>
+            <p>{legacyError ?? "Tente novamente em instantes."}</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
       {/* Controle de Login */}
-      <Card>
+      <Card className={cn(dashboardCardBaseClassName, dashboardCardToneClassName.info)}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Controle de Tentativas de Login
-            <InfoButton label="Informações sobre Controle de Tentativas de Login">
+            <InfoButton label="Ajuda da seção de controle de tentativas de login">
               <p>Configure o bloqueio automático de contas após múltiplas tentativas de login falhas.</p>
             </InfoButton>
           </CardTitle>
@@ -300,7 +341,7 @@ export default function SecurityConfigPage() {
             <div>
               <div className="mb-2 flex items-center gap-2">
                 <Label htmlFor="loginMaxAttempts">Máximo de Tentativas de Login</Label>
-                <InfoButton label="Informações sobre Máximo de Tentativas de Login">
+                <InfoButton label="Ajuda do campo máximo de tentativas de login">
                   <p>Número de tentativas antes de bloquear a conta. Faixa recomendada: 1 a 100.</p>
                 </InfoButton>
               </div>
@@ -319,7 +360,7 @@ export default function SecurityConfigPage() {
             <div>
               <div className="mb-2 flex items-center gap-2">
                 <Label htmlFor="loginLockDurationMinutes">Duração do Bloqueio (minutos)</Label>
-                <InfoButton label="Informações sobre Duração do Bloqueio">
+                <InfoButton label="Ajuda do campo duração do bloqueio">
                   <p>Tempo que a conta ficará bloqueada após atingir o limite de tentativas. Faixa: 5 a 1440 minutos.</p>
                 </InfoButton>
               </div>
@@ -339,12 +380,12 @@ export default function SecurityConfigPage() {
       </Card>
 
       {/* Rate Limiting Global */}
-      <Card>
+      <Card className={cn(dashboardCardBaseClassName, dashboardCardToneClassName.info)}>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2">
               Rate Limiting Global
-              <InfoButton label="Informações sobre Rate Limiting Global">
+              <InfoButton label="Ajuda da seção de rate limiting global">
                 <p>Controle o número de requisições permitidas para prevenir ataques DDoS e uso abusivo.</p>
                 <p>O limite atual é aplicado conforme o ambiente de execução.</p>
               </InfoButton>
@@ -354,6 +395,7 @@ export default function SecurityConfigPage() {
                 {process.env.NODE_ENV === 'production' ? 'Status (Produção)' : 'Status (Desenvolvimento)'}
               </span>
               <Switch
+                className={uncheckedSwitchClassName}
                 checked={process.env.NODE_ENV === 'production' ? config.rateLimitProdEnabled : config.rateLimitDevEnabled}
                 onCheckedChange={(checked: boolean) =>
                   updateConfig(process.env.NODE_ENV === 'production' ? "rateLimitProdEnabled" : "rateLimitDevEnabled", checked)
@@ -369,7 +411,7 @@ export default function SecurityConfigPage() {
                 <Label htmlFor="globalMaxRequests">
                   Requisições Globais (por período)
                 </Label>
-                <InfoButton label="Informações sobre Requisições Globais">
+                <InfoButton label="Ajuda do campo requisições globais por período">
                       <p className="font-semibold mb-1">? Como funciona o Rate Limiting Global:</p>
                       <p className="text-xs mb-2">
                         Limita o número total de requisições HTTP que qualquer usuário/IP pode fazer ao sistema durante a janela de tempo configurada.
@@ -405,7 +447,7 @@ export default function SecurityConfigPage() {
                 <Label htmlFor="globalWindowMinutes">
                   Janela Global (minutos)
                 </Label>
-                <InfoButton label="Informações sobre Janela Global">
+                <InfoButton label="Ajuda do campo janela global em minutos">
                       <p className="font-semibold mb-1">? Como funciona a Janela de Tempo:</p>
                       <p className="text-xs mb-2">
                         Define o período de tempo (em minutos) usado para contar as requisições globais.
@@ -440,11 +482,11 @@ export default function SecurityConfigPage() {
       </Card>
 
       {/* Rate Limiting de Endpoints Críticos */}
-      <Card>
+      <Card className={cn(dashboardCardBaseClassName, dashboardCardToneClassName.warn)}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Rate Limiting de Endpoints Críticos
-            <InfoButton label="Informações sobre Rate Limiting de Endpoints Críticos">
+            <InfoButton label="Ajuda da seção de rate limiting de endpoints críticos">
               <p>Configure limites específicos para operações sensíveis do sistema.</p>
               <p>Essas configurações controlam backup, restore e atualizações. Valores muito altos podem permitir abuso; valores muito baixos podem bloquear operações legítimas.</p>
             </InfoButton>
@@ -457,7 +499,7 @@ export default function SecurityConfigPage() {
                 <Label htmlFor="backupRateLimitPerHour">
                   Backup (por hora)
                 </Label>
-                <InfoButton label="Informações sobre Backup por hora">
+                <InfoButton label="Ajuda do campo limite de backup por hora">
                       <p className="font-semibold mb-1">? Como funciona o Rate Limiting de Backup:</p>
                       <p className="text-xs mb-2">
                         Limita o número de backups completos do banco de dados que podem ser criados por hora.
@@ -490,7 +532,7 @@ export default function SecurityConfigPage() {
                 <Label htmlFor="restoreRateLimitPerHour">
                   Restore (por hora)
                 </Label>
-                <InfoButton label="Informações sobre Restore por hora">
+                <InfoButton label="Ajuda do campo limite de restore por hora">
                       <p className="font-semibold mb-1">? Como funciona o Rate Limiting de Restore:</p>
                       <p className="text-xs mb-2">
                         Limita o número de restaurações completas do banco de dados que podem ser executadas por hora.
@@ -523,7 +565,7 @@ export default function SecurityConfigPage() {
                 <Label htmlFor="updateRateLimitPerHour">
                   Atualizações (por hora)
                 </Label>
-                <InfoButton label="Informações sobre Atualizações por hora">
+                <InfoButton label="Ajuda do campo limite de atualizações por hora">
                       <p className="font-semibold mb-1">? Como funciona o Rate Limiting de Atualizações:</p>
                       <p className="text-xs mb-2">
                         Limita o número de atualizações automáticas do sistema (via Git) que podem ser executadas por hora.
@@ -555,11 +597,11 @@ export default function SecurityConfigPage() {
       </Card>
 
       {/* Política de Senha */}
-      <Card>
+      <Card className={cn(dashboardCardBaseClassName, dashboardCardToneClassName.success)}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Política de Senha
-            <InfoButton label="Informações sobre Política de Senha">
+            <InfoButton label="Ajuda da seção de política de senha">
               <p>Defina os requisitos mínimos para senhas de usuários.</p>
             </InfoButton>
           </CardTitle>
@@ -568,7 +610,7 @@ export default function SecurityConfigPage() {
           <div>
             <div className="mb-2 flex items-center gap-2">
               <Label htmlFor="passwordMinLength">Tamanho Mínimo da Senha</Label>
-              <InfoButton label="Informações sobre Tamanho Mínimo da Senha">
+              <InfoButton label="Ajuda do campo tamanho mínimo da senha">
                 <p>Número mínimo de caracteres aceito para senha. Faixa suportada: 6 a 32.</p>
               </InfoButton>
             </div>
@@ -588,12 +630,13 @@ export default function SecurityConfigPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Label htmlFor="passwordRequireUppercase">Exigir Letra Maiúscula</Label>
-                <InfoButton label="Informações sobre Exigir Letra Maiúscula">
+                <InfoButton label="Ajuda do campo exigir letra maiúscula">
                   <p>Quando habilitado, a senha deve conter pelo menos uma letra maiúscula.</p>
                 </InfoButton>
               </div>
               <Switch
                 id="passwordRequireUppercase"
+                className={uncheckedSwitchClassName}
                 checked={config.passwordRequireUppercase}
                 onCheckedChange={(checked: boolean) =>
                   updateConfig("passwordRequireUppercase", checked)
@@ -604,12 +647,13 @@ export default function SecurityConfigPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Label htmlFor="passwordRequireLowercase">Exigir Letra Minúscula</Label>
-                <InfoButton label="Informações sobre Exigir Letra Minúscula">
+                <InfoButton label="Ajuda do campo exigir letra minúscula">
                   <p>Quando habilitado, a senha deve conter pelo menos uma letra minúscula.</p>
                 </InfoButton>
               </div>
               <Switch
                 id="passwordRequireLowercase"
+                className={uncheckedSwitchClassName}
                 checked={config.passwordRequireLowercase}
                 onCheckedChange={(checked: boolean) =>
                   updateConfig("passwordRequireLowercase", checked)
@@ -620,12 +664,13 @@ export default function SecurityConfigPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Label htmlFor="passwordRequireNumbers">Exigir Números</Label>
-                <InfoButton label="Informações sobre Exigir Números">
+                <InfoButton label="Ajuda do campo exigir números">
                   <p>Quando habilitado, a senha deve conter pelo menos um número.</p>
                 </InfoButton>
               </div>
               <Switch
                 id="passwordRequireNumbers"
+                className={uncheckedSwitchClassName}
                 checked={config.passwordRequireNumbers}
                 onCheckedChange={(checked: boolean) =>
                   updateConfig("passwordRequireNumbers", checked)
@@ -636,12 +681,13 @@ export default function SecurityConfigPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Label htmlFor="passwordRequireSpecial">Exigir Caractere Especial</Label>
-                <InfoButton label="Informações sobre Exigir Caractere Especial">
+                <InfoButton label="Ajuda do campo exigir caractere especial">
                   <p>Quando habilitado, a senha deve conter pelo menos um caractere especial, como !@#$%.</p>
                 </InfoButton>
               </div>
               <Switch
                 id="passwordRequireSpecial"
+                className={uncheckedSwitchClassName}
                 checked={config.passwordRequireSpecial}
                 onCheckedChange={(checked: boolean) =>
                   updateConfig("passwordRequireSpecial", checked)
@@ -653,11 +699,11 @@ export default function SecurityConfigPage() {
       </Card>
 
       {/* Autenticação de Dois Fatores */}
-      <Card>
+      <Card className={cn(dashboardCardBaseClassName, dashboardCardToneClassName.info)}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Autenticação de Dois Fatores (2FA)
-            <InfoButton label="Informações sobre Autenticação de Dois Fatores">
+            <InfoButton label="Ajuda da seção de autenticação de dois fatores">
               <p>Configure se o 2FA está disponível para usuários e se deve ser obrigatório.</p>
             </InfoButton>
           </CardTitle>
@@ -667,12 +713,13 @@ export default function SecurityConfigPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Label htmlFor="twoFactorEnabled">Habilitar 2FA Globalmente</Label>
-                <InfoButton label="Informações sobre Habilitar 2FA Globalmente">
+                <InfoButton label="Ajuda do campo habilitar 2FA globalmente">
                   <p>Permite que usuários configurem autenticação de dois fatores em suas contas.</p>
                 </InfoButton>
               </div>
               <Switch
                 id="twoFactorEnabled"
+                className={uncheckedSwitchClassName}
                 checked={config.twoFactorEnabled}
                 onCheckedChange={(checked: boolean) =>
                   updateConfig("twoFactorEnabled", checked)
@@ -683,7 +730,7 @@ export default function SecurityConfigPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Label htmlFor="twoFactorRequired">Tornar 2FA Obrigatório</Label>
-                <InfoButton label="Informações sobre Tornar 2FA Obrigatório">
+                <InfoButton label="Ajuda do campo tornar 2FA obrigatório">
                   <p>Quando habilitado, todos os usuários devem configurar 2FA para acessar o sistema.</p>
                 </InfoButton>
               </div>
@@ -691,7 +738,7 @@ export default function SecurityConfigPage() {
                 id="twoFactorRequired"
                 checked={config.twoFactorRequired}
                 disabled={!config.twoFactorEnabled}
-                className={disabledUncheckedSwitchClassName}
+                className={uncheckedSwitchClassName}
                 onCheckedChange={(checked: boolean) =>
                   updateConfig("twoFactorRequired", checked)
                 }
@@ -728,11 +775,11 @@ export default function SecurityConfigPage() {
       </Card>
 
       {/* JWT e Sessão */}
-      <Card>
+      <Card className={cn(dashboardCardBaseClassName, dashboardCardToneClassName.accent)}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Tokens e Sessão
-            <InfoButton label="Informações sobre Tokens e Sessão">
+            <InfoButton label="Ajuda da seção de tokens e sessão">
               <p>Configure o tempo de expiração de tokens e o logout automático por inatividade.</p>
             </InfoButton>
           </CardTitle>
@@ -742,7 +789,7 @@ export default function SecurityConfigPage() {
             <div>
               <div className="mb-2 flex items-center gap-2">
                 <Label htmlFor="accessTokenExpiresIn">Expiração do Access Token</Label>
-                <InfoButton label="Informações sobre Expiração do Access Token">
+                <InfoButton label="Ajuda do campo expiração do access token">
                   <p>Formato aceito: 15m, 1h, 1d.</p>
                 </InfoButton>
               </div>
@@ -760,7 +807,7 @@ export default function SecurityConfigPage() {
             <div>
               <div className="mb-2 flex items-center gap-2">
                 <Label htmlFor="refreshTokenExpiresIn">Expiração do Refresh Token</Label>
-                <InfoButton label="Informações sobre Expiração do Refresh Token">
+                <InfoButton label="Ajuda do campo expiração do refresh token">
                   <p>Formato aceito: 7d, 30d.</p>
                 </InfoButton>
               </div>
@@ -778,7 +825,7 @@ export default function SecurityConfigPage() {
             <div>
               <div className="mb-2 flex items-center gap-2">
                 <Label htmlFor="sessionTimeoutMinutes">Logout por Inatividade (minutos)</Label>
-                <InfoButton label="Informações sobre Logout por Inatividade">
+                <InfoButton label="Ajuda do campo logout por inatividade">
                   <p>Tempo de inatividade antes de deslogar automaticamente. Faixa: 5 a 1440 minutos.</p>
                 </InfoButton>
               </div>
@@ -796,6 +843,8 @@ export default function SecurityConfigPage() {
           </div>
         </CardContent>
       </Card>
+        </>
+      )}
 
       {/* Configurações de Email */}
       <EmailConfigSection />
@@ -804,12 +853,14 @@ export default function SecurityConfigPage() {
       <DynamicSecuritySettingsSection />
 
       {/* Botão de Salvar */}
-      <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={saving} size="lg">
-          <Save className="h-4 w-4 mr-2" />
-          {saving ? "Salvando..." : "Salvar Todas as Alterações"}
-        </Button>
-      </div>
+      {config ? (
+        <div className="flex justify-end">
+          <Button onClick={handleSave} disabled={saving} size="lg">
+            <Save className="h-4 w-4 mr-2" />
+            {saving ? "Salvando..." : "Salvar Todas as Alterações"}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -67,6 +67,76 @@ const buildLegacySecurityConfig = () => ({
   updatedBy: "super-admin-1",
 });
 
+it("permite que submit antigo e toggle dinamico coexistam sem derrubar a pagina", async () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        id: "super-admin-1",
+        email: "super-admin@example.com",
+        name: "Super Admin",
+        role: "SUPER_ADMIN",
+      },
+      loading: false,
+    });
+    apiMock.get.mockReset();
+    apiMock.put.mockReset();
+    apiMock.post.mockReset();
+    toastMock.mockReset();
+    refreshConfigMock.mockReset();
+    refreshConfigMock.mockResolvedValue(undefined);
+    localStorage.clear();
+
+    installDefaultGetHandlers([buildSetting({})]);
+    apiMock.put.mockImplementation((url: string, payload: unknown) => {
+      if (url === "/system/settings/panel/notifications.enabled") {
+        return Promise.resolve({
+          data: {
+            action: "update",
+            setting: buildSetting({
+              resolvedValue: false,
+              resolvedSource: "database",
+              hasDatabaseOverride: true,
+            }),
+          },
+        });
+      }
+
+      if (url === "/security-config") {
+        return Promise.resolve({ data: { ...buildLegacySecurityConfig(), ...(payload as object) } });
+      }
+
+      throw new Error(`Unhandled PUT ${url}`);
+    });
+
+    render(<SecuritySettingsPage />);
+
+    const user = userEvent.setup();
+    const toggle = await screen.findByRole("switch", { name: /Alternar Notificacoes do sistema/i });
+    await user.click(toggle);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("security-setting-origin-notifications.enabled")).toHaveTextContent("Painel");
+    });
+
+    const loginAttemptsInput = screen.getByRole("spinbutton", {
+      name: /Máximo de Tentativas de Login/i,
+    });
+    await user.clear(loginAttemptsInput);
+    await user.type(loginAttemptsInput, "11");
+    await user.click(screen.getByRole("button", { name: /Salvar Alterações/i }));
+
+    await waitFor(() => {
+      expect(apiMock.put).toHaveBeenCalledWith(
+        "/security-config",
+        expect.objectContaining({
+          loginMaxAttempts: 11,
+        }),
+      );
+    });
+
+    expect(screen.getByText(/Controle de Tentativas de Login/i)).toBeInTheDocument();
+    expect(screen.getByTestId("dynamic-security-settings-section")).toBeInTheDocument();
+  });
+
 const buildSetting = (overrides: Partial<SecuritySettingItem>): SecuritySettingItem => ({
   key: "notifications.enabled",
   label: "Notificacoes do sistema",
@@ -193,17 +263,33 @@ describe("/configuracoes/seguranca", () => {
     localStorage.clear();
   });
 
-  it("renderiza loading enquanto as configuracoes antigas ainda estao carregando", () => {
+  it("mantem a secao dinamica visivel enquanto as configuracoes antigas ainda estao carregando", async () => {
     apiMock.get.mockImplementation((url: string) => {
-      if (url === "/security-config") {
-        return new Promise(() => undefined);
+      switch (url) {
+        case "/security-config":
+          return new Promise(() => undefined);
+        case "/system/settings/panel":
+          return Promise.resolve(buildReadResponse([buildSetting({})]));
+        case "/email-config/providers":
+          return Promise.resolve(buildEmailProvidersResponse());
+        case "/email-config":
+          return Promise.resolve(buildEmailConfigListResponse());
+        case "/email-config/active":
+          return Promise.resolve(buildActiveEmailConfigResponse());
+        case "/email-config/smtp-credentials":
+          return Promise.resolve(buildEmailCredentialsResponse());
+        default:
+          throw new Error(`Unexpected GET ${url}`);
       }
-      throw new Error(`Unexpected GET ${url}`);
     });
 
     render(<SecuritySettingsPage />);
 
-    expect(screen.getByText(/Carregando configura/i)).toBeInTheDocument();
+    expect(screen.getByTestId("legacy-security-section-loading")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /Notificacoes do sistema/i }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText(/Configurações de Email/i)).toBeInTheDocument();
   });
 
   it("restaura todas as secoes antigas e integra a secao dinamica na mesma pagina", async () => {
@@ -270,6 +356,38 @@ describe("/configuracoes/seguranca", () => {
       );
     });
     expect(refreshConfigMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("mantem os dois botoes antigos de salvar equivalentes para /security-config", async () => {
+    installDefaultGetHandlers();
+    apiMock.put.mockImplementation((url: string, payload: unknown) => {
+      if (url === "/security-config") {
+        return Promise.resolve({ data: { ...buildLegacySecurityConfig(), ...(payload as object) } });
+      }
+      throw new Error(`Unhandled PUT ${url}`);
+    });
+
+    render(<SecuritySettingsPage />);
+
+    const user = userEvent.setup();
+    expect(await screen.findByRole("button", { name: /Salvar Alterações/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Salvar Todas as Alterações/i })).toBeInTheDocument();
+
+    const loginAttemptsInput = screen.getByRole("spinbutton", {
+      name: /Máximo de Tentativas de Login/i,
+    });
+    await user.clear(loginAttemptsInput);
+    await user.type(loginAttemptsInput, "9");
+    await user.click(screen.getByRole("button", { name: /Salvar Todas as Alterações/i }));
+
+    await waitFor(() => {
+      expect(apiMock.put).toHaveBeenCalledWith(
+        "/security-config",
+        expect.objectContaining({
+          loginMaxAttempts: 9,
+        }),
+      );
+    });
   });
 
   it("mantem os toggles dinamicos funcionando sem remover os controles antigos", async () => {
@@ -394,16 +512,27 @@ describe("/configuracoes/seguranca", () => {
     ).not.toBeInTheDocument();
 
     const user = userEvent.setup();
-    await user.click(screen.getByLabelText(/Informa.*Controle de Tentativas de Login/i));
+    expect(
+      screen.getByRole("spinbutton", { name: /Máximo de Tentativas de Login/i }),
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", {
+        name: /Ajuda da seção de controle de tentativas de login/i,
+      }),
+    );
     expect(
       await screen.findByText(/Configure o bloqueio automático de contas após múltiplas tentativas de login falhas/i),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByLabelText(/Informa.*Notificacoes do sistema/i));
+    await user.click(
+      screen.getByRole("button", {
+        name: /Ajuda da configuracao dinamica Notificacoes do sistema/i,
+      }),
+    );
     expect(await screen.findByText(/Ativa ou desativa o envio de notificacoes do sistema\./i)).toBeInTheDocument();
   });
 
-  it("deixa o toggle desabilitado visivel em vermelho quando estiver desligado", async () => {
+  it("deixa toggles desligados visiveis em vermelho na pagina", async () => {
     installDefaultGetHandlers([
       buildSetting({
         key: "security.headers.enabled",
@@ -421,8 +550,12 @@ describe("/configuracoes/seguranca", () => {
     const readonlyToggle = await screen.findByRole("switch", {
       name: /Headers de seguranca somente leitura/i,
     });
+    const legacyUncheckedToggle = screen.getByRole("switch", {
+      name: /Tornar 2FA Obrigatório/i,
+    });
 
     expect(readonlyToggle).toHaveClass("data-[state=unchecked]:bg-destructive/80");
+    expect(legacyUncheckedToggle).toHaveClass("data-[state=unchecked]:bg-destructive/80");
   });
 
   it("exige confirmacao explicita para chaves dinamicas marcadas com requiresConfirmation", async () => {
@@ -506,6 +639,41 @@ describe("/configuracoes/seguranca", () => {
       expect(screen.getByTestId("security-setting-origin-notifications.enabled")).toHaveTextContent("ENV");
     });
     expect(screen.getByText(/Política de Senha/i)).toBeInTheDocument();
+  });
+
+  it("mantem a secao dinamica operante mesmo quando /security-config falha", async () => {
+    apiMock.get.mockImplementation((url: string) => {
+      switch (url) {
+        case "/security-config":
+          return Promise.reject({
+            response: {
+              status: 500,
+              data: { message: "legacy offline" },
+            },
+          });
+        case "/system/settings/panel":
+          return Promise.resolve(buildReadResponse([buildSetting({})]));
+        case "/email-config/providers":
+          return Promise.resolve(buildEmailProvidersResponse());
+        case "/email-config":
+          return Promise.resolve(buildEmailConfigListResponse());
+        case "/email-config/active":
+          return Promise.resolve(buildActiveEmailConfigResponse());
+        case "/email-config/smtp-credentials":
+          return Promise.resolve(buildEmailCredentialsResponse());
+        default:
+          throw new Error(`Unhandled GET ${url}`);
+      }
+    });
+
+    render(<SecuritySettingsPage />);
+
+    expect(await screen.findByTestId("legacy-security-section-error")).toBeInTheDocument();
+    expect(screen.getByText(/legacy offline/i)).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /Notificacoes do sistema/i }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText(/Configurações de Email/i)).toBeInTheDocument();
   });
 
   it("mantem a pagina antiga operante mesmo quando a API dinamica falha", async () => {
