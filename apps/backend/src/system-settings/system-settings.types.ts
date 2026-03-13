@@ -1,10 +1,11 @@
 export type SettingValueType = 'boolean' | 'number' | 'string' | 'json';
 
 export type SettingValueSource = 'database' | 'env' | 'default';
+export type SettingValidationSource = SettingValueSource | 'request';
 
 export interface SettingValidatorContext {
   key: string;
-  source: SettingValueSource;
+  source: SettingValidationSource;
 }
 
 export interface SettingDefinition<T = unknown> {
@@ -19,6 +20,7 @@ export interface SettingDefinition<T = unknown> {
   sensitive: boolean;
   requiresConfirmation: boolean;
   allowedInPanel: boolean;
+  editableInPanel: boolean;
   validator?: (value: T, context: SettingValidatorContext) => boolean;
 }
 

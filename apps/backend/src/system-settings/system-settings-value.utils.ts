@@ -1,4 +1,4 @@
-import { SettingDefinition, SettingValueSource } from './system-settings.types';
+import { SettingDefinition, SettingValidationSource, SettingValueSource } from './system-settings.types';
 
 export interface CoerceSettingResult<T = unknown> {
   ok: boolean;
@@ -11,20 +11,36 @@ export const coerceSettingValue = <T = unknown>(
   input: unknown,
   source: SettingValueSource,
 ): CoerceSettingResult<T> => {
+  return coerceSettingValueInternal(definition, input, source, 'lenient');
+};
+
+export const coerceIncomingSettingValue = <T = unknown>(
+  definition: SettingDefinition<T>,
+  input: unknown,
+): CoerceSettingResult<T> => {
+  return coerceSettingValueInternal(definition, input, 'request', 'strict');
+};
+
+const coerceSettingValueInternal = <T = unknown>(
+  definition: SettingDefinition<T>,
+  input: unknown,
+  source: SettingValidationSource,
+  mode: 'lenient' | 'strict',
+): CoerceSettingResult<T> => {
   let coerced: unknown;
 
   switch (definition.type) {
     case 'boolean':
-      coerced = coerceBoolean(input);
+      coerced = coerceBoolean(input, mode);
       break;
     case 'number':
-      coerced = coerceNumber(input);
+      coerced = coerceNumber(input, mode);
       break;
     case 'string':
       coerced = typeof input === 'string' ? input : undefined;
       break;
     case 'json':
-      coerced = coerceJson(input);
+      coerced = coerceJson(input, mode);
       break;
     default:
       return { ok: false, reason: `Unsupported setting type "${String(definition.type)}"` };
@@ -67,9 +83,13 @@ export const readEnvValueForSetting = <T = unknown>(
   };
 };
 
-const coerceBoolean = (input: unknown): boolean | undefined => {
+const coerceBoolean = (input: unknown, mode: 'lenient' | 'strict'): boolean | undefined => {
   if (typeof input === 'boolean') {
     return input;
+  }
+
+  if (mode === 'strict') {
+    return undefined;
   }
 
   if (typeof input !== 'string') {
@@ -86,9 +106,13 @@ const coerceBoolean = (input: unknown): boolean | undefined => {
   return undefined;
 };
 
-const coerceNumber = (input: unknown): number | undefined => {
+const coerceNumber = (input: unknown, mode: 'lenient' | 'strict'): number | undefined => {
   if (typeof input === 'number' && Number.isFinite(input)) {
     return input;
+  }
+
+  if (mode === 'strict') {
+    return undefined;
   }
 
   if (typeof input !== 'string') {
@@ -99,13 +123,17 @@ const coerceNumber = (input: unknown): number | undefined => {
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
-const coerceJson = (input: unknown): unknown => {
+const coerceJson = (input: unknown, mode: 'lenient' | 'strict'): unknown => {
   if (input === null) {
     return null;
   }
 
   if (typeof input === 'object') {
     return input;
+  }
+
+  if (mode === 'strict') {
+    return undefined;
   }
 
   if (typeof input !== 'string') {

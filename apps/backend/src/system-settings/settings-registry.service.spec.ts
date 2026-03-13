@@ -24,11 +24,17 @@ describe('SettingsRegistry', () => {
       expect(typeof definition.sensitive).toBe('boolean');
       expect(typeof definition.requiresConfirmation).toBe('boolean');
       expect(typeof definition.allowedInPanel).toBe('boolean');
+      expect(typeof definition.editableInPanel).toBe('boolean');
       expect(definition.validator?.(definition.defaultValue, {
         key: definition.key,
         source: 'default',
       })).toBe(true);
     }
+  });
+
+  it('marca configuracoes sensiveis como nao editaveis nesta etapa', () => {
+    expect(registry.isEditableInPanel('security.module_upload.enabled')).toBe(true);
+    expect(registry.isEditableInPanel('security.headers.enabled')).toBe(false);
   });
 
   it('ignora chaves fora da whitelist', () => {

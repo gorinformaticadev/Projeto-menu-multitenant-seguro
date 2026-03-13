@@ -84,6 +84,7 @@ export class SystemSettingsReadService {
       category: definition.category,
       type: definition.type,
       allowedInPanel: definition.allowedInPanel,
+      editableInPanel: definition.editableInPanel,
       restartRequired: definition.restartRequired,
       requiresConfirmation: definition.requiresConfirmation,
       sensitive: definition.sensitive,

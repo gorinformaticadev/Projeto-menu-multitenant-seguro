@@ -21,6 +21,7 @@ export const SETTINGS_REGISTRY_DEFINITIONS = {
     sensitive: false,
     requiresConfirmation: true,
     allowedInPanel: true,
+    editableInPanel: true,
   }),
   'notifications.enabled': booleanSetting({
     key: 'notifications.enabled',
@@ -33,6 +34,7 @@ export const SETTINGS_REGISTRY_DEFINITIONS = {
     sensitive: false,
     requiresConfirmation: false,
     allowedInPanel: true,
+    editableInPanel: true,
   }),
   'notifications.push.enabled': booleanSetting({
     key: 'notifications.push.enabled',
@@ -45,6 +47,7 @@ export const SETTINGS_REGISTRY_DEFINITIONS = {
     sensitive: false,
     requiresConfirmation: false,
     allowedInPanel: true,
+    editableInPanel: true,
   }),
   'operations.watchdog.enabled': booleanSetting({
     key: 'operations.watchdog.enabled',
@@ -57,6 +60,7 @@ export const SETTINGS_REGISTRY_DEFINITIONS = {
     sensitive: false,
     requiresConfirmation: false,
     allowedInPanel: true,
+    editableInPanel: true,
   }),
   'operations.alerts.enabled': booleanSetting({
     key: 'operations.alerts.enabled',
@@ -69,6 +73,7 @@ export const SETTINGS_REGISTRY_DEFINITIONS = {
     sensitive: false,
     requiresConfirmation: false,
     allowedInPanel: true,
+    editableInPanel: true,
   }),
   'security.rate_limit.enabled': booleanSetting({
     key: 'security.rate_limit.enabled',
@@ -81,6 +86,7 @@ export const SETTINGS_REGISTRY_DEFINITIONS = {
     sensitive: true,
     requiresConfirmation: true,
     allowedInPanel: true,
+    editableInPanel: false,
   }),
   'security.rate_limit.advanced.enabled': booleanSetting({
     key: 'security.rate_limit.advanced.enabled',
@@ -93,6 +99,7 @@ export const SETTINGS_REGISTRY_DEFINITIONS = {
     sensitive: true,
     requiresConfirmation: true,
     allowedInPanel: true,
+    editableInPanel: false,
   }),
   'security.file_signature_validation.enabled': booleanSetting({
     key: 'security.file_signature_validation.enabled',
@@ -105,6 +112,7 @@ export const SETTINGS_REGISTRY_DEFINITIONS = {
     sensitive: false,
     requiresConfirmation: false,
     allowedInPanel: true,
+    editableInPanel: true,
   }),
   'security.websocket.enabled': booleanSetting({
     key: 'security.websocket.enabled',
@@ -117,6 +125,7 @@ export const SETTINGS_REGISTRY_DEFINITIONS = {
     sensitive: true,
     requiresConfirmation: true,
     allowedInPanel: true,
+    editableInPanel: false,
   }),
   'security.headers.enabled': booleanSetting({
     key: 'security.headers.enabled',
@@ -129,6 +138,7 @@ export const SETTINGS_REGISTRY_DEFINITIONS = {
     sensitive: true,
     requiresConfirmation: true,
     allowedInPanel: true,
+    editableInPanel: false,
   }),
   'security.csrf.enabled': booleanSetting({
     key: 'security.csrf.enabled',
@@ -141,6 +151,7 @@ export const SETTINGS_REGISTRY_DEFINITIONS = {
     sensitive: true,
     requiresConfirmation: true,
     allowedInPanel: true,
+    editableInPanel: false,
   }),
   'security.csp_advanced.enabled': booleanSetting({
     key: 'security.csp_advanced.enabled',
@@ -153,6 +164,7 @@ export const SETTINGS_REGISTRY_DEFINITIONS = {
     sensitive: true,
     requiresConfirmation: true,
     allowedInPanel: true,
+    editableInPanel: false,
   }),
 } as const satisfies Record<string, SettingDefinition>;
 
@@ -185,5 +197,9 @@ export class SettingsRegistry {
 
   getAllowedInPanel(): readonly SettingDefinition[] {
     return this.allDefinitions.filter((definition) => definition.allowedInPanel);
+  }
+
+  isEditableInPanel(key: string): boolean {
+    return this.get(key)?.editableInPanel === true;
   }
 }

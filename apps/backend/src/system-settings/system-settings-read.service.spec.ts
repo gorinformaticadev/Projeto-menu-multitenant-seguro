@@ -15,6 +15,7 @@ describe('SystemSettingsReadService', () => {
     sensitive: false,
     requiresConfirmation: true,
     allowedInPanel: true,
+    editableInPanel: true,
     validator: (value: boolean) => typeof value === 'boolean',
     ...overrides,
   });
@@ -22,10 +23,16 @@ describe('SystemSettingsReadService', () => {
   const createService = () => {
     const definitions = [
       makeDefinition({ key: 'security.module_upload.enabled', sensitive: false, label: 'Upload de modulos' }),
-      makeDefinition({ key: 'security.headers.enabled', sensitive: true, label: 'Headers de seguranca' }),
+      makeDefinition({
+        key: 'security.headers.enabled',
+        sensitive: true,
+        editableInPanel: false,
+        label: 'Headers de seguranca',
+      }),
       makeDefinition({
         key: 'internal.only',
         allowedInPanel: false,
+        editableInPanel: false,
         label: 'Internal only',
       }),
     ];
@@ -112,6 +119,7 @@ describe('SystemSettingsReadService', () => {
         category: 'security',
         type: 'boolean',
         allowedInPanel: true,
+        editableInPanel: true,
         requiresConfirmation: true,
         resolvedValue: true,
         resolvedSource: 'database',
@@ -140,6 +148,7 @@ describe('SystemSettingsReadService', () => {
       expect.objectContaining({
         sensitive: true,
         valueHidden: true,
+        editableInPanel: false,
         resolvedValue: null,
         resolvedSource: 'env',
       }),

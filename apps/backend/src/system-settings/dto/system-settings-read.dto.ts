@@ -13,6 +13,7 @@ export class SystemSettingReadItemDto {
   category!: string;
   type!: SettingValueType;
   allowedInPanel!: boolean;
+  editableInPanel!: boolean;
   restartRequired!: boolean;
   requiresConfirmation!: boolean;
   sensitive!: boolean;

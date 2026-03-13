@@ -11,8 +11,13 @@ describe('SystemSettingsController', () => {
   const readServiceMock = {
     listPanelSettings: jest.fn(),
   };
+  const writeServiceMock = {
+    updatePanelSetting: jest.fn(),
+    restorePanelSettingFallback: jest.fn(),
+  };
 
-  const createController = () => new SystemSettingsController(readServiceMock as any);
+  const createController = () =>
+    new SystemSettingsController(readServiceMock as any, writeServiceMock as any);
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -45,6 +50,86 @@ describe('SystemSettingsController', () => {
       meta: {
         total: 0,
         categories: [],
+      },
+    });
+  });
+
+  it('delegates update ao service de escrita whitelistada', async () => {
+    const controller = createController();
+    writeServiceMock.updatePanelSetting.mockResolvedValue({
+      action: 'update',
+      setting: {
+        key: 'notifications.enabled',
+        resolvedSource: 'database',
+      },
+    });
+
+    const result = await controller.updatePanelSetting(
+      'notifications.enabled',
+      {
+        value: false,
+        changeReason: 'disable notifications',
+      },
+      {
+        id: 'user-1',
+        email: 'super-admin@example.com',
+        role: Role.SUPER_ADMIN,
+      },
+    );
+
+    expect(writeServiceMock.updatePanelSetting).toHaveBeenCalledWith(
+      'notifications.enabled',
+      false,
+      {
+        userId: 'user-1',
+        email: 'super-admin@example.com',
+      },
+      'disable notifications',
+    );
+    expect(result).toEqual({
+      action: 'update',
+      setting: {
+        key: 'notifications.enabled',
+        resolvedSource: 'database',
+      },
+    });
+  });
+
+  it('delegates restore fallback ao service de escrita whitelistada', async () => {
+    const controller = createController();
+    writeServiceMock.restorePanelSettingFallback.mockResolvedValue({
+      action: 'restore_fallback',
+      setting: {
+        key: 'notifications.enabled',
+        resolvedSource: 'env',
+      },
+    });
+
+    const result = await controller.restorePanelSettingFallback(
+      'notifications.enabled',
+      {
+        changeReason: 'restore env',
+      },
+      {
+        sub: 'user-2',
+        email: 'super-admin@example.com',
+        role: Role.SUPER_ADMIN,
+      },
+    );
+
+    expect(writeServiceMock.restorePanelSettingFallback).toHaveBeenCalledWith(
+      'notifications.enabled',
+      {
+        userId: 'user-2',
+        email: 'super-admin@example.com',
+      },
+      'restore env',
+    );
+    expect(result).toEqual({
+      action: 'restore_fallback',
+      setting: {
+        key: 'notifications.enabled',
+        resolvedSource: 'env',
       },
     });
   });
