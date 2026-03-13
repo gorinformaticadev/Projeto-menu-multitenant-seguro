@@ -4,6 +4,7 @@
 
 import { Type } from 'class-transformer';
 import { IsString, IsOptional, IsEnum, IsObject, IsUUID, IsBoolean, ValidateNested } from 'class-validator';
+import { Notification } from './notification.entity';
 
 export class CreateNotificationDto {
   @IsString()
@@ -110,4 +111,27 @@ export class SavePushSubscriptionDto {
 export class RemovePushSubscriptionDto {
   @IsString()
   endpoint: string;
+}
+
+export type NotificationConfigurationSource = 'database' | 'env' | 'default';
+
+export interface NotificationConfigurationStatusDto {
+  key: 'notifications.enabled';
+  enabled: boolean;
+  source: NotificationConfigurationSource;
+}
+
+export interface NotificationSuppressionMetaDto {
+  suppressed: boolean;
+  blockReason: 'disabled_by_configuration' | null;
+  configuration: NotificationConfigurationStatusDto;
+}
+
+export interface CreateNotificationResponseDto extends NotificationSuppressionMetaDto {
+  success: boolean;
+  notification: Notification | null;
+}
+
+export interface BroadcastNotificationResponseDto extends NotificationSuppressionMetaDto {
+  count: number;
 }

@@ -28,6 +28,8 @@ import {
   BroadcastNotificationDto,
   SavePushSubscriptionDto,
   RemovePushSubscriptionDto,
+  BroadcastNotificationResponseDto,
+  CreateNotificationResponseDto,
 } from './notification.dto';
 
 @Controller('notifications')
@@ -75,13 +77,32 @@ export class NotificationsController {
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   @Throttle({ default: { limit: 20, ttl: 60000 } })
-  async create(@Body() createDto: CreateNotificationDto, @Request() req) {
+  async create(@Body() createDto: CreateNotificationDto, @Request() req): Promise<CreateNotificationResponseDto> {
+    const configuration = await this.notificationService.getNotificationsToggleState();
+    if (!configuration.enabled) {
+      return {
+        success: true,
+        notification: null,
+        suppressed: true,
+        blockReason: 'disabled_by_configuration',
+        configuration,
+      };
+    }
+
     const notification = await this.notificationService.create(createDto, req.user);
 
-    // Emite via Socket.IO
-    await this.notificationGateway.emitNewNotification(notification);
+    if (notification) {
+      // Emite via Socket.IO
+      await this.notificationGateway.emitNewNotification(notification);
+    }
 
-    return { success: true, notification };
+    return {
+      success: true,
+      notification,
+      suppressed: false,
+      blockReason: null,
+      configuration,
+    };
   }
 
   /**
@@ -91,8 +112,25 @@ export class NotificationsController {
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  async broadcast(@Body() body: BroadcastNotificationDto, @Request() req) {
-    return this.notificationService.broadcast(body, req.user);
+  async broadcast(@Body() body: BroadcastNotificationDto, @Request() req): Promise<BroadcastNotificationResponseDto> {
+    const configuration = await this.notificationService.getNotificationsToggleState();
+    if (!configuration.enabled) {
+      return {
+        count: 0,
+        suppressed: true,
+        blockReason: 'disabled_by_configuration',
+        configuration,
+      };
+    }
+
+    const result = await this.notificationService.broadcast(body, req.user);
+
+    return {
+      ...result,
+      suppressed: false,
+      blockReason: null,
+      configuration,
+    };
   }
 
   /**

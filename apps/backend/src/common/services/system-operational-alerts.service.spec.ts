@@ -8,6 +8,7 @@ import { PushNotificationService } from '../../notifications/push-notification.s
 import { CronService } from '../../core/cron/cron.service';
 import { SystemTelemetryService } from './system-telemetry.service';
 import { SystemOperationalAlertsService } from './system-operational-alerts.service';
+import { ConfigResolverService } from '../../system-settings/config-resolver.service';
 
 describe('SystemOperationalAlertsService', () => {
   const prismaMock = {
@@ -31,6 +32,9 @@ describe('SystemOperationalAlertsService', () => {
   };
   const cronServiceMock = {
     register: jest.fn(),
+  };
+  const configResolverMock = {
+    getBoolean: jest.fn(),
   };
 
   const baseNotification: Notification = {
@@ -64,6 +68,7 @@ describe('SystemOperationalAlertsService', () => {
       pushNotificationServiceMock as unknown as PushNotificationService,
       auditServiceMock as unknown as AuditService,
       cronServiceMock as unknown as CronService,
+      configResolverMock as unknown as ConfigResolverService,
     );
 
   beforeEach(() => {
@@ -106,6 +111,7 @@ describe('SystemOperationalAlertsService', () => {
     pushNotificationServiceMock.getPublicKey.mockResolvedValue('public-key');
     prismaMock.backupJob.findMany.mockResolvedValue([]);
     cronServiceMock.register.mockResolvedValue(undefined);
+    configResolverMock.getBoolean.mockResolvedValue(true);
     jest
       .spyOn(serviceInternals, 'checkDatabaseHealth')
       .mockResolvedValue({ status: 'healthy', latencyMs: 12 });
@@ -406,5 +412,26 @@ describe('SystemOperationalAlertsService', () => {
       baseNotification,
       expect.objectContaining({ push: true }),
     );
+  });
+
+  it('suppresses operational alerts when operations alerts are disabled', async () => {
+    configResolverMock.getBoolean.mockResolvedValue(false);
+
+    const emitted = await service.dispatchOperationalAlert({
+      action: 'OPS_MANUAL_TEST',
+      cooldownKey: 'OPS_MANUAL_TEST',
+      severity: 'critical',
+      title: 'Teste manual',
+      body: 'Alerta operacional manual',
+      pushEligible: true,
+      audit: true,
+      source: 'operational-alerts',
+    });
+
+    expect(emitted).toBe(false);
+    expect(notificationServiceMock.createSystemNotificationEntity).not.toHaveBeenCalled();
+    expect(notificationGatewayMock.emitNewNotification).not.toHaveBeenCalled();
+    expect(pushNotificationServiceMock.getPublicKey).not.toHaveBeenCalled();
+    expect(auditServiceMock.log).not.toHaveBeenCalled();
   });
 });

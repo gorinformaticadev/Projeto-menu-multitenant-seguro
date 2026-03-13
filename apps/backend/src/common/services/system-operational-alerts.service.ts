@@ -8,6 +8,7 @@ import { PrismaService } from '../../core/prisma/prisma.service';
 import { NotificationGateway } from '../../notifications/notification.gateway';
 import { NotificationService, SystemNotificationSeverity } from '../../notifications/notification.service';
 import { PushNotificationService } from '../../notifications/push-notification.service';
+import { ConfigResolverService } from '../../system-settings/config-resolver.service';
 import {
   ApiTelemetrySnapshot,
   RouteTelemetrySummary,
@@ -75,6 +76,7 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     private readonly pushNotificationService: PushNotificationService,
     private readonly auditService: AuditService,
     private readonly cronService: CronService,
+    private readonly configResolver: ConfigResolverService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -434,6 +436,12 @@ export class SystemOperationalAlertsService implements OnModuleInit {
   ): Promise<boolean> {
     const cooldownUntil = this.cooldownState.get(input.cooldownKey) || 0;
     if (cooldownUntil > nowMs) {
+      return false;
+    }
+
+    const alertsEnabled =
+      (await this.configResolver.getBoolean('operations.alerts.enabled')) !== false;
+    if (!alertsEnabled) {
       return false;
     }
 

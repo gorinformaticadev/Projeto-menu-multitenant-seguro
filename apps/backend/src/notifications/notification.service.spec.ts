@@ -1,6 +1,10 @@
 import { NotificationService } from './notification.service';
 
 describe('NotificationService system notifications', () => {
+  const configResolverMock = {
+    getResolved: jest.fn(),
+  };
+
   const prismaMock = {
     notification: {
       create: jest.fn(),
@@ -14,10 +18,19 @@ describe('NotificationService system notifications', () => {
     },
   };
 
-  const createService = () => new NotificationService(prismaMock as any);
+  const createService = () => new NotificationService(prismaMock as any, configResolverMock as any);
 
   beforeEach(() => {
     jest.clearAllMocks();
+    configResolverMock.getResolved.mockResolvedValue({
+      key: 'notifications.enabled',
+      value: true,
+      source: 'default',
+      definition: {
+        key: 'notifications.enabled',
+        type: 'boolean',
+      },
+    });
   });
 
   it('creates persisted notification for allowlisted system action', async () => {

@@ -4,6 +4,7 @@
 
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
+import { ConfigResolverService } from '../system-settings/config-resolver.service';
 import { Observable, Subject } from 'rxjs';
 import {
   Notification,
@@ -11,7 +12,7 @@ import {
   NotificationFilters,
   NotificationResponse,
 } from './notification.entity';
-import { BroadcastNotificationDto } from './notification.dto';
+import { BroadcastNotificationDto, NotificationConfigurationStatusDto } from './notification.dto';
 
 export type SystemNotificationSeverity = 'info' | 'warning' | 'critical';
 
@@ -72,6 +73,8 @@ export interface SystemNotificationDto {
   readAt: Date | null;
 }
 
+export interface NotificationsToggleState extends NotificationConfigurationStatusDto {}
+
 const SYSTEM_ALERT_RULES: Record<string, { severity: SystemNotificationSeverity; title: string }> = {
   UPDATE_STARTED: {
     severity: 'warning',
@@ -124,12 +127,25 @@ export class NotificationService {
   private readonly logger = new Logger(NotificationService.name);
   private readonly systemAlertsSubject = new Subject<SystemNotificationDto>();
 
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private prisma: PrismaService,
+    private readonly configResolver: ConfigResolverService,
+  ) {
     // Empty implementation
   }
 
   getSystemAlertStream(): Observable<SystemNotificationDto> {
     return this.systemAlertsSubject.asObservable();
+  }
+
+  async getNotificationsToggleState(): Promise<NotificationsToggleState> {
+    const resolved = await this.configResolver.getResolved<boolean>('notifications.enabled');
+
+    return {
+      key: 'notifications.enabled',
+      enabled: resolved?.value !== false,
+      source: resolved?.source ?? 'default',
+    };
   }
 
   async emitSystemAlert(input: EmitSystemAlertInput): Promise<SystemNotificationDto | null> {
@@ -185,6 +201,10 @@ export class NotificationService {
   }
 
   private async persistSystemNotification(input: CreateSystemNotificationInput): Promise<any | null> {
+    if (!(await this.areNotificationsEnabled())) {
+      return null;
+    }
+
     const severity = this.normalizeSeverity(input.severity);
     const title = this.normalizeText(input.title, 140);
     const body = this.normalizeText(input.body, 500);
@@ -397,7 +417,11 @@ export class NotificationService {
   /**
    * Cria uma nova notificacao
    */
-  async create(data: NotificationCreateData, authorInfo?: any): Promise<Notification> {
+  async create(data: NotificationCreateData, authorInfo?: any): Promise<Notification | null> {
+    if (!(await this.areNotificationsEnabled())) {
+      return null;
+    }
+
     try {
       const scopedData = await this.applyNotificationAuthorScope(data, authorInfo);
       const severity = this.mapTypeToSeverity(data.type);
@@ -615,6 +639,10 @@ export class NotificationService {
    * Envia notificacao em massa (Broadcast)
    */
   async broadcast(dto: BroadcastNotificationDto, authorInfo: any): Promise<{ count: number }> {
+    if (!(await this.areNotificationsEnabled())) {
+      return { count: 0 };
+    }
+
     const actor = this.normalizeNotificationActor(authorInfo);
     const where: any = {};
 
@@ -674,6 +702,10 @@ export class NotificationService {
     this.logger.log(`Broadcast enviado para ${result.count} usuarios. Scope: ${actor.role === 'ADMIN' ? 'tenant-admin' : dto.scope}`);
 
     return { count: result.count };
+  }
+
+  private async areNotificationsEnabled(): Promise<boolean> {
+    return (await this.getNotificationsToggleState()).enabled;
   }
 
   /**
