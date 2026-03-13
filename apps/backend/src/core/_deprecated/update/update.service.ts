@@ -321,10 +321,10 @@ export class UpdateService {
    * Busca ou cria configurações do sistema
    */
   private async getSystemSettings(): Promise<unknown> {
-    let settings = await (this.prisma as any).systemSettings.findFirst();
+    let settings = await (this.prisma as any).updateSystemSettings.findFirst();
 
     if (!settings) {
-      settings = await (this.prisma as any).systemSettings.create({
+      settings = await (this.prisma as any).updateSystemSettings.create({
         data: {
           appVersion: '1.0.0',
           packageManager: 'npm',
@@ -343,7 +343,7 @@ export class UpdateService {
   private async updateSystemSettings(data: any): Promise<void> {
     const settings: any = await this.getSystemSettings();
 
-    await (this.prisma as any).systemSettings.update({
+    await (this.prisma as any).updateSystemSettings.update({
       where: { id: settings.id },
       data: { ...data, updatedAt: new Date() },
     });

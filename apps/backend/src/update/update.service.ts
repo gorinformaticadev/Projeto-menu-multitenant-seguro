@@ -8,7 +8,7 @@ import * as semver from 'semver';
 import * as crypto from 'crypto';
 import * as path from 'path';
 import * as fs from 'fs';
-import { Prisma, SystemSettings, UpdateLog } from '@prisma/client';
+import { Prisma, UpdateLog, UpdateSystemSettings } from '@prisma/client';
 import { SystemVersionService } from '@common/services/system-version.service';
 import { SystemUpdateAdminService } from './system-update-admin.service';
 
@@ -420,7 +420,7 @@ export class UpdateService implements OnModuleInit {
 
   async updateConfig(config: UpdateConfigDto, updatedBy: string): Promise<{ success: boolean; message: string }> {
     try {
-      const updateData: Prisma.SystemSettingsUncheckedUpdateInput = { updatedBy };
+      const updateData: Prisma.UpdateSystemSettingsUncheckedUpdateInput = { updatedBy };
 
       if (typeof config.gitUsername === 'string') {
         updateData.gitUsername = config.gitUsername;
@@ -617,7 +617,7 @@ export class UpdateService implements OnModuleInit {
   }
 
   private buildLifecycleState(
-    settings: SystemSettings,
+    settings: UpdateSystemSettings,
     systemState: SystemUpdateStateSnapshot | null,
   ): UpdateStatusDto['updateLifecycle'] {
     const rawStatus = systemState?.status || 'idle';
@@ -664,7 +664,7 @@ export class UpdateService implements OnModuleInit {
   }
 
   private resolveLifecycleStatus(
-    settings: SystemSettings,
+    settings: UpdateSystemSettings,
     systemState: SystemUpdateStateSnapshot | null,
   ): UpdateLifecycleStatus {
     const step = String(systemState?.step || '').trim().toLowerCase();
@@ -819,11 +819,11 @@ export class UpdateService implements OnModuleInit {
     }
     return fallback;
   }
-  private async getSystemSettings(): Promise<SystemSettings> {
-    let settings = await this.prisma.systemSettings.findFirst();
+  private async getSystemSettings(): Promise<UpdateSystemSettings> {
+    let settings = await this.prisma.updateSystemSettings.findFirst();
 
     if (!settings) {
-      settings = await this.prisma.systemSettings.create({
+      settings = await this.prisma.updateSystemSettings.create({
         data: {
           appVersion: this.getRuntimeVersionInfo().version,
           packageManager: 'docker',
@@ -839,15 +839,15 @@ export class UpdateService implements OnModuleInit {
     return settings;
   }
 
-  private async updateSystemSettings(data: Prisma.SystemSettingsUncheckedUpdateInput): Promise<void> {
+  private async updateSystemSettings(data: Prisma.UpdateSystemSettingsUncheckedUpdateInput): Promise<void> {
     const settings = await this.getSystemSettings();
-    await this.prisma.systemSettings.update({
+    await this.prisma.updateSystemSettings.update({
       where: { id: settings.id },
       data: { ...data, updatedAt: new Date() },
     });
   }
 
-  private async runSafeImageDeploy(version: string, settings: SystemSettings): Promise<UpdateExecutionResult> {
+  private async runSafeImageDeploy(version: string, settings: UpdateSystemSettings): Promise<UpdateExecutionResult> {
     const root = this.getProjectRoot();
     const scriptPath = path.join(root, 'install', 'update-images.sh');
     if (!fs.existsSync(scriptPath)) {
@@ -884,7 +884,7 @@ export class UpdateService implements OnModuleInit {
     });
   }
 
-  private async runSafeNativeDeploy(version: string, settings: SystemSettings): Promise<UpdateExecutionResult> {
+  private async runSafeNativeDeploy(version: string, settings: UpdateSystemSettings): Promise<UpdateExecutionResult> {
     const root = this.getProjectRoot();
     const scriptPath = path.join(root, 'install', 'update-native.sh');
     if (!fs.existsSync(scriptPath)) {
@@ -1052,7 +1052,7 @@ export class UpdateService implements OnModuleInit {
     return coerced?.version || '0.0.0';
   }
 
-  private buildPublicGitRepoUrl(settings: SystemSettings): string {
+  private buildPublicGitRepoUrl(settings: UpdateSystemSettings): string {
     const repository = String(settings.gitRepository || '').replace(/\.git$/i, '');
     return `https://github.com/${settings.gitUsername}/${repository}.git`;
   }
@@ -1135,5 +1135,3 @@ export class UpdateService implements OnModuleInit {
     return new Error(String(error)) as UpdateExecutionError;
   }
 }
-
-

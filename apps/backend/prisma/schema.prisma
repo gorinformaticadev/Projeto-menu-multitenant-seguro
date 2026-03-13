@@ -242,7 +242,44 @@ model EmailConfiguration {
   @@map("email_configurations")
 }
 
-model SystemSettings {
+model SystemSetting {
+  id              String   @id @default(uuid())
+  key             String   @unique
+  valueJson       Json
+  valueType       String
+  category        String
+  scope           String   @default("system")
+  tenantId        String?
+  source          String   @default("seed_env")
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  version         Int      @default(1)
+
+  @@index([category])
+  @@index([scope])
+  @@index([tenantId])
+  @@index([scope, tenantId])
+  @@map("system_settings")
+}
+
+model SystemSettingAudit {
+  id              String   @id @default(uuid())
+  settingKey      String
+  oldValueJson    Json?
+  newValueJson    Json?
+  changedByUserId String?
+  changedByEmail  String?
+  changeReason    String?
+  createdAt       DateTime @default(now())
+
+  @@index([settingKey])
+  @@index([createdAt])
+  @@index([settingKey, createdAt])
+  @@map("system_setting_audits")
+}
+
+model UpdateSystemSettings {
   id                 String    @id @default(uuid())
   appVersion         String?   @default("1.0.0")
   gitToken           String?
@@ -260,7 +297,7 @@ model SystemSettings {
   updatedAt          DateTime  @updatedAt
   updatedBy          String?
 
-  @@map("system_settings")
+  @@map("update_system_settings")
 }
 
 model UpdateLog {

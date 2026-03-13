@@ -21,7 +21,7 @@ function createService() {
   process.env.ENCRYPTION_KEY = '12345678901234567890123456789012-strong-key-material';
 
   const prismaMock = {
-    systemSettings: {
+    updateSystemSettings: {
       findFirst: jest.fn(async () => ({
         id: 'settings-1',
         appVersion: 'v1.0.0',

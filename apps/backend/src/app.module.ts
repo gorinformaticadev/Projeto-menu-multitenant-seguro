@@ -37,12 +37,14 @@ import { ResponseTimeMetricsInterceptor } from './dashboard/system-response-time
 import { SystemTelemetryInterceptor } from './common/interceptors/system-telemetry.interceptor';
 import { SystemDashboardModule } from './dashboard/system-dashboard.module';
 import { SystemDiagnosticsModule } from './diagnostics/system-diagnostics.module';
+import { SystemSettingsModule } from './system-settings/system-settings.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    SystemSettingsModule,
     // Modulo de agendamento para tarefas cron
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
@@ -157,7 +159,6 @@ export class AppModule implements NestModule {
 }
 
 // Forced restart trigger
-
 
 
 

@@ -1,0 +1,38 @@
+import {
+  SETTINGS_REGISTRY_DEFINITIONS,
+  SettingsRegistry,
+} from './settings-registry.service';
+
+describe('SettingsRegistry', () => {
+  const registry = new SettingsRegistry();
+
+  it('registra apenas a whitelist inicial aprovada', () => {
+    const keys = registry.getAll().map((definition) => definition.key).sort();
+
+    expect(keys).toEqual(Object.keys(SETTINGS_REGISTRY_DEFINITIONS).sort());
+  });
+
+  it('fornece metadados validos para cada item', () => {
+    for (const definition of registry.getAll()) {
+      expect(definition.key).toBeTruthy();
+      expect(definition.type).toBe('boolean');
+      expect(typeof definition.defaultValue).toBe('boolean');
+      expect(definition.label).toBeTruthy();
+      expect(definition.description).toBeTruthy();
+      expect(definition.category).toBeTruthy();
+      expect(typeof definition.restartRequired).toBe('boolean');
+      expect(typeof definition.sensitive).toBe('boolean');
+      expect(typeof definition.requiresConfirmation).toBe('boolean');
+      expect(typeof definition.allowedInPanel).toBe('boolean');
+      expect(definition.validator?.(definition.defaultValue, {
+        key: definition.key,
+        source: 'default',
+      })).toBe(true);
+    }
+  });
+
+  it('ignora chaves fora da whitelist', () => {
+    expect(registry.has('database.url')).toBe(false);
+    expect(registry.get('database.url')).toBeUndefined();
+  });
+});
