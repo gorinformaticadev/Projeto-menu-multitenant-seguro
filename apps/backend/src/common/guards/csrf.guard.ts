@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import * as crypto from 'crypto';
+import { ConfigResolverService } from '../../system-settings/config-resolver.service';
 
 export const SKIP_CSRF_KEY = 'skipCsrf';
 
@@ -21,9 +22,21 @@ export const SKIP_CSRF_KEY = 'skipCsrf';
  */
 @Injectable()
 export class CsrfGuard implements CanActivate {
-  constructor(private reflector: Reflector) { }
+  private readonly configCacheTtlMs = 15000;
+  private cachedEnabled: boolean | null = null;
+  private configExpiresAt = 0;
 
-  canActivate(context: ExecutionContext): boolean {
+  constructor(
+    private reflector: Reflector,
+    private readonly configResolver: ConfigResolverService,
+  ) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const csrfEnabled = await this.isCsrfEnabledCached();
+    if (!csrfEnabled) {
+      return true;
+    }
+
     // Verifica se a rota está marcada para pular CSRF
     const skipCsrf = this.reflector.getAllAndOverride<boolean>(SKIP_CSRF_KEY, [
       context.getHandler(),
@@ -187,5 +200,15 @@ export class CsrfGuard implements CanActivate {
       url: request.url,
       timestamp: new Date().toISOString()
     });
+  }
+  private async isCsrfEnabledCached(): Promise<boolean> {
+    const now = Date.now();
+    if (this.cachedEnabled !== null && now < this.configExpiresAt) {
+      return this.cachedEnabled;
+    }
+
+    this.cachedEnabled = (await this.configResolver.getBoolean('security.csrf.enabled')) === true;
+    this.configExpiresAt = now + this.configCacheTtlMs;
+    return this.cachedEnabled;
   }
 }

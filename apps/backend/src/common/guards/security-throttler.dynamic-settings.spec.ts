@@ -177,7 +177,7 @@ const createInMemoryPrisma = (settingsDatabaseAvailable = true): InMemoryPrisma 
 };
 
 const createHttpContext = (path = '/api/orders', ip = '10.0.0.10') => {
-  const req = {
+  const req: Record<string, any> = {
     originalUrl: path,
     url: path,
     path,
@@ -250,8 +250,9 @@ const invokeGuard = async (
   return (guard as any).handleRequest(createRequestProps(context, options));
 };
 
-describe('SecurityThrottlerGuard dynamic global rate limit toggle', () => {
+describe('SecurityThrottlerGuard dynamic rate limit toggles', () => {
   const originalEnvValue = process.env.RATE_LIMITING_ENABLED;
+  const originalAdvancedEnvValue = process.env.RATE_LIMIT_ADVANCED_ENABLED;
 
   const createContext = async (prisma = createInMemoryPrisma(true)) => {
     const registry = new SettingsRegistry();
@@ -310,6 +311,7 @@ describe('SecurityThrottlerGuard dynamic global rate limit toggle', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     delete process.env.RATE_LIMITING_ENABLED;
+    delete process.env.RATE_LIMIT_ADVANCED_ENABLED;
   });
 
   afterAll(() => {
@@ -317,6 +319,12 @@ describe('SecurityThrottlerGuard dynamic global rate limit toggle', () => {
       delete process.env.RATE_LIMITING_ENABLED;
     } else {
       process.env.RATE_LIMITING_ENABLED = originalEnvValue;
+    }
+
+    if (originalAdvancedEnvValue === undefined) {
+      delete process.env.RATE_LIMIT_ADVANCED_ENABLED;
+    } else {
+      process.env.RATE_LIMIT_ADVANCED_ENABLED = originalAdvancedEnvValue;
     }
   });
 
@@ -409,5 +417,121 @@ describe('SecurityThrottlerGuard dynamic global rate limit toggle', () => {
         moduleTtl: 60000,
       }),
     ).rejects.toBeInstanceOf(HttpException);
+  });
+
+  it('uses the default advanced setting to keep reinforced policies active on high-volume authenticated traffic', async () => {
+    const { guard } = await createContext();
+    const http = createHttpContext('/api/whatsapp/messages/send', '10.0.0.60');
+    http.req.method = 'POST';
+    http.req.user = {
+      id: 'user-1',
+      tenantId: 'tenant-1',
+    };
+
+    await expect(invokeGuard(guard, http.context)).resolves.toBe(true);
+    await expect(invokeGuard(guard, http.context)).resolves.toBe(true);
+  });
+
+  it('falls back to ENV when the advanced toggle has no database override', async () => {
+    process.env.RATE_LIMIT_ADVANCED_ENABLED = 'false';
+    const { guard } = await createContext();
+    const http = createHttpContext('/api/whatsapp/messages/send', '10.0.0.61');
+    http.req.method = 'POST';
+    http.req.user = {
+      id: 'user-1',
+      tenantId: 'tenant-1',
+    };
+
+    await expect(invokeGuard(guard, http.context)).resolves.toBe(true);
+    await expect(invokeGuard(guard, http.context)).rejects.toBeInstanceOf(HttpException);
+  });
+
+  it('applies a database override for the advanced toggle and restores the env fallback', async () => {
+    process.env.RATE_LIMIT_ADVANCED_ENABLED = 'false';
+    const prisma = createInMemoryPrisma(true);
+
+    const initialContext = await createContext(prisma);
+    const initialHttp = createHttpContext('/api/whatsapp/messages/send', '10.0.0.62');
+    initialHttp.req.method = 'POST';
+    initialHttp.req.user = {
+      id: 'user-1',
+      tenantId: 'tenant-1',
+    };
+
+    await expect(invokeGuard(initialContext.guard, initialHttp.context)).resolves.toBe(true);
+    await expect(invokeGuard(initialContext.guard, initialHttp.context)).rejects.toBeInstanceOf(
+      HttpException,
+    );
+
+    applyDatabaseOverride(prisma, 'security.rate_limit.advanced.enabled', true);
+
+    const enabledContext = await createContext(prisma);
+    const enabledHttp = createHttpContext('/api/whatsapp/messages/send', '10.0.0.63');
+    enabledHttp.req.method = 'POST';
+    enabledHttp.req.user = {
+      id: 'user-1',
+      tenantId: 'tenant-1',
+    };
+
+    await expect(invokeGuard(enabledContext.guard, enabledHttp.context)).resolves.toBe(true);
+    await expect(invokeGuard(enabledContext.guard, enabledHttp.context)).resolves.toBe(true);
+
+    restoreDatabaseFallback(prisma, 'security.rate_limit.advanced.enabled');
+
+    const restoredContext = await createContext(prisma);
+    const restoredHttp = createHttpContext('/api/whatsapp/messages/send', '10.0.0.64');
+    restoredHttp.req.method = 'POST';
+    restoredHttp.req.user = {
+      id: 'user-1',
+      tenantId: 'tenant-1',
+    };
+
+    await expect(invokeGuard(restoredContext.guard, restoredHttp.context)).resolves.toBe(true);
+    await expect(invokeGuard(restoredContext.guard, restoredHttp.context)).rejects.toBeInstanceOf(
+      HttpException,
+    );
+  });
+
+  it('keeps fail-open behavior for the advanced toggle when the dynamic settings store is unavailable', async () => {
+    const defaultContext = await createContext(createInMemoryPrisma(false));
+    const defaultHttp = createHttpContext('/api/whatsapp/messages/send', '10.0.0.65');
+    defaultHttp.req.method = 'POST';
+    defaultHttp.req.user = {
+      id: 'user-1',
+      tenantId: 'tenant-1',
+    };
+
+    await expect(invokeGuard(defaultContext.guard, defaultHttp.context)).resolves.toBe(true);
+    await expect(invokeGuard(defaultContext.guard, defaultHttp.context)).resolves.toBe(true);
+
+    process.env.RATE_LIMIT_ADVANCED_ENABLED = 'false';
+    const envContext = await createContext(createInMemoryPrisma(false));
+    const envHttp = createHttpContext('/api/whatsapp/messages/send', '10.0.0.66');
+    envHttp.req.method = 'POST';
+    envHttp.req.user = {
+      id: 'user-1',
+      tenantId: 'tenant-1',
+    };
+
+    await expect(invokeGuard(envContext.guard, envHttp.context)).resolves.toBe(true);
+    await expect(invokeGuard(envContext.guard, envHttp.context)).rejects.toBeInstanceOf(
+      HttpException,
+    );
+  });
+
+  it('keeps the base toggle semantically separate when global rate limit is disabled', async () => {
+    process.env.RATE_LIMITING_ENABLED = 'false';
+    process.env.RATE_LIMIT_ADVANCED_ENABLED = 'true';
+    const { guard } = await createContext();
+    const http = createHttpContext('/api/whatsapp/messages/send', '10.0.0.67');
+    http.req.method = 'POST';
+    http.req.user = {
+      id: 'user-1',
+      tenantId: 'tenant-1',
+    };
+
+    await expect(invokeGuard(guard, http.context)).resolves.toBe(true);
+    await expect(invokeGuard(guard, http.context)).resolves.toBe(true);
+    await expect(invokeGuard(guard, http.context)).resolves.toBe(true);
   });
 });

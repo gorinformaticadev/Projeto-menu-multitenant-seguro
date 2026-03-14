@@ -480,8 +480,8 @@ describe("/configuracoes/seguranca", () => {
   it("nao permite editar item dinamico somente leitura nem expor valor protegido", async () => {
     installDefaultGetHandlers([
       buildSetting({
-        key: "security.headers.enabled",
-        label: "Headers de seguranca",
+        key: "security.internal.protected.enabled",
+        label: "Controle protegido",
         category: "security",
         editableInPanel: false,
         valueHidden: true,
@@ -492,11 +492,11 @@ describe("/configuracoes/seguranca", () => {
 
     render(<SecuritySettingsPage />);
 
-    expect(await screen.findByText(/Headers de seguranca/i)).toBeInTheDocument();
-    const readonlyRow = screen.getByTestId("security-setting-row-security.headers.enabled");
+    expect(await screen.findByText(/Controle protegido/i)).toBeInTheDocument();
+    const readonlyRow = screen.getByTestId("security-setting-row-security.internal.protected.enabled");
     expect(within(readonlyRow).getAllByText(/Somente leitura/i).length).toBeGreaterThan(0);
     expect(within(readonlyRow).getAllByText(/Valor protegido/i).length).toBeGreaterThan(0);
-    expect(screen.queryByRole("switch", { name: /Alternar Headers de seguranca/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: /Alternar Controle protegido/i })).not.toBeInTheDocument();
   });
 
   it("mostra as informacoes somente quando o icone e clicado", async () => {
@@ -557,8 +557,9 @@ describe("/configuracoes/seguranca", () => {
         category: "security",
         editableInPanel: false,
         valueHidden: false,
-        sensitive: true,
+        sensitive: false,
         resolvedValue: false,
+        restartRequired: true,
       }),
     ]);
 
@@ -573,6 +574,48 @@ describe("/configuracoes/seguranca", () => {
 
     expect(readonlyToggle).toHaveClass("data-[state=unchecked]:bg-destructive/80");
     expect(legacyUncheckedToggle).toHaveClass("data-[state=unchecked]:bg-destructive/80");
+  });
+
+  it("exibe security.headers.enabled como somente leitura visivel, com reinicio explicito e observacao operacional", async () => {
+    installDefaultGetHandlers([
+      buildSetting({
+        key: "security.headers.enabled",
+        label: "Headers de seguranca",
+        category: "security",
+        editableInPanel: false,
+        sensitive: false,
+        valueHidden: false,
+        resolvedValue: true,
+        restartRequired: true,
+        operationalNotes: [
+          "Mudancas nesta chave so passam a valer apos reiniciar o processo do backend.",
+          "CSP avancado e protecao CSRF continuam separados deste toggle.",
+        ],
+      }),
+    ]);
+
+    render(<SecuritySettingsPage />);
+
+    const readonlyToggle = await screen.findByRole("switch", {
+      name: /Headers de seguranca somente leitura/i,
+    });
+    expect(readonlyToggle).toBeInTheDocument();
+    expect(screen.getByText(/Requer reinicio/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Valor protegido/i)).not.toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", {
+        name: /Ajuda da configuracao dinamica Headers de seguranca/i,
+      }),
+    );
+
+    expect(
+      await screen.findByText(/Mudancas nesta chave so passam a valer apos reiniciar o processo do backend/i),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/CSP avancado e protecao CSRF continuam separados deste toggle/i),
+    ).toBeInTheDocument();
   });
 
   it("exibe security.rate_limit.enabled como somente leitura visivel, com observacao operacional", async () => {
@@ -609,6 +652,154 @@ describe("/configuracoes/seguranca", () => {
 
     expect(
       await screen.findByText(/Cada processo pode levar ate 15 segundos para refletir a mudanca/i),
+    ).toBeInTheDocument();
+  });
+
+  it("exibe security.csrf.enabled como somente leitura visivel, com risco operacional explicito", async () => {
+    installDefaultGetHandlers([
+      buildSetting({
+        key: "security.csrf.enabled",
+        label: "Protecao CSRF",
+        category: "security",
+        editableInPanel: false,
+        sensitive: false,
+        valueHidden: false,
+        resolvedValue: false,
+        restartRequired: false,
+        operationalNotes: [
+          "Cada processo pode levar ate 15 segundos para refletir a mudanca por causa do cache local do guard.",
+          "Quando habilitado, clientes reais precisam enviar cookie e header CSRF validos ou podem receber 403.",
+          "Nesta fase o painel exibe o estado atual, mas mantem esta chave como somente leitura devido ao risco operacional.",
+        ],
+      }),
+    ]);
+
+    render(<SecuritySettingsPage />);
+
+    const readonlyToggle = await screen.findByRole("switch", {
+      name: /Protecao CSRF somente leitura/i,
+    });
+    expect(readonlyToggle).toBeInTheDocument();
+    expect(screen.queryByText(/Valor protegido/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Requer reinicio/i)).not.toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", {
+        name: /Ajuda da configuracao dinamica Protecao CSRF/i,
+      }),
+    );
+
+    expect(
+      await screen.findByText(/Cada processo pode levar ate 15 segundos para refletir a mudanca/i),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/clientes reais precisam enviar cookie e header CSRF validos ou podem receber 403/i),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/mantem esta chave como somente leitura devido ao risco operacional/i),
+    ).toBeInTheDocument();
+  });
+
+  it("exibe security.csp_advanced.enabled como somente leitura visivel, com escopo real e risco explicito para o frontend", async () => {
+    installDefaultGetHandlers([
+      buildSetting({
+        key: "security.csp_advanced.enabled",
+        label: "CSP avancado",
+        description: "Ativa a politica CSP avancada aplicada pelo middleware global do backend.",
+        category: "security",
+        editableInPanel: false,
+        sensitive: false,
+        valueHidden: false,
+        resolvedValue: false,
+        restartRequired: false,
+        operationalNotes: [
+          "Controla apenas a sobrescrita da CSP avancada no CspMiddleware global. A CSP basica de security.headers.enabled continua separada.",
+          "Cada processo pode levar ate 15 segundos para refletir a mudanca por causa do cache local do middleware.",
+          "Quando habilitado, paginas e clientes reais podem falhar ao carregar scripts, estilos, imagens ou conexoes que nao estejam cobertos pela politica atual.",
+          "Nesta fase o painel exibe o estado atual, mas mantem esta chave como somente leitura devido ao risco operacional para o frontend real.",
+        ],
+      }),
+    ]);
+
+    render(<SecuritySettingsPage />);
+
+    const readonlyToggle = await screen.findByRole("switch", {
+      name: /CSP avancado somente leitura/i,
+    });
+    expect(readonlyToggle).toBeInTheDocument();
+    expect(screen.queryByText(/Valor protegido/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Requer reinicio/i)).not.toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", {
+        name: /Ajuda da configuracao dinamica CSP avancado/i,
+      }),
+    );
+
+    expect(
+      await screen.findByText(/CspMiddleware global.*security\.headers\.enabled continua separada/i),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Cada processo pode levar ate 15 segundos para refletir a mudanca/i),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/paginas e clientes reais podem falhar ao carregar scripts, estilos, imagens ou conexoes/i),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/mantem esta chave como somente leitura devido ao risco operacional para o frontend real/i),
+    ).toBeInTheDocument();
+  });
+
+  it("exibe security.websocket.enabled com escopo socket.io real e limite operacional explicito", async () => {
+    installDefaultGetHandlers([
+      buildSetting({
+        key: "security.websocket.enabled",
+        label: "Canal WebSocket realtime",
+        description: "Ativa ou desativa o canal Socket.IO dos gateways realtime ativos do backend.",
+        category: "security",
+        editableInPanel: false,
+        sensitive: false,
+        valueHidden: false,
+        resolvedValue: true,
+        restartRequired: false,
+        operationalNotes: [
+          "Nesta etapa controla apenas os gateways Socket.IO ativos do backend. SSE e outros canais realtime continuam fora deste escopo.",
+          "Conexoes ja abertas e ociosas podem permanecer ate nova interacao, emissao ou reconexao; este toggle nao faz dreno global instantaneo.",
+          "Cada processo pode levar ate 15 segundos para refletir a mudanca por causa do cache local do resolvedor.",
+          "Nesta fase o painel exibe o estado atual, mas mantem esta chave como somente leitura devido ao limite operacional do canal.",
+        ],
+      }),
+    ]);
+
+    render(<SecuritySettingsPage />);
+
+    const readonlyToggle = await screen.findByRole("switch", {
+      name: /Canal WebSocket realtime somente leitura/i,
+    });
+    expect(readonlyToggle).toBeInTheDocument();
+    expect(screen.queryByText(/Valor protegido/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Requer reinicio/i)).not.toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", {
+        name: /Ajuda da configuracao dinamica Canal WebSocket realtime/i,
+      }),
+    );
+
+    expect(
+      await screen.findByText(/apenas os gateways Socket\.IO ativos do backend/i),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/nao faz dreno global instantaneo/i),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Cada processo pode levar ate 15 segundos para refletir a mudanca/i),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/mantem esta chave como somente leitura devido ao limite operacional do canal/i),
     ).toBeInTheDocument();
   });
 

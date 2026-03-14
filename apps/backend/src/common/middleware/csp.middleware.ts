@@ -1,109 +1,68 @@
-import { Injectable, NestMiddleware } from '@nestjs/common';
+import { Injectable, Logger, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import * as crypto from 'crypto';
+import { ConfigResolverService } from '../../system-settings/config-resolver.service';
+import { SettingsRegistry } from '../../system-settings/settings-registry.service';
+import {
+  buildAdvancedCspHeaderValue,
+  resolveAdvancedCspSetting,
+} from '../http-csp-advanced';
 
 @Injectable()
 export class CspMiddleware implements NestMiddleware {
-  use(req: Request, res: Response, next: NextFunction) {
-    // Gerar nonce único para cada requisição
-    const nonce = crypto.randomBytes(16).toString('base64');
-    res.locals.nonce = nonce;
+  private readonly logger = new Logger(CspMiddleware.name);
+  private readonly configCacheTtlMs = 15000;
+  private cachedEnabled: boolean | null = null;
+  private configExpiresAt = 0;
 
-    const isProduction = process.env.NODE_ENV === 'production';
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5000';
+  constructor(
+    private readonly settingsRegistry: SettingsRegistry,
+    private readonly configResolver: ConfigResolverService,
+  ) {}
 
-    // Políticas CSP Avançadas
-    const cspDirectives = {
-      // Fontes padrão
-      'default-src': ["'self'"],
+  async use(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!(await this.isAdvancedCspEnabledCached())) {
+        next();
+        return;
+      }
 
-      // Scripts - permite apenas com nonce ou do próprio servidor
-      'script-src': [
-        "'self'",
-        `'nonce-${nonce}'`,
-        // Sentry (se configurado)
-        process.env.SENTRY_DSN ? 'https://*.sentry.io' : '',
-      ].filter(Boolean),
+      const nonce = crypto.randomBytes(16).toString('base64');
+      res.locals.nonce = nonce;
 
-      // Estilos - permite inline (necessário para frameworks modernos)
-      'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      const cspHeader = buildAdvancedCspHeaderValue({
+        nonce,
+        isProduction: process.env.NODE_ENV === 'production',
+        frontendUrl: process.env.FRONTEND_URL,
+        sentryDsn: process.env.SENTRY_DSN,
+      });
 
-      // Imagens - permite data URIs e HTTPS
-      'img-src': [
-        "'self'",
-        'data:',
-        'https:',
-        'blob:',
-        isProduction ? '' : 'http://localhost:4000',
-        isProduction ? '' : 'https://localhost:4000',
-      ].filter(Boolean),
-
-      // Fontes
-      'font-src': ["'self'", 'data:', 'https://fonts.gstatic.com'],
-
-      // Conexões - API e Sentry
-      'connect-src': [
-        "'self'",
-        frontendUrl,
-        process.env.SENTRY_DSN ? 'https://*.sentry.io' : '',
-        isProduction ? '' : 'http://localhost:4000',
-        isProduction ? '' : 'https://localhost:4000',
-        isProduction ? '' : 'http://localhost:5000',
-        isProduction ? '' : 'https://localhost:5000',
-      ].filter(Boolean),
-
-      // Frames - bloqueia completamente (anti-clickjacking)
-      'frame-src': ["'none'"],
-      'frame-ancestors': ["'none'"],
-
-      // Objetos - bloqueia plugins (Flash, etc)
-      'object-src': ["'none'"],
-
-      // Media
-      'media-src': ["'self'"],
-
-      // Workers
-      'worker-src': ["'self'", 'blob:'],
-
-      // Manifests (PWA)
-      'manifest-src': ["'self'"],
-
-      // Base URI - previne injeção de base tag
-      'base-uri': ["'self'"],
-
-      // Form action - apenas para o próprio servidor
-      'form-action': ["'self'"],
-
-      // Upgrade insecure requests (apenas em produção)
-      ...(isProduction ? { 'upgrade-insecure-requests': [] } : {
-      // Empty implementation
-    }),
-
-      // Report URI - endpoint para receber violações
-      'report-uri': ['/api/csp-report'],
-    };
-
-    // Construir header CSP
-    const cspHeader = Object.entries(cspDirectives)
-      .map(([key, values]) => {
-        if (Array.isArray(values) && values.length > 0) {
-          return `${key} ${values.join(' ')}`;
-        } else if (Array.isArray(values) && values.length === 0) {
-          return key; // Para upgrade-insecure-requests
-        }
-        return null;
-      })
-      .filter(Boolean)
-      .join('; ');
-
-    // Aplicar header
-    res.setHeader('Content-Security-Policy', cspHeader);
-
-    // CSP Report-Only (para testar sem quebrar)
-    // Descomente para modo de teste:
-    // res.setHeader('Content-Security-Policy-Report-Only', cspHeader);
+      res.setHeader('Content-Security-Policy', cspHeader);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to apply advanced CSP dynamically. Preserving existing HTTP pipeline. Cause: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
 
     next();
   }
-}
 
+  private async isAdvancedCspEnabledCached(): Promise<boolean> {
+    const now = Date.now();
+
+    if (this.cachedEnabled !== null && now < this.configExpiresAt) {
+      return this.cachedEnabled;
+    }
+
+    const resolved = await resolveAdvancedCspSetting(
+      this.settingsRegistry,
+      this.configResolver,
+      this.logger,
+    );
+
+    this.cachedEnabled = resolved.value === true;
+    this.configExpiresAt = now + this.configCacheTtlMs;
+
+    return this.cachedEnabled;
+  }
+}

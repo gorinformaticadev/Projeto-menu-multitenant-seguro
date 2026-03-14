@@ -52,6 +52,80 @@ describe('SettingsRegistry', () => {
     );
   });
 
+  it('mantem security.headers.enabled visivel, somente leitura e com reinicio explicito', () => {
+    const definition = registry.getOrThrow('security.headers.enabled');
+
+    expect(definition.allowedInPanel).toBe(true);
+    expect(definition.editableInPanel).toBe(false);
+    expect(definition.sensitive).toBe(false);
+    expect(definition.restartRequired).toBe(true);
+    expect(definition.operationalNotes).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/bootstrap http central/i),
+        expect.stringMatching(/apos reiniciar o processo/i),
+        expect.stringMatching(/somente leitura/i),
+      ]),
+    );
+  });
+
+  it('mantem security.csrf.enabled visivel, somente leitura e com risco operacional explicito', () => {
+    const definition = registry.getOrThrow('security.csrf.enabled');
+
+    expect(definition.allowedInPanel).toBe(true);
+    expect(definition.editableInPanel).toBe(false);
+    expect(definition.sensitive).toBe(false);
+    expect(definition.restartRequired).toBe(false);
+    expect(definition.operationalNotes).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/guard global/i),
+        expect.stringMatching(/15 segundos/i),
+        expect.stringMatching(/403/i),
+        expect.stringMatching(/somente leitura/i),
+      ]),
+    );
+  });
+
+  it('mantem security.websocket.enabled visivel, somente leitura e com escopo realtime explicito', () => {
+    const definition = registry.getOrThrow('security.websocket.enabled');
+
+    expect(definition.allowedInPanel).toBe(true);
+    expect(definition.editableInPanel).toBe(false);
+    expect(definition.sensitive).toBe(false);
+    expect(definition.restartRequired).toBe(false);
+    expect(definition.label).toMatch(/WebSocket/i);
+    expect(definition.description).toMatch(/Socket\.IO/i);
+    expect(definition.operationalNotes).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/Socket\.IO ativos/i),
+        expect.stringMatching(/novas conexoes websocket sao rejeitadas/i),
+        expect.stringMatching(/nao faz dreno global instantaneo/i),
+        expect.stringMatching(/15 segundos/i),
+        expect.stringMatching(/push\.enabled continua separado/i),
+        expect.stringMatching(/somente leitura/i),
+      ]),
+    );
+  });
+
+  it('mantem security.csp_advanced.enabled visivel, somente leitura e com risco operacional explicito para o frontend', () => {
+    const definition = registry.getOrThrow('security.csp_advanced.enabled');
+
+    expect(definition.allowedInPanel).toBe(true);
+    expect(definition.editableInPanel).toBe(false);
+    expect(definition.sensitive).toBe(false);
+    expect(definition.restartRequired).toBe(false);
+    expect(definition.label).toMatch(/CSP avancado/i);
+    expect(definition.description).toMatch(/middleware global do backend/i);
+    expect(definition.operationalNotes).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/CspMiddleware global/i),
+        expect.stringMatching(/CSP basica.*security\.headers\.enabled/i),
+        expect.stringMatching(/15 segundos/i),
+        expect.stringMatching(/paginas e clientes reais podem falhar/i),
+        expect.stringMatching(/somente leitura/i),
+      ]),
+    );
+  });
+
   it('ignora chaves fora da whitelist', () => {
     expect(registry.has('database.url')).toBe(false);
     expect(registry.get('database.url')).toBeUndefined();

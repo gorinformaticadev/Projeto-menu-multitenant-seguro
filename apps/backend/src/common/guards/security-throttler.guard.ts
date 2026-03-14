@@ -27,6 +27,7 @@ type ThrottleIdentity = {
 
 type RateLimitConfigSnapshot = {
   enabled: boolean;
+  advancedEnabled: boolean;
   requests?: number;
   window?: number;
   isProduction: boolean;
@@ -101,7 +102,14 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
         ttl = this.toPositiveNumber(rateLimitConfig.window, 1) * 60000;
       }
 
-      limit = this.applyScopePolicy(limit, identity.scope, identity.path, this.resolveRequestMethod(req));
+      if (rateLimitConfig.advancedEnabled !== false) {
+        limit = this.applyScopePolicy(
+          limit,
+          identity.scope,
+          identity.path,
+          this.resolveRequestMethod(req),
+        );
+      }
     }
 
     const allowed = await super.handleRequest({
@@ -487,12 +495,16 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
       return this.cachedRateLimitConfig;
     }
 
-    const enabled = await this.isGlobalRateLimitEnabled();
+    const [enabled, advancedEnabled] = await Promise.all([
+      this.isGlobalRateLimitEnabled(),
+      this.isAdvancedRateLimitEnabled(),
+    ]);
 
     try {
       const config = await this.securityConfigService.getRateLimitConfig();
       this.cachedRateLimitConfig = {
         enabled,
+        advancedEnabled,
         requests: this.readPositiveNumber(config?.requests),
         window: this.readPositiveNumber(config?.window),
         isProduction: config?.isProduction === true,
@@ -502,6 +514,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     } catch (error) {
       this.cachedRateLimitConfig = {
         enabled,
+        advancedEnabled,
         isProduction: process.env.NODE_ENV === 'production',
       };
       this.rateLimitConfigExpiresAt = now + this.configCacheTtlMs;
@@ -516,6 +529,10 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     return (await this.configResolver.getBoolean('security.rate_limit.enabled')) !== false;
   }
 
+  private async isAdvancedRateLimitEnabled(): Promise<boolean> {
+    return (await this.configResolver.getBoolean('security.rate_limit.advanced.enabled')) !== false;
+  }
+
   private readPositiveNumber(value: unknown): number | undefined {
     if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
       return value;
@@ -523,4 +540,3 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     return undefined;
   }
 }
-

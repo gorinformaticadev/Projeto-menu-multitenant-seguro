@@ -86,11 +86,12 @@ describe('SecurityThrottlerGuard identity resolution', () => {
     expect(limit).toBe(5000);
   });
 
-  it('reads only the dynamic global rate limit toggle for enable/disable decisions', async () => {
+  it('reads the dynamic base and advanced rate limit toggles for runtime decisions', async () => {
     const guard = createGuard();
 
     await (guard as any).getRateLimitConfigCached();
 
     expect(configResolver.getBoolean).toHaveBeenCalledWith('security.rate_limit.enabled');
+    expect(configResolver.getBoolean).toHaveBeenCalledWith('security.rate_limit.advanced.enabled');
   });
 });

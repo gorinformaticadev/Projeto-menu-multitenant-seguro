@@ -57,9 +57,84 @@ describe('SystemSettingsController HTTP', () => {
           lastUpdatedAt: null,
           lastUpdatedBy: null,
         },
+        {
+          key: 'security.csrf.enabled',
+          label: 'Protecao CSRF',
+          description: 'Ativa a validacao CSRF global do backend para requests mutaveis.',
+          operationalNotes: [
+            'Cada processo pode levar ate 15 segundos para refletir a mudanca por causa do cache local do guard.',
+            'Quando habilitado, clientes reais precisam enviar cookie e header CSRF validos ou podem receber 403.',
+            'Nesta fase o painel exibe o estado atual, mas mantem esta chave como somente leitura devido ao risco operacional.',
+          ],
+          category: 'security',
+          type: 'boolean',
+          allowedInPanel: true,
+          editableInPanel: false,
+          restartRequired: false,
+          requiresConfirmation: true,
+          sensitive: false,
+          valueHidden: false,
+          resolvedValue: false,
+          resolvedSource: 'env',
+          hasDatabaseOverride: false,
+          lastUpdatedAt: null,
+          lastUpdatedBy: null,
+        },
+        {
+          key: 'security.websocket.enabled',
+          label: 'Canal WebSocket realtime',
+          description: 'Ativa ou desativa o canal Socket.IO dos gateways realtime ativos do backend.',
+          operationalNotes: [
+            'Nesta etapa controla apenas os gateways Socket.IO ativos do backend. SSE e outros canais realtime continuam fora deste escopo.',
+            'Conexoes ja abertas e ociosas podem permanecer ate nova interacao, emissao ou reconexao; este toggle nao faz dreno global instantaneo.',
+            'Cada processo pode levar ate 15 segundos para refletir a mudanca por causa do cache local do resolvedor.',
+            'Nesta fase o painel exibe o estado atual, mas mantem esta chave como somente leitura devido ao limite operacional do canal.',
+          ],
+          category: 'security',
+          type: 'boolean',
+          allowedInPanel: true,
+          editableInPanel: false,
+          restartRequired: false,
+          requiresConfirmation: true,
+          sensitive: false,
+          valueHidden: false,
+          resolvedValue: true,
+          resolvedSource: 'database',
+          hasDatabaseOverride: true,
+          lastUpdatedAt: '2026-03-13T12:15:00.000Z',
+          lastUpdatedBy: {
+            userId: 'super-admin-user',
+            email: 'super-admin@example.com',
+            name: null,
+          },
+        },
+        {
+          key: 'security.csp_advanced.enabled',
+          label: 'CSP avancado',
+          description: 'Ativa a politica CSP avancada aplicada pelo middleware global do backend.',
+          operationalNotes: [
+            'Controla apenas a sobrescrita da CSP avancada no CspMiddleware global. A CSP basica de security.headers.enabled continua separada.',
+            'Cada processo pode levar ate 15 segundos para refletir a mudanca por causa do cache local do middleware.',
+            'Quando habilitado, paginas e clientes reais podem falhar ao carregar scripts, estilos, imagens ou conexoes que nao estejam cobertos pela politica atual.',
+            'Nesta fase o painel exibe o estado atual, mas mantem esta chave como somente leitura devido ao risco operacional para o frontend real.',
+          ],
+          category: 'security',
+          type: 'boolean',
+          allowedInPanel: true,
+          editableInPanel: false,
+          restartRequired: false,
+          requiresConfirmation: true,
+          sensitive: false,
+          valueHidden: false,
+          resolvedValue: false,
+          resolvedSource: 'env',
+          hasDatabaseOverride: false,
+          lastUpdatedAt: null,
+          lastUpdatedBy: null,
+        },
       ],
       meta: {
-        total: 1,
+        total: 4,
         categories: ['security'],
       },
     }),
@@ -145,8 +220,54 @@ describe('SystemSettingsController HTTP', () => {
       .set('x-test-role', Role.SUPER_ADMIN)
       .expect(200)
       .expect(({ body }) => {
-        expect(body.meta.total).toBe(1);
-        expect(body.data[0].key).toBe('security.module_upload.enabled');
+        expect(body.meta.total).toBe(4);
+        expect(body.data.map((item: { key: string }) => item.key).sort()).toEqual(
+          ['security.csp_advanced.enabled', 'security.csrf.enabled', 'security.module_upload.enabled', 'security.websocket.enabled'].sort(),
+        );
+        expect(body.data.find((item: { key: string }) => item.key === 'security.csrf.enabled')).toEqual(
+          expect.objectContaining({
+            editableInPanel: false,
+            restartRequired: false,
+            sensitive: false,
+            valueHidden: false,
+            operationalNotes: expect.arrayContaining([
+              expect.stringMatching(/15 segundos/i),
+              expect.stringMatching(/403/i),
+              expect.stringMatching(/somente leitura/i),
+            ]),
+          }),
+        );
+        expect(body.data.find((item: { key: string }) => item.key === 'security.websocket.enabled')).toEqual(
+          expect.objectContaining({
+            editableInPanel: false,
+            restartRequired: false,
+            sensitive: false,
+            valueHidden: false,
+            description: expect.stringMatching(/Socket\.IO/i),
+            operationalNotes: expect.arrayContaining([
+              expect.stringMatching(/Socket\.IO ativos/i),
+              expect.stringMatching(/dreno global instantaneo/i),
+              expect.stringMatching(/15 segundos/i),
+              expect.stringMatching(/somente leitura/i),
+            ]),
+          }),
+        );
+        expect(body.data.find((item: { key: string }) => item.key === 'security.csp_advanced.enabled')).toEqual(
+          expect.objectContaining({
+            editableInPanel: false,
+            restartRequired: false,
+            sensitive: false,
+            valueHidden: false,
+            description: expect.stringMatching(/middleware global do backend/i),
+            operationalNotes: expect.arrayContaining([
+              expect.stringMatching(/CspMiddleware global/i),
+              expect.stringMatching(/security\.headers\.enabled continua separada/i),
+              expect.stringMatching(/15 segundos/i),
+              expect.stringMatching(/paginas e clientes reais podem falhar/i),
+              expect.stringMatching(/somente leitura/i),
+            ]),
+          }),
+        );
       });
   });
 

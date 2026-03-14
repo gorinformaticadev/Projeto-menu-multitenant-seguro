@@ -2,6 +2,7 @@ import { Module, NestModule, MiddlewareConsumer, DynamicModule } from '@nestjs/c
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from "@nestjs/throttler";
+import { CsrfGuard } from './common/guards/csrf.guard';
 import { SecurityThrottlerGuard } from "./common/guards/security-throttler.guard";
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
@@ -125,13 +126,12 @@ import { SystemSettingsModule } from './system-settings/system-settings.module';
       provide: APP_GUARD,
       useClass: SecurityThrottlerGuard,
     },
-    // CSRF Protection Global (TEMPORARIAMENTE DESABILITADO PARA RESOLVER 403 EM PRODUÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½O)
-    // Sem cookie autenticado, CSRF nao se aplica aos fluxos atuais.
-    // Se algum login por cookie/sessao for adicionado, esta guarda deve ser reativada.
-    // {
-    //   provide: APP_GUARD,
-    //   useClass: CsrfGuard,
-    // },
+    {
+      provide: APP_GUARD,
+      useClass: CsrfGuard,
+    },
+    // CSRF Protection Global
+    // Mantido default-off via security.csrf.enabled para preservar o comportamento atual por padrao.
   ],
 })
 export class AppModule implements NestModule {
@@ -159,6 +159,3 @@ export class AppModule implements NestModule {
 }
 
 // Forced restart trigger
-
-
-

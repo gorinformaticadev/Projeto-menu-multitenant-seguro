@@ -18,9 +18,18 @@ import { PathsModule } from '@core/common/paths/paths.module';
 import { SystemOperationalAlertsService } from './services/system-operational-alerts.service';
 import { SystemJobWatchdogService } from './services/system-job-watchdog.service';
 import { CronModule } from '../core/cron/cron.module';
+import { SystemSettingsModule } from '../system-settings/system-settings.module';
 
 @Module({
-  imports: [PrismaModule, SecurityConfigModule, NotificationsModule, AuditModule, PathsModule, CronModule],
+  imports: [
+    PrismaModule,
+    SecurityConfigModule,
+    NotificationsModule,
+    AuditModule,
+    PathsModule,
+    CronModule,
+    SystemSettingsModule,
+  ],
   controllers: [CspReportController, SystemVersionController, UserModulesController, ModuleInstallerController],
   providers: [
     PlatformInitService,
@@ -52,9 +61,8 @@ export class CommonModule implements NestModule {
     // Middleware removido para permitir acesso público aos logos
     // StaticCorsMiddleware bloqueava requisições sem header 'origin'
 
-    // Aplicar CSP middleware apenas se CSP_ADVANCED estiver ativado
-    if (process.env.CSP_ADVANCED === 'true') {
-      consumer.apply(CspMiddleware).forRoutes('*');
-    }
+    // O middleware sempre participa do pipeline, mas decide dinamicamente
+    // se deve sobrescrever o CSP basico com a politica avancada.
+    consumer.apply(CspMiddleware).forRoutes('*');
   }
 }

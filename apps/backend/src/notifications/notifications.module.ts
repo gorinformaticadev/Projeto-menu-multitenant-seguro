@@ -9,6 +9,7 @@ import { SystemAlertDeliveryService } from './system-alert-delivery.service';
 import { NotificationsController } from './notifications.controller';
 import { SystemNotificationsController } from './system-notifications.controller';
 import { PrismaModule } from '@core/prisma/prisma.module';
+import { WebsocketRuntimeToggleService } from '@common/services/websocket-runtime-toggle.service';
 
 @Module({
   imports: [
@@ -31,7 +32,13 @@ import { PrismaModule } from '@core/prisma/prisma.module';
     }),
   ],
   controllers: [NotificationsController, SystemNotificationsController],
-  providers: [NotificationService, NotificationGateway, PushNotificationService, SystemAlertDeliveryService],
+  providers: [
+    NotificationService,
+    NotificationGateway,
+    PushNotificationService,
+    SystemAlertDeliveryService,
+    WebsocketRuntimeToggleService,
+  ],
   exports: [NotificationService, NotificationGateway, PushNotificationService],
 })
 export class NotificationsModule {}

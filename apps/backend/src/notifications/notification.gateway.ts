@@ -19,6 +19,7 @@ import { PrismaService } from '@core/prisma/prisma.service';
 import { NotificationService } from './notification.service';
 import { Notification } from './notification.entity';
 import { PushNotificationService } from './push-notification.service';
+import { WebsocketRuntimeToggleService } from '@common/services/websocket-runtime-toggle.service';
 
 interface ConnectionMetrics {
   totalConnections: number;
@@ -99,7 +100,8 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     private pushNotificationService: PushNotificationService,
     private jwtService: JwtService,
     private configService: ConfigService,
-    private prismaService: PrismaService
+    private prismaService: PrismaService,
+    private websocketRuntimeToggleService: WebsocketRuntimeToggleService,
   ) {
     this.startMonitoring();
   }
@@ -192,6 +194,13 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
       // Rastrear início da conexão para métricas
       this.connectionMetrics.totalConnections++;
       this.connectionMetrics.connectionAttempts++;
+      if (!(await this.websocketRuntimeToggleService.isEnabledCached())) {
+        this.logger.warn(`Canal de notificacoes websocket desabilitado; conexao rejeitada: ${client.id}`);
+        this.connectionMetrics.failedConnections++;
+        client.disconnect(true);
+        return;
+      }
+
       this.connectionStartTimes.set(client.id, Date.now());
 
       // DEBUG: Verificar se o token está sendo enviado
@@ -261,6 +270,10 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     @MessageBody() data: { id: string }
   ) {
     try {
+      if (!(await this.ensureRealtimeChannelEnabled(client))) {
+        return;
+      }
+
       const notification = await this.notificationService.markUserNotificationAsRead(data.id, client.user);
       
       if (notification) {
@@ -291,6 +304,10 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
   @SubscribeMessage('notification:mark-all-read')
   async handleMarkAllAsRead(@ConnectedSocket() client: AuthenticatedSocket) {
     try {
+      if (!(await this.ensureRealtimeChannelEnabled(client))) {
+        return;
+      }
+
       const count = await this.notificationService.markAllAsRead(client.user);
       
       // Emitir confirmação
@@ -321,6 +338,10 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     @MessageBody() data: { id: string }
   ) {
     try {
+      if (!(await this.ensureRealtimeChannelEnabled(client))) {
+        return;
+      }
+
       const notification = await this.notificationService.delete(data.id, client.user);
       
       if (notification) {
@@ -356,6 +377,11 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
    */
   async emitNewNotification(notification: Notification, options: EmitNotificationOptions = {}) {
     try {
+      if (!(await this.ensureRealtimeChannelEnabled())) {
+        await this.sendPushIfEnabled(notification, options);
+        return;
+      }
+
       const rooms = this.determineTargetRooms(notification);
       
       for (const room of rooms) {
@@ -377,13 +403,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
       }
 
       // Enviar push para PWA/background sem afetar fluxo principal
-      if (options.push !== false) {
-        try {
-          await this.pushNotificationService.sendNotification(notification);
-        } catch (pushError) {
-          this.logger.error('Erro ao enviar push (nao critico):', pushError);
-        }
-      }
+      await this.sendPushIfEnabled(notification, options);
       
     } catch (error) {
       // CRÍTICO: NUNCA permitir que este método falhe
@@ -397,6 +417,10 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
    */
   async emitNotificationRead(notification: Notification) {
     try {
+      if (!(await this.ensureRealtimeChannelEnabled())) {
+        return;
+      }
+
       const rooms = this.determineTargetRooms(notification);
       
       for (const room of rooms) {
@@ -413,6 +437,10 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
    */
   async emitNotificationDeleted(notificationId: string, notification: Notification) {
     try {
+      if (!(await this.ensureRealtimeChannelEnabled())) {
+        return;
+      }
+
       const rooms = this.determineTargetRooms(notification);
       
       for (const room of rooms) {
@@ -543,5 +571,68 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
   private async validateToken(token: string): Promise<unknown> {
     // Método legado - manter para compatibilidade
     return this.validateTokenForConnection(token);
+  }
+
+  private async ensureRealtimeChannelEnabled(client?: AuthenticatedSocket): Promise<boolean> {
+    const websocketEnabled = await this.websocketRuntimeToggleService.isEnabledCached();
+    if (websocketEnabled) {
+      return true;
+    }
+
+    if (client) {
+      try {
+        client.emit('notification:error', {
+          message: 'Canal websocket desabilitado pela configuracao.',
+          code: 'WEBSOCKET_DISABLED',
+        });
+      } catch {
+        // Melhor esforco: a desconexao nao deve depender do emit.
+      }
+
+      client.disconnect(true);
+      return false;
+    }
+
+    this.disconnectAllClientsBecauseChannelIsDisabled();
+    return false;
+  }
+
+  private disconnectAllClientsBecauseChannelIsDisabled(): void {
+    for (const client of this.connectedClients.values()) {
+      try {
+        client.emit('notification:error', {
+          message: 'Canal websocket desabilitado pela configuracao.',
+          code: 'WEBSOCKET_DISABLED',
+        });
+      } catch {
+        // Melhor esforco: manter a limpeza do namespace mesmo se o emit falhar.
+      }
+
+      try {
+        client.disconnect(true);
+      } catch (error) {
+        this.logger.warn(
+          `Falha ao desconectar cliente websocket ${client.id} apos desabilitacao dinamica. detalhe=${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    this.connectedClients.clear();
+    this.connectionStartTimes.clear();
+  }
+
+  private async sendPushIfEnabled(
+    notification: Notification,
+    options: EmitNotificationOptions,
+  ): Promise<void> {
+    if (options.push === false) {
+      return;
+    }
+
+    try {
+      await this.pushNotificationService.sendNotification(notification);
+    } catch (pushError) {
+      this.logger.error('Erro ao enviar push (nao critico):', pushError);
+    }
   }
 }
