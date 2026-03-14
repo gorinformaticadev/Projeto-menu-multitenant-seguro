@@ -11,6 +11,7 @@ import { randomUUID } from 'crypto';
 import { access, unlink, writeFile } from 'fs/promises';
 import { basename } from 'path';
 import { PrismaService } from '@core/prisma/prisma.service';
+import { SecurityConfigService } from '@core/security-config/security-config.service';
 import {
   resolveTenantUserAvatarDirPath,
   resolveTenantUserAvatarFilePath,
@@ -21,6 +22,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ThemeEnum } from './dto/update-preferences.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { validatePasswordAgainstPolicy } from '../common/utils/password-policy.util';
 
 type UserScopeActor = {
   id: string;
@@ -40,10 +42,15 @@ type ScopedUser = {
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private securityConfigService: SecurityConfigService,
+  ) {}
 
   async create(createUserDto: CreateUserDto) {
     const { email, password, name, role, tenantId } = createUserDto;
+
+    await this.assertPasswordMatchesPolicy(password);
 
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
@@ -132,6 +139,7 @@ export class UsersService {
 
     const data: Record<string, any> = { ...updateUserDto };
     if (updateUserDto.password && updateUserDto.password.trim() !== '') {
+      await this.assertPasswordMatchesPolicy(updateUserDto.password);
       data.password = await bcrypt.hash(updateUserDto.password, 10);
       data.lastPasswordChange = new Date();
     } else {
@@ -199,6 +207,8 @@ export class UsersService {
     if (isSamePassword) {
       throw new BadRequestException('A nova senha deve ser diferente da senha atual');
     }
+
+    await this.assertPasswordMatchesPolicy(newPassword);
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
@@ -497,5 +507,13 @@ export class UsersService {
         : null;
     }
     return safeUser;
+  }
+
+  private async assertPasswordMatchesPolicy(password: string): Promise<void> {
+    const policy = await this.securityConfigService.getPasswordPolicy();
+    const errors = validatePasswordAgainstPolicy(password, policy);
+    if (errors.length > 0) {
+      throw new BadRequestException(errors.join(' '));
+    }
   }
 }

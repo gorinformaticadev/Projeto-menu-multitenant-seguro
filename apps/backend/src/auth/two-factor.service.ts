@@ -1,5 +1,6 @@
- import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
+import { SecurityConfigService } from '@core/security-config/security-config.service';
 import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
 import { getPlatformName } from '@core/common/constants/platform.constants';
@@ -7,14 +8,17 @@ import { encryptSensitiveData, decryptSensitiveData } from '@core/common/utils/s
 
 @Injectable()
 export class TwoFactorService {
-  constructor(private prisma: PrismaService) {
-      // Empty implementation
-    }
+  constructor(
+    private prisma: PrismaService,
+    private securityConfigService: SecurityConfigService,
+  ) {}
 
   /**
    * Gerar secret para 2FA
    */
   async generateSecret(userId: string) {
+    await this.assertTwoFactorGloballyEnabled();
+
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
@@ -54,6 +58,8 @@ export class TwoFactorService {
    * Ativar 2FA após verificar código
    */
   async enable(userId: string, token: string) {
+    await this.assertTwoFactorGloballyEnabled();
+
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
@@ -141,5 +147,11 @@ export class TwoFactorService {
       window: 2,
     });
   }
-}
 
+  private async assertTwoFactorGloballyEnabled(): Promise<void> {
+    const policy = await this.securityConfigService.getTwoFactorConfig();
+    if (policy.enabled !== true) {
+      throw new ForbiddenException('2FA desabilitado globalmente');
+    }
+  }
+}

@@ -12,6 +12,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { TokenBlacklistService } from '../common/services/token-blacklist.service';
 import { AuditModule } from '../audit/audit.module';
 import { EmailModule } from '../email/email.module';
+import { SecurityConfigModule } from '@core/security-config/security-config.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { EmailModule } from '../email/email.module';
     }),
     forwardRef(() => AuditModule),
     EmailModule,
+    SecurityConfigModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, TwoFactorService, EmailVerificationService, PasswordResetService, JwtStrategy, TokenBlacklistService],

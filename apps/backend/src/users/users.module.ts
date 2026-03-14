@@ -3,9 +3,10 @@ import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { PrismaModule } from '@core/prisma/prisma.module';
 import { ValidatorsModule } from '@core/common/validators/validators.module';
+import { SecurityConfigModule } from '@core/security-config/security-config.module';
 
 @Module({
-  imports: [PrismaModule, ValidatorsModule],
+  imports: [PrismaModule, ValidatorsModule, SecurityConfigModule],
   controllers: [UsersController],
   providers: [UsersService],
   exports: [UsersService],
@@ -13,5 +14,4 @@ import { ValidatorsModule } from '@core/common/validators/validators.module';
 export class UsersModule {
       // Empty implementation
     }
-
 

@@ -11,6 +11,13 @@ interface MaintenanceModePayload {
   startedAt?: string | null;
 }
 
+type TokenRefreshPayload = {
+  accessToken: string;
+  refreshToken: string;
+  accessTokenExpiresAt?: string | null;
+  refreshTokenExpiresAt?: string | null;
+};
+
 const MAINTENANCE_STORAGE_KEY = '__maintenance_state';
 const MAINTENANCE_EVENT_ACTIVE = 'maintenance-mode';
 
@@ -82,6 +89,23 @@ const publishMaintenanceState = (payload: MaintenanceModePayload) => {
   window.dispatchEvent(new CustomEvent(MAINTENANCE_EVENT_ACTIVE, { detail: normalized }));
 };
 
+const resolveCookieMaxAgeSeconds = (
+  expiresAt: string | null | undefined,
+  fallbackSeconds: number,
+): number => {
+  if (!expiresAt) {
+    return fallbackSeconds;
+  }
+
+  const parsed = Date.parse(expiresAt);
+  if (!Number.isFinite(parsed)) {
+    return fallbackSeconds;
+  }
+
+  const seconds = Math.floor((parsed - Date.now()) / 1000);
+  return seconds > 0 ? seconds : fallbackSeconds;
+};
+
 // Funções para gerenciamento seguro de tokens
 export const getSecureToken = async (): Promise<string | null> => {
   if (typeof window === "undefined") return null;
@@ -138,21 +162,29 @@ const getSecureRefreshToken = async (): Promise<string | null> => {
   return null;
 };
 
-const setSecureToken = async (token: string): Promise<void> => {
+const setSecureToken = async (
+  token: string,
+  expiresAt?: string | null,
+): Promise<void> => {
   if (typeof window === "undefined") return;
 
   try {
-    document.cookie = `accessToken=${token}; Secure; SameSite=Strict; Max-Age=900; Path=/`;
+    const maxAgeSeconds = resolveCookieMaxAgeSeconds(expiresAt, 900);
+    document.cookie = `accessToken=${token}; Secure; SameSite=Strict; Max-Age=${maxAgeSeconds}; Path=/`;
   } catch {
     sessionStorage.setItem("@App:token", btoa(token));
   }
 };
 
-const setSecureRefreshToken = async (token: string): Promise<void> => {
+const setSecureRefreshToken = async (
+  token: string,
+  expiresAt?: string | null,
+): Promise<void> => {
   if (typeof window === "undefined") return;
 
   try {
-    document.cookie = `refreshToken=${token}; Secure; SameSite=Strict; Max-Age=604800; Path=/`;
+    const maxAgeSeconds = resolveCookieMaxAgeSeconds(expiresAt, 604800);
+    document.cookie = `refreshToken=${token}; Secure; SameSite=Strict; Max-Age=${maxAgeSeconds}; Path=/`;
   } catch {
     sessionStorage.setItem("@App:refreshToken", btoa(token));
   }
@@ -277,12 +309,17 @@ api.interceptors.response.use(
           refreshToken,
         });
 
-        const { accessToken, refreshToken: newRefreshToken } = response.data;
+        const {
+          accessToken,
+          refreshToken: newRefreshToken,
+          accessTokenExpiresAt,
+          refreshTokenExpiresAt,
+        } = response.data as TokenRefreshPayload;
 
         // Salvar novos tokens de forma segura
         if (typeof window !== "undefined") {
-          await setSecureToken(accessToken);
-          await setSecureRefreshToken(newRefreshToken);
+          await setSecureToken(accessToken, accessTokenExpiresAt);
+          await setSecureRefreshToken(newRefreshToken, refreshTokenExpiresAt);
         }
 
         // Atualizar header padrão
@@ -309,6 +346,5 @@ api.interceptors.response.use(
 );
 
 export default api;
-
 
 

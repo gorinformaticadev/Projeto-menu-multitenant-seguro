@@ -105,14 +105,16 @@ export class SecurityConfigController {
     return {
       twoFactorEnabled: config.twoFactorEnabled,
       twoFactorRequired: config.twoFactorRequired,
-      twoFactorSuggested: config.twoFactorSuggested || true,
-      emailVerificationRequired: config.emailVerificationRequired || false,
-      emailVerificationLevel: config.emailVerificationLevel || 'SOFT',
+      twoFactorRequiredForAdmins: config.twoFactorRequiredForAdmins,
+      twoFactorSuggested: config.twoFactorSuggested ?? true,
+      emailVerificationRequired: config.emailVerificationRequired ?? false,
+      emailVerificationLevel: config.emailVerificationLevel ?? 'SOFT',
       passwordMinLength: config.passwordMinLength,
       passwordRequireUppercase: config.passwordRequireUppercase,
       passwordRequireLowercase: config.passwordRequireLowercase,
       passwordRequireNumbers: config.passwordRequireNumbers,
       passwordRequireSpecial: config.passwordRequireSpecial,
+      sessionTimeoutMinutes: config.sessionTimeoutMinutes,
     };
   }
 }

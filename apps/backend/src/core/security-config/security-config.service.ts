@@ -70,6 +70,7 @@ export class SecurityConfigService {
     const config = await this.getConfig();
     return {
       maxAttempts: config.loginMaxAttempts,
+      lockDurationMinutes: config.loginLockDurationMinutes,
       windowMinutes: config.loginWindowMinutes,
     };
   }
@@ -96,6 +97,7 @@ export class SecurityConfigService {
     return {
       accessTokenExpiresIn: config.accessTokenExpiresIn,
       refreshTokenExpiresIn: config.refreshTokenExpiresIn,
+      sessionTimeoutMinutes: config.sessionTimeoutMinutes,
     };
   }
 
@@ -107,6 +109,8 @@ export class SecurityConfigService {
     return {
       enabled: config.twoFactorEnabled,
       required: config.twoFactorRequired,
+      requiredForAdmins: config.twoFactorRequiredForAdmins,
+      suggested: config.twoFactorSuggested,
     };
   }
 
@@ -193,4 +197,3 @@ export class SecurityConfigService {
     return normalized ? normalized : null;
   }
 }
-

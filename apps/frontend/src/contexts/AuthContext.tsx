@@ -42,6 +42,14 @@ interface ApiError {
   message?: string;
 }
 
+type TokenResponsePayload = {
+  accessToken: string;
+  refreshToken: string;
+  accessTokenExpiresAt?: string | null;
+  refreshTokenExpiresAt?: string | null;
+  user: User;
+};
+
 interface AuthContextData {
   user: User | null;
   token: string | null;
@@ -121,12 +129,30 @@ const decrypt = async (encryptedText: string): Promise<string> => {
   }
 };
 
+const resolveCookieMaxAgeSeconds = (
+  expiresAt: string | null | undefined,
+  fallbackSeconds: number,
+): number => {
+  if (!expiresAt) {
+    return fallbackSeconds;
+  }
+
+  const parsed = Date.parse(expiresAt);
+  if (!Number.isFinite(parsed)) {
+    return fallbackSeconds;
+  }
+
+  const seconds = Math.floor((parsed - Date.now()) / 1000);
+  return seconds > 0 ? seconds : fallbackSeconds;
+};
+
 const SecureStorage = {
-  setToken: async (token: string) => {
+  setToken: async (token: string, expiresAt?: string | null) => {
     if (typeof window !== "undefined") {
       try {
         // Tentar usar cookie primeiro (mais seguro)
-        document.cookie = `accessToken=${token}; Secure; SameSite=Strict; Max-Age=900; Path=/`;
+        const maxAgeSeconds = resolveCookieMaxAgeSeconds(expiresAt, 900);
+        document.cookie = `accessToken=${token}; Secure; SameSite=Strict; Max-Age=${maxAgeSeconds}; Path=/`;
       } catch {
         // Fallback para sessionStorage criptografado
         const encrypted = await encrypt(token);
@@ -166,11 +192,12 @@ const SecureStorage = {
     }
   },
 
-  setRefreshToken: async (token: string) => {
+  setRefreshToken: async (token: string, expiresAt?: string | null) => {
     if (typeof window !== "undefined") {
       try {
         // Cookie com duração maior para refresh token
-        document.cookie = `refreshToken=${token}; Secure; SameSite=Strict; Max-Age=604800; Path=/`;
+        const maxAgeSeconds = resolveCookieMaxAgeSeconds(expiresAt, 604800);
+        document.cookie = `refreshToken=${token}; Secure; SameSite=Strict; Max-Age=${maxAgeSeconds}; Path=/`;
       } catch {
         // Fallback para sessionStorage criptografado
         const encrypted = await encrypt(token);
@@ -296,10 +323,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function login(email: string, password: string) {
     try {
       const response = await api.post("/auth/login", { email, password });
-      const { accessToken, refreshToken, user: userData } = response.data;
+      const {
+        accessToken,
+        refreshToken,
+        accessTokenExpiresAt,
+        refreshTokenExpiresAt,
+        user: userData,
+      } = response.data as TokenResponsePayload;
 
-      await SecureStorage.setToken(accessToken);
-      await SecureStorage.setRefreshToken(refreshToken);
+      await SecureStorage.setToken(accessToken, accessTokenExpiresAt);
+      await SecureStorage.setRefreshToken(refreshToken, refreshTokenExpiresAt);
       api.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
 
       setToken(accessToken);
@@ -326,11 +359,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Tentar login normal
       const response = await api.post("/auth/login", { email, password });
-      const { accessToken, refreshToken, user: userData } = response.data;
+      const {
+        accessToken,
+        refreshToken,
+        accessTokenExpiresAt,
+        refreshTokenExpiresAt,
+        user: userData,
+      } = response.data as TokenResponsePayload;
 
       // Salvar tokens no SecureStorage
-      await SecureStorage.setToken(accessToken);
-      await SecureStorage.setRefreshToken(refreshToken);
+      await SecureStorage.setToken(accessToken, accessTokenExpiresAt);
+      await SecureStorage.setRefreshToken(refreshToken, refreshTokenExpiresAt);
       api.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
 
       // Atualizar estado do usuário
@@ -388,11 +427,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         twoFactorToken: code
       });
 
-      const { accessToken, refreshToken, user: userData } = response.data;
+      const {
+        accessToken,
+        refreshToken,
+        accessTokenExpiresAt,
+        refreshTokenExpiresAt,
+        user: userData,
+      } = response.data as TokenResponsePayload;
 
       // Salvar tokens no SecureStorage
-      await SecureStorage.setToken(accessToken);
-      await SecureStorage.setRefreshToken(refreshToken);
+      await SecureStorage.setToken(accessToken, accessTokenExpiresAt);
+      await SecureStorage.setRefreshToken(refreshToken, refreshTokenExpiresAt);
       api.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
 
       // Atualizar estado do usuário

@@ -5,8 +5,10 @@ import { PrismaService } from '@core/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TwoFactorService } from './two-factor.service';
 import { TokenBlacklistService } from '../common/services/token-blacklist.service';
+import { SecurityConfigService } from '@core/security-config/security-config.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import type { StringValue } from 'ms';
 import { LoginDto } from './dto/login.dto';
 import { Login2FADto } from './dto/login-2fa.dto';
 
@@ -16,6 +18,13 @@ type TokenGenerationInput = {
   role: string;
   tenantId: string | null;
   sessionVersion: number;
+};
+
+type GeneratedTokens = {
+  accessToken: string;
+  refreshToken: string;
+  accessTokenExpiresAt: string | null;
+  refreshTokenExpiresAt: string;
 };
 
 @Injectable()
@@ -29,6 +38,7 @@ export class AuthService {
     @Inject(forwardRef(() => TwoFactorService))
     private twoFactorService: TwoFactorService,
     private tokenBlacklistService: TokenBlacklistService,
+    private securityConfigService: SecurityConfigService,
   ) {}
 
   async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string) {
@@ -83,9 +93,9 @@ export class AuthService {
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
-      const securityConfig = await this.prisma.securityConfig.findFirst();
-      const maxAttempts = securityConfig?.loginMaxAttempts || 5;
-      const lockDurationMinutes = securityConfig?.loginLockDurationMinutes || 30;
+      const loginPolicy = await this.securityConfigService.getLoginRateLimit();
+      const maxAttempts = loginPolicy.maxAttempts ?? 5;
+      const lockDurationMinutes = loginPolicy.lockDurationMinutes ?? 30;
       const newAttempts = user.loginAttempts + 1;
 
       const updateData: any = {
@@ -156,9 +166,11 @@ export class AuthService {
       });
     }
 
-    const securityConfig = await this.prisma.securityConfig.findFirst();
-    const is2FARequired = securityConfig?.twoFactorRequired || false;
-    const is2FARequiredForAdmins = securityConfig?.twoFactorRequiredForAdmins || false;
+    const twoFactorPolicy = await this.securityConfigService.getTwoFactorConfig();
+    const is2FAGloballyEnabled = twoFactorPolicy.enabled === true;
+    const is2FARequired = is2FAGloballyEnabled && twoFactorPolicy.required === true;
+    const is2FARequiredForAdmins =
+      is2FAGloballyEnabled && twoFactorPolicy.requiredForAdmins === true;
     const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN';
 
     if ((is2FARequired || (is2FARequiredForAdmins && isAdmin)) && !user.twoFactorEnabled) {
@@ -177,6 +189,25 @@ export class AuthService {
 
       throw new UnauthorizedException(
         '2FA e obrigatorio para sua conta. Por favor, ative a autenticacao de dois fatores antes de fazer login.',
+      );
+    }
+
+    if (is2FAGloballyEnabled && user.twoFactorEnabled) {
+      await this.auditService.log({
+        action: 'LOGIN_2FA_CHALLENGE',
+        userId: user.id,
+        tenantId: user.tenantId,
+        ipAddress,
+        userAgent,
+        details: {
+          email,
+          reason: 'user_has_2fa_enabled',
+          role: user.role,
+        },
+      });
+
+      throw new UnauthorizedException(
+        '2FA necessario para concluir o login. Informe o codigo de autenticacao.',
       );
     }
 
@@ -200,11 +231,13 @@ export class AuthService {
     return {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
+      accessTokenExpiresAt: tokens.accessTokenExpiresAt,
+      refreshTokenExpiresAt: tokens.refreshTokenExpiresAt,
       user: this.toUserResponse(user),
     };
   }
 
-  async generateTokens(input: TokenGenerationInput) {
+  async generateTokens(input: TokenGenerationInput): Promise<GeneratedTokens> {
     const payload = {
       sub: input.userId,
       email: input.email,
@@ -214,13 +247,23 @@ export class AuthService {
       jti: crypto.randomUUID(),
     };
 
+    const tokenPolicy = await this.securityConfigService.getJwtConfig();
+    const accessTokenExpiresIn = this.normalizeJwtExpiresIn(
+      tokenPolicy.accessTokenExpiresIn,
+      this.config.get('JWT_ACCESS_EXPIRES_IN', '15m'),
+    );
+    const refreshTokenExpiresIn = this.normalizeDurationString(
+      tokenPolicy.refreshTokenExpiresIn,
+      this.config.get('JWT_REFRESH_EXPIRES_IN', '7d'),
+    );
+
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: this.config.get('JWT_ACCESS_EXPIRES_IN', '15m'),
+      expiresIn: accessTokenExpiresIn,
     });
 
     const refreshToken = crypto.randomBytes(64).toString('hex');
-    const expiresIn = this.config.get('JWT_REFRESH_EXPIRES_IN', '7d');
-    const expiresAt = this.calculateExpirationDate(expiresIn);
+    const expiresAt = this.calculateExpirationDate(refreshTokenExpiresIn);
+    const accessTokenExpiresAt = this.extractJwtExpiry(accessToken);
 
     await this.prisma.refreshToken.create({
       data: {
@@ -233,6 +276,8 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
+      accessTokenExpiresAt,
+      refreshTokenExpiresAt: expiresAt.toISOString(),
     };
   }
 
@@ -281,6 +326,8 @@ export class AuthService {
     return {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
+      accessTokenExpiresAt: tokens.accessTokenExpiresAt,
+      refreshTokenExpiresAt: tokens.refreshTokenExpiresAt,
       user: this.toUserResponse(storedToken.user),
     };
   }
@@ -340,6 +387,29 @@ export class AuthService {
     }
   }
 
+  private extractJwtExpiry(token: string): string | null {
+    const decoded = this.jwtService.decode(token);
+    if (!decoded || typeof decoded !== 'object' || typeof decoded.exp !== 'number') {
+      return null;
+    }
+
+    return new Date(decoded.exp * 1000).toISOString();
+  }
+
+  private normalizeJwtExpiresIn(value: unknown, fallback: unknown): StringValue {
+    return this.normalizeDurationString(value, fallback) as StringValue;
+  }
+
+  private normalizeDurationString(value: unknown, fallback: unknown): string {
+    const normalized = String(value ?? '').trim();
+    if (normalized.length > 0) {
+      return normalized;
+    }
+
+    const normalizedFallback = String(fallback ?? '').trim();
+    return normalizedFallback.length > 0 ? normalizedFallback : '15m';
+  }
+
   async login2FA(login2FADto: Login2FADto, ipAddress?: string, userAgent?: string) {
     const { email, password, twoFactorToken } = login2FADto;
 
@@ -378,6 +448,11 @@ export class AuthService {
         details: { email, reason: 'invalid_password' },
       });
       throw new UnauthorizedException('Credenciais invalidas');
+    }
+
+    const twoFactorPolicy = await this.securityConfigService.getTwoFactorConfig();
+    if (twoFactorPolicy.enabled !== true) {
+      throw new UnauthorizedException('2FA desabilitado globalmente');
     }
 
     if (!user.twoFactorEnabled || !user.twoFactorSecret) {
@@ -427,6 +502,8 @@ export class AuthService {
     return {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
+      accessTokenExpiresAt: tokens.accessTokenExpiresAt,
+      refreshTokenExpiresAt: tokens.refreshTokenExpiresAt,
       user: this.toUserResponse(user),
     };
   }

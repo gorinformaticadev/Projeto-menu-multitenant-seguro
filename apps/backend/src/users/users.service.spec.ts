@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as fs from 'fs';
@@ -10,6 +10,7 @@ import { UsersService } from './users.service';
 describe('UsersService security boundaries', () => {
   const prismaMock = {
     user: {
+      create: jest.fn(),
       findFirst: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
@@ -20,12 +21,24 @@ describe('UsersService security boundaries', () => {
     },
   };
 
-  const createService = () => new UsersService(prismaMock as any);
+  const securityConfigServiceMock = {
+    getPasswordPolicy: jest.fn(),
+  };
+
+  const createService = () =>
+    new UsersService(prismaMock as any, securityConfigServiceMock as any);
   let tempUploadsDir: string;
   let previousUploadsDir: string | undefined;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    securityConfigServiceMock.getPasswordPolicy.mockResolvedValue({
+      minLength: 8,
+      requireUppercase: true,
+      requireLowercase: true,
+      requireNumbers: true,
+      requireSpecial: true,
+    });
     tempUploadsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'users-avatar-'));
     previousUploadsDir = process.env.UPLOADS_DIR;
     process.env.UPLOADS_DIR = tempUploadsDir;
@@ -116,6 +129,23 @@ describe('UsersService security boundaries', () => {
     expect(prismaMock.refreshToken.deleteMany).toHaveBeenCalledWith({
       where: { userId: 'user-1' },
     });
+  });
+
+  it('rejects user creation when the password violates the runtime policy', async () => {
+    const service = createService();
+    prismaMock.user.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.create({
+        email: 'user@example.com',
+        password: 'fraca',
+        name: 'User One',
+        role: Role.USER,
+        tenantId: 'tenant-1',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(prismaMock.user.create).not.toHaveBeenCalled();
   });
 
   it('stores user avatar in a tenant-scoped directory and exposes a public avatar URL', async () => {

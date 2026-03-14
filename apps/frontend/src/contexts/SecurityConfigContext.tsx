@@ -42,13 +42,13 @@ export function SecurityConfigProvider({ children }: { children: ReactNode }) {
       // Mapeia os dados do backend para o formato esperado
       const backendConfig = response.data;
       setConfig({
-        twoFactorEnabled: backendConfig.twoFactorEnabled || false,
-        twoFactorRequired: backendConfig.twoFactorRequired || false,
-        twoFactorRequiredForAdmins: backendConfig.twoFactorRequiredForAdmins || false,
-        twoFactorSuggested: backendConfig.twoFactorSuggested || true,
-        sessionTimeoutMinutes: backendConfig.sessionTimeoutMinutes || 30,
+        twoFactorEnabled: backendConfig.twoFactorEnabled ?? false,
+        twoFactorRequired: backendConfig.twoFactorRequired ?? false,
+        twoFactorRequiredForAdmins: backendConfig.twoFactorRequiredForAdmins ?? false,
+        twoFactorSuggested: backendConfig.twoFactorSuggested ?? true,
+        sessionTimeoutMinutes: backendConfig.sessionTimeoutMinutes ?? 30,
         passwordPolicy: {
-          minLength: backendConfig.passwordMinLength || 8,
+          minLength: backendConfig.passwordMinLength ?? 8,
           requireUppercase: backendConfig.passwordRequireUppercase !== false,
           requireLowercase: backendConfig.passwordRequireLowercase !== false,
           requireNumbers: backendConfig.passwordRequireNumbers !== false,

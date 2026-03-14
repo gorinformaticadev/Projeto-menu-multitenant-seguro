@@ -12,6 +12,7 @@ import { Verify2FADto } from './dto/verify-2fa.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { SecurityConfigService } from '@core/security-config/security-config.service';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { SkipCsrf } from '@core/common/decorators/skip-csrf.decorator';
 import { Request } from 'express';
@@ -25,6 +26,7 @@ export class AuthController {
     private twoFactorService: TwoFactorService,
     private emailVerificationService: EmailVerificationService,
     private passwordResetService: PasswordResetService,
+    private securityConfigService: SecurityConfigService,
   ) { }
 
   /**
@@ -136,9 +138,13 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async get2FAStatus(@Req() req: AuthenticatedRequest) {
     const user = await this.authService.getProfile(req.user.id);
+    const policy = await this.securityConfigService.getTwoFactorConfig();
     return {
       enabled: user.twoFactorEnabled || false,
-      suggested: true, // Esta informação virá da configuração de segurança
+      globallyEnabled: policy.enabled === true,
+      required: policy.required === true,
+      requiredForAdmins: policy.requiredForAdmins === true,
+      suggested: policy.suggested !== false,
     };
   }
 

@@ -1,9 +1,11 @@
- import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
+import { SecurityConfigService } from '@core/security-config/security-config.service';
 import { EmailService } from '../email/email.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import { validatePasswordAgainstPolicy } from '../common/utils/password-policy.util';
 
 @Injectable()
 export class PasswordResetService {
@@ -14,9 +16,8 @@ export class PasswordResetService {
     private emailService: EmailService,
     private jwtService: JwtService,
     private config: ConfigService,
-  ) {
-      // Empty implementation
-    }
+    private securityConfigService: SecurityConfigService,
+  ) {}
 
   /**
    * Solicitar recuperação de senha
@@ -142,6 +143,12 @@ export class PasswordResetService {
       if (!resetTokenRecord.user || resetTokenRecord.user.isLocked) {
         this.logger.warn('Usuário não encontrado ou bloqueado');
         throw new BadRequestException('Usuário não encontrado ou bloqueado.');
+      }
+
+      const passwordPolicy = await this.securityConfigService.getPasswordPolicy();
+      const policyErrors = validatePasswordAgainstPolicy(newPassword, passwordPolicy);
+      if (policyErrors.length > 0) {
+        throw new BadRequestException(policyErrors.join(' '));
       }
 
       // Hash da nova senha

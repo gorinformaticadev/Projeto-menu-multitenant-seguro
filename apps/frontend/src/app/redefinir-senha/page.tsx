@@ -11,6 +11,8 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { ArrowLeft, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { API_URL } from "@/lib/api";
+import { useSecurityConfig } from "@/contexts/SecurityConfigContext";
+import { validatePasswordWithPolicy } from "@/hooks/usePasswordValidation";
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +25,7 @@ function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { toast } = useToast();
+  const { config } = useSecurityConfig();
 
   const token = searchParams.get("token");
 
@@ -50,11 +53,25 @@ function ResetPasswordForm() {
       return;
     }
 
-    if (newPassword.length < 6) {
+    const passwordPolicy = config?.passwordPolicy ?? {
+      minLength: 8,
+      requireUppercase: true,
+      requireLowercase: true,
+      requireNumbers: true,
+      requireSpecial: true,
+    };
+    const passwordValidation = validatePasswordWithPolicy(newPassword, passwordPolicy);
+
+    if (!passwordValidation.isValid) {
+      const firstInvalidRequirement = passwordValidation.requirements.find(
+        (requirement) => !requirement.valid,
+      );
       toast({
         variant: "destructive",
-        title: "Senha muito curta",
-        description: "A senha deve ter pelo menos 6 caracteres.",
+        title: "Senha fora da política",
+        description:
+          firstInvalidRequirement?.label ||
+          "A nova senha não atende à política de segurança ativa.",
       });
       return;
     }

@@ -4,6 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
+import { useContainer } from 'class-validator';
 import { AppModule } from './app.module';
 import {
   buildSecurityHeadersHelmetOptions,
@@ -60,6 +61,7 @@ async function bootstrap() {
 
   const dynamicModule = await AppModule.register();
   const app = await NestFactory.create<NestExpressApplication>(dynamicModule);
+  useContainer(app.select(AppModule), { fallbackOnErrors: true });
   app.setGlobalPrefix('api');
 
   const isProduction = process.env.NODE_ENV === 'production';
