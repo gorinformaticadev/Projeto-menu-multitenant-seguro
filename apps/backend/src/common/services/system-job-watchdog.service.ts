@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { CronExpression } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { CronJobDefinition, CronService } from '../../core/cron/cron.service';
+import { ConfigResolverService } from '../../system-settings/config-resolver.service';
 import { SystemOperationalAlertsService } from './system-operational-alerts.service';
 
 type WatchdogAlertInput = {
@@ -26,6 +27,7 @@ export class SystemJobWatchdogService implements OnModuleInit {
   constructor(
     private readonly cronService: CronService,
     private readonly systemOperationalAlertsService: SystemOperationalAlertsService,
+    private readonly configResolver: ConfigResolverService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -53,6 +55,13 @@ export class SystemJobWatchdogService implements OnModuleInit {
       return {
         emitted: [],
         skipped: ['maintenance_paused'],
+      };
+    }
+
+    if (!(await this.isWatchdogEnabled())) {
+      return {
+        emitted: [],
+        skipped: ['watchdog_disabled'],
       };
     }
 
@@ -296,6 +305,10 @@ export class SystemJobWatchdogService implements OnModuleInit {
       },
       nowMs,
     );
+  }
+
+  private async isWatchdogEnabled(): Promise<boolean> {
+    return (await this.configResolver.getBoolean('operations.watchdog.enabled')) !== false;
   }
 
   private readRepeatedFailureThreshold(): number {

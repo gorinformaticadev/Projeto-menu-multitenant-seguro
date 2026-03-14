@@ -1,4 +1,5 @@
 import { CronService } from '../../core/cron/cron.service';
+import { ConfigResolverService } from '../../system-settings/config-resolver.service';
 import { SystemJobWatchdogService } from './system-job-watchdog.service';
 import { SystemOperationalAlertsService } from './system-operational-alerts.service';
 
@@ -11,6 +12,9 @@ describe('SystemJobWatchdogService', () => {
   const operationalAlertsServiceMock = {
     dispatchOperationalAlert: jest.fn(),
   };
+  const configResolverMock = {
+    getBoolean: jest.fn(),
+  };
 
   let service: SystemJobWatchdogService;
   let previousFailureThreshold: string | undefined;
@@ -19,6 +23,7 @@ describe('SystemJobWatchdogService', () => {
     new SystemJobWatchdogService(
       cronServiceMock as unknown as CronService,
       operationalAlertsServiceMock as unknown as SystemOperationalAlertsService,
+      configResolverMock as unknown as ConfigResolverService,
     );
 
   beforeEach(() => {
@@ -31,6 +36,7 @@ describe('SystemJobWatchdogService', () => {
     cronServiceMock.getRuntimeJobs.mockResolvedValue([]);
     cronServiceMock.isMaintenancePaused.mockReturnValue(false);
     operationalAlertsServiceMock.dispatchOperationalAlert.mockResolvedValue(true);
+    configResolverMock.getBoolean.mockResolvedValue(true);
 
     service = createService();
   });
@@ -152,7 +158,7 @@ describe('SystemJobWatchdogService', () => {
   it('skips evaluation while cron jobs are paused for maintenance', async () => {
     cronServiceMock.isMaintenancePaused.mockReturnValue(true);
 
-    const result = await service.evaluateWatchdog(new Date('2026-03-07T15:00:00.000Z'));
+    const result = await service.evaluateWatchdog(new Date('2026-03-07T15:01:00.000Z'));
 
     expect(result).toEqual({
       emitted: [],
@@ -179,12 +185,59 @@ describe('SystemJobWatchdogService', () => {
       },
     ]);
 
-    const result = await service.evaluateWatchdog(new Date('2026-03-07T15:00:00.000Z'));
+    const result = await service.evaluateWatchdog(new Date('2026-03-07T15:01:00.000Z'));
 
     expect(result).toEqual({
       emitted: [],
       skipped: [],
     });
     expect(operationalAlertsServiceMock.dispatchOperationalAlert).not.toHaveBeenCalled();
+  });
+
+  it('skips watchdog execution entirely when the watchdog toggle is disabled', async () => {
+    configResolverMock.getBoolean.mockResolvedValue(false);
+
+    const result = await service.evaluateWatchdog(new Date('2026-03-07T15:01:00.000Z'));
+
+    expect(result).toEqual({
+      emitted: [],
+      skipped: ['watchdog_disabled'],
+    });
+    expect(cronServiceMock.getRuntimeJobs).not.toHaveBeenCalled();
+    expect(operationalAlertsServiceMock.dispatchOperationalAlert).not.toHaveBeenCalled();
+  });
+
+  it('keeps watchdog execution separate from downstream alert emission', async () => {
+    operationalAlertsServiceMock.dispatchOperationalAlert.mockResolvedValue(false);
+    cronServiceMock.getRuntimeJobs.mockResolvedValue([
+      {
+        key: 'system.update_check',
+        name: 'Update check',
+        description: 'Checks for updates',
+        schedule: '0 * * * *',
+        enabled: true,
+        runtimeRegistered: true,
+        runtimeActive: true,
+        lastStatus: 'success',
+        lastStartedAt: new Date('2026-03-07T12:00:00.000Z'),
+        lastSucceededAt: new Date('2026-03-07T12:01:00.000Z'),
+        nextExpectedRunAt: new Date('2026-03-07T13:00:00.000Z'),
+        consecutiveFailureCount: 0,
+      },
+    ]);
+
+    const result = await service.evaluateWatchdog(new Date('2026-03-07T15:01:00.000Z'));
+
+    expect(operationalAlertsServiceMock.dispatchOperationalAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'JOB_NOT_RUNNING',
+        source: 'job-watchdog',
+      }),
+      expect.any(Number),
+    );
+    expect(result).toEqual({
+      emitted: [],
+      skipped: ['JOB_NOT_RUNNING:system.update_check'],
+    });
   });
 });
