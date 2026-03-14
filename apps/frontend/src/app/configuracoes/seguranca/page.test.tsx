@@ -311,10 +311,11 @@ describe("/configuracoes/seguranca", () => {
     expect(screen.getByText(/Política de Senha/i)).toBeInTheDocument();
     expect(screen.getByText(/Autenticação de Dois Fatores \(2FA\)/i)).toBeInTheDocument();
     expect(screen.getByText(/Tokens e Sessão/i)).toBeInTheDocument();
-    expect(await screen.findByText(/Configurações de Email/i)).toBeInTheDocument();
+    const emailHeading = await screen.findByText(/Configurações de Email/i);
     const dynamicSection = await screen.findByTestId("dynamic-security-settings-section");
     expect(within(dynamicSection).getByText(/Configuracoes Dinamicas de Seguranca/i)).toBeInTheDocument();
     expect(within(dynamicSection).getByRole("heading", { name: /Notificacoes do sistema/i })).toBeInTheDocument();
+    expect(Boolean(dynamicSection.compareDocumentPosition(emailHeading) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
 
     expect(apiMock.get).toHaveBeenCalledWith("/security-config");
     expect(apiMock.get).toHaveBeenCalledWith("/system/settings/panel");
@@ -477,6 +478,57 @@ describe("/configuracoes/seguranca", () => {
     expect(screen.getByText(/Tokens e Sessão/i)).toBeInTheDocument();
   });
 
+  it("explica origens e bloqueios operacionais na secao dinamica sem depender do icone de ajuda", async () => {
+    installDefaultGetHandlers([
+      buildSetting({}),
+      buildSetting({
+        key: "security.headers.enabled",
+        label: "Headers de seguranca",
+        category: "security",
+        editableInPanel: false,
+        restartRequired: true,
+      }),
+    ]);
+
+    render(<SecuritySettingsPage />);
+
+    const dynamicSection = await screen.findByTestId("dynamic-security-settings-section");
+    expect(within(dynamicSection).getByText(/Como ler esta secao/i)).toBeInTheDocument();
+    expect(
+      within(dynamicSection).getByText(/As origens mostram de onde vem o valor efetivo/i),
+    ).toBeInTheDocument();
+    expect(
+      within(dynamicSection).getByText(/confirmacao aparece so para acoes editaveis; reinicio indica efeito apenas apos restart/i),
+    ).toBeInTheDocument();
+  });
+
+  it("nao oferece restore fallback para item somente leitura com override em banco", async () => {
+    installDefaultGetHandlers([
+      buildSetting({
+        key: "security.headers.enabled",
+        label: "Headers de seguranca",
+        category: "security",
+        editableInPanel: false,
+        sensitive: false,
+        valueHidden: false,
+        resolvedValue: true,
+        resolvedSource: "database",
+        hasDatabaseOverride: true,
+        restartRequired: true,
+      }),
+    ]);
+
+    render(<SecuritySettingsPage />);
+
+    const readonlyRow = await screen.findByTestId("security-setting-row-security.headers.enabled");
+    expect(
+      within(readonlyRow).getByText(/Override em banco ativo; restauracao bloqueada neste painel/i),
+    ).toBeInTheDocument();
+    expect(
+      within(readonlyRow).queryByRole("button", { name: /Restaurar fallback/i }),
+    ).not.toBeInTheDocument();
+  });
+
   it("nao permite editar item dinamico somente leitura nem expor valor protegido", async () => {
     installDefaultGetHandlers([
       buildSetting({
@@ -599,9 +651,11 @@ describe("/configuracoes/seguranca", () => {
     const readonlyToggle = await screen.findByRole("switch", {
       name: /Headers de seguranca somente leitura/i,
     });
+    const readonlyRow = screen.getByTestId("security-setting-row-security.headers.enabled");
     expect(readonlyToggle).toBeInTheDocument();
-    expect(screen.getByText(/Requer reinicio/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Valor protegido/i)).not.toBeInTheDocument();
+    expect(within(readonlyRow).getByText(/Requer reinicio/i)).toBeInTheDocument();
+    expect(within(readonlyRow).queryByText(/Exige confirmacao/i)).not.toBeInTheDocument();
+    expect(within(readonlyRow).queryByText(/Valor protegido/i)).not.toBeInTheDocument();
 
     const user = userEvent.setup();
     await user.click(
@@ -655,6 +709,63 @@ describe("/configuracoes/seguranca", () => {
     ).toBeInTheDocument();
   });
 
+  it("exibe security.rate_limit.advanced.enabled como somente leitura visivel, com escopo avancado explicito", async () => {
+    installDefaultGetHandlers([
+      buildSetting({
+        key: "security.rate_limit.advanced.enabled",
+        label: "Rate limit avancado",
+        description:
+          "Controla apenas os reforcos avancados do rate limiting global para rotas sensiveis, alto volume e trafego autenticado.",
+        category: "security",
+        editableInPanel: false,
+        sensitive: false,
+        valueHidden: false,
+        resolvedValue: true,
+        restartRequired: false,
+        operationalNotes: [
+          "Controla apenas os reforcos avancados aplicados pelo SecurityThrottlerGuard. O rate limit global/base continua separado em security.rate_limit.enabled.",
+          "Rotas com @Throttle explicito continuam usando suas proprias politicas e nao passam a obedecer este toggle automaticamente.",
+          "Cada processo pode levar ate 15 segundos para refletir a mudanca por causa do snapshot local do guard.",
+          "Nesta fase o painel exibe o estado atual, mas mantem esta chave como somente leitura.",
+        ],
+      }),
+    ]);
+
+    render(<SecuritySettingsPage />);
+
+    const readonlyToggle = await screen.findByRole("switch", {
+      name: /Rate limit avancado somente leitura/i,
+    });
+    const readonlyRow = screen.getByTestId("security-setting-row-security.rate_limit.advanced.enabled");
+    expect(readonlyToggle).toBeInTheDocument();
+    expect(within(readonlyRow).queryByText(/Exige confirmacao/i)).not.toBeInTheDocument();
+    expect(within(readonlyRow).queryByText(/Valor protegido/i)).not.toBeInTheDocument();
+    expect(within(readonlyRow).queryByText(/Requer reinicio/i)).not.toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", {
+        name: /Ajuda da configuracao dinamica Rate limit avancado/i,
+      }),
+    );
+
+    expect(
+      await screen.findByText(/reforcos avancados aplicados pelo SecurityThrottlerGuard/i),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/security\.rate_limit\.enabled/i),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Rotas com @Throttle explicito continuam usando suas proprias politicas/i),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Cada processo pode levar ate 15 segundos para refletir a mudanca/i),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/mantem esta chave como somente leitura/i),
+    ).toBeInTheDocument();
+  });
+
   it("exibe security.csrf.enabled como somente leitura visivel, com risco operacional explicito", async () => {
     installDefaultGetHandlers([
       buildSetting({
@@ -679,9 +790,10 @@ describe("/configuracoes/seguranca", () => {
     const readonlyToggle = await screen.findByRole("switch", {
       name: /Protecao CSRF somente leitura/i,
     });
+    const readonlyRow = screen.getByTestId("security-setting-row-security.csrf.enabled");
     expect(readonlyToggle).toBeInTheDocument();
-    expect(screen.queryByText(/Valor protegido/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Requer reinicio/i)).not.toBeInTheDocument();
+    expect(within(readonlyRow).queryByText(/Valor protegido/i)).not.toBeInTheDocument();
+    expect(within(readonlyRow).queryByText(/Requer reinicio/i)).not.toBeInTheDocument();
 
     const user = userEvent.setup();
     await user.click(
@@ -727,9 +839,10 @@ describe("/configuracoes/seguranca", () => {
     const readonlyToggle = await screen.findByRole("switch", {
       name: /CSP avancado somente leitura/i,
     });
+    const readonlyRow = screen.getByTestId("security-setting-row-security.csp_advanced.enabled");
     expect(readonlyToggle).toBeInTheDocument();
-    expect(screen.queryByText(/Valor protegido/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Requer reinicio/i)).not.toBeInTheDocument();
+    expect(within(readonlyRow).queryByText(/Valor protegido/i)).not.toBeInTheDocument();
+    expect(within(readonlyRow).queryByText(/Requer reinicio/i)).not.toBeInTheDocument();
 
     const user = userEvent.setup();
     await user.click(
@@ -778,9 +891,10 @@ describe("/configuracoes/seguranca", () => {
     const readonlyToggle = await screen.findByRole("switch", {
       name: /Canal WebSocket realtime somente leitura/i,
     });
+    const readonlyRow = screen.getByTestId("security-setting-row-security.websocket.enabled");
     expect(readonlyToggle).toBeInTheDocument();
-    expect(screen.queryByText(/Valor protegido/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Requer reinicio/i)).not.toBeInTheDocument();
+    expect(within(readonlyRow).queryByText(/Valor protegido/i)).not.toBeInTheDocument();
+    expect(within(readonlyRow).queryByText(/Requer reinicio/i)).not.toBeInTheDocument();
 
     const user = userEvent.setup();
     await user.click(
@@ -800,6 +914,64 @@ describe("/configuracoes/seguranca", () => {
     ).toBeInTheDocument();
     expect(
       await screen.findByText(/mantem esta chave como somente leitura devido ao limite operacional do canal/i),
+    ).toBeInTheDocument();
+  });
+
+  it("exibe notifications.push.enabled com escopo real de entrega, separacoes explicitas e confirmacao", async () => {
+    installDefaultGetHandlers([
+      buildSetting({
+        key: "notifications.push.enabled",
+        label: "Entrega Web Push",
+        description:
+          "Controla a tentativa real de envio Web Push para subscriptions ja registradas quando houver VAPID valido.",
+        category: "notifications",
+        editableInPanel: true,
+        sensitive: false,
+        valueHidden: false,
+        resolvedValue: true,
+        restartRequired: false,
+        requiresConfirmation: true,
+        operationalNotes: [
+          "Controla apenas a tentativa de entrega push no PushNotificationService. Nao cria nem persiste notificacoes.",
+          "Notifications.enabled continua controlando a criacao/persistencia da notificacao, e security.websocket.enabled continua controlando o canal realtime/socket.",
+          "Disponibilidade de public key VAPID ou existencia de subscriptions nao equivale a entrega habilitada; se esta chave estiver desligada, o envio push nao e tentado.",
+          "Cada processo pode levar ate 15 segundos para refletir a mudanca por causa do cache local do servico.",
+        ],
+      }),
+    ]);
+
+    render(<SecuritySettingsPage />);
+
+    const liveToggle = await screen.findByRole("switch", {
+      name: /Alternar Entrega Web Push/i,
+    });
+    const liveRow = screen.getByTestId("security-setting-row-notifications.push.enabled");
+    expect(liveToggle).toBeInTheDocument();
+    expect(within(liveRow).getByText(/Exige confirmacao/i)).toBeInTheDocument();
+    expect(within(liveRow).queryByText(/Somente leitura/i)).not.toBeInTheDocument();
+    expect(within(liveRow).queryByText(/Requer reinicio/i)).not.toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", {
+        name: /Ajuda da configuracao dinamica Entrega Web Push/i,
+      }),
+    );
+
+    expect(
+      await screen.findByText(/tentativa real de envio Web Push para subscriptions ja registradas/i),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Controla apenas a tentativa de entrega push no PushNotificationService/i),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Notifications\.enabled continua controlando a criacao\/persistencia da notificacao, e security\.websocket\.enabled continua controlando o canal realtime\/socket/i),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Disponibilidade de public key VAPID ou existencia de subscriptions nao equivale a entrega habilitada/i),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Cada processo pode levar ate 15 segundos para refletir a mudanca/i),
     ).toBeInTheDocument();
   });
 

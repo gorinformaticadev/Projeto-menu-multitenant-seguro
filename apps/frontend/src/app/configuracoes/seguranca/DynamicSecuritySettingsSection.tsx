@@ -194,6 +194,7 @@ function SettingRow({
   const isBusy = pendingAction !== undefined;
   const showLiveToggle = isBoolean && item.editableInPanel && !item.valueHidden;
   const showReadonlyToggle = isBoolean && !item.editableInPanel && !item.valueHidden;
+  const canRestoreInPanel = item.hasDatabaseOverride && item.editableInPanel && !item.valueHidden;
   const lastUpdated = formatLastUpdated(item);
 
   return (
@@ -251,11 +252,15 @@ function SettingRow({
             {isBusy ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
           </div>
 
-          {item.hasDatabaseOverride ? (
+          {canRestoreInPanel ? (
             <Button type="button" size="sm" variant="outline" disabled={isBusy} onClick={() => onRestore(item)}>
               <RotateCcw className="mr-2 h-4 w-4" />
               Restaurar fallback
             </Button>
+          ) : item.hasDatabaseOverride ? (
+            <div className="text-right text-xs text-muted-foreground">
+              Override em banco ativo; restauracao bloqueada neste painel
+            </div>
           ) : (
             <div className="text-right text-xs text-muted-foreground">Sem override em banco</div>
           )}
@@ -365,7 +370,7 @@ export function DynamicSecuritySettingsSection() {
   };
 
   const handleRestore = (item: SecuritySettingItem) => {
-    if (!item.hasDatabaseOverride) return;
+    if (!item.hasDatabaseOverride || !item.editableInPanel || item.valueHidden) return;
     if (item.requiresConfirmation) {
       setConfirmation({ open: true, item, nextValue: null, action: "restore" });
       return;
@@ -411,6 +416,35 @@ export function DynamicSecuritySettingsSection() {
             <InfoButton label="Ajuda das alteracoes por item nas configuracoes dinamicas">
               <p>Cada mudanca e salva individualmente, com auditoria no backend e restore para ENV ou Padrao quando necessario.</p>
             </InfoButton>
+          </div>
+
+          <div className="rounded-[18px] border border-slate-200/80 bg-white/80 p-4 text-sm text-muted-foreground shadow-sm dark:border-slate-800/80 dark:bg-slate-950/45">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4 text-amber-600" />
+              <span className="font-medium text-foreground">Como ler esta secao</span>
+            </div>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="default">Painel</Badge>
+                  <Badge variant="secondary">ENV</Badge>
+                  <Badge variant="outline">Padrao</Badge>
+                </div>
+                <p>
+                  As origens mostram de onde vem o valor efetivo: override ativo em banco ou fallback para ENV/Padrao.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline">Somente leitura</Badge>
+                  <Badge variant="outline">Exige confirmacao</Badge>
+                  <Badge variant="outline">Requer reinicio</Badge>
+                </div>
+                <p>
+                  Somente leitura bloqueia alteracao no painel; confirmacao aparece so para acoes editaveis; reinicio indica efeito apenas apos restart. Use o icone de ajuda para ver limites operacionais como cache local ou proximo ciclo.
+                </p>
+              </div>
+            </div>
           </div>
 
           {loading ? (

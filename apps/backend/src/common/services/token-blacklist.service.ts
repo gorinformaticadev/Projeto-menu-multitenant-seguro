@@ -25,10 +25,11 @@ export class TokenBlacklistService {
 
     const ttl = expiry.getTime() - Date.now();
     if (ttl > 0) {
-      setTimeout(() => {
+      const cleanupTimer = setTimeout(() => {
         this.blacklist.delete(token);
         void this.cleanupExpiredTokens();
       }, ttl);
+      cleanupTimer.unref?.();
     }
 
     this.logger.log(`Token revogado para usuario ${userId ?? 'unknown'} ate ${expiry.toISOString()}`);

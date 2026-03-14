@@ -846,11 +846,11 @@ export default function SecurityConfigPage() {
         </>
       )}
 
-      {/* Configurações de Email */}
-      <EmailConfigSection />
-
       {/* Configurações Dinâmicas */}
       <DynamicSecuritySettingsSection />
+
+      {/* Configurações de Email */}
+      <EmailConfigSection />
 
       {/* Botão de Salvar */}
       {config ? (

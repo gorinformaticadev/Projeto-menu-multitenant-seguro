@@ -28,6 +28,7 @@ describe('SystemSettingsReadService', () => {
         key: 'security.headers.enabled',
         sensitive: false,
         editableInPanel: false,
+        requiresConfirmation: false,
         restartRequired: true,
         operationalNotes: [
           'Mudancas nesta chave so passam a valer apos reiniciar o processo do backend.',
@@ -35,9 +36,26 @@ describe('SystemSettingsReadService', () => {
         label: 'Headers de seguranca',
       }),
       makeDefinition({
+        key: 'security.rate_limit.advanced.enabled',
+        sensitive: false,
+        editableInPanel: false,
+        requiresConfirmation: false,
+        restartRequired: false,
+        description:
+          'Controla apenas os reforcos avancados do rate limiting global para rotas sensiveis, alto volume e trafego autenticado.',
+        operationalNotes: [
+          'Controla apenas os reforcos avancados aplicados pelo SecurityThrottlerGuard. O rate limit global/base continua separado em security.rate_limit.enabled.',
+          'Rotas com @Throttle explicito continuam usando suas proprias politicas e nao passam a obedecer este toggle automaticamente.',
+          'Cada processo pode levar ate 15 segundos para refletir a mudanca por causa do snapshot local do guard.',
+          'Nesta fase o painel exibe o estado atual, mas mantem esta chave como somente leitura.',
+        ],
+        label: 'Rate limit avancado',
+      }),
+      makeDefinition({
         key: 'security.csrf.enabled',
         sensitive: false,
         editableInPanel: false,
+        requiresConfirmation: false,
         restartRequired: false,
         operationalNotes: [
           'Cada processo pode levar ate 15 segundos para refletir a mudanca por causa do cache local do guard.',
@@ -50,6 +68,7 @@ describe('SystemSettingsReadService', () => {
         key: 'security.websocket.enabled',
         sensitive: false,
         editableInPanel: false,
+        requiresConfirmation: false,
         restartRequired: false,
         description: 'Ativa ou desativa o canal Socket.IO dos gateways realtime ativos do backend.',
         operationalNotes: [
@@ -64,6 +83,7 @@ describe('SystemSettingsReadService', () => {
         key: 'security.csp_advanced.enabled',
         sensitive: false,
         editableInPanel: false,
+        requiresConfirmation: false,
         restartRequired: false,
         description: 'Ativa a politica CSP avancada aplicada pelo middleware global do backend.',
         operationalNotes: [
@@ -118,6 +138,11 @@ describe('SystemSettingsReadService', () => {
             updatedByUserId: null,
           },
           {
+            key: 'security.rate_limit.advanced.enabled',
+            updatedAt: new Date('2026-03-13T12:07:00.000Z'),
+            updatedByUserId: null,
+          },
+          {
             key: 'security.csrf.enabled',
             updatedAt: new Date('2026-03-13T12:10:00.000Z'),
             updatedByUserId: null,
@@ -167,6 +192,7 @@ describe('SystemSettingsReadService', () => {
         'security.csp_advanced.enabled',
         'security.headers.enabled',
         'security.module_upload.enabled',
+        'security.rate_limit.advanced.enabled',
         'security.websocket.enabled',
       ].sort(),
     );
@@ -200,7 +226,7 @@ describe('SystemSettingsReadService', () => {
       }),
     );
     expect(result.meta).toEqual({
-      total: 5,
+      total: 6,
       categories: ['security'],
     });
   });
@@ -253,6 +279,7 @@ describe('SystemSettingsReadService', () => {
         sensitive: false,
         valueHidden: false,
         editableInPanel: false,
+        requiresConfirmation: false,
         restartRequired: true,
         resolvedValue: false,
         resolvedSource: 'env',
@@ -275,12 +302,43 @@ describe('SystemSettingsReadService', () => {
         sensitive: false,
         valueHidden: false,
         editableInPanel: false,
+        requiresConfirmation: false,
         restartRequired: false,
         resolvedValue: false,
         resolvedSource: 'env',
         operationalNotes: expect.arrayContaining([
           expect.stringMatching(/15 segundos/i),
           expect.stringMatching(/403/i),
+          expect.stringMatching(/somente leitura/i),
+        ]),
+      }),
+    );
+  });
+
+  it('mantem security.rate_limit.advanced.enabled visivel, somente leitura e com escopo avancado explicito', async () => {
+    const { service } = createService();
+
+    const result = await service.listPanelSettings();
+    const item = result.data.find((entry) => entry.key === 'security.rate_limit.advanced.enabled');
+
+    expect(item).toEqual(
+      expect.objectContaining({
+        key: 'security.rate_limit.advanced.enabled',
+        label: 'Rate limit avancado',
+        description:
+          'Controla apenas os reforcos avancados do rate limiting global para rotas sensiveis, alto volume e trafego autenticado.',
+        sensitive: false,
+        valueHidden: false,
+        editableInPanel: false,
+        requiresConfirmation: false,
+        restartRequired: false,
+        resolvedValue: false,
+        resolvedSource: 'env',
+        operationalNotes: expect.arrayContaining([
+          expect.stringMatching(/SecurityThrottlerGuard/i),
+          expect.stringMatching(/security\.rate_limit\.enabled/i),
+          expect.stringMatching(/@Throttle explicito/i),
+          expect.stringMatching(/15 segundos/i),
           expect.stringMatching(/somente leitura/i),
         ]),
       }),
@@ -301,6 +359,7 @@ describe('SystemSettingsReadService', () => {
         sensitive: false,
         valueHidden: false,
         editableInPanel: false,
+        requiresConfirmation: false,
         restartRequired: false,
         resolvedValue: false,
         resolvedSource: 'env',
@@ -328,6 +387,7 @@ describe('SystemSettingsReadService', () => {
         sensitive: false,
         valueHidden: false,
         editableInPanel: false,
+        requiresConfirmation: false,
         restartRequired: false,
         resolvedValue: false,
         resolvedSource: 'env',
@@ -353,6 +413,7 @@ describe('SystemSettingsReadService', () => {
           operationalNotes: ['Cada processo pode levar ate 15 segundos para refletir a mudanca.'],
           sensitive: false,
           editableInPanel: false,
+          requiresConfirmation: false,
         }),
       ]),
     } as unknown as SettingsRegistry;
@@ -372,10 +433,82 @@ describe('SystemSettingsReadService', () => {
       expect.objectContaining({
         key: 'security.rate_limit.enabled',
         editableInPanel: false,
+        requiresConfirmation: false,
         sensitive: false,
         valueHidden: false,
         resolvedValue: false,
         operationalNotes: ['Cada processo pode levar ate 15 segundos para refletir a mudanca.'],
+      }),
+    );
+  });
+
+  it('mantem notifications.push.enabled visivel, editavel e com separacao operacional explicita', async () => {
+    const { resolverMock, prismaMock } = createService();
+    const registryMock = {
+      getAllowedInPanel: jest.fn(() => [
+        makeDefinition({
+          key: 'notifications.push.enabled',
+          label: 'Entrega Web Push',
+          description:
+            'Controla a tentativa real de envio Web Push para subscriptions ja registradas quando houver VAPID valido.',
+          category: 'notifications',
+          sensitive: false,
+          editableInPanel: true,
+          restartRequired: false,
+          requiresConfirmation: true,
+          operationalNotes: [
+            'Controla apenas a tentativa de entrega push no PushNotificationService. Nao cria nem persiste notificacoes.',
+            'Notifications.enabled continua controlando a criacao/persistencia da notificacao, e security.websocket.enabled continua controlando o canal realtime/socket.',
+            'Disponibilidade de public key VAPID ou existencia de subscriptions nao equivale a entrega habilitada; se esta chave estiver desligada, o envio push nao e tentado.',
+            'Cada processo pode levar ate 15 segundos para refletir a mudanca por causa do cache local do servico.',
+          ],
+        }),
+      ]),
+    } as unknown as SettingsRegistry;
+
+    (resolverMock.getResolved as jest.Mock).mockResolvedValue({
+      key: 'notifications.push.enabled',
+      value: true,
+      source: 'database',
+    });
+    prismaMock.systemSetting.findMany.mockResolvedValue([
+      {
+        key: 'notifications.push.enabled',
+        updatedAt: new Date('2026-03-14T12:40:00.000Z'),
+        updatedByUserId: 'user-1',
+      },
+    ]);
+    prismaMock.user.findMany.mockResolvedValue([
+      {
+        id: 'user-1',
+        email: 'admin@example.com',
+        name: 'Admin User',
+      },
+    ]);
+
+    const service = new SystemSettingsReadService(registryMock, resolverMock, prismaMock as any);
+    const result = await service.listPanelSettings();
+
+    expect(result.data[0]).toEqual(
+      expect.objectContaining({
+        key: 'notifications.push.enabled',
+        label: 'Entrega Web Push',
+        description:
+          'Controla a tentativa real de envio Web Push para subscriptions ja registradas quando houver VAPID valido.',
+        editableInPanel: true,
+        restartRequired: false,
+        requiresConfirmation: true,
+        sensitive: false,
+        valueHidden: false,
+        resolvedValue: true,
+        resolvedSource: 'database',
+        operationalNotes: expect.arrayContaining([
+          expect.stringMatching(/PushNotificationService/i),
+          expect.stringMatching(/Notifications\.enabled continua controlando a criacao\/persistencia/i),
+          expect.stringMatching(/security\.websocket\.enabled continua controlando o canal realtime/i),
+          expect.stringMatching(/public key VAPID/i),
+          expect.stringMatching(/15 segundos/i),
+        ]),
       }),
     );
   });

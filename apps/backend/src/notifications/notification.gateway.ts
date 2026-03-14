@@ -117,6 +117,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
         this.logger.error('Erro no monitoramento do gateway (não crítico):', error);
       }
     }, 60000); // A cada minuto
+    this.monitoringInterval.unref?.();
   }
 
   private updateMetrics() {

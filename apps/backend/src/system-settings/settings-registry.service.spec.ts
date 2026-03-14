@@ -44,10 +44,53 @@ describe('SettingsRegistry', () => {
     expect(definition.allowedInPanel).toBe(true);
     expect(definition.editableInPanel).toBe(false);
     expect(definition.sensitive).toBe(false);
+    expect(definition.requiresConfirmation).toBe(false);
     expect(definition.operationalNotes).toEqual(
       expect.arrayContaining([
         expect.stringMatching(/15 segundos/i),
         expect.stringMatching(/somente leitura/i),
+      ]),
+    );
+  });
+
+  it('mantem security.rate_limit.advanced.enabled visivel, somente leitura e com escopo avancado explicito', () => {
+    const definition = registry.getOrThrow('security.rate_limit.advanced.enabled');
+
+    expect(definition.allowedInPanel).toBe(true);
+    expect(definition.editableInPanel).toBe(false);
+    expect(definition.sensitive).toBe(false);
+    expect(definition.restartRequired).toBe(false);
+    expect(definition.requiresConfirmation).toBe(false);
+    expect(definition.description).toMatch(/reforcos avancados do rate limiting global/i);
+    expect(definition.operationalNotes).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/SecurityThrottlerGuard/i),
+        expect.stringMatching(/security\.rate_limit\.enabled/i),
+        expect.stringMatching(/@Throttle explicito/i),
+        expect.stringMatching(/15 segundos/i),
+        expect.stringMatching(/somente leitura/i),
+      ]),
+    );
+  });
+
+  it('mantem notifications.push.enabled editavel, com confirmacao e escopo real de entrega explicito', () => {
+    const definition = registry.getOrThrow('notifications.push.enabled');
+
+    expect(definition.allowedInPanel).toBe(true);
+    expect(definition.editableInPanel).toBe(true);
+    expect(definition.sensitive).toBe(false);
+    expect(definition.restartRequired).toBe(false);
+    expect(definition.requiresConfirmation).toBe(true);
+    expect(definition.label).toMatch(/Web Push/i);
+    expect(definition.description).toMatch(/tentativa real de envio Web Push/i);
+    expect(definition.operationalNotes).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/PushNotificationService/i),
+        expect.stringMatching(/Notifications\.enabled continua controlando a criacao\/persistencia/i),
+        expect.stringMatching(/security\.websocket\.enabled continua controlando o canal realtime/i),
+        expect.stringMatching(/public key VAPID/i),
+        expect.stringMatching(/subscriptions nao equivale a entrega habilitada/i),
+        expect.stringMatching(/15 segundos/i),
       ]),
     );
   });
@@ -59,6 +102,7 @@ describe('SettingsRegistry', () => {
     expect(definition.editableInPanel).toBe(false);
     expect(definition.sensitive).toBe(false);
     expect(definition.restartRequired).toBe(true);
+    expect(definition.requiresConfirmation).toBe(false);
     expect(definition.operationalNotes).toEqual(
       expect.arrayContaining([
         expect.stringMatching(/bootstrap http central/i),
@@ -75,6 +119,7 @@ describe('SettingsRegistry', () => {
     expect(definition.editableInPanel).toBe(false);
     expect(definition.sensitive).toBe(false);
     expect(definition.restartRequired).toBe(false);
+    expect(definition.requiresConfirmation).toBe(false);
     expect(definition.operationalNotes).toEqual(
       expect.arrayContaining([
         expect.stringMatching(/guard global/i),
@@ -92,6 +137,7 @@ describe('SettingsRegistry', () => {
     expect(definition.editableInPanel).toBe(false);
     expect(definition.sensitive).toBe(false);
     expect(definition.restartRequired).toBe(false);
+    expect(definition.requiresConfirmation).toBe(false);
     expect(definition.label).toMatch(/WebSocket/i);
     expect(definition.description).toMatch(/Socket\.IO/i);
     expect(definition.operationalNotes).toEqual(
@@ -113,6 +159,7 @@ describe('SettingsRegistry', () => {
     expect(definition.editableInPanel).toBe(false);
     expect(definition.sensitive).toBe(false);
     expect(definition.restartRequired).toBe(false);
+    expect(definition.requiresConfirmation).toBe(false);
     expect(definition.label).toMatch(/CSP avancado/i);
     expect(definition.description).toMatch(/middleware global do backend/i);
     expect(definition.operationalNotes).toEqual(

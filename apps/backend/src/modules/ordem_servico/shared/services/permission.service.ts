@@ -70,9 +70,10 @@ export class PermissionService implements IPermissionService {
       }));
 
       this.permissionCache.set(cacheKey, userPermissions);
-      setTimeout(() => {
+      const cacheEvictionTimer = setTimeout(() => {
         this.permissionCache.delete(cacheKey);
       }, this.CACHE_TTL);
+      cacheEvictionTimer.unref?.();
 
       return userPermissions;
     } catch (error) {
@@ -495,9 +496,10 @@ export class PermissionService implements IPermissionService {
       }
 
       this.profilePermissionCache.set(tenantId, merged);
-      setTimeout(() => {
+      const profileCacheEvictionTimer = setTimeout(() => {
         this.profilePermissionCache.delete(tenantId);
       }, this.PROFILE_CACHE_TTL);
+      profileCacheEvictionTimer.unref?.();
 
       return merged;
     } catch (error) {

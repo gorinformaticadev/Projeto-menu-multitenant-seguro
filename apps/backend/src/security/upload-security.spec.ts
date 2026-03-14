@@ -52,7 +52,7 @@ describe('Upload security boundaries', () => {
 
   it('blocks tenant path traversal and cross-tenant file access', () => {
     expect(() => assertTenantUploadAccess('tenant-1', 'tenant-2')).toThrow(ForbiddenException);
-    expect(() => resolveTenantUploadPath(tempRoot, 'tenant-1', '../evil.png')).toThrow(BadRequestException);
+    expect(() => resolveTenantUploadPath(tempRoot, 'tenant-1', '../evil.png')).toThrow(ForbiddenException);
   });
 
   it('stores module uploads under the canonical ordem servico directory and normalizes jpeg extension', () => {

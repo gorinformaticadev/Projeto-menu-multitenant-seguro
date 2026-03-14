@@ -74,6 +74,7 @@ describe('Permission boundaries', () => {
 
     it('filters permission user listings by tenant', async () => {
       const service = createService();
+      prismaMock.$queryRawUnsafe.mockResolvedValue([]);
       prismaMock.$queryRawUnsafe.mockResolvedValueOnce([
         {
           id: 'user-1',
@@ -92,7 +93,7 @@ describe('Permission boundaries', () => {
 
       expect(prismaMock.$queryRawUnsafe).toHaveBeenNthCalledWith(
         1,
-        expect.stringContaining('WHERE tenant_id = $1'),
+        expect.stringContaining('WHERE "tenantId" = $1'),
         'tenant-1',
       );
     });

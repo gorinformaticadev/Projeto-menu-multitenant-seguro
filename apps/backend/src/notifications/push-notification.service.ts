@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { decryptSensitiveData } from '@core/common/utils/security.utils';
+import { ConfigResolverService } from '../system-settings/config-resolver.service';
 import { Notification } from './notification.entity';
 import { SavePushSubscriptionDto } from './notification.dto';
 
@@ -31,16 +32,20 @@ export class PushNotificationService {
   private readonly logger = new Logger(PushNotificationService.name);
   private webPush: WebPushModuleLike | null = null;
   private enabled = false;
+  private cachedPushEnabled: boolean | null = null;
+  private pushToggleExpiresAt = 0;
   private cachedConfig: ResolvedVapidConfig | null = null;
   private cachedConfigAt = 0;
   private lastVapidFingerprint: string | null = null;
   private warnedMissingConfig = false;
   private warnedMissingDependency = false;
+  private readonly pushToggleCacheTtlMs = 15 * 1000;
   private readonly configCacheTtlMs = 60 * 1000;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly configResolver: ConfigResolverService,
   ) {}
 
   async getPublicKey(): Promise<string | null> {
@@ -110,6 +115,10 @@ export class PushNotificationService {
   }
 
   async sendNotification(notification: Notification): Promise<void> {
+    if (!(await this.isPushDeliveryEnabledCached())) {
+      return;
+    }
+
     const config = await this.getResolvedVapidConfig();
     if (!config) {
       return;
@@ -203,6 +212,20 @@ export class PushNotificationService {
     } catch (error) {
       this.logger.error('Erro ao enviar notificacao push (nao critico):', error);
     }
+  }
+
+  private async isPushDeliveryEnabledCached(): Promise<boolean> {
+    const now = Date.now();
+
+    if (this.cachedPushEnabled !== null && now < this.pushToggleExpiresAt) {
+      return this.cachedPushEnabled;
+    }
+
+    const resolved = await this.configResolver.getResolved<boolean>('notifications.push.enabled');
+    this.cachedPushEnabled = resolved?.value === true;
+    this.pushToggleExpiresAt = now + this.pushToggleCacheTtlMs;
+
+    return this.cachedPushEnabled;
   }
 
   private async initialize(config: ResolvedVapidConfig): Promise<void> {

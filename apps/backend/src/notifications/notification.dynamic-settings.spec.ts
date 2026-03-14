@@ -501,6 +501,24 @@ describe('NotificationService dynamic notifications toggle', () => {
     expect(prisma.notifications).toHaveLength(0);
   });
 
+  it('keeps notification persistence independent from the push delivery toggle', async () => {
+    const { controller, notificationGateway, prisma, writeService } = createContext();
+
+    await writeService.updatePanelSetting('notifications.push.enabled', false, actor, 'Disable push only');
+
+    await expect(controller.create(createNotificationDto, { user: requestUser } as any)).resolves.toMatchObject({
+      success: true,
+      suppressed: false,
+      configuration: {
+        key: 'notifications.enabled',
+        enabled: true,
+      },
+    });
+
+    expect(prisma.notifications).toHaveLength(1);
+    expect(notificationGateway.emitNewNotification).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps fail-open behavior when the dynamic settings store is unavailable by falling back to default or ENV', async () => {
     const defaultContext = createContext(false);
 

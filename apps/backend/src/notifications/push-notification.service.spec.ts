@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { Notification } from './notification.entity';
 import { PushNotificationService } from './push-notification.service';
+import { ConfigResolverService } from '../system-settings/config-resolver.service';
 
 describe('PushNotificationService', () => {
   const prismaMock = {
@@ -16,6 +17,13 @@ describe('PushNotificationService', () => {
   };
   const configServiceMock = {
     get: jest.fn(),
+  };
+  const configResolverMock = {
+    getResolved: jest.fn().mockResolvedValue({
+      key: 'notifications.push.enabled',
+      value: true,
+      source: 'default',
+    }),
   };
 
   const baseNotification: Notification = {
@@ -36,6 +44,7 @@ describe('PushNotificationService', () => {
     new PushNotificationService(
       prismaMock as unknown as PrismaService,
       configServiceMock as unknown as ConfigService,
+      configResolverMock as unknown as ConfigResolverService,
     );
 
   beforeEach(() => {
@@ -63,6 +72,11 @@ describe('PushNotificationService', () => {
     ]);
     prismaMock.pushSubscription.updateMany.mockResolvedValue({ count: 2 });
     prismaMock.pushSubscription.deleteMany.mockResolvedValue({ count: 0 });
+    configResolverMock.getResolved.mockResolvedValue({
+      key: 'notifications.push.enabled',
+      value: true,
+      source: 'default',
+    });
   });
 
   it('deduplicates subscriptions by endpoint before sending push', async () => {
