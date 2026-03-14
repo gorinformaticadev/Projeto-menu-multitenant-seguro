@@ -285,6 +285,7 @@ run_docker_vps_install() {
     local db_name="${DB_NAME:-db_${domain_prefix}}"
     local db_user="${DB_USER:-us_${domain_prefix}}"
     local db_pass="${DB_PASSWORD:-$(openssl rand -hex 16)}"
+    local redis_pass="${REDIS_PASSWORD:-$(openssl rand -hex 16)}"
     local jwt_secret="${JWT_SECRET:-$(openssl rand -hex 32)}"
     local enc_key="${ENCRYPTION_KEY:-$(openssl rand -hex 32)}"
 
@@ -303,9 +304,16 @@ run_docker_vps_install() {
     upsert_env "DB_PASSWORD" "$db_pass" "$ENV_PRODUCTION"
     upsert_env "DB_NAME" "$db_name" "$ENV_PRODUCTION"
     upsert_env "DATABASE_URL" "postgresql://$db_user:$db_pass@db:5432/$db_name?schema=public" "$ENV_PRODUCTION"
+    upsert_env "REDIS_PASSWORD" "$redis_pass" "$ENV_PRODUCTION"
+    upsert_env "REDIS_DB" "0" "$ENV_PRODUCTION"
     upsert_env "JWT_SECRET" "$jwt_secret" "$ENV_PRODUCTION"
     upsert_env "ENCRYPTION_KEY" "$enc_key" "$ENV_PRODUCTION"
     upsert_env "REQUIRE_SECRET_MANAGER" "false" "$ENV_PRODUCTION"
+    upsert_env "SEED_ON_START" "${SEED_ON_START:-true}" "$ENV_PRODUCTION"
+    upsert_env "SEED_FORCE" "${SEED_FORCE:-false}" "$ENV_PRODUCTION"
+    upsert_env "SEED_LOCK_ID" "${SEED_LOCK_ID:-87456321}" "$ENV_PRODUCTION"
+    upsert_env "SEED_LOCK_WAIT_SECONDS" "${SEED_LOCK_WAIT_SECONDS:-90}" "$ENV_PRODUCTION"
+    upsert_env "SEED_LOCK_RETRY_MS" "${SEED_LOCK_RETRY_MS:-2000}" "$ENV_PRODUCTION"
     upsert_env "NODE_ENV" "production" "$ENV_PRODUCTION"
     upsert_env "PORT" "4000" "$ENV_PRODUCTION"
     upsert_env "INSTALL_DOMAIN" "$domain" "$ENV_PRODUCTION"
@@ -323,6 +331,8 @@ run_docker_vps_install() {
             log_info "Criado apps/backend/.env a partir de .env.example"
         fi
         upsert_env "DATABASE_URL" "postgresql://$db_user:$db_pass@db:5432/$db_name?schema=public" "$BACKEND_ENV"
+        upsert_env "REDIS_PASSWORD" "$redis_pass" "$BACKEND_ENV"
+        upsert_env "REDIS_DB" "0" "$BACKEND_ENV"
         upsert_env "JWT_SECRET" "$jwt_secret" "$BACKEND_ENV"
         upsert_env "ENCRYPTION_KEY" "$enc_key" "$BACKEND_ENV"
         upsert_env "FRONTEND_URL" "https://$domain" "$BACKEND_ENV"
@@ -330,6 +340,9 @@ run_docker_vps_install() {
         upsert_env "NODE_ENV" "production" "$BACKEND_ENV"
         upsert_env "INSTALL_ADMIN_EMAIL" "${admin_email:-$email}" "$BACKEND_ENV"
         upsert_env "INSTALL_ADMIN_PASSWORD" "$admin_pass" "$BACKEND_ENV"
+        upsert_env "SEED_LOCK_ID" "${SEED_LOCK_ID:-87456321}" "$BACKEND_ENV"
+        upsert_env "SEED_LOCK_WAIT_SECONDS" "${SEED_LOCK_WAIT_SECONDS:-90}" "$BACKEND_ENV"
+        upsert_env "SEED_LOCK_RETRY_MS" "${SEED_LOCK_RETRY_MS:-2000}" "$BACKEND_ENV"
     fi
     if [[ -f "$FRONTEND_EXAMPLE" ]]; then
         if [[ ! -f "$FRONTEND_ENV" ]]; then

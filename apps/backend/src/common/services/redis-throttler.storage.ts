@@ -11,6 +11,7 @@ type RedisThrottlerStorageOptions = {
   db?: number;
   keyPrefix?: string;
   connectTimeout?: number;
+  retryCooldownMs?: number;
 };
 
 const REDIS_INCREMENT_SCRIPT = `
@@ -52,19 +53,27 @@ end
 return { count, counterTtl, isBlocked, blockRemaining }
 `;
 
+const REDIS_RETRY_COOLDOWN_MS = 15000;
+
 export class RedisThrottlerStorage implements ThrottlerStorage {
   private readonly logger = new Logger(RedisThrottlerStorage.name);
   private readonly fallbackStorage = new ThrottlerStorageService();
   private readonly redisPrefix: string;
   private readonly redisEnabled: boolean;
+  private readonly retryCooldownMs: number;
   private readonly redis?: Redis;
+  private redisRetryAvailableAt = 0;
+  private fallbackActive = false;
+  private lastFallbackLogAt = 0;
+  private lastFallbackDetail = '';
 
   constructor(options: RedisThrottlerStorageOptions = {}) {
     this.redisEnabled = options.enabled !== false;
     this.redisPrefix = options.keyPrefix || 'rate-limit';
+    this.retryCooldownMs = options.retryCooldownMs ?? REDIS_RETRY_COOLDOWN_MS;
 
     if (!this.redisEnabled) {
-      this.logger.warn('Redis throttling desativado por configuração; usando storage local em memória.');
+      this.logger.warn('Redis throttling desativado por configuracao; usando storage local em memoria.');
       return;
     }
 
@@ -86,7 +95,14 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
     });
 
     this.redis.on('error', (error) => {
-      this.logger.warn(`Falha no Redis de rate limit; fallback em memória ativo. detalhe=${error.message}`);
+      this.markRedisUnavailable(
+        'Falha no Redis de rate limit; fallback em memoria ativo.',
+        error.message,
+      );
+    });
+
+    this.redis.on('ready', () => {
+      this.markRedisRecovered();
     });
   }
 
@@ -110,9 +126,17 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
     const scopedBlockKey = `${this.redisPrefix}:${throttlerName}:block:${key}`;
     const safeBlockDuration = Number.isFinite(blockDuration) && blockDuration > 0 ? blockDuration : ttl;
 
+    if (this.shouldUseFallbackWithoutRetry()) {
+      return this.fallbackStorage.increment(key, ttl, limit, safeBlockDuration, throttlerName);
+    }
+
     try {
-      if (this.redis.status === 'wait') {
+      if (this.shouldAttemptReconnect()) {
         await this.redis.connect();
+      }
+
+      if (this.redis.status !== 'ready') {
+        throw new Error(`Redis status ${this.redis.status}`);
       }
 
       const rawResult = await this.redis.eval(
@@ -132,6 +156,8 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
       const isBlocked = this.parseRedisNumber(rawBlocked) === 1;
       const timeToBlockExpireMs = this.parseRedisNumber(rawBlockTtlMs);
 
+      this.markRedisRecovered();
+
       return {
         totalHits,
         timeToExpire: this.toSeconds(timeToExpireMs),
@@ -139,11 +165,51 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
         timeToBlockExpire: this.toSeconds(timeToBlockExpireMs),
       };
     } catch (error) {
-      this.logger.warn(
-        `Erro ao aplicar rate limit no Redis; usando storage local para esta requisição. detalhe=${error instanceof Error ? error.message : String(error)}`,
+      this.markRedisUnavailable(
+        'Erro ao aplicar rate limit no Redis; usando storage local nesta janela.',
+        error instanceof Error ? error.message : String(error),
       );
       return this.fallbackStorage.increment(key, ttl, limit, safeBlockDuration, throttlerName);
     }
+  }
+
+  private shouldUseFallbackWithoutRetry(): boolean {
+    return !!this.redis && this.redis.status !== 'ready' && Date.now() < this.redisRetryAvailableAt;
+  }
+
+  private shouldAttemptReconnect(): boolean {
+    return !!this.redis && ['wait', 'end', 'close'].includes(this.redis.status);
+  }
+
+  private markRedisUnavailable(prefix: string, detail: string): void {
+    const now = Date.now();
+    const shouldLog =
+      !this.fallbackActive ||
+      now - this.lastFallbackLogAt >= this.retryCooldownMs ||
+      this.lastFallbackDetail !== detail;
+
+    this.redisRetryAvailableAt = now + this.retryCooldownMs;
+    this.fallbackActive = true;
+
+    if (!shouldLog) {
+      return;
+    }
+
+    this.lastFallbackLogAt = now;
+    this.lastFallbackDetail = detail;
+    this.logger.warn(
+      `${prefix} novas tentativas em ${Math.ceil(this.retryCooldownMs / 1000)}s. detalhe=${detail}`,
+    );
+  }
+
+  private markRedisRecovered(): void {
+    if (this.fallbackActive) {
+      this.logger.log('Redis de rate limit reconectado; storage distribuido reativado.');
+    }
+
+    this.fallbackActive = false;
+    this.redisRetryAvailableAt = 0;
+    this.lastFallbackDetail = '';
   }
 
   private parseRedisNumber(value: unknown): number {

@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
 import { createHash } from 'crypto';
 
+const REDIS_RETRY_COOLDOWN_MS = 15000;
+
 export type RateLimitMetricInput = {
   tenantId?: string | null;
   scope: 'ip' | 'user' | 'tenant-user' | 'tenant' | 'api-key';
@@ -42,13 +44,21 @@ export class RateLimitMetricsService {
   private readonly maxQueryHours = this.readEnvNumber('RATE_LIMIT_METRICS_MAX_QUERY_HOURS', 168);
   private readonly blockAuditCooldownMs = this.readEnvNumber('RATE_LIMIT_BLOCK_AUDIT_COOLDOWN_MS', 30000);
   private readonly maxDedupEntries = this.readEnvNumber('RATE_LIMIT_BLOCK_AUDIT_DEDUP_MAX', 5000);
+  private readonly redisRetryCooldownMs = this.readEnvNumber(
+    'RATE_LIMIT_REDIS_RETRY_COOLDOWN_MS',
+    REDIS_RETRY_COOLDOWN_MS,
+  );
   private readonly redis?: Redis;
   private readonly memoryBuckets = new Map<string, MemoryBucket>();
   private readonly memoryAuditDedup = new Map<string, number>();
+  private redisRetryAvailableAt = 0;
+  private fallbackActive = false;
+  private lastFallbackLogAt = 0;
+  private lastFallbackDetail = '';
 
   constructor() {
     if (!this.redisEnabled) {
-      this.logger.warn('Rate limit metrics em Redis desativadas; usando armazenamento local em memória.');
+      this.logger.warn('Rate limit metrics em Redis desativadas; usando armazenamento local em memoria.');
       return;
     }
 
@@ -69,7 +79,14 @@ export class RateLimitMetricsService {
     });
 
     this.redis.on('error', (error) => {
-      this.logger.warn(`Falha no Redis de métricas de rate limit; fallback em memória ativo. detalhe=${error.message}`);
+      this.markRedisUnavailable(
+        'Falha no Redis de metricas de rate limit; fallback em memoria ativo.',
+        error.message,
+      );
+    });
+
+    this.redis.on('ready', () => {
+      this.markRedisRecovered();
     });
   }
 
@@ -80,10 +97,14 @@ export class RateLimitMetricsService {
     const path = this.normalizePath(input.path);
     const endpointMember = `${tenantId}|${path}`;
 
-    if (this.redis) {
+    if (this.redis && !this.shouldUseFallbackWithoutRetry()) {
       try {
-        if (this.redis.status === 'wait') {
+        if (this.shouldAttemptReconnect()) {
           await this.redis.connect();
+        }
+
+        if (this.redis.status !== 'ready') {
+          throw new Error(`Redis status ${this.redis.status}`);
         }
 
         const hashKey = `${this.redisPrefix}:metrics:h:${bucket}`;
@@ -112,10 +133,12 @@ export class RateLimitMetricsService {
         pipeline.expire(endpointsKey, ttlSeconds);
         pipeline.expire(blockedEndpointsKey, ttlSeconds);
         await pipeline.exec();
+        this.markRedisRecovered();
         return;
       } catch (error) {
-        this.logger.warn(
-          `Erro ao gravar métricas de rate limit no Redis; usando memória nesta requisição. detalhe=${error instanceof Error ? error.message : String(error)}`,
+        this.markRedisUnavailable(
+          'Erro ao gravar metricas de rate limit no Redis; usando memoria nesta janela.',
+          error instanceof Error ? error.message : String(error),
         );
       }
     }
@@ -135,10 +158,14 @@ export class RateLimitMetricsService {
     const endpointHits = new Map<string, number>();
     const endpointBlocked = new Map<string, number>();
 
-    if (this.redis) {
+    if (this.redis && !this.shouldUseFallbackWithoutRetry()) {
       try {
-        if (this.redis.status === 'wait') {
+        if (this.shouldAttemptReconnect()) {
           await this.redis.connect();
+        }
+
+        if (this.redis.status !== 'ready') {
+          throw new Error(`Redis status ${this.redis.status}`);
         }
 
         const multi = this.redis.multi();
@@ -166,9 +193,12 @@ export class RateLimitMetricsService {
             this.aggregateEndpointZset(rawBlockedEndpoints as string[], endpointBlocked, tenantFilter);
           }
         }
+
+        this.markRedisRecovered();
       } catch (error) {
-        this.logger.warn(
-          `Erro ao consultar métricas no Redis; usando agregação local em memória. detalhe=${error instanceof Error ? error.message : String(error)}`,
+        this.markRedisUnavailable(
+          'Erro ao consultar metricas no Redis; usando agregacao local em memoria nesta janela.',
+          error instanceof Error ? error.message : String(error),
         );
         this.aggregateFromMemory(buckets, totals, byTenant, byScope, endpointHits, endpointBlocked, tenantFilter);
       }
@@ -198,19 +228,25 @@ export class RateLimitMetricsService {
     const dedupToken = this.buildBlockedAuditDedupToken(input);
     const cooldownSeconds = Math.max(1, Math.ceil(this.blockAuditCooldownMs / 1000));
 
-    if (this.redis) {
+    if (this.redis && !this.shouldUseFallbackWithoutRetry()) {
       try {
-        if (this.redis.status === 'wait') {
+        if (this.shouldAttemptReconnect()) {
           await this.redis.connect();
+        }
+
+        if (this.redis.status !== 'ready') {
+          throw new Error(`Redis status ${this.redis.status}`);
         }
 
         const keyHash = this.hashIdentifier(dedupToken);
         const redisKey = `${this.redisPrefix}:audit:rl-block:dedup:${keyHash}`;
         const result = await this.redis.set(redisKey, '1', 'EX', cooldownSeconds, 'NX');
+        this.markRedisRecovered();
         return result === 'OK';
       } catch (error) {
-        this.logger.warn(
-          `Erro ao aplicar dedupe de auditoria de rate limit no Redis; usando memÃ³ria local. detalhe=${error instanceof Error ? error.message : String(error)}`,
+        this.markRedisUnavailable(
+          'Erro ao aplicar dedupe de auditoria de rate limit no Redis; usando memoria local nesta janela.',
+          error instanceof Error ? error.message : String(error),
         );
       }
     }
@@ -529,5 +565,44 @@ export class RateLimitMetricsService {
       return value;
     }
     return fallback;
+  }
+
+  private shouldUseFallbackWithoutRetry(): boolean {
+    return !!this.redis && this.redis.status !== 'ready' && Date.now() < this.redisRetryAvailableAt;
+  }
+
+  private shouldAttemptReconnect(): boolean {
+    return !!this.redis && ['wait', 'end', 'close'].includes(this.redis.status);
+  }
+
+  private markRedisUnavailable(prefix: string, detail: string): void {
+    const now = Date.now();
+    const shouldLog =
+      !this.fallbackActive ||
+      now - this.lastFallbackLogAt >= this.redisRetryCooldownMs ||
+      this.lastFallbackDetail !== detail;
+
+    this.redisRetryAvailableAt = now + this.redisRetryCooldownMs;
+    this.fallbackActive = true;
+
+    if (!shouldLog) {
+      return;
+    }
+
+    this.lastFallbackLogAt = now;
+    this.lastFallbackDetail = detail;
+    this.logger.warn(
+      `${prefix} novas tentativas em ${Math.ceil(this.redisRetryCooldownMs / 1000)}s. detalhe=${detail}`,
+    );
+  }
+
+  private markRedisRecovered(): void {
+    if (this.fallbackActive) {
+      this.logger.log('Redis de metricas de rate limit reconectado; persistencia distribuida reativada.');
+    }
+
+    this.fallbackActive = false;
+    this.redisRetryAvailableAt = 0;
+    this.lastFallbackDetail = '';
   }
 }

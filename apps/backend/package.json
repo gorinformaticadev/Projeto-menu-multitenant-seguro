@@ -14,7 +14,7 @@
     "test": "pnpm run prisma:generate:test && node .\\scripts\\run-jest-cleanly.js",
     "test:smoke": "jest --config ./test/jest-smoke.json --runInBand --passWithNoTests",
     "prisma:generate": "pnpm exec prisma generate",
-    "prisma:generate:test": "pnpm exec prisma generate --no-engine",
+    "prisma:generate:test": "node .\\scripts\\ensure-prisma-client.js",
     "prisma:migrate": "prisma migrate deploy",
     "seed:deploy": "node dist/prisma/seed.js deploy",
     "seed:force": "node dist/prisma/seed.js deploy --force",
