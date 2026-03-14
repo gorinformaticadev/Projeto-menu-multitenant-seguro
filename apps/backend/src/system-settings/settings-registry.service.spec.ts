@@ -19,6 +19,7 @@ describe('SettingsRegistry', () => {
       expect(typeof definition.defaultValue).toBe('boolean');
       expect(definition.label).toBeTruthy();
       expect(definition.description).toBeTruthy();
+      expect(Array.isArray(definition.operationalNotes ?? [])).toBe(true);
       expect(definition.category).toBeTruthy();
       expect(typeof definition.restartRequired).toBe('boolean');
       expect(typeof definition.sensitive).toBe('boolean');
@@ -35,6 +36,20 @@ describe('SettingsRegistry', () => {
   it('marca configuracoes sensiveis como nao editaveis nesta etapa', () => {
     expect(registry.isEditableInPanel('security.module_upload.enabled')).toBe(true);
     expect(registry.isEditableInPanel('security.headers.enabled')).toBe(false);
+  });
+
+  it('mantem security.rate_limit.enabled visivel e somente leitura, com notas operacionais explicitas', () => {
+    const definition = registry.getOrThrow('security.rate_limit.enabled');
+
+    expect(definition.allowedInPanel).toBe(true);
+    expect(definition.editableInPanel).toBe(false);
+    expect(definition.sensitive).toBe(false);
+    expect(definition.operationalNotes).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/15 segundos/i),
+        expect.stringMatching(/somente leitura/i),
+      ]),
+    );
   });
 
   it('ignora chaves fora da whitelist', () => {

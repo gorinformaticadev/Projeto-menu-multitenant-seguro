@@ -141,6 +141,7 @@ const buildSetting = (overrides: Partial<SecuritySettingItem>): SecuritySettingI
   key: "notifications.enabled",
   label: "Notificacoes do sistema",
   description: "Ativa ou desativa o envio de notificacoes do sistema.",
+  operationalNotes: [],
   category: "notifications",
   type: "boolean",
   allowedInPanel: true,
@@ -499,7 +500,17 @@ describe("/configuracoes/seguranca", () => {
   });
 
   it("mostra as informacoes somente quando o icone e clicado", async () => {
-    installDefaultGetHandlers([buildSetting({})]);
+    installDefaultGetHandlers([
+      buildSetting({
+        key: "security.module_upload.enabled",
+        label: "Upload de modulos",
+        description: "Permite instalar ou bloquear o upload de modulos no sistema.",
+        category: "security",
+        operationalNotes: [
+          "Em development, upload, uninstall e reload continuam liberados automaticamente independentemente deste toggle.",
+        ],
+      }),
+    ]);
 
     render(<SecuritySettingsPage />);
 
@@ -509,6 +520,9 @@ describe("/configuracoes/seguranca", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByText(/Ativa ou desativa o envio de notificacoes do sistema\./i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/upload, uninstall e reload continuam liberados automaticamente/i),
     ).not.toBeInTheDocument();
 
     const user = userEvent.setup();
@@ -526,10 +540,13 @@ describe("/configuracoes/seguranca", () => {
 
     await user.click(
       screen.getByRole("button", {
-        name: /Ajuda da configuracao dinamica Notificacoes do sistema/i,
+        name: /Ajuda da configuracao dinamica Upload de modulos/i,
       }),
     );
-    expect(await screen.findByText(/Ativa ou desativa o envio de notificacoes do sistema\./i)).toBeInTheDocument();
+    expect(await screen.findByText(/Permite instalar ou bloquear o upload de modulos no sistema\./i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/upload, uninstall e reload continuam liberados automaticamente independentemente deste toggle/i),
+    ).toBeInTheDocument();
   });
 
   it("deixa toggles desligados visiveis em vermelho na pagina", async () => {
@@ -556,6 +573,43 @@ describe("/configuracoes/seguranca", () => {
 
     expect(readonlyToggle).toHaveClass("data-[state=unchecked]:bg-destructive/80");
     expect(legacyUncheckedToggle).toHaveClass("data-[state=unchecked]:bg-destructive/80");
+  });
+
+  it("exibe security.rate_limit.enabled como somente leitura visivel, com observacao operacional", async () => {
+    installDefaultGetHandlers([
+      buildSetting({
+        key: "security.rate_limit.enabled",
+        label: "Rate limit global",
+        category: "security",
+        editableInPanel: false,
+        sensitive: false,
+        valueHidden: false,
+        resolvedValue: false,
+        operationalNotes: [
+          "Cada processo pode levar ate 15 segundos para refletir a mudanca por causa do snapshot local do guard.",
+        ],
+      }),
+    ]);
+
+    render(<SecuritySettingsPage />);
+
+    const readonlyToggle = await screen.findByRole("switch", {
+      name: /Rate limit global somente leitura/i,
+    });
+    expect(readonlyToggle).toBeInTheDocument();
+    expect(screen.getByText(/Sem override em banco/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Valor protegido/i)).not.toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", {
+        name: /Ajuda da configuracao dinamica Rate limit global/i,
+      }),
+    );
+
+    expect(
+      await screen.findByText(/Cada processo pode levar ate 15 segundos para refletir a mudanca/i),
+    ).toBeInTheDocument();
   });
 
   it("exige confirmacao explicita para chaves dinamicas marcadas com requiresConfirmation", async () => {

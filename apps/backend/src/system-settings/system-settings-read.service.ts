@@ -81,6 +81,7 @@ export class SystemSettingsReadService {
       key: definition.key,
       label: definition.label,
       description: definition.description,
+      operationalNotes: [...(definition.operationalNotes || [])],
       category: definition.category,
       type: definition.type,
       allowedInPanel: definition.allowedInPanel,

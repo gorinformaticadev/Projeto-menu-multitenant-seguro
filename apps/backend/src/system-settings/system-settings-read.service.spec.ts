@@ -9,6 +9,7 @@ describe('SystemSettingsReadService', () => {
     defaultValue: false,
     label: 'Upload de modulos',
     description: 'Permite instalar ou bloquear o upload de modulos no sistema.',
+    operationalNotes: [],
     category: 'security',
     envKey: 'ENABLE_MODULE_UPLOAD',
     restartRequired: false,
@@ -118,6 +119,7 @@ describe('SystemSettingsReadService', () => {
         label: 'Upload de modulos',
         category: 'security',
         type: 'boolean',
+        operationalNotes: [],
         allowedInPanel: true,
         editableInPanel: true,
         requiresConfirmation: true,
@@ -151,6 +153,44 @@ describe('SystemSettingsReadService', () => {
         editableInPanel: false,
         resolvedValue: null,
         resolvedSource: 'env',
+      }),
+    );
+  });
+
+  it('propaga notas operacionais e nao oculta valor de chave somente leitura nao sensivel', async () => {
+    const { resolverMock, prismaMock } = createService();
+    const registryMock = {
+      getAllowedInPanel: jest.fn(() => [
+        makeDefinition({
+          key: 'security.rate_limit.enabled',
+          label: 'Rate limit global',
+          description: 'Ativa ou desativa o rate limit global do backend.',
+          operationalNotes: ['Cada processo pode levar ate 15 segundos para refletir a mudanca.'],
+          sensitive: false,
+          editableInPanel: false,
+        }),
+      ]),
+    } as unknown as SettingsRegistry;
+
+    (resolverMock.getResolved as jest.Mock).mockResolvedValue({
+      key: 'security.rate_limit.enabled',
+      value: false,
+      source: 'env',
+    });
+    prismaMock.systemSetting.findMany.mockResolvedValue([]);
+    prismaMock.user.findMany.mockResolvedValue([]);
+
+    const service = new SystemSettingsReadService(registryMock, resolverMock, prismaMock as any);
+    const result = await service.listPanelSettings();
+
+    expect(result.data[0]).toEqual(
+      expect.objectContaining({
+        key: 'security.rate_limit.enabled',
+        editableInPanel: false,
+        sensitive: false,
+        valueHidden: false,
+        resolvedValue: false,
+        operationalNotes: ['Cada processo pode levar ate 15 segundos para refletir a mudanca.'],
       }),
     );
   });

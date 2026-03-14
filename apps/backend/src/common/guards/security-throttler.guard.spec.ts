@@ -21,6 +21,9 @@ describe('SecurityThrottlerGuard identity resolution', () => {
   const systemTelemetryService = {
     recordSecurityEvent: jest.fn(),
   };
+  const configResolver = {
+    getBoolean: jest.fn().mockResolvedValue(true),
+  };
 
   const createGuard = () =>
     new SecurityThrottlerGuard(
@@ -31,7 +34,19 @@ describe('SecurityThrottlerGuard identity resolution', () => {
       auditService as any,
       rateLimitMetricsService as any,
       systemTelemetryService as any,
+      configResolver as any,
     );
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    configResolver.getBoolean.mockResolvedValue(true);
+    securityConfigService.getRateLimitConfig.mockResolvedValue({
+      enabled: true,
+      requests: 100,
+      window: 1,
+      isProduction: false,
+    });
+  });
 
   it('uses tenant:user tracker when request is authenticated', () => {
     const guard = createGuard();
@@ -70,5 +85,12 @@ describe('SecurityThrottlerGuard identity resolution', () => {
 
     expect(limit).toBe(5000);
   });
-});
 
+  it('reads only the dynamic global rate limit toggle for enable/disable decisions', async () => {
+    const guard = createGuard();
+
+    await (guard as any).getRateLimitConfigCached();
+
+    expect(configResolver.getBoolean).toHaveBeenCalledWith('security.rate_limit.enabled');
+  });
+});

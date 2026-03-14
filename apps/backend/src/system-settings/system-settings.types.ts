@@ -14,6 +14,7 @@ export interface SettingDefinition<T = unknown> {
   defaultValue: T;
   label: string;
   description: string;
+  operationalNotes?: string[];
   category: string;
   envKey?: string;
   restartRequired: boolean;

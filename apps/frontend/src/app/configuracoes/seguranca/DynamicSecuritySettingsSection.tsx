@@ -125,6 +125,28 @@ function InfoButton({
   );
 }
 
+function SettingInfoContent({ item }: { item: SecuritySettingItem }) {
+  const notes = item.operationalNotes || [];
+
+  return (
+    <div className="space-y-3">
+      <p>{item.description}</p>
+      {notes.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-foreground/80">
+            Observacoes operacionais
+          </p>
+          <ul className="list-disc space-y-1 pl-4">
+            {notes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function buildOptimisticSetting(item: SecuritySettingItem, nextValue: boolean): SecuritySettingItem {
   return {
     ...item,
@@ -184,7 +206,7 @@ function SettingRow({
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-semibold text-foreground">{item.label}</h3>
             <InfoButton label={`Ajuda da configuracao dinamica ${item.label}`}>
-              <p>{item.description}</p>
+              <SettingInfoContent item={item} />
             </InfoButton>
 
             <Badge data-testid={`security-setting-origin-${item.key}`} variant={getOriginBadgeVariant(item.resolvedSource)}>

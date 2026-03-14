@@ -11,6 +11,7 @@ export interface SecuritySettingItem {
   key: string;
   label: string;
   description: string;
+  operationalNotes: string[];
   category: string;
   type: SecuritySettingValueType;
   allowedInPanel: boolean;

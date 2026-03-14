@@ -10,6 +10,7 @@ export class SystemSettingReadItemDto {
   key!: string;
   label!: string;
   description!: string;
+  operationalNotes!: string[];
   category!: string;
   type!: SettingValueType;
   allowedInPanel!: boolean;

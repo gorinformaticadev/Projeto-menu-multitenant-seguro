@@ -14,6 +14,7 @@ import { SecurityConfigService } from '@core/security-config/security-config.ser
 import { AuditService } from '../../audit/audit.service';
 import { RateLimitMetricsService } from '../services/rate-limit-metrics.service';
 import { SystemTelemetryService } from '@common/services/system-telemetry.service';
+import { ConfigResolverService } from '../../system-settings/config-resolver.service';
 
 type ThrottleScope = 'ip' | 'user' | 'tenant-user' | 'tenant' | 'api-key';
 
@@ -26,8 +27,8 @@ type ThrottleIdentity = {
 
 type RateLimitConfigSnapshot = {
   enabled: boolean;
-  requests: number;
-  window: number;
+  requests?: number;
+  window?: number;
   isProduction: boolean;
 };
 
@@ -64,6 +65,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     private readonly auditService: AuditService,
     private readonly rateLimitMetricsService: RateLimitMetricsService,
     private readonly systemTelemetryService: SystemTelemetryService,
+    private readonly configResolver: ConfigResolverService,
   ) {
     super(options, storageService, reflector);
   }
@@ -92,8 +94,10 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
 
     // Apply adaptive panel config only when route does not define custom @Throttle.
     if (!hasExplicitRouteConfig && throttler?.name === 'default') {
-      if (rateLimitConfig?.enabled === true) {
+      if (rateLimitConfig.requests !== undefined) {
         limit = this.toPositiveNumber(rateLimitConfig.requests, limit);
+      }
+      if (rateLimitConfig.window !== undefined) {
         ttl = this.toPositiveNumber(rateLimitConfig.window, 1) * 60000;
       }
 
@@ -476,27 +480,47 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     return fallback;
   }
 
-  private async getRateLimitConfigCached(): Promise<RateLimitConfigSnapshot | null> {
+  private async getRateLimitConfigCached(): Promise<RateLimitConfigSnapshot> {
     const now = Date.now();
 
     if (this.cachedRateLimitConfig && now < this.rateLimitConfigExpiresAt) {
       return this.cachedRateLimitConfig;
     }
 
+    const enabled = await this.isGlobalRateLimitEnabled();
+
     try {
       const config = await this.securityConfigService.getRateLimitConfig();
-      this.cachedRateLimitConfig = config;
+      this.cachedRateLimitConfig = {
+        enabled,
+        requests: this.readPositiveNumber(config?.requests),
+        window: this.readPositiveNumber(config?.window),
+        isProduction: config?.isProduction === true,
+      };
       this.rateLimitConfigExpiresAt = now + this.configCacheTtlMs;
-      return config;
+      return this.cachedRateLimitConfig;
     } catch (error) {
-      this.cachedRateLimitConfig = null;
+      this.cachedRateLimitConfig = {
+        enabled,
+        isProduction: process.env.NODE_ENV === 'production',
+      };
       this.rateLimitConfigExpiresAt = now + this.configCacheTtlMs;
       this.logger.warn(
         `Falha ao carregar config de rate limit do banco; usando limites do modulo. detalhe=${error instanceof Error ? error.message : String(error)}`,
       );
-      return null;
+      return this.cachedRateLimitConfig;
     }
   }
-}
 
+  private async isGlobalRateLimitEnabled(): Promise<boolean> {
+    return (await this.configResolver.getBoolean('security.rate_limit.enabled')) !== false;
+  }
+
+  private readPositiveNumber(value: unknown): number | undefined {
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+      return value;
+    }
+    return undefined;
+  }
+}
 
