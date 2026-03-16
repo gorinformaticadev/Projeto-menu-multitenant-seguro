@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException, Inject, Logger, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TwoFactorService } from './two-factor.service';
@@ -30,6 +31,8 @@ type GeneratedTokens = {
   accessTokenExpiresAt: string | null;
   refreshTokenExpiresAt: string;
 };
+
+type RefreshTokenWriter = PrismaService | Prisma.TransactionClient;
 
 @Injectable()
 export class AuthService {
@@ -250,7 +253,10 @@ export class AuthService {
     };
   }
 
-  async generateTokens(input: TokenGenerationInput): Promise<GeneratedTokens> {
+  async generateTokens(
+    input: TokenGenerationInput,
+    refreshTokenWriter: RefreshTokenWriter = this.prisma,
+  ): Promise<GeneratedTokens> {
     const session =
       input.sessionId
         ? { id: input.sessionId }
@@ -287,7 +293,7 @@ export class AuthService {
     const expiresAt = this.calculateExpirationDate(refreshTokenExpiresIn);
     const accessTokenExpiresAt = this.extractJwtExpiry(accessToken);
 
-    await this.prisma.refreshToken.create({
+    await refreshTokenWriter.refreshToken.create({
       data: {
         token: refreshToken,
         userId: input.userId,
@@ -309,62 +315,83 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token invalido');
     }
 
-    const storedToken = await this.prisma.refreshToken.findUnique({
-      where: { token: refreshToken },
-      include: { user: { include: { tenant: true } }, session: true },
-    });
-
-    if (!storedToken) {
-      throw new UnauthorizedException('Refresh token invalido');
-    }
-
-    if (storedToken.expiresAt < new Date()) {
-      await this.prisma.refreshToken.delete({
-        where: { id: storedToken.id },
+    const refreshResult = await this.prisma.$transaction(async (tx) => {
+      const now = new Date();
+      const storedToken = await tx.refreshToken.findUnique({
+        where: { token: refreshToken },
+        include: { user: { include: { tenant: true } }, session: true },
       });
-      throw new UnauthorizedException('Refresh token expirado');
-    }
 
-    if (!storedToken.sessionId) {
-      await this.prisma.refreshToken.delete({
-        where: { id: storedToken.id },
+      if (!storedToken) {
+        throw new UnauthorizedException('Refresh token invalido');
+      }
+
+      if (storedToken.expiresAt < now) {
+        await tx.refreshToken.deleteMany({
+          where: { id: storedToken.id },
+        });
+        throw new UnauthorizedException('Refresh token expirado');
+      }
+
+      if (!storedToken.sessionId) {
+        await tx.refreshToken.deleteMany({
+          where: { id: storedToken.id },
+        });
+        throw new UnauthorizedException('Sessao legada expirada; faca login novamente');
+      }
+
+      await this.userSessionService.assertRefreshSessionActive(
+        storedToken.sessionId,
+        storedToken.user.id,
+      );
+
+      const consumed = await tx.refreshToken.deleteMany({
+        where: {
+          id: storedToken.id,
+          token: refreshToken,
+          expiresAt: {
+            gte: now,
+          },
+        },
       });
-      throw new UnauthorizedException('Sessao legada expirada; faca login novamente');
-    }
 
-    await this.userSessionService.assertRefreshSessionActive(
-      storedToken.sessionId,
-      storedToken.user.id,
-    );
+      if (consumed.count !== 1) {
+        throw new UnauthorizedException('Refresh token invalido ou ja utilizado');
+      }
 
-    const tokens = await this.generateTokens({
-      userId: storedToken.user.id,
-      email: storedToken.user.email,
-      role: storedToken.user.role,
-      tenantId: storedToken.user.tenantId,
-      sessionVersion: this.readSessionVersion(storedToken.user),
-      sessionId: storedToken.sessionId,
-    });
+      const tokens = await this.generateTokens(
+        {
+          userId: storedToken.user.id,
+          email: storedToken.user.email,
+          role: storedToken.user.role,
+          tenantId: storedToken.user.tenantId,
+          sessionVersion: this.readSessionVersion(storedToken.user),
+          sessionId: storedToken.sessionId,
+        },
+        tx,
+      );
 
-    await this.prisma.refreshToken.delete({
-      where: { id: storedToken.id },
+      return {
+        storedToken,
+        tokens,
+      };
     });
 
     await this.auditService.log({
       action: 'TOKEN_REFRESHED',
-      userId: storedToken.user.id,
-      tenantId: storedToken.user.tenantId,
+      userId: refreshResult.storedToken.user.id,
+      tenantId: refreshResult.storedToken.user.tenantId,
       ipAddress,
       userAgent,
-      details: { email: storedToken.user.email },
+      details: { email: refreshResult.storedToken.user.email },
     });
 
     return {
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      accessTokenExpiresAt: tokens.accessTokenExpiresAt,
-      refreshTokenExpiresAt: tokens.refreshTokenExpiresAt,
-      user: this.toUserResponse(storedToken.user),
+      accessToken: refreshResult.tokens.accessToken,
+      refreshToken: refreshResult.tokens.refreshToken,
+      accessTokenExpiresAt: refreshResult.tokens.accessTokenExpiresAt,
+      refreshTokenExpiresAt: refreshResult.tokens.refreshTokenExpiresAt,
+      user: this.toUserResponse(refreshResult.storedToken.user),
     };
   }
 

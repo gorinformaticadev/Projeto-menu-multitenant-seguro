@@ -12,7 +12,9 @@ describe('AuthService security runtime enforcement', () => {
       create: jest.fn(),
       findUnique: jest.fn(),
       delete: jest.fn(),
+      deleteMany: jest.fn(),
     },
+    $transaction: jest.fn(),
   };
 
   const jwtServiceMock = {
@@ -82,6 +84,12 @@ describe('AuthService security runtime enforcement', () => {
     });
     auditServiceMock.log.mockResolvedValue(undefined);
     prismaMock.refreshToken.create.mockResolvedValue(undefined);
+    prismaMock.refreshToken.deleteMany.mockResolvedValue({ count: 1 });
+    prismaMock.$transaction.mockImplementation(async (callback: (tx: any) => Promise<unknown>) =>
+      callback({
+        refreshToken: prismaMock.refreshToken,
+      }),
+    );
     jwtServiceMock.sign.mockReturnValue('jwt-token');
     jwtServiceMock.decode.mockReturnValue({
       exp: Math.floor(Date.now() / 1000) + 900,
@@ -212,9 +220,54 @@ describe('AuthService security runtime enforcement', () => {
       new UnauthorizedException('Sessao legada expirada; faca login novamente'),
     );
 
-    expect(prismaMock.refreshToken.delete).toHaveBeenCalledWith({
+    expect(prismaMock.refreshToken.deleteMany).toHaveBeenCalledWith({
       where: { id: 'refresh-1' },
     });
     expect(userSessionServiceMock.assertRefreshSessionActive).not.toHaveBeenCalled();
+  });
+
+  it('consumes the refresh token atomically and blocks concurrent refresh reuse', async () => {
+    const service = createService();
+    tokenBlacklistServiceMock.isTokenBlacklisted.mockResolvedValue(false);
+
+    const storedToken = {
+      id: 'refresh-atomic',
+      token: 'refresh-atomic-token',
+      sessionId: 'session-1',
+      expiresAt: new Date(Date.now() + 120_000),
+      user: {
+        id: 'user-1',
+        email: 'user@example.com',
+        role: 'ADMIN',
+        tenantId: 'tenant-1',
+        tenant: null,
+        sessionVersion: 3,
+      },
+      session: {
+        id: 'session-1',
+      },
+    };
+
+    prismaMock.refreshToken.findUnique.mockResolvedValue(storedToken);
+    prismaMock.refreshToken.deleteMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+    prismaMock.refreshToken.create.mockResolvedValue(undefined);
+
+    const results = await Promise.allSettled([
+      service.refreshTokens('refresh-atomic-token'),
+      service.refreshTokens('refresh-atomic-token'),
+    ]);
+
+    const fulfilled = results.filter((result) => result.status === 'fulfilled');
+    const rejected = results.filter((result) => result.status === 'rejected');
+
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect(prismaMock.refreshToken.create).toHaveBeenCalledTimes(1);
+    expect(userSessionServiceMock.assertRefreshSessionActive).toHaveBeenCalledWith(
+      'session-1',
+      'user-1',
+    );
   });
 });

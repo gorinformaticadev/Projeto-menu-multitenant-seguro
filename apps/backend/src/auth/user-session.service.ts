@@ -7,6 +7,10 @@ type SessionContext = {
   userAgent?: string;
 };
 
+type SessionPolicySnapshot = {
+  timeoutMinutes: number;
+};
+
 @Injectable()
 export class UserSessionService {
   private readonly logger = new Logger(UserSessionService.name);
@@ -22,6 +26,7 @@ export class UserSessionService {
     context: SessionContext = {},
   ) {
     const now = new Date();
+    const policy = await this.getSessionPolicy();
 
     return this.prisma.userSession.create({
       data: {
@@ -29,6 +34,7 @@ export class UserSessionService {
         tenantId,
         lastActivityAt: now,
         lastAuthenticatedAt: now,
+        expiresAt: this.calculateSessionExpiresAt(now, policy.timeoutMinutes),
         lastIpAddress: context.ipAddress || null,
         lastUserAgent: context.userAgent || null,
       },
@@ -41,12 +47,13 @@ export class UserSessionService {
     context: SessionContext = {},
   ) {
     const session = await this.getSessionOrThrow(sessionId, userId);
-    const timeoutMinutes = await this.getTimeoutMinutes();
+    const policy = await this.getSessionPolicy();
+    const now = new Date();
 
-    if (this.isInactive(session.lastActivityAt, timeoutMinutes)) {
+    if (this.isSessionExpired(session, policy.timeoutMinutes, now)) {
       await this.revokeSession(session.id, 'inactive_timeout');
       this.logger.warn(
-        `session_inactive_expired sessionId=${session.id} userId=${userId} timeoutMinutes=${timeoutMinutes}`,
+        `session_inactive_expired sessionId=${session.id} userId=${userId} timeoutMinutes=${policy.timeoutMinutes}`,
       );
       throw new UnauthorizedException('Sessao expirada por inatividade');
     }
@@ -54,7 +61,8 @@ export class UserSessionService {
     await this.prisma.userSession.update({
       where: { id: session.id },
       data: {
-        lastActivityAt: new Date(),
+        lastActivityAt: now,
+        expiresAt: this.calculateSessionExpiresAt(now, policy.timeoutMinutes),
         lastIpAddress: context.ipAddress || session.lastIpAddress,
         lastUserAgent: context.userAgent || session.lastUserAgent,
       },
@@ -65,12 +73,13 @@ export class UserSessionService {
 
   async assertRefreshSessionActive(sessionId: string, userId: string) {
     const session = await this.getSessionOrThrow(sessionId, userId);
-    const timeoutMinutes = await this.getTimeoutMinutes();
+    const policy = await this.getSessionPolicy();
+    const now = new Date();
 
-    if (this.isInactive(session.lastActivityAt, timeoutMinutes)) {
+    if (this.isSessionExpired(session, policy.timeoutMinutes, now)) {
       await this.revokeSession(session.id, 'inactive_timeout');
       this.logger.warn(
-        `session_inactive_expired_on_refresh sessionId=${session.id} userId=${userId} timeoutMinutes=${timeoutMinutes}`,
+        `session_inactive_expired_on_refresh sessionId=${session.id} userId=${userId} timeoutMinutes=${policy.timeoutMinutes}`,
       );
       throw new UnauthorizedException('Sessao expirada por inatividade');
     }
@@ -155,13 +164,39 @@ export class UserSessionService {
     return session;
   }
 
-  private async getTimeoutMinutes() {
-    const policy = await this.securityRuntimeConfigService.getSessionPolicy();
-    return policy.timeoutMinutes;
+  async cleanupExpiredSessions() {
+    const result = await this.prisma.userSession.deleteMany({
+      where: {
+        expiresAt: {
+          lt: new Date(),
+        },
+      },
+    });
+
+    return result.count;
   }
 
-  private isInactive(lastActivityAt: Date, timeoutMinutes: number) {
-    const inactiveSince = Date.now() - lastActivityAt.getTime();
+  private async getSessionPolicy(): Promise<SessionPolicySnapshot> {
+    const policy = await this.securityRuntimeConfigService.getSessionPolicy();
+    return {
+      timeoutMinutes: policy.timeoutMinutes,
+    };
+  }
+
+  private isSessionExpired(
+    session: { lastActivityAt: Date; expiresAt: Date },
+    timeoutMinutes: number,
+    now: Date,
+  ) {
+    if (session.expiresAt.getTime() <= now.getTime()) {
+      return true;
+    }
+
+    const inactiveSince = now.getTime() - session.lastActivityAt.getTime();
     return inactiveSince > timeoutMinutes * 60_000;
+  }
+
+  private calculateSessionExpiresAt(reference: Date, timeoutMinutes: number): Date {
+    return new Date(reference.getTime() + timeoutMinutes * 60_000);
   }
 }

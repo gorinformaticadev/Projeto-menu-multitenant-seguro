@@ -9,6 +9,7 @@ describe('UserSessionService inactivity enforcement', () => {
       update: jest.fn(),
       updateMany: jest.fn(),
       findMany: jest.fn(),
+      deleteMany: jest.fn(),
     },
     refreshToken: {
       deleteMany: jest.fn(),
@@ -33,6 +34,7 @@ describe('UserSessionService inactivity enforcement', () => {
     prismaMock.$transaction.mockImplementation(async (operations: unknown[]) => operations);
     prismaMock.userSession.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.refreshToken.deleteMany.mockResolvedValue({ count: 1 });
+    prismaMock.userSession.deleteMany.mockResolvedValue({ count: 0 });
     prismaMock.userSession.update.mockResolvedValue(undefined);
   });
 
@@ -42,6 +44,7 @@ describe('UserSessionService inactivity enforcement', () => {
       id: 'session-1',
       userId: 'user-1',
       lastActivityAt: new Date(Date.now() - 5 * 60_000),
+      expiresAt: new Date(Date.now() + 25 * 60_000),
       revokedAt: null,
       lastIpAddress: null,
       lastUserAgent: null,
@@ -64,6 +67,7 @@ describe('UserSessionService inactivity enforcement', () => {
         data: expect.objectContaining({
           lastIpAddress: '10.0.0.10',
           lastUserAgent: 'jest',
+          expiresAt: expect.any(Date),
         }),
       }),
     );
@@ -75,6 +79,7 @@ describe('UserSessionService inactivity enforcement', () => {
       id: 'session-2',
       userId: 'user-1',
       lastActivityAt: new Date(Date.now() - 31 * 60_000),
+      expiresAt: new Date(Date.now() - 1_000),
       revokedAt: null,
     });
 
@@ -96,6 +101,7 @@ describe('UserSessionService inactivity enforcement', () => {
       id: 'session-3',
       userId: 'user-1',
       lastActivityAt: new Date(Date.now() - 31 * 60_000),
+      expiresAt: new Date(Date.now() - 1_000),
       revokedAt: null,
     });
 
@@ -104,5 +110,35 @@ describe('UserSessionService inactivity enforcement', () => {
     );
 
     expect(prismaMock.userSession.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects revoked sessions from the ledger immediately', async () => {
+    const service = createService();
+    prismaMock.userSession.findUnique.mockResolvedValue({
+      id: 'session-4',
+      userId: 'user-1',
+      lastActivityAt: new Date(),
+      expiresAt: new Date(Date.now() + 60_000),
+      revokedAt: new Date(),
+    });
+
+    await expect(service.assertAccessSessionActive('session-4', 'user-1')).rejects.toThrow(
+      new UnauthorizedException('Sessao expirada ou revogada'),
+    );
+    expect(prismaMock.userSession.update).not.toHaveBeenCalled();
+  });
+
+  it('purges expired session rows through cleanup', async () => {
+    const service = createService();
+    prismaMock.userSession.deleteMany.mockResolvedValue({ count: 3 });
+
+    await expect(service.cleanupExpiredSessions()).resolves.toBe(3);
+    expect(prismaMock.userSession.deleteMany).toHaveBeenCalledWith({
+      where: {
+        expiresAt: {
+          lt: expect.any(Date),
+        },
+      },
+    });
   });
 });

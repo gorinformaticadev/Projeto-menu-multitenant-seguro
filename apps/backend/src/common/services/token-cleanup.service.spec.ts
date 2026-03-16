@@ -8,6 +8,9 @@ describe('TokenCleanupService', () => {
       deleteMany: jest.fn(),
       count: jest.fn(),
     },
+    userSession: {
+      deleteMany: jest.fn(),
+    },
     $queryRaw: jest.fn(),
     $executeRaw: jest.fn(),
   };
@@ -26,9 +29,10 @@ describe('TokenCleanupService', () => {
     jest.clearAllMocks();
     cronServiceMock.register.mockResolvedValue(undefined);
     prismaMock.refreshToken.deleteMany.mockResolvedValue({ count: 0 });
+    prismaMock.userSession.deleteMany.mockResolvedValue({ count: 0 });
   });
 
-  it('registers the token cleanup job in the dynamic cron runtime', async () => {
+  it('registers token and session cleanup jobs in the dynamic cron runtime', async () => {
     const service = createService();
 
     await service.onModuleInit();
@@ -39,6 +43,16 @@ describe('TokenCleanupService', () => {
       expect.any(Function),
       expect.objectContaining({
         name: 'Token cleanup',
+        origin: 'core',
+        settingsUrl: '/configuracoes/sistema/cron',
+      }),
+    );
+    expect(cronServiceMock.register).toHaveBeenCalledWith(
+      'system.session_cleanup',
+      expect.any(String),
+      expect.any(Function),
+      expect.objectContaining({
+        name: 'Session cleanup',
         origin: 'core',
         settingsUrl: '/configuracoes/sistema/cron',
       }),

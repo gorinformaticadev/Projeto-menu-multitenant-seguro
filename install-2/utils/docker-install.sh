@@ -227,7 +227,8 @@ run_docker_vps_install() {
     local image_tag="${IMAGE_TAG:-latest}"
     local local_build_only="false"
     local admin_email="${INSTALL_ADMIN_EMAIL:-$email}"
-    local admin_pass="${INSTALL_ADMIN_PASSWORD:-123456}"
+    local admin_pass="${INSTALL_ADMIN_PASSWORD:-}"
+    [[ -z "$admin_pass" ]] && admin_pass="Admin@$(openssl rand -hex 6)"
     local no_prompt="${INSTALL_NO_PROMPT:-false}"
     local clean_install="${CLEAN_INSTALL:-false}"
 
@@ -243,9 +244,6 @@ run_docker_vps_install() {
         image_repo="${image_repo:-projeto-menu-multitenant-seguro}"
         [[ -z "$image_tag" ]] && image_tag="latest"
         [[ -z "$admin_email" ]] && admin_email="$email"
-        read -sp "Senha inicial do admin [123456]: " admin_pass
-        echo
-        admin_pass="${admin_pass:-123456}"
     fi
 
     if [[ -z "$image_owner" && "$local_build_only" != "true" ]]; then

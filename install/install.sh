@@ -69,7 +69,7 @@ Opções para install:
   -t, --image-tag TAG       Tag da imagem (default: latest).
   -l, --local-build-only    Ignora pull de imagens e faz build local no servidor.
   -a, --admin-email EMAIL   Email do administrador (default: mesmo de -e).
-  -p, --admin-pass SENHA    Senha inicial do admin (default: 123456).
+  -p, --admin-pass SENHA    Senha inicial do admin (default: Admin@1234).
   -n, --no-prompt           Não perguntar; usa apenas variáveis de ambiente.
   -c, --clean               Remove volumes existentes antes de instalar (instalação limpa).
 
@@ -543,7 +543,7 @@ native_show_report() {
     echo "URL: https://${domain}"
     echo "API: https://${domain}/api"
     echo "Admin email: ${admin_email}"
-    echo "Admin senha: [redacted]"
+    echo "Admin senha: ${admin_pass}"
     echo "Database: ${db_name}"
     echo "DB user: ${db_user}"
     echo "DB pass: [redacted]"
@@ -948,7 +948,8 @@ run_install() {
     local image_tag="${IMAGE_TAG:-latest}"
     local local_build_only="${LOCAL_BUILD_ONLY:-false}"
     local admin_email="${INSTALL_ADMIN_EMAIL:-$email}"
-    local admin_pass="${INSTALL_ADMIN_PASSWORD:-123456}"
+    local admin_pass="${INSTALL_ADMIN_PASSWORD:-}"
+    [[ -z "$admin_pass" ]] && admin_pass="Admin@$(openssl rand -hex 6)"
     local no_prompt="${INSTALL_NO_PROMPT:-false}"
     local clean_install="${CLEAN_INSTALL:-false}"
 
@@ -1028,9 +1029,6 @@ run_install() {
             [[ -z "$image_tag" ]] && image_tag="latest"
         fi
         [[ -z "$admin_email" ]] && admin_email="$email"
-        read -sp "Senha inicial do admin [123456]: " admin_pass
-        echo
-        admin_pass="${admin_pass:-123456}"
     fi
 
     if [[ "$install_mode" == "docker" && -z "$image_owner" && "$local_build_only" != "true" ]]; then
@@ -1246,7 +1244,7 @@ run_install() {
 
     echo -e "\033[1;32m👤 CREDENCIAIS DO ADMINISTRADOR:\033[0m"
     echo -e "   Email:          $admin_email"
-    echo -e "   Senha:          [redacted]"
+    echo -e "   Senha:          $admin_pass"
     echo -e "   Nível:          SUPER_ADMIN"
     echo -e "\n"
 

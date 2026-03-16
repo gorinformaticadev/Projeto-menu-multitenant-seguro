@@ -1,4 +1,5 @@
 import { Reflector } from '@nestjs/core';
+import { JwtService } from '@nestjs/jwt';
 import { SecurityThrottlerGuard } from './security-throttler.guard';
 import {
   CRITICAL_RATE_LIMIT_KEY,
@@ -71,6 +72,7 @@ const createHttpContext = (
     method?: string;
     user?: Record<string, any>;
     criticalAction?: CriticalRateLimitAction;
+    authorization?: string;
   },
 ) => {
   const req: Record<string, any> = {
@@ -82,6 +84,7 @@ const createHttpContext = (
     user: options?.user,
     headers: {
       'user-agent': 'jest',
+      ...(options?.authorization ? { authorization: options.authorization } : {}),
     },
   };
 
@@ -159,6 +162,10 @@ describe('SecurityThrottlerGuard runtime enforcement', () => {
   const systemTelemetryService = {
     recordSecurityEvent: jest.fn(),
   };
+  const configService = {
+    get: jest.fn(),
+  };
+  const jwtSigner = new JwtService({ secret: 'jwt-secret' });
 
   const createGuard = (storage: any = createTestStorage()) =>
     new SecurityThrottlerGuard(
@@ -169,10 +176,12 @@ describe('SecurityThrottlerGuard runtime enforcement', () => {
       auditService as any,
       rateLimitMetricsService as any,
       systemTelemetryService as any,
+      configService as any,
     );
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    configService.get.mockImplementation((key: string) => (key === 'JWT_SECRET' ? 'jwt-secret' : undefined));
     securityRuntimeConfigService.getGlobalRateLimitPolicy.mockResolvedValue({
       source: 'security_config',
       enabled: true,
@@ -314,5 +323,40 @@ describe('SecurityThrottlerGuard runtime enforcement', () => {
         code: 'RATE_LIMIT_STORAGE_UNAVAILABLE',
       }),
     });
+  });
+
+  it('uses a bearer payload only after signature verification', async () => {
+    const guard = createGuard();
+    const signedToken = jwtSigner.sign({
+      sub: 'user-verified',
+      tenantId: 'tenant-verified',
+      apiKeyId: null,
+    });
+
+    const context = createHttpContext('/api/orders', {
+      ip: '10.0.0.50',
+      authorization: `Bearer ${signedToken}`,
+    });
+
+    const identity = (guard as any).resolveThrottleIdentity(context.req);
+    expect(identity.scope).toBe('tenant-user');
+    expect(identity.tracker).toBe('tenant:tenant-verified:user:user-verified');
+  });
+
+  it('falls back to ip when bearer payload is not signed with the configured secret', async () => {
+    const guard = createGuard();
+    const forgedToken = new JwtService({ secret: 'wrong-secret' }).sign({
+      sub: 'forged-user',
+      tenantId: 'forged-tenant',
+    });
+
+    const context = createHttpContext('/api/orders', {
+      ip: '10.0.0.51',
+      authorization: `Bearer ${forgedToken}`,
+    });
+
+    const identity = (guard as any).resolveThrottleIdentity(context.req);
+    expect(identity.scope).toBe('ip');
+    expect(identity.tracker).toBe('ip:10.0.0.51');
   });
 });

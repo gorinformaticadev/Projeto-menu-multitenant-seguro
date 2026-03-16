@@ -6,7 +6,9 @@ import { PrismaService } from '@core/prisma/prisma.service';
 @Injectable()
 export class TokenCleanupService implements OnModuleInit {
   private readonly logger = new Logger(TokenCleanupService.name);
-  private readonly lockId = Number(process.env.TOKEN_CLEANUP_LOCK_ID || 98542173);
+  private static readonly EVERY_15_MINUTES = '0 */15 * * * *';
+  private readonly tokenCleanupLockId = Number(process.env.TOKEN_CLEANUP_LOCK_ID || 98542173);
+  private readonly sessionCleanupLockId = Number(process.env.SESSION_CLEANUP_LOCK_ID || 98542174);
   private readonly advisoryLockEnabled =
     String(process.env.TOKEN_CLEANUP_USE_ADVISORY_LOCK || 'true').toLowerCase() !== 'false';
 
@@ -30,10 +32,25 @@ export class TokenCleanupService implements OnModuleInit {
         editable: true,
       },
     );
+
+    await this.cronService.register(
+      'system.session_cleanup',
+      TokenCleanupService.EVERY_15_MINUTES,
+      async () => {
+        await this.cleanupExpiredSessions();
+      },
+      {
+        name: 'Session cleanup',
+        description: 'Remove sessoes expiradas do ledger para manter o runtime stateful consistente.',
+        settingsUrl: '/configuracoes/sistema/cron',
+        origin: 'core',
+        editable: true,
+      },
+    );
   }
 
   async cleanupExpiredTokens(): Promise<void> {
-    const lockAcquired = await this.tryAcquireAdvisoryLock();
+    const lockAcquired = await this.tryAcquireAdvisoryLock(this.tokenCleanupLockId);
     if (!lockAcquired) {
       this.logger.log('Token cleanup skipped: lock is held by another instance.');
       return;
@@ -51,7 +68,32 @@ export class TokenCleanupService implements OnModuleInit {
     } catch (error) {
       this.logger.error('Error during expired token cleanup.', error as Error);
     } finally {
-      await this.releaseAdvisoryLock();
+      await this.releaseAdvisoryLock(this.tokenCleanupLockId);
+    }
+  }
+
+  async cleanupExpiredSessions(): Promise<void> {
+    const lockAcquired = await this.tryAcquireAdvisoryLock(this.sessionCleanupLockId);
+    if (!lockAcquired) {
+      this.logger.log('Session cleanup skipped: lock is held by another instance.');
+      return;
+    }
+
+    this.logger.log('Starting cleanup of expired user sessions...');
+    try {
+      const result = await this.prisma.userSession.deleteMany({
+        where: {
+          expiresAt: {
+            lt: new Date(),
+          },
+        },
+      });
+      const removedCount = result.count;
+      this.logger.log(`Session cleanup completed: ${removedCount} rows removed.`);
+    } catch (error) {
+      this.logger.error('Error during expired session cleanup.', error as Error);
+    } finally {
+      await this.releaseAdvisoryLock(this.sessionCleanupLockId);
     }
   }
 
@@ -113,14 +155,14 @@ export class TokenCleanupService implements OnModuleInit {
     };
   }
 
-  private async tryAcquireAdvisoryLock(): Promise<boolean> {
+  private async tryAcquireAdvisoryLock(lockId: number): Promise<boolean> {
     if (!this.advisoryLockEnabled) {
       return true;
     }
 
     try {
       const result = await this.prisma.$queryRaw<Array<{ acquired: boolean }>>`
-        SELECT pg_try_advisory_lock(${this.lockId}) AS acquired
+        SELECT pg_try_advisory_lock(${lockId}) AS acquired
       `;
       return result?.[0]?.acquired === true;
     } catch (error) {
@@ -129,13 +171,13 @@ export class TokenCleanupService implements OnModuleInit {
     }
   }
 
-  private async releaseAdvisoryLock(): Promise<void> {
+  private async releaseAdvisoryLock(lockId: number): Promise<void> {
     if (!this.advisoryLockEnabled) {
       return;
     }
 
     try {
-      await this.prisma.$executeRaw`SELECT pg_advisory_unlock(${this.lockId})`;
+      await this.prisma.$executeRaw`SELECT pg_advisory_unlock(${lockId})`;
     } catch (error) {
       this.logger.warn(`Failed to release token cleanup advisory lock: ${String(error)}`);
     }

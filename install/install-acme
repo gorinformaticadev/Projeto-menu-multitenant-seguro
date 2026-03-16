@@ -294,7 +294,7 @@ setup_env_file() {
     jwt_secret="$(openssl rand -hex 32)"
     encryption_key="$(openssl rand -hex 32)"
     db_pass="$(openssl rand -hex 16)"
-    admin_pass="$(openssl rand -hex 12)"
+    admin_pass="Admin@$(openssl rand -hex 6)"
     local dockerhub_username="${DOCKERHUB_USERNAME:-local}"
 
     upsert_env_var() {

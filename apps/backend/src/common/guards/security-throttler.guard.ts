@@ -5,6 +5,8 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import {
   InjectThrottlerOptions,
   InjectThrottlerStorage,
@@ -41,6 +43,14 @@ type PrincipalIdentity = {
   apiKeyId: string | null;
 };
 
+type VerifiedJwtPayload = {
+  sub?: unknown;
+  tenantId?: unknown;
+  apiKeyId?: unknown;
+  exp?: unknown;
+  [key: string]: unknown;
+};
+
 type RateLimitExecution = {
   kind: 'global' | 'critical' | 'route';
   category?: CriticalRateLimitAction;
@@ -64,6 +74,9 @@ type RateLimitTelemetry = {
 @Injectable()
 export class SecurityThrottlerGuard extends ThrottlerGuard {
   private readonly logger = new Logger(SecurityThrottlerGuard.name);
+  private readonly jwtVerifier: JwtService | null;
+  private readonly jwtSecret: string | null;
+  private hasLoggedMissingJwtSecret = false;
 
   constructor(
     @InjectThrottlerOptions() options: ThrottlerModuleOptions,
@@ -73,8 +86,13 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     private readonly auditService: AuditService,
     private readonly rateLimitMetricsService: RateLimitMetricsService,
     private readonly systemTelemetryService: SystemTelemetryService,
+    private readonly configService: ConfigService,
   ) {
     super(options, storageService, reflector);
+    const rawSecret = this.configService.get<string>('JWT_SECRET');
+    const normalizedSecret = this.normalizeOpaqueString(rawSecret);
+    this.jwtSecret = normalizedSecret;
+    this.jwtVerifier = normalizedSecret ? new JwtService({ secret: normalizedSecret }) : null;
   }
 
   protected async handleRequest(requestProps: ThrottlerRequest): Promise<boolean> {
@@ -431,7 +449,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
       return fromRequest;
     }
 
-    const payload = this.decodeJwtPayload(token);
+    const payload = this.verifyJwtPayload(token);
     if (payload) {
       const userId = this.normalizeText(payload.sub);
       const tenantId = this.normalizeText(payload.tenantId);
@@ -477,6 +495,37 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
       return typeof payload === 'object' && payload !== null
         ? (payload as Record<string, unknown>)
         : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private verifyJwtPayload(token: string): VerifiedJwtPayload | null {
+    const decodedPayload = this.decodeJwtPayload(token);
+    if (!decodedPayload) {
+      return null;
+    }
+
+    const exp = decodedPayload.exp;
+    if (typeof exp === 'number' && Number.isFinite(exp) && exp * 1000 <= Date.now()) {
+      return null;
+    }
+
+    if (!this.jwtVerifier || !this.jwtSecret) {
+      if (!this.hasLoggedMissingJwtSecret) {
+        this.logger.warn(
+          'JWT_SECRET ausente para validacao de identidade no throttler; guard usara fallback por IP para tokens sem principal autenticado.',
+        );
+        this.hasLoggedMissingJwtSecret = true;
+      }
+      return null;
+    }
+
+    try {
+      const payload = this.jwtVerifier.verify<VerifiedJwtPayload>(token, {
+        secret: this.jwtSecret,
+      });
+      return payload && typeof payload === 'object' ? payload : null;
     } catch {
       return null;
     }
@@ -551,6 +600,15 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     }
 
     const normalized = String(value).trim().toLowerCase();
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  private normalizeOpaqueString(value: unknown): string | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    const normalized = String(value).trim();
     return normalized.length > 0 ? normalized : null;
   }
 

@@ -125,6 +125,7 @@ model UserSession {
   userId              String
   tenantId            String?
   lastActivityAt      DateTime       @default(now())
+  expiresAt           DateTime
   lastAuthenticatedAt DateTime       @default(now())
   lastIpAddress       String?
   lastUserAgent       String?
@@ -136,6 +137,7 @@ model UserSession {
   refreshTokens       RefreshToken[]
 
   @@index([userId])
+  @@index([expiresAt])
   @@index([tenantId])
   @@index([revokedAt])
   @@index([lastActivityAt])

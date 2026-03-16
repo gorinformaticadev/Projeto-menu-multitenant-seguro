@@ -44,11 +44,10 @@ run_native_vps_dev() {
 
     if [[ "$INSTALL_NO_PROMPT" != "true" ]]; then
         [[ -z "$admin_email" ]] && admin_email="$email"
-        read -sp "Senha inicial do admin [123456]: " admin_pass
-        echo
-        admin_pass="${admin_pass:-123456}"
-    else
-        admin_pass="${admin_pass:-123456}"
+    fi
+
+    if [[ -z "$admin_pass" ]]; then
+        admin_pass="Admin@$(openssl rand -hex 6)"
     fi
 
     # --- Gerar credenciais ---
