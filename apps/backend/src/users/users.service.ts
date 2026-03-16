@@ -253,6 +253,26 @@ export class UsersService {
     return { message: 'Usuario desbloqueado com sucesso' };
   }
 
+  async lockUser(userId: string, actor: UserScopeActor) {
+    const user = (await this.findOne(userId, actor)) as unknown as ScopedUser;
+    this.assertActorCanManageTarget(actor, user);
+    this.auditCrossTenantAction('lock_user', actor, user.id, user.tenantId);
+
+    if (user.isLocked) {
+      throw new BadRequestException('Usuario ja esta bloqueado');
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        isLocked: true,
+        lockedAt: new Date(),
+      },
+    });
+
+    return { message: 'Usuario bloqueado com sucesso' };
+  }
+
   async updateProfile(userId: string, updateProfileDto: { name: string; email: string }) {
     const { name, email } = updateProfileDto;
 

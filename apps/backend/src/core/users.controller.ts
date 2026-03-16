@@ -117,4 +117,16 @@ export class UsersController {
     return this.usersService.unlockUser(id);
   }
 
+  /**
+   * POST /users/:id/lock
+   * Bloquear usuário
+   * Apenas SUPER_ADMIN e ADMIN
+   */
+  @Post(':id/lock')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @SkipTenantIsolation()
+  lockUser(@Param('id') id: string) {
+    return this.usersService.lockUser(id);
+  }
+
 }

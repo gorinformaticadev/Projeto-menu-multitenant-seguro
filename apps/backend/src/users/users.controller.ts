@@ -192,6 +192,12 @@ export class UsersController {
     return this.usersService.unlockUser(id, currentUser);
   }
 
+  @Post(':id/lock')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  lockUser(@Param('id') id: string, @CurrentUser() currentUser: AuthenticatedUser) {
+    return this.usersService.lockUser(id, currentUser);
+  }
+
   @Public()
   @Get('public/:id/avatar-file')
   async getPublicAvatarFile(@Param('id') id: string, @Res() res: Response) {

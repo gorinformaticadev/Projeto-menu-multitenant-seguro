@@ -248,6 +248,33 @@ export class UsersService {
   }
 
   /**
+   * Bloquear usuário manualmente
+   */
+  async lockUser(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    if (user.isLocked) {
+      throw new BadRequestException('Usuário já está bloqueado');
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        isLocked: true,
+        lockedAt: new Date(),
+      },
+    });
+
+    return { message: 'Usuário bloqueado com sucesso' };
+  }
+
+  /**
    * Atualizar perfil do próprio usuário
    */
   async updateProfile(userId: string, updateProfileDto: { name: string; email: string }) {

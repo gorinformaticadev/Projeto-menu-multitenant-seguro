@@ -284,6 +284,22 @@ function UsuariosContent() {
     }
   }
 
+  async function handleLock(id: string, userName: string) {
+    if (!confirm(`Tem certeza que deseja bloquear o usuário ${userName}?`)) return;
+
+    try {
+      await api.post(`/users/${id}/lock`);
+      toast({ title: "Usuário bloqueado com sucesso!" });
+      loadUsers();
+    } catch (error: unknown) {
+      toast({
+        title: "Erro ao bloquear",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro",
+        variant: "destructive",
+      });
+    }
+  }
+
   function openEditDialog(user: UserData) {
     setEditingUser(user);
     setFormData({
@@ -477,10 +493,21 @@ function UsuariosContent() {
                             variant="default"
                             size="sm"
                             onClick={() => handleUnlock(user.id, user.name)}
-                            className="bg-green-600 hover:bg-green-700"
+                            className="bg-green-600 hover:bg-green-700 text-white"
                           >
                             <Unlock className="h-4 w-4 mr-1" />
                             Desbloquear
+                          </Button>
+                        )}
+                        {!user.isLocked && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleLock(user.id, user.name)}
+                            className="bg-orange-500 hover:bg-orange-600 text-white"
+                          >
+                            <Lock className="h-4 w-4 mr-1" />
+                            Bloquear
                           </Button>
                         )}
                         <Button variant="outline" size="sm" onClick={() => openEditDialog(user)}>
