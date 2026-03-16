@@ -1,6 +1,7 @@
 import { seedRegistry } from '../../prisma/seeds/registry';
 import { resolveAdminPassword } from '../../prisma/seeds/defaults';
 import { defaultUsersSeed } from '../../prisma/seeds/modules/default-users.seed';
+import * as bcrypt from 'bcrypt';
 
 describe('default users seed hardening', () => {
   const originalInstallAdminPassword = process.env.INSTALL_ADMIN_PASSWORD;
@@ -80,5 +81,51 @@ describe('default users seed hardening', () => {
       /viola a politica ativa/i,
     );
     expect(tx.user.create).not.toHaveBeenCalled();
+  });
+
+  it('remediates legacy weak default password hashes even without force', async () => {
+    process.env.INSTALL_ADMIN_PASSWORD = 'SenhaForte#2026Aa';
+
+    const weakHash = await bcrypt.hash('admin123', 4);
+    const tx = {
+      tenant: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'tenant-1',
+          email: 'empresa1@example.com',
+        }),
+      },
+      securityConfig: {
+        findFirst: jest.fn().mockResolvedValue({
+          passwordMinLength: 8,
+          passwordRequireUppercase: true,
+          passwordRequireLowercase: true,
+          passwordRequireNumbers: true,
+          passwordRequireSpecial: true,
+        }),
+      },
+      user: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValueOnce({ id: 'legacy-super-admin', password: weakHash })
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(null),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+    };
+
+    const summary = await defaultUsersSeed.run({ tx: tx as any, force: false } as any);
+
+    expect(tx.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'legacy-super-admin' },
+        data: expect.objectContaining({
+          isLocked: false,
+          loginAttempts: 0,
+        }),
+      }),
+    );
+    expect(summary.updated).toBeGreaterThan(0);
+    expect(summary.notes.join(' ')).toMatch(/senha fraca legada corrigida/i);
   });
 });

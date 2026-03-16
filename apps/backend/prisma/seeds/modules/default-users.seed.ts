@@ -11,6 +11,7 @@ import { SeedModuleDefinition, SeedSummary } from '../types';
 import { validatePasswordAgainstPolicy } from '../../../src/common/utils/password-policy.util';
 
 const BCRYPT_ROUNDS = 12;
+const LEGACY_WEAK_DEFAULT_PASSWORDS = ['admin123'];
 
 export const defaultUsersSeed: SeedModuleDefinition = {
   key: 'default-users',
@@ -160,7 +161,7 @@ async function ensureUser(
 ): Promise<void> {
   const existing = await tx.user.findUnique({
     where: { email: input.email },
-    select: { id: true },
+    select: { id: true, password: true },
   });
 
   if (!existing) {
@@ -177,7 +178,9 @@ async function ensureUser(
     return;
   }
 
-  if (!force) {
+  const shouldRemediateWeakPassword = await hasLegacyWeakDefaultPassword(existing.password);
+
+  if (!force && !shouldRemediateWeakPassword) {
     summary.skipped += 1;
     return;
   }
@@ -195,4 +198,20 @@ async function ensureUser(
     },
   });
   summary.updated += 1;
+
+  if (shouldRemediateWeakPassword) {
+    summary.notes.push(
+      `Senha fraca legada corrigida automaticamente para ${input.email}.`,
+    );
+  }
+}
+
+async function hasLegacyWeakDefaultPassword(passwordHash: string): Promise<boolean> {
+  for (const weakPassword of LEGACY_WEAK_DEFAULT_PASSWORDS) {
+    if (await bcrypt.compare(weakPassword, passwordHash)) {
+      return true;
+    }
+  }
+
+  return false;
 }
