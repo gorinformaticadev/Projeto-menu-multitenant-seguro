@@ -28,6 +28,7 @@ import { BackupService } from './backup.service';
 import { BackupInternalGuard } from './guards/backup-internal.guard';
 import { LegacyBackupDeprecationInterceptor } from './interceptors/legacy-backup-deprecation.interceptor';
 import { extractRequestContext } from '../common/interceptors/request-context.interceptor';
+import { CriticalRateLimit } from '../common/decorators/critical-rate-limit.decorator';
 
 const MAX_UPLOAD_SIZE = Number(process.env.BACKUP_MAX_SIZE || 2 * 1024 * 1024 * 1024);
 
@@ -39,6 +40,7 @@ export class BackupsController {
   constructor(private readonly backupService: BackupService) {}
 
   @Post()
+  @CriticalRateLimit('backup')
   async createBackupJob(@Request() req) {
     const userId = req.user?.id || req.user?.sub;
     const job = await this.backupService.createBackupJob(userId, {
@@ -94,6 +96,7 @@ export class BackupsController {
   }
 
   @Post(':id/restore')
+  @CriticalRateLimit('restore')
   async restoreExistingBackup(@Param('id') artifactId: string, @Body() dto: RestoreJobDto, @Request() req) {
     const userId = req.user?.id || req.user?.sub;
     const job = await this.backupService.queueRestoreFromArtifact(
@@ -117,6 +120,7 @@ export class BackupsController {
   }
 
   @Post('restore-from-upload/:uploadId')
+  @CriticalRateLimit('restore')
   async restoreFromUpload(@Param('uploadId') uploadId: string, @Body() dto: RestoreJobDto, @Request() req) {
     const userId = req.user?.id || req.user?.sub;
     const job = await this.backupService.queueRestoreFromUpload(
@@ -191,6 +195,7 @@ export class BackupLegacyController {
   constructor(private readonly backupService: BackupService) {}
 
   @Post('create')
+  @CriticalRateLimit('backup')
   async create(@Request() req) {
     const userId = req.user?.id || req.user?.sub;
     const job = await this.backupService.createBackupJob(userId, {
@@ -246,6 +251,7 @@ export class BackupLegacyController {
   }
 
   @Post('restore')
+  @CriticalRateLimit('restore')
   async restore(@Body() body: { backupFile: string } & RestoreJobDto, @Request() req) {
     const userId = req.user?.id || req.user?.sub;
     const artifact = await this.backupService.findArtifactByFileName(body.backupFile);
@@ -316,6 +322,7 @@ export class BackupInternalController {
   constructor(private readonly backupService: BackupService) {}
 
   @Post('restore-by-file')
+  @CriticalRateLimit('restore')
   async restoreByFile(
     @Body(
       new ValidationPipe({

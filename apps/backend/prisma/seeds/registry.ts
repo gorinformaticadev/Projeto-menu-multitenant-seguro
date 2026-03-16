@@ -5,6 +5,6 @@ import { SeedModuleDefinition } from './types';
 
 export const seedRegistry: SeedModuleDefinition[] = [
   initialTenantsSeed,
-  defaultUsersSeed,
   systemConfigSeed,
+  defaultUsersSeed,
 ];

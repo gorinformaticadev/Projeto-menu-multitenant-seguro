@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Inject, Logger, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@core/prisma/prisma.service';
@@ -11,6 +11,7 @@ import * as crypto from 'crypto';
 import type { StringValue } from 'ms';
 import { LoginDto } from './dto/login.dto';
 import { Login2FADto } from './dto/login-2fa.dto';
+import { UserSessionService } from './user-session.service';
 
 type TokenGenerationInput = {
   userId: string;
@@ -18,6 +19,9 @@ type TokenGenerationInput = {
   role: string;
   tenantId: string | null;
   sessionVersion: number;
+  sessionId?: string;
+  ipAddress?: string;
+  userAgent?: string;
 };
 
 type GeneratedTokens = {
@@ -29,6 +33,8 @@ type GeneratedTokens = {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -39,6 +45,7 @@ export class AuthService {
     private twoFactorService: TwoFactorService,
     private tokenBlacklistService: TokenBlacklistService,
     private securityConfigService: SecurityConfigService,
+    private userSessionService: UserSessionService,
   ) {}
 
   async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string) {
@@ -124,6 +131,10 @@ export class AuthService {
           userAgent,
           details: { email, attempts: newAttempts, lockedUntil, maxAttempts, lockDurationMinutes },
         });
+
+        this.logger.warn(
+          `login_lockout userId=${user.id} tenantId=${user.tenantId || 'global'} attempts=${newAttempts} lockDurationMinutes=${lockDurationMinutes}`,
+        );
 
         throw new UnauthorizedException(
           `Conta bloqueada por multiplas tentativas de login. Tente novamente em ${lockDurationMinutes} minutos ou contate um administrador.`,
@@ -217,6 +228,8 @@ export class AuthService {
       role: user.role,
       tenantId: user.tenantId,
       sessionVersion: this.readSessionVersion(user),
+      ipAddress,
+      userAgent,
     });
 
     await this.auditService.log({
@@ -238,12 +251,21 @@ export class AuthService {
   }
 
   async generateTokens(input: TokenGenerationInput): Promise<GeneratedTokens> {
+    const session =
+      input.sessionId
+        ? { id: input.sessionId }
+        : await this.userSessionService.createSession(input.userId, input.tenantId, {
+            ipAddress: input.ipAddress,
+            userAgent: input.userAgent,
+          });
+
     const payload = {
       sub: input.userId,
       email: input.email,
       role: input.role,
       tenantId: input.tenantId,
       sessionVersion: input.sessionVersion,
+      sid: session.id,
       jti: crypto.randomUUID(),
     };
 
@@ -269,6 +291,7 @@ export class AuthService {
       data: {
         token: refreshToken,
         userId: input.userId,
+        sessionId: session.id,
         expiresAt,
       },
     });
@@ -288,7 +311,7 @@ export class AuthService {
 
     const storedToken = await this.prisma.refreshToken.findUnique({
       where: { token: refreshToken },
-      include: { user: { include: { tenant: true } } },
+      include: { user: { include: { tenant: true } }, session: true },
     });
 
     if (!storedToken) {
@@ -302,12 +325,25 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token expirado');
     }
 
+    if (!storedToken.sessionId) {
+      await this.prisma.refreshToken.delete({
+        where: { id: storedToken.id },
+      });
+      throw new UnauthorizedException('Sessao legada expirada; faca login novamente');
+    }
+
+    await this.userSessionService.assertRefreshSessionActive(
+      storedToken.sessionId,
+      storedToken.user.id,
+    );
+
     const tokens = await this.generateTokens({
       userId: storedToken.user.id,
       email: storedToken.user.email,
       role: storedToken.user.role,
       tenantId: storedToken.user.tenantId,
       sessionVersion: this.readSessionVersion(storedToken.user),
+      sessionId: storedToken.sessionId,
     });
 
     await this.prisma.refreshToken.delete({
@@ -343,11 +379,18 @@ export class AuthService {
       where: { token: refreshToken },
     });
 
+    let sessionId = this.resolveSessionIdFromAccessToken(accessToken);
+
     if (storedToken && storedToken.userId === userId) {
       await this.tokenBlacklistService.blacklistToken(refreshToken, storedToken.expiresAt, userId);
+      sessionId = storedToken.sessionId || sessionId;
       await this.prisma.refreshToken.delete({
         where: { id: storedToken.id },
       });
+    }
+
+    if (sessionId) {
+      await this.userSessionService.revokeSession(sessionId, 'logout');
     }
 
     await this.blacklistAccessToken(accessToken, userId);
@@ -488,6 +531,8 @@ export class AuthService {
       role: user.role,
       tenantId: user.tenantId,
       sessionVersion: this.readSessionVersion(user),
+      ipAddress,
+      userAgent,
     });
 
     await this.auditService.log({
@@ -544,6 +589,20 @@ export class AuthService {
     }
 
     await this.tokenBlacklistService.blacklistToken(accessToken, expiry, userId);
+  }
+
+  private resolveSessionIdFromAccessToken(accessToken: string | undefined): string | null {
+    if (!accessToken) {
+      return null;
+    }
+
+    const decoded = this.jwtService.decode(accessToken);
+    if (!decoded || typeof decoded !== 'object') {
+      return null;
+    }
+
+    const sessionId = (decoded as { sid?: unknown }).sid;
+    return typeof sessionId === 'string' && sessionId.trim().length > 0 ? sessionId : null;
   }
 
   private toUserResponse(user: {

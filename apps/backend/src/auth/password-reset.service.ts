@@ -6,6 +6,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { validatePasswordAgainstPolicy } from '../common/utils/password-policy.util';
+import { UserSessionService } from './user-session.service';
 
 @Injectable()
 export class PasswordResetService {
@@ -17,6 +18,7 @@ export class PasswordResetService {
     private jwtService: JwtService,
     private config: ConfigService,
     private securityConfigService: SecurityConfigService,
+    private userSessionService: UserSessionService,
   ) {}
 
   /**
@@ -185,10 +187,12 @@ export class PasswordResetService {
           },
           data: { usedAt: new Date() },
         }),
-        this.prisma.refreshToken.deleteMany({
-          where: { userId: resetTokenRecord.userId },
-        }),
       ]);
+
+      await this.userSessionService.revokeAllUserSessions(
+        resetTokenRecord.userId,
+        'password_reset',
+      );
 
       this.logger.log(`Senha redefinida com sucesso para usuário: ${resetTokenRecord.user.email}`);
 

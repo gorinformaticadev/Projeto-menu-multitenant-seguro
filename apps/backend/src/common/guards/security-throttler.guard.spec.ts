@@ -1,97 +1,261 @@
 import { Reflector } from '@nestjs/core';
 import { ThrottlerStorageService } from '@nestjs/throttler';
 import { SecurityThrottlerGuard } from './security-throttler.guard';
+import {
+  CRITICAL_RATE_LIMIT_KEY,
+  CriticalRateLimitAction,
+} from '../decorators/critical-rate-limit.decorator';
+import { SharedThrottlerStorageUnavailableError } from '../services/redis-throttler.storage';
 
-describe('SecurityThrottlerGuard identity resolution', () => {
-  const options = [{ name: 'default', ttl: 60000, limit: 100 }] as any;
-  const securityConfigService = {
-    getRateLimitConfig: jest.fn().mockResolvedValue({
-      enabled: true,
-      requests: 100,
-      window: 1,
-      isProduction: false,
+const createHttpContext = (
+  path: string,
+  options?: {
+    ip?: string;
+    method?: string;
+    user?: Record<string, any>;
+    criticalAction?: CriticalRateLimitAction;
+  },
+) => {
+  const req: Record<string, any> = {
+    originalUrl: path,
+    url: path,
+    path,
+    method: options?.method ?? 'GET',
+    ip: options?.ip ?? '10.0.0.10',
+    user: options?.user,
+    headers: {
+      'user-agent': 'jest',
+    },
+  };
+
+  const resHeaders: Record<string, string | number> = {};
+  const res = {
+    header: jest.fn((name: string, value: string | number) => {
+      resHeaders[name] = value;
+      return res;
     }),
   };
+
+  const handler = function throttledHandler() {
+    return undefined;
+  };
+  const classRef = class TestController {};
+
+  if (options?.criticalAction) {
+    Reflect.defineMetadata(CRITICAL_RATE_LIMIT_KEY, options.criticalAction, handler);
+  }
+
+  const context = {
+    switchToHttp: () => ({
+      getRequest: () => req,
+      getResponse: () => res,
+    }),
+    getClass: () => classRef,
+    getHandler: () => handler,
+  };
+
+  return { context, req, res, resHeaders };
+};
+
+const createRequestProps = (
+  context: any,
+  options?: {
+    limit?: number;
+    ttl?: number;
+    moduleLimit?: number;
+    moduleTtl?: number;
+  },
+) => {
+  const ttl = options?.ttl ?? 60000;
+  const limit = options?.limit ?? 300;
+  const moduleLimit = options?.moduleLimit ?? 300;
+  const moduleTtl = options?.moduleTtl ?? 60000;
+
+  return {
+    context,
+    limit,
+    ttl,
+    blockDuration: ttl,
+    throttler: {
+      name: 'default',
+      limit: moduleLimit,
+      ttl: moduleTtl,
+    },
+    getTracker: async (req: Record<string, any>) => `ip:${req.ip}`,
+    generateKey: (_context: any, tracker: string, name: string) => `${name}:${tracker}`,
+  };
+};
+
+describe('SecurityThrottlerGuard runtime enforcement', () => {
+  const options = [{ name: 'default', ttl: 60000, limit: 300 }] as any;
+  const securityRuntimeConfigService = {
+    getGlobalRateLimitPolicy: jest.fn(),
+    getCriticalRateLimitPolicy: jest.fn(),
+  };
   const auditService = {
-    log: jest.fn(),
+    log: jest.fn().mockResolvedValue(undefined),
   };
   const rateLimitMetricsService = {
-    record: jest.fn(),
+    record: jest.fn().mockResolvedValue(undefined),
+    shouldEmitBlockedAudit: jest.fn().mockResolvedValue(true),
   };
   const systemTelemetryService = {
     recordSecurityEvent: jest.fn(),
   };
-  const configResolver = {
-    getBoolean: jest.fn().mockResolvedValue(true),
-  };
 
-  const createGuard = () =>
+  const createGuard = (storage: any = new ThrottlerStorageService()) =>
     new SecurityThrottlerGuard(
       options,
-      new ThrottlerStorageService(),
+      storage,
       new Reflector(),
-      securityConfigService as any,
+      securityRuntimeConfigService as any,
       auditService as any,
       rateLimitMetricsService as any,
       systemTelemetryService as any,
-      configResolver as any,
     );
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
-    configResolver.getBoolean.mockResolvedValue(true);
-    securityConfigService.getRateLimitConfig.mockResolvedValue({
+    securityRuntimeConfigService.getGlobalRateLimitPolicy.mockResolvedValue({
+      source: 'security_config',
       enabled: true,
-      requests: 100,
-      window: 1,
-      isProduction: false,
+      requests: 2,
+      windowMinutes: 1,
+      environment: 'test',
+    });
+    securityRuntimeConfigService.getCriticalRateLimitPolicy.mockResolvedValue({
+      source: 'security_config',
+      windowMinutes: 60,
+      backupPerHour: 1,
+      restorePerHour: 1,
+      updatePerHour: 1,
     });
   });
 
-  it('uses tenant:user tracker when request is authenticated', () => {
+  it('applies the configured global limit across different routes for the same identity', async () => {
     const guard = createGuard();
-    const identity = (guard as any).resolveThrottleIdentity({
-      originalUrl: '/api/users',
-      ip: '10.0.0.10',
-      user: { id: 'user-1', tenantId: 'tenant-1' },
+    await guard.onModuleInit();
+
+    const first = createHttpContext('/api/orders', { ip: '10.0.0.20' });
+    const second = createHttpContext('/api/profile', { ip: '10.0.0.20' });
+    const third = createHttpContext('/api/dashboard', { ip: '10.0.0.20' });
+
+    await expect((guard as any).handleRequest(createRequestProps(first.context))).resolves.toBe(true);
+    await expect((guard as any).handleRequest(createRequestProps(second.context))).resolves.toBe(true);
+    await expect((guard as any).handleRequest(createRequestProps(third.context))).rejects.toMatchObject({
+      response: expect.objectContaining({
+        statusCode: 429,
+        policy: 'global',
+      }),
+    });
+  });
+
+  it('picks up a changed global policy immediately without restart', async () => {
+    const guard = createGuard();
+    await guard.onModuleInit();
+
+    const firstIdentity = createHttpContext('/api/orders', { ip: '10.0.0.30' });
+    await expect((guard as any).handleRequest(createRequestProps(firstIdentity.context))).resolves.toBe(
+      true,
+    );
+    await expect((guard as any).handleRequest(createRequestProps(firstIdentity.context))).resolves.toBe(
+      true,
+    );
+
+    securityRuntimeConfigService.getGlobalRateLimitPolicy.mockResolvedValue({
+      source: 'security_config',
+      enabled: true,
+      requests: 1,
+      windowMinutes: 1,
+      environment: 'test',
     });
 
-    expect(identity.scope).toBe('tenant-user');
-    expect(identity.tracker).toBe('tenant:tenant-1:user:user-1');
+    const secondIdentity = createHttpContext('/api/orders', { ip: '10.0.0.31' });
+    await expect((guard as any).handleRequest(createRequestProps(secondIdentity.context))).resolves.toBe(
+      true,
+    );
+    await expect((guard as any).handleRequest(createRequestProps(secondIdentity.context))).rejects.toMatchObject({
+      response: expect.objectContaining({
+        statusCode: 429,
+        policy: 'global',
+      }),
+    });
   });
 
-  it('uses IP+target tracker for login routes to reduce shared-IP false positives', () => {
+  it('shares the same critical backup quota across equivalent routes', async () => {
     const guard = createGuard();
-    const identity = (guard as any).resolveThrottleIdentity({
-      originalUrl: '/api/auth/login',
-      ip: '10.0.0.20',
-      body: { email: 'admin@example.com' },
+    await guard.onModuleInit();
+
+    const user = {
+      id: 'user-1',
+      tenantId: 'tenant-1',
+    };
+    const first = createHttpContext('/api/backups', {
+      method: 'POST',
+      user,
+      criticalAction: 'backup',
+    });
+    const second = createHttpContext('/api/backup/create', {
+      method: 'POST',
+      user,
+      criticalAction: 'backup',
     });
 
-    expect(identity.scope).toBe('ip');
-    expect(identity.tracker.startsWith('ip:10.0.0.20:target:')).toBe(true);
+    await expect((guard as any).handleRequest(createRequestProps(first.context))).resolves.toBe(true);
+    await expect((guard as any).handleRequest(createRequestProps(second.context))).rejects.toMatchObject({
+      response: expect.objectContaining({
+        statusCode: 429,
+        policy: 'critical',
+        category: 'backup',
+      }),
+    });
   });
 
-  it('caps sensitive operational mutations even for authenticated admins', () => {
+  it('shares the same critical update quota across update controllers', async () => {
     const guard = createGuard();
-    const limit = (guard as any).applyScopePolicy(1000, 'tenant-user', '/api/system/update/run', 'POST');
+    await guard.onModuleInit();
 
-    expect(limit).toBe(30);
+    const user = {
+      id: 'user-1',
+      tenantId: 'tenant-1',
+    };
+    const first = createHttpContext('/api/update/execute', {
+      method: 'POST',
+      user,
+      criticalAction: 'update',
+    });
+    const second = createHttpContext('/api/system/update/run', {
+      method: 'POST',
+      user,
+      criticalAction: 'update',
+    });
+
+    await expect((guard as any).handleRequest(createRequestProps(first.context))).resolves.toBe(true);
+    await expect((guard as any).handleRequest(createRequestProps(second.context))).rejects.toMatchObject({
+      response: expect.objectContaining({
+        statusCode: 429,
+        policy: 'critical',
+        category: 'update',
+      }),
+    });
   });
 
-  it('keeps high-volume integration paths tolerant for authenticated tenants', () => {
-    const guard = createGuard();
-    const limit = (guard as any).applyScopePolicy(300, 'tenant-user', '/api/whatsapp/messages/send', 'POST');
+  it('returns an explicit 503 when distributed rate limit storage is unavailable in strict mode', async () => {
+    const storage = {
+      increment: jest.fn(async () => {
+        throw new SharedThrottlerStorageUnavailableError('redis offline');
+      }),
+    };
+    const guard = createGuard(storage);
+    await guard.onModuleInit();
 
-    expect(limit).toBe(5000);
-  });
+    const context = createHttpContext('/api/orders', { ip: '10.0.0.40' });
 
-  it('reads the dynamic base and advanced rate limit toggles for runtime decisions', async () => {
-    const guard = createGuard();
-
-    await (guard as any).getRateLimitConfigCached();
-
-    expect(configResolver.getBoolean).toHaveBeenCalledWith('security.rate_limit.enabled');
-    expect(configResolver.getBoolean).toHaveBeenCalledWith('security.rate_limit.advanced.enabled');
+    await expect((guard as any).handleRequest(createRequestProps(context.context))).rejects.toMatchObject({
+      response: expect.objectContaining({
+        statusCode: 503,
+        code: 'RATE_LIMIT_STORAGE_UNAVAILABLE',
+      }),
+    });
   });
 });

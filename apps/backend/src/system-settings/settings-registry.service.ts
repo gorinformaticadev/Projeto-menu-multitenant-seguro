@@ -115,7 +115,7 @@ export const SETTINGS_REGISTRY_DEFINITIONS = {
     restartRequired: false,
     sensitive: false,
     requiresConfirmation: false,
-    allowedInPanel: true,
+    allowedInPanel: false,
     editableInPanel: false,
   }),
   'security.rate_limit.advanced.enabled': booleanSetting({
@@ -135,7 +135,7 @@ export const SETTINGS_REGISTRY_DEFINITIONS = {
     restartRequired: false,
     sensitive: false,
     requiresConfirmation: false,
-    allowedInPanel: true,
+    allowedInPanel: false,
     editableInPanel: false,
   }),
   'security.file_signature_validation.enabled': booleanSetting({

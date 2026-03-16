@@ -43,6 +43,12 @@ describe('AuthService security runtime enforcement', () => {
     getJwtConfig: jest.fn(),
   };
 
+  const userSessionServiceMock = {
+    createSession: jest.fn(),
+    assertRefreshSessionActive: jest.fn(),
+    revokeSession: jest.fn(),
+  };
+
   const createService = () =>
     new AuthService(
       prismaMock as any,
@@ -52,6 +58,7 @@ describe('AuthService security runtime enforcement', () => {
       twoFactorServiceMock as any,
       tokenBlacklistServiceMock as any,
       securityConfigServiceMock as any,
+      userSessionServiceMock as any,
     );
 
   beforeEach(() => {
@@ -78,7 +85,13 @@ describe('AuthService security runtime enforcement', () => {
     jwtServiceMock.sign.mockReturnValue('jwt-token');
     jwtServiceMock.decode.mockReturnValue({
       exp: Math.floor(Date.now() / 1000) + 900,
+      sid: 'session-1',
     });
+    userSessionServiceMock.createSession.mockResolvedValue({
+      id: 'session-1',
+    });
+    userSessionServiceMock.assertRefreshSessionActive.mockResolvedValue(undefined);
+    userSessionServiceMock.revokeSession.mockResolvedValue(undefined);
   });
 
   it('blocks the normal login flow when the user already has 2FA enabled', async () => {
@@ -116,7 +129,9 @@ describe('AuthService security runtime enforcement', () => {
         '127.0.0.1',
         'jest',
       ),
-    ).rejects.toThrow(new UnauthorizedException('2FA necessario para concluir o login. Informe o codigo de autenticacao.'));
+    ).rejects.toThrow(
+      new UnauthorizedException('2FA necessario para concluir o login. Informe o codigo de autenticacao.'),
+    );
 
     expect(auditServiceMock.log).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -127,7 +142,7 @@ describe('AuthService security runtime enforcement', () => {
     expect(prismaMock.refreshToken.create).not.toHaveBeenCalled();
   });
 
-  it('uses the persisted token policy instead of env fallbacks when issuing tokens', async () => {
+  it('uses the persisted token policy and binds tokens to a backend session', async () => {
     const service = createService();
     securityConfigServiceMock.getJwtConfig.mockResolvedValue({
       accessTokenExpiresIn: '42m',
@@ -136,6 +151,7 @@ describe('AuthService security runtime enforcement', () => {
     });
     jwtServiceMock.decode.mockReturnValue({
       exp: 1_900_000_000,
+      sid: 'session-1',
     });
 
     const result = await service.generateTokens({
@@ -144,12 +160,19 @@ describe('AuthService security runtime enforcement', () => {
       role: 'ADMIN',
       tenantId: 'tenant-1',
       sessionVersion: 3,
+      ipAddress: '10.0.0.1',
+      userAgent: 'jest',
     });
 
+    expect(userSessionServiceMock.createSession).toHaveBeenCalledWith('user-1', 'tenant-1', {
+      ipAddress: '10.0.0.1',
+      userAgent: 'jest',
+    });
     expect(jwtServiceMock.sign).toHaveBeenCalledWith(
       expect.objectContaining({
         sub: 'user-1',
         sessionVersion: 3,
+        sid: 'session-1',
       }),
       expect.objectContaining({
         expiresIn: '42m',
@@ -160,9 +183,38 @@ describe('AuthService security runtime enforcement', () => {
     const refreshTokenExpiresAt = refreshTokenCreateArgs.data.expiresAt as Date;
     const nineDaysInMs = 9 * 24 * 60 * 60 * 1000;
 
+    expect(refreshTokenCreateArgs.data.sessionId).toBe('session-1');
     expect(refreshTokenExpiresAt.getTime() - Date.now()).toBeGreaterThan(nineDaysInMs - 5_000);
     expect(refreshTokenExpiresAt.getTime() - Date.now()).toBeLessThan(nineDaysInMs + 5_000);
     expect(result.accessTokenExpiresAt).toBe(new Date(1_900_000_000 * 1000).toISOString());
     expect(result.refreshTokenExpiresAt).toBe(refreshTokenExpiresAt.toISOString());
+  });
+
+  it('rejects refresh tokens that are not linked to a runtime session anymore', async () => {
+    const service = createService();
+    tokenBlacklistServiceMock.isTokenBlacklisted.mockResolvedValue(false);
+    prismaMock.refreshToken.findUnique.mockResolvedValue({
+      id: 'refresh-1',
+      token: 'refresh-token',
+      sessionId: null,
+      expiresAt: new Date(Date.now() + 60_000),
+      user: {
+        id: 'user-1',
+        email: 'user@example.com',
+        role: 'ADMIN',
+        tenantId: 'tenant-1',
+        tenant: null,
+        sessionVersion: 1,
+      },
+    });
+
+    await expect(service.refreshTokens('refresh-token')).rejects.toThrow(
+      new UnauthorizedException('Sessao legada expirada; faca login novamente'),
+    );
+
+    expect(prismaMock.refreshToken.delete).toHaveBeenCalledWith({
+      where: { id: 'refresh-1' },
+    });
+    expect(userSessionServiceMock.assertRefreshSessionActive).not.toHaveBeenCalled();
   });
 });

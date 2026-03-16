@@ -6,9 +6,10 @@ import {
   ReasonablePayloadSizeValidator 
 } from './security.validators';
 import { PrismaModule } from '@core/prisma/prisma.module';
+import { SecurityConfigModule } from '@core/security-config/security-config.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, SecurityConfigModule],
   providers: [
     IsStrongPasswordConstraint,
     ValidTenantIdValidator,
@@ -25,4 +26,3 @@ import { PrismaModule } from '@core/prisma/prisma.module';
 export class ValidatorsModule {
       // Empty implementation
     }
-

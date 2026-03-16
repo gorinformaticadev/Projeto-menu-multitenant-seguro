@@ -16,15 +16,21 @@ describe('JwtStrategy session validation', () => {
     isTokenBlacklisted: jest.fn(),
   };
 
+  const userSessionServiceMock = {
+    assertAccessSessionActive: jest.fn(),
+  };
+
   const createStrategy = () =>
     new JwtStrategy(
       configMock as any,
       prismaMock as any,
       tokenBlacklistServiceMock as any,
+      userSessionServiceMock as any,
     );
 
   beforeEach(() => {
     jest.clearAllMocks();
+    userSessionServiceMock.assertAccessSessionActive.mockResolvedValue(undefined);
   });
 
   it('rejects a revoked bearer token', async () => {
@@ -44,9 +50,32 @@ describe('JwtStrategy session validation', () => {
           role: 'USER',
           tenantId: 'tenant-1',
           sessionVersion: 2,
+          sid: 'session-1',
         },
       ),
     ).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('rejects legacy access tokens without a backend session id', async () => {
+    const strategy = createStrategy();
+    tokenBlacklistServiceMock.isTokenBlacklisted.mockResolvedValue(false);
+
+    await expect(
+      strategy.validate(
+        {
+          headers: {
+            authorization: 'Bearer valid-token',
+          },
+        } as any,
+        {
+          sub: 'user-1',
+          email: 'user@example.com',
+          role: 'USER',
+          tenantId: 'tenant-1',
+          sessionVersion: 2,
+        },
+      ),
+    ).rejects.toThrow(new UnauthorizedException('Sessao legada expirada; faca login novamente'));
   });
 
   it('rejects stale tokens after session version changes', async () => {
@@ -74,12 +103,13 @@ describe('JwtStrategy session validation', () => {
           role: 'USER',
           tenantId: 'tenant-1',
           sessionVersion: 2,
+          sid: 'session-1',
         },
       ),
     ).rejects.toThrow(UnauthorizedException);
   });
 
-  it('returns a fresh normalized user when the token still matches the current session', async () => {
+  it('updates session activity through the backend session ledger', async () => {
     const strategy = createStrategy();
     tokenBlacklistServiceMock.isTokenBlacklisted.mockResolvedValue(false);
     prismaMock.user.findUnique.mockResolvedValue({
@@ -94,8 +124,10 @@ describe('JwtStrategy session validation', () => {
     await expect(
       strategy.validate(
         {
+          ip: '10.0.0.9',
           headers: {
             authorization: 'Bearer valid-token',
+            'user-agent': 'jest-agent',
           },
         } as any,
         {
@@ -104,6 +136,7 @@ describe('JwtStrategy session validation', () => {
           role: 'ADMIN',
           tenantId: 'tenant-1',
           sessionVersion: 4,
+          sid: 'session-9',
         },
       ),
     ).resolves.toEqual({
@@ -114,6 +147,16 @@ describe('JwtStrategy session validation', () => {
       tenantId: 'tenant-1',
       name: 'Admin User',
       sessionVersion: 4,
+      sid: 'session-9',
     });
+
+    expect(userSessionServiceMock.assertAccessSessionActive).toHaveBeenCalledWith(
+      'session-9',
+      'user-1',
+      {
+        ipAddress: '10.0.0.9',
+        userAgent: 'jest-agent',
+      },
+    );
   });
 });

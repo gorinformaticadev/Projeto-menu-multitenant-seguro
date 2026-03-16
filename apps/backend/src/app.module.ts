@@ -58,26 +58,33 @@ import { SystemSettingsModule } from './system-settings/system-settings.module';
     // ============================================
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        storage: new RedisThrottlerStorage({
-          enabled: configService.get('RATE_LIMIT_REDIS_ENABLED', 'true') !== 'false',
-          host: configService.get('REDIS_HOST', '127.0.0.1'),
-          port: Number(configService.get('REDIS_PORT', 6379)),
-          username: configService.get('REDIS_USERNAME'),
-          password: configService.get('REDIS_PASSWORD'),
-          db: Number(configService.get('REDIS_DB', 0)),
-          keyPrefix: configService.get('RATE_LIMIT_REDIS_PREFIX', 'rate-limit'),
-          connectTimeout: Number(configService.get('RATE_LIMIT_REDIS_CONNECT_TIMEOUT', 1000)),
-        }),
-        throttlers: [
-          {
-            name: 'default',
-            ttl: 60000, // 60 segundos (1 minuto)
-            // O guard ajusta por IP, usuario, tenant, risco operacional e alto volume.
-            limit: 300,
-          },
-        ],
-      }),
+      useFactory: (configService: ConfigService) => {
+        const nodeEnv = configService.get<string>('NODE_ENV', 'development');
+        const failureMode =
+          configService.get<string>('RATE_LIMIT_STORAGE_FAILURE_MODE') ||
+          (nodeEnv === 'production' ? 'strict' : 'memory');
+
+        return {
+          storage: new RedisThrottlerStorage({
+            enabled: configService.get('RATE_LIMIT_REDIS_ENABLED', 'true') !== 'false',
+            host: configService.get('REDIS_HOST', '127.0.0.1'),
+            port: Number(configService.get('REDIS_PORT', 6379)),
+            username: configService.get('REDIS_USERNAME'),
+            password: configService.get('REDIS_PASSWORD'),
+            db: Number(configService.get('REDIS_DB', 0)),
+            keyPrefix: configService.get('RATE_LIMIT_REDIS_PREFIX', 'rate-limit'),
+            connectTimeout: Number(configService.get('RATE_LIMIT_REDIS_CONNECT_TIMEOUT', 1000)),
+            failureMode: failureMode === 'strict' ? 'strict' : 'memory',
+          }),
+          throttlers: [
+            {
+              name: 'default',
+              ttl: 60000,
+              limit: 300,
+            },
+          ],
+        };
+      },
     }),
     PrismaModule,
     ValidatorsModule,

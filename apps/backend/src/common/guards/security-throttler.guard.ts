@@ -1,20 +1,30 @@
-import { Injectable, ExecutionContext, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import {
-  ThrottlerGuard,
-  ThrottlerStorage,
-  ThrottlerModuleOptions,
+  ExecutionContext,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
+import {
   InjectThrottlerOptions,
   InjectThrottlerStorage,
+  ThrottlerGuard,
   ThrottlerLimitDetail,
+  ThrottlerModuleOptions,
   ThrottlerRequest,
+  ThrottlerStorage,
 } from '@nestjs/throttler';
 import { Reflector } from '@nestjs/core';
 import { createHash } from 'crypto';
-import { SecurityConfigService } from '@core/security-config/security-config.service';
+import { SecurityRuntimeConfigService } from '@core/security-config/security-runtime-config.service';
 import { AuditService } from '../../audit/audit.service';
 import { RateLimitMetricsService } from '../services/rate-limit-metrics.service';
 import { SystemTelemetryService } from '@common/services/system-telemetry.service';
-import { ConfigResolverService } from '../../system-settings/config-resolver.service';
+import {
+  CRITICAL_RATE_LIMIT_KEY,
+  CriticalRateLimitAction,
+} from '../decorators/critical-rate-limit.decorator';
+import { SharedThrottlerStorageUnavailableError } from '../services/redis-throttler.storage';
 
 type ThrottleScope = 'ip' | 'user' | 'tenant-user' | 'tenant' | 'api-key';
 
@@ -25,12 +35,13 @@ type ThrottleIdentity = {
   clientIp: string;
 };
 
-type RateLimitConfigSnapshot = {
-  enabled: boolean;
-  advancedEnabled: boolean;
-  requests?: number;
-  window?: number;
-  isProduction: boolean;
+type RateLimitExecution = {
+  kind: 'global' | 'critical' | 'route';
+  category?: CriticalRateLimitAction;
+  tracker: string;
+  keyPrefix: string;
+  limit: number;
+  ttl: number;
 };
 
 type RateLimitTelemetry = {
@@ -40,97 +51,80 @@ type RateLimitTelemetry = {
   limit: number;
   windowSec: number;
   retryAfterSec?: number;
+  kind: RateLimitExecution['kind'];
+  category?: CriticalRateLimitAction;
 };
 
 @Injectable()
 export class SecurityThrottlerGuard extends ThrottlerGuard {
   private readonly logger = new Logger(SecurityThrottlerGuard.name);
-  private readonly configCacheTtlMs = 15000;
-  private cachedRateLimitConfig: RateLimitConfigSnapshot | null = null;
-  private rateLimitConfigExpiresAt = 0;
-
-  // Scope policy to reduce false positives and isolate anonymous/authenticated traffic.
-  private readonly anonymousLimitCap = this.readEnvNumber('RATE_LIMIT_ANON_LIMIT', 120);
-  private readonly userLimitFloor = this.readEnvNumber('RATE_LIMIT_USER_LIMIT', 1000);
-  private readonly tenantLimitFloor = this.readEnvNumber('RATE_LIMIT_TENANT_LIMIT', 2000);
-  private readonly apiKeyLimitFloor = this.readEnvNumber('RATE_LIMIT_API_KEY_LIMIT', 1500);
-  private readonly dashboardLimitFloor = this.readEnvNumber('RATE_LIMIT_DASHBOARD_LIMIT', 2500);
-  private readonly highVolumeLimitFloor = this.readEnvNumber('RATE_LIMIT_HIGH_VOLUME_LIMIT', 5000);
-  private readonly sensitiveOperationLimitCap = this.readEnvNumber('RATE_LIMIT_SENSITIVE_OPERATION_LIMIT', 30);
 
   constructor(
     @InjectThrottlerOptions() options: ThrottlerModuleOptions,
     @InjectThrottlerStorage() storageService: ThrottlerStorage,
     reflector: Reflector,
-    private readonly securityConfigService: SecurityConfigService,
+    private readonly securityRuntimeConfigService: SecurityRuntimeConfigService,
     private readonly auditService: AuditService,
     private readonly rateLimitMetricsService: RateLimitMetricsService,
     private readonly systemTelemetryService: SystemTelemetryService,
-    private readonly configResolver: ConfigResolverService,
   ) {
     super(options, storageService, reflector);
   }
 
   protected async handleRequest(requestProps: ThrottlerRequest): Promise<boolean> {
-    const { context, throttler } = requestProps;
+    const { context } = requestProps;
     const req = context.switchToHttp().getRequest();
     const identity = this.resolveThrottleIdentity(req);
-    const rateLimitConfig = await this.getRateLimitConfigCached();
+    const execution = await this.resolveRateLimitExecution(requestProps, identity);
 
-    // Keep limits declared with @Throttle to avoid breaking endpoint-specific rules.
-    const moduleLimit = this.toPositiveNumber(throttler?.limit, requestProps.limit);
-    const moduleTtl = this.toPositiveNumber(throttler?.ttl, requestProps.ttl);
-    const resolvedLimit = this.toPositiveNumber(requestProps.limit, moduleLimit);
-    const resolvedTtl = this.toPositiveNumber(requestProps.ttl, moduleTtl);
-
-    let limit = resolvedLimit;
-    let ttl = resolvedTtl;
-
-    const hasExplicitRouteConfig = resolvedLimit !== moduleLimit || resolvedTtl !== moduleTtl;
-
-    // If disabled from panel, keep only explicit limits for critical endpoints.
-    if (rateLimitConfig?.enabled === false && !hasExplicitRouteConfig) {
+    if (!execution) {
       return true;
     }
 
-    // Apply adaptive panel config only when route does not define custom @Throttle.
-    if (!hasExplicitRouteConfig && throttler?.name === 'default') {
-      if (rateLimitConfig.requests !== undefined) {
-        limit = this.toPositiveNumber(rateLimitConfig.requests, limit);
-      }
-      if (rateLimitConfig.window !== undefined) {
-        ttl = this.toPositiveNumber(rateLimitConfig.window, 1) * 60000;
+    req.__rateLimitContext = execution;
+
+    try {
+      const allowed = await super.handleRequest({
+        ...requestProps,
+        limit: execution.limit,
+        ttl: execution.ttl,
+        blockDuration: execution.ttl,
+        getTracker: async () => execution.tracker,
+        generateKey: (_ctx, tracker, name) => `${execution.keyPrefix}:${name}:${tracker}`,
+      });
+
+      if (allowed) {
+        this.captureRateLimitTelemetry({
+          req,
+          identity,
+          blocked: false,
+          limit: execution.limit,
+          windowSec: Math.max(1, Math.ceil(execution.ttl / 1000)),
+          kind: execution.kind,
+          category: execution.category,
+        });
       }
 
-      if (rateLimitConfig.advancedEnabled !== false) {
-        limit = this.applyScopePolicy(
-          limit,
-          identity.scope,
-          identity.path,
-          this.resolveRequestMethod(req),
+      return allowed;
+    } catch (error) {
+      if (error instanceof SharedThrottlerStorageUnavailableError) {
+        this.logger.error(
+          `rate_limit_storage_unavailable path=${identity.path} tracker=${identity.tracker} detail=${error.message}`,
+        );
+        throw new HttpException(
+          {
+            statusCode: 503,
+            code: 'RATE_LIMIT_STORAGE_UNAVAILABLE',
+            message:
+              'Storage compartilhado de rate limit indisponivel. O backend recusou operar em modo inconsistente.',
+            path: identity.path,
+          },
+          HttpStatus.SERVICE_UNAVAILABLE,
         );
       }
+
+      throw error;
     }
-
-    const allowed = await super.handleRequest({
-      ...requestProps,
-      limit,
-      ttl,
-      // Force tracker key by scope to preserve multitenant and API key isolation.
-      getTracker: async () => identity.tracker,
-    });
-
-    if (allowed) {
-      this.captureRateLimitTelemetry({
-        req,
-        identity,
-        blocked: false,
-        limit,
-        windowSec: Math.max(1, Math.ceil(ttl / 1000)),
-      });
-    }
-
-    return allowed;
   }
 
   protected async getTracker(req: Record<string, any>): Promise<string> {
@@ -150,20 +144,18 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
       ),
     );
     const windowSec = Math.max(1, Math.ceil(throttlerLimitDetail.ttl / 1000));
+    const identity = this.resolveThrottleIdentity(req);
+    const execution = (req.__rateLimitContext || {}) as Partial<RateLimitExecution>;
 
-    // RFC-compliant + modern headers.
     res.header('Retry-After', String(retryAfterSec));
     res.header('RateLimit-Limit', String(throttlerLimitDetail.limit));
     res.header('RateLimit-Remaining', '0');
     res.header('RateLimit-Reset', String(retryAfterSec));
     res.header('RateLimit-Policy', `${throttlerLimitDetail.limit};w=${windowSec}`);
-
-    // Legacy compatibility headers.
     res.header('X-RateLimit-Limit', String(throttlerLimitDetail.limit));
     res.header('X-RateLimit-Remaining', '0');
     res.header('X-RateLimit-Reset', String(retryAfterSec));
 
-    const identity = this.resolveThrottleIdentity(req);
     this.captureRateLimitTelemetry({
       req,
       identity,
@@ -171,6 +163,8 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
       limit: throttlerLimitDetail.limit,
       windowSec,
       retryAfterSec,
+      kind: execution.kind ?? 'route',
+      category: execution.category,
     });
 
     throw new HttpException(
@@ -182,9 +176,87 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
         windowSec,
         limit: throttlerLimitDetail.limit,
         path: this.getRequestPath(req),
+        policy: execution.kind ?? 'route',
+        category: execution.category,
       },
       HttpStatus.TOO_MANY_REQUESTS,
     );
+  }
+
+  private async resolveRateLimitExecution(
+    requestProps: ThrottlerRequest,
+    identity: ThrottleIdentity,
+  ): Promise<RateLimitExecution | null> {
+    const { context, throttler } = requestProps;
+    const req = context.switchToHttp().getRequest();
+    const criticalAction = this.reflector.getAllAndOverride<CriticalRateLimitAction | undefined>(
+      CRITICAL_RATE_LIMIT_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+
+    if (criticalAction) {
+      const criticalPolicy = await this.securityRuntimeConfigService.getCriticalRateLimitPolicy();
+      return {
+        kind: 'critical',
+        category: criticalAction,
+        tracker: this.resolveCriticalTracker(req),
+        keyPrefix: `critical:${criticalAction}`,
+        limit: this.resolveCriticalLimit(criticalAction, criticalPolicy),
+        ttl: criticalPolicy.windowMinutes * 60000,
+      };
+    }
+
+    const moduleLimit = this.toPositiveNumber(throttler?.limit, requestProps.limit);
+    const moduleTtl = this.toPositiveNumber(throttler?.ttl, requestProps.ttl);
+    const routeLimit = this.toPositiveNumber(requestProps.limit, moduleLimit);
+    const routeTtl = this.toPositiveNumber(requestProps.ttl, moduleTtl);
+    const hasExplicitRouteConfig = routeLimit !== moduleLimit || routeTtl !== moduleTtl;
+
+    if (hasExplicitRouteConfig) {
+      return {
+        kind: 'route',
+        tracker: identity.tracker,
+        keyPrefix: `route:${context.getClass().name}:${context.getHandler().name}`,
+        limit: routeLimit,
+        ttl: routeTtl,
+      };
+    }
+
+    const globalPolicy = await this.securityRuntimeConfigService.getGlobalRateLimitPolicy();
+    if (!globalPolicy.enabled) {
+      return null;
+    }
+
+    return {
+      kind: 'global',
+      tracker: identity.tracker,
+      keyPrefix: 'global',
+      limit: globalPolicy.requests,
+      ttl: globalPolicy.windowMinutes * 60000,
+    };
+  }
+
+  private resolveCriticalLimit(
+    action: CriticalRateLimitAction,
+    policy: Awaited<ReturnType<SecurityRuntimeConfigService['getCriticalRateLimitPolicy']>>,
+  ): number {
+    switch (action) {
+      case 'backup':
+        return policy.backupPerHour;
+      case 'restore':
+        return policy.restorePerHour;
+      case 'update':
+        return policy.updatePerHour;
+      default:
+        return policy.updatePerHour;
+    }
+  }
+
+  private resolveCriticalTracker(req: Record<string, any>): string {
+    const tenantId = this.resolveTenantId(req) || 'global';
+    const userId = this.normalizeText(req?.user?.id || req?.user?.sub) || 'anonymous';
+    const clientIp = this.resolveClientIp(req);
+    return `tenant:${tenantId}:user:${userId}:ip:${clientIp}`;
   }
 
   private captureRateLimitTelemetry(data: RateLimitTelemetry): void {
@@ -211,6 +283,10 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     if (!data.blocked) {
       return;
     }
+
+    this.logger.warn(
+      `rate_limit_blocked kind=${data.kind} category=${data.category || 'none'} path=${data.identity.path} tracker=${data.identity.tracker} limit=${data.limit} windowSec=${data.windowSec} retryAfterSec=${data.retryAfterSec || 0}`,
+    );
 
     this.systemTelemetryService.recordSecurityEvent({
       type: 'rate_limited',
@@ -254,6 +330,8 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
           limit: data.limit,
           windowSec: data.windowSec,
           retryAfterSec: data.retryAfterSec ?? 0,
+          kind: data.kind,
+          category: data.category ?? null,
         },
       });
     } catch (error) {
@@ -261,34 +339,6 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
         `Falha ao gravar auditoria de bloqueio de rate limit. detalhe=${error instanceof Error ? error.message : String(error)}`,
       );
     }
-  }
-
-  private applyScopePolicy(baseLimit: number, scope: ThrottleScope, path: string, method: string): number {
-    let limit = baseLimit;
-
-    if (scope === 'ip') {
-      limit = Math.min(limit, this.anonymousLimitCap);
-    } else if (scope === 'tenant-user' || scope === 'user') {
-      limit = Math.max(limit, this.userLimitFloor);
-    } else if (scope === 'tenant') {
-      limit = Math.max(limit, this.tenantLimitFloor);
-    } else if (scope === 'api-key') {
-      limit = Math.max(limit, this.apiKeyLimitFloor);
-    }
-
-    if (this.isHighVolumePath(path) && scope !== 'ip') {
-      limit = Math.max(limit, this.highVolumeLimitFloor);
-    }
-
-    if (this.isDashboardLikePath(path) && scope !== 'ip') {
-      limit = Math.max(limit, this.dashboardLimitFloor);
-    }
-
-    if (this.isSensitiveOperationalMutation(path, method)) {
-      limit = Math.min(limit, this.sensitiveOperationLimitCap);
-    }
-
-    return limit;
   }
 
   private resolveThrottleIdentity(req: Record<string, any>): ThrottleIdentity {
@@ -376,50 +426,9 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     return null;
   }
 
-  private isDashboardLikePath(path: string): boolean {
-    return (
-      path.includes('/dashboard') ||
-      path.includes('/notifications') ||
-      path.includes('/audit-logs')
-    );
-  }
-
-  private isHighVolumePath(path: string): boolean {
-    return (
-      path.includes('/whatsapp') ||
-      path.includes('/messages') ||
-      path.includes('/webhook') ||
-      path.includes('/sync') ||
-      path.includes('/queue') ||
-      path.includes('/dispatch')
-    );
-  }
-
-  private isSensitiveOperationalMutation(path: string, method: string): boolean {
-    if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
-      return false;
-    }
-
-    return (
-      path.includes('/system/update') ||
-      path.includes('/update') ||
-      path.includes('/backups') ||
-      path.includes('/backup') ||
-      path.includes('/system/diagnostics') ||
-      path.includes('/system/audit') ||
-      path.includes('/system/notifications') ||
-      path.includes('/system/retention') ||
-      path.includes('/cron') ||
-      path.includes('/platform-config') ||
-      path.includes('/security-config') ||
-      path.includes('/email-config') ||
-      path.includes('/ordem_servico/permissions') ||
-      path.includes('/tenants')
-    );
-  }
-
   private getRequestPath(req: Record<string, any>): string {
-    const rawPath = this.normalizeText(req?.originalUrl || req?.url || req?.path || req?.route?.path) || '/';
+    const rawPath =
+      this.normalizeText(req?.originalUrl || req?.url || req?.path || req?.route?.path) || '/';
     const [pathWithoutQuery] = rawPath.split('?');
     return pathWithoutQuery.toLowerCase();
   }
@@ -465,6 +474,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     if (value === null || value === undefined) {
       return null;
     }
+
     const normalized = String(value).trim().toLowerCase();
     return normalized.length > 0 ? normalized : null;
   }
@@ -477,66 +487,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
       return value;
     }
+
     return fallback;
-  }
-
-  private readEnvNumber(name: string, fallback: number): number {
-    const value = Number(process.env[name]);
-    if (Number.isFinite(value) && value > 0) {
-      return value;
-    }
-    return fallback;
-  }
-
-  private async getRateLimitConfigCached(): Promise<RateLimitConfigSnapshot> {
-    const now = Date.now();
-
-    if (this.cachedRateLimitConfig && now < this.rateLimitConfigExpiresAt) {
-      return this.cachedRateLimitConfig;
-    }
-
-    const [enabled, advancedEnabled] = await Promise.all([
-      this.isGlobalRateLimitEnabled(),
-      this.isAdvancedRateLimitEnabled(),
-    ]);
-
-    try {
-      const config = await this.securityConfigService.getRateLimitConfig();
-      this.cachedRateLimitConfig = {
-        enabled,
-        advancedEnabled,
-        requests: this.readPositiveNumber(config?.requests),
-        window: this.readPositiveNumber(config?.window),
-        isProduction: config?.isProduction === true,
-      };
-      this.rateLimitConfigExpiresAt = now + this.configCacheTtlMs;
-      return this.cachedRateLimitConfig;
-    } catch (error) {
-      this.cachedRateLimitConfig = {
-        enabled,
-        advancedEnabled,
-        isProduction: process.env.NODE_ENV === 'production',
-      };
-      this.rateLimitConfigExpiresAt = now + this.configCacheTtlMs;
-      this.logger.warn(
-        `Falha ao carregar config de rate limit do banco; usando limites do modulo. detalhe=${error instanceof Error ? error.message : String(error)}`,
-      );
-      return this.cachedRateLimitConfig;
-    }
-  }
-
-  private async isGlobalRateLimitEnabled(): Promise<boolean> {
-    return (await this.configResolver.getBoolean('security.rate_limit.enabled')) !== false;
-  }
-
-  private async isAdvancedRateLimitEnabled(): Promise<boolean> {
-    return (await this.configResolver.getBoolean('security.rate_limit.advanced.enabled')) !== false;
-  }
-
-  private readPositiveNumber(value: unknown): number | undefined {
-    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-      return value;
-    }
-    return undefined;
   }
 }

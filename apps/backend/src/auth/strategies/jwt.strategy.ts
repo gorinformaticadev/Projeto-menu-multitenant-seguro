@@ -5,6 +5,7 @@ import { PrismaService } from '@core/prisma/prisma.service';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
 import { TokenBlacklistService } from '../../common/services/token-blacklist.service';
+import { UserSessionService } from '../user-session.service';
 
 interface JwtPayload {
   sub: string;
@@ -12,6 +13,7 @@ interface JwtPayload {
   role: string;
   tenantId: string | null;
   sessionVersion?: number;
+  sid?: string;
   jti?: string;
 }
 
@@ -21,6 +23,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private config: ConfigService,
     private prisma: PrismaService,
     private tokenBlacklistService: TokenBlacklistService,
+    private userSessionService: UserSessionService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -39,6 +42,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     if (rawToken && (await this.tokenBlacklistService.isTokenBlacklisted(rawToken))) {
       throw new UnauthorizedException('Token revogado');
+    }
+
+    if (!payload.sid) {
+      throw new UnauthorizedException('Sessao legada expirada; faca login novamente');
     }
 
     const user = await this.prisma.user.findUnique({
@@ -62,6 +69,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Token desatualizado');
     }
 
+    await this.userSessionService.assertAccessSessionActive(payload.sid, user.id, {
+      ipAddress: this.resolveClientIp(req),
+      userAgent: this.resolveUserAgent(req),
+    });
+
     return {
       id: user.id,
       sub: user.id,
@@ -70,6 +82,29 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       tenantId: user.tenantId,
       name: user.name,
       sessionVersion: currentSessionVersion,
+      sid: payload.sid,
     };
+  }
+
+  private resolveClientIp(req: Request): string | undefined {
+    if (typeof req.ip === 'string' && req.ip.trim().length > 0) {
+      return req.ip.trim();
+    }
+
+    const forwardedFor = req.headers['x-forwarded-for'];
+    const firstForwarded = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
+    if (typeof firstForwarded === 'string' && firstForwarded.trim().length > 0) {
+      return firstForwarded.split(',')[0].trim();
+    }
+
+    return undefined;
+  }
+
+  private resolveUserAgent(req: Request): string | undefined {
+    const header = req.headers['user-agent'];
+    const userAgent = Array.isArray(header) ? header[0] : header;
+    return typeof userAgent === 'string' && userAgent.trim().length > 0
+      ? userAgent.trim()
+      : undefined;
   }
 }

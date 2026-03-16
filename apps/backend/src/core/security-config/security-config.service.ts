@@ -3,26 +3,21 @@ import { PrismaService } from '@core/prisma/prisma.service';
 import { UpdateSecurityConfigDto } from './dto/update-security-config.dto';
 import { UpdateWebPushConfigDto } from './dto/update-web-push-config.dto';
 import { encryptSensitiveData, decryptSensitiveData } from '@core/common/utils/security.utils';
+import { SecurityRuntimeConfigService } from './security-runtime-config.service';
 
 @Injectable()
 export class SecurityConfigService {
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private readonly runtimeConfigService: SecurityRuntimeConfigService,
+  ) {}
 
   /**
    * Obtem a configuracao de seguranca atual
    * Se nao existir, cria uma com valores padrao
    */
   async getConfig() {
-    let config = await this.prisma.securityConfig.findFirst();
-
-    if (!config) {
-      // Criar configuracao padrao
-      config = await this.prisma.securityConfig.create({
-        data: {},
-      });
-    }
-
-    return config;
+    return this.runtimeConfigService.getSecurityConfig();
   }
 
   /**
@@ -34,6 +29,16 @@ export class SecurityConfigService {
 
     // Criptografar credenciais SMTP se fornecidas
     const updateData: Record<string, unknown> = { ...dto, updatedBy: userId };
+
+    if (dto.globalMaxRequests !== undefined) {
+      updateData.rateLimitDevRequests = dto.globalMaxRequests;
+      updateData.rateLimitProdRequests = dto.globalMaxRequests;
+    }
+
+    if (dto.globalWindowMinutes !== undefined) {
+      updateData.rateLimitDevWindow = dto.globalWindowMinutes;
+      updateData.rateLimitProdWindow = dto.globalWindowMinutes;
+    }
 
     if (dto.smtpPassword) {
       updateData.smtpPassword = encryptSensitiveData(dto.smtpPassword);
@@ -67,37 +72,26 @@ export class SecurityConfigService {
    * Obtem configuracao especifica de rate limiting para login
    */
   async getLoginRateLimit() {
-    const config = await this.getConfig();
-    return {
-      maxAttempts: config.loginMaxAttempts,
-      lockDurationMinutes: config.loginLockDurationMinutes,
-      windowMinutes: config.loginWindowMinutes,
-    };
+    return this.runtimeConfigService.getLoginPolicy();
   }
 
   /**
    * Obtem configuracao de validacao de senha
    */
   async getPasswordPolicy() {
-    const config = await this.getConfig();
-    return {
-      minLength: config.passwordMinLength,
-      requireUppercase: config.passwordRequireUppercase,
-      requireLowercase: config.passwordRequireLowercase,
-      requireNumbers: config.passwordRequireNumbers,
-      requireSpecial: config.passwordRequireSpecial,
-    };
+    return this.runtimeConfigService.getPasswordPolicy();
   }
 
   /**
    * Obtem configuracao de JWT
    */
   async getJwtConfig() {
-    const config = await this.getConfig();
+    const tokenPolicy = await this.runtimeConfigService.getTokenPolicy();
+    const sessionPolicy = await this.runtimeConfigService.getSessionPolicy();
     return {
-      accessTokenExpiresIn: config.accessTokenExpiresIn,
-      refreshTokenExpiresIn: config.refreshTokenExpiresIn,
-      sessionTimeoutMinutes: config.sessionTimeoutMinutes,
+      accessTokenExpiresIn: tokenPolicy.accessTokenExpiresIn,
+      refreshTokenExpiresIn: tokenPolicy.refreshTokenExpiresIn,
+      sessionTimeoutMinutes: sessionPolicy.timeoutMinutes,
     };
   }
 
@@ -105,13 +99,7 @@ export class SecurityConfigService {
    * Obtem configuracao de 2FA
    */
   async getTwoFactorConfig() {
-    const config = await this.getConfig();
-    return {
-      enabled: config.twoFactorEnabled,
-      required: config.twoFactorRequired,
-      requiredForAdmins: config.twoFactorRequiredForAdmins,
-      suggested: config.twoFactorSuggested,
-    };
+    return this.runtimeConfigService.getTwoFactorPolicy();
   }
 
   /**
@@ -181,14 +169,13 @@ export class SecurityConfigService {
    * Obtem configuracao de rate limiting adaptativo por ambiente
    */
   async getRateLimitConfig() {
-    const config = await this.getConfig();
-    const isProduction = process.env.NODE_ENV === 'production';
-
+    const policy = await this.runtimeConfigService.getGlobalRateLimitPolicy();
     return {
-      enabled: isProduction ? config.rateLimitProdEnabled : config.rateLimitDevEnabled,
-      requests: isProduction ? config.rateLimitProdRequests : config.rateLimitDevRequests,
-      window: isProduction ? config.rateLimitProdWindow : config.rateLimitDevWindow,
-      isProduction,
+      enabled: policy.enabled,
+      requests: policy.requests,
+      window: policy.windowMinutes,
+      isProduction: policy.environment === 'production',
+      source: policy.source,
     };
   }
 

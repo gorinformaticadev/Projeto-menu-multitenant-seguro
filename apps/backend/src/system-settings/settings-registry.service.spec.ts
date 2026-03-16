@@ -38,10 +38,10 @@ describe('SettingsRegistry', () => {
     expect(registry.isEditableInPanel('security.headers.enabled')).toBe(false);
   });
 
-  it('mantem security.rate_limit.enabled visivel e somente leitura, com notas operacionais explicitas', () => {
+  it('mantem security.rate_limit.enabled fora do painel para evitar conflito com a fonte oficial de seguranca', () => {
     const definition = registry.getOrThrow('security.rate_limit.enabled');
 
-    expect(definition.allowedInPanel).toBe(true);
+    expect(definition.allowedInPanel).toBe(false);
     expect(definition.editableInPanel).toBe(false);
     expect(definition.sensitive).toBe(false);
     expect(definition.requiresConfirmation).toBe(false);
@@ -53,10 +53,10 @@ describe('SettingsRegistry', () => {
     );
   });
 
-  it('mantem security.rate_limit.advanced.enabled visivel, somente leitura e com escopo avancado explicito', () => {
+  it('mantem security.rate_limit.advanced.enabled fora do painel para evitar configuracao decorativa', () => {
     const definition = registry.getOrThrow('security.rate_limit.advanced.enabled');
 
-    expect(definition.allowedInPanel).toBe(true);
+    expect(definition.allowedInPanel).toBe(false);
     expect(definition.editableInPanel).toBe(false);
     expect(definition.sensitive).toBe(false);
     expect(definition.restartRequired).toBe(false);

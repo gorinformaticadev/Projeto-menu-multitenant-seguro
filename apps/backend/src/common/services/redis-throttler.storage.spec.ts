@@ -1,5 +1,8 @@
 import { Logger } from '@nestjs/common';
-import { RedisThrottlerStorage } from './redis-throttler.storage';
+import {
+  RedisThrottlerStorage,
+  SharedThrottlerStorageUnavailableError,
+} from './redis-throttler.storage';
 
 type RedisHandler = (error?: Error) => void;
 
@@ -31,20 +34,23 @@ jest.mock('ioredis', () => ({
 
 describe('RedisThrottlerStorage', () => {
   let warnSpy: jest.SpyInstance;
+  let errorSpy: jest.SpyInstance;
 
   beforeEach(() => {
     redisInstances.length = 0;
     warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     jest.useRealTimers();
   });
 
   afterEach(() => {
     warnSpy.mockRestore();
+    errorSpy.mockRestore();
     jest.restoreAllMocks();
   });
 
-  it('falls back to local memory storage when redis is disabled', async () => {
-    const storage = new RedisThrottlerStorage({ enabled: false });
+  it('falls back to local memory storage when redis is disabled in memory mode', async () => {
+    const storage = new RedisThrottlerStorage({ enabled: false, failureMode: 'memory' });
     const key = 'test-key';
 
     const first = await storage.increment(key, 1000, 2, 1000, 'default');
@@ -58,11 +64,21 @@ describe('RedisThrottlerStorage', () => {
     expect(third.timeToBlockExpire).toBeGreaterThan(0);
   });
 
-  it('suppresses repeated redis reconnect attempts while fallback cooldown is active', async () => {
+  it('fails explicitly when redis is disabled in strict mode', async () => {
+    const storage = new RedisThrottlerStorage({ enabled: false, failureMode: 'strict' });
+
+    await expect(storage.increment('key-1', 1000, 10, 1000, 'default')).rejects.toThrow(
+      SharedThrottlerStorageUnavailableError,
+    );
+    expect(errorSpy).toHaveBeenCalled();
+  });
+
+  it('suppresses repeated redis reconnect attempts while fallback cooldown is active in memory mode', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-03-14T17:30:00.000Z'));
 
     const storage = new RedisThrottlerStorage({
       retryCooldownMs: 15000,
+      failureMode: 'memory',
     });
     const redis = redisInstances[0];
 
@@ -83,5 +99,25 @@ describe('RedisThrottlerStorage', () => {
 
     expect(redis.connect).toHaveBeenCalledTimes(2);
     expect(warnSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('refuses to enforce a distributed rate limit inconsistently in strict mode when redis is down', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-14T17:30:00.000Z'));
+
+    const storage = new RedisThrottlerStorage({
+      retryCooldownMs: 15000,
+      failureMode: 'strict',
+    });
+    const redis = redisInstances[0];
+
+    redis.connect.mockImplementation(async () => {
+      redis.status = 'end';
+      throw new Error('connect ECONNREFUSED 127.0.0.1:6379');
+    });
+
+    await expect(storage.increment('key-1', 1000, 10, 1000, 'default')).rejects.toThrow(
+      SharedThrottlerStorageUnavailableError,
+    );
+    expect(warnSpy).toHaveBeenCalled();
   });
 });

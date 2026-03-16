@@ -13,6 +13,7 @@ import { TokenBlacklistService } from '../common/services/token-blacklist.servic
 import { AuditModule } from '../audit/audit.module';
 import { EmailModule } from '../email/email.module';
 import { SecurityConfigModule } from '@core/security-config/security-config.module';
+import { UserSessionService } from './user-session.service';
 
 @Module({
   imports: [
@@ -36,7 +37,22 @@ import { SecurityConfigModule } from '@core/security-config/security-config.modu
     SecurityConfigModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, TwoFactorService, EmailVerificationService, PasswordResetService, JwtStrategy, TokenBlacklistService],
-  exports: [AuthService, TwoFactorService, EmailVerificationService, PasswordResetService, TokenBlacklistService],
+  providers: [
+    AuthService,
+    TwoFactorService,
+    EmailVerificationService,
+    PasswordResetService,
+    JwtStrategy,
+    TokenBlacklistService,
+    UserSessionService,
+  ],
+  exports: [
+    AuthService,
+    TwoFactorService,
+    EmailVerificationService,
+    PasswordResetService,
+    TokenBlacklistService,
+    UserSessionService,
+  ],
 })
 export class AuthModule { }

@@ -2,11 +2,13 @@ import { Prisma, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import {
   DEFAULT_MASTER_TENANT,
+  DEFAULT_SECURITY_CONFIG,
   DEFAULT_USERS,
   resolveAdminPassword,
   resolveUserPassword,
 } from '../defaults';
 import { SeedModuleDefinition, SeedSummary } from '../types';
+import { validatePasswordAgainstPolicy } from '../../../src/common/utils/password-policy.util';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -26,8 +28,59 @@ export const defaultUsersSeed: SeedModuleDefinition = {
       throw new Error(`Tenant mestre nao encontrado para seed de usuarios: ${DEFAULT_MASTER_TENANT.email}`);
     }
 
-    const adminPasswordHash = await bcrypt.hash(resolveAdminPassword(), BCRYPT_ROUNDS);
-    const userPasswordHash = await bcrypt.hash(resolveUserPassword(), BCRYPT_ROUNDS);
+    const securityConfig = await tx.securityConfig.findFirst({
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        passwordMinLength: true,
+        passwordRequireUppercase: true,
+        passwordRequireLowercase: true,
+        passwordRequireNumbers: true,
+        passwordRequireSpecial: true,
+      },
+    });
+    const passwordPolicy = {
+      minLength: securityConfig?.passwordMinLength ?? DEFAULT_SECURITY_CONFIG.passwordMinLength,
+      requireUppercase:
+        securityConfig?.passwordRequireUppercase ?? DEFAULT_SECURITY_CONFIG.passwordRequireUppercase,
+      requireLowercase:
+        securityConfig?.passwordRequireLowercase ?? DEFAULT_SECURITY_CONFIG.passwordRequireLowercase,
+      requireNumbers:
+        securityConfig?.passwordRequireNumbers ?? DEFAULT_SECURITY_CONFIG.passwordRequireNumbers,
+      requireSpecial:
+        securityConfig?.passwordRequireSpecial ?? DEFAULT_SECURITY_CONFIG.passwordRequireSpecial,
+    };
+
+    const adminPassword = resolveAdminPassword();
+    const userPassword = resolveUserPassword(adminPassword);
+
+    assertPasswordMatchesPolicy(
+      adminPassword.value,
+      passwordPolicy,
+      adminPassword.envKey || 'generated-admin-password',
+    );
+    assertPasswordMatchesPolicy(
+      userPassword.value,
+      passwordPolicy,
+      userPassword.envKey || 'generated-user-password',
+    );
+
+    const adminPasswordHash = await bcrypt.hash(adminPassword.value, BCRYPT_ROUNDS);
+    const userPasswordHash = await bcrypt.hash(userPassword.value, BCRYPT_ROUNDS);
+
+    if (adminPassword.source === 'generated') {
+      summary.notes.push(
+        'Senha inicial do bootstrap foi gerada dinamicamente. Consulte o log do seed atual e altere-a imediatamente apos o primeiro acesso.',
+      );
+      console.warn(
+        `[seed][security] Senha inicial gerada para ${DEFAULT_USERS.superAdminEmail}: ${adminPassword.value}`,
+      );
+    }
+
+    if (userPassword.source === 'generated' && userPassword.value !== adminPassword.value) {
+      console.warn(
+        `[seed][security] Senha inicial gerada para usuarios padrao de tenant: ${userPassword.value}`,
+      );
+    }
 
     await ensureUser(
       tx,
@@ -71,6 +124,25 @@ export const defaultUsersSeed: SeedModuleDefinition = {
     return summary;
   },
 };
+
+function assertPasswordMatchesPolicy(
+  password: string,
+  policy: {
+    minLength: number;
+    requireUppercase: boolean;
+    requireLowercase: boolean;
+    requireNumbers: boolean;
+    requireSpecial: boolean;
+  },
+  sourceLabel: string,
+) {
+  const errors = validatePasswordAgainstPolicy(password, policy);
+  if (errors.length > 0) {
+    throw new Error(
+      `Senha inicial do seed (${sourceLabel}) viola a politica ativa: ${errors.join(' ')}`,
+    );
+  }
+}
 
 type EnsureUserInput = {
   email: string;

@@ -12,7 +12,15 @@ type RedisThrottlerStorageOptions = {
   keyPrefix?: string;
   connectTimeout?: number;
   retryCooldownMs?: number;
+  failureMode?: 'memory' | 'strict';
 };
+
+export class SharedThrottlerStorageUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SharedThrottlerStorageUnavailableError';
+  }
+}
 
 const REDIS_INCREMENT_SCRIPT = `
 local counterKey = KEYS[1]
@@ -61,6 +69,7 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
   private readonly redisPrefix: string;
   private readonly redisEnabled: boolean;
   private readonly retryCooldownMs: number;
+  private readonly failureMode: 'memory' | 'strict';
   private readonly redis?: Redis;
   private redisRetryAvailableAt = 0;
   private fallbackActive = false;
@@ -71,9 +80,18 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
     this.redisEnabled = options.enabled !== false;
     this.redisPrefix = options.keyPrefix || 'rate-limit';
     this.retryCooldownMs = options.retryCooldownMs ?? REDIS_RETRY_COOLDOWN_MS;
+    this.failureMode = options.failureMode ?? 'memory';
 
     if (!this.redisEnabled) {
-      this.logger.warn('Redis throttling desativado por configuracao; usando storage local em memoria.');
+      if (this.failureMode === 'strict') {
+        this.logger.error(
+          'Redis throttling desativado, mas o modo estrito exige storage compartilhado para rate limit.',
+        );
+      } else {
+        this.logger.warn(
+          'Redis throttling desativado por configuracao; usando storage local em memoria.',
+        );
+      }
       return;
     }
 
@@ -96,7 +114,9 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
 
     this.redis.on('error', (error) => {
       this.markRedisUnavailable(
-        'Falha no Redis de rate limit; fallback em memoria ativo.',
+        this.failureMode === 'strict'
+          ? 'Falha no Redis de rate limit; modo estrito impedira enforcement inconsistente.'
+          : 'Falha no Redis de rate limit; fallback em memoria ativo.',
         error.message,
       );
     });
@@ -119,6 +139,12 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
     timeToBlockExpire: number;
   }> {
     if (!this.redis) {
+      if (this.failureMode === 'strict') {
+        throw new SharedThrottlerStorageUnavailableError(
+          'Storage compartilhado de rate limit indisponivel: Redis desabilitado.',
+        );
+      }
+
       return this.fallbackStorage.increment(key, ttl, limit, blockDuration, throttlerName);
     }
 
@@ -127,6 +153,12 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
     const safeBlockDuration = Number.isFinite(blockDuration) && blockDuration > 0 ? blockDuration : ttl;
 
     if (this.shouldUseFallbackWithoutRetry()) {
+      if (this.failureMode === 'strict') {
+        throw new SharedThrottlerStorageUnavailableError(
+          'Storage compartilhado de rate limit indisponivel durante cooldown de reconexao.',
+        );
+      }
+
       return this.fallbackStorage.increment(key, ttl, limit, safeBlockDuration, throttlerName);
     }
 
@@ -166,9 +198,18 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
       };
     } catch (error) {
       this.markRedisUnavailable(
-        'Erro ao aplicar rate limit no Redis; usando storage local nesta janela.',
+        this.failureMode === 'strict'
+          ? 'Erro ao aplicar rate limit no Redis; enforcement estrito mantera falha explicita.'
+          : 'Erro ao aplicar rate limit no Redis; usando storage local nesta janela.',
         error instanceof Error ? error.message : String(error),
       );
+
+      if (this.failureMode === 'strict') {
+        throw new SharedThrottlerStorageUnavailableError(
+          error instanceof Error ? error.message : 'Redis indisponivel para rate limit',
+        );
+      }
+
       return this.fallbackStorage.increment(key, ttl, limit, safeBlockDuration, throttlerName);
     }
   }

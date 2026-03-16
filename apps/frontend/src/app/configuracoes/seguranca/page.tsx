@@ -39,10 +39,6 @@ interface SecurityConfig {
   updateRateLimitPerHour: number;
   rateLimitDevEnabled: boolean;
   rateLimitProdEnabled: boolean;
-  rateLimitDevRequests: number;
-  rateLimitProdRequests: number;
-  rateLimitDevWindow: number;
-  rateLimitProdWindow: number;
   updatedAt: string;
   updatedBy: string | null;
 }
@@ -115,36 +111,11 @@ export default function SecurityConfigPage() {
   // Carregar configurações
   useEffect(() => {
     const fetchConfig = async () => {
-      const cacheKey = 'security-config-full-cache';
-      const cacheTTL = 5 * 60 * 1000; // 5 minutos
-
-      // Verificar cache
-      const cached = localStorage.getItem(cacheKey);
-      if (cached) {
-        try {
-          const { data, timestamp } = JSON.parse(cached);
-          if (Date.now() - timestamp < cacheTTL) {
-            setConfig(data);
-            setLegacyError(null);
-            setLoading(false);
-            return;
-          }
-        } catch {
-          // Cache inválido, continua
-        }
-      }
-
       try {
         setLoading(true);
         setLegacyError(null);
         const response = await api.get("/security-config");
         setConfig(response.data);
-
-        // Cache o resultado
-        localStorage.setItem(cacheKey, JSON.stringify({
-          data: response.data,
-          timestamp: Date.now()
-        }));
       } catch (error: unknown) {
         setConfig(null);
         setLegacyError(
@@ -219,19 +190,10 @@ export default function SecurityConfigPage() {
         updateRateLimitPerHour: Number(config.updateRateLimitPerHour),
         rateLimitDevEnabled: config.rateLimitDevEnabled,
         rateLimitProdEnabled: config.rateLimitProdEnabled,
-        rateLimitDevRequests: Number(config.rateLimitDevRequests),
-        rateLimitProdRequests: Number(config.rateLimitProdRequests),
-        rateLimitDevWindow: Number(config.rateLimitDevWindow),
-        rateLimitProdWindow: Number(config.rateLimitProdWindow),
       };
 
       const response = await api.put("/security-config", updateData);
-
-      // Atualizar cache local
-      localStorage.setItem('security-config-full-cache', JSON.stringify({
-        data: response.data,
-        timestamp: Date.now()
-      }));
+      setConfig(response.data);
 
       // Atualizar configuração global no contexto
       await refreshConfig();

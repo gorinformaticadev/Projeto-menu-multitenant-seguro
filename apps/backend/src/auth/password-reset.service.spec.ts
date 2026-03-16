@@ -37,6 +37,10 @@ describe('PasswordResetService runtime password policy enforcement', () => {
     getPasswordPolicy: jest.fn(),
   };
 
+  const userSessionServiceMock = {
+    revokeAllUserSessions: jest.fn(),
+  };
+
   const createService = () =>
     new PasswordResetService(
       prismaMock as any,
@@ -44,6 +48,7 @@ describe('PasswordResetService runtime password policy enforcement', () => {
       jwtServiceMock as any,
       configServiceMock as any,
       securityConfigServiceMock as any,
+      userSessionServiceMock as any,
     );
 
   beforeEach(() => {
@@ -58,6 +63,7 @@ describe('PasswordResetService runtime password policy enforcement', () => {
       requireNumbers: true,
       requireSpecial: true,
     });
+    userSessionServiceMock.revokeAllUserSessions.mockResolvedValue(undefined);
   });
 
   it('rejects reset passwords that violate the persisted policy', async () => {

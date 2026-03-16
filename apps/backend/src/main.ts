@@ -61,7 +61,9 @@ async function bootstrap() {
 
   const dynamicModule = await AppModule.register();
   const app = await NestFactory.create<NestExpressApplication>(dynamicModule);
-  useContainer(app.select(AppModule), { fallbackOnErrors: true });
+  // O bootstrap usa um DynamicModule; o container valido para os validadores
+  // e o proprio app, nao AppModule selecionado por token estatico.
+  useContainer(app, { fallbackOnErrors: true });
   app.setGlobalPrefix('api');
 
   const isProduction = process.env.NODE_ENV === 'production';

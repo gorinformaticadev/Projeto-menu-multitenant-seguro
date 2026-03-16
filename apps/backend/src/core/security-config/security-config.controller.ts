@@ -87,10 +87,12 @@ export class SecurityConfigController {
   @Public()
   @Get('2fa-status')
   async get2FAStatus() {
-    const config = await this.securityConfigService.getConfig();
+    const config = await this.securityConfigService.getTwoFactorConfig();
     return {
-      enabled: config.twoFactorEnabled,
-      required: config.twoFactorRequired,
+      enabled: config.enabled,
+      required: config.required,
+      requiredForAdmins: config.requiredForAdmins,
+      suggested: config.suggested,
     };
   }
 
@@ -102,19 +104,22 @@ export class SecurityConfigController {
   @Get('full')
   async getFullConfig() {
     const config = await this.securityConfigService.getConfig();
+    const twoFactorPolicy = await this.securityConfigService.getTwoFactorConfig();
+    const passwordPolicy = await this.securityConfigService.getPasswordPolicy();
+    const jwtConfig = await this.securityConfigService.getJwtConfig();
     return {
-      twoFactorEnabled: config.twoFactorEnabled,
-      twoFactorRequired: config.twoFactorRequired,
-      twoFactorRequiredForAdmins: config.twoFactorRequiredForAdmins,
-      twoFactorSuggested: config.twoFactorSuggested ?? true,
+      twoFactorEnabled: twoFactorPolicy.enabled,
+      twoFactorRequired: twoFactorPolicy.required,
+      twoFactorRequiredForAdmins: twoFactorPolicy.requiredForAdmins,
+      twoFactorSuggested: twoFactorPolicy.suggested,
       emailVerificationRequired: config.emailVerificationRequired ?? false,
       emailVerificationLevel: config.emailVerificationLevel ?? 'SOFT',
-      passwordMinLength: config.passwordMinLength,
-      passwordRequireUppercase: config.passwordRequireUppercase,
-      passwordRequireLowercase: config.passwordRequireLowercase,
-      passwordRequireNumbers: config.passwordRequireNumbers,
-      passwordRequireSpecial: config.passwordRequireSpecial,
-      sessionTimeoutMinutes: config.sessionTimeoutMinutes,
+      passwordMinLength: passwordPolicy.minLength,
+      passwordRequireUppercase: passwordPolicy.requireUppercase,
+      passwordRequireLowercase: passwordPolicy.requireLowercase,
+      passwordRequireNumbers: passwordPolicy.requireNumbers,
+      passwordRequireSpecial: passwordPolicy.requireSpecial,
+      sessionTimeoutMinutes: jwtConfig.sessionTimeoutMinutes,
     };
   }
 }

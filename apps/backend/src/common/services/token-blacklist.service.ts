@@ -1,12 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
+import { UserSessionService } from '../../auth/user-session.service';
 
 @Injectable()
 export class TokenBlacklistService {
   private readonly logger = new Logger(TokenBlacklistService.name);
   private blacklist = new Set<string>();
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly userSessionService: UserSessionService,
+  ) {}
 
   async blacklistToken(token: string, expiry: Date, userId?: string): Promise<void> {
     this.blacklist.add(token);
@@ -84,9 +88,6 @@ export class TokenBlacklistService {
       }
 
       await this.prisma.$transaction([
-        this.prisma.refreshToken.deleteMany({
-          where: { userId },
-        }),
         this.prisma.user.update({
           where: { id: userId },
           data: {
@@ -96,6 +97,8 @@ export class TokenBlacklistService {
           } as any,
         }),
       ]);
+
+      await this.userSessionService.revokeAllUserSessions(userId, 'user_tokens_revoked');
 
       this.logger.log(`Revogados todos os tokens do usuario ${userId}`);
     } catch (error) {

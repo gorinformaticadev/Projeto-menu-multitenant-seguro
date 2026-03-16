@@ -1,3 +1,5 @@
+import { randomBytes } from 'crypto';
+
 export const DEFAULT_MASTER_TENANT = {
   email: process.env.SEED_MASTER_TENANT_EMAIL || 'empresa1@example.com',
   cnpjCpf: process.env.SEED_MASTER_TENANT_CNPJ_CPF || '12345678901234',
@@ -15,12 +17,45 @@ export const DEFAULT_USERS = {
   tenantUserName: process.env.SEED_TENANT_USER_NAME || 'Usuario Comum',
 };
 
-export const resolveAdminPassword = (): string => {
-  return process.env.INSTALL_ADMIN_PASSWORD || process.env.ADMIN_DEFAULT_PASSWORD || 'admin123';
+export type ResolvedSeedPassword = {
+  value: string;
+  source: 'env' | 'generated';
+  envKey?: string;
 };
 
-export const resolveUserPassword = (): string => {
-  return process.env.USER_DEFAULT_PASSWORD || resolveAdminPassword();
+const generateStrongSeedPassword = () => {
+  return `Aa1!${randomBytes(18).toString('base64url')}`;
+};
+
+export const resolveAdminPassword = (): ResolvedSeedPassword => {
+  const explicitPassword = process.env.INSTALL_ADMIN_PASSWORD || process.env.ADMIN_DEFAULT_PASSWORD;
+  if (explicitPassword) {
+    return {
+      value: explicitPassword,
+      source: 'env',
+      envKey: process.env.INSTALL_ADMIN_PASSWORD ? 'INSTALL_ADMIN_PASSWORD' : 'ADMIN_DEFAULT_PASSWORD',
+    };
+  }
+
+  return {
+    value: generateStrongSeedPassword(),
+    source: 'generated',
+  };
+};
+
+export const resolveUserPassword = (
+  fallbackPassword: ResolvedSeedPassword,
+): ResolvedSeedPassword => {
+  const explicitPassword = process.env.USER_DEFAULT_PASSWORD;
+  if (explicitPassword) {
+    return {
+      value: explicitPassword,
+      source: 'env',
+      envKey: 'USER_DEFAULT_PASSWORD',
+    };
+  }
+
+  return fallbackPassword;
 };
 
 export const DEFAULT_SECURITY_CONFIG = {
