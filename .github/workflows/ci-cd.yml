@@ -44,6 +44,12 @@ jobs:
       - name: Backend tests
         run: pnpm -C apps/backend run --if-present test
 
+      - name: Backend security guardrails
+        run: pnpm -C apps/backend run --if-present security:guardrails
+
+      - name: Backend security regression tests
+        run: pnpm -C apps/backend run --if-present test:security-regression
+
       - name: Backend lint
         run: pnpm -C apps/backend run --if-present lint
 
