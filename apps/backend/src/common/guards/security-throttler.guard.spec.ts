@@ -1,11 +1,68 @@
 import { Reflector } from '@nestjs/core';
-import { ThrottlerStorageService } from '@nestjs/throttler';
 import { SecurityThrottlerGuard } from './security-throttler.guard';
 import {
   CRITICAL_RATE_LIMIT_KEY,
   CriticalRateLimitAction,
 } from '../decorators/critical-rate-limit.decorator';
 import { SharedThrottlerStorageUnavailableError } from '../services/redis-throttler.storage';
+
+type InMemoryThrottleState = {
+  totalHits: number;
+  expiresAt: number;
+  blockedUntil: number;
+};
+
+const createTestStorage = () => {
+  const states = new Map<string, InMemoryThrottleState>();
+
+  return {
+    increment: jest.fn(
+      async (key: string, ttl: number, limit: number, blockDuration: number) => {
+        const now = Date.now();
+        const effectiveBlockDuration = Number.isFinite(blockDuration) && blockDuration > 0 ? blockDuration : ttl;
+        const existing = states.get(key);
+        const baseState: InMemoryThrottleState =
+          !existing || existing.expiresAt <= now
+            ? {
+                totalHits: 0,
+                expiresAt: now + ttl,
+                blockedUntil: 0,
+              }
+            : existing;
+
+        if (baseState.blockedUntil > now) {
+          const timeToBlockExpire = Math.ceil((baseState.blockedUntil - now) / 1000);
+          const timeToExpire = Math.max(0, Math.ceil((baseState.expiresAt - now) / 1000));
+          states.set(key, baseState);
+          return {
+            totalHits: baseState.totalHits,
+            timeToExpire,
+            isBlocked: true,
+            timeToBlockExpire,
+          };
+        }
+
+        const nextHits = baseState.totalHits + 1;
+        const isBlocked = nextHits > limit;
+        const nextState: InMemoryThrottleState = {
+          totalHits: nextHits,
+          expiresAt: baseState.expiresAt,
+          blockedUntil: isBlocked ? now + effectiveBlockDuration : 0,
+        };
+        states.set(key, nextState);
+
+        return {
+          totalHits: nextState.totalHits,
+          timeToExpire: Math.max(0, Math.ceil((nextState.expiresAt - now) / 1000)),
+          isBlocked,
+          timeToBlockExpire: isBlocked
+            ? Math.max(1, Math.ceil((nextState.blockedUntil - now) / 1000))
+            : 0,
+        };
+      },
+    ),
+  };
+};
 
 const createHttpContext = (
   path: string,
@@ -103,7 +160,7 @@ describe('SecurityThrottlerGuard runtime enforcement', () => {
     recordSecurityEvent: jest.fn(),
   };
 
-  const createGuard = (storage: any = new ThrottlerStorageService()) =>
+  const createGuard = (storage: any = createTestStorage()) =>
     new SecurityThrottlerGuard(
       options,
       storage,

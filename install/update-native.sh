@@ -779,7 +779,7 @@ prepare_release_build() {
     (
       cd apps/backend
       pnpm exec prisma generate
-      pnpm exec tsc prisma/seed.ts --outDir dist/prisma --skipLibCheck --module commonjs --target ES2021 --esModuleInterop --resolveJsonModule
+      pnpm exec tsc prisma/seed.ts --outDir dist --skipLibCheck --module commonjs --target ES2021 --esModuleInterop --resolveJsonModule
     )
 
     pnpm --filter frontend build
@@ -911,6 +911,10 @@ run_legacy_inplace() {
     set_step "legacy-build" 50
     pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
     pnpm --filter backend build
+    (
+      cd apps/backend
+      pnpm exec tsc prisma/seed.ts --outDir dist --skipLibCheck --module commonjs --target ES2021 --esModuleInterop --resolveJsonModule
+    )
     pnpm --filter frontend build
 
     set_step "legacy-migrate" 70
@@ -1133,4 +1137,3 @@ main() {
 }
 
 main "$@"
-

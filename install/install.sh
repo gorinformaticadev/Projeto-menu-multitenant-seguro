@@ -407,7 +407,7 @@ native_build_apps() {
     local app_dir="$1"
     log_info "Etapa 13/23: build backend/frontend e seed..."
     run_as_native_user "cd '${app_dir}' && pnpm --filter backend build"
-    run_as_native_user "cd '${app_dir}/apps/backend' && pnpm exec tsc prisma/seed.ts --outDir dist/prisma --skipLibCheck --module commonjs --target ES2021 --esModuleInterop --resolveJsonModule"
+    run_as_native_user "cd '${app_dir}/apps/backend' && pnpm exec tsc prisma/seed.ts --outDir dist --skipLibCheck --module commonjs --target ES2021 --esModuleInterop --resolveJsonModule"
     run_as_native_user "cd '${app_dir}' && pnpm --filter frontend build"
 }
 

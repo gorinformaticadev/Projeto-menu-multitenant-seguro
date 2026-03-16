@@ -529,6 +529,11 @@ build_application() {
     cd "$PROJECT_ROOT/apps/backend"
     sudo -u multitenant NODE_ENV="$node_env" pnpm run build
 
+    # Compilar seed para o caminho esperado: dist/prisma/seed.js
+    log_info "Compilando seed versionado..."
+    cd "$PROJECT_ROOT/apps/backend"
+    sudo -u multitenant pnpm exec tsc prisma/seed.ts --outDir dist --skipLibCheck --module commonjs --target ES2021 --esModuleInterop --resolveJsonModule
+
     # Build do frontend
     log_info "Construindo frontend (Next.js)..."
     cd "$PROJECT_ROOT/apps/frontend"

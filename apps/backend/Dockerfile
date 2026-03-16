@@ -23,7 +23,7 @@ RUN pnpm --filter backend exec prisma generate --schema prisma/schema.prisma
 RUN pnpm --filter backend build
 # Compilar o seed para o diretório correto
 WORKDIR /app/apps/backend
-RUN pnpm exec tsc prisma/seed.ts --outDir dist/prisma --skipLibCheck --module commonjs --target ES2021 --esModuleInterop --resolveJsonModule
+RUN pnpm exec tsc prisma/seed.ts --outDir dist --skipLibCheck --module commonjs --target ES2021 --esModuleInterop --resolveJsonModule
 WORKDIR /app
 
 FROM base AS prod-deps
