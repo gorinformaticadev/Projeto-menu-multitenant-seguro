@@ -35,6 +35,12 @@ type ThrottleIdentity = {
   clientIp: string;
 };
 
+type PrincipalIdentity = {
+  userId: string | null;
+  tenantId: string | null;
+  apiKeyId: string | null;
+};
+
 type RateLimitExecution = {
   kind: 'global' | 'critical' | 'route';
   category?: CriticalRateLimitAction;
@@ -253,8 +259,9 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
   }
 
   private resolveCriticalTracker(req: Record<string, any>): string {
-    const tenantId = this.resolveTenantId(req) || 'global';
-    const userId = this.normalizeText(req?.user?.id || req?.user?.sub) || 'anonymous';
+    const principal = this.resolvePrincipalIdentity(req);
+    const tenantId = principal.tenantId || 'global';
+    const userId = principal.userId || 'anonymous';
     const clientIp = this.resolveClientIp(req);
     return `tenant:${tenantId}:user:${userId}:ip:${clientIp}`;
   }
@@ -345,8 +352,9 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     const path = this.getRequestPath(req);
     const clientIp = this.resolveClientIp(req);
 
-    const tenantId = this.resolveTenantId(req);
-    const apiKeyId = this.normalizeText(req?.apiKey?.id || req?.user?.apiKeyId || req?.auth?.apiKeyId);
+    const principal = this.resolvePrincipalIdentity(req);
+    const tenantId = principal.tenantId;
+    const apiKeyId = principal.apiKeyId;
 
     if (apiKeyId) {
       return {
@@ -357,7 +365,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
       };
     }
 
-    const userId = this.normalizeText(req?.user?.id || req?.user?.sub);
+    const userId = principal.userId;
     if (userId && tenantId) {
       return {
         scope: 'tenant-user',
@@ -405,6 +413,73 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
 
   private resolveTenantId(req: Record<string, any>): string | null {
     return this.normalizeText(req?.apiKey?.tenantId || req?.user?.tenantId || req?.tenantId);
+  }
+
+  private resolvePrincipalIdentity(req: Record<string, any>): PrincipalIdentity {
+    const fromRequest = {
+      userId: this.normalizeText(req?.user?.id || req?.user?.sub),
+      tenantId: this.resolveTenantId(req),
+      apiKeyId: this.normalizeText(req?.apiKey?.id || req?.user?.apiKeyId || req?.auth?.apiKeyId),
+    };
+
+    if (fromRequest.userId || fromRequest.tenantId || fromRequest.apiKeyId) {
+      return fromRequest;
+    }
+
+    const token = this.extractBearerToken(req);
+    if (!token) {
+      return fromRequest;
+    }
+
+    const payload = this.decodeJwtPayload(token);
+    if (payload) {
+      const userId = this.normalizeText(payload.sub);
+      const tenantId = this.normalizeText(payload.tenantId);
+      const apiKeyId = this.normalizeText(payload.apiKeyId);
+      return {
+        userId,
+        tenantId,
+        apiKeyId,
+      };
+    }
+
+    return fromRequest;
+  }
+
+  private extractBearerToken(req: Record<string, any>): string | null {
+    const authorizationHeader = req?.headers?.authorization;
+    const authorization = Array.isArray(authorizationHeader)
+      ? authorizationHeader[0]
+      : authorizationHeader;
+
+    if (typeof authorization !== 'string') {
+      return null;
+    }
+
+    const [scheme, token] = authorization.split(' ');
+    if (!scheme || scheme.toLowerCase() !== 'bearer') {
+      return null;
+    }
+
+    const normalizedToken = (token || '').trim();
+    return normalizedToken.length > 0 ? normalizedToken : null;
+  }
+
+  private decodeJwtPayload(token: string): Record<string, unknown> | null {
+    const parts = token.split('.');
+    if (parts.length < 2) {
+      return null;
+    }
+
+    try {
+      const payloadJson = Buffer.from(parts[1], 'base64url').toString('utf8');
+      const payload = JSON.parse(payloadJson);
+      return typeof payload === 'object' && payload !== null
+        ? (payload as Record<string, unknown>)
+        : null;
+    } catch {
+      return null;
+    }
   }
 
   private resolveAuthTarget(path: string, req: Record<string, any>): string | null {
