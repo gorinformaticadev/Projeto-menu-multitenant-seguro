@@ -1,6 +1,6 @@
 // Forced reload to check module loading debug logs v3
 import { ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
+import { ModuleRef, NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
@@ -61,23 +61,16 @@ async function bootstrap() {
 
   const dynamicModule = await AppModule.register();
   const app = await NestFactory.create<NestExpressApplication>(dynamicModule);
+  const moduleRef = app.get(ModuleRef);
   // Bridge seguro para class-validator:
   // - resolve providers do Nest quando existirem (ex.: IsStrongPasswordConstraint)
-  // - nao quebra bootstrap para constraints inline (CustomConstraint)
-  // - deixa class-validator usar fallback interno quando token nao existir no Nest
+  // - deixa class-validator usar fallback interno para constraints inline/nao registradas
+  // - usa ModuleRef (nao proxy) para evitar ExceptionsZone fatal do app.get() em token ausente
   useContainer(
     {
       get<T>(token: new (...args: any[]) => T): T | undefined {
-        // class-validator cria CustomConstraint para validadores inline (validator: { validate() {} }).
-        // Esse token nao pertence ao container do Nest e consultar app.get(token) pode disparar
-        // UnknownElementException durante bootstrap.
-        const tokenName = (token as unknown as { name?: string })?.name;
-        if (tokenName === 'CustomConstraint') {
-          return undefined;
-        }
-
         try {
-          return app.get(token, { strict: false });
+          return moduleRef.get(token, { strict: false });
         } catch {
           return undefined;
         }
