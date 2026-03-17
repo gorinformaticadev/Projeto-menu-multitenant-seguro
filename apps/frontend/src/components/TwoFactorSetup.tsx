@@ -13,7 +13,7 @@ import Image from "next/image";
 
 interface TwoFactorSetupProps {
   isEnabled: boolean;
-  onStatusChange: () => void;
+  onStatusChange: (enabled: boolean) => Promise<void> | void;
 }
 
 export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProps) {
@@ -71,7 +71,11 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
       setQrCode(null);
       setSecret(null);
       setVerificationCode("");
-      onStatusChange();
+      try {
+        await onStatusChange(true);
+      } catch {
+        // noop
+      }
     } catch (error: unknown) {
       let message = "Código inválido";
       if (error && typeof error === "object" && "response" in error && error.response && typeof error.response === "object" && "data" in error.response && error.response.data && typeof error.response.data === "object" && "message" in error.response.data) {
@@ -110,7 +114,11 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
         description: "Autenticação de dois fatores desativada",
       });
       setVerificationCode("");
-      onStatusChange();
+      try {
+        await onStatusChange(false);
+      } catch {
+        // noop
+      }
     } catch (error: unknown) {
       let message = "Código inválido";
       if (error && typeof error === "object" && "response" in error && error.response && typeof error.response === "object" && "data" in error.response && error.response.data && typeof error.response.data === "object" && "message" in error.response.data) {

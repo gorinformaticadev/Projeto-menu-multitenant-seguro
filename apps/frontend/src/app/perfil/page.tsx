@@ -53,10 +53,16 @@ export default function PerfilPage() {
   });
   const currentAvatarSrc = avatarPreview || userAvatarSrc || tenantLogoFallbackSrc;
 
+  const getProfileCacheKey = useCallback(() => {
+    if (!user?.id) return null;
+    return `user-profile-${user.id}`;
+  }, [user?.id]);
+
   const loadUserData = useCallback(async (force = false) => {
     if (!user?.id) return;
 
-    const cacheKey = `user-profile-${user.id}`;
+    const cacheKey = getProfileCacheKey();
+    if (!cacheKey) return;
     const cacheTTL = 2 * 60 * 1000;
 
     if (!force) {
@@ -79,13 +85,18 @@ export default function PerfilPage() {
     }
 
     try {
-      const response = await api.get(`/users/${user.id}`);
+      const response = await api.get("/auth/me");
       const userData = response.data;
 
       setTwoFactorEnabled(userData.twoFactorEnabled || false);
       setProfileData({
         name: userData.name || "",
         email: userData.email || "",
+      });
+      updateUser({
+        name: userData.name || "",
+        email: userData.email || "",
+        twoFactorEnabled: userData.twoFactorEnabled || false,
       });
 
       localStorage.setItem(cacheKey, JSON.stringify({
@@ -95,7 +106,18 @@ export default function PerfilPage() {
     } catch {
       // noop
     }
-  }, [user?.id]);
+  }, [getProfileCacheKey, updateUser, user?.id]);
+
+  const handleTwoFactorStatusChange = useCallback(async (enabled: boolean) => {
+    const cacheKey = getProfileCacheKey();
+    if (cacheKey) {
+      localStorage.removeItem(cacheKey);
+    }
+
+    setTwoFactorEnabled(enabled);
+    updateUser({ twoFactorEnabled: enabled });
+    await loadUserData(true);
+  }, [getProfileCacheKey, loadUserData, updateUser]);
 
   useEffect(() => {
     if (user?.id) {
@@ -702,7 +724,7 @@ export default function PerfilPage() {
 
       <TwoFactorSetup
         isEnabled={twoFactorEnabled}
-        onStatusChange={loadUserData}
+        onStatusChange={handleTwoFactorStatusChange}
       />
     </div>
   );

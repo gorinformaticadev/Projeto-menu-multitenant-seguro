@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
-import { Plus, User, Mail, Shield, Edit, Trash2, Building2, Lock, Unlock, AlertTriangle } from "lucide-react";
+import { Plus, User, Mail, Shield, Edit, Trash2, Building2, Lock, Unlock, AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { PasswordInput } from "@/components/ui/password-input";
 
 interface UserData {
@@ -57,6 +57,7 @@ export default function UsuariosPage() {
     password: "",
     confirmPassword: "",
   });
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const loadTenants = useCallback(async () => {
     const cacheKey = 'tenants-list-cache';
@@ -200,6 +201,7 @@ export default function UsuariosPage() {
       setShowDialog(false);
       setEditingUser(null);
       setFormData({ email: "", name: "", role: "USER", password: "", confirmPassword: "" });
+      setShowConfirmPassword(false);
       loadUsers();
     } catch (error: unknown) {
       toast({
@@ -262,6 +264,7 @@ export default function UsuariosPage() {
       password: "",
       confirmPassword: "",
     });
+    setShowConfirmPassword(false);
     setShowDialog(true);
   }
 
@@ -276,6 +279,7 @@ export default function UsuariosPage() {
     }
     setEditingUser(null);
     setFormData({ email: "", name: "", role: "USER", password: "", confirmPassword: "" });
+    setShowConfirmPassword(false);
     setShowDialog(true);
   }
 
@@ -474,8 +478,16 @@ export default function UsuariosPage() {
         )}
 
         {/* Dialog de Criar/Editar */}
-        <Dialog open={showDialog} onOpenChange={setShowDialog}>
-          <DialogContent>
+        <Dialog
+          open={showDialog}
+          onOpenChange={(open) => {
+            setShowDialog(open);
+            if (!open) {
+              setShowConfirmPassword(false);
+            }
+          }}
+        >
+          <DialogContent className="max-h-[90vh] w-[95vw] overflow-y-auto sm:w-full">
             <DialogHeader>
               <DialogTitle>{editingUser ? "Editar Usuário" : "Novo Usuário"}</DialogTitle>
               <DialogDescription>
@@ -540,22 +552,46 @@ export default function UsuariosPage() {
                   <Label htmlFor="confirmPassword">
                     {editingUser ? "Confirmar Nova Senha" : "Confirmar Senha"}
                   </Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    value={formData.confirmPassword}
-                    onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                    placeholder="Digite a senha novamente"
-                    required={!editingUser || formData.password.length > 0}
-                    className={formData.password && formData.confirmPassword && formData.password !== formData.confirmPassword ? "border-destructive" : ""}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={formData.confirmPassword}
+                      onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                      placeholder="Digite a senha novamente"
+                      required={!editingUser || formData.password.length > 0}
+                      className={formData.password && formData.confirmPassword && formData.password !== formData.confirmPassword ? "border-destructive pr-10" : "pr-10"}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowConfirmPassword((prev) => !prev)}
+                      tabIndex={-1}
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
                   {formData.confirmPassword && formData.password !== formData.confirmPassword && (
                     <p className="text-sm text-destructive">As senhas não coincidem</p>
                   )}
                 </div>
               )}
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setShowDialog(false)} disabled={submitting}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowDialog(false);
+                    setShowConfirmPassword(false);
+                  }}
+                  disabled={submitting}
+                >
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={submitting}>

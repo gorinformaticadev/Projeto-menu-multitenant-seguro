@@ -40,6 +40,7 @@ interface ApiError {
     status?: number;
   };
   message?: string;
+  code?: string;
 }
 
 type TokenResponsePayload = {
@@ -48,6 +49,25 @@ type TokenResponsePayload = {
   accessTokenExpiresAt?: string | null;
   refreshTokenExpiresAt?: string | null;
   user: User;
+};
+
+const AUTH_REQUEST_TIMEOUT_MS = 15000;
+
+const resolveApiErrorMessage = (error: ApiError, fallback: string): string => {
+  if (error.code === "ECONNABORTED") {
+    return "Tempo de resposta esgotado. Tente novamente.";
+  }
+
+  const apiMessage = error.response?.data?.message;
+  if (typeof apiMessage === "string" && apiMessage.trim()) {
+    return apiMessage;
+  }
+
+  if (typeof error.message === "string" && error.message.trim()) {
+    return error.message;
+  }
+
+  return fallback;
 };
 
 interface AuthContextData {
@@ -322,7 +342,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function login(email: string, password: string) {
     try {
-      const response = await api.post("/auth/login", { email, password });
+      const response = await api.post(
+        "/auth/login",
+        { email, password },
+        { timeout: AUTH_REQUEST_TIMEOUT_MS },
+      );
       const {
         accessToken,
         refreshToken,
@@ -340,9 +364,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       router.push("/dashboard");
     } catch (error: unknown) {
       const apiError = error as ApiError;
-      throw new Error(
-        apiError.response?.data?.message || "Erro ao fazer login"
-      );
+      throw new Error(resolveApiErrorMessage(apiError, "Erro ao fazer login"));
     }
   }
 
@@ -392,7 +414,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error: unknown) {
       const apiError = error as ApiError;
       // Verificar se é erro de 2FA
-      const errorMessage = apiError.response?.data?.message || "";
+      const errorMessage = resolveApiErrorMessage(apiError, "Erro ao fazer login");
       if (errorMessage.includes("2FA") || errorMessage.includes("two-factor")) {
         return {
           success: false,
@@ -404,7 +426,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return {
         success: false,
         requires2FA: false,
-        error: errorMessage || "Erro ao fazer login"
+        error: errorMessage
       };
     }
   }
@@ -421,11 +443,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Login com 2FA
-      const response = await api.post("/auth/login-2fa", {
-        email,
-        password,
-        twoFactorToken: code
-      });
+      const response = await api.post(
+        "/auth/login-2fa",
+        {
+          email,
+          password,
+          twoFactorToken: code
+        },
+        { timeout: AUTH_REQUEST_TIMEOUT_MS },
+      );
 
       const {
         accessToken,
@@ -460,9 +486,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error: unknown) {
       let errorMessage = "Código inválido";
       const apiError = error as ApiError;
-      if (apiError.response?.data?.message) {
-        errorMessage = apiError.response.data.message;
-      }
+      errorMessage = resolveApiErrorMessage(apiError, "Codigo invalido");
       return {
         success: false,
         requires2FA: false,
