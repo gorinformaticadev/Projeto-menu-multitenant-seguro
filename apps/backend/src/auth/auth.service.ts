@@ -13,6 +13,8 @@ import type { StringValue } from 'ms';
 import { LoginDto } from './dto/login.dto';
 import { Login2FADto } from './dto/login-2fa.dto';
 import { UserSessionService } from './user-session.service';
+import { TrustedDeviceService } from './trusted-device.service';
+import { TwoFactorRequiredException } from './exceptions/two-factor-required.exception';
 
 type TokenGenerationInput = {
   userId: string;
@@ -49,9 +51,15 @@ export class AuthService {
     private tokenBlacklistService: TokenBlacklistService,
     private securityConfigService: SecurityConfigService,
     private userSessionService: UserSessionService,
+    private trustedDeviceService: TrustedDeviceService,
   ) {}
 
-  async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string) {
+  async login(
+    loginDto: LoginDto,
+    ipAddress?: string,
+    userAgent?: string,
+    trustedDeviceToken?: string,
+  ) {
     const { email, password } = loginDto;
 
     const user = await this.prisma.user.findUnique({
@@ -206,23 +214,66 @@ export class AuthService {
       );
     }
 
+    let trustedDeviceUsedForBypass = false;
+    let shouldClearTrustedDeviceCookie = false;
+
     if (is2FAGloballyEnabled && user.twoFactorEnabled) {
-      await this.auditService.log({
-        action: 'LOGIN_2FA_CHALLENGE',
+      const trustedDeviceValidation = await this.trustedDeviceService.validateTrustedDevice({
+        token: trustedDeviceToken,
         userId: user.id,
-        tenantId: user.tenantId,
         ipAddress,
         userAgent,
-        details: {
-          email,
-          reason: 'user_has_2fa_enabled',
-          role: user.role,
-        },
       });
 
-      throw new UnauthorizedException(
-        '2FA necessario para concluir o login. Informe o codigo de autenticacao.',
-      );
+      trustedDeviceUsedForBypass = trustedDeviceValidation.shouldBypass2FA;
+      shouldClearTrustedDeviceCookie = trustedDeviceValidation.shouldClearCookie;
+
+      if (trustedDeviceValidation.status === 'valid') {
+        await this.auditService.log({
+          action: 'TRUSTED_DEVICE_USED',
+          userId: user.id,
+          tenantId: user.tenantId,
+          ipAddress,
+          userAgent,
+          details: {
+            trustedDeviceId: trustedDeviceValidation.trustedDeviceId,
+            status: trustedDeviceValidation.status,
+          },
+        });
+      } else if (trustedDeviceValidation.status !== 'missing') {
+        await this.auditService.log({
+          action: 'TRUSTED_DEVICE_INVALID',
+          userId: user.id,
+          tenantId: user.tenantId,
+          ipAddress,
+          userAgent,
+          details: {
+            trustedDeviceId: trustedDeviceValidation.trustedDeviceId,
+            status: trustedDeviceValidation.status,
+          },
+        });
+      }
+
+      if (!trustedDeviceUsedForBypass) {
+        await this.auditService.log({
+          action: 'LOGIN_2FA_CHALLENGE',
+          userId: user.id,
+          tenantId: user.tenantId,
+          ipAddress,
+          userAgent,
+          details: {
+            email,
+            reason: 'user_has_2fa_enabled',
+            role: user.role,
+            trustedDeviceStatus: trustedDeviceValidation.status,
+          },
+        });
+
+        throw new TwoFactorRequiredException(
+          '2FA necessario para concluir o login. Informe o codigo de autenticacao.',
+          shouldClearTrustedDeviceCookie,
+        );
+      }
     }
 
     const tokens = await this.generateTokens({
@@ -241,7 +292,10 @@ export class AuthService {
       tenantId: user.tenantId,
       ipAddress,
       userAgent,
-      details: { email },
+      details: {
+        email,
+        trustedDeviceBypass: trustedDeviceUsedForBypass,
+      },
     });
 
     return {
@@ -562,13 +616,30 @@ export class AuthService {
       userAgent,
     });
 
+    let trustedDeviceToken: string | undefined;
+    let trustedDeviceExpiresAt: Date | undefined;
+
+    if (login2FADto.trustDevice === true) {
+      const issuedTrustedDevice = await this.trustedDeviceService.issueTrustedDevice({
+        userId: user.id,
+        tenantId: user.tenantId,
+        ipAddress,
+        userAgent,
+      });
+      trustedDeviceToken = issuedTrustedDevice.token;
+      trustedDeviceExpiresAt = issuedTrustedDevice.expiresAt;
+    }
+
     await this.auditService.log({
       action: 'LOGIN_2FA_SUCCESS',
       userId: user.id,
       tenantId: user.tenantId,
       ipAddress,
       userAgent,
-      details: { email },
+      details: {
+        email,
+        trustDevice: login2FADto.trustDevice === true,
+      },
     });
 
     return {
@@ -577,6 +648,8 @@ export class AuthService {
       accessTokenExpiresAt: tokens.accessTokenExpiresAt,
       refreshTokenExpiresAt: tokens.refreshTokenExpiresAt,
       user: this.toUserResponse(user),
+      trustedDeviceToken,
+      trustedDeviceExpiresAt,
     };
   }
 

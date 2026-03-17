@@ -1,6 +1,7 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { SecurityRuntimeConfigService } from '@core/security-config/security-runtime-config.service';
+import { TrustedDeviceService } from './trusted-device.service';
 
 type SessionContext = {
   ipAddress?: string;
@@ -18,6 +19,7 @@ export class UserSessionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly securityRuntimeConfigService: SecurityRuntimeConfigService,
+    private readonly trustedDeviceService: TrustedDeviceService,
   ) {}
 
   async createSession(
@@ -127,6 +129,11 @@ export class UserSessionService {
       await this.prisma.refreshToken.deleteMany({
         where: { userId },
       });
+      await this.trustedDeviceService.revokeAllForUser({
+        userId,
+        revokedByUserId: userId,
+        reason: `global_security_action:${reason}`,
+      });
       return;
     }
 
@@ -150,6 +157,12 @@ export class UserSessionService {
         },
       }),
     ]);
+
+    await this.trustedDeviceService.revokeAllForUser({
+      userId,
+      revokedByUserId: userId,
+      reason: `global_security_action:${reason}`,
+    });
   }
 
   private async getSessionOrThrow(sessionId: string, userId: string) {

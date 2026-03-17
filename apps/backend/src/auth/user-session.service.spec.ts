@@ -21,8 +21,16 @@ describe('UserSessionService inactivity enforcement', () => {
     getSessionPolicy: jest.fn(),
   };
 
+  const trustedDeviceServiceMock = {
+    revokeAllForUser: jest.fn(),
+  };
+
   const createService = () =>
-    new UserSessionService(prismaMock as any, securityRuntimeConfigServiceMock as any);
+    new UserSessionService(
+      prismaMock as any,
+      securityRuntimeConfigServiceMock as any,
+      trustedDeviceServiceMock as any,
+    );
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -36,6 +44,7 @@ describe('UserSessionService inactivity enforcement', () => {
     prismaMock.refreshToken.deleteMany.mockResolvedValue({ count: 1 });
     prismaMock.userSession.deleteMany.mockResolvedValue({ count: 0 });
     prismaMock.userSession.update.mockResolvedValue(undefined);
+    trustedDeviceServiceMock.revokeAllForUser.mockResolvedValue(1);
   });
 
   it('updates last activity on authenticated requests', async () => {

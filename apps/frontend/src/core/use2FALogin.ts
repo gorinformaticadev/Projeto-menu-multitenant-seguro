@@ -42,13 +42,13 @@ export function use2FALogin() {
     }
   }
 
-  async function loginWith2FACode(code: string) {
+  async function loginWith2FACode(code: string, trustDevice: boolean) {
     setLoading(true);
     setError("");
 
     try {
       // Delegar para AuthContext
-      const result = await loginWith2FA(credentials.email, credentials.password, code);
+      const result = await loginWith2FA(credentials.email, credentials.password, code, trustDevice);
 
       if (result.success) {
         // Login concluído com sucesso - AuthContext já redirecionou

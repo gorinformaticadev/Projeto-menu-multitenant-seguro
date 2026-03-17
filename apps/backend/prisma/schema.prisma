@@ -55,6 +55,8 @@ model User {
   passwordResetTokens      PasswordResetToken[]
   refreshTokens            RefreshToken[]
   blacklistedTokens        BlacklistedToken[]
+  trustedDevices           TrustedDevice[]
+  trustedDevicesRevoked    TrustedDevice[]       @relation("TrustedDeviceRevokedBy")
   sessions                 UserSession[]
   tenant                   Tenant?              @relation(fields: [tenantId], references: [id])
   preferences              UserPreferences?
@@ -72,6 +74,30 @@ model User {
   @@index([isLocked])
   @@index([tenantId, role])
   @@map("users")
+}
+
+model TrustedDevice {
+  id              String    @id @default(uuid())
+  userId          String
+  tokenHash       String    @unique
+  deviceLabel     String?
+  userAgent       String?
+  createdIp       String?
+  lastUsedIp      String?
+  createdAt       DateTime  @default(now())
+  lastUsedAt      DateTime?
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  revokedByUserId String?
+  revokeReason    String?
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revokedByUser   User?     @relation("TrustedDeviceRevokedBy", fields: [revokedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+  @@index([userId, revokedAt, expiresAt])
+  @@map("trusted_devices")
 }
 
 model DashboardLayout {

@@ -14,6 +14,7 @@ import { AuditModule } from '../audit/audit.module';
 import { EmailModule } from '../email/email.module';
 import { SecurityConfigModule } from '@core/security-config/security-config.module';
 import { UserSessionService } from './user-session.service';
+import { TrustedDeviceService } from './trusted-device.service';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { UserSessionService } from './user-session.service';
     JwtStrategy,
     TokenBlacklistService,
     UserSessionService,
+    TrustedDeviceService,
   ],
   exports: [
     AuthService,
@@ -53,6 +55,7 @@ import { UserSessionService } from './user-session.service';
     PasswordResetService,
     TokenBlacklistService,
     UserSessionService,
+    TrustedDeviceService,
   ],
 })
 export class AuthModule { }

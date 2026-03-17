@@ -58,13 +58,37 @@ export class TokenCleanupService implements OnModuleInit {
 
     this.logger.log('Starting cleanup of expired refresh tokens...');
     try {
-      const result = await this.prisma.refreshToken.deleteMany({
-        where: {
-          expiresAt: { lt: new Date() },
-        },
-      });
+      const now = new Date();
+      const trustedDeviceRetentionBoundary = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-      this.logger.log(`Token cleanup completed: ${result.count} rows removed.`);
+      const [refreshTokenResult, trustedDeviceResult] = await this.prisma.$transaction([
+        this.prisma.refreshToken.deleteMany({
+          where: {
+            expiresAt: { lt: now },
+          },
+        }),
+        this.prisma.trustedDevice.deleteMany({
+          where: {
+            OR: [
+              {
+                expiresAt: {
+                  lt: now,
+                },
+              },
+              {
+                revokedAt: {
+                  not: null,
+                  lt: trustedDeviceRetentionBoundary,
+                },
+              },
+            ],
+          },
+        }),
+      ]);
+
+      this.logger.log(
+        `Token cleanup completed: refreshTokens=${refreshTokenResult.count} trustedDevices=${trustedDeviceResult.count}`,
+      );
     } catch (error) {
       this.logger.error('Error during expired token cleanup.', error as Error);
     } finally {

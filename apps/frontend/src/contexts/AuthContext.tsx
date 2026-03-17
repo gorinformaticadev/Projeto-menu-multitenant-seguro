@@ -90,7 +90,12 @@ interface AuthContextData {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginWithCredentials: (email: string, password: string) => Promise<LoginResult>;
-  loginWith2FA: (email: string, password: string, code: string) => Promise<LoginResult>;
+  loginWith2FA: (
+    email: string,
+    password: string,
+    code: string,
+    trustDevice: boolean,
+  ) => Promise<LoginResult>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
 }
@@ -439,7 +444,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function loginWith2FA(email: string, password: string, code: string): Promise<LoginResult> {
+  async function loginWith2FA(
+    email: string,
+    password: string,
+    code: string,
+    trustDevice: boolean,
+  ): Promise<LoginResult> {
     try {
       // Validar inputs
       if (!email || !password || !code) {
@@ -456,7 +466,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         {
           email,
           password,
-          twoFactorToken: code
+          twoFactorToken: code,
+          trustDevice,
         },
         { timeout: AUTH_REQUEST_TIMEOUT_MS },
       );

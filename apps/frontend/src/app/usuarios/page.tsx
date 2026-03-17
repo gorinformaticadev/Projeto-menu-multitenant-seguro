@@ -302,6 +302,27 @@ function UsuariosContent() {
     }
   }
 
+  async function handleRevokeTrustedDevices(id: string, userName: string) {
+    if (!confirm(`Tem certeza que deseja revogar todos os dispositivos confiaveis de ${userName}?`)) {
+      return;
+    }
+
+    try {
+      const response = await api.post(`/users/${id}/trusted-devices/revoke`);
+      const revokedCount = Number(response?.data?.revokedCount ?? 0);
+      toast({
+        title: "Dispositivos confiaveis revogados",
+        description: `${revokedCount} dispositivo(s) revogado(s) para ${userName}.`,
+      });
+    } catch (error: unknown) {
+      toast({
+        title: "Erro ao revogar dispositivos confiaveis",
+        description: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ocorreu um erro",
+        variant: "destructive",
+      });
+    }
+  }
+
   function openEditDialog(user: UserData) {
     setEditingUser(user);
     setFormData({
@@ -641,6 +662,22 @@ function UsuariosContent() {
                   {formData.confirmPassword && formData.password !== formData.confirmPassword && (
                     <p className="text-sm text-destructive">As senhas não coincidem</p>
                   )}
+                </div>
+              )}
+              {editingUser && user?.role === "SUPER_ADMIN" && (
+                <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
+                  <p className="text-sm font-medium">Acao administrativa de seguranca</p>
+                  <p className="mb-3 text-xs text-muted-foreground">
+                    Revoga imediatamente todos os dispositivos confiaveis deste usuario.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => handleRevokeTrustedDevices(editingUser.id, editingUser.name)}
+                    disabled={submitting}
+                  >
+                    Revogar dispositivos confiaveis
+                  </Button>
                 </div>
               )}
               <DialogFooter>

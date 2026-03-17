@@ -14,6 +14,8 @@ import { usePlatformConfigContext } from "@/contexts/PlatformConfigContext";
 import { Building2, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import { resolveTenantLogoSrc } from "@/lib/tenant-logo";
 
+const REMEMBERED_LOGIN_KEY = "rememberedLoginEmail";
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,18 +37,10 @@ export default function LoginPage() {
   } = use2FALogin();
 
   useEffect(() => {
-    const savedCredentials = localStorage.getItem("loginCredentials");
-    if (savedCredentials) {
-      try {
-        const { email: savedEmail, password: savedPassword, rememberMe: savedRememberMe } = JSON.parse(savedCredentials);
-        if (savedRememberMe) {
-          setEmail(savedEmail || "");
-          setPassword(savedPassword || "");
-          setRememberMe(true);
-        }
-      } catch {
-        localStorage.removeItem("loginCredentials");
-      }
+    const rememberedEmail = localStorage.getItem(REMEMBERED_LOGIN_KEY);
+    if (rememberedEmail) {
+      setEmail(rememberedEmail);
+      setRememberMe(true);
     }
   }, []);
 
@@ -73,20 +67,16 @@ export default function LoginPage() {
     }
 
     if (rememberMe) {
-      localStorage.setItem("loginCredentials", JSON.stringify({
-        email,
-        password,
-        rememberMe: true
-      }));
+      localStorage.setItem(REMEMBERED_LOGIN_KEY, email);
     } else {
-      localStorage.removeItem("loginCredentials");
+      localStorage.removeItem(REMEMBERED_LOGIN_KEY);
     }
 
     await attemptLogin(email, password);
   }
 
-  async function handle2FASubmit(code: string) {
-    await loginWith2FA(code);
+  async function handle2FASubmit(code: string, trustDevice: boolean) {
+    await loginWith2FA(code, trustDevice);
   }
 
   function handleBack() {
@@ -190,10 +180,12 @@ export default function LoginPage() {
               {/* Glassy Inset Input */}
               <Input
                 id="email"
+                name="username"
                 type="email"
                 placeholder="seu@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                autoComplete="username"
                 className="bg-black/20 border border-white/5 rounded-xl h-10 px-4 shadow-[inset_2px_2px_4px_rgba(0,0,0,0.5),inset_-1px_-1px_3px_rgba(255,255,255,0.05)] focus-visible:ring-1 focus-visible:ring-indigo-500/50 focus-visible:bg-black/30 transition-all placeholder:text-slate-600 text-slate-200"
               />
             </div>
@@ -207,10 +199,12 @@ export default function LoginPage() {
               {/* Glassy Inset Input */}
               <Input
                 id="password"
+                name="password"
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
                 onKeyDown={handleKeyDown}
                 onKeyUp={handleKeyDown}
                 className="bg-black/20 border border-white/5 rounded-xl h-10 px-4 pr-10 shadow-[inset_2px_2px_4px_rgba(0,0,0,0.5),inset_-1px_-1px_3px_rgba(255,255,255,0.05)] focus-visible:ring-1 focus-visible:ring-indigo-500/50 focus-visible:bg-black/30 transition-all placeholder:text-slate-600 text-slate-200"

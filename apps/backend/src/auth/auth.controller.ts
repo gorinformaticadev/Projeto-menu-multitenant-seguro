@@ -1,4 +1,14 @@
-import { Controller, Post, Body, Ip, UseGuards, Get, Req } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Ip,
+  UseGuards,
+  Get,
+  Req,
+  Res,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { TwoFactorService } from './two-factor.service';
@@ -15,7 +25,13 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SecurityConfigService } from '@core/security-config/security-config.service';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { SkipCsrf } from '@core/common/decorators/skip-csrf.decorator';
-import { Request } from 'express';
+import { Request, Response } from 'express';
+import {
+  TRUSTED_DEVICE_COOKIE_NAME,
+  buildTrustedDeviceCookieClearOptions,
+  buildTrustedDeviceCookieOptions,
+} from './trusted-device.constants';
+import { TwoFactorRequiredException } from './exceptions/two-factor-required.exception';
 
 type AuthenticatedRequest = Request & { user: { id: string } };
 
@@ -40,10 +56,25 @@ export class AuthController {
   async login(
     @Body() loginDto: LoginDto,
     @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
     @Ip() ip: string,
   ) {
     const userAgent = req.headers['user-agent'] || 'Unknown';
-    return this.authService.login(loginDto, ip, userAgent);
+    const trustedDeviceToken = this.extractTrustedDeviceToken(req);
+
+    try {
+      return await this.authService.login(loginDto, ip, userAgent, trustedDeviceToken);
+    } catch (error) {
+      if (error instanceof TwoFactorRequiredException) {
+        if (error.clearTrustedDeviceCookie) {
+          this.clearTrustedDeviceCookie(res);
+        }
+
+        throw new UnauthorizedException(error.message);
+      }
+
+      throw error;
+    }
   }
 
   /**
@@ -95,10 +126,20 @@ export class AuthController {
   async login2FA(
     @Body() login2FADto: Login2FADto,
     @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
     @Ip() ip: string,
   ) {
     const userAgent = req.headers['user-agent'] || 'Unknown';
-    return this.authService.login2FA(login2FADto, ip, userAgent);
+    const result = await this.authService.login2FA(login2FADto, ip, userAgent);
+
+    if (result.trustedDeviceToken && result.trustedDeviceExpiresAt) {
+      this.setTrustedDeviceCookie(res, result.trustedDeviceToken, result.trustedDeviceExpiresAt);
+    }
+
+    const responseBody = { ...result } as Record<string, unknown>;
+    delete responseBody.trustedDeviceToken;
+    delete responseBody.trustedDeviceExpiresAt;
+    return responseBody;
   }
 
   /**
@@ -232,5 +273,23 @@ export class AuthController {
     }
 
     return token.trim();
+  }
+
+  private extractTrustedDeviceToken(req: Request): string | undefined {
+    const cookieValue = req.cookies?.[TRUSTED_DEVICE_COOKIE_NAME];
+    if (typeof cookieValue !== 'string') {
+      return undefined;
+    }
+
+    const token = cookieValue.trim();
+    return token.length > 0 ? token : undefined;
+  }
+
+  private setTrustedDeviceCookie(res: Response, token: string, expiresAt: Date): void {
+    res.cookie(TRUSTED_DEVICE_COOKIE_NAME, token, buildTrustedDeviceCookieOptions(expiresAt));
+  }
+
+  private clearTrustedDeviceCookie(res: Response): void {
+    res.cookie(TRUSTED_DEVICE_COOKIE_NAME, '', buildTrustedDeviceCookieClearOptions());
   }
 }

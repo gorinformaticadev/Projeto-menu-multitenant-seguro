@@ -51,6 +51,11 @@ describe('AuthService security runtime enforcement', () => {
     revokeSession: jest.fn(),
   };
 
+  const trustedDeviceServiceMock = {
+    validateTrustedDevice: jest.fn(),
+    issueTrustedDevice: jest.fn(),
+  };
+
   const createService = () =>
     new AuthService(
       prismaMock as any,
@@ -61,6 +66,7 @@ describe('AuthService security runtime enforcement', () => {
       tokenBlacklistServiceMock as any,
       securityConfigServiceMock as any,
       userSessionServiceMock as any,
+      trustedDeviceServiceMock as any,
     );
 
   beforeEach(() => {
@@ -100,6 +106,15 @@ describe('AuthService security runtime enforcement', () => {
     });
     userSessionServiceMock.assertRefreshSessionActive.mockResolvedValue(undefined);
     userSessionServiceMock.revokeSession.mockResolvedValue(undefined);
+    trustedDeviceServiceMock.validateTrustedDevice.mockResolvedValue({
+      status: 'missing',
+      shouldBypass2FA: false,
+      shouldClearCookie: false,
+    });
+    trustedDeviceServiceMock.issueTrustedDevice.mockResolvedValue({
+      token: 'trusted-token',
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    });
   });
 
   it('blocks the normal login flow when the user already has 2FA enabled', async () => {
@@ -144,6 +159,128 @@ describe('AuthService security runtime enforcement', () => {
     expect(auditServiceMock.log).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'LOGIN_2FA_CHALLENGE',
+        userId: 'user-1',
+      }),
+    );
+    expect(prismaMock.refreshToken.create).not.toHaveBeenCalled();
+  });
+
+  it('bypasses 2FA when the trusted device token is valid after password validation', async () => {
+    const service = createService();
+    const hashedPassword = await bcrypt.hash('SenhaValida!123', 4);
+
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'admin@example.com',
+      password: hashedPassword,
+      name: 'Admin',
+      role: 'ADMIN',
+      tenantId: 'tenant-1',
+      tenant: null,
+      twoFactorEnabled: true,
+      sessionVersion: 0,
+      loginAttempts: 0,
+      isLocked: false,
+      lockedUntil: null,
+      avatarUrl: null,
+    });
+    securityConfigServiceMock.getTwoFactorConfig.mockResolvedValue({
+      enabled: true,
+      required: false,
+      requiredForAdmins: false,
+      suggested: true,
+    });
+    trustedDeviceServiceMock.validateTrustedDevice.mockResolvedValue({
+      status: 'valid',
+      shouldBypass2FA: true,
+      shouldClearCookie: false,
+      trustedDeviceId: 'trusted-1',
+    });
+
+    await expect(
+      service.login(
+        {
+          email: 'admin@example.com',
+          password: 'SenhaValida!123',
+        },
+        '127.0.0.1',
+        'jest',
+        'trusted-token',
+      ),
+    ).resolves.toMatchObject({
+      accessToken: expect.any(String),
+      refreshToken: expect.any(String),
+    });
+
+    expect(trustedDeviceServiceMock.validateTrustedDevice).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        token: 'trusted-token',
+      }),
+    );
+    expect(auditServiceMock.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'TRUSTED_DEVICE_USED',
+        userId: 'user-1',
+      }),
+    );
+  });
+
+  it('falls back to normal 2FA challenge when trusted device token is invalid', async () => {
+    const service = createService();
+    const hashedPassword = await bcrypt.hash('SenhaValida!123', 4);
+
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'admin@example.com',
+      password: hashedPassword,
+      name: 'Admin',
+      role: 'ADMIN',
+      tenantId: 'tenant-1',
+      tenant: null,
+      twoFactorEnabled: true,
+      sessionVersion: 0,
+      loginAttempts: 0,
+      isLocked: false,
+      lockedUntil: null,
+      avatarUrl: null,
+    });
+    securityConfigServiceMock.getTwoFactorConfig.mockResolvedValue({
+      enabled: true,
+      required: false,
+      requiredForAdmins: false,
+      suggested: true,
+    });
+    trustedDeviceServiceMock.validateTrustedDevice.mockResolvedValue({
+      status: 'expired',
+      shouldBypass2FA: false,
+      shouldClearCookie: true,
+      trustedDeviceId: 'trusted-1',
+    });
+
+    await expect(
+      service.login(
+        {
+          email: 'admin@example.com',
+          password: 'SenhaValida!123',
+        },
+        '127.0.0.1',
+        'jest',
+        'stale-token',
+      ),
+    ).rejects.toThrow(
+      new UnauthorizedException('2FA necessario para concluir o login. Informe o codigo de autenticacao.'),
+    );
+
+    expect(trustedDeviceServiceMock.validateTrustedDevice).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        token: 'stale-token',
+      }),
+    );
+    expect(auditServiceMock.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'TRUSTED_DEVICE_INVALID',
         userId: 'user-1',
       }),
     );

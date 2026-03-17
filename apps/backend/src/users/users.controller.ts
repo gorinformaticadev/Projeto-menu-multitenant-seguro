@@ -10,12 +10,14 @@ import {
   Post,
   Put,
   Query,
+  Req,
+  Ip,
   Res,
   UploadedFile,
   UseInterceptors,
   UseGuards,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '@core/common/decorators/current-user.decorator';
@@ -37,6 +39,7 @@ import { UsersService } from './users.service';
 type AuthenticatedUser = {
   id: string;
   role: Role;
+  email?: string;
   tenantId?: string | null;
 };
 
@@ -196,6 +199,18 @@ export class UsersController {
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   lockUser(@Param('id') id: string, @CurrentUser() currentUser: AuthenticatedUser) {
     return this.usersService.lockUser(id, currentUser);
+  }
+
+  @Post(':id/trusted-devices/revoke')
+  @Roles(Role.SUPER_ADMIN)
+  revokeTrustedDevices(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: AuthenticatedUser,
+    @Req() req: Request,
+    @Ip() ip: string,
+  ) {
+    const userAgent = req.headers['user-agent'] || 'Unknown';
+    return this.usersService.revokeTrustedDevices(id, currentUser, ip, String(userAgent));
   }
 
   @Public()

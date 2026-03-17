@@ -25,8 +25,12 @@ describe('UsersService security boundaries', () => {
     getPasswordPolicy: jest.fn(),
   };
 
+  const trustedDeviceServiceMock = {
+    revokeAllForUser: jest.fn(),
+  };
+
   const createService = () =>
-    new UsersService(prismaMock as any, securityConfigServiceMock as any);
+    new UsersService(prismaMock as any, securityConfigServiceMock as any, trustedDeviceServiceMock as any);
   let tempUploadsDir: string;
   let previousUploadsDir: string | undefined;
 
@@ -39,6 +43,7 @@ describe('UsersService security boundaries', () => {
       requireNumbers: true,
       requireSpecial: true,
     });
+    trustedDeviceServiceMock.revokeAllForUser.mockResolvedValue(1);
     tempUploadsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'users-avatar-'));
     previousUploadsDir = process.env.UPLOADS_DIR;
     process.env.UPLOADS_DIR = tempUploadsDir;
@@ -129,6 +134,12 @@ describe('UsersService security boundaries', () => {
     expect(prismaMock.refreshToken.deleteMany).toHaveBeenCalledWith({
       where: { userId: 'user-1' },
     });
+    expect(trustedDeviceServiceMock.revokeAllForUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        reason: 'user_password_changed',
+      }),
+    );
   });
 
   it('rejects user creation when the password violates the runtime policy', async () => {

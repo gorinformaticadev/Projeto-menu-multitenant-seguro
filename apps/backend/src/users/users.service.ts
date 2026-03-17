@@ -12,6 +12,7 @@ import { access, unlink, writeFile } from 'fs/promises';
 import { basename } from 'path';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { SecurityConfigService } from '@core/security-config/security-config.service';
+import { TrustedDeviceService } from '../auth/trusted-device.service';
 import {
   resolveTenantUserAvatarDirPath,
   resolveTenantUserAvatarFilePath,
@@ -27,6 +28,7 @@ import { validatePasswordAgainstPolicy } from '../common/utils/password-policy.u
 type UserScopeActor = {
   id: string;
   role: Role;
+  email?: string;
   tenantId?: string | null;
 };
 
@@ -45,6 +47,7 @@ export class UsersService {
   constructor(
     private prisma: PrismaService,
     private securityConfigService: SecurityConfigService,
+    private trustedDeviceService: TrustedDeviceService,
   ) {}
 
   async create(createUserDto: CreateUserDto) {
@@ -138,10 +141,15 @@ export class UsersService {
     }
 
     const data: Record<string, any> = { ...updateUserDto };
+    let passwordUpdated = false;
     if (updateUserDto.password && updateUserDto.password.trim() !== '') {
       await this.assertPasswordMatchesPolicy(updateUserDto.password);
       data.password = await bcrypt.hash(updateUserDto.password, 10);
       data.lastPasswordChange = new Date();
+      data.sessionVersion = {
+        increment: 1,
+      };
+      passwordUpdated = true;
     } else {
       delete data.password;
     }
@@ -158,6 +166,23 @@ export class UsersService {
         },
       },
     });
+
+    if (passwordUpdated) {
+      await this.prisma.refreshToken.deleteMany({
+        where: { userId: id },
+      });
+
+      await this.trustedDeviceService.revokeAllForUser({
+        userId: id,
+        tenantId: (user as { tenantId?: string | null }).tenantId || null,
+        revokedByUserId: actor.id,
+        reason: 'admin_password_changed',
+        actor: {
+          userId: actor.id,
+          role: actor.role,
+        },
+      });
+    }
 
     return this.sanitizeUser(user);
   }
@@ -185,6 +210,38 @@ export class UsersService {
     });
 
     return users.map((item) => this.sanitizeUser(item));
+  }
+
+  async revokeTrustedDevices(
+    userId: string,
+    actor: UserScopeActor,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
+    if (actor.role !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException('Apenas SUPER_ADMIN pode revogar dispositivos confiaveis');
+    }
+
+    const user = (await this.findOne(userId, actor)) as unknown as ScopedUser;
+
+    const revokedCount = await this.trustedDeviceService.revokeAllForUser({
+      userId: user.id,
+      tenantId: user.tenantId || null,
+      revokedByUserId: actor.id,
+      reason: 'admin_forced_revocation',
+      actor: {
+        userId: actor.id,
+        role: actor.role,
+        email: actor.email,
+      },
+      ipAddress,
+      userAgent,
+    });
+
+    return {
+      message: 'Dispositivos confiaveis revogados com sucesso',
+      revokedCount,
+    };
   }
 
   async changePassword(userId: string, changePasswordDto: ChangePasswordDto) {
@@ -225,6 +282,18 @@ export class UsersService {
 
     await this.prisma.refreshToken.deleteMany({
       where: { userId },
+    });
+
+    await this.trustedDeviceService.revokeAllForUser({
+      userId,
+      tenantId: user.tenantId,
+      revokedByUserId: userId,
+      reason: 'user_password_changed',
+      actor: {
+        userId,
+        role: user.role,
+        email: user.email,
+      },
     });
 
     return { message: 'Senha alterada com sucesso' };

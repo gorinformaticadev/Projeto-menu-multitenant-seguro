@@ -5,12 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Shield, ArrowLeft } from "lucide-react";
 
 interface TwoFactorLoginProps {
   email: string;
   password: string;
-  onSubmit: (code: string) => Promise<void>;
+  onSubmit: (code: string, trustDevice: boolean) => Promise<void>;
   onBack: () => void;
   loading: boolean;
 }
@@ -23,11 +24,12 @@ export function TwoFactorLogin({
   loading,
 }: TwoFactorLoginProps) {
   const [code, setCode] = useState("");
+  const [trustDevice, setTrustDevice] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (code.length === 6) {
-      await onSubmit(code);
+      await onSubmit(code, trustDevice);
     }
   }
 
@@ -54,12 +56,25 @@ export function TwoFactorLogin({
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
               className="text-center text-2xl tracking-widest"
+              autoComplete="one-time-code"
               autoFocus
               disabled={loading}
             />
             <p className="text-xs text-muted-foreground text-center">
               Abra o Google Authenticator e digite o código
             </p>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-md border p-3">
+            <Checkbox
+              id="trust-device"
+              checked={trustDevice}
+              onCheckedChange={(checked) => setTrustDevice(checked === true)}
+              disabled={loading}
+            />
+            <Label htmlFor="trust-device" className="cursor-pointer text-sm">
+              Confiar neste dispositivo por 30 dias
+            </Label>
           </div>
 
           <div className="flex gap-2">
