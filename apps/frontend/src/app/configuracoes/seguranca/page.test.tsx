@@ -307,7 +307,7 @@ describe("/configuracoes/seguranca", () => {
 
     expect(await screen.findByText(/Controle de Tentativas de Login/i)).toBeInTheDocument();
     expect(screen.getByText(/Rate Limiting Global/i)).toBeInTheDocument();
-    expect(screen.getByText(/Rate Limiting de Endpoints Críticos/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Rate Limiting de Endpoints Críticos/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Política de Senha/i)).toBeInTheDocument();
     expect(screen.getByText(/Autenticação de Dois Fatores \(2FA\)/i)).toBeInTheDocument();
     expect(screen.getByText(/Tokens e Sessão/i)).toBeInTheDocument();

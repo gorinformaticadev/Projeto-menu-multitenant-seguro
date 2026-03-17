@@ -34,9 +34,6 @@ interface SecurityConfig {
   twoFactorEnabled: boolean;
   twoFactorRequired: boolean;
   sessionTimeoutMinutes: number;
-  backupRateLimitPerHour: number;
-  restoreRateLimitPerHour: number;
-  updateRateLimitPerHour: number;
   rateLimitDevEnabled: boolean;
   rateLimitProdEnabled: boolean;
   updatedAt: string;
@@ -147,10 +144,7 @@ export default function SecurityConfigPage() {
       'globalMaxRequests',
       'globalWindowMinutes',
       'passwordMinLength',
-      'sessionTimeoutMinutes',
-      'backupRateLimitPerHour',
-      'restoreRateLimitPerHour',
-      'updateRateLimitPerHour'
+      'sessionTimeoutMinutes'
     ];
 
     for (const field of numericFields) {
@@ -185,9 +179,6 @@ export default function SecurityConfigPage() {
         twoFactorEnabled: config.twoFactorEnabled,
         twoFactorRequired: config.twoFactorRequired,
         sessionTimeoutMinutes: Number(config.sessionTimeoutMinutes),
-        backupRateLimitPerHour: Number(config.backupRateLimitPerHour),
-        restoreRateLimitPerHour: Number(config.restoreRateLimitPerHour),
-        updateRateLimitPerHour: Number(config.updateRateLimitPerHour),
         rateLimitDevEnabled: config.rateLimitDevEnabled,
         rateLimitProdEnabled: config.rateLimitProdEnabled,
       };
@@ -436,121 +427,6 @@ export default function SecurityConfigPage() {
                 value={config.globalWindowMinutes}
                 onChange={(e) =>
                   updateConfig("globalWindowMinutes", e.target.value === "" ? "" : parseInt(e.target.value))
-                }
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Rate Limiting de Endpoints Críticos */}
-      <Card className={cn(dashboardCardBaseClassName, dashboardCardToneClassName.warn)}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Rate Limiting de Endpoints Críticos
-            <InfoButton label="Ajuda da seção de rate limiting de endpoints críticos">
-              <p>Configure limites específicos para operações sensíveis do sistema.</p>
-              <p>Essas configurações controlam backup, restore e atualizações. Valores muito altos podem permitir abuso; valores muito baixos podem bloquear operações legítimas.</p>
-            </InfoButton>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Label htmlFor="backupRateLimitPerHour">
-                  Backup (por hora)
-                </Label>
-                <InfoButton label="Ajuda do campo limite de backup por hora">
-                      <p className="font-semibold mb-1">? Como funciona o Rate Limiting de Backup:</p>
-                      <p className="text-xs mb-2">
-                        Limita o número de backups completos do banco de dados que podem ser criados por hora.
-                      </p>
-                      <p className="text-xs mb-1">
-                        <strong>• Propósito:</strong> Evitar sobrecarga do servidor e uso excessivo de disco.
-                      </p>
-                      <p className="text-xs mb-1">
-                        <strong>• Recomendado:</strong> 5-10 para produção, 15-20 para desenvolvimento.
-                      </p>
-                      <p className="text-xs">
-                        <strong>• Impacto:</strong> Após atingir o limite, novos backups serão bloqueados por 1 hora.
-                      </p>
-                </InfoButton>
-              </div>
-              <Input
-                id="backupRateLimitPerHour"
-                type="number"
-                min="1"
-                max="20"
-                value={config.backupRateLimitPerHour}
-                onChange={(e) =>
-                  updateConfig("backupRateLimitPerHour", e.target.value === "" ? "" : parseInt(e.target.value))
-                }
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Label htmlFor="restoreRateLimitPerHour">
-                  Restore (por hora)
-                </Label>
-                <InfoButton label="Ajuda do campo limite de restore por hora">
-                      <p className="font-semibold mb-1">? Como funciona o Rate Limiting de Restore:</p>
-                      <p className="text-xs mb-2">
-                        Limita o número de restaurações completas do banco de dados que podem ser executadas por hora.
-                      </p>
-                      <p className="text-xs mb-1">
-                        <strong>• Propósito:</strong> Operação crítica que substitui TODOS os dados do sistema.
-                      </p>
-                      <p className="text-xs mb-1">
-                        <strong>• Recomendado:</strong> 2-3 para produção, 5-10 para desenvolvimento.
-                      </p>
-                      <p className="text-xs">
-                        <strong>• Impacto:</strong> Após atingir o limite, novos restores serão bloqueados por 1 hora.
-                      </p>
-                </InfoButton>
-              </div>
-              <Input
-                id="restoreRateLimitPerHour"
-                type="number"
-                min="1"
-                max="10"
-                value={config.restoreRateLimitPerHour}
-                onChange={(e) =>
-                  updateConfig("restoreRateLimitPerHour", e.target.value === "" ? "" : parseInt(e.target.value))
-                }
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Label htmlFor="updateRateLimitPerHour">
-                  Atualizações (por hora)
-                </Label>
-                <InfoButton label="Ajuda do campo limite de atualizações por hora">
-                      <p className="font-semibold mb-1">? Como funciona o Rate Limiting de Atualizações:</p>
-                      <p className="text-xs mb-2">
-                        Limita o número de atualizações automáticas do sistema (via Git) que podem ser executadas por hora.
-                      </p>
-                      <p className="text-xs mb-1">
-                        <strong>• Propósito:</strong> Operação sensível que atualiza código, dependencias e banco de dados.
-                      </p>
-                      <p className="text-xs mb-1">
-                        <strong>• Recomendado:</strong> 1-2 para produção, 3-5 para desenvolvimento.
-                      </p>
-                      <p className="text-xs">
-                        <strong>• Impacto:</strong> Após atingir o limite, novas atualizações serão bloqueadas por 1 hora.
-                      </p>
-                </InfoButton>
-              </div>
-              <Input
-                id="updateRateLimitPerHour"
-                type="number"
-                min="1"
-                max="5"
-                value={config.updateRateLimitPerHour}
-                onChange={(e) =>
-                  updateConfig("updateRateLimitPerHour", e.target.value === "" ? "" : parseInt(e.target.value))
                 }
               />
             </div>
@@ -826,4 +702,3 @@ export default function SecurityConfigPage() {
     </div>
   );
 }
-
