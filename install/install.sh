@@ -843,8 +843,7 @@ native_validate_backend_shared_storage() {
 
     log_info "[INFO] Validando storage compartilhado do backend..."
 
-    local probe_file=""
-    probe_file="$(mktemp)"
+    local probe_file="$backend_dir/.installer-shared-storage-probe.cjs"
     cat > "$probe_file" <<'EOF'
 const Redis = require('ioredis');
 
@@ -900,7 +899,7 @@ run()
     process.exit(1);
   });
 EOF
-    chmod 644 "$probe_file"
+    chown "${NATIVE_SYSTEM_USER}:${NATIVE_SYSTEM_USER}" "$probe_file" 2>/dev/null || true
 
     if ! run_as_native_user "cd '${backend_dir}' && set -a && source ./.env && set +a && node '${probe_file}'"; then
         rm -f "$probe_file"
