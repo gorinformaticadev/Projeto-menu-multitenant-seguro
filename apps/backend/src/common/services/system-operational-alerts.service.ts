@@ -678,7 +678,7 @@ export class SystemOperationalAlertsService implements OnModuleInit {
       `;
       return result?.[0]?.acquired === true;
     } catch (error) {
-      this.logger.warn(`Failed to acquire operational alerts advisory lock: ${String(error)}`);
+      this.logger.warn(`Falha ao adquirir lock advisory de alertas operacionais: ${String(error)}`);
       return false;
     }
   }
@@ -691,7 +691,7 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     try {
       await this.prisma.$executeRaw`SELECT pg_advisory_unlock(${this.lockId})`;
     } catch (error) {
-      this.logger.warn(`Failed to release operational alerts advisory lock: ${String(error)}`);
+      this.logger.warn(`Falha ao liberar lock advisory de alertas operacionais: ${String(error)}`);
     }
   }
 }

@@ -38,7 +38,7 @@ export async function getPlatformName(): Promise<string> {
   try {
     return await platformConfigService.getPlatformName();
   } catch (error) {
-    console.warn('Failed to get platform name, using default:', error);
+    console.warn('Falha ao obter nome da plataforma; usando padrao:', error);
     return DEFAULT_PLATFORM_CONFIG.PLATFORM_NAME;
   }
 }
@@ -54,7 +54,7 @@ export async function getPlatformEmail(): Promise<string> {
   try {
     return await platformConfigService.getPlatformEmail();
   } catch (error) {
-    console.warn('Failed to get platform email, using default:', error);
+    console.warn('Falha ao obter email da plataforma; usando padrao:', error);
     return DEFAULT_PLATFORM_CONFIG.PLATFORM_EMAIL;
   }
 }
@@ -70,7 +70,7 @@ export async function getPlatformPhone(): Promise<string> {
   try {
     return await platformConfigService.getPlatformPhone();
   } catch (error) {
-    console.warn('Failed to get platform phone, using default:', error);
+    console.warn('Falha ao obter telefone da plataforma; usando padrao:', error);
     return DEFAULT_PLATFORM_CONFIG.PLATFORM_PHONE;
   }
 }
@@ -94,7 +94,7 @@ export async function getPlatformConfig(): Promise<{
   try {
     return await platformConfigService.getPlatformConfig();
   } catch (error) {
-    console.warn('Failed to get platform config, using defaults:', error);
+    console.warn('Falha ao obter configuracao da plataforma; usando valores padrao:', error);
     return {
       platformName: DEFAULT_PLATFORM_CONFIG.PLATFORM_NAME,
       platformEmail: DEFAULT_PLATFORM_CONFIG.PLATFORM_EMAIL,

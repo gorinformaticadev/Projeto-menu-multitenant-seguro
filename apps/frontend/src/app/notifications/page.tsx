@@ -198,7 +198,7 @@ export default function NotificationsPage() {
               >
                 <option value="all">Todas</option>
                 <option value="critical">Criticas</option>
-                <option value="warning">Warnings</option>
+                <option value="warning">Avisos</option>
                 <option value="info">Informativas</option>
               </select>
             </label>
@@ -213,10 +213,10 @@ export default function NotificationsPage() {
                 }
               >
                 <option value="all">Todas</option>
-                <option value="update">Update</option>
-                <option value="maintenance">Maintenance</option>
+                <option value="update">Atualizacoes</option>
+                <option value="maintenance">Manutencao</option>
                 <option value="backup">Backup</option>
-                <option value="restore">Restore</option>
+                <option value="restore">Restauracao</option>
               </select>
             </label>
           </div>

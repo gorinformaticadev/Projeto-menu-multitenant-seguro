@@ -73,7 +73,7 @@ export class ConfigResolverService {
 
     if (definition.type !== expectedType) {
       this.logger.warn(
-        `Dynamic setting "${key}" requested as ${expectedType}, but registry type is ${definition.type}.`,
+        `Configuracao dinamica "${key}" solicitada como ${expectedType}, mas o tipo registrado e ${definition.type}.`,
       );
       return undefined;
     }
@@ -136,7 +136,7 @@ export class ConfigResolverService {
       return;
     }
     this.warnedUnknownKeys.add(key);
-    this.logger.warn(`Dynamic setting "${key}" is not registered and will be ignored.`);
+    this.logger.warn(`Configuracao dinamica "${key}" nao esta registrada e sera ignorada.`);
   }
 
   private warnDatabaseFailure(key: string, error: unknown): void {
@@ -145,7 +145,7 @@ export class ConfigResolverService {
     }
     this.warnedDatabaseKeys.add(key);
     this.logger.warn(
-      `Failed to read dynamic setting "${key}" from database. Falling back to ENV/default. Cause: ${this.stringifyError(error)}`,
+      `Falha ao ler configuracao dinamica "${key}" no banco. Usando fallback de ENV/default. Causa: ${this.stringifyError(error)}`,
     );
   }
 
@@ -156,7 +156,7 @@ export class ConfigResolverService {
     }
     this.warnedInvalidKeys.add(warningKey);
     this.logger.warn(
-      `Dynamic setting "${key}" has an invalid ${source} value. Falling back to next source. Cause: ${reason}`,
+      `Configuracao dinamica "${key}" possui valor ${source} invalido. Usando a proxima fonte. Causa: ${reason}`,
     );
   }
 

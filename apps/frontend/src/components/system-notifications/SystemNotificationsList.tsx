@@ -34,7 +34,7 @@ interface SystemNotificationsListProps {
 
 const severityLabel: Record<SystemNotification["severity"], string> = {
   info: "Informativa",
-  warning: "Warning",
+  warning: "Aviso",
   critical: "Critica",
 };
 

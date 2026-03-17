@@ -107,7 +107,7 @@ const KNOWN_METADATA_FIELDS: MetadataFieldConfig[] = [
   { key: "rollbackAttempted", label: "Rollback tentado", formatter: asBooleanLabel },
   { key: "rollbackCompleted", label: "Rollback concluido", formatter: asBooleanLabel },
   { key: "backupId", label: "Backup", formatter: asString },
-  { key: "restoreId", label: "Restore", formatter: asString },
+  { key: "restoreId", label: "Restauracao", formatter: asString },
   { key: "jobId", label: "Job", formatter: asString },
   { key: "artifactId", label: "Artefato", formatter: asString },
   { key: "backupType", label: "Tipo de backup", formatter: asString },
@@ -147,16 +147,16 @@ export function getNotificationCategoryFromAction(action: string | null): Notifi
 
 export function getNotificationCategoryLabel(category: NotificationCategory): string {
   if (category === "update") {
-    return "Update";
+    return "Atualizacao";
   }
   if (category === "maintenance") {
-    return "Maintenance";
+    return "Manutencao";
   }
   if (category === "backup") {
     return "Backup";
   }
   if (category === "restore") {
-    return "Restore";
+    return "Restauracao";
   }
 
   return "Sistema";

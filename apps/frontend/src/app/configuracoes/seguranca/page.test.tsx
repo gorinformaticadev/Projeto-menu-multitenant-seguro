@@ -360,6 +360,29 @@ describe("/configuracoes/seguranca", () => {
     expect(refreshConfigMock).toHaveBeenCalledTimes(1);
   });
 
+  it("bloqueia submit local quando logout por inatividade fica abaixo do minimo aceito", async () => {
+    installDefaultGetHandlers();
+
+    render(<SecuritySettingsPage />);
+
+    const user = userEvent.setup();
+    const sessionTimeoutInput = await screen.findByRole("spinbutton", {
+      name: /Logout por Inatividade/i,
+    });
+    await user.clear(sessionTimeoutInput);
+    await user.type(sessionTimeoutInput, "1");
+    await user.click(screen.getByRole("button", { name: /Salvar Altera/i }));
+
+    expect(apiMock.put).not.toHaveBeenCalled();
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Erro de validação",
+        description: "Logout por Inatividade deve estar entre 5 e 1440.",
+        variant: "destructive",
+      }),
+    );
+  });
+
   it("mantem os dois botoes antigos de salvar equivalentes para /security-config", async () => {
     installDefaultGetHandlers();
     apiMock.put.mockImplementation((url: string, payload: unknown) => {

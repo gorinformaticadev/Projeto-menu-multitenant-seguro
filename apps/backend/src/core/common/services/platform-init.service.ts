@@ -25,8 +25,8 @@ export class PlatformInitService implements OnModuleInit {
       this.logger.log(`Contact email: ${config.platformEmail}`);
       this.logger.log(`Contact phone: ${config.platformPhone}`);
     } catch (error) {
-      this.logger.error('Failed to initialize platform configuration:', error);
-      this.logger.warn('Using default platform configuration');
+      this.logger.error('Falha ao inicializar configuracao da plataforma:', error);
+      this.logger.warn('Usando configuracao padrao da plataforma');
     }
   }
 }

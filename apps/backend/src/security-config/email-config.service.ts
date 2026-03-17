@@ -179,7 +179,7 @@ export class EmailConfigService {
       const config = await this.getActiveConfig();
 
       if (!config) {
-        this.logger.warn('No active email configuration found');
+        this.logger.warn('Nenhuma configuracao de email ativa encontrada');
         return {
           success: false,
           message: 'Nenhuma configuração de email ativa encontrada. Configure um provedor de email primeiro.'
@@ -204,7 +204,7 @@ export class EmailConfigService {
           message: `Email de teste enviado com sucesso para ${email}. Verifique sua caixa de entrada.`
         };
       } else {
-        this.logger.warn(`❌ Failed to send test email to ${email}`);
+        this.logger.warn(`❌ Falha ao enviar email de teste para ${email}`);
         return {
           success: false,
           message: 'Falha ao enviar email de teste. Verifique as configurações e credenciais.'

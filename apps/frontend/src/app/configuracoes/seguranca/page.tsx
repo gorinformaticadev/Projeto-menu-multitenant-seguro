@@ -137,23 +137,39 @@ export default function SecurityConfigPage() {
   const handleSave = async () => {
     if (!config) return;
 
-    // Validar campos numéricos
-    const numericFields: (keyof SecurityConfig)[] = [
-      'loginMaxAttempts',
-      'loginLockDurationMinutes',
-      'globalMaxRequests',
-      'globalWindowMinutes',
-      'passwordMinLength',
-      'sessionTimeoutMinutes'
+    // Validar campos numéricos e faixas aceitas pelo backend
+    const numericConstraints: Array<{
+      field: keyof SecurityConfig;
+      label: string;
+      min: number;
+      max: number;
+    }> = [
+      { field: "loginMaxAttempts", label: "Máximo de Tentativas de Login", min: 1, max: 100 },
+      { field: "loginLockDurationMinutes", label: "Duração do Bloqueio", min: 5, max: 1440 },
+      { field: "loginWindowMinutes", label: "Janela de Tentativas", min: 1, max: 60 },
+      { field: "globalMaxRequests", label: "Requisições Globais por período", min: 10, max: 100000 },
+      { field: "globalWindowMinutes", label: "Janela Global", min: 1, max: 60 },
+      { field: "passwordMinLength", label: "Tamanho Mínimo da Senha", min: 6, max: 32 },
+      { field: "sessionTimeoutMinutes", label: "Logout por Inatividade", min: 5, max: 1440 },
     ];
 
-    for (const field of numericFields) {
-      const val = config[field];
-      if (val === "" || val === null || val === undefined || isNaN(Number(val))) {
+    for (const { field, label, min, max } of numericConstraints) {
+      const rawValue = config[field];
+      const numericValue = Number(rawValue);
+      if (rawValue === "" || rawValue === null || rawValue === undefined || Number.isNaN(numericValue)) {
         toast({
           title: "Erro de validação",
-          description: `Por favor, preencha corretamente o campo ${field}`,
+          description: `Por favor, preencha corretamente o campo ${label}.`,
           variant: "destructive"
+        });
+        return;
+      }
+
+      if (numericValue < min || numericValue > max) {
+        toast({
+          title: "Erro de validação",
+          description: `${label} deve estar entre ${min} e ${max}.`,
+          variant: "destructive",
         });
         return;
       }

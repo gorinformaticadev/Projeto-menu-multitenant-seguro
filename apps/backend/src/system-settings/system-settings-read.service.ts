@@ -129,7 +129,7 @@ export class SystemSettingsReadService {
       );
     } catch (error) {
       this.logger.warn(
-        `Failed to read dynamic setting overrides for admin listing. Falling back to resolver only. Cause: ${this.stringifyError(error)}`,
+        `Falha ao ler overrides de configuracoes dinamicas para listagem administrativa. Usando apenas o resolvedor. Causa: ${this.stringifyError(error)}`,
       );
       return new Map<string, SettingRecord>();
     }
@@ -168,7 +168,7 @@ export class SystemSettingsReadService {
       );
     } catch (error) {
       this.logger.warn(
-        `Failed to read setting actors for admin listing. Continuing without actor metadata. Cause: ${this.stringifyError(error)}`,
+        `Falha ao ler autores das configuracoes para listagem administrativa. Continuando sem metadados de autoria. Causa: ${this.stringifyError(error)}`,
       );
       return new Map<string, UserSummary>();
     }

@@ -103,7 +103,7 @@ export class SecureFilesService {
         try {
           await fsPromises.unlink(file.path);
         } catch {
-          this.logger.warn(`Failed to delete temporary file: ${file.path}`);
+          this.logger.warn(`Falha ao remover arquivo temporario: ${file.path}`);
         }
       }
 
@@ -435,7 +435,7 @@ export class SecureFilesService {
         },
       });
     } catch (error) {
-      this.logger.warn(`Failed to write secure-file audit event: ${error.message}`);
+      this.logger.warn(`Falha ao registrar evento de auditoria de arquivo seguro: ${error.message}`);
     }
   }
 }

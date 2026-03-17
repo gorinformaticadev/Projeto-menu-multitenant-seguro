@@ -29,8 +29,8 @@ export class AppModulesModule {
             // NOTA: Carregamento dinâmico de módulos desabilitado
             // O campo 'backendEntry' não existe no banco de dados
             // Módulos são gerenciados pelo ModuleLoader
-            this.logger.log(`✅ Found ${enabledModules.length} active module(s) in database`);
-            this.logger.log(`ℹ️  Dynamic module loading is managed by ModuleLoader service`);
+            this.logger.log(`✅ Encontrado(s) ${enabledModules.length} modulo(s) ativo(s) no banco`);
+            this.logger.log(`ℹ️  O carregamento dinamico de modulos e gerenciado pelo servico ModuleLoader`);
 
             /*
             for (const mod of enabledModules) {
@@ -70,10 +70,10 @@ export class AppModulesModule {
         } catch (dbError) {
             // Tratamento específico para erros de schema
             if (dbError.message?.includes('does not exist') || dbError.code === 'P2010') {
-                this.logger.error(`❌ Schema inconsistency detected: ${dbError.message}`);
-                this.logger.warn('⚠️ Continuing without modules. Please check database migrations.');
+                this.logger.error(`❌ Inconsistencia de schema detectada: ${dbError.message}`);
+                this.logger.warn('⚠️ Continuando sem modulos. Verifique as migrations do banco.');
             } else {
-                this.logger.error(`❌ Database error while loading modules: ${dbError.message}`);
+                this.logger.error(`❌ Erro de banco ao carregar modulos: ${dbError.message}`);
             }
             // Sistema continua sem módulos em vez de quebrar
         } finally {

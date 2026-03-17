@@ -31,7 +31,7 @@ export async function resolveAdvancedCspSetting(
       }
     } catch (error) {
       logger?.warn(
-        `[security.csp_advanced.enabled] Failed to resolve dynamic setting from ConfigResolverService. Falling back to ENV/default. Cause: ${stringifyError(error)}`,
+        `[security.csp_advanced.enabled] Falha ao resolver configuracao dinamica via ConfigResolverService. Usando fallback de ENV/default. Causa: ${stringifyError(error)}`,
       );
     }
   }

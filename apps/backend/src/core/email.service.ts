@@ -472,7 +472,7 @@ export class EmailService implements OnModuleInit {
           smtpPass = smtpCredentials.smtpPassword;
         }
       } catch (error) {
-        this.logger.warn('Could not fetch SMTP credentials from database:', error);
+        this.logger.warn('Nao foi possivel buscar credenciais SMTP no banco:', error);
       }
     }
 

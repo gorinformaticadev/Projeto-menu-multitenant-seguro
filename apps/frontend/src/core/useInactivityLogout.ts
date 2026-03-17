@@ -8,9 +8,18 @@ import { useToast } from '@/hooks/use-toast';
  */
 export function useInactivityLogout(timeoutMinutes: number = 30) {
   const { logout, user } = useAuth();
-  const { toast } = useToast();
+  const { toast, dismiss } = useToast();
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const warningToastIdRef = useRef<string | null>(null);
+
+  const dismissWarningToast = useCallback(() => {
+    if (!warningToastIdRef.current) {
+      return;
+    }
+    dismiss(warningToastIdRef.current);
+    warningToastIdRef.current = null;
+  }, [dismiss]);
 
   const resetTimer = useCallback(() => {
     // Limpar timers existentes
@@ -20,24 +29,35 @@ export function useInactivityLogout(timeoutMinutes: number = 30) {
     if (warningTimeoutRef.current) {
       clearTimeout(warningTimeoutRef.current);
     }
+    dismissWarningToast();
 
     // Não iniciar timer se não houver usuário logado
     if (!user) return;
 
-    const timeoutMs = timeoutMinutes * 60 * 1000; // Converter minutos para ms
-    const warningMs = timeoutMs - 60 * 1000; // Avisar 1 minuto antes
+    const parsedTimeoutMinutes = Number(timeoutMinutes);
+    const normalizedTimeoutMinutes =
+      Number.isFinite(parsedTimeoutMinutes) && parsedTimeoutMinutes > 0
+        ? parsedTimeoutMinutes
+        : 30;
+    const timeoutMs = normalizedTimeoutMinutes * 60 * 1000;
+    const warningLeadMs = Math.min(60 * 1000, timeoutMs / 2);
+    const warningMs = timeoutMs - warningLeadMs;
 
-    // Timer de aviso (1 minuto antes do logout)
-    warningTimeoutRef.current = setTimeout(() => {
-      toast({
-        title: "Sessão expirando",
-        description: "Você será deslogado em 1 minuto por inatividade. Mova o mouse ou pressione uma tecla para continuar.",
-        variant: "default",
-      });
-    }, warningMs);
+    // Timer de aviso (até 1 minuto antes do logout, sem disparo imediato em timeout curto)
+    if (warningMs > 0 && warningLeadMs >= 1000) {
+      warningTimeoutRef.current = setTimeout(() => {
+        const warning = toast({
+          title: "Sessão expirando",
+          description: "Você será deslogado em 1 minuto por inatividade. Mova o mouse ou pressione uma tecla para continuar.",
+          variant: "default",
+        });
+        warningToastIdRef.current = warning.id;
+      }, warningMs);
+    }
 
     // Timer de logout
     timeoutRef.current = setTimeout(() => {
+      dismissWarningToast();
       toast({
         title: "Sessão expirada",
         description: "Você foi deslogado por inatividade.",
@@ -45,7 +65,7 @@ export function useInactivityLogout(timeoutMinutes: number = 30) {
       });
       logout();
     }, timeoutMs);
-  }, [timeoutMinutes, user, logout, toast]);
+  }, [timeoutMinutes, user, logout, toast, dismissWarningToast]);
 
   useEffect(() => {
     // Eventos que resetam o timer
@@ -77,6 +97,7 @@ export function useInactivityLogout(timeoutMinutes: number = 30) {
       if (warningTimeoutRef.current) {
         clearTimeout(warningTimeoutRef.current);
       }
+      dismissWarningToast();
     };
-  }, [resetTimer]);
+  }, [resetTimer, dismissWarningToast]);
 }

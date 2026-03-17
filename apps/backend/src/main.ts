@@ -25,13 +25,13 @@ async function bootstrap() {
 
   const securityValidation = validateSecurityConfig();
   if (!securityValidation.isValid) {
-    console.error('Security error: unsafe configuration detected.');
+    console.error('Erro de seguranca: configuracao insegura detectada.');
     securityValidation.errors.forEach((error) => console.error(`   - ${error}`));
     process.exit(1);
   }
 
   if (securityValidation.warnings.length > 0) {
-    console.warn('Security warnings:');
+    console.warn('Avisos de seguranca:');
     securityValidation.warnings.forEach((warning) => console.warn(`   - ${warning}`));
   }
 
@@ -40,21 +40,21 @@ async function bootstrap() {
     await secretManager.initialize();
 
     if (!secretManager.validateCriticalSecrets()) {
-      console.error('Critical secrets are missing.');
+      console.error('Segredos criticos ausentes.');
       if (requireSecretManager) {
         process.exit(1);
       }
-      console.warn('REQUIRE_SECRET_MANAGER=false: continuing without strict secret validation.');
+      console.warn('REQUIRE_SECRET_MANAGER=false: continuando sem validacao estrita de segredos.');
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error('Failed to initialize Secret Manager:', message);
+    console.error('Falha ao inicializar Secret Manager:', message);
     if (process.env.NODE_ENV === 'production' && requireSecretManager) {
       process.exit(1);
     } else {
-      console.warn('Continuing without Secret Manager.');
+      console.warn('Continuando sem Secret Manager.');
       if (process.env.NODE_ENV === 'production') {
-        console.warn('REQUIRE_SECRET_MANAGER=false: continuing in production without Secret Manager.');
+        console.warn('REQUIRE_SECRET_MANAGER=false: continuando em producao sem Secret Manager.');
       }
     }
   }
@@ -107,7 +107,7 @@ async function bootstrap() {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(
-      `Failed to resolve security.headers.enabled dynamically. Continuing with extra HTTP security headers enabled for compatibility. Cause: ${message}`,
+      `Falha ao resolver security.headers.enabled dinamicamente. Continuando com cabecalhos HTTP extras de seguranca habilitados por compatibilidade. Causa: ${message}`,
     );
   }
 
@@ -166,7 +166,7 @@ async function bootstrap() {
       ].filter(Boolean);
 
   if (isProduction && allowedOrigins.length === 0) {
-    console.warn('FRONTEND_URL is not defined in production. CORS may block legitimate requests.');
+    console.warn('FRONTEND_URL nao esta definido em producao. O CORS pode bloquear requisicoes legitimas.');
   }
 
   app.enableCors({
@@ -200,11 +200,11 @@ async function bootstrap() {
 
   if (securityHeadersEnabled) {
     console.warn(
-      `Extra HTTP security headers enabled (source: ${securityHeadersSource})`,
+      `Cabecalhos HTTP extras de seguranca habilitados (origem: ${securityHeadersSource})`,
     );
   } else {
     console.warn(
-      `Extra HTTP security headers disabled by configuration (source: ${securityHeadersSource})`,
+      `Cabecalhos HTTP extras de seguranca desabilitados por configuracao (origem: ${securityHeadersSource})`,
     );
   }
 }

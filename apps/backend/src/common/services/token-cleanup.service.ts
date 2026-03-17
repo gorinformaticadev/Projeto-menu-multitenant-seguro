@@ -166,7 +166,7 @@ export class TokenCleanupService implements OnModuleInit {
       `;
       return result?.[0]?.acquired === true;
     } catch (error) {
-      this.logger.warn(`Failed to acquire token cleanup advisory lock: ${String(error)}`);
+      this.logger.warn(`Falha ao adquirir lock advisory de limpeza de tokens: ${String(error)}`);
       return false;
     }
   }
@@ -179,7 +179,7 @@ export class TokenCleanupService implements OnModuleInit {
     try {
       await this.prisma.$executeRaw`SELECT pg_advisory_unlock(${lockId})`;
     } catch (error) {
-      this.logger.warn(`Failed to release token cleanup advisory lock: ${String(error)}`);
+      this.logger.warn(`Falha ao liberar lock advisory de limpeza de tokens: ${String(error)}`);
     }
   }
 }

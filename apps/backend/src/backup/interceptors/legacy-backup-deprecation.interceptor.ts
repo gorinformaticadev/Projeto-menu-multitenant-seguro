@@ -9,7 +9,7 @@ export class LegacyBackupDeprecationInterceptor implements NestInterceptor {
     response.setHeader('X-API-Deprecated', 'true');
     response.setHeader('Deprecation', 'true');
     response.setHeader('Link', '</api/backups>; rel="successor-version"');
-    response.setHeader('Warning', '299 - "Deprecated endpoint. Use /api/backups/*"');
+    response.setHeader('Warning', '299 - "Endpoint obsoleto. Use /api/backups/*"');
     return next.handle();
   }
 }

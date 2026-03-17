@@ -32,7 +32,7 @@ export async function resolveSecurityHeadersSetting(
       }
     } catch (error) {
       logger?.warn(
-        `[security.headers.enabled] Failed to resolve dynamic setting from ConfigResolverService. Falling back to ENV/default. Cause: ${stringifyError(error)}`,
+        `[security.headers.enabled] Falha ao resolver configuracao dinamica via ConfigResolverService. Usando fallback de ENV/default. Causa: ${stringifyError(error)}`,
       );
     }
   }

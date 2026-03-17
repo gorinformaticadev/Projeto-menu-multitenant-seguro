@@ -17,7 +17,7 @@ export class SystemSettingsBootstrapService implements OnApplicationBootstrap {
       await this.bootstrapFromEnv();
     } catch (error) {
       this.logger.warn(
-        `Dynamic settings bootstrap failed. Runtime will continue with ENV/default fallbacks. Cause: ${this.stringifyError(error)}`,
+        `Falha no bootstrap das configuracoes dinamicas. O runtime seguira com fallback de ENV/default. Causa: ${this.stringifyError(error)}`,
       );
     }
   }
@@ -34,7 +34,7 @@ export class SystemSettingsBootstrapService implements OnApplicationBootstrap {
 
       if (!envValue.ok) {
         this.logger.warn(
-          `Skipping bootstrap for dynamic setting "${definition.key}" because ENV value is invalid. Cause: ${envValue.reason}`,
+          `Ignorando bootstrap da configuracao dinamica "${definition.key}" porque o valor em ENV e invalido. Causa: ${envValue.reason}`,
         );
         continue;
       }
@@ -66,14 +66,14 @@ export class SystemSettingsBootstrapService implements OnApplicationBootstrap {
         createdCount += 1;
       } catch (error) {
         this.logger.warn(
-          `Failed to bootstrap dynamic setting "${definition.key}" from ENV. Runtime will continue without persisted override. Cause: ${this.stringifyError(error)}`,
+          `Falha ao executar bootstrap da configuracao dinamica "${definition.key}" a partir do ENV. O runtime continuara sem override persistido. Causa: ${this.stringifyError(error)}`,
         );
         break;
       }
     }
 
     if (createdCount > 0) {
-      this.logger.log(`Dynamic settings bootstrap created ${createdCount} missing record(s) from ENV.`);
+      this.logger.log(`Bootstrap de configuracoes dinamicas criou ${createdCount} registro(s) ausente(s) a partir do ENV.`);
     }
   }
 
