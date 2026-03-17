@@ -15,6 +15,8 @@ import api, { API_URL } from './api';
 import { FrontendModuleDefinition, DashboardWidgetDefinition } from './module-types';
 import { getConfigurationPanelItems } from './configuration-menu';
 
+const MODULE_REGISTRY_REQUEST_TIMEOUT_MS = 10000;
+
 export interface ModuleMenu {
   id?: string;
   label: string;
@@ -99,7 +101,10 @@ class ModuleRegistry {
 
     this.loadingPromise = (async () => {
       try {
-        const response = await api.get<ModulesResponse>(`${API_URL}/me/modules`);
+        const modulesEndpoint = API_URL === '/api' ? '/me/modules' : `${API_URL}/me/modules`;
+        const response = await api.get<ModulesResponse>(modulesEndpoint, {
+          timeout: MODULE_REGISTRY_REQUEST_TIMEOUT_MS,
+        });
         this.apiModules = response.data.modules.filter(m => m.enabled !== false);
         this.isLoaded = true;
         // console.log('✅ [ModuleRegistry] Módulos ativos carregados da API:', this.apiModules.length);

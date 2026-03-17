@@ -52,6 +52,7 @@ type TokenResponsePayload = {
 };
 
 const AUTH_REQUEST_TIMEOUT_MS = 15000;
+const MODULE_LOAD_TIMEOUT_MS = 10000;
 
 const resolveApiErrorMessage = (error: ApiError, fallback: string): string => {
   if (error.code === "ECONNABORTED") {
@@ -68,6 +69,19 @@ const resolveApiErrorMessage = (error: ApiError, fallback: string): string => {
   }
 
   return fallback;
+};
+
+const loadModulesSafely = async (): Promise<void> => {
+  try {
+    await Promise.race([
+      moduleRegistry.loadModules(),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("module_load_timeout")), MODULE_LOAD_TIMEOUT_MS);
+      }),
+    ]);
+  } catch (error) {
+    console.warn("Falha ao carregar modulos apos autenticacao:", error);
+  }
 };
 
 interface AuthContextData {
@@ -291,10 +305,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const response = await api.get("/auth/me");
           setUser(response.data);
 
-          // Carregar módulos após autenticação bem-sucedida
-          // console.log('📦 Carregando módulos...');
-          await moduleRegistry.loadModules();
-          // console.log('✅ Módulos carregados');
+          void loadModulesSafely();
         } catch (error: unknown) {
           const apiError = error as ApiError;
           console.error("❌ Erro ao carregar usuário:", error);
@@ -398,10 +409,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(accessToken);
       setUser(userData);
 
-      // Carregar módulos após login
-      // console.log('📦 Carregando módulos...');
-      await moduleRegistry.loadModules();
-      // console.log('✅ Módulos carregados');
+      void loadModulesSafely();
 
       // Redirecionar para dashboard
       router.push("/dashboard");
@@ -470,10 +478,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(accessToken);
       setUser(userData);
 
-      // Carregar módulos após login com 2FA
-      // console.log('📦 Carregando módulos...');
-      await moduleRegistry.loadModules();
-      // console.log('✅ Módulos carregados');
+      void loadModulesSafely();
 
       // Redirecionar para dashboard
       router.push("/dashboard");
