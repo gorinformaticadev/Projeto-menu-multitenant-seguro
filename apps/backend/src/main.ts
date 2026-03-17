@@ -68,6 +68,14 @@ async function bootstrap() {
   useContainer(
     {
       get<T>(token: new (...args: any[]) => T): T | undefined {
+        // class-validator cria CustomConstraint para validadores inline (validator: { validate() {} }).
+        // Esse token nao pertence ao container do Nest e consultar app.get(token) pode disparar
+        // UnknownElementException durante bootstrap.
+        const tokenName = (token as unknown as { name?: string })?.name;
+        if (tokenName === 'CustomConstraint') {
+          return undefined;
+        }
+
         try {
           return app.get(token, { strict: false });
         } catch {
