@@ -13,11 +13,13 @@ server {
     server_name __DOMAIN__;
 
     # ACME challenge para Certbot
-    location /.well-known/acme-challenge/ {
+    location ^~ /.well-known/acme-challenge/ {
+        allow all;
         root /var/www/certbot;
-        try_files $uri =404;
+        default_type "text/plain";
     }
 
+    # Redirecionar tudo para HTTPS caso nao seja o acme-challenge
     location / {
         return 301 https://$host$request_uri;
     }
