@@ -214,20 +214,153 @@ check_redis() {
     return 1
 }
 
-install_redis() {
-    if check_redis; then
+strip_wrapping_quotes_native() {
+    local raw="$1"
+    raw="${raw%$'\r'}"
+    if [[ "${#raw}" -ge 2 && "${raw:0:1}" == "\"" && "${raw: -1}" == "\"" ]]; then
+        echo "${raw:1:${#raw}-2}"
+        return 0
+    fi
+    if [[ "${#raw}" -ge 2 && "${raw:0:1}" == "'" && "${raw: -1}" == "'" ]]; then
+        echo "${raw:1:${#raw}-2}"
+        return 0
+    fi
+    echo "$raw"
+}
+
+read_env_value_native() {
+    local key="$1"
+    local file="$2"
+    if [[ ! -f "$file" ]]; then
+        return 1
+    fi
+
+    local line=""
+    line="$(grep -E "^${key}=" "$file" 2>/dev/null | tail -n 1 || true)"
+    if [[ -z "$line" ]]; then
+        return 1
+    fi
+
+    strip_wrapping_quotes_native "${line#*=}"
+}
+
+read_redis_conf_password_native() {
+    local redis_conf="/etc/redis/redis.conf"
+    if [[ ! -f "$redis_conf" ]]; then
+        return 1
+    fi
+
+    local line=""
+    line="$(grep -E "^[[:space:]]*requirepass[[:space:]]+" "$redis_conf" 2>/dev/null | tail -n 1 || true)"
+    if [[ -z "$line" ]]; then
+        return 1
+    fi
+
+    line="$(echo "$line" | sed -E 's/^[[:space:]]*requirepass[[:space:]]+//')"
+    strip_wrapping_quotes_native "$line"
+}
+
+resolve_redis_password_native() {
+    local explicit_password="${1:-}"
+    local backend_env_file="${2:-$PROJECT_ROOT/apps/backend/.env}"
+    local value=""
+
+    if [[ -n "$explicit_password" ]]; then
+        echo "$explicit_password"
         return 0
     fi
 
-    log_info "Instalando Redis..."
+    value="$(read_redis_conf_password_native || true)"
+    if [[ -n "$value" ]]; then
+        echo "$value"
+        return 0
+    fi
 
-    apt-get install -y -qq redis-server
+    value="$(read_env_value_native "REDIS_PASSWORD" "$backend_env_file" || true)"
+    if [[ -n "$value" ]]; then
+        echo "$value"
+        return 0
+    fi
+
+    openssl rand -hex 16
+}
+
+configure_redis_auth_native() {
+    local redis_pass="$1"
+    local redis_conf="/etc/redis/redis.conf"
+
+    if [[ -z "$redis_pass" ]]; then
+        log_error "[ERROR] REDIS_PASSWORD vazio; nao e possivel configurar autenticacao no Redis."
+        return 1
+    fi
+
+    if [[ ! -f "$redis_conf" ]]; then
+        log_error "[ERROR] Arquivo Redis nao encontrado: $redis_conf"
+        return 1
+    fi
+
+    log_info "[INFO] Redis configurado com autenticacao"
+
+    local tmp_conf=""
+    tmp_conf="$(mktemp)"
+    awk -v pass="$redis_pass" '
+BEGIN { updated = 0 }
+{
+  if ($0 ~ /^[[:space:]]*#?[[:space:]]*requirepass[[:space:]]+/) {
+    if (!updated) {
+      print "requirepass " pass
+      updated = 1
+    }
+    next
+  }
+  print $0
+}
+END {
+  if (!updated) {
+    print "requirepass " pass
+  }
+}
+' "$redis_conf" > "$tmp_conf"
+
+    cat "$tmp_conf" > "$redis_conf"
+    rm -f "$tmp_conf"
+    systemctl enable redis-server >/dev/null 2>&1 || true
+    systemctl restart redis-server
+}
+
+validate_redis_auth_native() {
+    local redis_pass="$1"
+    log_info "[INFO] Validando Redis autenticado..."
+
+    local pong=""
+    pong="$(redis-cli -a "$redis_pass" ping 2>/dev/null | tr -d '\r' | tail -n 1 || true)"
+    if [[ "$pong" != "PONG" ]]; then
+        log_error "[ERROR] Redis autenticado nao respondeu com PONG para as credenciais configuradas."
+        return 1
+    fi
+
+    log_success "[OK] Redis respondeu PONG com autenticacao"
+}
+
+install_redis() {
+    local redis_pass="${1:-}"
+
+    if ! check_redis; then
+        log_info "Instalando Redis..."
+        apt-get install -y -qq redis-server
+    fi
 
     # Configurar para rodar como servico
     systemctl start redis-server
     systemctl enable redis-server
 
-    # Verificar conexao
+    if [[ -n "$redis_pass" ]]; then
+        configure_redis_auth_native "$redis_pass"
+        validate_redis_auth_native "$redis_pass"
+        return 0
+    fi
+
+    # Verificar conexao sem auth apenas para ambientes sem senha (fallback inicial)
     if redis-cli ping 2>/dev/null | grep -q "PONG"; then
         log_success "Redis instalado e respondendo."
     else
@@ -557,6 +690,7 @@ configure_backend_env() {
     local admin_email="$7"
     local admin_pass="$8"
     local node_env="$9"
+    local redis_pass="${10}"
 
     local env_file="$PROJECT_ROOT/apps/backend/.env"
     local env_example="$PROJECT_ROOT/apps/backend/.env.example"
@@ -577,6 +711,10 @@ configure_backend_env() {
     upsert_env "NODE_ENV" "$node_env" "$env_file"
     upsert_env "REDIS_HOST" "127.0.0.1" "$env_file"
     upsert_env "REDIS_PORT" "6379" "$env_file"
+    upsert_env "REDIS_PASSWORD" "$redis_pass" "$env_file"
+    upsert_env "REDIS_DB" "0" "$env_file"
+    upsert_env "RATE_LIMIT_REDIS_ENABLED" "true" "$env_file"
+    upsert_env "RATE_LIMIT_STORAGE_FAILURE_MODE" "strict" "$env_file"
     upsert_env "INSTALL_ADMIN_EMAIL" "$admin_email" "$env_file"
     upsert_env "INSTALL_ADMIN_PASSWORD" "$admin_pass" "$env_file"
     upsert_env "REQUIRE_SECRET_MANAGER" "false" "$env_file"
@@ -879,7 +1017,8 @@ start_pm2_services() {
     log_info "Iniciando aplicacao com PM2..."
     cd "$PROJECT_ROOT"
 
-    sudo -u multitenant pm2 start ecosystem.config.js
+    sudo -u multitenant pm2 start ecosystem.config.js --update-env
+    sudo -u multitenant pm2 restart multitenant-backend multitenant-frontend --update-env >/dev/null 2>&1 || true
     sudo -u multitenant pm2 save
 
     sleep 5
@@ -931,6 +1070,88 @@ check_native_health() {
 
     log_warn "Timeout aguardando servicos. Verifique os logs."
     return 1
+}
+
+validate_backend_shared_storage_native() {
+    local backend_dir="$PROJECT_ROOT/apps/backend"
+    local env_file="$backend_dir/.env"
+
+    log_info "[INFO] Validando storage compartilhado do backend..."
+
+    local probe_file=""
+    probe_file="$(mktemp)"
+    cat > "$probe_file" <<'EOF'
+const Redis = require('ioredis');
+
+const host = process.env.REDIS_HOST || '127.0.0.1';
+const port = Number(process.env.REDIS_PORT || 6379);
+const username = process.env.REDIS_USERNAME || undefined;
+const password = process.env.REDIS_PASSWORD || undefined;
+const db = Number(process.env.REDIS_DB || 0);
+
+const options = {
+  host,
+  port,
+  db,
+  connectTimeout: Number(process.env.RATE_LIMIT_REDIS_CONNECT_TIMEOUT || 1000),
+  maxRetriesPerRequest: 1,
+  enableOfflineQueue: false,
+  lazyConnect: true,
+};
+
+if (username) options.username = username;
+if (password) options.password = password;
+
+const client = new Redis(options);
+
+async function run() {
+  if (client.status === 'wait') {
+    await client.connect();
+  }
+  const pong = await client.ping();
+  if (pong !== 'PONG') {
+    throw new Error(`Redis ping inesperado: ${pong}`);
+  }
+
+  const key = `installer:shared-storage:${Date.now()}`;
+  await client.set(key, 'ok', 'EX', 20);
+  const value = await client.get(key);
+  if (value !== 'ok') {
+    throw new Error('Falha no teste SET/GET do storage compartilhado');
+  }
+  await client.del(key);
+  await client.quit();
+}
+
+run()
+  .then(() => process.exit(0))
+  .catch(async (error) => {
+    try {
+      await client.quit();
+    } catch {
+      // noop
+    }
+    console.error(error?.message || error);
+    process.exit(1);
+  });
+EOF
+    chmod 644 "$probe_file"
+
+    if ! sudo -u multitenant bash -lc "cd '$backend_dir' && set -a && source ./.env && set +a && node '$probe_file'"; then
+        rm -f "$probe_file"
+        local redis_host=""
+        local redis_port=""
+        local redis_db=""
+        redis_host="$(read_env_value_native "REDIS_HOST" "$env_file" || true)"
+        redis_port="$(read_env_value_native "REDIS_PORT" "$env_file" || true)"
+        redis_db="$(read_env_value_native "REDIS_DB" "$env_file" || true)"
+        log_error "[ERROR] Backend nao conseguiu operar com storage compartilhado em modo estrito."
+        log_error "[ERROR] Config atual -> host=${redis_host:-127.0.0.1} port=${redis_port:-6379} db=${redis_db:-0}"
+        return 1
+    fi
+
+    rm -f "$probe_file"
+    log_success "[OK] Backend confirmou acesso ao Redis compartilhado"
 }
 
 # =============================================================================
@@ -988,7 +1209,7 @@ print_native_report() {
     if [[ "$process_mgr" == "pm2" ]]; then
         echo -e "   Status:         sudo -u multitenant pm2 list"
         echo -e "   Logs:           sudo -u multitenant pm2 logs"
-        echo -e "   Restart:        sudo -u multitenant pm2 restart all"
+        echo -e "   Restart:        sudo -u multitenant pm2 restart all --update-env"
         echo -e "   Stop:           sudo -u multitenant pm2 stop all"
     else
         echo -e "   Status backend: systemctl status multitenant-backend"

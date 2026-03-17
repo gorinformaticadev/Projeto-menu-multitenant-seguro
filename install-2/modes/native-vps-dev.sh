@@ -55,8 +55,10 @@ run_native_vps_dev() {
     local db_name="${DB_NAME:-db_${domain_prefix}}"
     local db_user="${DB_USER:-us_${domain_prefix}}"
     local db_pass="${DB_PASSWORD:-$(openssl rand -hex 16)}"
+    local redis_pass=""
     local jwt_secret="${JWT_SECRET:-$(openssl rand -hex 32)}"
     local enc_key="${ENCRYPTION_KEY:-$(openssl rand -hex 32)}"
+    redis_pass="$(resolve_redis_password_native "${REDIS_PASSWORD:-}" "$PROJECT_ROOT/apps/backend/.env")"
 
     print_separator
     log_info "Iniciando instalacao dos componentes..."
@@ -71,7 +73,7 @@ run_native_vps_dev() {
     # Preparar ambiente do usuário multitenant após instalação do Node.js e pnpm
     prepare_multitenant_environment
     install_postgresql
-    install_redis
+    install_redis "$redis_pass"
     install_pm2
     install_nginx
     install_certbot
@@ -84,7 +86,7 @@ run_native_vps_dev() {
 
     # --- 4. Configurar .env dos apps ---
     configure_backend_env "$domain" "$db_user" "$db_pass" "$db_name" \
-        "$jwt_secret" "$enc_key" "$admin_email" "$admin_pass" "development"
+        "$jwt_secret" "$enc_key" "$admin_email" "$admin_pass" "development" "$redis_pass"
     configure_frontend_env "$domain"
 
     # --- 5. Ajustar permissoes ---
@@ -121,6 +123,7 @@ run_native_vps_dev() {
 
     # --- 11. Verificar saude ---
     check_native_health "$domain"
+    validate_backend_shared_storage_native
 
     # --- Relatorio final ---
     print_native_report "$domain" "$admin_email" "$admin_pass" \

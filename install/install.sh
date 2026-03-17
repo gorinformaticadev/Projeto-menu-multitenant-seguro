@@ -418,9 +418,10 @@ native_setup_database() {
     local redis_pass="$4"
     log_info "Etapa 14/23: instalando PostgreSQL/Redis e criando database..."
     as_root "DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql postgresql-contrib redis-server"
-    as_root "sed -i 's/^# requirepass foobared/requirepass ${redis_pass}/g' /etc/redis/redis.conf"
-    as_root "if ! grep -q '^requirepass ' /etc/redis/redis.conf; then echo 'requirepass ${redis_pass}' >> /etc/redis/redis.conf; fi"
-    as_root "systemctl enable postgresql redis-server && systemctl restart postgresql redis-server"
+    as_root "systemctl enable postgresql redis-server"
+    as_root "systemctl restart postgresql"
+    native_configure_redis_auth "$redis_pass"
+    native_validate_redis_auth "$redis_pass"
     as_root "if ! sudo -u postgres psql -tAc \"SELECT 1 FROM pg_roles WHERE rolname='${db_user}'\" | grep -q 1; then sudo -u postgres psql -c \"CREATE USER \\\"${db_user}\\\" WITH PASSWORD '${db_pass}' CREATEDB;\"; else sudo -u postgres psql -c \"ALTER USER \\\"${db_user}\\\" WITH PASSWORD '${db_pass}' CREATEDB;\"; fi"
     as_root "if ! sudo -u postgres psql -tAc \"SELECT 1 FROM pg_database WHERE datname='${db_name}'\" | grep -q 1; then sudo -u postgres psql -c \"CREATE DATABASE \\\"${db_name}\\\" OWNER \\\"${db_user}\\\";\"; fi"
     as_root "sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE \\\"${db_name}\\\" TO \\\"${db_user}\\\";\""
@@ -459,7 +460,7 @@ native_create_app_envs() {
     upsert_env "BACKUP_DIR" "${app_dir}/backups" "$backend_env"
     upsert_env "REDIS_HOST" "127.0.0.1" "$backend_env"
     upsert_env "REDIS_PORT" "6379" "$backend_env"
-    upsert_env "REDIS_PASSWORD" "$11" "$backend_env"
+    upsert_env "REDIS_PASSWORD" "$redis_pass" "$backend_env"
     upsert_env "REDIS_DB" "0" "$backend_env"
     upsert_env "SEED_LOCK_ID" "${SEED_LOCK_ID:-87456321}" "$backend_env"
     upsert_env "SEED_LOCK_WAIT_SECONDS" "${SEED_LOCK_WAIT_SECONDS:-90}" "$backend_env"
@@ -482,15 +483,15 @@ native_start_pm2_apps() {
     local app_dir="$1"
     local instance_name="$2"
     log_info "Etapa 18/23: iniciando PM2 backend/frontend..."
-    run_as_native_user "cd '${app_dir}/apps/backend' && pm2 delete '${instance_name}-backend' >/dev/null 2>&1 || true && pm2 start dist/main.js --name '${instance_name}-backend'"
-    run_as_native_user "cd '${app_dir}/apps/frontend' && pm2 delete '${instance_name}-frontend' >/dev/null 2>&1 || true && pm2 start 'pnpm start' --name '${instance_name}-frontend'"
+    run_as_native_user "cd '${app_dir}/apps/backend' && pm2 delete '${instance_name}-backend' >/dev/null 2>&1 || true && pm2 start dist/main.js --name '${instance_name}-backend' --update-env"
+    run_as_native_user "cd '${app_dir}/apps/frontend' && pm2 delete '${instance_name}-frontend' >/dev/null 2>&1 || true && pm2 start 'pnpm start' --name '${instance_name}-frontend' --update-env"
     run_as_native_user "pm2 save"
 }
 
 native_restart_apps() {
     local instance_name="$1"
     log_info "Etapa 20/23: reiniciando apps..."
-    run_as_native_user "pm2 restart '${instance_name}-backend' '${instance_name}-frontend'"
+    run_as_native_user "pm2 restart '${instance_name}-backend' '${instance_name}-frontend' --update-env"
     sleep 10
 }
 
@@ -588,6 +589,8 @@ run_install_native() {
     native_start_pm2_apps "$app_dir" "$instance_name"
     native_configure_nginx_proxy "$domain" "$instance_name"
     native_restart_apps "$instance_name"
+    native_wait_backend_health
+    native_validate_backend_shared_storage "$app_dir"
     if ! native_setup_certbot "$domain" "$email"; then
         log_warn "SSL nao foi emitido/configurado nesta execucao. Instalacao native continuara sem abortar."
     fi
@@ -638,6 +641,374 @@ upsert_env() {
     else
         echo "${key}=${value}" >> "$file"
     fi
+}
+
+strip_wrapping_quotes() {
+    local raw="$1"
+    raw="${raw%$'\r'}"
+    if [[ "${#raw}" -ge 2 && "${raw:0:1}" == "\"" && "${raw: -1}" == "\"" ]]; then
+        echo "${raw:1:${#raw}-2}"
+        return 0
+    fi
+    if [[ "${#raw}" -ge 2 && "${raw:0:1}" == "'" && "${raw: -1}" == "'" ]]; then
+        echo "${raw:1:${#raw}-2}"
+        return 0
+    fi
+    echo "$raw"
+}
+
+read_env_value() {
+    local key="$1"
+    local file="$2"
+    if [[ ! -f "$file" ]]; then
+        return 1
+    fi
+
+    local line=""
+    line="$(grep -E "^${key}=" "$file" 2>/dev/null | tail -n 1 || true)"
+    if [[ -z "$line" ]]; then
+        return 1
+    fi
+
+    strip_wrapping_quotes "${line#*=}"
+}
+
+read_native_redis_password_from_conf() {
+    local redis_conf="/etc/redis/redis.conf"
+    if [[ ! -f "$redis_conf" ]]; then
+        return 1
+    fi
+
+    local line=""
+    line="$(grep -E "^[[:space:]]*requirepass[[:space:]]+" "$redis_conf" 2>/dev/null | tail -n 1 || true)"
+    if [[ -z "$line" ]]; then
+        return 1
+    fi
+
+    line="$(echo "$line" | sed -E 's/^[[:space:]]*requirepass[[:space:]]+//')"
+    strip_wrapping_quotes "$line"
+}
+
+resolve_redis_password_for_install() {
+    local install_mode="$1"
+    local explicit_password="${2:-}"
+    local backend_env_file="${3:-$PROJECT_ROOT/apps/backend/.env}"
+    local value=""
+
+    if [[ -n "$explicit_password" ]]; then
+        echo "$explicit_password"
+        return 0
+    fi
+
+    if [[ "$install_mode" == "native" ]]; then
+        value="$(read_native_redis_password_from_conf || true)"
+        if [[ -n "$value" ]]; then
+            echo "$value"
+            return 0
+        fi
+    fi
+
+    value="$(read_env_value "REDIS_PASSWORD" "$ENV_PRODUCTION" || true)"
+    if [[ -n "$value" ]]; then
+        echo "$value"
+        return 0
+    fi
+
+    value="$(read_env_value "REDIS_PASSWORD" "$backend_env_file" || true)"
+    if [[ -n "$value" ]]; then
+        echo "$value"
+        return 0
+    fi
+
+    if [[ "$install_mode" == "docker" ]] && command -v docker >/dev/null 2>&1; then
+        value="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' multitenant-redis 2>/dev/null | sed -n 's/^REDIS_PASSWORD=//p' | tail -n 1 || true)"
+        if [[ -n "$value" ]]; then
+            echo "$value"
+            return 0
+        fi
+    fi
+
+    openssl rand -hex 16
+}
+
+resolve_existing_redis_password_or_fail() {
+    local env_file="$1"
+    local backend_env_file="${2:-$PROJECT_ROOT/apps/backend/.env}"
+    local value=""
+
+    value="$(read_env_value "REDIS_PASSWORD" "$env_file" || true)"
+    if [[ -z "$value" ]]; then
+        value="$(read_env_value "REDIS_PASSWORD" "$backend_env_file" || true)"
+    fi
+    if [[ -z "$value" ]] && command -v docker >/dev/null 2>&1; then
+        value="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' multitenant-redis 2>/dev/null | sed -n 's/^REDIS_PASSWORD=//p' | tail -n 1 || true)"
+    fi
+
+    if [[ -z "$value" ]]; then
+        log_error "[ERROR] REDIS_PASSWORD ausente no ambiente de instalacao."
+        return 1
+    fi
+
+    echo "$value"
+}
+
+native_configure_redis_auth() {
+    local redis_pass="$1"
+    local redis_conf="/etc/redis/redis.conf"
+
+    if [[ -z "$redis_pass" ]]; then
+        log_error "[ERROR] REDIS_PASSWORD vazio; nao e possivel configurar Redis com autenticacao."
+        return 1
+    fi
+
+    if [[ ! -f "$redis_conf" ]]; then
+        log_error "[ERROR] Arquivo de configuracao do Redis nao encontrado: $redis_conf"
+        return 1
+    fi
+
+    log_info "[INFO] Redis configurado com autenticacao (fonte de verdade native: $redis_conf)"
+
+    local tmp_conf=""
+    tmp_conf="$(mktemp)"
+    awk -v pass="$redis_pass" '
+BEGIN { updated = 0 }
+{
+  if ($0 ~ /^[[:space:]]*#?[[:space:]]*requirepass[[:space:]]+/) {
+    if (!updated) {
+      print "requirepass " pass
+      updated = 1
+    }
+    next
+  }
+  print $0
+}
+END {
+  if (!updated) {
+    print "requirepass " pass
+  }
+}
+' "$redis_conf" > "$tmp_conf"
+
+    cat "$tmp_conf" > "$redis_conf"
+    rm -f "$tmp_conf"
+    systemctl enable redis-server >/dev/null 2>&1 || true
+    systemctl restart redis-server
+}
+
+native_validate_redis_auth() {
+    local redis_pass="$1"
+
+    log_info "[INFO] Validando Redis autenticado..."
+
+    if ! command -v redis-cli >/dev/null 2>&1; then
+        log_error "[ERROR] redis-cli nao encontrado para validacao de autenticacao."
+        return 1
+    fi
+
+    local pong=""
+    pong="$(redis-cli -a "$redis_pass" ping 2>/dev/null | tr -d '\r' | tail -n 1 || true)"
+    if [[ "$pong" != "PONG" ]]; then
+        log_error "[ERROR] Redis autenticado nao respondeu com PONG para as credenciais configuradas."
+        return 1
+    fi
+
+    log_info "[OK] Redis respondeu PONG com autenticacao"
+}
+
+native_wait_backend_health() {
+    local retries=30
+    local wait_seconds=4
+    local i
+
+    if ! command -v curl >/dev/null 2>&1; then
+        log_error "[ERROR] curl nao encontrado para healthcheck do backend."
+        return 1
+    fi
+
+    for ((i = 1; i <= retries; i++)); do
+        if curl -fsS --max-time 3 "http://127.0.0.1:4000/api/health" >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep "$wait_seconds"
+    done
+
+    log_error "[ERROR] Backend nao respondeu ao healthcheck em http://127.0.0.1:4000/api/health"
+    return 1
+}
+
+native_validate_backend_shared_storage() {
+    local app_dir="$1"
+    local backend_dir="$app_dir/apps/backend"
+    local backend_env_file="$backend_dir/.env"
+
+    log_info "[INFO] Validando storage compartilhado do backend..."
+
+    local probe_file=""
+    probe_file="$(mktemp)"
+    cat > "$probe_file" <<'EOF'
+const Redis = require('ioredis');
+
+const host = process.env.REDIS_HOST || '127.0.0.1';
+const port = Number(process.env.REDIS_PORT || 6379);
+const username = process.env.REDIS_USERNAME || undefined;
+const password = process.env.REDIS_PASSWORD || undefined;
+const db = Number(process.env.REDIS_DB || 0);
+
+const options = {
+  host,
+  port,
+  db,
+  connectTimeout: Number(process.env.RATE_LIMIT_REDIS_CONNECT_TIMEOUT || 1000),
+  maxRetriesPerRequest: 1,
+  enableOfflineQueue: false,
+  lazyConnect: true,
+};
+
+if (username) options.username = username;
+if (password) options.password = password;
+
+const client = new Redis(options);
+
+async function run() {
+  if (client.status === 'wait') {
+    await client.connect();
+  }
+  const pong = await client.ping();
+  if (pong !== 'PONG') {
+    throw new Error(`Redis ping inesperado: ${pong}`);
+  }
+
+  const key = `installer:shared-storage:${Date.now()}`;
+  await client.set(key, 'ok', 'EX', 20);
+  const value = await client.get(key);
+  if (value !== 'ok') {
+    throw new Error('Falha no teste SET/GET do storage compartilhado');
+  }
+  await client.del(key);
+  await client.quit();
+}
+
+run()
+  .then(() => process.exit(0))
+  .catch(async (error) => {
+    try {
+      await client.quit();
+    } catch {
+      // noop
+    }
+    console.error(error?.message || error);
+    process.exit(1);
+  });
+EOF
+    chmod 644 "$probe_file"
+
+    if ! run_as_native_user "cd '${backend_dir}' && set -a && source ./.env && set +a && node '${probe_file}'"; then
+        rm -f "$probe_file"
+        local redis_host=""
+        local redis_port=""
+        local redis_db=""
+        redis_host="$(read_env_value "REDIS_HOST" "$backend_env_file" || true)"
+        redis_port="$(read_env_value "REDIS_PORT" "$backend_env_file" || true)"
+        redis_db="$(read_env_value "REDIS_DB" "$backend_env_file" || true)"
+        log_error "[ERROR] Backend nao conseguiu operar com storage compartilhado em modo estrito."
+        log_error "[ERROR] Config atual -> host=${redis_host:-127.0.0.1} port=${redis_port:-6379} db=${redis_db:-0}"
+        return 1
+    fi
+
+    rm -f "$probe_file"
+    log_info "[OK] Backend confirmou acesso ao Redis compartilhado"
+}
+
+docker_validate_redis_auth() {
+    local redis_pass="$1"
+
+    log_info "[INFO] Validando Redis autenticado..."
+    local pong=""
+    pong="$(docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml exec -T redis redis-cli -a "$redis_pass" ping 2>/dev/null | tr -d '\r' | tail -n 1 || true)"
+    if [[ "$pong" != "PONG" ]]; then
+        log_error "[ERROR] Redis autenticado nao respondeu com PONG para as credenciais configuradas."
+        return 1
+    fi
+    log_info "[OK] Redis respondeu PONG com autenticacao"
+}
+
+docker_validate_backend_shared_storage() {
+    log_info "[INFO] Validando storage compartilhado do backend..."
+
+    if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml exec -T backend node - <<'EOF'
+const Redis = require('ioredis');
+
+const host = process.env.REDIS_HOST || 'redis';
+const port = Number(process.env.REDIS_PORT || 6379);
+const username = process.env.REDIS_USERNAME || undefined;
+const password = process.env.REDIS_PASSWORD || undefined;
+const db = Number(process.env.REDIS_DB || 0);
+
+const options = {
+  host,
+  port,
+  db,
+  connectTimeout: Number(process.env.RATE_LIMIT_REDIS_CONNECT_TIMEOUT || 1000),
+  maxRetriesPerRequest: 1,
+  enableOfflineQueue: false,
+  lazyConnect: true,
+};
+
+if (username) options.username = username;
+if (password) options.password = password;
+
+const client = new Redis(options);
+
+async function run() {
+  if (client.status === 'wait') {
+    await client.connect();
+  }
+  const pong = await client.ping();
+  if (pong !== 'PONG') {
+    throw new Error(`Redis ping inesperado: ${pong}`);
+  }
+
+  const key = `installer:shared-storage:${Date.now()}`;
+  await client.set(key, 'ok', 'EX', 20);
+  const value = await client.get(key);
+  if (value !== 'ok') {
+    throw new Error('Falha no teste SET/GET do storage compartilhado');
+  }
+  await client.del(key);
+  await client.quit();
+}
+
+run()
+  .then(() => process.exit(0))
+  .catch(async (error) => {
+    try {
+      await client.quit();
+    } catch {
+      // noop
+    }
+    console.error(error?.message || error);
+    process.exit(1);
+  });
+EOF
+    then
+        local redis_host=""
+        local redis_port=""
+        local redis_db=""
+        redis_host="$(read_env_value "REDIS_HOST" "$ENV_PRODUCTION" || true)"
+        redis_port="$(read_env_value "REDIS_PORT" "$ENV_PRODUCTION" || true)"
+        redis_db="$(read_env_value "REDIS_DB" "$ENV_PRODUCTION" || true)"
+        log_error "[ERROR] Backend nao conseguiu operar com storage compartilhado em modo estrito."
+        log_error "[ERROR] Config atual -> host=${redis_host:-redis} port=${redis_port:-6379} db=${redis_db:-0}"
+        return 1
+    fi
+
+    log_info "[OK] Backend confirmou acesso ao Redis compartilhado"
+}
+
+validate_docker_shared_storage_stack() {
+    local redis_pass="$1"
+    docker_validate_redis_auth "$redis_pass"
+    docker_validate_backend_shared_storage
 }
 
 RESOLVED_APP_VERSION="unknown"
@@ -831,15 +1202,18 @@ run_update_docker() {
 
     log_info "Baixando imagens..."
     pull_or_build_stack
+
+    local redis_pass=""
+    redis_pass="$(resolve_existing_redis_password_or_fail "$ENV_PRODUCTION" "$PROJECT_ROOT/apps/backend/.env")"
+    upsert_env "REDIS_PASSWORD" "$redis_pass" "$ENV_PRODUCTION"
+    upsert_env "REDIS_DB" "0" "$ENV_PRODUCTION"
+    validate_docker_shared_storage_stack "$redis_pass"
 }
 
 run_update_native() {
     local instance_name_filter="${1:-all}"
     local native_instances=()
     local selected_count=0
-
-    # Pega variaveis globais e repassa
-    local redis_pass="${REDIS_PASSWORD:-$(openssl rand -hex 16)}"
 
     while IFS= read -r instance_dir; do
         [[ -n "$instance_dir" ]] && native_instances+=("$instance_dir")
@@ -860,27 +1234,37 @@ run_update_native() {
 
         selected_count=$((selected_count + 1))
         log_info "Executando update Native da instancia: $instance_name"
+        local backend_env_file="$instance_dir/apps/backend/.env"
+        local redis_pass=""
+        redis_pass="$(resolve_redis_password_for_install "native" "${REDIS_PASSWORD:-}" "$backend_env_file")"
         native_system_permissions_and_project "$instance_dir"
         native_write_version_metadata "$instance_dir"
         native_install_project_dependencies "$instance_dir"
         
-        # O Update também injeta a senha de Redis se rodando native
-        if [[ -f "/etc/redis/redis.conf" ]]; then
-            as_root "sed -i 's/^# requirepass foobared/requirepass ${redis_pass}/g' /etc/redis/redis.conf"
-            as_root "if ! grep -q '^requirepass ' /etc/redis/redis.conf; then echo 'requirepass ${redis_pass}' >> /etc/redis/redis.conf; fi"
-            as_root "systemctl restart redis-server || true"
+        native_configure_redis_auth "$redis_pass"
+        native_validate_redis_auth "$redis_pass"
+
+        if [[ -f "$ENV_PRODUCTION" ]]; then
+            upsert_env "REDIS_PASSWORD" "$redis_pass" "$ENV_PRODUCTION"
+            upsert_env "REDIS_DB" "0" "$ENV_PRODUCTION"
         fi
-        
-        # Propaga o novo REDIS_PASSWORD pro .env do backend da instancia e forca a adicao se ja havia algum valor no install/.env.production
-        if [[ -f "$instance_dir/apps/backend/.env" ]]; then
-             upsert_env "REDIS_PASSWORD" "$redis_pass" "$instance_dir/apps/backend/.env"
-             upsert_env "REDIS_DB" "0" "$instance_dir/apps/backend/.env"
-             as_root "chown ${NATIVE_SYSTEM_USER}:${NATIVE_SYSTEM_USER} '$instance_dir/apps/backend/.env'"
+
+        # Propaga REDIS_* da fonte real (redis.conf) para o .env do backend da instancia
+        if [[ -f "$backend_env_file" ]]; then
+             upsert_env "REDIS_HOST" "127.0.0.1" "$backend_env_file"
+             upsert_env "REDIS_PORT" "6379" "$backend_env_file"
+             upsert_env "REDIS_PASSWORD" "$redis_pass" "$backend_env_file"
+             upsert_env "REDIS_DB" "0" "$backend_env_file"
+             upsert_env "RATE_LIMIT_REDIS_ENABLED" "true" "$backend_env_file"
+             upsert_env "RATE_LIMIT_STORAGE_FAILURE_MODE" "strict" "$backend_env_file"
+             as_root "chown ${NATIVE_SYSTEM_USER}:${NATIVE_SYSTEM_USER} '$backend_env_file'"
         fi
 
         native_build_apps "$instance_dir"
         native_migrate_and_seed "$instance_dir"
         native_restart_apps "$instance_name"
+        native_wait_backend_health
+        native_validate_backend_shared_storage "$instance_dir"
         log_info "Instancia native atualizada: $instance_name"
     done
 
@@ -1084,13 +1468,17 @@ run_install() {
     local db_name="${DB_NAME:-db_${domain_prefix}}"
     local db_user="${DB_USER:-us_${domain_prefix}}"
     local db_pass="${DB_PASSWORD:-$(openssl rand -hex 16)}"
-    local redis_pass="${REDIS_PASSWORD:-$(openssl rand -hex 16)}"
+    local redis_pass=""
     local jwt_secret="${JWT_SECRET:-$(openssl rand -hex 32)}"
     local enc_key="${ENCRYPTION_KEY:-$(openssl rand -hex 32)}"
     local db_host_env="db"
+    local redis_host_env="redis"
+    local redis_port_env="6379"
     if [[ "$install_mode" == "native" ]]; then
         db_host_env="127.0.0.1"
+        redis_host_env="127.0.0.1"
     fi
+    redis_pass="$(resolve_redis_password_for_install "$install_mode" "${REDIS_PASSWORD:-}" "$PROJECT_ROOT/apps/backend/.env")"
 
     resolve_build_metadata "$PROJECT_ROOT"
     local app_version_value="${APP_VERSION:-}"
@@ -1128,8 +1516,12 @@ run_install() {
     upsert_env "DB_PASSWORD" "$db_pass"
     upsert_env "DB_NAME" "$db_name"
     upsert_env "DATABASE_URL" "postgresql://$db_user:$db_pass@$db_host_env:5432/$db_name?schema=public"
+    upsert_env "REDIS_HOST" "$redis_host_env"
+    upsert_env "REDIS_PORT" "$redis_port_env"
     upsert_env "REDIS_PASSWORD" "$redis_pass"
     upsert_env "REDIS_DB" "0"
+    upsert_env "RATE_LIMIT_REDIS_ENABLED" "true"
+    upsert_env "RATE_LIMIT_STORAGE_FAILURE_MODE" "strict"
     upsert_env "JWT_SECRET" "$jwt_secret"
     upsert_env "ENCRYPTION_KEY" "$enc_key"
     upsert_env "REQUIRE_SECRET_MANAGER" "false"
@@ -1156,8 +1548,12 @@ run_install() {
             log_info "Criado apps/backend/.env a partir de .env.example"
         fi
         upsert_env "DATABASE_URL" "postgresql://$db_user:$db_pass@$db_host_env:5432/$db_name?schema=public" "$BACKEND_ENV"
+        upsert_env "REDIS_HOST" "$redis_host_env" "$BACKEND_ENV"
+        upsert_env "REDIS_PORT" "$redis_port_env" "$BACKEND_ENV"
         upsert_env "REDIS_PASSWORD" "$redis_pass" "$BACKEND_ENV"
         upsert_env "REDIS_DB" "0" "$BACKEND_ENV"
+        upsert_env "RATE_LIMIT_REDIS_ENABLED" "true" "$BACKEND_ENV"
+        upsert_env "RATE_LIMIT_STORAGE_FAILURE_MODE" "strict" "$BACKEND_ENV"
         upsert_env "JWT_SECRET" "$jwt_secret" "$BACKEND_ENV"
         upsert_env "ENCRYPTION_KEY" "$enc_key" "$BACKEND_ENV"
         upsert_env "FRONTEND_URL" "https://$domain" "$BACKEND_ENV"
@@ -1218,6 +1614,7 @@ run_install() {
     log_info "Subindo stack (docker-compose.prod.yml) com install/.env.production..."
     cd "$PROJECT_ROOT"
     pull_or_build_stack
+    validate_docker_shared_storage_stack "$redis_pass"
 
     # Tentar obter certificado Let's Encrypt (domínio deve apontar para este host e porta 80 acessível)
     sleep 5
@@ -1337,15 +1734,14 @@ run_update() {
     upsert_env "REQUIRE_SECRET_MANAGER" "${REQUIRE_SECRET_MANAGER:-false}" "$ENV_PRODUCTION"
 
     # Garante segurança do Redis em updates posteriores a 1.x
-    local redis_pass="${REDIS_PASSWORD:-}"
-    if [[ -z "$redis_pass" ]]; then
-        redis_pass="$(openssl rand -hex 16)"
-        log_info "Gerando nova REDIS_PASSWORD segura durante o update..."
-        upsert_env "REDIS_PASSWORD" "$redis_pass" "$ENV_PRODUCTION"
-        upsert_env "REDIS_DB" "0" "$ENV_PRODUCTION"
-        export REDIS_PASSWORD="$redis_pass"
-        export REDIS_DB="0"
-    fi
+    local redis_pass=""
+    redis_pass="$(resolve_redis_password_for_install "docker" "${REDIS_PASSWORD:-}" "$PROJECT_ROOT/apps/backend/.env")"
+    upsert_env "REDIS_PASSWORD" "$redis_pass" "$ENV_PRODUCTION"
+    upsert_env "REDIS_DB" "0" "$ENV_PRODUCTION"
+    upsert_env "RATE_LIMIT_REDIS_ENABLED" "${RATE_LIMIT_REDIS_ENABLED:-true}" "$ENV_PRODUCTION"
+    upsert_env "RATE_LIMIT_STORAGE_FAILURE_MODE" "${RATE_LIMIT_STORAGE_FAILURE_MODE:-strict}" "$ENV_PRODUCTION"
+    export REDIS_PASSWORD="$redis_pass"
+    export REDIS_DB="0"
 
     if [[ -d "$PROJECT_ROOT/.git" ]] && [[ -n "$branch" ]]; then
         log_info "Atualizando repositório (branch: ${branch})..."

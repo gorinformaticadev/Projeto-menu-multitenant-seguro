@@ -87,6 +87,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Install shellcheck
         run: |
           sudo apt-get update
@@ -98,7 +103,30 @@ jobs:
         run: |
           set -euo pipefail
 
-          scripts=(
+          syntax_scripts=(
+            "install/install.sh"
+            "install/update.sh"
+            "install/update-native.sh"
+            "install/rollback-native.sh"
+            "install/release-retention.sh"
+            "install/restore-native.sh"
+            "install/restore-db.sh"
+            "install/update-images.sh"
+            "install-2/utils/native-utils.sh"
+            "install-2/utils/docker-install.sh"
+            "Scripts/migrate-uploads.sh"
+          )
+
+          for script in "${syntax_scripts[@]}"; do
+            if [[ ! -f "$script" ]]; then
+              echo "Script obrigatorio nao encontrado: $script"
+              exit 1
+            fi
+            chmod +x "$script"
+            bash -n "$script"
+          done
+
+          shellcheck_scripts=(
             "install/update-native.sh"
             "install/rollback-native.sh"
             "install/release-retention.sh"
@@ -108,16 +136,10 @@ jobs:
             "Scripts/migrate-uploads.sh"
           )
 
-          for script in "${scripts[@]}"; do
-            if [[ ! -f "$script" ]]; then
-              echo "Script obrigatorio nao encontrado: $script"
-              exit 1
-            fi
-            chmod +x "$script"
-            bash -n "$script"
-          done
+          shellcheck -x -e SC1090,SC1091 "${shellcheck_scripts[@]}"
 
-          shellcheck -x -e SC1090,SC1091 "${scripts[@]}"
+      - name: Installer redis auth regression guard
+        run: node Scripts/tests/installer-redis-auth-regression.js
 
   smoke-tests:
     name: smoke-tests

@@ -202,6 +202,82 @@ else
 fi
 
 # ===============================
+# Validação Redis autenticado + backend shared storage
+# ===============================
+REDIS_PASSWORD="$(grep '^REDIS_PASSWORD=' "$ENV_FILE" | tail -n 1 | cut -d'=' -f2- || true)"
+if [ -z "$REDIS_PASSWORD" ]; then
+    echored "REDIS_PASSWORD ausente em $ENV_FILE. Update abortado."
+    exit 1
+fi
+
+echoblue "Validando Redis autenticado..."
+if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T redis redis-cli -a "$REDIS_PASSWORD" ping 2>/dev/null | grep -q "PONG"; then
+    echogreen "Redis respondeu PONG com autenticação."
+else
+    echored "Redis autenticado nao respondeu com PONG. Update abortado."
+    exit 1
+fi
+
+echoblue "Validando storage compartilhado do backend..."
+if ! docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend node - <<'EOF'
+const Redis = require('ioredis');
+
+const host = process.env.REDIS_HOST || 'redis';
+const port = Number(process.env.REDIS_PORT || 6379);
+const username = process.env.REDIS_USERNAME || undefined;
+const password = process.env.REDIS_PASSWORD || undefined;
+const db = Number(process.env.REDIS_DB || 0);
+
+const options = {
+  host,
+  port,
+  db,
+  connectTimeout: Number(process.env.RATE_LIMIT_REDIS_CONNECT_TIMEOUT || 1000),
+  maxRetriesPerRequest: 1,
+  enableOfflineQueue: false,
+  lazyConnect: true,
+};
+if (username) options.username = username;
+if (password) options.password = password;
+
+const client = new Redis(options);
+
+async function run() {
+  if (client.status === 'wait') {
+    await client.connect();
+  }
+  const pong = await client.ping();
+  if (pong !== 'PONG') {
+    throw new Error(`Redis ping inesperado: ${pong}`);
+  }
+  const key = `installer:shared-storage:${Date.now()}`;
+  await client.set(key, 'ok', 'EX', 20);
+  const value = await client.get(key);
+  if (value !== 'ok') {
+    throw new Error('Falha no teste SET/GET do storage compartilhado');
+  }
+  await client.del(key);
+  await client.quit();
+}
+
+run()
+  .then(() => process.exit(0))
+  .catch(async (error) => {
+    try {
+      await client.quit();
+    } catch {}
+    console.error(error?.message || error);
+    process.exit(1);
+  });
+EOF
+then
+    echogreen "Backend confirmou acesso ao Redis compartilhado."
+else
+    echored "Backend nao conseguiu operar com storage compartilhado em modo estrito. Update abortado."
+    exit 1
+fi
+
+# ===============================
 # Verifica saúde do backend
 # ===============================
 echoblue "Aguardando o backend ficar saudável (até 3 minutos)..."

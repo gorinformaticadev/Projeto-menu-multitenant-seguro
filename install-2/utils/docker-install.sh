@@ -212,6 +212,162 @@ ensure_production_env_file() {
     fi
 }
 
+strip_wrapping_quotes_install2() {
+    local raw="$1"
+    raw="${raw%$'\r'}"
+    if [[ "${#raw}" -ge 2 && "${raw:0:1}" == "\"" && "${raw: -1}" == "\"" ]]; then
+        echo "${raw:1:${#raw}-2}"
+        return 0
+    fi
+    if [[ "${#raw}" -ge 2 && "${raw:0:1}" == "'" && "${raw: -1}" == "'" ]]; then
+        echo "${raw:1:${#raw}-2}"
+        return 0
+    fi
+    echo "$raw"
+}
+
+read_env_value_install2() {
+    local key="$1"
+    local file="$2"
+    if [[ ! -f "$file" ]]; then
+        return 1
+    fi
+
+    local line=""
+    line="$(grep -E "^${key}=" "$file" 2>/dev/null | tail -n 1 || true)"
+    if [[ -z "$line" ]]; then
+        return 1
+    fi
+
+    strip_wrapping_quotes_install2 "${line#*=}"
+}
+
+resolve_docker_redis_password() {
+    local explicit_password="${1:-}"
+    local backend_env_file="${2:-$PROJECT_ROOT/apps/backend/.env}"
+    local value=""
+
+    if [[ -n "$explicit_password" ]]; then
+        echo "$explicit_password"
+        return 0
+    fi
+
+    value="$(read_env_value_install2 "REDIS_PASSWORD" "$ENV_PRODUCTION" || true)"
+    if [[ -n "$value" ]]; then
+        echo "$value"
+        return 0
+    fi
+
+    value="$(read_env_value_install2 "REDIS_PASSWORD" "$backend_env_file" || true)"
+    if [[ -n "$value" ]]; then
+        echo "$value"
+        return 0
+    fi
+
+    if command -v docker >/dev/null 2>&1; then
+        value="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' multitenant-redis 2>/dev/null | sed -n 's/^REDIS_PASSWORD=//p' | tail -n 1 || true)"
+        if [[ -n "$value" ]]; then
+            echo "$value"
+            return 0
+        fi
+    fi
+
+    openssl rand -hex 16
+}
+
+validate_docker_redis_auth_install2() {
+    local redis_pass="$1"
+
+    log_info "[INFO] Validando Redis autenticado..."
+    local pong=""
+    pong="$(docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml exec -T redis redis-cli -a "$redis_pass" ping 2>/dev/null | tr -d '\r' | tail -n 1 || true)"
+    if [[ "$pong" != "PONG" ]]; then
+        log_error "[ERROR] Redis autenticado nao respondeu com PONG para as credenciais configuradas."
+        return 1
+    fi
+
+    log_success "[OK] Redis respondeu PONG com autenticacao"
+}
+
+validate_docker_backend_shared_storage_install2() {
+    log_info "[INFO] Validando storage compartilhado do backend..."
+
+    if ! docker compose --env-file "$ENV_PRODUCTION" -f docker-compose.prod.yml exec -T backend node - <<'EOF'
+const Redis = require('ioredis');
+
+const host = process.env.REDIS_HOST || 'redis';
+const port = Number(process.env.REDIS_PORT || 6379);
+const username = process.env.REDIS_USERNAME || undefined;
+const password = process.env.REDIS_PASSWORD || undefined;
+const db = Number(process.env.REDIS_DB || 0);
+
+const options = {
+  host,
+  port,
+  db,
+  connectTimeout: Number(process.env.RATE_LIMIT_REDIS_CONNECT_TIMEOUT || 1000),
+  maxRetriesPerRequest: 1,
+  enableOfflineQueue: false,
+  lazyConnect: true,
+};
+
+if (username) options.username = username;
+if (password) options.password = password;
+
+const client = new Redis(options);
+
+async function run() {
+  if (client.status === 'wait') {
+    await client.connect();
+  }
+  const pong = await client.ping();
+  if (pong !== 'PONG') {
+    throw new Error(`Redis ping inesperado: ${pong}`);
+  }
+
+  const key = `installer:shared-storage:${Date.now()}`;
+  await client.set(key, 'ok', 'EX', 20);
+  const value = await client.get(key);
+  if (value !== 'ok') {
+    throw new Error('Falha no teste SET/GET do storage compartilhado');
+  }
+  await client.del(key);
+  await client.quit();
+}
+
+run()
+  .then(() => process.exit(0))
+  .catch(async (error) => {
+    try {
+      await client.quit();
+    } catch {
+      // noop
+    }
+    console.error(error?.message || error);
+    process.exit(1);
+  });
+EOF
+    then
+        local redis_host=""
+        local redis_port=""
+        local redis_db=""
+        redis_host="$(read_env_value_install2 "REDIS_HOST" "$ENV_PRODUCTION" || true)"
+        redis_port="$(read_env_value_install2 "REDIS_PORT" "$ENV_PRODUCTION" || true)"
+        redis_db="$(read_env_value_install2 "REDIS_DB" "$ENV_PRODUCTION" || true)"
+        log_error "[ERROR] Backend nao conseguiu operar com storage compartilhado em modo estrito."
+        log_error "[ERROR] Config atual -> host=${redis_host:-redis} port=${redis_port:-6379} db=${redis_db:-0}"
+        return 1
+    fi
+
+    log_success "[OK] Backend confirmou acesso ao Redis compartilhado"
+}
+
+validate_docker_shared_storage_install2() {
+    local redis_pass="$1"
+    validate_docker_redis_auth_install2 "$redis_pass"
+    validate_docker_backend_shared_storage_install2
+}
+
 # =============================================================================
 # Funcao principal de instalacao Docker VPS
 # Logica extraida de run_install() em install/install.sh sem modificacao.
@@ -283,9 +439,10 @@ run_docker_vps_install() {
     local db_name="${DB_NAME:-db_${domain_prefix}}"
     local db_user="${DB_USER:-us_${domain_prefix}}"
     local db_pass="${DB_PASSWORD:-$(openssl rand -hex 16)}"
-    local redis_pass="${REDIS_PASSWORD:-$(openssl rand -hex 16)}"
+    local redis_pass=""
     local jwt_secret="${JWT_SECRET:-$(openssl rand -hex 32)}"
     local enc_key="${ENCRYPTION_KEY:-$(openssl rand -hex 32)}"
+    redis_pass="$(resolve_docker_redis_password "${REDIS_PASSWORD:-}" "$PROJECT_ROOT/apps/backend/.env")"
 
     log_info "Configurando .env..."
     upsert_env "DOMAIN" "$domain" "$ENV_PRODUCTION"
@@ -302,8 +459,12 @@ run_docker_vps_install() {
     upsert_env "DB_PASSWORD" "$db_pass" "$ENV_PRODUCTION"
     upsert_env "DB_NAME" "$db_name" "$ENV_PRODUCTION"
     upsert_env "DATABASE_URL" "postgresql://$db_user:$db_pass@db:5432/$db_name?schema=public" "$ENV_PRODUCTION"
+    upsert_env "REDIS_HOST" "redis" "$ENV_PRODUCTION"
+    upsert_env "REDIS_PORT" "6379" "$ENV_PRODUCTION"
     upsert_env "REDIS_PASSWORD" "$redis_pass" "$ENV_PRODUCTION"
     upsert_env "REDIS_DB" "0" "$ENV_PRODUCTION"
+    upsert_env "RATE_LIMIT_REDIS_ENABLED" "true" "$ENV_PRODUCTION"
+    upsert_env "RATE_LIMIT_STORAGE_FAILURE_MODE" "strict" "$ENV_PRODUCTION"
     upsert_env "JWT_SECRET" "$jwt_secret" "$ENV_PRODUCTION"
     upsert_env "ENCRYPTION_KEY" "$enc_key" "$ENV_PRODUCTION"
     upsert_env "REQUIRE_SECRET_MANAGER" "false" "$ENV_PRODUCTION"
@@ -329,8 +490,12 @@ run_docker_vps_install() {
             log_info "Criado apps/backend/.env a partir de .env.example"
         fi
         upsert_env "DATABASE_URL" "postgresql://$db_user:$db_pass@db:5432/$db_name?schema=public" "$BACKEND_ENV"
+        upsert_env "REDIS_HOST" "redis" "$BACKEND_ENV"
+        upsert_env "REDIS_PORT" "6379" "$BACKEND_ENV"
         upsert_env "REDIS_PASSWORD" "$redis_pass" "$BACKEND_ENV"
         upsert_env "REDIS_DB" "0" "$BACKEND_ENV"
+        upsert_env "RATE_LIMIT_REDIS_ENABLED" "true" "$BACKEND_ENV"
+        upsert_env "RATE_LIMIT_STORAGE_FAILURE_MODE" "strict" "$BACKEND_ENV"
         upsert_env "JWT_SECRET" "$jwt_secret" "$BACKEND_ENV"
         upsert_env "ENCRYPTION_KEY" "$enc_key" "$BACKEND_ENV"
         upsert_env "FRONTEND_URL" "https://$domain" "$BACKEND_ENV"
@@ -386,6 +551,7 @@ run_docker_vps_install() {
     log_info "Subindo stack (docker-compose.prod.yml) com install-2/.env.production..."
     cd "$PROJECT_ROOT"
     pull_or_build_stack
+    validate_docker_shared_storage_install2 "$redis_pass"
 
     # Tentar obter certificado Let's Encrypt
     sleep 5

@@ -18,6 +18,7 @@
     "dev:frontend": "pnpm --filter frontend dev",
     "build:all": "pnpm -r run build",
     "test:all": "pnpm -r run test",
+    "test:installer-regression": "node Scripts/tests/installer-redis-auth-regression.js",
     "clean": "pnpm -r exec rm -rf node_modules dist .next"
   },
   "overrides": {
