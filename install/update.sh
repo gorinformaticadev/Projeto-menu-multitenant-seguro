@@ -220,7 +220,13 @@ fi
 
 echoblue "Validando storage compartilhado do backend..."
 if ! docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend node - <<'EOF'
-const Redis = require('ioredis');
+let Redis;
+try {
+  Redis = require(require.resolve('ioredis', { paths: [process.cwd()] }));
+} catch (error) {
+  console.error('Dependencia ioredis nao encontrada no backend. Execute a instalacao de dependencias antes da validacao.');
+  process.exit(1);
+}
 
 const host = process.env.REDIS_HOST || 'redis';
 const port = Number(process.env.REDIS_PORT || 6379);

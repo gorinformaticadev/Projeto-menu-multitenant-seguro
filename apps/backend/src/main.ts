@@ -61,9 +61,22 @@ async function bootstrap() {
 
   const dynamicModule = await AppModule.register();
   const app = await NestFactory.create<NestExpressApplication>(dynamicModule);
-  // O bootstrap usa um DynamicModule; o container valido para os validadores
-  // e o proprio app, nao AppModule selecionado por token estatico.
-  useContainer(app, { fallbackOnErrors: true });
+  // Bridge seguro para class-validator:
+  // - resolve providers do Nest quando existirem (ex.: IsStrongPasswordConstraint)
+  // - nao quebra bootstrap para constraints inline (CustomConstraint)
+  // - deixa class-validator usar fallback interno quando token nao existir no Nest
+  useContainer(
+    {
+      get<T>(token: new (...args: any[]) => T): T | undefined {
+        try {
+          return app.get(token, { strict: false });
+        } catch {
+          return undefined;
+        }
+      },
+    },
+    { fallback: true, fallbackOnErrors: true },
+  );
   app.setGlobalPrefix('api');
 
   const isProduction = process.env.NODE_ENV === 'production';
