@@ -6,6 +6,7 @@ import {
   IsString,
   MinLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { Role } from '@prisma/client';
 import { IsStrongPassword } from '@core/common/validators/password.validator';
 
@@ -24,6 +25,7 @@ export class UpdateUserDto {
   role?: Role;
 
   @IsOptional()
+  @Transform(({ value }) => (value === '' ? undefined : value))
   @IsString()
   @IsStrongPassword()
   password?: string;

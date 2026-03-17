@@ -148,6 +148,124 @@ describe('UsersService security boundaries', () => {
     expect(prismaMock.user.create).not.toHaveBeenCalled();
   });
 
+  it('rejects user update when the new password violates the runtime policy', async () => {
+    const service = createService();
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      role: Role.USER,
+      tenantId: 'tenant-1',
+      tenant: null,
+    });
+
+    await expect(
+      service.update(
+        'user-1',
+        {
+          password: 'fraca',
+        },
+        {
+          id: 'admin-1',
+          role: Role.ADMIN,
+          tenantId: 'tenant-1',
+        },
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+
+  it('allows user update when password is omitted', async () => {
+    const service = createService();
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      role: Role.USER,
+      tenantId: 'tenant-1',
+      tenant: null,
+    });
+    prismaMock.user.update.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      name: 'Novo Nome',
+      role: Role.USER,
+      tenantId: 'tenant-1',
+      tenant: null,
+      avatarUrl: null,
+    });
+
+    await expect(
+      service.update(
+        'user-1',
+        {
+          name: 'Novo Nome',
+        },
+        {
+          id: 'admin-1',
+          role: Role.ADMIN,
+          tenantId: 'tenant-1',
+        },
+      ),
+    ).resolves.toMatchObject({
+      name: 'Novo Nome',
+    });
+
+    expect(securityConfigServiceMock.getPasswordPolicy).not.toHaveBeenCalled();
+    expect(prismaMock.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({
+          password: expect.anything(),
+        }),
+      }),
+    );
+  });
+
+  it('treats empty password on update as no password change', async () => {
+    const service = createService();
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      role: Role.USER,
+      tenantId: 'tenant-1',
+      tenant: null,
+    });
+    prismaMock.user.update.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      name: 'Nome Mantido',
+      role: Role.USER,
+      tenantId: 'tenant-1',
+      tenant: null,
+      avatarUrl: null,
+    });
+
+    await expect(
+      service.update(
+        'user-1',
+        {
+          name: 'Nome Mantido',
+          password: '',
+        },
+        {
+          id: 'admin-1',
+          role: Role.ADMIN,
+          tenantId: 'tenant-1',
+        },
+      ),
+    ).resolves.toMatchObject({
+      name: 'Nome Mantido',
+    });
+
+    expect(securityConfigServiceMock.getPasswordPolicy).not.toHaveBeenCalled();
+    expect(prismaMock.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({
+          password: expect.anything(),
+        }),
+      }),
+    );
+  });
+
   it('stores user avatar in a tenant-scoped directory and exposes a public avatar URL', async () => {
     const service = createService();
     const jpegBuffer = Buffer.from([
