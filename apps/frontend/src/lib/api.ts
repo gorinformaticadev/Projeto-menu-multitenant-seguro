@@ -84,14 +84,34 @@ const publishMaintenanceState = (payload: MaintenanceModePayload) => {
   window.dispatchEvent(new CustomEvent(MAINTENANCE_EVENT_ACTIVE, { detail: normalized }));
 };
 
-const doLogout = () => {
+const doLogout = async () => {
   if (typeof window === "undefined") {
     return;
   }
 
-  // Limpar os cookies para evitar loop infinito na Middleware de Autenticação
+  // Limpar os cookies para precaver (embora HttpOnly precise do backend)
   document.cookie = "accessToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
   document.cookie = "refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+
+  try {
+    const isMaintenanceRequest = window.location.pathname.startsWith("/maintenance");
+    
+    // Se não estiver em manutenção, tenta o logout para limpar cookies HttpOnly no backend
+    if (!isMaintenanceRequest) {
+      await axios.post(
+        `${API_URL}/auth/logout`,
+        {},
+        {
+          withCredentials: true,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+  } catch (e) {
+    console.warn("Forced logout request failed to propagate to server:", e);
+  }
 
   window.dispatchEvent(new Event("auth:logout"));
 
@@ -99,6 +119,7 @@ const doLogout = () => {
     window.location.href = ROUTE_CONFIG.unauthenticatedFallback;
   }
 };
+
 
 
 api.interceptors.request.use(
@@ -142,9 +163,10 @@ api.interceptors.response.use(
     const isRefreshRequest = normalizedUrl === "/auth/refresh";
 
     if (error.response?.status === 401 && isRefreshRequest) {
-      doLogout();
+      await doLogout();
       return Promise.reject(error);
     }
+
 
     if (
       error.response?.status === 401 &&
@@ -179,7 +201,7 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError: unknown) {
         processQueue(refreshError);
-        doLogout();
+        await doLogout();
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
