@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.35](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.34...v0.1.35) (2026-03-18)
+
+
+### Bug Fixes
+
+* **frontend:** Correção de loop infinito ao trocar senha ([b454db5](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/b454db57f7c9f8cbcd350758519862034c66ce82))
+
 ### [0.1.34](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.32...v0.1.34) (2026-03-18)
 
 ### [0.1.33](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.32...v0.1.33) (2026-03-18)
