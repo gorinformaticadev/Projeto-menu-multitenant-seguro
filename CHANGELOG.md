@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.3](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.30...v0.0.3) (2026-03-18)
+
+
+### Features
+
+* **auth:** Implementação de autenticação robusta baseada em cookies e inscrição em 2FA ([89bc7dd](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/89bc7dd4a3aa366e59106127a200ea130f40a057))
+
 ### [1.2.2](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v1.2.1...v1.2.2) (2026-02-21)
 
 
