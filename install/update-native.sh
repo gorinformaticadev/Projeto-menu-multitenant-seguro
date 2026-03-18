@@ -415,6 +415,65 @@ update_env_file() {
   fi
 }
 
+read_env_file_value() {
+  local key="$1"
+  local file="$2"
+  if [[ ! -f "$file" ]]; then
+    return 1
+  fi
+
+  local line=""
+  line="$(grep -E "^${key}=" "$file" 2>/dev/null | tail -n 1 || true)"
+  if [[ -z "$line" ]]; then
+    return 1
+  fi
+
+  line="${line#*=}"
+  line="${line%$'\r'}"
+  if [[ "${#line}" -ge 2 && "${line:0:1}" == "\"" && "${line: -1}" == "\"" ]]; then
+    line="${line:1:${#line}-2}"
+  elif [[ "${#line}" -ge 2 && "${line:0:1}" == "'" && "${line: -1}" == "'" ]]; then
+    line="${line:1:${#line}-2}"
+  fi
+
+  printf '%s\n' "$line"
+}
+
+ensure_required_security_secrets() {
+  local env_file="$1"
+  local jwt_secret=""
+  local encryption_key=""
+  local trusted_device_secret=""
+
+  jwt_secret="$(read_env_file_value "JWT_SECRET" "$env_file" || true)"
+  encryption_key="$(read_env_file_value "ENCRYPTION_KEY" "$env_file" || true)"
+  trusted_device_secret="$(read_env_file_value "TRUSTED_DEVICE_TOKEN_SECRET" "$env_file" || true)"
+
+  if [[ -z "$jwt_secret" ]]; then
+    log_err "JWT_SECRET ausente em $env_file. Update abortado."
+    return 1
+  fi
+
+  if [[ -z "$encryption_key" ]]; then
+    log_err "ENCRYPTION_KEY ausente em $env_file. Update abortado para evitar quebra do fluxo 2FA."
+    return 1
+  fi
+
+  if [[ -z "$trusted_device_secret" ]]; then
+    trusted_device_secret="$(openssl rand -hex 32)"
+    update_env_file "TRUSTED_DEVICE_TOKEN_SECRET" "$trusted_device_secret" "$env_file"
+    log "TRUSTED_DEVICE_TOKEN_SECRET ausente; segredo dedicado gerado e persistido em $env_file"
+    return 0
+  fi
+
+  if [[ "$trusted_device_secret" == "$jwt_secret" ]]; then
+    log_err "TRUSTED_DEVICE_TOKEN_SECRET nao pode reutilizar JWT_SECRET em $env_file. Update abortado."
+    return 1
+  fi
+
+  return 0
+}
+
 validate_release_dir() {
   local release_dir="$1"
   [[ -f "$release_dir/pnpm-workspace.yaml" ]] &&
@@ -697,7 +756,7 @@ restart_pm2_processes() {
   pm2 delete "$frontend_name" >/dev/null 2>&1 || true
 
   pm2 start dist/main.js --name "$backend_name" --cwd "$target_root/apps/backend" --update-env
-  pm2 start "pnpm start" --name "$frontend_name" --cwd "$target_root/apps/frontend" --update-env
+  pm2 start "node .next/standalone/apps/frontend/server.js" --name "$frontend_name" --cwd "$target_root/apps/frontend" --update-env
   pm2 save
 
   BACKEND_PROC="$backend_name"
@@ -1022,6 +1081,9 @@ main() {
   set_step "shared-env" 10
   if ! ensure_shared_env; then
     fail_and_exit "$EXIT_BUILD_FAILED" "Falha ao preparar shared/.env."
+  fi
+  if ! ensure_required_security_secrets "$SHARED_DIR/.env"; then
+    fail_and_exit "$EXIT_BUILD_FAILED" "Segredos obrigatorios invalidos em shared/.env."
   fi
   ensure_shared_frontend_env
 

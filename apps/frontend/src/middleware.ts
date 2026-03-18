@@ -49,14 +49,9 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  if (refreshToken) {
-    const payload = parseJwt(refreshToken);
-    if (payload && payload.exp && payload.exp > nowSeconds) {
-      isRefreshValid = true;
-    }
-  }
+  isRefreshValid = typeof refreshToken === "string" && refreshToken.trim().length > 0;
   
-  // A definicao de logado e estrita: possui pelo menos um token nao expirado
+  // Access token pode ser validado localmente; refresh token e opaco e vale pela presenca do cookie.
   const isLoggedIn = isAccessValid || isRefreshValid;
 
   // Se usuario ESTÁ logado, nao deve acessar rotas de autenticacao (ex: /login)

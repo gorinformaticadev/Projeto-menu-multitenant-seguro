@@ -117,7 +117,7 @@ describe('AuthService security runtime enforcement', () => {
     });
   });
 
-  it('blocks the normal login flow when the user already has 2FA enabled', async () => {
+  it('returns a formal REQUIRES_TWO_FACTOR contract when the user already has 2FA enabled', async () => {
     const service = createService();
     const hashedPassword = await bcrypt.hash('SenhaValida!123', 4);
 
@@ -152,14 +152,72 @@ describe('AuthService security runtime enforcement', () => {
         '127.0.0.1',
         'jest',
       ),
-    ).rejects.toThrow(
-      new UnauthorizedException('2FA necessario para concluir o login. Informe o codigo de autenticacao.'),
-    );
+    ).resolves.toMatchObject({
+      status: 'REQUIRES_TWO_FACTOR',
+      authenticated: false,
+      requiresTwoFactor: true,
+      mustEnrollTwoFactor: false,
+      clearTrustedDeviceCookie: false,
+    });
 
     expect(auditServiceMock.log).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'LOGIN_2FA_CHALLENGE',
         userId: 'user-1',
+      }),
+    );
+    expect(prismaMock.refreshToken.create).not.toHaveBeenCalled();
+  });
+
+  it('returns MUST_ENROLL_TWO_FACTOR when the policy requires 2FA and the user has not enrolled yet', async () => {
+    const service = createService();
+    const hashedPassword = await bcrypt.hash('SenhaValida!123', 4);
+
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'user-2',
+      email: 'admin@example.com',
+      password: hashedPassword,
+      name: 'Admin',
+      role: 'ADMIN',
+      tenantId: 'tenant-1',
+      tenant: null,
+      twoFactorEnabled: false,
+      twoFactorSecret: null,
+      sessionVersion: 0,
+      loginAttempts: 0,
+      isLocked: false,
+      lockedUntil: null,
+      avatarUrl: null,
+    });
+    securityConfigServiceMock.getTwoFactorConfig.mockResolvedValue({
+      enabled: true,
+      required: true,
+      requiredForAdmins: false,
+      suggested: true,
+    });
+
+    await expect(
+      service.login(
+        {
+          email: 'admin@example.com',
+          password: 'SenhaValida!123',
+        },
+        '127.0.0.1',
+        'jest',
+      ),
+    ).resolves.toMatchObject({
+      status: 'MUST_ENROLL_TWO_FACTOR',
+      authenticated: false,
+      requiresTwoFactor: false,
+      mustEnrollTwoFactor: true,
+      enrollmentToken: expect.any(String),
+      enrollmentExpiresAt: expect.any(String),
+    });
+
+    expect(auditServiceMock.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'LOGIN_2FA_ENROLLMENT_REQUIRED',
+        userId: 'user-2',
       }),
     );
     expect(prismaMock.refreshToken.create).not.toHaveBeenCalled();
@@ -226,7 +284,7 @@ describe('AuthService security runtime enforcement', () => {
     );
   });
 
-  it('falls back to normal 2FA challenge when trusted device token is invalid', async () => {
+  it('falls back to the same formal REQUIRES_TWO_FACTOR contract when trusted device token is invalid', async () => {
     const service = createService();
     const hashedPassword = await bcrypt.hash('SenhaValida!123', 4);
 
@@ -268,9 +326,13 @@ describe('AuthService security runtime enforcement', () => {
         'jest',
         'stale-token',
       ),
-    ).rejects.toThrow(
-      new UnauthorizedException('2FA necessario para concluir o login. Informe o codigo de autenticacao.'),
-    );
+    ).resolves.toMatchObject({
+      status: 'REQUIRES_TWO_FACTOR',
+      authenticated: false,
+      requiresTwoFactor: true,
+      mustEnrollTwoFactor: false,
+      clearTrustedDeviceCookie: true,
+    });
 
     expect(trustedDeviceServiceMock.validateTrustedDevice).toHaveBeenCalledWith(
       expect.objectContaining({

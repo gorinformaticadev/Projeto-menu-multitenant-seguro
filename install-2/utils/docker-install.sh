@@ -448,6 +448,7 @@ run_docker_vps_install() {
     local redis_pass=""
     local jwt_secret="${JWT_SECRET:-$(openssl rand -hex 32)}"
     local enc_key="${ENCRYPTION_KEY:-$(openssl rand -hex 32)}"
+    local trusted_device_secret="${TRUSTED_DEVICE_TOKEN_SECRET:-$(openssl rand -hex 32)}"
     redis_pass="$(resolve_docker_redis_password "${REDIS_PASSWORD:-}" "$PROJECT_ROOT/apps/backend/.env")"
 
     log_info "Configurando .env..."
@@ -473,6 +474,7 @@ run_docker_vps_install() {
     upsert_env "RATE_LIMIT_STORAGE_FAILURE_MODE" "strict" "$ENV_PRODUCTION"
     upsert_env "JWT_SECRET" "$jwt_secret" "$ENV_PRODUCTION"
     upsert_env "ENCRYPTION_KEY" "$enc_key" "$ENV_PRODUCTION"
+    upsert_env "TRUSTED_DEVICE_TOKEN_SECRET" "$trusted_device_secret" "$ENV_PRODUCTION"
     upsert_env "REQUIRE_SECRET_MANAGER" "false" "$ENV_PRODUCTION"
     upsert_env "SEED_ON_START" "${SEED_ON_START:-true}" "$ENV_PRODUCTION"
     upsert_env "SEED_FORCE" "${SEED_FORCE:-false}" "$ENV_PRODUCTION"
@@ -504,6 +506,7 @@ run_docker_vps_install() {
         upsert_env "RATE_LIMIT_STORAGE_FAILURE_MODE" "strict" "$BACKEND_ENV"
         upsert_env "JWT_SECRET" "$jwt_secret" "$BACKEND_ENV"
         upsert_env "ENCRYPTION_KEY" "$enc_key" "$BACKEND_ENV"
+        upsert_env "TRUSTED_DEVICE_TOKEN_SECRET" "$trusted_device_secret" "$BACKEND_ENV"
         upsert_env "FRONTEND_URL" "https://$domain" "$BACKEND_ENV"
         upsert_env "PORT" "4000" "$BACKEND_ENV"
         upsert_env "NODE_ENV" "production" "$BACKEND_ENV"

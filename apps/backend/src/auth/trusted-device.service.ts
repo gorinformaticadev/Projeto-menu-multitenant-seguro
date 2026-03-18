@@ -15,6 +15,7 @@ export type TrustedDeviceValidationStatus =
   | 'missing'
   | 'valid'
   | 'not_found'
+  | 'device_mismatch'
   | 'user_mismatch'
   | 'expired'
   | 'revoked'
@@ -151,6 +152,20 @@ export class TrustedDeviceService {
         };
       }
 
+      const currentDeviceLabel = this.buildDeviceLabel(input.userAgent);
+      if (
+        trustedDevice.deviceLabel &&
+        currentDeviceLabel &&
+        trustedDevice.deviceLabel !== currentDeviceLabel
+      ) {
+        return {
+          status: 'device_mismatch',
+          shouldBypass2FA: false,
+          shouldClearCookie: true,
+          trustedDeviceId: trustedDevice.id,
+        };
+      }
+
       await this.prisma.trustedDevice.update({
         where: { id: trustedDevice.id },
         data: {
@@ -242,12 +257,21 @@ export class TrustedDeviceService {
   }
 
   private hashToken(token: string): string {
-    const hashSecret =
-      this.configService.get<string>('TRUSTED_DEVICE_TOKEN_SECRET') ||
-      this.configService.get<string>('JWT_SECRET') ||
-      'trusted-device-fallback-secret';
+    const hashSecret = this.getHashSecret();
 
     return crypto.createHmac('sha256', hashSecret).update(token).digest('hex');
+  }
+
+  private getHashSecret(): string {
+    const hashSecret = String(
+      this.configService.get<string>('TRUSTED_DEVICE_TOKEN_SECRET') || '',
+    ).trim();
+
+    if (!hashSecret) {
+      throw new Error('TRUSTED_DEVICE_TOKEN_SECRET nao configurado');
+    }
+
+    return hashSecret;
   }
 
   private buildDeviceLabel(userAgent?: string): string | null {

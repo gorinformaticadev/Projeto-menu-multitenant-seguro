@@ -58,6 +58,7 @@ run_native_vps_dev() {
     local redis_pass=""
     local jwt_secret="${JWT_SECRET:-$(openssl rand -hex 32)}"
     local enc_key="${ENCRYPTION_KEY:-$(openssl rand -hex 32)}"
+    local trusted_device_secret="${TRUSTED_DEVICE_TOKEN_SECRET:-$(openssl rand -hex 32)}"
     redis_pass="$(resolve_redis_password_native "${REDIS_PASSWORD:-}" "$PROJECT_ROOT/apps/backend/.env")"
 
     print_separator
@@ -86,7 +87,7 @@ run_native_vps_dev() {
 
     # --- 4. Configurar .env dos apps ---
     configure_backend_env "$domain" "$db_user" "$db_pass" "$db_name" \
-        "$jwt_secret" "$enc_key" "$admin_email" "$admin_pass" "development" "$redis_pass"
+        "$jwt_secret" "$enc_key" "$trusted_device_secret" "$admin_email" "$admin_pass" "development" "$redis_pass"
     configure_frontend_env "$domain"
 
     # --- 5. Ajustar permissoes ---

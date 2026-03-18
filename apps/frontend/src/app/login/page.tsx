@@ -9,10 +9,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 // import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { TwoFactorLogin } from "@/components/TwoFactorLogin";
+import { TwoFactorSetup } from "@/components/TwoFactorSetup";
 import { use2FALogin } from "@/hooks/use2FALogin";
 import { usePlatformConfigContext } from "@/contexts/PlatformConfigContext";
 import { Building2, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import { resolveTenantLogoSrc } from "@/lib/tenant-logo";
+import { ROUTE_CONFIG, isSafeCallbackUrl } from "@/lib/routes";
 
 const REMEMBERED_LOGIN_KEY = "rememberedLoginEmail";
 
@@ -28,6 +30,7 @@ export default function LoginPage() {
   const { toast } = useToast();
   const {
     requires2FA,
+    mustEnrollTwoFactor,
     loading,
     error,
     attemptLogin,
@@ -118,6 +121,35 @@ export default function LoginPage() {
           onBack={handleBack}
           loading={loading}
         />
+      </Wrapper>
+    );
+  }
+
+  if (mustEnrollTwoFactor) {
+    return (
+      <Wrapper>
+        <div className="w-full max-w-md space-y-4">
+          <TwoFactorSetup
+            isEnabled={false}
+            mode="enrollment"
+            onStatusChange={async (enabled) => {
+              if (!enabled || typeof window === "undefined") {
+                return;
+              }
+
+              const searchParams = new URLSearchParams(window.location.search);
+              const rawCallback = searchParams.get("callbackUrl");
+              const callbackUrl = isSafeCallbackUrl(rawCallback)
+                ? rawCallback!
+                : ROUTE_CONFIG.authenticatedFallback;
+
+              window.location.assign(callbackUrl);
+            }}
+          />
+          <Button variant="outline" onClick={handleBack} disabled={loading} className="w-full">
+            Voltar ao login
+          </Button>
+        </div>
       </Wrapper>
     );
   }

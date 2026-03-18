@@ -23,6 +23,22 @@ import { SettingsRegistry } from './system-settings/settings-registry.service';
 async function bootstrap() {
   const requireSecretManager = process.env.REQUIRE_SECRET_MANAGER === 'true';
 
+  try {
+    const secretManager = new SecretManagerService();
+    await secretManager.initialize();
+
+    if (!secretManager.validateCriticalSecrets()) {
+      console.error('Segredos criticos ausentes.');
+      process.exit(1);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('Falha ao inicializar Secret Manager:', message);
+    if (process.env.NODE_ENV === 'production' || requireSecretManager) {
+      process.exit(1);
+    }
+  }
+
   const securityValidation = validateSecurityConfig();
   if (!securityValidation.isValid) {
     console.error('Erro de seguranca: configuracao insegura detectada.');
@@ -33,30 +49,6 @@ async function bootstrap() {
   if (securityValidation.warnings.length > 0) {
     console.warn('Avisos de seguranca:');
     securityValidation.warnings.forEach((warning) => console.warn(`   - ${warning}`));
-  }
-
-  try {
-    const secretManager = new SecretManagerService();
-    await secretManager.initialize();
-
-    if (!secretManager.validateCriticalSecrets()) {
-      console.error('Segredos criticos ausentes.');
-      if (requireSecretManager) {
-        process.exit(1);
-      }
-      console.warn('REQUIRE_SECRET_MANAGER=false: continuando sem validacao estrita de segredos.');
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error('Falha ao inicializar Secret Manager:', message);
-    if (process.env.NODE_ENV === 'production' && requireSecretManager) {
-      process.exit(1);
-    } else {
-      console.warn('Continuando sem Secret Manager.');
-      if (process.env.NODE_ENV === 'production') {
-        console.warn('REQUIRE_SECRET_MANAGER=false: continuando em producao sem Secret Manager.');
-      }
-    }
   }
 
   const dynamicModule = await AppModule.register();

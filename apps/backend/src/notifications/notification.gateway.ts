@@ -20,6 +20,7 @@ import { NotificationService } from './notification.service';
 import { Notification } from './notification.entity';
 import { PushNotificationService } from './push-notification.service';
 import { WebsocketRuntimeToggleService } from '@common/services/websocket-runtime-toggle.service';
+import { ACCESS_TOKEN_COOKIE_NAME } from '../auth/auth-cookie.constants';
 
 interface ConnectionMetrics {
   totalConnections: number;
@@ -530,7 +531,26 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
   private extractTokenFromHandshake(client: AuthenticatedSocket): string | null {
     return client.handshake?.auth?.token ||
            client.handshake?.headers?.authorization?.replace('Bearer ', '') ||
+           this.extractAccessTokenFromCookieHeader(client.handshake?.headers?.cookie) ||
            null;
+  }
+
+  private extractAccessTokenFromCookieHeader(cookieHeader?: string | string[]): string | null {
+    const rawHeader = Array.isArray(cookieHeader) ? cookieHeader[0] : cookieHeader;
+    if (typeof rawHeader !== 'string' || rawHeader.trim().length === 0) {
+      return null;
+    }
+
+    const cookies = rawHeader.split(';');
+    for (const cookie of cookies) {
+      const [name, ...valueParts] = cookie.trim().split('=');
+      if (name === ACCESS_TOKEN_COOKIE_NAME) {
+        const value = valueParts.join('=').trim();
+        return value.length > 0 ? decodeURIComponent(value) : null;
+      }
+    }
+
+    return null;
   }
 
   private async validateTokenForConnection(token: string): Promise<any> {

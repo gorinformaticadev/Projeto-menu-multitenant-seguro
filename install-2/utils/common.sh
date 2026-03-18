@@ -127,8 +127,9 @@ generate_db_credentials() {
     DB_PASSWORD="${DB_PASSWORD:-$(generate_secret 16)}"
     JWT_SECRET="${JWT_SECRET:-$(generate_secret 32)}"
     ENCRYPTION_KEY="${ENCRYPTION_KEY:-$(generate_secret 32)}"
+    TRUSTED_DEVICE_TOKEN_SECRET="${TRUSTED_DEVICE_TOKEN_SECRET:-$(generate_secret 32)}"
     
-    export DB_NAME DB_USER DB_PASSWORD JWT_SECRET ENCRYPTION_KEY
+    export DB_NAME DB_USER DB_PASSWORD JWT_SECRET ENCRYPTION_KEY TRUSTED_DEVICE_TOKEN_SECRET
 }
 
 # --- Confirmação do usuário ---
@@ -205,4 +206,3 @@ cleanup_on_error() {
     log_error "Verifique as mensagens acima para mais detalhes."
     exit 1
 }
-

@@ -291,8 +291,10 @@ setup_env_file() {
     local db_user="multitenant"
     local db_name="multitenant"
     local db_pass
+    local trusted_device_secret
     jwt_secret="$(openssl rand -hex 32)"
     encryption_key="$(openssl rand -hex 32)"
+    trusted_device_secret="$(openssl rand -hex 32)"
     db_pass="$(openssl rand -hex 16)"
     admin_pass="Admin@$(openssl rand -hex 6)"
     local dockerhub_username="${DOCKERHUB_USERNAME:-local}"
@@ -315,6 +317,7 @@ setup_env_file() {
     upsert_env_var "BACKEND_PORT" "$BACKEND_PORT"
     upsert_env_var "JWT_SECRET" "$jwt_secret"
     upsert_env_var "ENCRYPTION_KEY" "$encryption_key"
+    upsert_env_var "TRUSTED_DEVICE_TOKEN_SECRET" "$trusted_device_secret"
     upsert_env_var "NEXT_PUBLIC_API_URL" "https://$DOMAIN/api"
     upsert_env_var "FRONTEND_URL" "https://$DOMAIN"
     upsert_env_var "PORT" "4000"

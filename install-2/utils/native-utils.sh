@@ -687,10 +687,11 @@ configure_backend_env() {
     local db_name="$4"
     local jwt_secret="$5"
     local enc_key="$6"
-    local admin_email="$7"
-    local admin_pass="$8"
-    local node_env="$9"
-    local redis_pass="${10}"
+    local trusted_device_secret="$7"
+    local admin_email="$8"
+    local admin_pass="$9"
+    local node_env="${10}"
+    local redis_pass="${11}"
 
     local env_file="$PROJECT_ROOT/apps/backend/.env"
     local env_example="$PROJECT_ROOT/apps/backend/.env.example"
@@ -706,6 +707,7 @@ configure_backend_env() {
     upsert_env "DATABASE_URL" "postgresql://$db_user:$db_pass@localhost:5432/$db_name?schema=public" "$env_file"
     upsert_env "JWT_SECRET" "$jwt_secret" "$env_file"
     upsert_env "ENCRYPTION_KEY" "$enc_key" "$env_file"
+    upsert_env "TRUSTED_DEVICE_TOKEN_SECRET" "$trusted_device_secret" "$env_file"
     upsert_env "FRONTEND_URL" "https://$domain" "$env_file"
     upsert_env "PORT" "4000" "$env_file"
     upsert_env "NODE_ENV" "$node_env" "$env_file"
@@ -935,7 +937,7 @@ check_multitenant_environment() {
         log_success "Arquivo backend encontrado"
     fi
     
-    if [[ ! -f "$PROJECT_ROOT/apps/frontend/server.js" ]]; then
+    if [[ ! -f "$PROJECT_ROOT/apps/frontend/.next/standalone/apps/frontend/server.js" ]]; then
         log_error "Arquivo frontend server.js não encontrado"
         log_info "Certifique-se de que o build foi concluído com sucesso"
     else

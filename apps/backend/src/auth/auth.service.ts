@@ -14,7 +14,7 @@ import { LoginDto } from './dto/login.dto';
 import { Login2FADto } from './dto/login-2fa.dto';
 import { UserSessionService } from './user-session.service';
 import { TrustedDeviceService } from './trusted-device.service';
-import { TwoFactorRequiredException } from './exceptions/two-factor-required.exception';
+import { Complete2FAEnrollmentDto } from './dto/complete-2fa-enrollment.dto';
 
 type TokenGenerationInput = {
   userId: string;
@@ -36,9 +36,79 @@ type GeneratedTokens = {
 
 type RefreshTokenWriter = PrismaService | Prisma.TransactionClient;
 
+type AuthenticatedLoginResponse = GeneratedTokens & {
+  status: 'AUTHENTICATED';
+  authenticated: true;
+  requiresTwoFactor: false;
+  mustEnrollTwoFactor: false;
+  user: ReturnType<AuthService['toUserResponse']>;
+  trustedDeviceToken?: string;
+  trustedDeviceExpiresAt?: Date;
+};
+
+type TwoFactorChallengeResponse = {
+  status: 'REQUIRES_TWO_FACTOR';
+  authenticated: false;
+  requiresTwoFactor: true;
+  mustEnrollTwoFactor: false;
+  clearTrustedDeviceCookie: boolean;
+};
+
+type TwoFactorEnrollmentRequiredResponse = {
+  status: 'MUST_ENROLL_TWO_FACTOR';
+  authenticated: false;
+  requiresTwoFactor: false;
+  mustEnrollTwoFactor: true;
+  enrollmentToken: string;
+  enrollmentExpiresAt: string;
+};
+
+export type LoginFlowResponse =
+  | AuthenticatedLoginResponse
+  | TwoFactorChallengeResponse
+  | TwoFactorEnrollmentRequiredResponse;
+
+type TwoFactorEnrollmentPayload = {
+  sub: string;
+  email: string;
+  role: string;
+  tenantId: string | null;
+  purpose: 'two-factor-enrollment';
+};
+
+type AuthCode =
+  | 'INVALID_CREDENTIALS'
+  | 'ACCOUNT_LOCKED'
+  | 'INVALID_TWO_FACTOR_TOKEN'
+  | 'TWO_FACTOR_NOT_CONFIGURED'
+  | 'TWO_FACTOR_DISABLED'
+  | 'ENROLLMENT_SESSION_INVALID';
+
+type UserRecord = {
+  id: string;
+  email: string;
+  password: string;
+  name: string;
+  role: string;
+  tenantId: string | null;
+  tenant?: unknown;
+  avatarUrl?: string | null;
+  twoFactorEnabled?: boolean | null;
+  twoFactorSecret?: string | null;
+  loginAttempts: number;
+  isLocked: boolean;
+  lockedUntil?: Date | null;
+  sessionVersion?: number | null;
+};
+
+type UserLookupResult = UserRecord & {
+  tenant?: unknown;
+};
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
+  private readonly twoFactorEnrollmentExpiresIn = '10m';
 
   constructor(
     private prisma: PrismaService,
@@ -59,7 +129,7 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
     trustedDeviceToken?: string,
-  ) {
+  ): Promise<LoginFlowResponse> {
     const { email, password } = loginDto;
 
     const user = await this.prisma.user.findUnique({
@@ -74,7 +144,7 @@ export class AuthService {
         userAgent,
         details: { email, reason: 'user_not_found' },
       });
-      throw new UnauthorizedException('Credenciais invalidas');
+      throw this.buildUnauthorizedException('INVALID_CREDENTIALS', 'Credenciais invalidas');
     }
 
     if (user.isLocked) {
@@ -92,7 +162,8 @@ export class AuthService {
           details: { email, reason: 'account_locked', minutesRemaining },
         });
 
-        throw new UnauthorizedException(
+        throw this.buildUnauthorizedException(
+          'ACCOUNT_LOCKED',
           `Conta bloqueada por multiplas tentativas de login. Tente novamente em ${minutesRemaining} minuto(s) ou contate um administrador.`,
         );
       }
@@ -116,7 +187,7 @@ export class AuthService {
       const lockDurationMinutes = loginPolicy.lockDurationMinutes ?? 30;
       const newAttempts = user.loginAttempts + 1;
 
-      const updateData: any = {
+      const updateData: Prisma.UserUpdateInput = {
         loginAttempts: newAttempts,
         lastFailedLoginAt: new Date(),
       };
@@ -125,9 +196,11 @@ export class AuthService {
         const lockedUntil = new Date();
         lockedUntil.setMinutes(lockedUntil.getMinutes() + lockDurationMinutes);
 
-        updateData.isLocked = true;
-        updateData.lockedAt = new Date();
-        updateData.lockedUntil = lockedUntil;
+        Object.assign(updateData, {
+          isLocked: true,
+          lockedAt: new Date(),
+          lockedUntil,
+        });
 
         await this.prisma.user.update({
           where: { id: user.id },
@@ -147,7 +220,8 @@ export class AuthService {
           `login_lockout userId=${user.id} tenantId=${user.tenantId || 'global'} attempts=${newAttempts} lockDurationMinutes=${lockDurationMinutes}`,
         );
 
-        throw new UnauthorizedException(
+        throw this.buildUnauthorizedException(
+          'ACCOUNT_LOCKED',
           `Conta bloqueada por multiplas tentativas de login. Tente novamente em ${lockDurationMinutes} minutos ou contate um administrador.`,
         );
       }
@@ -175,7 +249,7 @@ export class AuthService {
         details: { email, reason: 'invalid_password', attempts: newAttempts, attemptsRemaining, maxAttempts },
       });
 
-      throw new UnauthorizedException(errorMessage);
+      throw this.buildUnauthorizedException('INVALID_CREDENTIALS', errorMessage);
     }
 
     if (user.loginAttempts > 0) {
@@ -194,10 +268,14 @@ export class AuthService {
     const is2FARequiredForAdmins =
       is2FAGloballyEnabled && twoFactorPolicy.requiredForAdmins === true;
     const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN';
+    const mustEnrollTwoFactor =
+      (is2FARequired || (is2FARequiredForAdmins && isAdmin)) && !user.twoFactorEnabled;
 
-    if ((is2FARequired || (is2FARequiredForAdmins && isAdmin)) && !user.twoFactorEnabled) {
+    if (mustEnrollTwoFactor) {
+      const enrollment = this.issueTwoFactorEnrollmentToken(user);
+
       await this.auditService.log({
-        action: 'LOGIN_2FA_REQUIRED',
+        action: 'LOGIN_2FA_ENROLLMENT_REQUIRED',
         userId: user.id,
         tenantId: user.tenantId,
         ipAddress,
@@ -209,9 +287,14 @@ export class AuthService {
         },
       });
 
-      throw new UnauthorizedException(
-        '2FA e obrigatorio para sua conta. Por favor, ative a autenticacao de dois fatores antes de fazer login.',
-      );
+      return {
+        status: 'MUST_ENROLL_TWO_FACTOR',
+        authenticated: false,
+        requiresTwoFactor: false,
+        mustEnrollTwoFactor: true,
+        enrollmentToken: enrollment.token,
+        enrollmentExpiresAt: enrollment.expiresAt.toISOString(),
+      };
     }
 
     let trustedDeviceUsedForBypass = false;
@@ -269,10 +352,13 @@ export class AuthService {
           },
         });
 
-        throw new TwoFactorRequiredException(
-          '2FA necessario para concluir o login. Informe o codigo de autenticacao.',
-          shouldClearTrustedDeviceCookie,
-        );
+        return {
+          status: 'REQUIRES_TWO_FACTOR',
+          authenticated: false,
+          requiresTwoFactor: true,
+          mustEnrollTwoFactor: false,
+          clearTrustedDeviceCookie: shouldClearTrustedDeviceCookie,
+        };
       }
     }
 
@@ -298,13 +384,7 @@ export class AuthService {
       },
     });
 
-    return {
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      accessTokenExpiresAt: tokens.accessTokenExpiresAt,
-      refreshTokenExpiresAt: tokens.refreshTokenExpiresAt,
-      user: this.toUserResponse(user),
-    };
+    return this.buildAuthenticatedResponse(user, tokens);
   }
 
   async generateTokens(
@@ -366,7 +446,7 @@ export class AuthService {
 
   async refreshTokens(refreshToken: string, ipAddress?: string, userAgent?: string) {
     if (await this.tokenBlacklistService.isTokenBlacklisted(refreshToken)) {
-      throw new UnauthorizedException('Refresh token invalido');
+      throw this.buildUnauthorizedException('INVALID_CREDENTIALS', 'Refresh token invalido');
     }
 
     const refreshResult = await this.prisma.$transaction(async (tx) => {
@@ -377,21 +457,24 @@ export class AuthService {
       });
 
       if (!storedToken) {
-        throw new UnauthorizedException('Refresh token invalido');
+        throw this.buildUnauthorizedException('INVALID_CREDENTIALS', 'Refresh token invalido');
       }
 
       if (storedToken.expiresAt < now) {
         await tx.refreshToken.deleteMany({
           where: { id: storedToken.id },
         });
-        throw new UnauthorizedException('Refresh token expirado');
+        throw this.buildUnauthorizedException('INVALID_CREDENTIALS', 'Refresh token expirado');
       }
 
       if (!storedToken.sessionId) {
         await tx.refreshToken.deleteMany({
           where: { id: storedToken.id },
         });
-        throw new UnauthorizedException('Sessao legada expirada; faca login novamente');
+        throw this.buildUnauthorizedException(
+          'INVALID_CREDENTIALS',
+          'Sessao legada expirada; faca login novamente',
+        );
       }
 
       await this.userSessionService.assertRefreshSessionActive(
@@ -410,7 +493,10 @@ export class AuthService {
       });
 
       if (consumed.count !== 1) {
-        throw new UnauthorizedException('Refresh token invalido ou ja utilizado');
+        throw this.buildUnauthorizedException(
+          'INVALID_CREDENTIALS',
+          'Refresh token invalido ou ja utilizado',
+        );
       }
 
       const tokens = await this.generateTokens(
@@ -440,13 +526,7 @@ export class AuthService {
       details: { email: refreshResult.storedToken.user.email },
     });
 
-    return {
-      accessToken: refreshResult.tokens.accessToken,
-      refreshToken: refreshResult.tokens.refreshToken,
-      accessTokenExpiresAt: refreshResult.tokens.accessTokenExpiresAt,
-      refreshTokenExpiresAt: refreshResult.tokens.refreshTokenExpiresAt,
-      user: this.toUserResponse(refreshResult.storedToken.user),
-    };
+    return this.buildAuthenticatedResponse(refreshResult.storedToken.user, refreshResult.tokens);
   }
 
   async logout(
@@ -486,55 +566,11 @@ export class AuthService {
     return { message: 'Logout realizado com sucesso' };
   }
 
-  private calculateExpirationDate(expiresIn: string): Date {
-    const now = new Date();
-    const match = expiresIn.match(/^(\d+)([smhd])$/);
-
-    if (!match) {
-      return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    }
-
-    const value = parseInt(match[1], 10);
-    const unit = match[2];
-
-    switch (unit) {
-      case 's':
-        return new Date(now.getTime() + value * 1000);
-      case 'm':
-        return new Date(now.getTime() + value * 60 * 1000);
-      case 'h':
-        return new Date(now.getTime() + value * 60 * 60 * 1000);
-      case 'd':
-        return new Date(now.getTime() + value * 24 * 60 * 60 * 1000);
-      default:
-        return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    }
-  }
-
-  private extractJwtExpiry(token: string): string | null {
-    const decoded = this.jwtService.decode(token);
-    if (!decoded || typeof decoded !== 'object' || typeof decoded.exp !== 'number') {
-      return null;
-    }
-
-    return new Date(decoded.exp * 1000).toISOString();
-  }
-
-  private normalizeJwtExpiresIn(value: unknown, fallback: unknown): StringValue {
-    return this.normalizeDurationString(value, fallback) as StringValue;
-  }
-
-  private normalizeDurationString(value: unknown, fallback: unknown): string {
-    const normalized = String(value ?? '').trim();
-    if (normalized.length > 0) {
-      return normalized;
-    }
-
-    const normalizedFallback = String(fallback ?? '').trim();
-    return normalizedFallback.length > 0 ? normalizedFallback : '15m';
-  }
-
-  async login2FA(login2FADto: Login2FADto, ipAddress?: string, userAgent?: string) {
+  async login2FA(
+    login2FADto: Login2FADto,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<AuthenticatedLoginResponse> {
     const { email, password, twoFactorToken } = login2FADto;
 
     const user = await this.prisma.user.findUnique({
@@ -549,14 +585,15 @@ export class AuthService {
         userAgent,
         details: { email, reason: 'user_not_found' },
       });
-      throw new UnauthorizedException('Credenciais invalidas');
+      throw this.buildUnauthorizedException('INVALID_CREDENTIALS', 'Credenciais invalidas');
     }
 
     if (user.isLocked && user.lockedUntil && user.lockedUntil > new Date()) {
       const minutesRemaining = Math.ceil(
         (user.lockedUntil.getTime() - new Date().getTime()) / 60000,
       );
-      throw new UnauthorizedException(
+      throw this.buildUnauthorizedException(
+        'ACCOUNT_LOCKED',
         `Conta bloqueada. Tente novamente em ${minutesRemaining} minuto(s).`,
       );
     }
@@ -571,16 +608,19 @@ export class AuthService {
         userAgent,
         details: { email, reason: 'invalid_password' },
       });
-      throw new UnauthorizedException('Credenciais invalidas');
+      throw this.buildUnauthorizedException('INVALID_CREDENTIALS', 'Credenciais invalidas');
     }
 
     const twoFactorPolicy = await this.securityConfigService.getTwoFactorConfig();
     if (twoFactorPolicy.enabled !== true) {
-      throw new UnauthorizedException('2FA desabilitado globalmente');
+      throw this.buildUnauthorizedException('TWO_FACTOR_DISABLED', '2FA desabilitado globalmente');
     }
 
     if (!user.twoFactorEnabled || !user.twoFactorSecret) {
-      throw new UnauthorizedException('2FA nao esta ativado para este usuario');
+      throw this.buildUnauthorizedException(
+        'TWO_FACTOR_NOT_CONFIGURED',
+        '2FA nao esta ativado para este usuario',
+      );
     }
 
     const is2FAValid = this.twoFactorService.verify(user.twoFactorSecret, twoFactorToken);
@@ -593,7 +633,7 @@ export class AuthService {
         userAgent,
         details: { email, reason: 'invalid_2fa_token' },
       });
-      throw new UnauthorizedException('Codigo 2FA invalido');
+      throw this.buildUnauthorizedException('INVALID_TWO_FACTOR_TOKEN', 'Codigo 2FA invalido');
     }
 
     if (user.loginAttempts > 0) {
@@ -643,11 +683,82 @@ export class AuthService {
     });
 
     return {
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      accessTokenExpiresAt: tokens.accessTokenExpiresAt,
-      refreshTokenExpiresAt: tokens.refreshTokenExpiresAt,
-      user: this.toUserResponse(user),
+      ...this.buildAuthenticatedResponse(user, tokens),
+      trustedDeviceToken,
+      trustedDeviceExpiresAt,
+    };
+  }
+
+  async generateTwoFactorEnrollmentSecret(enrollmentToken: string) {
+    const user = await this.resolveEnrollmentUser(enrollmentToken);
+    return this.twoFactorService.generateSecret(user.id);
+  }
+
+  async completeTwoFactorEnrollment(
+    enrollmentToken: string,
+    dto: Complete2FAEnrollmentDto,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<AuthenticatedLoginResponse> {
+    const user = await this.resolveEnrollmentUser(enrollmentToken);
+
+    await this.twoFactorService.enable(user.id, dto.token, {
+      actorUserId: user.id,
+      actorEmail: user.email,
+      actorRole: user.role,
+      ipAddress,
+      userAgent,
+      auditAction: 'TWO_FACTOR_ENROLLMENT_COMPLETED',
+    });
+
+    const refreshedUser = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      include: { tenant: true },
+    });
+
+    if (!refreshedUser) {
+      throw this.buildUnauthorizedException('ENROLLMENT_SESSION_INVALID', 'Usuario nao encontrado');
+    }
+
+    const tokens = await this.generateTokens({
+      userId: refreshedUser.id,
+      email: refreshedUser.email,
+      role: refreshedUser.role,
+      tenantId: refreshedUser.tenantId,
+      sessionVersion: this.readSessionVersion(refreshedUser),
+      ipAddress,
+      userAgent,
+    });
+
+    let trustedDeviceToken: string | undefined;
+    let trustedDeviceExpiresAt: Date | undefined;
+
+    if (dto.trustDevice === true) {
+      const issuedTrustedDevice = await this.trustedDeviceService.issueTrustedDevice({
+        userId: refreshedUser.id,
+        tenantId: refreshedUser.tenantId,
+        ipAddress,
+        userAgent,
+      });
+      trustedDeviceToken = issuedTrustedDevice.token;
+      trustedDeviceExpiresAt = issuedTrustedDevice.expiresAt;
+    }
+
+    await this.auditService.log({
+      action: 'LOGIN_SUCCESS',
+      userId: refreshedUser.id,
+      tenantId: refreshedUser.tenantId,
+      ipAddress,
+      userAgent,
+      details: {
+        email: refreshedUser.email,
+        enrollmentCompleted: true,
+        trustDevice: dto.trustDevice === true,
+      },
+    });
+
+    return {
+      ...this.buildAuthenticatedResponse(refreshedUser, tokens),
       trustedDeviceToken,
       trustedDeviceExpiresAt,
     };
@@ -664,7 +775,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Usuario nao encontrado');
+      throw this.buildUnauthorizedException('INVALID_CREDENTIALS', 'Usuario nao encontrado');
     }
 
     return {
@@ -705,6 +816,159 @@ export class AuthService {
     return typeof sessionId === 'string' && sessionId.trim().length > 0 ? sessionId : null;
   }
 
+  private buildAuthenticatedResponse(
+    user: {
+      id: string;
+      email: string;
+      name: string;
+      role: string;
+      tenantId: string | null;
+      avatarUrl?: string | null;
+      tenant?: unknown;
+    },
+    tokens: GeneratedTokens,
+  ): AuthenticatedLoginResponse {
+    return {
+      status: 'AUTHENTICATED',
+      authenticated: true,
+      requiresTwoFactor: false,
+      mustEnrollTwoFactor: false,
+      ...tokens,
+      user: this.toUserResponse(user),
+    };
+  }
+
+  private issueTwoFactorEnrollmentToken(user: UserLookupResult): { token: string; expiresAt: Date } {
+    const payload: TwoFactorEnrollmentPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      tenantId: user.tenantId,
+      purpose: 'two-factor-enrollment',
+    };
+
+    const token = this.jwtService.sign(payload, {
+      expiresIn: this.twoFactorEnrollmentExpiresIn,
+    });
+
+    const expiresAt = this.extractJwtExpiryDate(token);
+
+    return {
+      token,
+      expiresAt,
+    };
+  }
+
+  private async resolveEnrollmentUser(enrollmentToken: string): Promise<UserLookupResult> {
+    const normalizedToken = String(enrollmentToken || '').trim();
+    if (!normalizedToken) {
+      throw this.buildUnauthorizedException(
+        'ENROLLMENT_SESSION_INVALID',
+        'Sessao temporaria de configuracao do 2FA ausente ou expirada',
+      );
+    }
+
+    let payload: TwoFactorEnrollmentPayload;
+    try {
+      payload = this.jwtService.verify<TwoFactorEnrollmentPayload>(normalizedToken, {
+        secret: this.config.get<string>('JWT_SECRET'),
+      });
+    } catch {
+      throw this.buildUnauthorizedException(
+        'ENROLLMENT_SESSION_INVALID',
+        'Sessao temporaria de configuracao do 2FA ausente ou expirada',
+      );
+    }
+
+    if (payload.purpose !== 'two-factor-enrollment' || !payload.sub) {
+      throw this.buildUnauthorizedException(
+        'ENROLLMENT_SESSION_INVALID',
+        'Sessao temporaria de configuracao do 2FA invalida',
+      );
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      include: { tenant: true },
+    });
+
+    if (!user || user.email !== payload.email || user.role !== payload.role || user.tenantId !== payload.tenantId) {
+      throw this.buildUnauthorizedException(
+        'ENROLLMENT_SESSION_INVALID',
+        'Sessao temporaria de configuracao do 2FA invalida',
+      );
+    }
+
+    if (user.twoFactorEnabled) {
+      throw this.buildUnauthorizedException(
+        'ENROLLMENT_SESSION_INVALID',
+        '2FA ja foi configurado para esta conta. Faça login novamente.',
+      );
+    }
+
+    return user;
+  }
+
+  private extractJwtExpiry(token: string): string | null {
+    const decoded = this.jwtService.decode(token);
+    if (!decoded || typeof decoded !== 'object' || typeof decoded.exp !== 'number') {
+      return null;
+    }
+
+    return new Date(decoded.exp * 1000).toISOString();
+  }
+
+  private extractJwtExpiryDate(token: string): Date {
+    const expiresAt = this.extractJwtExpiry(token);
+    if (!expiresAt) {
+      return this.calculateExpirationDate(this.twoFactorEnrollmentExpiresIn);
+    }
+
+    const parsed = new Date(expiresAt);
+    return Number.isNaN(parsed.getTime())
+      ? this.calculateExpirationDate(this.twoFactorEnrollmentExpiresIn)
+      : parsed;
+  }
+
+  private calculateExpirationDate(expiresIn: string): Date {
+    const now = new Date();
+    const match = expiresIn.match(/^(\d+)([smhd])$/);
+
+    if (!match) {
+      return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    }
+
+    const value = parseInt(match[1], 10);
+    const unit = match[2];
+
+    switch (unit) {
+      case 's':
+        return new Date(now.getTime() + value * 1000);
+      case 'm':
+        return new Date(now.getTime() + value * 60 * 1000);
+      case 'h':
+        return new Date(now.getTime() + value * 60 * 60 * 1000);
+      case 'd':
+        return new Date(now.getTime() + value * 24 * 60 * 60 * 1000);
+      default:
+        return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    }
+  }
+
+  private normalizeJwtExpiresIn(value: unknown, fallback: unknown): StringValue {
+    return this.normalizeDurationString(value, fallback) as StringValue;
+  }
+
+  private normalizeDurationString(value: unknown, fallback: unknown): string {
+    const normalized = String(value ?? '').trim();
+    if (normalized.length > 0) {
+      return normalized;
+    }
+
+    const normalizedFallback = String(fallback ?? '').trim();
+    return normalizedFallback.length > 0 ? normalizedFallback : '15m';
+  }
+
   private toUserResponse(user: {
     id: string;
     email: string;
@@ -733,5 +997,11 @@ export class AuthService {
   private readSessionVersion(user: { sessionVersion?: number | null } | Record<string, unknown>) {
     const rawValue = (user as { sessionVersion?: number | null }).sessionVersion;
     return typeof rawValue === 'number' && Number.isFinite(rawValue) ? rawValue : 0;
+  }
+
+  private buildUnauthorizedException(code: AuthCode, message: string): UnauthorizedException {
+    const exception = new UnauthorizedException(message);
+    (exception as UnauthorizedException & { authCode?: AuthCode }).authCode = code;
+    return exception;
   }
 }

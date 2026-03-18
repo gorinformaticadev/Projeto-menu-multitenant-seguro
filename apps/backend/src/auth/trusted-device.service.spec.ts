@@ -98,6 +98,7 @@ describe('TrustedDeviceService', () => {
     prismaMock.trustedDevice.findUnique.mockResolvedValue({
       id: 'trusted-1',
       userId: 'user-1',
+      deviceLabel: null,
       expiresAt: new Date(Date.now() + 60_000),
       revokedAt: null,
       lastUsedIp: null,
@@ -127,6 +128,59 @@ describe('TrustedDeviceService', () => {
         }),
       }),
     );
+  });
+
+  it('rejects a trusted device cookie when the coarse device binding no longer matches', async () => {
+    const service = createService();
+    prismaMock.trustedDevice.findUnique.mockResolvedValue({
+      id: 'trusted-1',
+      userId: 'user-1',
+      deviceLabel: 'Chrome / Windows',
+      expiresAt: new Date(Date.now() + 60_000),
+      revokedAt: null,
+      lastUsedIp: null,
+    });
+
+    await expect(
+      service.validateTrustedDevice({
+        userId: 'user-1',
+        token: 'valid-token',
+        userAgent:
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Version/17.5 Safari/605.1.15',
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        status: 'device_mismatch',
+        shouldBypass2FA: false,
+        shouldClearCookie: true,
+        trustedDeviceId: 'trusted-1',
+      }),
+    );
+
+    expect(prismaMock.trustedDevice.update).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the dedicated trusted-device secret is absent', async () => {
+    configServiceMock.get.mockImplementation((key: string) => {
+      if (key === 'TRUSTED_DEVICE_TOKEN_SECRET') {
+        return undefined;
+      }
+
+      if (key === 'JWT_SECRET') {
+        return 'jwt-secret';
+      }
+
+      return undefined;
+    });
+
+    const service = createService();
+
+    await expect(
+      service.issueTrustedDevice({
+        userId: 'user-1',
+        tenantId: 'tenant-1',
+      }),
+    ).rejects.toThrow('TRUSTED_DEVICE_TOKEN_SECRET nao configurado');
   });
 
   it('revokes all active trusted devices for a user and returns the revoked count', async () => {

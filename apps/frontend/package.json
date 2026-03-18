@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev -p 5000",
     "build": "next build --webpack --experimental-build-mode=compile",
-    "start": "next start -p 5000",
+    "start": "node .next/standalone/apps/frontend/server.js",
     "lint": "eslint src --config ./eslint.config.js",
     "test": "vitest run",
     "test:watch": "vitest"

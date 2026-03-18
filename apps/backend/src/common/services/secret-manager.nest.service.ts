@@ -105,7 +105,8 @@ export class SecretManagerService implements OnModuleInit {
 
     const secretsToLoad = [
       'JWT_SECRET',
-      'ENCRYPTION_KEY', 
+      'ENCRYPTION_KEY',
+      'TRUSTED_DEVICE_TOKEN_SECRET',
       'DATABASE_URL',
       'SMTP_PASSWORD',
       'SENTRY_DSN'
@@ -131,7 +132,8 @@ export class SecretManagerService implements OnModuleInit {
   validateCriticalSecrets(): boolean {
     const criticalSecrets = [
       'JWT_SECRET',
-      'ENCRYPTION_KEY'
+      'ENCRYPTION_KEY',
+      'TRUSTED_DEVICE_TOKEN_SECRET',
     ];
 
     let allPresent = true;

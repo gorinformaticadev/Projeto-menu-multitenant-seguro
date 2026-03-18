@@ -11,7 +11,8 @@
 #
 # Variáveis de instalação (podem ser passadas por ambiente ou interativamente):
 #   INSTALL_DOMAIN, LETSENCRYPT_EMAIL, IMAGE_OWNER, IMAGE_REPO, IMAGE_TAG, INSTALL_ADMIN_EMAIL,
-#   INSTALL_ADMIN_PASSWORD, DB_USER, DB_PASSWORD, JWT_SECRET, ENCRYPTION_KEY
+#   INSTALL_ADMIN_PASSWORD, DB_USER, DB_PASSWORD, JWT_SECRET, ENCRYPTION_KEY,
+#   TRUSTED_DEVICE_TOKEN_SECRET
 # =============================================================================
 
 set -Eeuo pipefail
@@ -77,7 +78,7 @@ Variáveis de ambiente (alternativa às opções):
   INSTALL_DOMAIN, LETSENCRYPT_EMAIL, IMAGE_OWNER, IMAGE_REPO, IMAGE_TAG,
   LOCAL_BUILD_ONLY,
   INSTALL_ADMIN_EMAIL, INSTALL_ADMIN_PASSWORD,
-  DB_USER, DB_PASSWORD, DB_NAME, JWT_SECRET, ENCRYPTION_KEY
+  DB_USER, DB_PASSWORD, DB_NAME, JWT_SECRET, ENCRYPTION_KEY, TRUSTED_DEVICE_TOKEN_SECRET
 
 Exemplos:
   sudo bash install/install.sh install -d menu.empresa.com -e admin@empresa.com -u gorinformatica -r projeto-menu-multitenant-seguro -t v1.0.0
@@ -438,7 +439,8 @@ native_create_app_envs() {
     local db_pass="$8"
     local jwt_secret="$9"
     local enc_key="${10}"
-    local redis_pass="${11}"
+    local trusted_device_secret="${11}"
+    local redis_pass="${12}"
 
     local backend_env="$app_dir/apps/backend/.env"
     local frontend_env="$app_dir/apps/frontend/.env.local"
@@ -454,6 +456,7 @@ native_create_app_envs() {
     upsert_env "DATABASE_URL" "postgresql://${db_user}:${db_pass}@127.0.0.1:5432/${db_name}?schema=public" "$backend_env"
     upsert_env "JWT_SECRET" "$jwt_secret" "$backend_env"
     upsert_env "ENCRYPTION_KEY" "$enc_key" "$backend_env"
+    upsert_env "TRUSTED_DEVICE_TOKEN_SECRET" "$trusted_device_secret" "$backend_env"
     upsert_env "FRONTEND_URL" "https://${domain}" "$backend_env"
     upsert_env "UPLOADS_PUBLIC_URL" "https://${domain}/uploads" "$backend_env"
     upsert_env "UPLOADS_DIR" "${app_dir}/uploads" "$backend_env"
@@ -484,7 +487,7 @@ native_start_pm2_apps() {
     local instance_name="$2"
     log_info "Etapa 18/23: iniciando PM2 backend/frontend..."
     run_as_native_user "cd '${app_dir}/apps/backend' && pm2 delete '${instance_name}-backend' >/dev/null 2>&1 || true && pm2 start dist/main.js --name '${instance_name}-backend' --update-env"
-    run_as_native_user "cd '${app_dir}/apps/frontend' && pm2 delete '${instance_name}-frontend' >/dev/null 2>&1 || true && pm2 start 'pnpm start' --name '${instance_name}-frontend' --update-env"
+    run_as_native_user "cd '${app_dir}/apps/frontend' && pm2 delete '${instance_name}-frontend' >/dev/null 2>&1 || true && pm2 start 'node .next/standalone/apps/frontend/server.js' --name '${instance_name}-frontend' --update-env"
     run_as_native_user "pm2 save"
 }
 
@@ -536,8 +539,9 @@ native_show_report() {
     local db_pass="$6"
     local jwt_secret="$7"
     local enc_key="$8"
-    local redis_pass="$9"
-    local app_dir="${10}"
+    local trusted_device_secret="$9"
+    local redis_pass="${10}"
+    local app_dir="${11}"
     echoblue "=========================================================="
     echoblue "      RELATORIO FINAL DE INSTALACAO - NATIVE             "
     echoblue "=========================================================="
@@ -551,6 +555,7 @@ native_show_report() {
     echo "Redis pass: [redacted]"
     echo "JWT_SECRET: [redacted]"
     echo "ENCRYPTION_KEY: [redacted]"
+    echo "TRUSTED_DEVICE_TOKEN_SECRET: [redacted]"
     echo "Diretorio: ${app_dir}"
     log_info "Etapa 23/23 concluida."
 }
@@ -566,7 +571,8 @@ run_install_native() {
     local db_pass="$8"
     local jwt_secret="$9"
     local enc_key="${10}"
-    local redis_pass="${11}"
+    local trusted_device_secret="${11}"
+    local redis_pass="${12}"
     local app_dir="${NATIVE_BASE_DIR}/${instance_name}"
 
     native_system_create_user "$admin_pass"
@@ -584,7 +590,7 @@ run_install_native() {
     native_install_certbot
     native_build_apps "$app_dir"
     native_setup_database "$db_name" "$db_user" "$db_pass" "$redis_pass"
-    native_create_app_envs "$app_dir" "$domain" "$email" "$admin_email" "$admin_pass" "$db_name" "$db_user" "$db_pass" "$jwt_secret" "$enc_key" "$redis_pass"
+    native_create_app_envs "$app_dir" "$domain" "$email" "$admin_email" "$admin_pass" "$db_name" "$db_user" "$db_pass" "$jwt_secret" "$enc_key" "$trusted_device_secret" "$redis_pass"
     native_migrate_and_seed "$app_dir"
     native_start_pm2_apps "$app_dir" "$instance_name"
     native_configure_nginx_proxy "$domain" "$instance_name"
@@ -595,7 +601,7 @@ run_install_native() {
         log_warn "SSL nao foi emitido/configurado nesta execucao. Instalacao native continuara sem abortar."
     fi
     native_start_firewall
-    native_show_report "$domain" "$admin_email" "$admin_pass" "$db_name" "$db_user" "$db_pass" "$jwt_secret" "$enc_key" "$redis_pass" "$app_dir"
+    native_show_report "$domain" "$admin_email" "$admin_pass" "$db_name" "$db_user" "$db_pass" "$jwt_secret" "$enc_key" "$trusted_device_secret" "$redis_pass" "$app_dir"
 }
 
 # --- Validações ---
@@ -1482,6 +1488,7 @@ run_install() {
     local redis_pass=""
     local jwt_secret="${JWT_SECRET:-$(openssl rand -hex 32)}"
     local enc_key="${ENCRYPTION_KEY:-$(openssl rand -hex 32)}"
+    local trusted_device_secret="${TRUSTED_DEVICE_TOKEN_SECRET:-$(openssl rand -hex 32)}"
     local db_host_env="db"
     local redis_host_env="redis"
     local redis_port_env="6379"
@@ -1535,6 +1542,7 @@ run_install() {
     upsert_env "RATE_LIMIT_STORAGE_FAILURE_MODE" "strict"
     upsert_env "JWT_SECRET" "$jwt_secret"
     upsert_env "ENCRYPTION_KEY" "$enc_key"
+    upsert_env "TRUSTED_DEVICE_TOKEN_SECRET" "$trusted_device_secret"
     upsert_env "REQUIRE_SECRET_MANAGER" "false"
     upsert_env "SEED_ON_START" "${SEED_ON_START:-true}"
     upsert_env "SEED_FORCE" "${SEED_FORCE:-false}"
@@ -1567,6 +1575,7 @@ run_install() {
         upsert_env "RATE_LIMIT_STORAGE_FAILURE_MODE" "strict" "$BACKEND_ENV"
         upsert_env "JWT_SECRET" "$jwt_secret" "$BACKEND_ENV"
         upsert_env "ENCRYPTION_KEY" "$enc_key" "$BACKEND_ENV"
+        upsert_env "TRUSTED_DEVICE_TOKEN_SECRET" "$trusted_device_secret" "$BACKEND_ENV"
         upsert_env "FRONTEND_URL" "https://$domain" "$BACKEND_ENV"
         upsert_env "PORT" "4000" "$BACKEND_ENV"
         upsert_env "NODE_ENV" "production" "$BACKEND_ENV"
@@ -1585,7 +1594,7 @@ run_install() {
     fi
 
     if [[ "$install_mode" == "native" ]]; then
-        run_install_native "$domain_prefix" "$domain" "$email" "${admin_email:-$email}" "$admin_pass" "$db_name" "$db_user" "$db_pass" "$jwt_secret" "$enc_key" "$redis_pass"
+        run_install_native "$domain_prefix" "$domain" "$email" "${admin_email:-$email}" "$admin_pass" "$db_name" "$db_user" "$db_pass" "$jwt_secret" "$enc_key" "$trusted_device_secret" "$redis_pass"
         return 0
     fi
 
@@ -1673,6 +1682,7 @@ run_install() {
     echo -e "\033[1;32m🔑 SEGREDOS DO SISTEMA:\033[0m"
     echo -e "   JWT_SECRET:     [redacted]"
     echo -e "   ENCRYPTION_KEY: [redacted]"
+    echo -e "   TRUSTED_DEVICE_TOKEN_SECRET: [redacted]"
     echo -e "\n"
 
     echoblue "=========================================================="
@@ -1726,6 +1736,23 @@ run_update() {
         # shellcheck source=/dev/null
         source "$ENV_PRODUCTION" 2>/dev/null || true
         set +a
+    fi
+
+    if [[ -z "${JWT_SECRET:-}" ]]; then
+        log_error "JWT_SECRET ausente em install/.env.production. Update abortado."
+        exit 1
+    fi
+    if [[ -z "${ENCRYPTION_KEY:-}" ]]; then
+        log_error "ENCRYPTION_KEY ausente em install/.env.production. Update abortado para evitar quebra do fluxo 2FA."
+        exit 1
+    fi
+    if [[ -z "${TRUSTED_DEVICE_TOKEN_SECRET:-}" ]]; then
+        TRUSTED_DEVICE_TOKEN_SECRET="$(openssl rand -hex 32)"
+        upsert_env "TRUSTED_DEVICE_TOKEN_SECRET" "$TRUSTED_DEVICE_TOKEN_SECRET" "$ENV_PRODUCTION"
+        log_info "TRUSTED_DEVICE_TOKEN_SECRET ausente; segredo dedicado gerado em install/.env.production"
+    elif [[ "$TRUSTED_DEVICE_TOKEN_SECRET" == "$JWT_SECRET" ]]; then
+        log_error "TRUSTED_DEVICE_TOKEN_SECRET deve ser diferente de JWT_SECRET em install/.env.production."
+        exit 1
     fi
 
     IMAGE_OWNER="${IMAGE_OWNER:-$(resolve_image_owner)}"

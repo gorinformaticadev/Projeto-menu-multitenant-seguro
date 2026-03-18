@@ -6,6 +6,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
 import { TokenBlacklistService } from '../../common/services/token-blacklist.service';
 import { UserSessionService } from '../user-session.service';
+import { ACCESS_TOKEN_COOKIE_NAME } from '../auth-cookie.constants';
 
 interface JwtPayload {
   sub: string;
@@ -17,6 +18,13 @@ interface JwtPayload {
   jti?: string;
 }
 
+const extractAccessTokenFromCookie = (req: Request): string | null => {
+  const cookieValue = req?.cookies?.[ACCESS_TOKEN_COOKIE_NAME];
+  return typeof cookieValue === 'string' && cookieValue.trim().length > 0
+    ? cookieValue.trim()
+    : null;
+};
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
@@ -26,7 +34,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private userSessionService: UserSessionService,
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        extractAccessTokenFromCookie,
+      ]),
       ignoreExpiration: false,
       secretOrKey: config.get('JWT_SECRET'),
       passReqToCallback: true,
@@ -38,7 +49,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const rawToken =
       typeof authorization === 'string' && authorization.toLowerCase().startsWith('bearer ')
         ? authorization.slice(7).trim()
-        : undefined;
+        : extractAccessTokenFromCookie(req) || undefined;
 
     if (rawToken && (await this.tokenBlacklistService.isTokenBlacklisted(rawToken))) {
       throw new UnauthorizedException('Token revogado');

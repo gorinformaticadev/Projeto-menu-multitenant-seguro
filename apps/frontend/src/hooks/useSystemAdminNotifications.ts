@@ -93,7 +93,7 @@ const resolveApiBase = (): string => {
 };
 
 export function useSystemAdminNotifications(): UseSystemAdminNotificationsReturn {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -122,7 +122,7 @@ export function useSystemAdminNotifications(): UseSystemAdminNotificationsReturn
   }, []);
 
   const refreshNotifications = useCallback(async () => {
-    if (!isSuperAdmin || !token) {
+    if (!isSuperAdmin) {
       return;
     }
 
@@ -134,7 +134,7 @@ export function useSystemAdminNotifications(): UseSystemAdminNotificationsReturn
     });
 
     applySnapshot(response.data || { notifications: [], unreadCount: 0 });
-  }, [applySnapshot, isSuperAdmin, token]);
+  }, [applySnapshot, isSuperAdmin]);
 
   const stopPolling = useCallback(() => {
     if (pollTimerRef.current) {
@@ -192,7 +192,7 @@ export function useSystemAdminNotifications(): UseSystemAdminNotificationsReturn
   );
 
   const connectStream = useCallback(() => {
-    if (!isSuperAdmin || !token || typeof window === 'undefined') {
+    if (!isSuperAdmin || typeof window === 'undefined') {
       return;
     }
 
@@ -205,7 +205,7 @@ export function useSystemAdminNotifications(): UseSystemAdminNotificationsReturn
 
     closeStream();
 
-    const streamUrl = `${resolveApiBase()}/system/notifications/stream?token=${encodeURIComponent(token)}`;
+    const streamUrl = `${resolveApiBase()}/system/notifications/stream`;
     const stream = new window.EventSource(streamUrl);
     eventSourceRef.current = stream;
 
@@ -242,11 +242,11 @@ export function useSystemAdminNotifications(): UseSystemAdminNotificationsReturn
       closeStream();
       startPolling();
     };
-  }, [closeStream, isSuperAdmin, pushIncomingNotification, startPolling, stopPolling, token]);
+  }, [closeStream, isSuperAdmin, pushIncomingNotification, startPolling, stopPolling]);
 
   const markAsRead = useCallback(
     async (id: string) => {
-      if (!isSuperAdmin || !token) {
+      if (!isSuperAdmin) {
         return;
       }
 
@@ -262,11 +262,11 @@ export function useSystemAdminNotifications(): UseSystemAdminNotificationsReturn
 
       setUnreadCount((previous) => Math.max(0, previous - 1));
     },
-    [isSuperAdmin, token],
+    [isSuperAdmin],
   );
 
   const markAllAsRead = useCallback(async () => {
-    if (!isSuperAdmin || !token) {
+    if (!isSuperAdmin) {
       return;
     }
 
@@ -281,10 +281,10 @@ export function useSystemAdminNotifications(): UseSystemAdminNotificationsReturn
       previous.map((entry) => ({ ...entry, read: true, readAt: new Date(), updatedAt: new Date() })),
     );
     setUnreadCount(0);
-  }, [isSuperAdmin, notifications, token]);
+  }, [isSuperAdmin, notifications]);
 
   useEffect(() => {
-    if (!isSuperAdmin || !token) {
+    if (!isSuperAdmin) {
       closeStream();
       stopPolling();
       setNotifications([]);
@@ -304,7 +304,7 @@ export function useSystemAdminNotifications(): UseSystemAdminNotificationsReturn
       closeStream();
       stopPolling();
     };
-  }, [closeStream, connectStream, isSuperAdmin, refreshNotifications, startPolling, stopPolling, token]);
+  }, [closeStream, connectStream, isSuperAdmin, refreshNotifications, startPolling, stopPolling]);
 
   return {
     notifications,

@@ -45,7 +45,7 @@ const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
 };
 
 export function useNotifications(): UseNotificationsReturn {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
@@ -413,7 +413,7 @@ export function useNotifications(): UseNotificationsReturn {
    * Busca dados atualizados via REST
    */
   const refreshNotifications = useCallback(async () => {
-    if (!user || !token) return;
+    if (!user) return;
 
     try {
       const [unreadRes, dropdownRes] = await Promise.all([
@@ -431,13 +431,13 @@ export function useNotifications(): UseNotificationsReturn {
     } catch (error) {
       console.error('❌ Erro ao atualizar notificações:', error);
     }
-  }, [user, token]);
+  }, [user]);
 
   /**
    * Conecta/desconecta e busca dados iniciais REST
    */
   useEffect(() => {
-    if (user && token) {
+    if (user) {
       // 1. Fetch inicial via REST (Garante dados mesmo sem socket)
       const fetchInitialData = async () => {
         try {
@@ -462,7 +462,7 @@ export function useNotifications(): UseNotificationsReturn {
 
       // 2. Socket.IO para updates em tempo real (apenas se habilitado)
       if (SOCKET_ENABLED) {
-        socketClient.connect(token);
+        socketClient.connect();
         const cleanup = setupSocketListeners();
 
         return () => {
@@ -481,7 +481,7 @@ export function useNotifications(): UseNotificationsReturn {
       setIsConnected(false);
       setConnectionError(null);
     }
-  }, [user, token, setupSocketListeners, unregisterPushSubscription]);
+  }, [user, setupSocketListeners, unregisterPushSubscription]);
 
   /**
    * Inicializa audio e solicita permissao de notificacao apos a primeira interacao.
