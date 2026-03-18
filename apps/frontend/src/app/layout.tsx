@@ -59,6 +59,7 @@ export default function RootLayout({
                       defaultTheme="light"
                       enableSystem
                       disableTransitionOnChange
+                      themes={['light', 'dark', 'system', 'theme-blue', 'theme-emerald', 'theme-violet']}
                     >
                       <MaintenanceBanner />
                       <InactivityLogout />

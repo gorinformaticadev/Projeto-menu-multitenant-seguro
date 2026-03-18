@@ -450,7 +450,7 @@ function MiniTrendSparkline({
 }) {
   if (!hasTrendData(config.data)) {
     return (
-      <div className={`flex items-center text-[10px] text-slate-400 ${className}`}>
+      <div className={`flex items-center text-[10px] text-muted-foreground/80 ${className}`}>
         {config.emptyLabel || "Sem historico recente"}
       </div>
     );
@@ -509,12 +509,12 @@ function DashboardCollectionState({
   minHeight?: string;
 }) {
   return (
-    <div className={`flex ${minHeight} items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-slate-50/85 p-4 dark:border-slate-800 dark:bg-slate-950/30`}>
+    <div className={`flex ${minHeight} items-center justify-center rounded-[28px] border border-dashed border-border bg-muted/50/85 p-4 dark:border-border dark:bg-background/30`}>
       <DashboardSurfaceState
         title={title}
         description={description}
         centered
-        className="max-w-sm border-slate-200/90 bg-white/80 dark:border-slate-800/80 dark:bg-slate-950/50"
+        className="max-w-sm border-border/90 bg-white/80 dark:border-border/80 dark:bg-background/50"
       />
     </div>
   );
@@ -536,7 +536,7 @@ function DashboardChartState({
       centered
       className={dark
         ? "h-full border-white/10 bg-white/5 text-slate-100"
-        : "h-full border-dashed border-slate-200/80 bg-slate-50/70 dark:border-slate-800/80 dark:bg-slate-950/35"}
+        : "h-full border-dashed border-border/80 bg-muted/50/70 dark:border-border/80 dark:bg-background/35"}
     />
   );
 }
@@ -603,7 +603,7 @@ function DashboardOverviewSkeleton() {
         </div>
       </section>
 
-      <section className="rounded-[32px] border border-slate-200/80 bg-white/80 p-4 shadow-[0_25px_60px_-38px_rgba(15,23,42,0.35)] backdrop-blur-sm dark:border-slate-800/80 dark:bg-slate-950/45">
+      <section className="rounded-[32px] border border-border/80 bg-white/80 p-4 shadow-[0_25px_60px_-38px_rgba(15,23,42,0.35)] backdrop-blur-sm dark:border-border/80 dark:bg-background/45">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-2">
             <div className="h-3 w-28 animate-pulse rounded-full bg-slate-200/80 dark:bg-slate-800/80" />
@@ -613,13 +613,13 @@ function DashboardOverviewSkeleton() {
         </div>
         <div className="mt-4 space-y-3">
           {Array.from({ length: 3 }).map((_, index) => (
-            <div key={`resource-skeleton-${index}`} className="rounded-[18px] border border-slate-200/80 bg-white/75 p-2.5 shadow-sm dark:border-slate-800/80 dark:bg-slate-950/45">
+            <div key={`resource-skeleton-${index}`} className="rounded-[18px] border border-border/80 bg-white/75 p-2.5 shadow-sm dark:border-border/80 dark:bg-background/45">
               <div className="flex items-center justify-between gap-3">
                 <div className="h-2.5 w-20 animate-pulse rounded-full bg-slate-200/80 dark:bg-slate-800/80" />
                 <div className="h-4 w-10 animate-pulse rounded-full bg-slate-200/80 dark:bg-slate-800/80" />
               </div>
               <div className="mt-3 h-2 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
-              <div className="mt-3 h-10 animate-pulse rounded-[16px] bg-slate-100/80 dark:bg-slate-900/60" />
+              <div className="mt-3 h-10 animate-pulse rounded-[16px] bg-muted/80 dark:bg-slate-900/60" />
             </div>
           ))}
         </div>
@@ -724,8 +724,8 @@ function ToolbarIconButton({
           disabled={disabled}
           aria-label={label}
           className={`h-11 w-11 rounded-xl border transition-all ${active
-            ? "border-blue-500 bg-blue-600 text-white hover:bg-blue-500 hover:text-white"
-            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-white/10 dark:hover:text-white"
+            ? "border-primary bg-primary text-white hover:bg-primary/90 hover:text-primary-foreground"
+            : "border-border bg-white text-slate-600 hover:border-border hover:bg-muted/50 hover:text-foreground dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-white/10 dark:hover:text-white"
             }`}
         >
           {children}
@@ -749,15 +749,15 @@ function QuickActionButton({
     <button
       type="button"
       onClick={onClick}
-      className="group flex min-w-0 flex-1 items-start justify-between gap-3 rounded-[22px] border border-slate-200/80 bg-white/80 px-4 py-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-800/80 dark:bg-slate-950/40 dark:hover:border-blue-800 dark:focus-visible:ring-offset-slate-950 sm:min-w-[220px]"
+      className="group flex min-w-0 flex-1 items-start justify-between gap-3 rounded-[22px] border border-border/80 bg-white/80 px-4 py-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-border/80 dark:bg-background/40 dark:hover:border-blue-800 dark:focus-visible:ring-offset-slate-950 sm:min-w-[220px]"
     >
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">{label}</p>
-        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+        <p className="text-sm font-semibold text-foreground dark:text-foreground">{label}</p>
+        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground dark:text-muted-foreground/80">
           {description}
         </p>
       </div>
-      <span className="hidden rounded-full border border-slate-200 px-2 py-1 text-[10px] font-medium text-slate-600 transition-colors group-hover:border-blue-200 group-hover:text-blue-700 dark:border-slate-700 dark:text-slate-300 dark:group-hover:border-blue-800 dark:group-hover:text-blue-300 sm:inline-flex">
+      <span className="hidden rounded-full border border-border px-2 py-1 text-[10px] font-medium text-slate-600 transition-colors group-hover:border-primary/30 group-hover:text-blue-700 dark:border-slate-700 dark:text-slate-300 dark:group-hover:border-blue-800 dark:group-hover:text-blue-300 sm:inline-flex">
         Abrir
       </span>
     </button>
@@ -800,15 +800,15 @@ function OverviewStat({
   const content = (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-300/80">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground dark:text-slate-300/80">
           {label}
         </p>
-        <p className="mt-1.5 text-[1.35rem] font-semibold tracking-tight text-slate-900 dark:text-white">{value}</p>
-        <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-300/80">{hint}</p>
+        <p className="mt-1.5 text-[1.35rem] font-semibold tracking-tight text-foreground dark:text-white">{value}</p>
+        <p className="mt-1 text-[10px] text-muted-foreground dark:text-slate-300/80">{hint}</p>
         {trend ? <MiniTrendSparkline config={trend} className="mt-3 h-14" /> : null}
       </div>
       <div className="space-y-2 text-right">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-slate-100">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-border bg-muted/50 text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-foreground">
           {icon}
         </div>
         {isInteractive ? (
@@ -824,8 +824,8 @@ function OverviewStat({
     return (
       <div
         className={`rounded-[20px] border px-3.5 py-3 text-left backdrop-blur-sm ${tone === "danger"
-          ? "border-rose-200/80 bg-rose-50/70 text-slate-900 dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-50"
-          : "border-slate-200/80 bg-white/82 text-slate-900 dark:border-white/10 dark:bg-white/6 dark:text-slate-50"
+          ? "border-rose-200/80 bg-rose-50/70 text-foreground dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-50"
+          : "border-border/80 bg-white/82 text-foreground dark:border-white/10 dark:bg-white/6 dark:text-foreground"
           }`}
       >
         {content}
@@ -837,9 +837,9 @@ function OverviewStat({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-[20px] border px-3.5 py-3 text-left backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:hover:border-cyan-300/30 dark:hover:bg-white/10 dark:focus-visible:ring-cyan-300/70 dark:focus-visible:ring-offset-slate-950 ${tone === "danger"
-        ? "border-rose-200/80 bg-rose-50/70 text-slate-900 dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-50"
-        : "border-slate-200/80 bg-white/82 text-slate-900 dark:border-white/10 dark:bg-white/6 dark:text-slate-50"
+      className={`rounded-[20px] border px-3.5 py-3 text-left backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:hover:border-cyan-300/30 dark:hover:bg-white/10 dark:focus-visible:ring-cyan-300/70 dark:focus-visible:ring-offset-slate-950 ${tone === "danger"
+        ? "border-rose-200/80 bg-rose-50/70 text-foreground dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-50"
+        : "border-border/80 bg-white/82 text-foreground dark:border-white/10 dark:bg-white/6 dark:text-foreground"
         }`}
     >
       {content}
@@ -870,17 +870,17 @@ function PanoramaSignal({
   const isInteractive = Boolean(onClick) && !hasDetails;
   const card = (
     <div
-      className={`rounded-[20px] border border-slate-200/80 bg-white/82 px-3.5 py-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/5 ${isInteractive ? "transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white dark:hover:border-cyan-300/30 dark:hover:bg-white/10" : ""}`}
+      className={`rounded-[20px] border border-border/80 bg-white/82 px-3.5 py-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/5 ${isInteractive ? "transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-white dark:hover:border-cyan-300/30 dark:hover:bg-white/10" : ""}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className={`h-1.5 w-10 rounded-full ${accentClassName}`} />
-        {hasDetails ? <ChevronDown className="mt-0.5 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" /> : null}
+        {hasDetails ? <ChevronDown className="mt-0.5 h-3.5 w-3.5 text-muted-foreground/80 dark:text-muted-foreground" /> : null}
       </div>
-      <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300/80">
+      <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground dark:text-slate-300/80">
         {label}
       </p>
-      <p className="mt-1.5 text-[1.1rem] font-semibold tracking-tight text-slate-900 dark:text-white">{value}</p>
-      <p className="mt-1 truncate text-[10px] text-slate-500 dark:text-slate-400">{hint}</p>
+      <p className="mt-1.5 text-[1.1rem] font-semibold tracking-tight text-foreground dark:text-white">{value}</p>
+      <p className="mt-1 truncate text-[10px] text-muted-foreground dark:text-muted-foreground/80">{hint}</p>
       {isInteractive ? (
         <p className="mt-2 text-[10px] font-medium text-blue-700 dark:text-cyan-200/90">{actionLabel || "Abrir"}</p>
       ) : null}
@@ -892,7 +892,7 @@ function PanoramaSignal({
       <button
         type="button"
         onClick={onClick}
-        className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:focus-visible:ring-cyan-300/70 dark:focus-visible:ring-offset-slate-950"
+        className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:focus-visible:ring-cyan-300/70 dark:focus-visible:ring-offset-slate-950"
       >
         {card}
       </button>
@@ -908,7 +908,7 @@ function PanoramaSignal({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:focus-visible:ring-cyan-300/70 dark:focus-visible:ring-offset-slate-950"
+          className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:focus-visible:ring-cyan-300/70 dark:focus-visible:ring-offset-slate-950"
         >
           {card}
         </button>
@@ -917,13 +917,13 @@ function PanoramaSignal({
         side="bottom"
         align="start"
         sideOffset={10}
-        className="w-80 rounded-[20px] border border-slate-200 bg-white/95 p-3 text-slate-900 shadow-xl dark:border-slate-700/70 dark:bg-slate-950/95 dark:text-slate-100 dark:shadow-2xl"
+        className="w-80 rounded-[20px] border border-border bg-white/95 p-3 text-foreground shadow-xl dark:border-slate-700/70 dark:bg-background/95 dark:text-foreground dark:shadow-2xl"
       >
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-600 dark:text-slate-300">
             {detailsTitle || label}
           </p>
-          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-[11px] text-muted-foreground dark:text-muted-foreground/80">
             Historico recente disponivel para consulta rapida.
           </p>
         </div>
@@ -931,11 +931,11 @@ function PanoramaSignal({
           {detailsItems.map((item, index) => (
             <div
               key={`${item.label}-${index}`}
-              className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-white/10 dark:bg-white/5"
+              className="rounded-2xl border border-border bg-muted/50/80 px-3 py-2 dark:border-white/10 dark:bg-white/5"
             >
-              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{item.label}</p>
+              <p className="text-sm font-medium text-foreground dark:text-foreground">{item.label}</p>
               {item.hint ? (
-                <p className="mt-1 text-[10px] leading-snug text-slate-500 dark:text-slate-400">{item.hint}</p>
+                <p className="mt-1 text-[10px] leading-snug text-muted-foreground dark:text-muted-foreground/80">{item.hint}</p>
               ) : null}
             </div>
           ))}
@@ -961,12 +961,12 @@ function ResourceMeter({
   const boundedValue = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
 
   return (
-    <div className="space-y-1.5 rounded-[18px] border border-slate-200/80 bg-white/75 p-2.5 shadow-sm dark:border-slate-800/80 dark:bg-slate-950/45">
+    <div className="space-y-1.5 rounded-[18px] border border-border/80 bg-white/75 p-2.5 shadow-sm dark:border-border/80 dark:bg-background/45">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground dark:text-muted-foreground/80">
           {label}
         </p>
-        <span className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">
+        <span className="text-[13px] font-semibold text-foreground dark:text-foreground">
           {Number.isFinite(value) ? `${Math.round(value)}${suffix}` : "--"}
         </span>
       </div>
@@ -1025,12 +1025,12 @@ function HealthBucketLegendRow({
         </span>
       </div>
       <div className="flex items-center gap-2">
-        <p className="shrink-0 text-base font-semibold tracking-tight text-slate-900 dark:text-white">
+        <p className="shrink-0 text-base font-semibold tracking-tight text-foreground dark:text-white">
           {value}
         </p>
         {hasItems ? (
           <ChevronDown
-            className={`h-3.5 w-3.5 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+            className={`h-3.5 w-3.5 text-muted-foreground/80 transition-transform ${open ? "rotate-180" : ""}`}
           />
         ) : null}
       </div>
@@ -1039,7 +1039,7 @@ function HealthBucketLegendRow({
 
   if (!hasItems) {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white/82 px-3 py-2 dark:border-white/10 dark:bg-white/5">
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/80 bg-white/82 px-3 py-2 dark:border-white/10 dark:bg-white/5">
         {content}
       </div>
     );
@@ -1050,7 +1050,7 @@ function HealthBucketLegendRow({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white/82 px-3 py-2 text-left transition-colors hover:border-blue-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20 dark:hover:bg-white/10 dark:focus-visible:ring-cyan-300/70 dark:focus-visible:ring-offset-slate-950"
+          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-border/80 bg-white/82 px-3 py-2 text-left transition-colors hover:border-primary/30 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20 dark:hover:bg-white/10 dark:focus-visible:ring-cyan-300/70 dark:focus-visible:ring-offset-slate-950"
           onClick={() => {
             clearCloseTimeout();
             setOpen((current) => !current);
@@ -1070,7 +1070,7 @@ function HealthBucketLegendRow({
         side="left"
         align="start"
         sideOffset={10}
-        className="w-72 rounded-[20px] border border-slate-200 bg-white/95 p-3 text-slate-900 shadow-xl dark:border-slate-700/70 dark:bg-slate-950/95 dark:text-slate-100 dark:shadow-2xl"
+        className="w-72 rounded-[20px] border border-border bg-white/95 p-3 text-foreground shadow-xl dark:border-slate-700/70 dark:bg-background/95 dark:text-foreground dark:shadow-2xl"
         onMouseEnter={clearCloseTimeout}
         onMouseLeave={scheduleClose}
       >
@@ -1079,7 +1079,7 @@ function HealthBucketLegendRow({
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-600 dark:text-slate-300">
               {label}
             </p>
-            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-[11px] text-muted-foreground dark:text-muted-foreground/80">
               {value} widgets identificados neste grupo
             </p>
           </div>
@@ -1089,12 +1089,12 @@ function HealthBucketLegendRow({
           {items.map((item) => (
             <div
               key={item.id}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-white/10 dark:bg-white/5"
+              className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-muted/50/80 px-3 py-2 dark:border-white/10 dark:bg-white/5"
             >
-              <span className="min-w-0 truncate text-sm text-slate-900 dark:text-slate-100">
+              <span className="min-w-0 truncate text-sm text-foreground dark:text-foreground">
                 {item.label}
               </span>
-              <span className="shrink-0 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-slate-300">
+              <span className="shrink-0 rounded-full border border-border bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-slate-300">
                 {item.statusLabel}
               </span>
             </div>
@@ -1798,7 +1798,7 @@ export function OperationalDashboard({
               Build {versionMetric?.buildDate ? formatDateTime(versionMetric.buildDate) : "--"}
             </p>
           </div>
-          <span className="shrink-0 rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300">
+          <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300">
             {String(versionMetric?.commitSha || "--").slice(0, 7) || "--"}
           </span>
         </div>
@@ -1896,12 +1896,12 @@ export function OperationalDashboard({
       >
         <div className="flex flex-col h-full">
           <div className="px-3 pt-3 flex items-end justify-between">
-            <p className="text-4xl font-bold text-slate-900 dark:text-blue-400">
+            <p className="text-4xl font-bold text-foreground dark:text-blue-400">
               {apiMetric?.avgResponseTimeMs !== null && apiMetric?.avgResponseTimeMs !== undefined
                 ? `${apiMetric.avgResponseTimeMs}ms`
                 : "--"}
             </p>
-            <p className="mb-1 text-xs text-slate-500 dark:text-slate-400">Amostras: {String(apiMetric?.sampleSize ?? 0)}</p>
+            <p className="mb-1 text-xs text-muted-foreground dark:text-muted-foreground/80">Amostras: {String(apiMetric?.sampleSize ?? 0)}</p>
           </div>
           {apiHistory.length > 0 ? (
             <div className="px-3">
@@ -1956,8 +1956,8 @@ export function OperationalDashboard({
       >
         <div className="flex flex-col h-full">
           <div className="px-3 pt-3 flex items-end justify-between">
-            <p className="text-4xl font-bold text-slate-900 dark:text-blue-400">{formatPercent(cpuMetric?.usagePercent)}</p>
-            <p className="mb-1 text-xs text-slate-500 dark:text-slate-400">Cores: {String(cpuMetric?.cores ?? "--")}</p>
+            <p className="text-4xl font-bold text-foreground dark:text-blue-400">{formatPercent(cpuMetric?.usagePercent)}</p>
+            <p className="mb-1 text-xs text-muted-foreground dark:text-muted-foreground/80">Cores: {String(cpuMetric?.cores ?? "--")}</p>
           </div>
           <div className="flex-1 min-h-0 w-full mt-2">
             {cpuLoadData.length > 0 ? (
@@ -2008,9 +2008,9 @@ export function OperationalDashboard({
       >
         <div className="flex h-full items-center">
           <div className="flex-1 space-y-1">
-            <p className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50">{formatPercent(memoryMetric?.usedPercent)}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Usado: <span className="text-slate-700 dark:text-slate-200">{formatBytes(memUsed)}</span></p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Total: <span className="text-slate-700 dark:text-slate-200">{formatBytes(memoryMetric?.totalBytes)}</span></p>
+            <p className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">{formatPercent(memoryMetric?.usedPercent)}</p>
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground/80">Usado: <span className="text-slate-700 dark:text-slate-200">{formatBytes(memUsed)}</span></p>
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground/80">Total: <span className="text-slate-700 dark:text-slate-200">{formatBytes(memoryMetric?.totalBytes)}</span></p>
           </div>
           <div className="h-24 w-24 shrink-0">
             {memUsed > 0 ? (
@@ -2059,9 +2059,9 @@ export function OperationalDashboard({
       >
         <div className="flex h-full items-center">
           <div className="flex-1 space-y-1">
-            <p className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50">{formatPercent(diskMetric?.usedPercent)}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Usado: <span className="text-slate-700 dark:text-slate-200">{formatBytes(diskUsed)}</span></p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Total: <span className="text-slate-700 dark:text-slate-200">{formatBytes(diskMetric?.totalBytes)}</span></p>
+            <p className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">{formatPercent(diskMetric?.usedPercent)}</p>
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground/80">Usado: <span className="text-slate-700 dark:text-slate-200">{formatBytes(diskUsed)}</span></p>
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground/80">Total: <span className="text-slate-700 dark:text-slate-200">{formatBytes(diskMetric?.totalBytes)}</span></p>
           </div>
           <div className="h-24 w-24 shrink-0">
             {diskUsed > 0 ? (
@@ -2103,13 +2103,13 @@ export function OperationalDashboard({
         compact
       >
         <div className="mt-auto flex flex-wrap gap-1.5">
-          <span className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300">
+          <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300">
             {String(systemMetric?.platform || "--")}
           </span>
-          <span className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300">
+          <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300">
             {String(systemMetric?.release || "--")}
           </span>
-          <span className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300">
+          <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300">
             Node {String(systemMetric?.nodeVersion || "--")}
           </span>
         </div>
@@ -2139,11 +2139,11 @@ export function OperationalDashboard({
                   ? `${databaseMetric.latencyMs}ms`
                   : "--"}
               </p>
-              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400/80">
+              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground dark:text-muted-foreground/80/80">
                 banco
               </p>
             </div>
-            <span className="rounded-full border border-slate-200 bg-white/80 px-2 py-0.5 text-[10px] font-medium capitalize text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-slate-100">
+            <span className="rounded-full border border-border bg-white/80 px-2 py-0.5 text-[10px] font-medium capitalize text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-foreground">
               {String(databaseMetric?.status || "--")}
             </span>
           </div>
@@ -2174,11 +2174,11 @@ export function OperationalDashboard({
                   ? `${redisMetric.latencyMs}ms`
                   : "--"}
               </p>
-              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400/80">
+              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground dark:text-muted-foreground/80/80">
                 cache
               </p>
             </div>
-            <span className="rounded-full border border-slate-200 bg-white/80 px-2 py-0.5 text-[10px] font-medium capitalize text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-slate-100">
+            <span className="rounded-full border border-border bg-white/80 px-2 py-0.5 text-[10px] font-medium capitalize text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-foreground">
               {String(redisMetric?.status || "--")}
             </span>
           </div>
@@ -2203,14 +2203,14 @@ export function OperationalDashboard({
           <DashboardMetricState metric={workersMetric} />
         ) : (
           <div className="mt-auto flex items-end justify-between gap-2">
-            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-slate-900 dark:text-blue-400/90">
+            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-foreground dark:text-blue-400/90">
               {String(workersMetric?.activeWorkers ?? workersMetric?.runningJobs ?? "--")}
             </p>
             <div className="text-right">
-              <p className="text-[10px] text-slate-500 dark:text-slate-400/80">
+              <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">
                 Executando: <span className="font-medium text-slate-700 dark:text-slate-300">{String(workersMetric?.runningJobs ?? "--")}</span>
               </p>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400/80">
+              <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">
                 Pendentes: <span className="font-medium text-amber-700 dark:text-amber-300/80">{String(workersMetric?.pendingJobs ?? "--")}</span>
               </p>
             </div>
@@ -2236,12 +2236,12 @@ export function OperationalDashboard({
           <DashboardMetricState metric={jobsMetric} />
         ) : (
           <div className="mt-auto flex items-end justify-between gap-2">
-            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-slate-900 dark:text-blue-400/90">
+            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-foreground dark:text-blue-400/90">
               {String(jobsMetric?.running ?? "--")}
             </p>
             <div className="text-right">
-              <p className="text-[10px] text-slate-500 dark:text-slate-400/80">Pendentes: <span className="text-amber-700 dark:text-amber-300/80">{String(jobsMetric?.pending ?? "--")}</span></p>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400/80">Falhas 24h: <span className="text-rose-700 dark:text-red-400">{String(jobsMetric?.failedLast24h ?? "--")}</span></p>
+              <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">Pendentes: <span className="text-amber-700 dark:text-amber-300/80">{String(jobsMetric?.pending ?? "--")}</span></p>
+              <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">Falhas 24h: <span className="text-rose-700 dark:text-red-400">{String(jobsMetric?.failedLast24h ?? "--")}</span></p>
             </div>
           </div>
         )}
@@ -2274,24 +2274,24 @@ export function OperationalDashboard({
               <p className="truncate text-sm font-semibold">
                 {String(lastBackup.fileName || lastBackup.id || "--")}
               </p>
-              <span className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300">
+              <span className="rounded-full border border-border px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300">
                 {String(lastBackup.status || "--")}
               </span>
             </div>
             <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-              <span className="rounded-full border border-slate-200 px-2 py-1 dark:border-slate-700">
+              <span className="rounded-full border border-border px-2 py-1 dark:border-slate-700">
                 {formatBytes(lastBackup.sizeBytes)}
               </span>
-              <span className="rounded-full border border-slate-200 px-2 py-1 dark:border-slate-700">
+              <span className="rounded-full border border-border px-2 py-1 dark:border-slate-700">
                 {formatDurationSeconds(lastBackup.durationSeconds)}
               </span>
-              <span className="rounded-full border border-slate-200 px-2 py-1 dark:border-slate-700">
+              <span className="rounded-full border border-border px-2 py-1 dark:border-slate-700">
                 {lastBackup.finishedAt ? formatDateTime(lastBackup.finishedAt) : "--"}
               </span>
             </div>
             {recentBackups.length > 1 ? (
-              <div className="border-t border-slate-200/70 pt-2 dark:border-slate-800/70">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              <div className="border-t border-border/70 pt-2 dark:border-border/70">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/80">
                   Historico recente
                 </p>
                 <div className="mt-2 space-y-1.5">
@@ -2300,12 +2300,12 @@ export function OperationalDashboard({
                     return (
                       <div
                         key={`${row.id || index}`}
-                        className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/70 px-2.5 py-1.5 text-[11px] dark:border-slate-800/70"
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 px-2.5 py-1.5 text-[11px] dark:border-border/70"
                       >
                         <span className="min-w-0 truncate text-slate-600 dark:text-slate-300">
                           {String(row.fileName || row.id || "--")}
                         </span>
-                        <span className="shrink-0 text-slate-500 dark:text-slate-400">
+                        <span className="shrink-0 text-muted-foreground dark:text-muted-foreground/80">
                           {row.finishedAt ? formatDateTime(row.finishedAt) : "--"}
                         </span>
                       </div>
@@ -2343,18 +2343,18 @@ export function OperationalDashboard({
           <DashboardMetricState metric={routeLatencyMetric} />
         ) : topSlowRoutes.length > 0 ? (
           <div className="flex h-full min-h-0 flex-col gap-3">
-            <div className="flex items-end justify-between gap-3 rounded-[20px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70">
+            <div className="flex items-end justify-between gap-3 rounded-[20px] border border-border/70 px-3 py-2 dark:border-border/70">
               <div>
                   <p className="text-[1.7rem] font-bold leading-none tracking-tight text-sky-700 dark:text-sky-400">
                   {routeLatencyMetric?.avgResponseMs !== null && routeLatencyMetric?.avgResponseMs !== undefined
                     ? `${routeLatencyMetric.avgResponseMs}ms`
                     : "--"}
                 </p>
-                <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground/80">
                   media recente
                 </p>
               </div>
-              <div className="text-right text-[11px] text-slate-500 dark:text-slate-400">
+              <div className="text-right text-[11px] text-muted-foreground dark:text-muted-foreground/80">
                 <p>{String(routeLatencyMetric?.totalRequestsRecent ?? 0)} req</p>
                 <p>{String(routeLatencyMetric?.windowSeconds ?? "--")}s janela</p>
               </div>
@@ -2363,17 +2363,17 @@ export function OperationalDashboard({
               {topSlowRoutes.map((item) => (
                 <div
                   key={`${item.method}:${item.route}`}
-                  className="rounded-[20px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70"
+                  className="rounded-[20px] border border-border/70 px-3 py-2 dark:border-border/70"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="flex items-center gap-2 text-[11px] font-semibold text-slate-900 dark:text-slate-100">
+                      <p className="flex items-center gap-2 text-[11px] font-semibold text-foreground dark:text-foreground">
                         <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300">
                           {item.method}
                         </span>
                         <span className="truncate">{item.route}</span>
                       </p>
-                      <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+                      <p className="mt-1 text-[10px] text-muted-foreground dark:text-muted-foreground/80">
                         {item.requestCount} req - p95 {item.p95Ms !== null ? `${item.p95Ms}ms` : "--"}
                       </p>
                     </div>
@@ -2413,16 +2413,16 @@ export function OperationalDashboard({
           <DashboardMetricState metric={routeErrorsMetric} />
         ) : topErrorRoutes.length > 0 ? (
           <div className="flex h-full min-h-0 flex-col gap-3">
-            <div className="flex items-end justify-between gap-3 rounded-[20px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70">
+            <div className="flex items-end justify-between gap-3 rounded-[20px] border border-border/70 px-3 py-2 dark:border-border/70">
               <div>
                 <p className="text-[1.7rem] font-bold leading-none tracking-tight text-rose-700 dark:text-rose-400">
                   {String(routeErrorsMetric?.totalErrorCount ?? "--")}
                 </p>
-                <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground/80">
                   erros recentes
                 </p>
               </div>
-              <div className="text-right text-[11px] text-slate-500 dark:text-slate-400">
+              <div className="text-right text-[11px] text-muted-foreground dark:text-muted-foreground/80">
                 <p>{formatPercent(routeErrorsMetric?.errorRateRecent)}</p>
                 <p>{String(routeErrorsMetric?.totalRequestsRecent ?? 0)} req</p>
               </div>
@@ -2431,21 +2431,21 @@ export function OperationalDashboard({
               {topErrorRoutes.map((item) => (
                 <div
                   key={`${item.method}:${item.route}`}
-                  className="rounded-[20px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70"
+                  className="rounded-[20px] border border-border/70 px-3 py-2 dark:border-border/70"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="flex items-center gap-2 text-[11px] font-semibold text-slate-900 dark:text-slate-100">
+                      <p className="flex items-center gap-2 text-[11px] font-semibold text-foreground dark:text-foreground">
                         <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
                           {item.method}
                         </span>
                         <span className="truncate">{item.route}</span>
                       </p>
-                      <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+                      <p className="mt-1 text-[10px] text-muted-foreground dark:text-muted-foreground/80">
                         {item.errorCount} erros - 5xx {item.status5xx} - {formatPercent(item.errorRate)}
                       </p>
                     </div>
-                    <p className="shrink-0 text-right text-[10px] text-slate-500 dark:text-slate-400">
+                    <p className="shrink-0 text-right text-[10px] text-muted-foreground dark:text-muted-foreground/80">
                       {item.lastErrorAt ? formatDateTime(item.lastErrorAt) : "--"}
                     </p>
                   </div>
@@ -2491,7 +2491,7 @@ export function OperationalDashboard({
                   key={`${row.id || index}`}
                   className="flex items-center justify-between gap-3 rounded border border-red-200/60 px-2.5 py-2 dark:border-red-900/50"
                 >
-                  <p className="min-w-0 truncate text-[11px] font-medium text-slate-900 dark:text-slate-100">
+                  <p className="min-w-0 truncate text-[11px] font-medium text-foreground dark:text-foreground">
                     {buildAuditEventLine(row)}
                   </p>
                   <p className="shrink-0 text-[10px] text-muted-foreground">
@@ -2532,39 +2532,39 @@ export function OperationalDashboard({
         ) : deniedIps.length > 0 || rateLimitedIps.length > 0 || recentSecurityEvents.length > 0 ? (
           <div className="flex h-full min-h-0 flex-col gap-3">
             <div className="grid gap-2 sm:grid-cols-3">
-              <div className="rounded-[18px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70">
+              <div className="rounded-[18px] border border-border/70 px-3 py-2 dark:border-border/70">
                 <p className="text-[1.45rem] font-bold tracking-tight text-rose-700 dark:text-rose-400">
                   {deniedIps.reduce((acc, item) => acc + item.count, 0)}
                 </p>
-                <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">negados</p>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground/80">negados</p>
               </div>
-              <div className="rounded-[18px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70">
+              <div className="rounded-[18px] border border-border/70 px-3 py-2 dark:border-border/70">
                 <p className="text-[1.45rem] font-bold tracking-tight text-amber-700 dark:text-amber-300">
                   {rateLimitedIps.reduce((acc, item) => acc + item.count, 0)}
                 </p>
-                <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">429 recentes</p>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground/80">429 recentes</p>
               </div>
-              <div className="rounded-[18px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70">
+              <div className="rounded-[18px] border border-border/70 px-3 py-2 dark:border-border/70">
                 <p className="text-[1.45rem] font-bold tracking-tight text-sky-700 dark:text-sky-300">
                   {String(securityMetric?.maintenanceBypassAttemptsRecent ?? 0)}
                 </p>
-                <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">bypass</p>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground/80">bypass</p>
               </div>
             </div>
             <div className="grid flex-1 gap-3 lg:grid-cols-[1.2fr_1fr]">
               <div className="space-y-2">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground dark:text-muted-foreground/80">
                   IPs com mais negacoes
                 </p>
                 {deniedIps.slice(0, 4).map((item) => (
                   <div
                     key={`${item.ip}:${item.route || 'na'}`}
-                    className="rounded-[18px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70"
+                    className="rounded-[18px] border border-border/70 px-3 py-2 dark:border-border/70"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-[11px] font-semibold text-slate-900 dark:text-slate-100">{item.ip}</p>
-                        <p className="mt-1 truncate text-[10px] text-slate-500 dark:text-slate-400">
+                        <p className="truncate text-[11px] font-semibold text-foreground dark:text-foreground">{item.ip}</p>
+                        <p className="mt-1 truncate text-[10px] text-muted-foreground dark:text-muted-foreground/80">
                           {item.route || "rota nao informada"}
                         </p>
                       </div>
@@ -2574,7 +2574,7 @@ export function OperationalDashboard({
                 ))}
               </div>
               <div className="space-y-2">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground dark:text-muted-foreground/80">
                   Pressao recente
                 </p>
                 {(rateLimitedIps.length > 0 ? rateLimitedIps : recentSecurityEvents.slice(0, 4)).slice(0, 4).map((item, index) => {
@@ -2582,12 +2582,12 @@ export function OperationalDashboard({
                     return (
                       <div
                         key={`${item.ip}:${index}`}
-                        className="rounded-[18px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70"
+                        className="rounded-[18px] border border-border/70 px-3 py-2 dark:border-border/70"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="truncate text-[11px] font-semibold text-slate-900 dark:text-slate-100">{item.ip}</p>
-                            <p className="mt-1 truncate text-[10px] text-slate-500 dark:text-slate-400">{item.route || "429"}</p>
+                            <p className="truncate text-[11px] font-semibold text-foreground dark:text-foreground">{item.ip}</p>
+                            <p className="mt-1 truncate text-[10px] text-muted-foreground dark:text-muted-foreground/80">{item.route || "429"}</p>
                           </div>
                           <span className="shrink-0 text-sm font-semibold text-amber-700 dark:text-amber-300">{item.count}</span>
                         </div>
@@ -2598,12 +2598,12 @@ export function OperationalDashboard({
                   return (
                     <div
                       key={`${item.type}:${item.at}:${index}`}
-                      className="rounded-[18px] border border-slate-200/70 px-3 py-2 dark:border-slate-800/70"
+                      className="rounded-[18px] border border-border/70 px-3 py-2 dark:border-border/70"
                     >
-                      <p className="truncate text-[11px] font-semibold text-slate-900 dark:text-slate-100">
+                      <p className="truncate text-[11px] font-semibold text-foreground dark:text-foreground">
                         {formatSecurityEventType(item.type)} - {item.method} {item.route}
                       </p>
-                      <p className="mt-1 truncate text-[10px] text-slate-500 dark:text-slate-400">
+                      <p className="mt-1 truncate text-[10px] text-muted-foreground dark:text-muted-foreground/80">
                         {item.ip} - {item.statusCode} - {item.at ? formatDateTime(item.at) : "--"}
                       </p>
                     </div>
@@ -2636,8 +2636,8 @@ export function OperationalDashboard({
         compact
       >
         <div className="mt-auto flex items-end justify-between gap-2">
-          <p className="text-[1.7rem] font-bold leading-none tracking-tight text-slate-900 dark:text-blue-400/90">{String(tenantsMetric?.active ?? "--")}</p>
-          <div className="text-right text-[10px] text-slate-500 dark:text-slate-400/80">
+          <p className="text-[1.7rem] font-bold leading-none tracking-tight text-foreground dark:text-blue-400/90">{String(tenantsMetric?.active ?? "--")}</p>
+          <div className="text-right text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">
             <p>ativas</p>
             <p>{String(tenantsMetric?.total ?? "--")} total</p>
           </div>
@@ -2665,32 +2665,32 @@ export function OperationalDashboard({
       >
         <div className="mt-auto space-y-3">
           <div className="flex items-end justify-between gap-2">
-            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-slate-900 dark:text-blue-400/90">
+            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-foreground dark:text-blue-400/90">
               {String(notificationsMetric?.criticalUnread ?? "--")}
             </p>
             <div className="text-right">
-              <p className="text-[10px] text-slate-500 dark:text-slate-400/80">Nao lidas</p>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400/80">
+              <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">Nao lidas</p>
+              <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">
                 Criticas no periodo: <span className="font-medium text-slate-700 dark:text-slate-300">{String(notificationsMetric?.criticalRecent ?? "--")}</span>
               </p>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400/80">
+              <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">
                 Alertas operacionais: <span className="font-medium text-slate-700 dark:text-slate-300">{String(notificationsMetric?.operationalRecentCount ?? "--")}</span>
               </p>
             </div>
           </div>
-          <div className="space-y-1.5 border-t border-slate-200/80 pt-2 dark:border-white/10">
+          <div className="space-y-1.5 border-t border-border/80 pt-2 dark:border-white/10">
             {recentOperationalAlerts.length > 0 ? (
               recentOperationalAlerts.map((alert) => (
                 <div key={alert.id} className="flex items-start justify-between gap-2 text-[10px]">
                   <div className="min-w-0">
-                    <p className="truncate font-medium text-slate-900 dark:text-slate-100">{alert.title}</p>
-                    <p className="truncate text-slate-500 dark:text-slate-400/80">{alert.body}</p>
+                    <p className="truncate font-medium text-foreground dark:text-foreground">{alert.title}</p>
+                    <p className="truncate text-muted-foreground dark:text-muted-foreground/80/80">{alert.body}</p>
                   </div>
-                  <span className="shrink-0 text-slate-500 dark:text-slate-500">{formatTimeOfDay(alert.createdAt)}</span>
+                  <span className="shrink-0 text-muted-foreground dark:text-muted-foreground">{formatTimeOfDay(alert.createdAt)}</span>
                 </div>
               ))
             ) : (
-              <p className="text-[10px] text-slate-500 dark:text-slate-400/80">Sem alertas operacionais recentes.</p>
+              <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">Sem alertas operacionais recentes.</p>
             )}
           </div>
         </div>
@@ -2715,34 +2715,34 @@ export function OperationalDashboard({
       <div className={embedded ? "space-y-4" : "mx-auto max-w-[1600px] space-y-4 p-4 md:p-6"}>
         <div className="space-y-3">
           {!embedded ? (
-            <div className="rounded-[24px] border border-slate-200/80 bg-white/88 px-4 py-3 text-slate-900 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.18)] dark:border-slate-900 dark:bg-slate-950 dark:text-slate-50 dark:shadow-xl">
+            <div className="rounded-[24px] border border-border/80 bg-white/88 px-4 py-3 text-foreground shadow-[0_18px_40px_-30px_rgba(15,23,42,0.18)] dark:border-slate-900 dark:bg-background dark:text-foreground dark:shadow-xl">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="inline-flex h-7 items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 dark:border-slate-700 dark:bg-slate-900">
+                    <div className="inline-flex h-7 items-center rounded-full border border-border bg-muted/50 px-2.5 dark:border-slate-700 dark:bg-slate-900">
                       <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700 dark:text-blue-300">
                         Visao operacional
                       </span>
                     </div>
-                    <h1 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
+                    <h1 className="text-lg font-semibold tracking-tight text-foreground dark:text-white">
                       Dashboard Operacional
                     </h1>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-300">
-                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 dark:border-white/10 dark:bg-white/5">
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground dark:text-slate-300">
+                    <span className="rounded-full border border-border bg-white px-2.5 py-1 dark:border-white/10 dark:bg-white/5">
                       Snapshot: {dashboard?.generatedAt ? formatDateTime(dashboard.generatedAt) : "--"}
                     </span>
-                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 dark:border-white/10 dark:bg-white/5">
+                    <span className="rounded-full border border-border bg-white px-2.5 py-1 dark:border-white/10 dark:bg-white/5">
                       Layout:{" "}
                       {lastLayoutUpdateAt
                         ? `salvo em ${formatDateTime(lastLayoutUpdateAt)}`
                         : "padrao ativo"}
                     </span>
-                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 dark:border-white/10 dark:bg-white/5">
+                    <span className="rounded-full border border-border bg-white px-2.5 py-1 dark:border-white/10 dark:bg-white/5">
                       Auto refresh {Math.floor(POLL_INTERVAL_MS / 1000)}s
                     </span>
                     {isMobileViewport ? (
-                      <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+                      <span className="rounded-full border border-border bg-white px-2.5 py-1 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
                         Reordenacao disponivel no desktop
                       </span>
                     ) : null}
@@ -2791,14 +2791,14 @@ export function OperationalDashboard({
             </div>
           ) : null}
 
-          <div className="rounded-[24px] border border-slate-200/80 bg-white/80 px-4 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.35)] dark:border-slate-800/80 dark:bg-slate-950/45">
+          <div className="rounded-[24px] border border-border/80 bg-white/80 px-4 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.35)] dark:border-border/80 dark:bg-background/45">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  <p className="text-sm font-semibold text-foreground dark:text-foreground">
                     Acoes rapidas
                   </p>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-900 dark:text-slate-300">
                     Contextuais
                   </span>
                 </div>
@@ -2813,7 +2813,7 @@ export function OperationalDashboard({
                       />
                     ))
                   ) : (
-                    <div className="rounded-[20px] border border-dashed border-slate-200/80 px-4 py-3 text-sm text-slate-500 dark:border-slate-800/80 dark:text-slate-400">
+                    <div className="rounded-[20px] border border-dashed border-border/80 px-4 py-3 text-sm text-muted-foreground dark:border-border/80 dark:text-muted-foreground/80">
                       Nenhuma acao contextual disponivel para a role atual.
                     </div>
                   )}
@@ -2823,10 +2823,10 @@ export function OperationalDashboard({
               <div className="xl:max-w-[34rem] xl:min-w-[28rem]">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    <p className="text-sm font-semibold text-foreground dark:text-foreground">
                       Foco rapido
                     </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="text-xs text-muted-foreground dark:text-muted-foreground/80">
                       Filtra apenas os blocos visiveis nesta tela sem persistir no backend.
                     </p>
                   </div>
@@ -2834,7 +2834,7 @@ export function OperationalDashboard({
                     <button
                       type="button"
                       onClick={() => setActiveQuickFilter("all")}
-                      className="text-xs font-medium text-blue-700 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-blue-300 dark:hover:text-blue-200 dark:focus-visible:ring-offset-slate-950"
+                      className="text-xs font-medium text-blue-700 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-blue-300 dark:hover:text-blue-200 dark:focus-visible:ring-offset-slate-950"
                     >
                       Limpar
                     </button>
@@ -2846,9 +2846,9 @@ export function OperationalDashboard({
                       key={option.id}
                       type="button"
                       onClick={() => setActiveQuickFilter(option.id)}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950 ${activeQuickFilter === option.id
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950 ${activeQuickFilter === option.id
                         ? "border-blue-200 bg-blue-100 text-blue-800 dark:border-blue-800 dark:bg-blue-900/50 dark:text-blue-100"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-slate-100"
+                        : "border-border bg-white text-slate-600 hover:border-border hover:text-foreground/90 dark:border-slate-700 dark:bg-background/40 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-slate-100"
                         }`}
                       aria-pressed={activeQuickFilter === option.id}
                       title={option.description}
@@ -2857,13 +2857,13 @@ export function OperationalDashboard({
                     </button>
                   ))}
                 </div>
-                <div className="mt-4 rounded-[22px] border border-slate-200/80 bg-slate-50/80 p-3 dark:border-slate-800/80 dark:bg-slate-900/40">
+                <div className="mt-4 rounded-[22px] border border-border/80 bg-muted/50/80 p-3 dark:border-border/80 dark:bg-slate-900/40">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                      <p className="text-sm font-semibold text-foreground dark:text-foreground">
                         Recorte operacional
                       </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-muted-foreground dark:text-muted-foreground/80">
                         Periodo e tenant ficam disponiveis direto nas acoes rapidas.
                       </p>
                     </div>
@@ -2896,10 +2896,10 @@ export function OperationalDashboard({
                         onClick={() =>
                           setDraftFilters((current) => ({ ...current, periodMinutes: minutes }))
                         }
-                        className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950 ${
+                        className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950 ${
                           draftFilters.periodMinutes === minutes
                             ? "border-blue-200 bg-blue-100 text-blue-800 dark:border-blue-800 dark:bg-blue-900/50 dark:text-blue-100"
-                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-slate-100"
+                            : "border-border bg-white text-slate-600 hover:border-border hover:text-foreground/90 dark:border-slate-700 dark:bg-background/40 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-slate-100"
                         }`}
                       >
                         {minutes} min
@@ -2947,7 +2947,7 @@ export function OperationalDashboard({
                 <Button
                   type="button"
                   variant="outline"
-                  className="gap-2 border-slate-300 bg-white/70 text-slate-700 hover:bg-white dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-200"
+                  className="gap-2 border-border bg-white/70 text-slate-700 hover:bg-white dark:border-slate-700 dark:bg-background/40 dark:text-slate-200"
                   onClick={resetLayoutEditing}
                   disabled={savingLayout}
                 >
@@ -2957,7 +2957,7 @@ export function OperationalDashboard({
                 <Button
                   type="button"
                   variant="outline"
-                  className="gap-2 border-slate-300 bg-white/70 text-slate-700 hover:bg-white dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-200"
+                  className="gap-2 border-border bg-white/70 text-slate-700 hover:bg-white dark:border-slate-700 dark:bg-background/40 dark:text-slate-200"
                   onClick={cancelLayoutEditing}
                   disabled={savingLayout}
                 >
@@ -2966,7 +2966,7 @@ export function OperationalDashboard({
                 </Button>
                 <Button
                   type="button"
-                  className="gap-2 bg-blue-600 text-white hover:bg-blue-500"
+                  className="gap-2 bg-primary text-white hover:bg-blue-500"
                   onClick={() => {
                     void saveLayoutEditing();
                   }}
@@ -2991,7 +2991,7 @@ export function OperationalDashboard({
                     type="button"
                     onClick={() => toggleWidgetVisibilityInEditor(widgetId)}
                     className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${isHidden
-                      ? "border-slate-300 bg-white text-slate-500 hover:border-slate-400 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-400 dark:hover:text-slate-200"
+                      ? "border-border bg-white text-muted-foreground hover:border-slate-400 hover:text-slate-700 dark:border-slate-700 dark:bg-background/50 dark:text-muted-foreground/80 dark:hover:text-slate-200"
                       : "border-blue-200 bg-blue-100 text-blue-800 hover:bg-blue-200 dark:border-blue-800 dark:bg-blue-900/50 dark:text-blue-100"
                       }`}
                     aria-pressed={!isHidden}
@@ -3023,18 +3023,18 @@ export function OperationalDashboard({
           <DashboardOverviewSkeleton />
         ) : (
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.9fr)]">
-          <section className="overflow-hidden rounded-[32px] border border-slate-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.09),_transparent_30%),radial-gradient(circle_at_right,_rgba(59,130,246,0.12),_transparent_26%),linear-gradient(180deg,_rgba(255,255,255,0.96),_rgba(248,250,252,0.95))] px-5 py-5 text-slate-900 shadow-[0_22px_55px_-38px_rgba(15,23,42,0.2)] dark:border-slate-900 dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.2),_transparent_30%),radial-gradient(circle_at_right,_rgba(59,130,246,0.24),_transparent_26%),linear-gradient(150deg,_rgba(2,6,23,0.98),_rgba(15,23,42,0.96))] dark:text-slate-50 dark:shadow-[0_35px_90px_-45px_rgba(15,23,42,0.85)]">
+          <section className="overflow-hidden rounded-[32px] border border-border/80 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.09),_transparent_30%),radial-gradient(circle_at_right,_rgba(59,130,246,0.12),_transparent_26%),linear-gradient(180deg,_rgba(255,255,255,0.96),_rgba(248,250,252,0.95))] px-5 py-5 text-foreground shadow-[0_22px_55px_-38px_rgba(15,23,42,0.2)] dark:border-slate-900 dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.2),_transparent_30%),radial-gradient(circle_at_right,_rgba(59,130,246,0.24),_transparent_26%),linear-gradient(150deg,_rgba(2,6,23,0.98),_rgba(15,23,42,0.96))] dark:text-foreground dark:shadow-[0_35px_90px_-45px_rgba(15,23,42,0.85)]">
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_220px]">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-700 dark:border-cyan-400/25 dark:bg-cyan-400/10 dark:text-cyan-200">
                     Panorama
                   </span>
-                  <span className="rounded-full border border-slate-200 bg-white/85 px-3 py-1 text-[11px] text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                  <span className="rounded-full border border-border bg-white/85 px-3 py-1 text-[11px] text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
                     {dashboardOverview.visibleWidgets} cards livres
                   </span>
                   {activeQuickFilter !== "all" ? (
-                    <span className="rounded-full border border-slate-200 bg-white/85 px-3 py-1 text-[11px] text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                    <span className="rounded-full border border-border bg-white/85 px-3 py-1 text-[11px] text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
                       Filtro rapido: {dashboardQuickFilterOptions.find((option) => option.id === activeQuickFilter)?.label || activeQuickFilter}
                     </span>
                   ) : null}
@@ -3076,14 +3076,14 @@ export function OperationalDashboard({
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-slate-200/80 bg-white/78 p-4 backdrop-blur-sm dark:border-white/10 dark:bg-white/5">
+              <div className="rounded-[28px] border border-border/80 bg-white/78 p-4 backdrop-blur-sm dark:border-white/10 dark:bg-white/5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground dark:text-slate-300">
                       Saude do painel
                     </p>
                   </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-slate-100">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-muted/50 text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-foreground">
                     <Server className="h-4 w-4" />
                   </div>
                 </div>
@@ -3152,7 +3152,7 @@ export function OperationalDashboard({
                       id: "restricted" as const,
                       label: "Restrito",
                       value: dashboardOverview.counts.restricted,
-                      color: "bg-slate-500",
+                      color: "bg-muted/500",
                       items: dashboardOverview.healthDetails.restricted,
                     },
                   ].map((item) => (
@@ -3169,14 +3169,14 @@ export function OperationalDashboard({
             </div>
           </section>
 
-          <section className="rounded-[32px] border border-slate-200/80 bg-white/80 p-4 shadow-[0_25px_60px_-38px_rgba(15,23,42,0.35)] backdrop-blur-sm dark:border-slate-800/80 dark:bg-slate-950/45">
+          <section className="rounded-[32px] border border-border/80 bg-white/80 p-4 shadow-[0_25px_60px_-38px_rgba(15,23,42,0.35)] backdrop-blur-sm dark:border-border/80 dark:bg-background/45">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
+                <h3 className="mt-1 text-xl font-semibold tracking-tight text-foreground dark:text-foreground">
                   Monitoramento do Servidor
                 </h3>
               </div>
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-muted/50 text-slate-700 dark:border-border dark:bg-slate-900 dark:text-slate-200">
                 <Maximize2 className="h-4 w-4" />
               </div>
             </div>
@@ -3247,22 +3247,22 @@ export function OperationalDashboard({
           )}
         </div>
 
-        <div className="flex flex-col gap-2 rounded-[24px] border border-slate-200 bg-white/80 px-4 py-3 text-xs text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-2 rounded-[24px] border border-border bg-white/80 px-4 py-3 text-xs text-slate-600 shadow-sm dark:border-border dark:bg-background/40 dark:text-slate-300 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium text-slate-800 dark:text-slate-100">Contexto ativo</span>
-            <span className="rounded-full border border-slate-200 px-2 py-1 dark:border-slate-700">
+            <span className="font-medium text-foreground/90 dark:text-foreground">Contexto ativo</span>
+            <span className="rounded-full border border-border px-2 py-1 dark:border-slate-700">
               Periodo: {appliedFilters.periodMinutes} min
             </span>
-            <span className="rounded-full border border-slate-200 px-2 py-1 dark:border-slate-700">
+            <span className="rounded-full border border-border px-2 py-1 dark:border-slate-700">
               Severidade: {appliedFilters.severity === "all" ? "todas" : appliedFilters.severity}
             </span>
             {activeQuickFilter !== "all" ? (
-              <span className="rounded-full border border-slate-200 px-2 py-1 dark:border-slate-700">
+              <span className="rounded-full border border-border px-2 py-1 dark:border-slate-700">
                 Foco rapido: {dashboardQuickFilterOptions.find((option) => option.id === activeQuickFilter)?.label || activeQuickFilter}
               </span>
             ) : null}
             {role === "SUPER_ADMIN" && appliedFilters.tenantId ? (
-              <span className="rounded-full border border-slate-200 px-2 py-1 dark:border-slate-700">
+              <span className="rounded-full border border-border px-2 py-1 dark:border-slate-700">
                 Tenant: {appliedFilters.tenantId}
               </span>
             ) : null}
@@ -3278,7 +3278,7 @@ export function OperationalDashboard({
                 Filtros padrao
               </span>
             )}
-            <span className="rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-900">
+            <span className="rounded-full bg-muted px-2 py-1 dark:bg-slate-900">
               {layoutEditingActive ? "Edicao de layout ativa" : "Modo leitura"}
             </span>
           </div>

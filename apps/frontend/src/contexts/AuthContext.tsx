@@ -24,6 +24,9 @@ export interface User {
     email?: string;
   } | null;
   twoFactorEnabled?: boolean;
+  preferences?: {
+    theme?: string;
+  } | null;
 }
 
 export interface LoginResult {

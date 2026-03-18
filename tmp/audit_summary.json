@@ -1,0 +1,50 @@
+{
+  "totalIssues": 2780,
+  "issuesByType": {
+    "HEX": 89,
+    "TAILWIND_HARDCODE": 2688,
+    "INLINE_STYLE_COLOR": 3
+  },
+  "topFiles": [
+    {
+      "file": "components\\operational-dashboard\\OperationalDashboard.tsx",
+      "count": 583
+    },
+    {
+      "file": "components\\dashboard\\DashboardHome.tsx",
+      "count": 170
+    },
+    {
+      "file": "components\\system-notifications\\SystemNotificationsList.tsx",
+      "count": 96
+    },
+    {
+      "file": "app\\modules\\ordem_servico\\components\\ClientEditModal.tsx",
+      "count": 84
+    },
+    {
+      "file": "app\\modules\\ordem_servico\\components\\ClientModal.tsx",
+      "count": 84
+    },
+    {
+      "file": "components\\NotificationCenter.tsx",
+      "count": 78
+    },
+    {
+      "file": "app\\modules\\ordem_servico\\pages\\dashboard\\page.tsx",
+      "count": 74
+    },
+    {
+      "file": "app\\(authenticated)\\settings\\modules\\page.tsx",
+      "count": 70
+    },
+    {
+      "file": "app\\configuracoes\\sistema\\cron\\page.tsx",
+      "count": 69
+    },
+    {
+      "file": "components\\operational-dashboard\\OperationalDashboardWidget.tsx",
+      "count": 66
+    }
+  ]
+}

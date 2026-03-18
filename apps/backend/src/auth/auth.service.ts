@@ -134,7 +134,7 @@ export class AuthService {
 
     const user = await this.prisma.user.findUnique({
       where: { email },
-      include: { tenant: true },
+      include: { tenant: true, preferences: true },
     });
 
     if (!user) {
@@ -453,7 +453,7 @@ export class AuthService {
       const now = new Date();
       const storedToken = await tx.refreshToken.findUnique({
         where: { token: refreshToken },
-        include: { user: { include: { tenant: true } }, session: true },
+        include: { user: { include: { tenant: true, preferences: true } }, session: true },
       });
 
       if (!storedToken) {
@@ -590,7 +590,7 @@ export class AuthService {
 
     const user = await this.prisma.user.findUnique({
       where: { email },
-      include: { tenant: true },
+      include: { tenant: true, preferences: true },
     });
 
     if (!user) {
@@ -786,7 +786,7 @@ export class AuthService {
   async getProfile(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { tenant: true },
+      include: { tenant: true, preferences: true },
     });
 
     if (!user) {
@@ -992,6 +992,7 @@ export class AuthService {
     tenantId: string | null;
     avatarUrl?: string | null;
     tenant?: unknown;
+    preferences?: { theme: string } | null;
   }) {
     const avatarUrl = user.avatarUrl
       ? `/api/users/public/${encodeURIComponent(user.id)}/avatar-file`
@@ -1005,6 +1006,7 @@ export class AuthService {
       tenantId: user.tenantId,
       avatarUrl,
       tenant: user.tenant,
+      preferences: user.preferences ? { theme: user.preferences.theme } : null,
       twoFactorSecret: undefined,
     };
   }

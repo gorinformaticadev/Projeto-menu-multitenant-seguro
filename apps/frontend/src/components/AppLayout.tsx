@@ -10,11 +10,20 @@ import { useModuleRegistry } from "@/hooks/useModuleRegistry";
 import { ModuleRegistryTaskbar } from "./ModuleRegistryTaskbar";
 import { ModuleLoader } from "@/core/ModuleLoader";
 import { RouteGuard } from "./RouteGuard";
+import { useTheme } from "next-themes";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
   const { isInitialized, error } = useModuleRegistry();
+  const { setTheme, theme } = useTheme();
+
+  // Sincroniza tema do backend com o next-themes no primeiro load
+  useEffect(() => {
+    if (user?.preferences?.theme && user.preferences.theme !== theme) {
+      setTheme(user.preferences.theme);
+    }
+  }, [user, theme, setTheme]);
 
   // Páginas onde o sidebar e topbar NÃO devem aparecer
   const publicPages = ["/", "/login", "/esqueci-senha", "/redefinir-senha"];
