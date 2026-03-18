@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.36](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.35...v0.1.36) (2026-03-18)
+
+
+### Bug Fixes
+
+* Add Next.js middleware to handle authentication, route protection, and token validation. ([ac26880](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/ac26880e6d6c7923ec08dca66d5102953526b6df))
+* corrigisdo para um sistema robusto, persistente e distribuído de gerenciamento de tarefas cron, com recursos de monitoramento (watchdog) e pulsação (heartbeat). ([ba57161](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/ba57161368920c68575f084d6b13192371f8d816))
+* Implement AuthContext for managing user authentication, login, logout, and two-factor authentication. ([619a330](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/619a3304ece05cf1493caccf31f5ace3b10930ee))
+
 ### [0.1.35](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.34...v0.1.35) (2026-03-18)
 
 
