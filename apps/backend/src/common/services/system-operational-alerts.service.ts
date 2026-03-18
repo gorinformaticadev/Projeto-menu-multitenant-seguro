@@ -514,50 +514,7 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     return true;
   }
 
-  // This is the new emitAlertIfNeeded from the instruction, with a different signature.
-  // I've renamed it to emitAlertIfNeededNew to avoid conflict and allow both to coexist
-  // until a full refactor is done. If the intent was to replace the old one,
-  // all call sites would need to be updated.
-  private async emitAlertIfNeededNew(
-    key: string,
-    message: string,
-    severity: string,
-    options: { cooldownSeconds: number; allowRepeated: boolean },
-  ): Promise<boolean> {
-    if (!this.operationalAlertsEnabled) {
-      return false;
-    }
 
-    const cooldownKey = `alert:cooldown:${key}:${severity}`;
-
-    // 1. Verificar cooldown distribuído
-    const hasCooldown = await this.redisLock.hasCooldown(cooldownKey);
-    if (hasCooldown && !options.allowRepeated) {
-      return false;
-    }
-
-    try {
-      this.logger.warn(`[EMITTING_ALERT] [${severity.toUpperCase()}] ${key}: ${message}`);
-      await this.notifications.createNotification({
-        title: `Alerta: ${key}`,
-        message,
-        body: message,
-        severity: severity as any,
-        type: 'SYSTEM_ALERT',
-        context: 'system_incident',
-        source: 'system-watchdog',
-      });
-
-      // 2. Definir cooldown distribuído
-      const durationMs = options.cooldownSeconds > 0 ? options.cooldownSeconds * 1000 : 5 * 60 * 1000;
-      await this.redisLock.setCooldown(cooldownKey, durationMs);
-
-      return true;
-    } catch (error) {
-      this.logger.error(`Falha ao disparar alerta ${key}: ${String(error)}`);
-      return false;
-    }
-  }
 
   private isInfraMetricDegraded(metric: InfraHealthMetric): boolean {
     return metric.status === 'degraded' || metric.status === 'error' || metric.status === 'down';
