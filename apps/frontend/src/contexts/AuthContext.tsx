@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { moduleRegistry } from "@/lib/module-registry";
-import { isProtectedRoute, ROUTE_CONFIG } from "@/lib/routes";
+import { isProtectedRoute, isSafeCallbackUrl, ROUTE_CONFIG } from "@/lib/routes";
 
 export type Role = "SUPER_ADMIN" | "ADMIN" | "USER" | "CLIENT";
 
@@ -345,7 +345,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             // Se estiver em uma rota protegida, redirecionar
             if (typeof window !== 'undefined' && isProtectedRoute(window.location.pathname)) {
-              router.push(`${ROUTE_CONFIG.unauthenticatedFallback}?callbackUrl=${encodeURIComponent(window.location.pathname)}`);
+              router.replace(`${ROUTE_CONFIG.unauthenticatedFallback}?callbackUrl=${encodeURIComponent(window.location.pathname)}`);
             }
           }
         }
@@ -379,11 +379,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(accessToken);
       setUser(userData);
       
-      // Ler callbackUrl se existir
+      // Ler callbackUrl se existir e VALIDAR contra Open Redirect
       const searchParams = new URLSearchParams(window.location.search);
-      const callbackUrl = searchParams.get("callbackUrl") || ROUTE_CONFIG.authenticatedFallback;
+      const rawCallback = searchParams.get("callbackUrl");
+      const callbackUrl = isSafeCallbackUrl(rawCallback) ? rawCallback! : ROUTE_CONFIG.authenticatedFallback;
       
-      router.push(callbackUrl);
+      router.replace(callbackUrl);
     } catch (error: unknown) {
       const apiError = error as ApiError;
       throw new Error(resolveApiErrorMessage(apiError, "Erro ao fazer login"));
@@ -422,11 +423,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       void loadModulesSafely();
 
-      // Ler callbackUrl se existir
+      // Ler callbackUrl se existir e VALIDAR contra Open Redirect
       const searchParams = new URLSearchParams(window.location.search);
-      const callbackUrl = searchParams.get("callbackUrl") || ROUTE_CONFIG.authenticatedFallback;
+      const rawCallback = searchParams.get("callbackUrl");
+      const callbackUrl = isSafeCallbackUrl(rawCallback) ? rawCallback! : ROUTE_CONFIG.authenticatedFallback;
 
-      router.push(callbackUrl);
+      router.replace(callbackUrl);
 
       return {
         success: true,
@@ -500,11 +502,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       void loadModulesSafely();
 
-      // Ler callbackUrl se existir
+      // Ler callbackUrl se existir e VALIDAR contra Open Redirect
       const searchParams = new URLSearchParams(window.location.search);
-      const callbackUrl = searchParams.get("callbackUrl") || ROUTE_CONFIG.authenticatedFallback;
+      const rawCallback = searchParams.get("callbackUrl");
+      const callbackUrl = isSafeCallbackUrl(rawCallback) ? rawCallback! : ROUTE_CONFIG.authenticatedFallback;
 
-      router.push(callbackUrl);
+      router.replace(callbackUrl);
 
       return {
         success: true,

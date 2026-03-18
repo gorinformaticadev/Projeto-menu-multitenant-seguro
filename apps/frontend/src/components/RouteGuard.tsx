@@ -104,7 +104,7 @@ export function RouteGuard({ children }: RouteGuardProps) {
       // Se não tem usuário, redireciona
       if (!user) {
         console.warn('⚠️ Usuário não autenticado tentando acessar rota protegida:', pathname);
-        router.push(`${ROUTE_CONFIG.unauthenticatedFallback}?callbackUrl=${encodeURIComponent(pathname)}`);
+        router.replace(`${ROUTE_CONFIG.unauthenticatedFallback}?callbackUrl=${encodeURIComponent(pathname)}`);
         return;
       }
 
@@ -122,7 +122,7 @@ export function RouteGuard({ children }: RouteGuardProps) {
 
         if (validation.shouldRedirect) {
           // Redirecionar para página de login (unauthenticatedFallback)
-          router.push(ROUTE_CONFIG.unauthenticatedFallback);
+          router.replace(`${ROUTE_CONFIG.unauthenticatedFallback}?callbackUrl=${encodeURIComponent(pathname)}`);
           return;
         }
       }

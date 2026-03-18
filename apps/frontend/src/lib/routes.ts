@@ -43,3 +43,12 @@ export const isApiRoute = (pathname: string) => {
 export const isProtectedRoute = (pathname: string) => {
   return !isPublicRoute(pathname) && !isAuthRoute(pathname) && !isApiRoute(pathname);
 };
+
+/**
+ * Valida se uma URL de retorno é segura para redirecionamento (previne Open Redirect).
+ * Deve começar com '/' e NÃO pode ser '//' (que indica protocolo relativo).
+ */
+export const isSafeCallbackUrl = (url?: string | null): boolean => {
+  if (!url) return false;
+  return url.startsWith('/') && !url.startsWith('//');
+};
