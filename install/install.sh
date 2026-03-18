@@ -410,6 +410,9 @@ native_build_apps() {
     run_as_native_user "cd '${app_dir}' && pnpm --filter backend build"
     run_as_native_user "cd '${app_dir}/apps/backend' && pnpm exec tsc prisma/seed.ts --outDir dist --skipLibCheck --module commonjs --target ES2021 --esModuleInterop --resolveJsonModule"
     run_as_native_user "cd '${app_dir}' && pnpm --filter frontend build"
+    run_as_native_user "cd '${app_dir}' && cp -r apps/frontend/public apps/frontend/.next/standalone/apps/frontend/ || true"
+    run_as_native_user "cd '${app_dir}' && mkdir -p apps/frontend/.next/standalone/apps/frontend/.next/static && cp -r apps/frontend/.next/static/. apps/frontend/.next/standalone/apps/frontend/.next/static/ || true"
+
 }
 
 native_setup_database() {

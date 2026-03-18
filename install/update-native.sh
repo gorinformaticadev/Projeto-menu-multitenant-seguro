@@ -842,6 +842,12 @@ prepare_release_build() {
     )
 
     pnpm --filter frontend build
+
+    log "Copiando assets estáticos e públicos para o bundle standalone..."
+    cp -r apps/frontend/public apps/frontend/.next/standalone/apps/frontend/ || true
+    mkdir -p apps/frontend/.next/standalone/apps/frontend/.next/static
+    cp -r apps/frontend/.next/static/. apps/frontend/.next/standalone/apps/frontend/.next/static/ || true
+
   )
 }
 
@@ -975,6 +981,12 @@ run_legacy_inplace() {
       pnpm exec tsc prisma/seed.ts --outDir dist --skipLibCheck --module commonjs --target ES2021 --esModuleInterop --resolveJsonModule
     )
     pnpm --filter frontend build
+
+    log "Copiando assets estáticos e públicos para o bundle standalone (legacy-inplace)..."
+    cp -r apps/frontend/public apps/frontend/.next/standalone/apps/frontend/ || true
+    mkdir -p apps/frontend/.next/standalone/apps/frontend/.next/static
+    cp -r apps/frontend/.next/static/. apps/frontend/.next/standalone/apps/frontend/.next/static/ || true
+
 
     set_step "legacy-migrate" 70
     (
