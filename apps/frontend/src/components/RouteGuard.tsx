@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
+import { isProtectedRoute, isAuthRoute, ROUTE_CONFIG } from '@/lib/routes';
 
 interface RouteGuardProps {
   children: React.ReactNode;
@@ -28,18 +29,8 @@ export function RouteGuard({ children }: RouteGuardProps) {
     isValid: false
   });
 
-  // Páginas que não precisam de autenticação
-  const publicRoutes = [
-    '/',
-    '/login',
-    '/esqueci-senha',
-    '/redefinir-senha'
-  ];
-
-  // Verificar se é uma rota de módulo que precisa de proteção
-  const isModuleRoute = pathname.startsWith('/modules/');
-  const isPublicRoute = publicRoutes.includes(pathname);
-  const needsProtection = isModuleRoute && !isPublicRoute;
+  // Usar regras centralizadas para decidir se precisa de proteção
+  const needsProtection = isProtectedRoute(pathname);
 
   // Função para validar autenticação no backend
   const validateAuthentication = useCallback(async (): Promise<AuthValidationResult> => {
@@ -113,7 +104,7 @@ export function RouteGuard({ children }: RouteGuardProps) {
       // Se não tem usuário, redireciona
       if (!user) {
         console.warn('⚠️ Usuário não autenticado tentando acessar rota protegida:', pathname);
-        router.push('/');
+        router.push(`${ROUTE_CONFIG.unauthenticatedFallback}?callbackUrl=${encodeURIComponent(pathname)}`);
         return;
       }
 
@@ -130,8 +121,8 @@ export function RouteGuard({ children }: RouteGuardProps) {
         });
 
         if (validation.shouldRedirect) {
-          // Redirecionar para página inicial
-          router.push('/');
+          // Redirecionar para página de login (unauthenticatedFallback)
+          router.push(ROUTE_CONFIG.unauthenticatedFallback);
           return;
         }
       }
@@ -181,13 +172,13 @@ export function RouteGuard({ children }: RouteGuardProps) {
           )}
           <div className="space-y-2">
             <button
-              onClick={() => router.push('/')}
+              onClick={() => router.push(ROUTE_CONFIG.publicRoutes[0] || '/')}
               className="w-full bg-primary text-primary-foreground px-6 py-2 rounded-md hover:bg-primary/90 transition-colors"
             >
               Voltar ao Início
             </button>
             <button
-              onClick={() => router.push('/login')}
+              onClick={() => router.push(ROUTE_CONFIG.unauthenticatedFallback)}
               className="w-full bg-secondary text-secondary-foreground px-6 py-2 rounded-md hover:bg-secondary/90 transition-colors"
             >
               Fazer Login Novamente
@@ -231,12 +222,14 @@ export function useRouteGuard() {
   };
 
   const isModuleRoute = pathname.startsWith('/modules/');
+  const isProtected = isProtectedRoute(pathname);
 
   return {
     checkAccess,
     redirectToHome,
     redirectToLogin,
-    isModuleRoute,
+    isModuleRoute, // Mantido apenas para compatibilidade legada
+    isProtected,
     isAuthenticated: !!user && !!token
   };
 }

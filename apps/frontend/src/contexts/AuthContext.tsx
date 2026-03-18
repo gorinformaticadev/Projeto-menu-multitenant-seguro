@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { moduleRegistry } from "@/lib/module-registry";
+import { isProtectedRoute, ROUTE_CONFIG } from "@/lib/routes";
 
 export type Role = "SUPER_ADMIN" | "ADMIN" | "USER" | "CLIENT";
 
@@ -343,8 +344,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             delete api.defaults.headers.common["Authorization"];
 
             // Se estiver em uma rota protegida, redirecionar
-            if (typeof window !== 'undefined' && window.location.pathname.startsWith('/modules/')) {
-              window.location.href = '/';
+            if (typeof window !== 'undefined' && isProtectedRoute(window.location.pathname)) {
+              router.push(`${ROUTE_CONFIG.unauthenticatedFallback}?callbackUrl=${encodeURIComponent(window.location.pathname)}`);
             }
           }
         }
@@ -377,7 +378,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setToken(accessToken);
       setUser(userData);
-      router.push("/dashboard");
+      
+      // Ler callbackUrl se existir
+      const searchParams = new URLSearchParams(window.location.search);
+      const callbackUrl = searchParams.get("callbackUrl") || ROUTE_CONFIG.authenticatedFallback;
+      
+      router.push(callbackUrl);
     } catch (error: unknown) {
       const apiError = error as ApiError;
       throw new Error(resolveApiErrorMessage(apiError, "Erro ao fazer login"));
@@ -416,8 +422,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       void loadModulesSafely();
 
-      // Redirecionar para dashboard
-      router.push("/dashboard");
+      // Ler callbackUrl se existir
+      const searchParams = new URLSearchParams(window.location.search);
+      const callbackUrl = searchParams.get("callbackUrl") || ROUTE_CONFIG.authenticatedFallback;
+
+      router.push(callbackUrl);
 
       return {
         success: true,
@@ -491,8 +500,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       void loadModulesSafely();
 
-      // Redirecionar para dashboard
-      router.push("/dashboard");
+      // Ler callbackUrl se existir
+      const searchParams = new URLSearchParams(window.location.search);
+      const callbackUrl = searchParams.get("callbackUrl") || ROUTE_CONFIG.authenticatedFallback;
+
+      router.push(callbackUrl);
 
       return {
         success: true,

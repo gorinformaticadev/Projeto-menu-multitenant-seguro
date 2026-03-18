@@ -1,4 +1,5 @@
 import axios, { InternalAxiosRequestConfig } from "axios";
+import { ROUTE_CONFIG } from "@/lib/routes";
 
 interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
@@ -223,8 +224,8 @@ const doLogout = () => {
     delete api.defaults.headers.common["Authorization"];
 
     // Redirecionar apenas se não estiver já na página de login
-    if (window.location.pathname !== "/login") {
-      window.location.href = "/login";
+    if (window.location.pathname !== ROUTE_CONFIG.unauthenticatedFallback) {
+      window.location.href = ROUTE_CONFIG.unauthenticatedFallback;
     }
   }
 };
