@@ -24,9 +24,10 @@ function parseJwt(token: string) {
   }
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { nextUrl } = request;
   const pathname = nextUrl.pathname;
+
 
   // Ignorar rotas de API do proprio Next (ex: /api/auth) e static assets
   if (isApiRoute(pathname)) {
