@@ -144,10 +144,10 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
 
     const getStrengthColor = () => {
       switch (validation.strength) {
-        case 'very-strong': return 'bg-green-500';
-        case 'strong': return 'bg-blue-500';
-        case 'medium': return 'bg-yellow-500';
-        default: return 'bg-red-500';
+        case 'very-strong': return 'bg-skin-success';
+        case 'strong': return 'bg-skin-info';
+        case 'medium': return 'bg-skin-warning';
+        default: return 'bg-skin-danger';
       }
     };
 
@@ -249,16 +249,16 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
               <span className="text-muted-foreground">Força da senha:</span>
               <span className={cn(
                 "font-medium",
-                validation.strength === 'very-strong' && "text-green-600",
-                validation.strength === 'strong' && "text-blue-600",
-                validation.strength === 'medium' && "text-yellow-600",
-                validation.strength === 'weak' && "text-red-600"
+                validation.strength === 'very-strong' && "text-skin-success",
+                validation.strength === 'strong' && "text-skin-info",
+                validation.strength === 'medium' && "text-skin-warning",
+                validation.strength === 'weak' && "text-skin-danger"
               )}>
                 {getStrengthText()}
               </span>
             </div>
             
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="h-2 w-full rounded-full bg-skin-border">
               <div
                 className={cn("h-2 rounded-full transition-all duration-300", getStrengthColor())}
                 style={{ width: `${validation.score}%` }}
@@ -281,12 +281,12 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
               {requirements.map((req) => (
                 <div key={req.key} className="flex items-center gap-2 text-sm">
                   {req.valid ? (
-                    <Check className="h-3 w-3 text-green-600 flex-shrink-0" />
+                    <Check className="h-3 w-3 flex-shrink-0 text-skin-success" />
                   ) : (
-                    <X className="h-3 w-3 text-red-500 flex-shrink-0" />
+                    <X className="h-3 w-3 flex-shrink-0 text-skin-danger" />
                   )}
                   <span className={cn(
-                    req.valid ? "text-green-700" : "text-red-600"
+                    req.valid ? "text-skin-success" : "text-skin-danger"
                   )}>
                     {req.label}
                   </span>
@@ -338,13 +338,13 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
               <div className="flex items-center gap-2 text-sm">
                 {passwordsMatch ? (
                   <>
-                    <Check className="h-3 w-3 text-green-600" />
-                    <span className="text-green-700">Senhas coincidem</span>
+                    <Check className="h-3 w-3 text-skin-success" />
+                    <span className="text-skin-success">Senhas coincidem</span>
                   </>
                 ) : (
                   <>
-                    <X className="h-3 w-3 text-red-500" />
-                    <span className="text-red-600">Senhas não coincidem</span>
+                    <X className="h-3 w-3 text-skin-danger" />
+                    <span className="text-skin-danger">Senhas não coincidem</span>
                   </>
                 )}
               </div>
@@ -363,12 +363,12 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
         {value && showValidation && (
           <div className="text-sm">
             {validation.isValid ? (
-              <div className="flex items-center gap-2 text-green-700">
+              <div className="flex items-center gap-2 text-skin-success">
                 <Check className="h-4 w-4" />
                 <span className="font-medium">Senha atende a todos os requisitos</span>
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-red-600">
+              <div className="flex items-center gap-2 text-skin-danger">
                 <X className="h-4 w-4" />
                 <span className="font-medium">Senha não atende aos requisitos de segurança</span>
               </div>

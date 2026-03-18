@@ -337,12 +337,12 @@ function operationalWidgetTone(
 
 function metricStateAccentClassName(tone: "neutral" | "warn" | "danger"): string {
   if (tone === "warn") {
-    return "bg-amber-400";
+    return "bg-skin-warning";
   }
   if (tone === "danger") {
-    return "bg-rose-400";
+    return "bg-skin-danger";
   }
-  return "bg-slate-400";
+  return "bg-skin-text-muted";
 }
 
 function buildAuditEventLine(row: Record<string, unknown>): string {
@@ -509,12 +509,12 @@ function DashboardCollectionState({
   minHeight?: string;
 }) {
   return (
-    <div className={`flex ${minHeight} items-center justify-center rounded-[28px] border border-dashed border-border bg-muted/50/85 p-4 dark:border-border dark:bg-background/30`}>
+    <div className={`flex ${minHeight} items-center justify-center rounded-[28px] border border-dashed border-skin-border bg-skin-background-elevated/50/85 p-4 dark:border-skin-border dark:bg-background/30`}>
       <DashboardSurfaceState
         title={title}
         description={description}
         centered
-        className="max-w-sm border-border/90 bg-white/80 dark:border-border/80 dark:bg-background/50"
+        className="max-w-sm border-skin-border/90 bg-skin-surface/80 dark:border-skin-border/80 dark:bg-background/50"
       />
     </div>
   );
@@ -535,8 +535,8 @@ function DashboardChartState({
       description={description}
       centered
       className={dark
-        ? "h-full border-white/10 bg-white/5 text-slate-100"
-        : "h-full border-dashed border-border/80 bg-muted/50/70 dark:border-border/80 dark:bg-background/35"}
+        ? "h-full border-white/10 bg-skin-surface/5 text-skin-text"
+        : "h-full border-dashed border-skin-border/80 bg-skin-background-elevated/50/70 dark:border-skin-border/80 dark:bg-background/35"}
     />
   );
 }
@@ -544,58 +544,58 @@ function DashboardChartState({
 function DashboardOverviewSkeleton() {
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.9fr)]">
-      <section className="overflow-hidden rounded-[32px] border border-slate-900 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_30%),linear-gradient(150deg,_rgba(2,6,23,0.98),_rgba(15,23,42,0.96))] px-5 py-5 text-slate-50 shadow-[0_35px_90px_-45px_rgba(15,23,42,0.85)]">
+      <section className="overflow-hidden rounded-[32px] border border-skin-border bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_30%),linear-gradient(150deg,_rgba(2,6,23,0.98),_rgba(15,23,42,0.96))] px-5 py-5 text-skin-text shadow-[0_35px_90px_-45px_rgba(15,23,42,0.85)]">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_220px]">
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
-              <div className="h-7 w-24 animate-pulse rounded-full bg-white/10" />
-              <div className="h-7 w-28 animate-pulse rounded-full bg-white/10" />
+              <div className="h-7 w-24 animate-pulse rounded-full bg-skin-surface/10" />
+              <div className="h-7 w-28 animate-pulse rounded-full bg-skin-surface/10" />
             </div>
             <div className="grid gap-3 md:grid-cols-3">
               {Array.from({ length: 3 }).map((_, index) => (
-                <div key={`overview-stat-skeleton-${index}`} className="rounded-[20px] border border-white/10 bg-white/6 px-3.5 py-3">
+                <div key={`overview-stat-skeleton-${index}`} className="rounded-[20px] border border-white/10 bg-skin-surface/6 px-3.5 py-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1 space-y-2">
-                      <div className="h-2.5 w-20 animate-pulse rounded-full bg-white/15" />
-                      <div className="h-8 w-24 animate-pulse rounded-2xl bg-white/15" />
-                      <div className="h-2.5 w-28 animate-pulse rounded-full bg-white/10" />
+                      <div className="h-2.5 w-20 animate-pulse rounded-full bg-skin-surface/15" />
+                      <div className="h-8 w-24 animate-pulse rounded-2xl bg-skin-surface/15" />
+                      <div className="h-2.5 w-28 animate-pulse rounded-full bg-skin-surface/10" />
                     </div>
-                    <div className="h-8 w-8 animate-pulse rounded-xl bg-white/10" />
+                    <div className="h-8 w-8 animate-pulse rounded-xl bg-skin-surface/10" />
                   </div>
                 </div>
               ))}
             </div>
             <div className="grid gap-3 md:grid-cols-3">
               {Array.from({ length: 3 }).map((_, index) => (
-                <div key={`panorama-signal-skeleton-${index}`} className="rounded-[20px] border border-white/10 bg-white/5 px-3.5 py-3">
-                  <div className="h-1.5 w-10 animate-pulse rounded-full bg-white/15" />
-                  <div className="mt-3 h-2.5 w-24 animate-pulse rounded-full bg-white/10" />
-                  <div className="mt-2 h-7 w-16 animate-pulse rounded-2xl bg-white/15" />
-                  <div className="mt-2 h-2.5 w-28 animate-pulse rounded-full bg-white/10" />
+                <div key={`panorama-signal-skeleton-${index}`} className="rounded-[20px] border border-white/10 bg-skin-surface/5 px-3.5 py-3">
+                  <div className="h-1.5 w-10 animate-pulse rounded-full bg-skin-surface/15" />
+                  <div className="mt-3 h-2.5 w-24 animate-pulse rounded-full bg-skin-surface/10" />
+                  <div className="mt-2 h-7 w-16 animate-pulse rounded-2xl bg-skin-surface/15" />
+                  <div className="mt-2 h-2.5 w-28 animate-pulse rounded-full bg-skin-surface/10" />
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+          <div className="rounded-[28px] border border-white/10 bg-skin-surface/5 p-4 backdrop-blur-sm">
             <div className="flex items-center justify-between gap-3">
               <div className="space-y-2">
-                <div className="h-2.5 w-28 animate-pulse rounded-full bg-white/10" />
-                <div className="h-2.5 w-20 animate-pulse rounded-full bg-white/10" />
+                <div className="h-2.5 w-28 animate-pulse rounded-full bg-skin-surface/10" />
+                <div className="h-2.5 w-20 animate-pulse rounded-full bg-skin-surface/10" />
               </div>
-              <div className="h-10 w-10 animate-pulse rounded-2xl bg-white/10" />
+              <div className="h-10 w-10 animate-pulse rounded-2xl bg-skin-surface/10" />
             </div>
             <div className="mt-4 flex h-32 items-center justify-center">
               <div className="h-24 w-24 animate-pulse rounded-full border-8 border-white/10 border-t-cyan-300/40" />
             </div>
             <div className="mt-3 space-y-2">
               {Array.from({ length: 3 }).map((_, index) => (
-                <div key={`health-skeleton-${index}`} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+                <div key={`health-skeleton-${index}`} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-skin-surface/5 px-3 py-2">
                   <div className="flex items-center gap-2">
-                    <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-white/20" />
-                    <div className="h-2.5 w-20 animate-pulse rounded-full bg-white/10" />
+                    <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-skin-surface/20" />
+                    <div className="h-2.5 w-20 animate-pulse rounded-full bg-skin-surface/10" />
                   </div>
-                  <div className="h-4 w-6 animate-pulse rounded-full bg-white/15" />
+                  <div className="h-4 w-6 animate-pulse rounded-full bg-skin-surface/15" />
                 </div>
               ))}
             </div>
@@ -603,23 +603,23 @@ function DashboardOverviewSkeleton() {
         </div>
       </section>
 
-      <section className="rounded-[32px] border border-border/80 bg-white/80 p-4 shadow-[0_25px_60px_-38px_rgba(15,23,42,0.35)] backdrop-blur-sm dark:border-border/80 dark:bg-background/45">
+      <section className="rounded-[32px] border border-skin-border/80 bg-skin-surface/80 p-4 shadow-[0_25px_60px_-38px_rgba(15,23,42,0.35)] backdrop-blur-sm dark:border-skin-border/80 dark:bg-background/45">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-2">
-            <div className="h-3 w-28 animate-pulse rounded-full bg-slate-200/80 dark:bg-slate-800/80" />
-            <div className="h-7 w-44 animate-pulse rounded-2xl bg-slate-200/80 dark:bg-slate-800/80" />
+            <div className="h-3 w-28 animate-pulse rounded-full bg-skin-border/80" />
+            <div className="h-7 w-44 animate-pulse rounded-2xl bg-skin-border/80" />
           </div>
-          <div className="h-11 w-11 animate-pulse rounded-2xl bg-slate-200/80 dark:bg-slate-800/80" />
+          <div className="h-11 w-11 animate-pulse rounded-2xl bg-skin-border/80" />
         </div>
         <div className="mt-4 space-y-3">
           {Array.from({ length: 3 }).map((_, index) => (
-            <div key={`resource-skeleton-${index}`} className="rounded-[18px] border border-border/80 bg-white/75 p-2.5 shadow-sm dark:border-border/80 dark:bg-background/45">
+            <div key={`resource-skeleton-${index}`} className="rounded-[18px] border border-skin-border/80 bg-skin-surface/75 p-2.5 shadow-sm dark:border-skin-border/80 dark:bg-background/45">
               <div className="flex items-center justify-between gap-3">
-                <div className="h-2.5 w-20 animate-pulse rounded-full bg-slate-200/80 dark:bg-slate-800/80" />
-                <div className="h-4 w-10 animate-pulse rounded-full bg-slate-200/80 dark:bg-slate-800/80" />
+                <div className="h-2.5 w-20 animate-pulse rounded-full bg-skin-border/80" />
+                <div className="h-4 w-10 animate-pulse rounded-full bg-skin-border/80" />
               </div>
-              <div className="mt-3 h-2 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
-              <div className="mt-3 h-10 animate-pulse rounded-[16px] bg-muted/80 dark:bg-slate-900/60" />
+              <div className="mt-3 h-2 animate-pulse rounded-full bg-skin-border" />
+              <div className="mt-3 h-10 animate-pulse rounded-[16px] bg-skin-background-elevated/80 /60" />
             </div>
           ))}
         </div>
@@ -725,7 +725,7 @@ function ToolbarIconButton({
           aria-label={label}
           className={`h-11 w-11 rounded-xl border transition-all ${active
             ? "border-primary bg-primary text-white hover:bg-primary/90 hover:text-primary-foreground"
-            : "border-border bg-white text-slate-600 hover:border-border hover:bg-muted/50 hover:text-foreground dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-white/10 dark:hover:text-white"
+            : "border-skin-border bg-skin-surface text-skin-text-muted hover:border-skin-border hover:bg-skin-background-elevated/50 hover:text-foreground"
             }`}
         >
           {children}
@@ -749,7 +749,7 @@ function QuickActionButton({
     <button
       type="button"
       onClick={onClick}
-      className="group flex min-w-0 flex-1 items-start justify-between gap-3 rounded-[22px] border border-border/80 bg-white/80 px-4 py-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-border/80 dark:bg-background/40 dark:hover:border-blue-800 dark:focus-visible:ring-offset-slate-950 sm:min-w-[220px]"
+      className="group flex min-w-0 flex-1 items-start justify-between gap-3 rounded-[22px] border border-skin-border/80 bg-skin-surface/80 px-4 py-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-skin-primary/30 hover:bg-skin-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-skin-surface sm:min-w-[220px]"
     >
       <div className="min-w-0">
         <p className="text-sm font-semibold text-foreground dark:text-foreground">{label}</p>
@@ -757,7 +757,7 @@ function QuickActionButton({
           {description}
         </p>
       </div>
-      <span className="hidden rounded-full border border-border px-2 py-1 text-[10px] font-medium text-slate-600 transition-colors group-hover:border-primary/30 group-hover:text-blue-700 dark:border-slate-700 dark:text-slate-300 dark:group-hover:border-blue-800 dark:group-hover:text-blue-300 sm:inline-flex">
+      <span className="hidden rounded-full border border-skin-border px-2 py-1 text-[10px] font-medium text-skin-text-muted transition-colors group-hover:border-skin-primary/30 group-hover:text-skin-info sm:inline-flex">
         Abrir
       </span>
     </button>
@@ -800,19 +800,19 @@ function OverviewStat({
   const content = (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground dark:text-slate-300/80">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground dark:text-skin-text-muted/80">
           {label}
         </p>
         <p className="mt-1.5 text-[1.35rem] font-semibold tracking-tight text-foreground dark:text-white">{value}</p>
-        <p className="mt-1 text-[10px] text-muted-foreground dark:text-slate-300/80">{hint}</p>
+        <p className="mt-1 text-[10px] text-muted-foreground dark:text-skin-text-muted/80">{hint}</p>
         {trend ? <MiniTrendSparkline config={trend} className="mt-3 h-14" /> : null}
       </div>
       <div className="space-y-2 text-right">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-border bg-muted/50 text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-foreground">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-skin-border bg-skin-background-elevated/50 text-foreground">
           {icon}
         </div>
         {isInteractive ? (
-          <span className="hidden text-[10px] font-medium text-blue-700 dark:text-cyan-200/90 sm:block">
+          <span className="hidden text-[10px] font-medium text-skin-info sm:block">
             {actionLabel || "Abrir"}
           </span>
         ) : null}
@@ -824,8 +824,8 @@ function OverviewStat({
     return (
       <div
         className={`rounded-[20px] border px-3.5 py-3 text-left backdrop-blur-sm ${tone === "danger"
-          ? "border-rose-200/80 bg-rose-50/70 text-foreground dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-50"
-          : "border-border/80 bg-white/82 text-foreground dark:border-white/10 dark:bg-white/6 dark:text-foreground"
+          ? "border-skin-danger/30 bg-skin-danger/10 text-foreground"
+          : "border-skin-border/80 bg-skin-surface/82 text-foreground dark:border-white/10 dark:bg-skin-surface/6 dark:text-foreground"
           }`}
       >
         {content}
@@ -837,9 +837,9 @@ function OverviewStat({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-[20px] border px-3.5 py-3 text-left backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:hover:border-cyan-300/30 dark:hover:bg-white/10 dark:focus-visible:ring-cyan-300/70 dark:focus-visible:ring-offset-slate-950 ${tone === "danger"
-        ? "border-rose-200/80 bg-rose-50/70 text-foreground dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-50"
-        : "border-border/80 bg-white/82 text-foreground dark:border-white/10 dark:bg-white/6 dark:text-foreground"
+      className={`rounded-[20px] border px-3.5 py-3 text-left backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-skin-primary/30 hover:bg-skin-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${tone === "danger"
+        ? "border-skin-danger/30 bg-skin-danger/10 text-foreground"
+        : "border-skin-border/80 bg-skin-surface/82 text-foreground dark:border-white/10 dark:bg-skin-surface/6 dark:text-foreground"
         }`}
     >
       {content}
@@ -870,19 +870,19 @@ function PanoramaSignal({
   const isInteractive = Boolean(onClick) && !hasDetails;
   const card = (
     <div
-      className={`rounded-[20px] border border-border/80 bg-white/82 px-3.5 py-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/5 ${isInteractive ? "transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-white dark:hover:border-cyan-300/30 dark:hover:bg-white/10" : ""}`}
+      className={`rounded-[20px] border border-skin-border/80 bg-skin-surface/82 px-3.5 py-3 backdrop-blur-sm ${isInteractive ? "transition-all hover:-translate-y-0.5 hover:border-skin-primary/30 hover:bg-skin-surface" : ""}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className={`h-1.5 w-10 rounded-full ${accentClassName}`} />
         {hasDetails ? <ChevronDown className="mt-0.5 h-3.5 w-3.5 text-muted-foreground/80 dark:text-muted-foreground" /> : null}
       </div>
-      <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground dark:text-slate-300/80">
+      <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground dark:text-skin-text-muted/80">
         {label}
       </p>
       <p className="mt-1.5 text-[1.1rem] font-semibold tracking-tight text-foreground dark:text-white">{value}</p>
       <p className="mt-1 truncate text-[10px] text-muted-foreground dark:text-muted-foreground/80">{hint}</p>
       {isInteractive ? (
-        <p className="mt-2 text-[10px] font-medium text-blue-700 dark:text-cyan-200/90">{actionLabel || "Abrir"}</p>
+        <p className="mt-2 text-[10px] font-medium text-skin-info">{actionLabel || "Abrir"}</p>
       ) : null}
     </div>
   );
@@ -892,7 +892,7 @@ function PanoramaSignal({
       <button
         type="button"
         onClick={onClick}
-        className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:focus-visible:ring-cyan-300/70 dark:focus-visible:ring-offset-slate-950"
+        className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background "
       >
         {card}
       </button>
@@ -908,7 +908,7 @@ function PanoramaSignal({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:focus-visible:ring-cyan-300/70 dark:focus-visible:ring-offset-slate-950"
+          className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background "
         >
           {card}
         </button>
@@ -917,10 +917,10 @@ function PanoramaSignal({
         side="bottom"
         align="start"
         sideOffset={10}
-        className="w-80 rounded-[20px] border border-border bg-white/95 p-3 text-foreground shadow-xl dark:border-slate-700/70 dark:bg-background/95 dark:text-foreground dark:shadow-2xl"
+        className="w-80 rounded-[20px] border border-skin-border bg-skin-surface/95 p-3 text-foreground shadow-xl /70 dark:bg-background/95 dark:text-foreground dark:shadow-2xl"
       >
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-600 dark:text-slate-300">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-skin-text-muted">
             {detailsTitle || label}
           </p>
           <p className="mt-1 text-[11px] text-muted-foreground dark:text-muted-foreground/80">
@@ -931,7 +931,7 @@ function PanoramaSignal({
           {detailsItems.map((item, index) => (
             <div
               key={`${item.label}-${index}`}
-              className="rounded-2xl border border-border bg-muted/50/80 px-3 py-2 dark:border-white/10 dark:bg-white/5"
+              className="rounded-2xl border border-skin-border bg-skin-background-elevated/50/80 px-3 py-2 dark:border-white/10 dark:bg-skin-surface/5"
             >
               <p className="text-sm font-medium text-foreground dark:text-foreground">{item.label}</p>
               {item.hint ? (
@@ -961,7 +961,7 @@ function ResourceMeter({
   const boundedValue = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
 
   return (
-    <div className="space-y-1.5 rounded-[18px] border border-border/80 bg-white/75 p-2.5 shadow-sm dark:border-border/80 dark:bg-background/45">
+    <div className="space-y-1.5 rounded-[18px] border border-skin-border/80 bg-skin-surface/75 p-2.5 shadow-sm dark:border-skin-border/80 dark:bg-background/45">
       <div className="flex items-center justify-between gap-3">
         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground dark:text-muted-foreground/80">
           {label}
@@ -970,7 +970,7 @@ function ResourceMeter({
           {Number.isFinite(value) ? `${Math.round(value)}${suffix}` : "--"}
         </span>
       </div>
-      <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-800">
+      <div className="h-2 rounded-full bg-skin-border">
         <div
           className={`h-2 rounded-full transition-[width] duration-300 ${toneClassName}`}
           style={{ width: `${boundedValue}%` }}
@@ -1020,7 +1020,7 @@ function HealthBucketLegendRow({
     <>
       <div className="flex min-w-0 items-center gap-2">
         <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${color}`} />
-        <span className="truncate text-[11px] font-medium text-slate-600 dark:text-slate-300">
+        <span className="truncate text-[11px] font-medium text-skin-text-muted">
           {label}
         </span>
       </div>
@@ -1039,7 +1039,7 @@ function HealthBucketLegendRow({
 
   if (!hasItems) {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/80 bg-white/82 px-3 py-2 dark:border-white/10 dark:bg-white/5">
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-skin-border/80 bg-skin-surface/82 px-3 py-2 dark:border-white/10 dark:bg-skin-surface/5">
         {content}
       </div>
     );
@@ -1050,7 +1050,7 @@ function HealthBucketLegendRow({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-border/80 bg-white/82 px-3 py-2 text-left transition-colors hover:border-primary/30 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20 dark:hover:bg-white/10 dark:focus-visible:ring-cyan-300/70 dark:focus-visible:ring-offset-slate-950"
+          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-skin-border/80 bg-skin-surface/82 px-3 py-2 text-left transition-colors hover:border-primary/30 hover:bg-skin-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-skin-surface/5 dark:hover:border-white/20 dark:hover:bg-skin-surface/10 "
           onClick={() => {
             clearCloseTimeout();
             setOpen((current) => !current);
@@ -1070,13 +1070,13 @@ function HealthBucketLegendRow({
         side="left"
         align="start"
         sideOffset={10}
-        className="w-72 rounded-[20px] border border-border bg-white/95 p-3 text-foreground shadow-xl dark:border-slate-700/70 dark:bg-background/95 dark:text-foreground dark:shadow-2xl"
+        className="w-72 rounded-[20px] border border-skin-border bg-skin-surface/95 p-3 text-foreground shadow-xl /70 dark:bg-background/95 dark:text-foreground dark:shadow-2xl"
         onMouseEnter={clearCloseTimeout}
         onMouseLeave={scheduleClose}
       >
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-600 dark:text-slate-300">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-skin-text-muted">
               {label}
             </p>
             <p className="mt-1 text-[11px] text-muted-foreground dark:text-muted-foreground/80">
@@ -1089,12 +1089,12 @@ function HealthBucketLegendRow({
           {items.map((item) => (
             <div
               key={item.id}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-muted/50/80 px-3 py-2 dark:border-white/10 dark:bg-white/5"
+              className="flex items-center justify-between gap-3 rounded-2xl border border-skin-border bg-skin-background-elevated/50/80 px-3 py-2 dark:border-white/10 dark:bg-skin-surface/5"
             >
               <span className="min-w-0 truncate text-sm text-foreground dark:text-foreground">
                 {item.label}
               </span>
-              <span className="shrink-0 rounded-full border border-border bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-slate-300">
+              <span className="shrink-0 rounded-full border border-skin-border bg-skin-surface px-2 py-0.5 text-[10px] font-medium text-skin-text-muted">
                 {item.statusLabel}
               </span>
             </div>
@@ -1714,7 +1714,7 @@ export function OperationalDashboard({
             hint: maintenanceMetric?.enabled
               ? String(maintenanceMetric?.reason || "Janela operacional")
               : "Sem janela ativa",
-            accentClassName: maintenanceMetric?.enabled ? "bg-amber-400" : "bg-emerald-400",
+            accentClassName: maintenanceMetric?.enabled ? "bg-skin-warning" : "bg-skin-success",
           },
         jobsMetricState
           ? {
@@ -1729,7 +1729,7 @@ export function OperationalDashboard({
             label: "Jobs na fila",
             value: String(jobsMetric?.pending ?? "--"),
             hint: `${String(jobsMetric?.running ?? "--")} em execucao`,
-            accentClassName: "bg-sky-400",
+            accentClassName: "bg-skin-info",
             detailsTitle: "Ultimas falhas de jobs",
             detailsItems: recentJobFailures.slice(0, 5).map((item) => {
               const row = item as Record<string, unknown>;
@@ -1755,7 +1755,7 @@ export function OperationalDashboard({
             label: "Empresas / Tenants",
             value: String(tenantsMetric?.active ?? "--"),
             hint: `${String(tenantsMetric?.total ?? "--")} registradas`,
-            accentClassName: "bg-cyan-400",
+            accentClassName: "bg-skin-info",
           },
       ],
       resourceUsage: [
@@ -1763,10 +1763,10 @@ export function OperationalDashboard({
           widgetId: "cpu",
           label: "CPU",
           value: Number(cpuMetric?.usagePercent),
-          toneClassName: "bg-sky-500",
+          toneClassName: "bg-skin-info",
         },
-        { label: "Memoria", value: Number(memoryMetric?.usedPercent), toneClassName: "bg-emerald-500" },
-        { label: "Armazenamento", value: Number(diskMetric?.usedPercent), toneClassName: "bg-amber-500" },
+        { label: "Memoria", value: Number(memoryMetric?.usedPercent), toneClassName: "bg-skin-success" },
+        { label: "Armazenamento", value: Number(diskMetric?.usedPercent), toneClassName: "bg-skin-warning" },
       ],
     };
   }, [availableWidgetIds, dashboard, visibleWidgetIds.length]);
@@ -1798,7 +1798,7 @@ export function OperationalDashboard({
               Build {versionMetric?.buildDate ? formatDateTime(versionMetric.buildDate) : "--"}
             </p>
           </div>
-          <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300">
+          <span className="shrink-0 rounded-full border border-skin-border px-2 py-0.5 text-[10px] font-medium text-skin-text-muted">
             {String(versionMetric?.commitSha || "--").slice(0, 7) || "--"}
           </span>
         </div>
@@ -1824,7 +1824,7 @@ export function OperationalDashboard({
               Desde {uptimeMetric?.startedAt ? formatDateTime(uptimeMetric.startedAt) : "--"}
             </p>
           </div>
-          <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
+          <span className="shrink-0 rounded-full border border-skin-success/30 bg-skin-success/10 px-2 py-0.5 text-[10px] font-medium text-skin-success">
             online
           </span>
         </div>
@@ -1849,7 +1849,7 @@ export function OperationalDashboard({
         <div className="mt-auto flex items-end justify-between gap-2">
           <div className="min-w-0">
             <p
-              className={`truncate text-[1.55rem] font-bold leading-none tracking-tight ${maintenanceMetric?.enabled ? "text-amber-500" : "text-emerald-400"
+              className={`truncate text-[1.55rem] font-bold leading-none tracking-tight ${maintenanceMetric?.enabled ? "text-skin-warning" : "text-skin-success"
                 }`}
             >
               {maintenanceMetric?.enabled ? "Ativo" : "Estavel"}
@@ -1861,7 +1861,7 @@ export function OperationalDashboard({
             </p>
           </div>
           {maintenanceMetric?.enabled ? (
-            <span className="shrink-0 rounded-full border border-amber-300/60 bg-amber-100/70 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+            <span className="shrink-0 rounded-full border border-skin-warning/30 bg-skin-warning/10 px-2 py-0.5 text-[10px] font-medium text-skin-warning">
               ETA {String(maintenanceMetric?.etaSeconds ?? "--")}s
             </span>
           ) : null}
@@ -1896,7 +1896,7 @@ export function OperationalDashboard({
       >
         <div className="flex flex-col h-full">
           <div className="px-3 pt-3 flex items-end justify-between">
-            <p className="text-4xl font-bold text-foreground dark:text-blue-400">
+            <p className="text-4xl font-bold text-foreground text-skin-info">
               {apiMetric?.avgResponseTimeMs !== null && apiMetric?.avgResponseTimeMs !== undefined
                 ? `${apiMetric.avgResponseTimeMs}ms`
                 : "--"}
@@ -1956,7 +1956,7 @@ export function OperationalDashboard({
       >
         <div className="flex flex-col h-full">
           <div className="px-3 pt-3 flex items-end justify-between">
-            <p className="text-4xl font-bold text-foreground dark:text-blue-400">{formatPercent(cpuMetric?.usagePercent)}</p>
+            <p className="text-4xl font-bold text-foreground text-skin-info">{formatPercent(cpuMetric?.usagePercent)}</p>
             <p className="mb-1 text-xs text-muted-foreground dark:text-muted-foreground/80">Cores: {String(cpuMetric?.cores ?? "--")}</p>
           </div>
           <div className="flex-1 min-h-0 w-full mt-2">
@@ -2009,8 +2009,8 @@ export function OperationalDashboard({
         <div className="flex h-full items-center">
           <div className="flex-1 space-y-1">
             <p className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">{formatPercent(memoryMetric?.usedPercent)}</p>
-            <p className="text-xs text-muted-foreground dark:text-muted-foreground/80">Usado: <span className="text-slate-700 dark:text-slate-200">{formatBytes(memUsed)}</span></p>
-            <p className="text-xs text-muted-foreground dark:text-muted-foreground/80">Total: <span className="text-slate-700 dark:text-slate-200">{formatBytes(memoryMetric?.totalBytes)}</span></p>
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground/80">Usado: <span className="text-skin-text">{formatBytes(memUsed)}</span></p>
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground/80">Total: <span className="text-skin-text">{formatBytes(memoryMetric?.totalBytes)}</span></p>
           </div>
           <div className="h-24 w-24 shrink-0">
             {memUsed > 0 ? (
@@ -2060,8 +2060,8 @@ export function OperationalDashboard({
         <div className="flex h-full items-center">
           <div className="flex-1 space-y-1">
             <p className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">{formatPercent(diskMetric?.usedPercent)}</p>
-            <p className="text-xs text-muted-foreground dark:text-muted-foreground/80">Usado: <span className="text-slate-700 dark:text-slate-200">{formatBytes(diskUsed)}</span></p>
-            <p className="text-xs text-muted-foreground dark:text-muted-foreground/80">Total: <span className="text-slate-700 dark:text-slate-200">{formatBytes(diskMetric?.totalBytes)}</span></p>
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground/80">Usado: <span className="text-skin-text">{formatBytes(diskUsed)}</span></p>
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground/80">Total: <span className="text-skin-text">{formatBytes(diskMetric?.totalBytes)}</span></p>
           </div>
           <div className="h-24 w-24 shrink-0">
             {diskUsed > 0 ? (
@@ -2103,13 +2103,13 @@ export function OperationalDashboard({
         compact
       >
         <div className="mt-auto flex flex-wrap gap-1.5">
-          <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300">
+          <span className="rounded-full border border-skin-border px-2 py-0.5 text-[10px] font-medium text-skin-text-muted">
             {String(systemMetric?.platform || "--")}
           </span>
-          <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300">
+          <span className="rounded-full border border-skin-border px-2 py-0.5 text-[10px] font-medium text-skin-text-muted">
             {String(systemMetric?.release || "--")}
           </span>
-          <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300">
+          <span className="rounded-full border border-skin-border px-2 py-0.5 text-[10px] font-medium text-skin-text-muted">
             Node {String(systemMetric?.nodeVersion || "--")}
           </span>
         </div>
@@ -2134,7 +2134,7 @@ export function OperationalDashboard({
         ) : (
           <div className="mt-auto flex items-end justify-between gap-2">
             <div>
-              <p className="text-[1.55rem] font-bold leading-none tracking-tight text-emerald-700 dark:text-emerald-400">
+              <p className="text-[1.55rem] font-bold leading-none tracking-tight text-skin-success">
                 {databaseMetric?.latencyMs !== null && databaseMetric?.latencyMs !== undefined
                   ? `${databaseMetric.latencyMs}ms`
                   : "--"}
@@ -2143,7 +2143,7 @@ export function OperationalDashboard({
                 banco
               </p>
             </div>
-            <span className="rounded-full border border-border bg-white/80 px-2 py-0.5 text-[10px] font-medium capitalize text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-foreground">
+            <span className="rounded-full border border-skin-border bg-skin-surface/80 px-2 py-0.5 text-[10px] font-medium capitalize text-skin-text-muted">
               {String(databaseMetric?.status || "--")}
             </span>
           </div>
@@ -2169,7 +2169,7 @@ export function OperationalDashboard({
         ) : (
           <div className="mt-auto flex items-end justify-between gap-2">
             <div>
-              <p className="text-[1.55rem] font-bold leading-none tracking-tight text-sky-700 dark:text-sky-400">
+              <p className="text-[1.55rem] font-bold leading-none tracking-tight text-skin-info">
                 {redisMetric?.latencyMs !== null && redisMetric?.latencyMs !== undefined
                   ? `${redisMetric.latencyMs}ms`
                   : "--"}
@@ -2178,7 +2178,7 @@ export function OperationalDashboard({
                 cache
               </p>
             </div>
-            <span className="rounded-full border border-border bg-white/80 px-2 py-0.5 text-[10px] font-medium capitalize text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-foreground">
+            <span className="rounded-full border border-skin-border bg-skin-surface/80 px-2 py-0.5 text-[10px] font-medium capitalize text-skin-text-muted">
               {String(redisMetric?.status || "--")}
             </span>
           </div>
@@ -2203,15 +2203,15 @@ export function OperationalDashboard({
           <DashboardMetricState metric={workersMetric} />
         ) : (
           <div className="mt-auto flex items-end justify-between gap-2">
-            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-foreground dark:text-blue-400/90">
+            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-foreground text-skin-info/90">
               {String(workersMetric?.activeWorkers ?? workersMetric?.runningJobs ?? "--")}
             </p>
             <div className="text-right">
               <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">
-                Executando: <span className="font-medium text-slate-700 dark:text-slate-300">{String(workersMetric?.runningJobs ?? "--")}</span>
+                Executando: <span className="font-medium text-skin-text">{String(workersMetric?.runningJobs ?? "--")}</span>
               </p>
               <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">
-                Pendentes: <span className="font-medium text-amber-700 dark:text-amber-300/80">{String(workersMetric?.pendingJobs ?? "--")}</span>
+                Pendentes: <span className="font-medium text-skin-warning/80">{String(workersMetric?.pendingJobs ?? "--")}</span>
               </p>
             </div>
           </div>
@@ -2236,12 +2236,12 @@ export function OperationalDashboard({
           <DashboardMetricState metric={jobsMetric} />
         ) : (
           <div className="mt-auto flex items-end justify-between gap-2">
-            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-foreground dark:text-blue-400/90">
+            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-foreground text-skin-info/90">
               {String(jobsMetric?.running ?? "--")}
             </p>
             <div className="text-right">
-              <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">Pendentes: <span className="text-amber-700 dark:text-amber-300/80">{String(jobsMetric?.pending ?? "--")}</span></p>
-              <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">Falhas 24h: <span className="text-rose-700 dark:text-red-400">{String(jobsMetric?.failedLast24h ?? "--")}</span></p>
+              <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">Pendentes: <span className="text-skin-warning/80">{String(jobsMetric?.pending ?? "--")}</span></p>
+              <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">Falhas 24h: <span className="text-skin-danger">{String(jobsMetric?.failedLast24h ?? "--")}</span></p>
             </div>
           </div>
         )}
@@ -2274,23 +2274,23 @@ export function OperationalDashboard({
               <p className="truncate text-sm font-semibold">
                 {String(lastBackup.fileName || lastBackup.id || "--")}
               </p>
-              <span className="rounded-full border border-border px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300">
+              <span className="rounded-full border border-skin-border px-2.5 py-1 text-[11px] font-medium text-skin-text-muted  dark:text-skin-text-muted">
                 {String(lastBackup.status || "--")}
               </span>
             </div>
             <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-              <span className="rounded-full border border-border px-2 py-1 dark:border-slate-700">
+              <span className="rounded-full border border-skin-border px-2 py-1 ">
                 {formatBytes(lastBackup.sizeBytes)}
               </span>
-              <span className="rounded-full border border-border px-2 py-1 dark:border-slate-700">
+              <span className="rounded-full border border-skin-border px-2 py-1 ">
                 {formatDurationSeconds(lastBackup.durationSeconds)}
               </span>
-              <span className="rounded-full border border-border px-2 py-1 dark:border-slate-700">
+              <span className="rounded-full border border-skin-border px-2 py-1 ">
                 {lastBackup.finishedAt ? formatDateTime(lastBackup.finishedAt) : "--"}
               </span>
             </div>
             {recentBackups.length > 1 ? (
-              <div className="border-t border-border/70 pt-2 dark:border-border/70">
+              <div className="border-t border-skin-border/70 pt-2 dark:border-skin-border/70">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/80">
                   Historico recente
                 </p>
@@ -2300,9 +2300,9 @@ export function OperationalDashboard({
                     return (
                       <div
                         key={`${row.id || index}`}
-                        className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 px-2.5 py-1.5 text-[11px] dark:border-border/70"
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-skin-border/70 px-2.5 py-1.5 text-[11px] dark:border-skin-border/70"
                       >
-                        <span className="min-w-0 truncate text-slate-600 dark:text-slate-300">
+                        <span className="min-w-0 truncate text-skin-text-muted">
                           {String(row.fileName || row.id || "--")}
                         </span>
                         <span className="shrink-0 text-muted-foreground dark:text-muted-foreground/80">
@@ -2343,9 +2343,9 @@ export function OperationalDashboard({
           <DashboardMetricState metric={routeLatencyMetric} />
         ) : topSlowRoutes.length > 0 ? (
           <div className="flex h-full min-h-0 flex-col gap-3">
-            <div className="flex items-end justify-between gap-3 rounded-[20px] border border-border/70 px-3 py-2 dark:border-border/70">
+            <div className="flex items-end justify-between gap-3 rounded-[20px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70">
               <div>
-                  <p className="text-[1.7rem] font-bold leading-none tracking-tight text-sky-700 dark:text-sky-400">
+                  <p className="text-[1.7rem] font-bold leading-none tracking-tight text-skin-info">
                   {routeLatencyMetric?.avgResponseMs !== null && routeLatencyMetric?.avgResponseMs !== undefined
                     ? `${routeLatencyMetric.avgResponseMs}ms`
                     : "--"}
@@ -2363,12 +2363,12 @@ export function OperationalDashboard({
               {topSlowRoutes.map((item) => (
                 <div
                   key={`${item.method}:${item.route}`}
-                  className="rounded-[20px] border border-border/70 px-3 py-2 dark:border-border/70"
+                  className="rounded-[20px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="flex items-center gap-2 text-[11px] font-semibold text-foreground dark:text-foreground">
-                        <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300">
+                        <span className="rounded-full border border-skin-info/30 bg-skin-info/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-skin-info">
                           {item.method}
                         </span>
                         <span className="truncate">{item.route}</span>
@@ -2377,7 +2377,7 @@ export function OperationalDashboard({
                         {item.requestCount} req - p95 {item.p95Ms !== null ? `${item.p95Ms}ms` : "--"}
                       </p>
                     </div>
-                    <p className="shrink-0 text-sm font-semibold text-sky-700 dark:text-sky-300">
+                    <p className="shrink-0 text-sm font-semibold text-skin-info">
                       {item.avgMs !== null ? `${item.avgMs}ms` : "--"}
                     </p>
                   </div>
@@ -2413,9 +2413,9 @@ export function OperationalDashboard({
           <DashboardMetricState metric={routeErrorsMetric} />
         ) : topErrorRoutes.length > 0 ? (
           <div className="flex h-full min-h-0 flex-col gap-3">
-            <div className="flex items-end justify-between gap-3 rounded-[20px] border border-border/70 px-3 py-2 dark:border-border/70">
+            <div className="flex items-end justify-between gap-3 rounded-[20px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70">
               <div>
-                <p className="text-[1.7rem] font-bold leading-none tracking-tight text-rose-700 dark:text-rose-400">
+                <p className="text-[1.7rem] font-bold leading-none tracking-tight text-skin-danger">
                   {String(routeErrorsMetric?.totalErrorCount ?? "--")}
                 </p>
                 <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground/80">
@@ -2431,12 +2431,12 @@ export function OperationalDashboard({
               {topErrorRoutes.map((item) => (
                 <div
                   key={`${item.method}:${item.route}`}
-                  className="rounded-[20px] border border-border/70 px-3 py-2 dark:border-border/70"
+                  className="rounded-[20px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="flex items-center gap-2 text-[11px] font-semibold text-foreground dark:text-foreground">
-                        <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
+                        <span className="rounded-full border border-skin-danger/30 bg-skin-danger/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-skin-danger">
                           {item.method}
                         </span>
                         <span className="truncate">{item.route}</span>
@@ -2489,7 +2489,7 @@ export function OperationalDashboard({
               return (
                 <div
                   key={`${row.id || index}`}
-                  className="flex items-center justify-between gap-3 rounded border border-red-200/60 px-2.5 py-2 dark:border-red-900/50"
+                  className="flex items-center justify-between gap-3 rounded border border-skin-danger/30 px-2.5 py-2"
                 >
                   <p className="min-w-0 truncate text-[11px] font-medium text-foreground dark:text-foreground">
                     {buildAuditEventLine(row)}
@@ -2532,20 +2532,20 @@ export function OperationalDashboard({
         ) : deniedIps.length > 0 || rateLimitedIps.length > 0 || recentSecurityEvents.length > 0 ? (
           <div className="flex h-full min-h-0 flex-col gap-3">
             <div className="grid gap-2 sm:grid-cols-3">
-              <div className="rounded-[18px] border border-border/70 px-3 py-2 dark:border-border/70">
-                <p className="text-[1.45rem] font-bold tracking-tight text-rose-700 dark:text-rose-400">
+              <div className="rounded-[18px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70">
+                <p className="text-[1.45rem] font-bold tracking-tight text-skin-danger">
                   {deniedIps.reduce((acc, item) => acc + item.count, 0)}
                 </p>
                 <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground/80">negados</p>
               </div>
-              <div className="rounded-[18px] border border-border/70 px-3 py-2 dark:border-border/70">
-                <p className="text-[1.45rem] font-bold tracking-tight text-amber-700 dark:text-amber-300">
+              <div className="rounded-[18px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70">
+                <p className="text-[1.45rem] font-bold tracking-tight text-skin-warning">
                   {rateLimitedIps.reduce((acc, item) => acc + item.count, 0)}
                 </p>
                 <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground/80">429 recentes</p>
               </div>
-              <div className="rounded-[18px] border border-border/70 px-3 py-2 dark:border-border/70">
-                <p className="text-[1.45rem] font-bold tracking-tight text-sky-700 dark:text-sky-300">
+              <div className="rounded-[18px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70">
+                <p className="text-[1.45rem] font-bold tracking-tight text-skin-info">
                   {String(securityMetric?.maintenanceBypassAttemptsRecent ?? 0)}
                 </p>
                 <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground/80">bypass</p>
@@ -2559,7 +2559,7 @@ export function OperationalDashboard({
                 {deniedIps.slice(0, 4).map((item) => (
                   <div
                     key={`${item.ip}:${item.route || 'na'}`}
-                    className="rounded-[18px] border border-border/70 px-3 py-2 dark:border-border/70"
+                    className="rounded-[18px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
@@ -2568,7 +2568,7 @@ export function OperationalDashboard({
                           {item.route || "rota nao informada"}
                         </p>
                       </div>
-                      <span className="shrink-0 text-sm font-semibold text-rose-700 dark:text-rose-300">{item.count}</span>
+                      <span className="shrink-0 text-sm font-semibold text-skin-danger">{item.count}</span>
                     </div>
                   </div>
                 ))}
@@ -2582,14 +2582,14 @@ export function OperationalDashboard({
                     return (
                       <div
                         key={`${item.ip}:${index}`}
-                        className="rounded-[18px] border border-border/70 px-3 py-2 dark:border-border/70"
+                        className="rounded-[18px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
                             <p className="truncate text-[11px] font-semibold text-foreground dark:text-foreground">{item.ip}</p>
                             <p className="mt-1 truncate text-[10px] text-muted-foreground dark:text-muted-foreground/80">{item.route || "429"}</p>
                           </div>
-                          <span className="shrink-0 text-sm font-semibold text-amber-700 dark:text-amber-300">{item.count}</span>
+                          <span className="shrink-0 text-sm font-semibold text-skin-warning">{item.count}</span>
                         </div>
                       </div>
                     );
@@ -2598,7 +2598,7 @@ export function OperationalDashboard({
                   return (
                     <div
                       key={`${item.type}:${item.at}:${index}`}
-                      className="rounded-[18px] border border-border/70 px-3 py-2 dark:border-border/70"
+                      className="rounded-[18px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70"
                     >
                       <p className="truncate text-[11px] font-semibold text-foreground dark:text-foreground">
                         {formatSecurityEventType(item.type)} - {item.method} {item.route}
@@ -2636,7 +2636,7 @@ export function OperationalDashboard({
         compact
       >
         <div className="mt-auto flex items-end justify-between gap-2">
-          <p className="text-[1.7rem] font-bold leading-none tracking-tight text-foreground dark:text-blue-400/90">{String(tenantsMetric?.active ?? "--")}</p>
+          <p className="text-[1.7rem] font-bold leading-none tracking-tight text-foreground text-skin-info/90">{String(tenantsMetric?.active ?? "--")}</p>
           <div className="text-right text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">
             <p>ativas</p>
             <p>{String(tenantsMetric?.total ?? "--")} total</p>
@@ -2665,20 +2665,20 @@ export function OperationalDashboard({
       >
         <div className="mt-auto space-y-3">
           <div className="flex items-end justify-between gap-2">
-            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-foreground dark:text-blue-400/90">
+            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-foreground text-skin-info/90">
               {String(notificationsMetric?.criticalUnread ?? "--")}
             </p>
             <div className="text-right">
               <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">Nao lidas</p>
               <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">
-                Criticas no periodo: <span className="font-medium text-slate-700 dark:text-slate-300">{String(notificationsMetric?.criticalRecent ?? "--")}</span>
+                Criticas no periodo: <span className="font-medium text-skin-text">{String(notificationsMetric?.criticalRecent ?? "--")}</span>
               </p>
               <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">
-                Alertas operacionais: <span className="font-medium text-slate-700 dark:text-slate-300">{String(notificationsMetric?.operationalRecentCount ?? "--")}</span>
+                Alertas operacionais: <span className="font-medium text-skin-text">{String(notificationsMetric?.operationalRecentCount ?? "--")}</span>
               </p>
             </div>
           </div>
-          <div className="space-y-1.5 border-t border-border/80 pt-2 dark:border-white/10">
+          <div className="space-y-1.5 border-t border-skin-border/80 pt-2 dark:border-white/10">
             {recentOperationalAlerts.length > 0 ? (
               recentOperationalAlerts.map((alert) => (
                 <div key={alert.id} className="flex items-start justify-between gap-2 text-[10px]">
@@ -2715,12 +2715,12 @@ export function OperationalDashboard({
       <div className={embedded ? "space-y-4" : "mx-auto max-w-[1600px] space-y-4 p-4 md:p-6"}>
         <div className="space-y-3">
           {!embedded ? (
-            <div className="rounded-[24px] border border-border/80 bg-white/88 px-4 py-3 text-foreground shadow-[0_18px_40px_-30px_rgba(15,23,42,0.18)] dark:border-slate-900 dark:bg-background dark:text-foreground dark:shadow-xl">
+            <div className="rounded-[24px] border border-skin-border/80 bg-skin-surface/88 px-4 py-3 text-foreground shadow-[0_18px_40px_-30px_rgba(15,23,42,0.18)] dark:border-skin-border dark:bg-background dark:text-foreground dark:shadow-xl">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="inline-flex h-7 items-center rounded-full border border-border bg-muted/50 px-2.5 dark:border-slate-700 dark:bg-slate-900">
-                      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700 dark:text-blue-300">
+                    <div className="inline-flex h-7 items-center rounded-full border border-skin-border bg-skin-background-elevated/50 px-2.5  ">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-skin-info">
                         Visao operacional
                       </span>
                     </div>
@@ -2728,21 +2728,21 @@ export function OperationalDashboard({
                       Dashboard Operacional
                     </h1>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground dark:text-slate-300">
-                    <span className="rounded-full border border-border bg-white px-2.5 py-1 dark:border-white/10 dark:bg-white/5">
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground dark:text-skin-text-muted">
+                    <span className="rounded-full border border-skin-border bg-skin-surface px-2.5 py-1 dark:border-white/10 dark:bg-skin-surface/5">
                       Snapshot: {dashboard?.generatedAt ? formatDateTime(dashboard.generatedAt) : "--"}
                     </span>
-                    <span className="rounded-full border border-border bg-white px-2.5 py-1 dark:border-white/10 dark:bg-white/5">
+                    <span className="rounded-full border border-skin-border bg-skin-surface px-2.5 py-1 dark:border-white/10 dark:bg-skin-surface/5">
                       Layout:{" "}
                       {lastLayoutUpdateAt
                         ? `salvo em ${formatDateTime(lastLayoutUpdateAt)}`
                         : "padrao ativo"}
                     </span>
-                    <span className="rounded-full border border-border bg-white px-2.5 py-1 dark:border-white/10 dark:bg-white/5">
+                    <span className="rounded-full border border-skin-border bg-skin-surface px-2.5 py-1 dark:border-white/10 dark:bg-skin-surface/5">
                       Auto refresh {Math.floor(POLL_INTERVAL_MS / 1000)}s
                     </span>
                     {isMobileViewport ? (
-                      <span className="rounded-full border border-border bg-white px-2.5 py-1 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+                      <span className="rounded-full border border-skin-border bg-skin-surface px-2.5 py-1 text-skin-text-muted">
                         Reordenacao disponivel no desktop
                       </span>
                     ) : null}
@@ -2791,14 +2791,14 @@ export function OperationalDashboard({
             </div>
           ) : null}
 
-          <div className="rounded-[24px] border border-border/80 bg-white/80 px-4 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.35)] dark:border-border/80 dark:bg-background/45">
+          <div className="rounded-[24px] border border-skin-border/80 bg-skin-surface/80 px-4 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.35)] dark:border-skin-border/80 dark:bg-background/45">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-foreground dark:text-foreground">
                     Acoes rapidas
                   </p>
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                  <span className="rounded-full bg-skin-background-elevated px-2 py-0.5 text-[10px] font-medium text-skin-text-muted">
                     Contextuais
                   </span>
                 </div>
@@ -2813,7 +2813,7 @@ export function OperationalDashboard({
                       />
                     ))
                   ) : (
-                    <div className="rounded-[20px] border border-dashed border-border/80 px-4 py-3 text-sm text-muted-foreground dark:border-border/80 dark:text-muted-foreground/80">
+                    <div className="rounded-[20px] border border-dashed border-skin-border/80 px-4 py-3 text-sm text-muted-foreground dark:border-skin-border/80 dark:text-muted-foreground/80">
                       Nenhuma acao contextual disponivel para a role atual.
                     </div>
                   )}
@@ -2834,7 +2834,7 @@ export function OperationalDashboard({
                     <button
                       type="button"
                       onClick={() => setActiveQuickFilter("all")}
-                      className="text-xs font-medium text-blue-700 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-blue-300 dark:hover:text-blue-200 dark:focus-visible:ring-offset-slate-950"
+                      className="text-xs font-medium text-skin-info hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-skin-surface"
                     >
                       Limpar
                     </button>
@@ -2846,9 +2846,9 @@ export function OperationalDashboard({
                       key={option.id}
                       type="button"
                       onClick={() => setActiveQuickFilter(option.id)}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950 ${activeQuickFilter === option.id
-                        ? "border-blue-200 bg-blue-100 text-blue-800 dark:border-blue-800 dark:bg-blue-900/50 dark:text-blue-100"
-                        : "border-border bg-white text-slate-600 hover:border-border hover:text-foreground/90 dark:border-slate-700 dark:bg-background/40 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-slate-100"
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950 ${activeQuickFilter === option.id
+                        ? "border-skin-info/30 bg-skin-info/15 text-skin-info"
+                        : "border-skin-border bg-skin-surface text-skin-text-muted hover:border-skin-border hover:text-foreground/90"
                         }`}
                       aria-pressed={activeQuickFilter === option.id}
                       title={option.description}
@@ -2857,7 +2857,7 @@ export function OperationalDashboard({
                     </button>
                   ))}
                 </div>
-                <div className="mt-4 rounded-[22px] border border-border/80 bg-muted/50/80 p-3 dark:border-border/80 dark:bg-slate-900/40">
+                <div className="mt-4 rounded-[22px] border border-skin-border/80 bg-skin-background-elevated/50/80 p-3 dark:border-skin-border/80 /40">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-sm font-semibold text-foreground dark:text-foreground">
@@ -2896,10 +2896,10 @@ export function OperationalDashboard({
                         onClick={() =>
                           setDraftFilters((current) => ({ ...current, periodMinutes: minutes }))
                         }
-                        className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950 ${
+                        className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950 ${
                           draftFilters.periodMinutes === minutes
-                            ? "border-blue-200 bg-blue-100 text-blue-800 dark:border-blue-800 dark:bg-blue-900/50 dark:text-blue-100"
-                            : "border-border bg-white text-slate-600 hover:border-border hover:text-foreground/90 dark:border-slate-700 dark:bg-background/40 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-slate-100"
+                            ? "border-skin-info/30 bg-skin-info/15 text-skin-info"
+                            : "border-skin-border bg-skin-surface text-skin-text-muted hover:border-skin-border hover:text-foreground/90"
                         }`}
                       >
                         {minutes} min
@@ -2929,14 +2929,14 @@ export function OperationalDashboard({
         </div>
 
         {layoutEditingActive ? (
-          <div className="rounded-[28px] border border-blue-200 bg-blue-50/80 p-4 shadow-sm dark:border-blue-900/60 dark:bg-blue-950/30">
+          <div className="rounded-[28px] border border-skin-info/30 bg-skin-info/10 p-4 shadow-sm">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                <div className="flex items-center gap-2 text-skin-info">
                   <LayoutGrid className="h-4 w-4" />
                   <p className="text-sm font-semibold">Modo de edicao de layout</p>
                 </div>
-                <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                <p className="mt-1 text-xs text-skin-text-muted">
                   Arraste pelos handles dos cards e use o canto inferior direito para
                   redimensionar os blocos. Os atalhos abaixo permitem ocultar ou restaurar
                   widgets antes de salvar.
@@ -2947,7 +2947,7 @@ export function OperationalDashboard({
                 <Button
                   type="button"
                   variant="outline"
-                  className="gap-2 border-border bg-white/70 text-slate-700 hover:bg-white dark:border-slate-700 dark:bg-background/40 dark:text-slate-200"
+                  className="gap-2 border-skin-border bg-skin-surface/70 text-skin-text hover:bg-skin-surface "
                   onClick={resetLayoutEditing}
                   disabled={savingLayout}
                 >
@@ -2957,7 +2957,7 @@ export function OperationalDashboard({
                 <Button
                   type="button"
                   variant="outline"
-                  className="gap-2 border-border bg-white/70 text-slate-700 hover:bg-white dark:border-slate-700 dark:bg-background/40 dark:text-slate-200"
+                  className="gap-2 border-skin-border bg-skin-surface/70 text-skin-text hover:bg-skin-surface "
                   onClick={cancelLayoutEditing}
                   disabled={savingLayout}
                 >
@@ -2966,7 +2966,7 @@ export function OperationalDashboard({
                 </Button>
                 <Button
                   type="button"
-                  className="gap-2 bg-primary text-white hover:bg-blue-500"
+                  className="gap-2 bg-skin-primary text-skin-text-inverse hover:bg-skin-primary-hover"
                   onClick={() => {
                     void saveLayoutEditing();
                   }}
@@ -2991,8 +2991,8 @@ export function OperationalDashboard({
                     type="button"
                     onClick={() => toggleWidgetVisibilityInEditor(widgetId)}
                     className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${isHidden
-                      ? "border-border bg-white text-muted-foreground hover:border-slate-400 hover:text-slate-700 dark:border-slate-700 dark:bg-background/50 dark:text-muted-foreground/80 dark:hover:text-slate-200"
-                      : "border-blue-200 bg-blue-100 text-blue-800 hover:bg-blue-200 dark:border-blue-800 dark:bg-blue-900/50 dark:text-blue-100"
+                      ? "border-skin-border bg-skin-surface text-skin-text-muted hover:border-skin-border-strong hover:text-skin-text"
+                      : "border-skin-info/30 bg-skin-info/15 text-skin-info hover:bg-skin-info/20"
                       }`}
                     aria-pressed={!isHidden}
                   >
@@ -3010,11 +3010,11 @@ export function OperationalDashboard({
         ) : null}
 
         {error ? (
-          <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
+          <div className="flex items-start gap-3 rounded-2xl border border-skin-danger/30 bg-skin-danger/10 px-4 py-3 text-skin-danger">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <div className="min-w-0">
               <p className="text-sm font-semibold">Falha ao carregar o dashboard</p>
-              <p className="text-xs text-red-700/90 dark:text-red-200/90">{error}</p>
+              <p className="text-xs text-skin-danger/90">{error}</p>
             </div>
           </div>
         ) : null}
@@ -3023,18 +3023,18 @@ export function OperationalDashboard({
           <DashboardOverviewSkeleton />
         ) : (
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.9fr)]">
-          <section className="overflow-hidden rounded-[32px] border border-border/80 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.09),_transparent_30%),radial-gradient(circle_at_right,_rgba(59,130,246,0.12),_transparent_26%),linear-gradient(180deg,_rgba(255,255,255,0.96),_rgba(248,250,252,0.95))] px-5 py-5 text-foreground shadow-[0_22px_55px_-38px_rgba(15,23,42,0.2)] dark:border-slate-900 dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.2),_transparent_30%),radial-gradient(circle_at_right,_rgba(59,130,246,0.24),_transparent_26%),linear-gradient(150deg,_rgba(2,6,23,0.98),_rgba(15,23,42,0.96))] dark:text-foreground dark:shadow-[0_35px_90px_-45px_rgba(15,23,42,0.85)]">
+          <section className="overflow-hidden rounded-[32px] border border-skin-border/80 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.09),_transparent_30%),radial-gradient(circle_at_right,_rgba(59,130,246,0.12),_transparent_26%),linear-gradient(180deg,_rgba(255,255,255,0.96),_rgba(248,250,252,0.95))] px-5 py-5 text-foreground shadow-[0_22px_55px_-38px_rgba(15,23,42,0.2)] dark:border-skin-border dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.2),_transparent_30%),radial-gradient(circle_at_right,_rgba(59,130,246,0.24),_transparent_26%),linear-gradient(150deg,_rgba(2,6,23,0.98),_rgba(15,23,42,0.96))] dark:text-foreground dark:shadow-[0_35px_90px_-45px_rgba(15,23,42,0.85)]">
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_220px]">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-700 dark:border-cyan-400/25 dark:bg-cyan-400/10 dark:text-cyan-200">
+                  <span className="rounded-full border border-skin-info/30 bg-skin-info/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-skin-info">
                     Panorama
                   </span>
-                  <span className="rounded-full border border-border bg-white/85 px-3 py-1 text-[11px] text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                  <span className="rounded-full border border-skin-border bg-skin-surface/85 px-3 py-1 text-[11px] text-skin-text-muted">
                     {dashboardOverview.visibleWidgets} cards livres
                   </span>
                   {activeQuickFilter !== "all" ? (
-                    <span className="rounded-full border border-border bg-white/85 px-3 py-1 text-[11px] text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                    <span className="rounded-full border border-skin-border bg-skin-surface/85 px-3 py-1 text-[11px] text-skin-text-muted">
                       Filtro rapido: {dashboardQuickFilterOptions.find((option) => option.id === activeQuickFilter)?.label || activeQuickFilter}
                     </span>
                   ) : null}
@@ -3076,14 +3076,14 @@ export function OperationalDashboard({
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-border/80 bg-white/78 p-4 backdrop-blur-sm dark:border-white/10 dark:bg-white/5">
+              <div className="rounded-[28px] border border-skin-border/80 bg-skin-surface/78 p-4 backdrop-blur-sm dark:border-white/10 dark:bg-skin-surface/5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground dark:text-slate-300">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground dark:text-skin-text-muted">
                       Saude do painel
                     </p>
                   </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-muted/50 text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-foreground">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-skin-border bg-skin-background-elevated/50 text-foreground">
                     <Server className="h-4 w-4" />
                   </div>
                 </div>
@@ -3138,21 +3138,21 @@ export function OperationalDashboard({
                       id: "good" as const,
                       label: "Saudavel",
                       value: dashboardOverview.counts.good,
-                      color: "bg-emerald-500",
+                      color: "bg-skin-success",
                       items: dashboardOverview.healthDetails.good,
                     },
                     {
                       id: "attention" as const,
                       label: "Atencao",
                       value: dashboardOverview.counts.attention,
-                      color: "bg-amber-500",
+                      color: "bg-skin-warning",
                       items: dashboardOverview.healthDetails.attention,
                     },
                     {
                       id: "restricted" as const,
                       label: "Restrito",
                       value: dashboardOverview.counts.restricted,
-                      color: "bg-muted/500",
+                      color: "bg-skin-background-elevated/500",
                       items: dashboardOverview.healthDetails.restricted,
                     },
                   ].map((item) => (
@@ -3169,14 +3169,14 @@ export function OperationalDashboard({
             </div>
           </section>
 
-          <section className="rounded-[32px] border border-border/80 bg-white/80 p-4 shadow-[0_25px_60px_-38px_rgba(15,23,42,0.35)] backdrop-blur-sm dark:border-border/80 dark:bg-background/45">
+          <section className="rounded-[32px] border border-skin-border/80 bg-skin-surface/80 p-4 shadow-[0_25px_60px_-38px_rgba(15,23,42,0.35)] backdrop-blur-sm dark:border-skin-border/80 dark:bg-background/45">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="mt-1 text-xl font-semibold tracking-tight text-foreground dark:text-foreground">
                   Monitoramento do Servidor
                 </h3>
               </div>
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-muted/50 text-slate-700 dark:border-border dark:bg-slate-900 dark:text-slate-200">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-skin-border bg-skin-background-elevated/50 text-foreground">
                 <Maximize2 className="h-4 w-4" />
               </div>
             </div>
@@ -3247,22 +3247,22 @@ export function OperationalDashboard({
           )}
         </div>
 
-        <div className="flex flex-col gap-2 rounded-[24px] border border-border bg-white/80 px-4 py-3 text-xs text-slate-600 shadow-sm dark:border-border dark:bg-background/40 dark:text-slate-300 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-2 rounded-[24px] border border-skin-border bg-skin-surface/80 px-4 py-3 text-xs text-skin-text-muted shadow-sm md:flex-row md:items-center md:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium text-foreground/90 dark:text-foreground">Contexto ativo</span>
-            <span className="rounded-full border border-border px-2 py-1 dark:border-slate-700">
+            <span className="rounded-full border border-skin-border px-2 py-1 ">
               Periodo: {appliedFilters.periodMinutes} min
             </span>
-            <span className="rounded-full border border-border px-2 py-1 dark:border-slate-700">
+            <span className="rounded-full border border-skin-border px-2 py-1 ">
               Severidade: {appliedFilters.severity === "all" ? "todas" : appliedFilters.severity}
             </span>
             {activeQuickFilter !== "all" ? (
-              <span className="rounded-full border border-border px-2 py-1 dark:border-slate-700">
+              <span className="rounded-full border border-skin-border px-2 py-1 ">
                 Foco rapido: {dashboardQuickFilterOptions.find((option) => option.id === activeQuickFilter)?.label || activeQuickFilter}
               </span>
             ) : null}
             {role === "SUPER_ADMIN" && appliedFilters.tenantId ? (
-              <span className="rounded-full border border-border px-2 py-1 dark:border-slate-700">
+              <span className="rounded-full border border-skin-border px-2 py-1 ">
                 Tenant: {appliedFilters.tenantId}
               </span>
             ) : null}
@@ -3270,15 +3270,15 @@ export function OperationalDashboard({
 
           <div className="flex flex-wrap items-center gap-2">
             {hasAppliedActiveFilters ? (
-              <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+              <span className="rounded-full bg-skin-warning/10 px-2 py-1 text-skin-warning">
                 Filtros personalizados
               </span>
             ) : (
-              <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+              <span className="rounded-full bg-skin-success/10 px-2 py-1 text-skin-success">
                 Filtros padrao
               </span>
             )}
-            <span className="rounded-full bg-muted px-2 py-1 dark:bg-slate-900">
+            <span className="rounded-full bg-skin-background-elevated px-2 py-1 ">
               {layoutEditingActive ? "Edicao de layout ativa" : "Modo leitura"}
             </span>
           </div>
@@ -3287,6 +3287,10 @@ export function OperationalDashboard({
     </TooltipProvider >
   );
 }
+
+
+
+
 
 
 
