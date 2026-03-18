@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.37](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.36...v0.1.37) (2026-03-18)
+
+
+### Bug Fixes
+
+* Implementar um sistema de monitoramento de tarefas agendadas (cron jobs) e introduzir um serviço de limpeza de tokens. ([63e1897](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/63e1897ba8eb9788128fee6815e0d90ec3765aa0))
+
 ### [0.1.36](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.35...v0.1.36) (2026-03-18)
 
 
