@@ -14,6 +14,7 @@ export interface CronJobDefinition {
   description: string;
   schedule: string;
   enabled: boolean;
+  idempotent?: boolean;
   lastRun?: Date;
   nextRun?: Date;
   settingsUrl?: string;
@@ -23,6 +24,7 @@ export interface CronJobDefinition {
   runtimeActive?: boolean;
   sourceOfTruth?: 'database';
   lastStartedAt?: Date;
+  lastHeartbeatAt?: Date;
   lastSucceededAt?: Date;
   lastFailedAt?: Date;
   lastDurationMs?: number;
@@ -41,6 +43,7 @@ type RegisterCronMeta = {
   description: string;
   settingsUrl?: string;
   origin?: 'core' | 'modulo';
+  idempotent?: boolean;
   editable?: boolean;
   watchdogEnabled?: boolean;
   watchdogStaleAfterMs?: number;
@@ -54,6 +57,8 @@ type JobWrapper = {
   runtimeRegistered: boolean;
 };
 
+import { RedisLockService } from '../../common/services/redis-lock.service';
+
 @Injectable()
 export class CronService implements OnModuleInit {
   private readonly logger = new Logger(CronService.name);
@@ -65,10 +70,12 @@ export class CronService implements OnModuleInit {
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly prisma: PrismaService,
     private readonly heartbeatService: CronJobHeartbeatService,
+    private readonly redisLock: RedisLockService,
   ) {}
 
   async onModuleInit(): Promise<void> {
     this.logger.log('Inicializando Cron Service...');
+    await this.heartbeatService.reconcileOrphans();
     await this.syncWithDatabase();
   }
 
@@ -484,6 +491,7 @@ export class CronService implements OnModuleInit {
       watchdogEnabled?: boolean;
       watchdogStaleAfterMs?: number;
       watchdogStuckAfterMs?: number;
+      idempotent?: boolean;
     },
     runtimeRegistered: boolean,
   ): CronJobDefinition {
@@ -496,6 +504,7 @@ export class CronService implements OnModuleInit {
       settingsUrl: input.settingsUrl,
       origin: input.origin,
       editable: input.editable,
+      idempotent: input.idempotent,
       runtimeRegistered,
       runtimeActive: false,
       sourceOfTruth: 'database',
@@ -518,6 +527,7 @@ export class CronService implements OnModuleInit {
     }
 
     definition.lastStartedAt = heartbeat.lastStartedAt || undefined;
+    definition.lastHeartbeatAt = heartbeat.lastHeartbeatAt || undefined;
     definition.lastSucceededAt = heartbeat.lastSucceededAt || undefined;
     definition.lastFailedAt = heartbeat.lastFailedAt || undefined;
     definition.lastDurationMs = heartbeat.lastDurationMs ?? undefined;
@@ -542,20 +552,76 @@ export class CronService implements OnModuleInit {
     },
   ): Promise<void> {
     if (this.maintenancePaused && options.reason === 'scheduled') {
-      this.logger.log(`Job ${key} pausado por maintenance mode de restore`);
+      this.logger.log(`[EXECUTION_SKIPPED] Job ${key} pausado por maintenance mode de restore`);
       return;
     }
 
+    // 0. Obter dados determinísticos para cycleId
+    const heartbeat = await this.heartbeatService.get(key);
+    
+    let cycleId = `manual-${Date.now()}`;
+    if (options.reason !== 'manual') {
+      if (heartbeat?.nextExpectedRunAt) {
+        cycleId = heartbeat.nextExpectedRunAt.getTime().toString();
+      } else {
+        const intervalMs = this.estimateIntervalMs(definition.schedule);
+        const nextRun = this.safeNextRun(job);
+        if (nextRun && intervalMs) {
+          cycleId = (nextRun.getTime() - intervalMs).toString();
+        } else {
+          cycleId = `fallback-${Math.floor(Date.now() / 60000) * 60000}`;
+        }
+      }
+    }
+    
+    // instanceId (PM2_INSTANCE ou Hostname)
+    const instanceId = process.env.NODE_APP_INSTANCE || process.env.HOSTNAME || 'single-instance';
+
+    // 1. Cooldown Redundante Removido
+
+    // 2. Verificação de status ativo (Banco)
     if (options.respectEnabledCheck) {
       const current = await this.prisma.cronSchedule.findUnique({
         where: { modulo_identificador: { modulo, identificador } },
       });
 
       if (!current || !current.ativo) {
-        this.logger.log(`Job ${key} ignorado (desativado no banco).`);
+        this.logger.log(`[EXECUTION_SKIPPED] Job ${key} ignorado (desativado no banco).`);
         return;
       }
     }
+
+    // 3. Modo Degradado (Check)
+    const isDegraded = this.redisLock.isDegraded();
+    if (isDegraded) {
+      this.logger.warn(`[DEGRADED_MODE_EXEC] Redis offline no ciclo ${cycleId} do job ${key}.`);
+    }
+
+    // 4. Lock por Ciclo distribuído
+    const lockKey = `cron:cycle:${key}:${cycleId}`;
+    const intervalMs = this.estimateIntervalMs(definition.schedule) || 60000;
+    const lockTtlMs = intervalMs + 30000; 
+    
+    let lockAcquired = false;
+    if (!isDegraded) {
+      lockAcquired = await this.redisLock.acquireLock(lockKey, lockTtlMs, instanceId);
+    } else {
+      const isIdempotent = definition.idempotent !== false; 
+      if (isIdempotent) {
+        this.logger.warn(`[DEGRADED_MODE_EXEC] Job ${key} é idempotente. Prosseguindo com DB Guard.`);
+        lockAcquired = true;
+      } else {
+        this.logger.error(`[DEGRADED_MODE_ABORT] Job ${key} crítico com riscos de concorrência. Abortando.`);
+        return;
+      }
+    }
+
+    if (!lockAcquired) {
+      this.logger.log(`[LOCK_DENIED] Job ${key} concorrente rejeitado. cycleId=${cycleId} instanceId=${instanceId}`);
+      return;
+    }
+
+    this.logger.log(`[LOCK_ACQUIRED] Job ${key} ciclo=${cycleId} instanceId=${instanceId}`);
 
     const startedAt = new Date();
     const nextExpectedRunAt = this.resolveNextExpectedRun(job);
@@ -563,12 +629,33 @@ export class CronService implements OnModuleInit {
     definition.lastStartedAt = startedAt;
     definition.lastRun = startedAt;
     definition.lastStatus = 'running';
-    definition.lastError = undefined;
 
-    await this.heartbeatService.markStarted(key, startedAt, nextExpectedRunAt || null);
+    // 5. Atualização de Status no Banco (Exclusive Guard)
+    const stuckAfterMs = definition.watchdogStuckAfterMs || 15 * 60 * 1000; 
+    const startedStatus = await this.heartbeatService.markStarted(
+      key, 
+      startedAt, 
+      nextExpectedRunAt || null, 
+      cycleId, 
+      instanceId,
+      stuckAfterMs
+    );
+
+    if (!startedStatus) {
+      this.logger.warn(`[DB_SYNC_FAILED_ABORT] Job ${key} bloqueado pelo Exclusive Guard. cycleId=${cycleId}`);
+      return;
+    }
+
+    const heartbeatInterval = setInterval(async () => {
+      try {
+        await this.heartbeatService.updateHeartbeat(key);
+      } catch (err) {
+        this.logger.warn(`[HEARTBEAT_FAILED] Falha ao atualizar heartbeat para ${key}`);
+      }
+    }, 30000);
 
     try {
-      this.logger.log(`Executando cron job: ${key} (${options.reason})`);
+      this.logger.log(`[EXECUTION_STARTED] Executando callback do cron job: ${key}`);
       await callback();
 
       const finishedAt = new Date();
@@ -577,12 +664,10 @@ export class CronService implements OnModuleInit {
       definition.lastStatus = 'success';
       definition.lastSucceededAt = finishedAt;
       definition.lastDurationMs = Math.max(0, finishedAt.getTime() - startedAt.getTime());
-      definition.lastError = undefined;
-      definition.nextRun = nextRun;
-      definition.nextExpectedRunAt = nextRun;
       definition.consecutiveFailureCount = 0;
 
       await this.heartbeatService.markSuccess(key, startedAt, finishedAt, nextRun || null);
+      this.logger.log(`[EXECUTION_FINISHED] Job ${key} concluído com sucesso.`);
     } catch (error) {
       const finishedAt = new Date();
       const nextRun = this.resolveNextExpectedRun(job);
@@ -590,9 +675,6 @@ export class CronService implements OnModuleInit {
       definition.lastStatus = 'failed';
       definition.lastFailedAt = finishedAt;
       definition.lastDurationMs = Math.max(0, finishedAt.getTime() - startedAt.getTime());
-      definition.lastError = this.normalizeErrorMessage(error);
-      definition.nextRun = nextRun;
-      definition.nextExpectedRunAt = nextRun;
       definition.consecutiveFailureCount = (definition.consecutiveFailureCount || 0) + 1;
 
       await this.heartbeatService.markFailure(key, startedAt, finishedAt, error, nextRun || null);
@@ -601,6 +683,7 @@ export class CronService implements OnModuleInit {
         throw error;
       }
     } finally {
+      clearInterval(heartbeatInterval);
       definition.nextRun = this.resolveNextExpectedRun(job);
       definition.nextExpectedRunAt = definition.nextRun;
     }
@@ -650,6 +733,21 @@ export class CronService implements OnModuleInit {
       return undefined;
     }
     return this.safeNextRun(job);
+  }
+
+  private estimateIntervalMs(schedule: string): number | null {
+    try {
+      const probe = new CronJob(schedule, () => undefined);
+      const dates = probe.nextDates(2);
+      if (!Array.isArray(dates) || dates.length < 2) {
+        return null;
+      }
+      const first = dates[0].toJSDate().getTime();
+      const second = dates[1].toJSDate().getTime();
+      return second - first;
+    } catch {
+      return null;
+    }
   }
 
   private normalizeErrorMessage(error: unknown): string {

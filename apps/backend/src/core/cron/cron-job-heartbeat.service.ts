@@ -7,6 +7,7 @@ export type CronJobHeartbeatStatus = 'idle' | 'running' | 'success' | 'failed';
 export interface CronJobHeartbeatRecord {
   jobKey: string;
   lastStartedAt: Date | null;
+  lastHeartbeatAt: Date | null;
   lastSucceededAt: Date | null;
   lastFailedAt: Date | null;
   lastDurationMs: number | null;
@@ -15,11 +16,14 @@ export interface CronJobHeartbeatRecord {
   nextExpectedRunAt: Date | null;
   consecutiveFailureCount: number;
   updatedAt: Date;
+  cycleId?: string | null;
+  instanceId?: string | null;
 }
 
 type HeartbeatRow = {
   jobKey: string;
   lastStartedAt: Date | null;
+  lastHeartbeatAt: Date | null;
   lastSucceededAt: Date | null;
   lastFailedAt: Date | null;
   lastDurationMs: number | null;
@@ -28,6 +32,8 @@ type HeartbeatRow = {
   nextExpectedRunAt: Date | null;
   consecutiveFailureCount: number | null;
   updatedAt: Date;
+  cycleId: string | null;
+  instanceId: string | null;
 };
 
 @Injectable()
@@ -59,6 +65,7 @@ export class CronJobHeartbeatService {
     await this.persist({
       jobKey,
       lastStartedAt: current?.lastStartedAt || null,
+      lastHeartbeatAt: current?.lastHeartbeatAt || null,
       lastSucceededAt: current?.lastSucceededAt || null,
       lastFailedAt: current?.lastFailedAt || null,
       lastDurationMs: current?.lastDurationMs || null,
@@ -70,23 +77,85 @@ export class CronJobHeartbeatService {
       nextExpectedRunAt,
       consecutiveFailureCount: current?.consecutiveFailureCount || 0,
       updatedAt: new Date(),
+      cycleId: current?.cycleId,
+      instanceId: current?.instanceId,
     });
   }
 
-  async markStarted(jobKey: string, startedAt: Date, nextExpectedRunAt: Date | null): Promise<void> {
-    const current = await this.get(jobKey);
-    await this.persist({
-      jobKey,
-      lastStartedAt: startedAt,
-      lastSucceededAt: current?.lastSucceededAt || null,
-      lastFailedAt: current?.lastFailedAt || null,
-      lastDurationMs: current?.lastDurationMs || null,
-      lastStatus: 'running',
-      lastError: null,
-      nextExpectedRunAt,
-      consecutiveFailureCount: current?.consecutiveFailureCount || 0,
-      updatedAt: new Date(),
-    });
+  /**
+   * Marca o inicio da execucao de um ciclo.
+   * Aplica Exclusive Guard no Banco para mitigar sobreposicao de ciclos.
+   */
+  async markStarted(
+    jobKey: string,
+    startedAt: Date,
+    nextExpectedRunAt: Date | null,
+    cycleId: string,
+    instanceId: string,
+    stuckAfterMs = 15 * 60 * 1000 // 15 mins default fallback
+  ): Promise<boolean> {
+    const fallbackDate = new Date(Date.now() - stuckAfterMs);
+
+    try {
+      // 1. Tentar update com Exclusive Guard
+      const result = await this.prisma.$executeRaw`
+        UPDATE "cron_job_heartbeats"
+        SET 
+          "lastStartedAt" = ${startedAt},
+          "lastHeartbeatAt" = NOW(),
+          "lastStatus" = 'running',
+          "nextExpectedRunAt" = ${nextExpectedRunAt},
+          "cycleId" = ${cycleId},
+          "instanceId" = ${instanceId},
+          "lastError" = NULL,
+          "updatedAt" = NOW()
+        WHERE "jobKey" = ${jobKey}
+          AND ("lastStatus" != 'running' OR "lastHeartbeatAt" < ${fallbackDate})
+      `;
+
+      if (result > 0) {
+        return true;
+      }
+
+      // 2. Se nao atualizou nenhuma linha, verificar se o registro existe
+      const current = await this.get(jobKey);
+      if (!current) {
+        // Primeira execucao, cria o registro
+        try {
+          await this.prisma.$executeRaw`
+            INSERT INTO "cron_job_heartbeats" (
+              "jobKey", "lastStartedAt", "lastHeartbeatAt", "lastStatus", "nextExpectedRunAt", "cycleId", "instanceId", "updatedAt"
+            ) VALUES (
+              ${jobKey}, ${startedAt}, NOW(), 'running', ${nextExpectedRunAt}, ${cycleId}, ${instanceId}, NOW()
+            )
+          `;
+          return true;
+        } catch {
+          return false; // Erro de unique/concorrencia ao criar
+        }
+      }
+
+      // Se existe e o update falhou, a condicao do Guard (nao rodando e nao travado) falhou!
+      return false;
+    } catch (error) {
+      this.logger.error(`Erro ao marcar início de ciclo (markStarted) para ${jobKey}: ${String(error)}`);
+      return false;
+    }
+  }
+
+  /**
+   * Atualiza o heartbeat (sinal de vida) para um job em execução.
+   */
+  async updateHeartbeat(jobKey: string): Promise<void> {
+    try {
+      await this.prisma.$executeRaw`
+        UPDATE "cron_job_heartbeats"
+        SET "lastHeartbeatAt" = NOW()
+        WHERE "jobKey" = ${jobKey} AND "lastStatus" = 'running'
+      `;
+    } catch (error) {
+      this.logger.warn(`Falha ao atualizar heartbeat para ${jobKey}: ${String(error)}`);
+    }
   }
 
   async markSuccess(
@@ -95,17 +164,21 @@ export class CronJobHeartbeatService {
     finishedAt: Date,
     nextExpectedRunAt: Date | null,
   ): Promise<void> {
+    const current = await this.get(jobKey);
     await this.persist({
       jobKey,
       lastStartedAt: startedAt,
+      lastHeartbeatAt: finishedAt,
       lastSucceededAt: finishedAt,
-      lastFailedAt: (await this.get(jobKey))?.lastFailedAt || null,
+      lastFailedAt: current?.lastFailedAt || null,
       lastDurationMs: Math.max(0, finishedAt.getTime() - startedAt.getTime()),
       lastStatus: 'success',
       lastError: null,
       nextExpectedRunAt,
       consecutiveFailureCount: 0,
       updatedAt: finishedAt,
+      cycleId: current?.cycleId,
+      instanceId: current?.instanceId,
     });
   }
 
@@ -120,6 +193,7 @@ export class CronJobHeartbeatService {
     await this.persist({
       jobKey,
       lastStartedAt: startedAt,
+      lastHeartbeatAt: finishedAt,
       lastSucceededAt: current?.lastSucceededAt || null,
       lastFailedAt: finishedAt,
       lastDurationMs: Math.max(0, finishedAt.getTime() - startedAt.getTime()),
@@ -128,7 +202,35 @@ export class CronJobHeartbeatService {
       nextExpectedRunAt,
       consecutiveFailureCount: (current?.consecutiveFailureCount || 0) + 1,
       updatedAt: finishedAt,
+      cycleId: current?.cycleId,
+      instanceId: current?.instanceId,
     });
+  }
+
+  /**
+   * Encontra jobs que estao 'running' há muito tempo sem progresso (stuck orphan)
+   * e os recupera para 'failed' para permitir novos ciclos.
+   */
+  async reconcileOrphans(defaultUnstuckMs = 15 * 60 * 1000): Promise<number> {
+    const thresholdDate = new Date(Date.now() - defaultUnstuckMs);
+    try {
+      const result = await this.prisma.$executeRaw`
+        UPDATE "cron_job_heartbeats"
+        SET 
+          "lastStatus" = 'failed',
+          "lastError" = 'STUCK_ORPHAN_RECOVERED',
+          "updatedAt" = NOW()
+        WHERE "lastStatus" = 'running'
+          AND ("lastHeartbeatAt" < ${thresholdDate} OR ("lastHeartbeatAt" IS NULL AND "updatedAt" < ${thresholdDate}))
+      `;
+      if (result > 0) {
+        this.logger.log(`[ORPHAN_RECONCILER] Forçados ${result} jobs travados para FAILED.`);
+      }
+      return result;
+    } catch (error) {
+      this.logger.error(`[ORPHAN_RECONCILER] Falha ao reconciliar órfãos: ${String(error)}`);
+      return 0;
+    }
   }
 
   private async queryRows(jobKeys?: string[]): Promise<HeartbeatRow[]> {
@@ -141,6 +243,7 @@ export class CronJobHeartbeatService {
         SELECT
           "jobKey",
           "lastStartedAt",
+          "lastHeartbeatAt",
           "lastSucceededAt",
           "lastFailedAt",
           "lastDurationMs",
@@ -148,7 +251,9 @@ export class CronJobHeartbeatService {
           "lastError",
           "nextExpectedRunAt",
           "consecutiveFailureCount",
-          "updatedAt"
+          "updatedAt",
+          "cycleId",
+          "instanceId"
         FROM "cron_job_heartbeats"
       `;
     }
@@ -157,6 +262,7 @@ export class CronJobHeartbeatService {
       SELECT
         "jobKey",
         "lastStartedAt",
+        "lastHeartbeatAt",
         "lastSucceededAt",
         "lastFailedAt",
         "lastDurationMs",
@@ -164,7 +270,9 @@ export class CronJobHeartbeatService {
         "lastError",
         "nextExpectedRunAt",
         "consecutiveFailureCount",
-        "updatedAt"
+        "updatedAt",
+        "cycleId",
+        "instanceId"
       FROM "cron_job_heartbeats"
       WHERE "jobKey" IN (${Prisma.join(jobKeys)})
     `;
@@ -175,6 +283,7 @@ export class CronJobHeartbeatService {
       INSERT INTO "cron_job_heartbeats" (
         "jobKey",
         "lastStartedAt",
+        "lastHeartbeatAt",
         "lastSucceededAt",
         "lastFailedAt",
         "lastDurationMs",
@@ -182,10 +291,13 @@ export class CronJobHeartbeatService {
         "lastError",
         "nextExpectedRunAt",
         "consecutiveFailureCount",
-        "updatedAt"
+        "updatedAt",
+        "cycleId",
+        "instanceId"
       ) VALUES (
         ${record.jobKey},
         ${record.lastStartedAt},
+        ${record.lastHeartbeatAt},
         ${record.lastSucceededAt},
         ${record.lastFailedAt},
         ${record.lastDurationMs},
@@ -193,10 +305,13 @@ export class CronJobHeartbeatService {
         ${record.lastError},
         ${record.nextExpectedRunAt},
         ${record.consecutiveFailureCount},
-        ${record.updatedAt}
+        ${record.updatedAt},
+        ${record.cycleId || null},
+        ${record.instanceId || null}
       )
       ON CONFLICT ("jobKey") DO UPDATE SET
         "lastStartedAt" = EXCLUDED."lastStartedAt",
+        "lastHeartbeatAt" = EXCLUDED."lastHeartbeatAt",
         "lastSucceededAt" = EXCLUDED."lastSucceededAt",
         "lastFailedAt" = EXCLUDED."lastFailedAt",
         "lastDurationMs" = EXCLUDED."lastDurationMs",
@@ -204,7 +319,9 @@ export class CronJobHeartbeatService {
         "lastError" = EXCLUDED."lastError",
         "nextExpectedRunAt" = EXCLUDED."nextExpectedRunAt",
         "consecutiveFailureCount" = EXCLUDED."consecutiveFailureCount",
-        "updatedAt" = EXCLUDED."updatedAt"
+        "updatedAt" = EXCLUDED."updatedAt",
+        "cycleId" = EXCLUDED."cycleId",
+        "instanceId" = EXCLUDED."instanceId"
     `;
   }
 
@@ -212,6 +329,7 @@ export class CronJobHeartbeatService {
     return {
       jobKey: row.jobKey,
       lastStartedAt: row.lastStartedAt || null,
+      lastHeartbeatAt: row.lastHeartbeatAt || null,
       lastSucceededAt: row.lastSucceededAt || null,
       lastFailedAt: row.lastFailedAt || null,
       lastDurationMs: row.lastDurationMs ?? null,
@@ -220,6 +338,8 @@ export class CronJobHeartbeatService {
       nextExpectedRunAt: row.nextExpectedRunAt || null,
       consecutiveFailureCount: Math.max(0, row.consecutiveFailureCount || 0),
       updatedAt: row.updatedAt,
+      cycleId: row.cycleId || null,
+      instanceId: row.instanceId || null,
     };
   }
 

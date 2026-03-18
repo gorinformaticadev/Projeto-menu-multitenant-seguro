@@ -608,6 +608,7 @@ model CronSchedule {
 model CronJobHeartbeat {
   jobKey                  String   @id
   lastStartedAt           DateTime?
+  lastHeartbeatAt         DateTime?
   lastSucceededAt         DateTime?
   lastFailedAt            DateTime?
   lastDurationMs          Int?
@@ -616,6 +617,8 @@ model CronJobHeartbeat {
   nextExpectedRunAt       DateTime?
   consecutiveFailureCount Int      @default(0)
   updatedAt               DateTime @updatedAt
+  cycleId                 String?
+  instanceId              String?
 
   @@index([lastStatus])
   @@index([updatedAt])

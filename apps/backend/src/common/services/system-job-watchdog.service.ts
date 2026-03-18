@@ -22,12 +22,15 @@ const DEFAULT_WATCHDOG_MAX_STALE_MS = 12 * 60 * 60 * 1000;
 const DEFAULT_WATCHDOG_MIN_STUCK_MS = 10 * 60 * 1000;
 const DEFAULT_WATCHDOG_MAX_STUCK_MS = 6 * 60 * 60 * 1000;
 
+import { RedisLockService } from './redis-lock.service';
+
 @Injectable()
 export class SystemJobWatchdogService implements OnModuleInit {
   constructor(
     private readonly cronService: CronService,
     private readonly systemOperationalAlertsService: SystemOperationalAlertsService,
     private readonly configResolver: ConfigResolverService,
+    private readonly redisLock: RedisLockService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -51,12 +54,22 @@ export class SystemJobWatchdogService implements OnModuleInit {
   async evaluateWatchdog(
     now = new Date(),
   ): Promise<{ emitted: string[]; skipped: string[] }> {
-    if (this.cronService.isMaintenancePaused()) {
-      return {
-        emitted: [],
-        skipped: ['maintenance_paused'],
-      };
+    const instanceId = process.env.NODE_APP_INSTANCE || process.env.HOSTNAME || 'single-instance';
+    const lockKey = 'watchdog:evaluator:lock';
+    
+    // Evitar que multiplas instancias rodem o evaluator ao mesmo tempo
+    const lockAcquired = await this.redisLock.acquireLock(lockKey, 50000, instanceId); // 50s TTL
+    if (!lockAcquired) {
+      return { emitted: [], skipped: ['locked_by_other_instance'] };
     }
+
+    try {
+      if (this.cronService.isMaintenancePaused()) {
+        return {
+          emitted: [],
+          skipped: ['maintenance_paused'],
+        };
+      }
 
     if (!(await this.isWatchdogEnabled())) {
       return {
@@ -188,6 +201,9 @@ export class SystemJobWatchdogService implements OnModuleInit {
     }
 
     return { emitted, skipped };
+    } finally {
+      await this.redisLock.releaseLock(lockKey, instanceId);
+    }
   }
 
   private isJobRepeatedFailure(job: CronJobDefinition): boolean {
@@ -212,7 +228,8 @@ export class SystemJobWatchdogService implements OnModuleInit {
       return false;
     }
 
-    return nowMs - job.lastStartedAt.getTime() > stuckAfterMs;
+    const referenceTime = job.lastHeartbeatAt ? job.lastHeartbeatAt.getTime() : job.lastStartedAt.getTime();
+    return nowMs - referenceTime > stuckAfterMs;
   }
 
   private isJobStale(job: CronJobDefinition, nowMs: number, staleAfterMs: number): boolean {
