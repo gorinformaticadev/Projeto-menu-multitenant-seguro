@@ -193,7 +193,7 @@ restart_pm2_processes() {
   pm2 delete "$frontend_name" >/dev/null 2>&1 || true
 
   pm2 start dist/main.js --name "$backend_name" --cwd "$target_root/apps/backend" --update-env
-  pm2 start "node .next/standalone/apps/frontend/server.js" --name "$frontend_name" --cwd "$target_root/apps/frontend" --update-env
+  PORT=5000 HOSTNAME=0.0.0.0 pm2 start "node .next/standalone/apps/frontend/server.js" --name "$frontend_name" --cwd "$target_root/apps/frontend" --update-env
   pm2 save
 
   BACKEND_PROC="$backend_name"

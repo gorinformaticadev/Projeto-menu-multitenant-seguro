@@ -33,6 +33,11 @@ module.exports = {
         PORT: 5000,
         HOSTNAME: '0.0.0.0',
       },
+      env_production: {
+        NODE_ENV: '__NODE_ENV__',
+        PORT: 5000,
+        HOSTNAME: '0.0.0.0',
+      },
       max_memory_restart: '512M',
       error_file: '/var/log/multitenant/frontend-error.log',
       out_file: '/var/log/multitenant/frontend-out.log',
