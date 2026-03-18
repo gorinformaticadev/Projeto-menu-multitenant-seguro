@@ -57,11 +57,12 @@ export function proxy(request: NextRequest) {
 
   // Se usuario ESTÁ logado, nao deve acessar rotas de autenticacao (ex: /login)
   if (isAuthRoute(pathname)) {
-    if (isLoggedIn) {
+    if (isAccessValid) {
       return NextResponse.redirect(new URL(ROUTE_CONFIG.authenticatedFallback, nextUrl));
     }
     return NextResponse.next();
   }
+
 
   // Se for uma rota publica comum (ex: home "/")
   if (isPublicRoute(pathname)) {

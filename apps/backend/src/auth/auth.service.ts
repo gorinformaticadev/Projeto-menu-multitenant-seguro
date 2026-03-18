@@ -531,40 +531,55 @@ export class AuthService {
 
   async logout(
     refreshToken: string,
-    userId: string,
+    userId?: string,
     accessToken?: string,
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const storedToken = await this.prisma.refreshToken.findUnique({
-      where: { token: refreshToken },
-    });
+    const storedToken = refreshToken
+      ? await this.prisma.refreshToken.findUnique({
+          where: { token: refreshToken },
+        })
+      : null;
 
     let sessionId = this.resolveSessionIdFromAccessToken(accessToken);
+    const targetUserId = userId || storedToken?.userId;
 
-    if (storedToken && storedToken.userId === userId) {
-      await this.tokenBlacklistService.blacklistToken(refreshToken, storedToken.expiresAt, userId);
-      sessionId = storedToken.sessionId || sessionId;
-      await this.prisma.refreshToken.delete({
-        where: { id: storedToken.id },
-      });
+    if (storedToken) {
+      // Se veio sem userId (fluxo tolerante) ou bate com o dono do token
+      if (!userId || storedToken.userId === userId) {
+        await this.tokenBlacklistService.blacklistToken(
+          refreshToken,
+          storedToken.expiresAt,
+          storedToken.userId,
+        );
+        sessionId = storedToken.sessionId || sessionId;
+        await this.prisma.refreshToken.delete({
+          where: { id: storedToken.id },
+        });
+      }
     }
 
     if (sessionId) {
       await this.userSessionService.revokeSession(sessionId, 'logout');
     }
 
-    await this.blacklistAccessToken(accessToken, userId);
+    if (accessToken && targetUserId) {
+      await this.blacklistAccessToken(accessToken, targetUserId);
+    }
 
-    await this.auditService.log({
-      action: 'LOGOUT',
-      userId,
-      ipAddress,
-      userAgent,
-    });
+    if (targetUserId) {
+      await this.auditService.log({
+        action: 'LOGOUT',
+        userId: targetUserId,
+        ipAddress,
+        userAgent,
+      });
+    }
 
     return { message: 'Logout realizado com sucesso' };
   }
+
 
   async login2FA(
     login2FADto: Login2FADto,

@@ -25,6 +25,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SecurityConfigService } from '@core/security-config/security-config.service';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '@core/common/guards/optional-jwt-auth.guard';
 import { SkipCsrf } from '@core/common/decorators/skip-csrf.decorator';
 import { Request, Response } from 'express';
 import {
@@ -115,13 +116,13 @@ export class AuthController {
 
   /**
    * POST /auth/logout
-   * Invalidar refresh token
+   * Invalidar refresh token (Tolerante a falhas)
    */
   @Post('logout')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   async logout(
     @Body() logoutDto: LogoutDto,
-    @Req() req: AuthenticatedRequest,
+    @Req() req: Request & { user?: { id?: string } },
     @Res({ passthrough: true }) res: Response,
     @Ip() ip: string,
   ) {
@@ -130,20 +131,27 @@ export class AuthController {
       logoutDto.refreshToken || this.extractRefreshToken(req) || '';
     const accessToken = this.extractAccessToken(req);
 
-    const result = await this.authService.logout(
-      refreshToken,
-      req.user.id,
-      accessToken,
-      ip,
-      userAgent,
-    );
+    try {
+      if (req.user?.id || refreshToken || accessToken) {
+        await this.authService.logout(
+          refreshToken,
+          req.user?.id,
+          accessToken,
+          ip,
+          userAgent,
+        );
+      }
+    } catch (error) {
+      console.warn('Logout fallback to cookie sweep due to error:', error);
+    } finally {
+      this.clearAuthCookies(res);
+      this.clearTrustedDeviceCookie(res);
+      this.clearTwoFactorEnrollmentCookie(res);
+    }
 
-    this.clearAuthCookies(res);
-    this.clearTrustedDeviceCookie(res);
-    this.clearTwoFactorEnrollmentCookie(res);
-
-    return result;
+    return { message: 'Logout realizado com sucesso' };
   }
+
 
   /**
    * POST /auth/login-2fa
