@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { CronExpression } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { CronJobDefinition, CronService } from '../../core/cron/cron.service';
+import { CronJobHeartbeatService } from '../../core/cron/cron-job-heartbeat.service';
 import { ConfigResolverService } from '../../system-settings/config-resolver.service';
 import { SystemOperationalAlertsService } from './system-operational-alerts.service';
 
@@ -28,6 +29,7 @@ import { RedisLockService } from './redis-lock.service';
 export class SystemJobWatchdogService implements OnModuleInit {
   constructor(
     private readonly cronService: CronService,
+    private readonly heartbeatService: CronJobHeartbeatService,
     private readonly systemOperationalAlertsService: SystemOperationalAlertsService,
     private readonly configResolver: ConfigResolverService,
     private readonly redisLock: RedisLockService,
@@ -76,6 +78,13 @@ export class SystemJobWatchdogService implements OnModuleInit {
         emitted: [],
         skipped: ['watchdog_disabled'],
       };
+    }
+
+    // Limpa jobs órfãos/travados antes de avaliar status
+    try {
+      await this.heartbeatService.reconcileOrphans();
+    } catch (error) {
+      // Já logado internamente
     }
 
     const jobs = await this.cronService.getRuntimeJobs();

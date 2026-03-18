@@ -103,17 +103,36 @@ export class TokenCleanupService implements OnModuleInit {
       return;
     }
 
-    this.logger.log('Starting cleanup of expired user sessions...');
+    this.logger.log('Starting cleanup of expired user sessions in batches...');
     try {
-      const result = await this.prisma.userSession.deleteMany({
-        where: {
-          expiresAt: {
-            lt: new Date(),
+      let totalRemoved = 0;
+      const batchSize = 1000;
+
+      while (true) {
+        const expiredSessions = await this.prisma.userSession.findMany({
+          where: {
+            expiresAt: { lt: new Date() },
           },
-        },
-      });
-      const removedCount = result.count;
-      this.logger.log(`Session cleanup completed: ${removedCount} rows removed.`);
+          take: batchSize,
+          select: { id: true },
+        });
+
+        if (expiredSessions.length === 0) {
+          break;
+        }
+
+        const ids = expiredSessions.map((s) => s.id);
+        const result = await this.prisma.userSession.deleteMany({
+          where: {
+            id: { in: ids },
+          },
+        });
+
+        totalRemoved += result.count;
+        if (result.count === 0) break; // Segurança contra loop infinito
+      }
+
+      this.logger.log(`Session cleanup completed: ${totalRemoved} rows removed.`);
     } catch (error) {
       this.logger.error('Error during expired session cleanup.', error as Error);
     } finally {
