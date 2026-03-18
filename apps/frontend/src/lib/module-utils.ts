@@ -206,28 +206,28 @@ export function getStatusBadgeConfig(status: ModuleStatus) {
     case 'detected':
       return {
         label: 'Detectado',
-        color: 'bg-gray-100 text-gray-800 border-gray-300',
+        color: 'bg-skin-background-elevated text-skin-text border-skin-border',
         icon: 'SCAN',
       };
 
     case 'uploaded':
       return {
         label: 'Upload concluido',
-        color: 'bg-slate-100 text-slate-800 border-slate-300',
+        color: 'bg-skin-background-elevated text-skin-text border-skin-border',
         icon: 'UP',
       };
 
     case 'pending_dependencies':
       return {
         label: 'Dependencias pendentes',
-        color: 'bg-amber-100 text-amber-900 border-amber-300',
+        color: 'bg-skin-warning/15 text-skin-warning border-skin-warning/30',
         icon: 'WAIT',
       };
 
     case 'dependency_conflict':
       return {
         label: 'Conflito de dependencia',
-        color: 'bg-red-100 text-red-800 border-red-300',
+        color: 'bg-skin-danger/15 text-skin-danger border-skin-danger/30',
         icon: 'ERR',
       };
 
@@ -235,7 +235,7 @@ export function getStatusBadgeConfig(status: ModuleStatus) {
     case 'dependencies_installed':
       return {
         label: 'Dependencias instaladas',
-        color: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+        color: 'bg-skin-warning/15 text-skin-warning border-skin-warning/30',
         icon: 'NPM',
       };
 
@@ -243,35 +243,35 @@ export function getStatusBadgeConfig(status: ModuleStatus) {
     case 'ready':
       return {
         label: 'Pronto',
-        color: 'bg-blue-100 text-blue-800 border-blue-300',
+        color: 'bg-skin-info/15 text-skin-info border-skin-info/30',
         icon: 'DB',
       };
 
     case 'active':
       return {
         label: 'Ativo',
-        color: 'bg-green-100 text-green-800 border-green-300',
+        color: 'bg-skin-success/15 text-skin-success border-skin-success/30',
         icon: 'ON',
       };
 
     case 'disabled':
       return {
         label: 'Desativado',
-        color: 'bg-orange-100 text-orange-800 border-orange-300',
+        color: 'bg-skin-warning/15 text-skin-warning border-skin-warning/30',
         icon: 'OFF',
       };
 
     case 'corrupted':
       return {
         label: 'Corrompido',
-        color: 'bg-rose-100 text-rose-800 border-rose-300',
+        color: 'bg-skin-danger/15 text-skin-danger border-skin-danger/30',
         icon: 'BAD',
       };
 
     default:
       return {
         label: 'Desconhecido',
-        color: 'bg-gray-100 text-gray-800 border-gray-300',
+        color: 'bg-skin-background-elevated text-skin-text border-skin-border',
         icon: '?',
       };
   }
@@ -356,13 +356,13 @@ export function getStatusGuidance(status: ModuleStatus) {
 export function getLifecycleStepBadgeClass(status: ModuleLifecycleStepStatus) {
   switch (status) {
     case 'ready':
-      return 'bg-green-50 text-green-800 border-green-200';
+      return 'bg-skin-success/10 text-skin-success border-skin-success/30';
     case 'blocked':
-      return 'bg-amber-50 text-amber-900 border-amber-200';
+      return 'bg-skin-warning/10 text-skin-warning border-skin-warning/30';
     case 'error':
-      return 'bg-red-50 text-red-800 border-red-200';
+      return 'bg-skin-danger/10 text-skin-danger border-skin-danger/30';
     default:
-      return 'bg-slate-50 text-slate-700 border-slate-200';
+      return 'bg-skin-background-elevated text-skin-text border-skin-border';
   }
 }
 

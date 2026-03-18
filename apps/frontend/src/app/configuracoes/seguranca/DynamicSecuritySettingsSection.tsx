@@ -78,13 +78,13 @@ const dashboardCardBaseClassName =
 
 const dashboardCardToneClassName = {
   neutral:
-    "border-slate-200/80 bg-white/85 dark:border-slate-800/80 dark:bg-slate-950/45",
+    "border-skin-border/80 bg-skin-surface/85",
   info:
-    "border-sky-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.08),_transparent_42%),linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(248,250,252,0.96))] dark:border-sky-900/60 dark:bg-gradient-to-br dark:from-sky-950/35 dark:via-slate-950/65 dark:to-slate-950/55",
+    "border-skin-info/30 bg-skin-surface/95",
   warn:
-    "border-amber-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.1),_transparent_42%),linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(255,251,235,0.96))] dark:border-amber-900/60 dark:bg-gradient-to-br dark:from-amber-950/40 dark:via-slate-950/65 dark:to-slate-950/55",
+    "border-skin-warning/30 bg-skin-surface/95",
   accent:
-    "border-violet-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(139,92,246,0.08),_transparent_42%),linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(245,243,255,0.96))] dark:border-violet-900/60 dark:bg-gradient-to-br dark:from-violet-950/35 dark:via-slate-950/65 dark:to-slate-950/55",
+    "border-skin-secondary/40 bg-skin-surface/95",
 } as const;
 
 function getDynamicCategoryClassName(category: string) {
@@ -200,7 +200,7 @@ function SettingRow({
   return (
     <article
       data-testid={`security-setting-row-${item.key}`}
-      className="rounded-[22px] border border-slate-200/80 bg-white/80 p-4 shadow-sm dark:border-slate-800/80 dark:bg-slate-950/45"
+      className="rounded-[22px] border border-skin-border/80 bg-skin-surface/80 p-4 shadow-sm"
     >
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 flex-1 space-y-3">
@@ -410,7 +410,7 @@ export function DynamicSecuritySettingsSection() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-2 rounded-[18px] border border-slate-200/80 bg-slate-50/70 p-3 text-sm text-muted-foreground dark:border-slate-800/80 dark:bg-slate-900/45">
+          <div className="flex items-center gap-2 rounded-[18px] border border-skin-border/80 bg-skin-background-elevated/70 p-3 text-sm text-muted-foreground ">
             <AlertTriangle className="h-4 w-4" />
             <span className="font-medium text-foreground">Alteracoes por item</span>
             <InfoButton label="Ajuda das alteracoes por item nas configuracoes dinamicas">
@@ -418,9 +418,9 @@ export function DynamicSecuritySettingsSection() {
             </InfoButton>
           </div>
 
-          <div className="rounded-[18px] border border-slate-200/80 bg-white/80 p-4 text-sm text-muted-foreground shadow-sm dark:border-slate-800/80 dark:bg-slate-950/45">
+          <div className="rounded-[18px] border border-skin-border/80 bg-skin-surface/80 p-4 text-sm text-muted-foreground shadow-sm ">
             <div className="flex items-center gap-2">
-              <ShieldAlert className="h-4 w-4 text-amber-600" />
+              <ShieldAlert className="h-4 w-4 text-skin-warning" />
               <span className="font-medium text-foreground">Como ler esta secao</span>
             </div>
             <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -527,3 +527,4 @@ export function DynamicSecuritySettingsSection() {
     </>
   );
 }
+

@@ -260,21 +260,21 @@ export default function CronJobsPage() {
   }
 
   return (
-    <div className="space-y-6 p-4 text-slate-950 dark:text-slate-50 md:p-8">
+    <div className="space-y-6 p-4 text-skin-text dark:text-skin-text md:p-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-2">
-          <h1 className="flex items-center gap-3 text-3xl font-bold tracking-tight text-slate-950 dark:text-slate-50">
+          <h1 className="flex items-center gap-3 text-3xl font-bold tracking-tight text-skin-text dark:text-skin-text">
             <Clock3 className="h-8 w-8 text-primary" />
             Tarefas agendadas
           </h1>
-          <p className="max-w-2xl text-sm text-slate-600 dark:text-slate-300">
+          <p className="max-w-2xl text-sm text-skin-text-muted ">
             Visualize a saude das rotinas, execute acoes rapidas e deixe os detalhes tecnicos em
             um painel lateral.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Badge variant="outline" className="rounded-full border-slate-200/80 bg-white/85 px-3 py-1 text-slate-700 dark:border-slate-800/80 dark:bg-slate-950/55 dark:text-slate-200">
+          <Badge variant="outline" className="rounded-full border-skin-border/80 bg-skin-surface/85 px-3 py-1 text-skin-text dark:border-skin-border/80 dark:bg-skin-surface/55 ">
             {runningCount} ativas
           </Badge>
           <Badge
@@ -282,8 +282,8 @@ export default function CronJobsPage() {
             className={cn(
               "rounded-full px-3 py-1",
               runtimeIssuesCount > 0
-                ? "dark:border-rose-900/70 dark:bg-rose-950/40 dark:text-rose-100"
-                : "border-slate-200/80 bg-white/85 text-slate-700 dark:border-slate-800/80 dark:bg-slate-950/55 dark:text-slate-200",
+                ? "border-skin-danger/30 bg-skin-danger/10 text-skin-danger"
+                : "border-skin-border/80 bg-skin-surface/85 text-skin-text dark:border-skin-border/80 dark:bg-skin-surface/55 ",
             )}
           >
             {runtimeIssuesCount > 0 ? `${runtimeIssuesCount} com divergencia` : "Runtime sincronizado"}
@@ -311,21 +311,21 @@ export default function CronJobsPage() {
               className={cn(
                 "rounded-[28px] shadow-[0_20px_55px_-36px_rgba(15,23,42,0.35)] transition-shadow hover:shadow-[0_24px_60px_-36px_rgba(15,23,42,0.45)]",
                 hasIssue
-                  ? "border-rose-200/80 bg-gradient-to-br from-rose-50/90 via-white to-orange-50/85 dark:border-rose-900/60 dark:bg-gradient-to-br dark:from-rose-950/35 dark:via-slate-950/96 dark:to-orange-950/25"
-                  : "border-sky-200/80 bg-gradient-to-br from-sky-50/90 via-white to-cyan-50/85 dark:border-sky-900/60 dark:bg-gradient-to-br dark:from-sky-950/30 dark:via-slate-950/96 dark:to-cyan-950/20",
+                  ? "border-skin-danger/30 bg-skin-surface/95"
+                  : "border-skin-info/30 bg-skin-surface/95",
               )}
             >
               <CardContent className="p-3.5 sm:p-4">
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                   <div className="min-w-0 flex-1 space-y-2.5">
                     <div className="flex flex-wrap items-start gap-3">
-                      <div className="rounded-2xl border border-slate-200/80 bg-white/85 p-2 shadow-sm dark:border-slate-800/80 dark:bg-slate-950/55">
-                        <Clock3 className="h-5 w-5 text-slate-700 dark:text-slate-300" />
+                      <div className="rounded-2xl border border-skin-border/80 bg-skin-surface/85 p-2 shadow-sm dark:border-skin-border/80 dark:bg-skin-surface/55">
+                        <Clock3 className="h-5 w-5 text-skin-text " />
                       </div>
 
                       <div className="min-w-0 flex-1 space-y-1.5">
                         <div className="flex flex-wrap items-center gap-2">
-                          <CardTitle className="truncate text-base font-semibold text-slate-950 dark:text-slate-50 sm:text-lg">
+                          <CardTitle className="truncate text-base font-semibold text-skin-text dark:text-skin-text sm:text-lg">
                             {presentation.label}
                           </CardTitle>
                           <TaskInfoPopover description={presentation.description} />
@@ -335,14 +335,14 @@ export default function CronJobsPage() {
                           {renderStatusBadge(job)}
                         </div>
 
-                        <p className="line-clamp-2 text-sm text-slate-600 dark:text-slate-300">
+                        <p className="line-clamp-2 text-sm text-skin-text-muted ">
                           {presentation.description}
                         </p>
                       </div>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline" className="rounded-full border-slate-200/80 bg-white/85 px-2.5 py-1 text-[11px] text-slate-700 dark:border-slate-800/80 dark:bg-slate-950/55 dark:text-slate-200">
+                      <Badge variant="outline" className="rounded-full border-skin-border/80 bg-skin-surface/85 px-2.5 py-1 text-[11px] text-skin-text dark:border-skin-border/80 dark:bg-skin-surface/55 ">
                         {scheduleSummary.label}
                       </Badge>
                       <Badge
@@ -350,27 +350,27 @@ export default function CronJobsPage() {
                         className={cn(
                           "rounded-full px-2.5 py-1 text-[11px]",
                           hasIssue
-                            ? "dark:border-rose-900/70 dark:bg-rose-950/40 dark:text-rose-100"
-                            : "border-slate-200/80 bg-white/85 text-slate-700 dark:border-slate-800/80 dark:bg-slate-950/55 dark:text-slate-200",
+                            ? "border-skin-danger/30 bg-skin-danger/10 text-skin-danger"
+                            : "border-skin-border/80 bg-skin-surface/85 text-skin-text dark:border-skin-border/80 dark:bg-skin-surface/55 ",
                         )}
                       >
                         {hasIssue ? "Runtime com divergencia" : "Runtime OK"}
                       </Badge>
-                      <Badge variant="outline" className="rounded-full border-slate-200/80 bg-white/85 px-2.5 py-1 text-[11px] text-slate-700 dark:border-slate-800/80 dark:bg-slate-950/55 dark:text-slate-200">
+                      <Badge variant="outline" className="rounded-full border-skin-border/80 bg-skin-surface/85 px-2.5 py-1 text-[11px] text-skin-text dark:border-skin-border/80 dark:bg-skin-surface/55 ">
                         Proxima: {nextRunText}
                       </Badge>
                       {typeof job.consecutiveFailureCount === "number" &&
                         job.consecutiveFailureCount > 0 && (
                           <Badge
                             variant="outline"
-                            className="rounded-full border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/35 dark:text-amber-100"
+                            className="rounded-full border-skin-warning/30 bg-skin-warning/10 px-2.5 py-1 text-[11px] text-skin-warning"
                           >
                             {job.consecutiveFailureCount} falha(s) seguidas
                           </Badge>
                         )}
                     </div>
 
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-skin-text-muted dark:text-skin-text-muted">
                       <span>{job.origin === "modulo" ? "Origem: modulo" : "Origem: plataforma"}</span>
                       <span>
                         Fonte: {job.sourceOfTruth === "database" ? "configuracao persistida" : "runtime"}
@@ -386,7 +386,7 @@ export default function CronJobsPage() {
                     )}
 
                     {job.lastError && (
-                      <p className="line-clamp-1 text-xs text-amber-700 dark:text-amber-300">
+                      <p className="line-clamp-1 text-xs text-skin-warning">
                         Ultimo erro: {job.lastError}
                       </p>
                     )}
@@ -406,7 +406,7 @@ export default function CronJobsPage() {
                       variant={job.enabled ? "outline" : "default"}
                       className={cn(
                         "w-full sm:w-auto",
-                        !job.enabled && "bg-green-600 hover:bg-green-700",
+                        !job.enabled && "bg-skin-success hover:bg-skin-success",
                       )}
                       disabled={isBusy}
                       onClick={() => void handleToggle(job.key, job.enabled)}
@@ -501,8 +501,8 @@ export default function CronJobsPage() {
               <DialogHeader className={cn("shrink-0 border-b px-4 py-4 text-left sm:px-6 sm:py-5", cronModalChromeClassName)}>
                 <div className="pr-8">
                   <DialogTitle className="flex flex-wrap items-center gap-2 text-xl">
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-sky-200/80 bg-sky-50/80 shadow-sm dark:border-sky-900/60 dark:bg-sky-950/30">
-                      <Clock3 className="h-4 w-4 text-sky-700 dark:text-sky-300" />
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-skin-info/30 bg-skin-info/10 shadow-sm">
+                      <Clock3 className="h-4 w-4 text-skin-info dark:text-skin-info" />
                     </span>
                     {getCronTaskPresentation(selectedJob).label}
                     <Badge variant={selectedJob.enabled ? "default" : "secondary"}>
@@ -609,7 +609,7 @@ export default function CronJobsPage() {
 
                         {typeof selectedJob.consecutiveFailureCount === "number" &&
                           selectedJob.consecutiveFailureCount > 0 && (
-                            <div className="rounded-xl border border-amber-300/60 bg-amber-50/90 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/35 dark:text-amber-100">
+                            <div className="rounded-xl border border-skin-warning/30 bg-skin-warning/10 px-4 py-3 text-sm text-skin-warning">
                               Falhas consecutivas: {selectedJob.consecutiveFailureCount}
                             </div>
                           )}
@@ -621,7 +621,7 @@ export default function CronJobsPage() {
                         )}
 
                         {selectedJob.lastError && (
-                          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/35 dark:text-amber-100">
+                          <div className="rounded-xl border border-skin-warning/30 bg-skin-warning/10 px-4 py-3 text-sm text-skin-warning">
                             <span className="font-medium">Ultimo erro:</span> {selectedJob.lastError}
                           </div>
                         )}
@@ -731,7 +731,7 @@ export default function CronJobsPage() {
                     )}
 
                   {editingJob.editable === false ? (
-                    <div className="rounded-[22px] border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-100">
+                    <div className="rounded-[22px] border border-skin-warning/30 bg-skin-warning/10 px-4 py-3 text-sm text-skin-warning">
                       Esta tarefa usa um cronograma fixo. Voce ainda pode ativar ou pausar a execucao.
                     </div>
                   ) : editorForm.mode === "simple" ? (
@@ -1057,3 +1057,5 @@ function formatDurationMs(value?: number): string {
 
   return `${value} ms`;
 }
+
+
