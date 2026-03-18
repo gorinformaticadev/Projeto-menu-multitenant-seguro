@@ -144,6 +144,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setToken(null);
 
+    if (typeof window !== "undefined") {
+      document.cookie = "accessToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      document.cookie = "refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    }
+
     if (
       shouldRedirect &&
       typeof window !== "undefined" &&
@@ -154,6 +159,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
     }
   };
+
 
   const handleAuthenticatedResponse = async (payload: AuthenticatedResponsePayload) => {
     setUser(payload.user);

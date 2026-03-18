@@ -489,8 +489,9 @@ native_start_pm2_apps() {
     local app_dir="$1"
     local instance_name="$2"
     log_info "Etapa 18/23: iniciando PM2 backend/frontend..."
-    run_as_native_user "cd '${app_dir}/apps/backend' && pm2 delete '${instance_name}-backend' >/dev/null 2>&1 || true && pm2 start dist/main.js --name '${instance_name}-backend' --update-env"
-    run_as_native_user "cd '${app_dir}/apps/frontend' && pm2 delete '${instance_name}-frontend' >/dev/null 2>&1 || true && PORT=5000 HOSTNAME=0.0.0.0 pm2 start 'node .next/standalone/apps/frontend/server.js' --name '${instance_name}-frontend' --update-env"
+    run_as_native_user "cd '${app_dir}/apps/backend' && pm2 delete '${instance_name}-backend' >/dev/null 2>&1 || true && pm2 start dist/main.js --name '${instance_name}-backend' --cwd '${app_dir}/apps/backend' --update-env"
+    run_as_native_user "cd '${app_dir}/apps/frontend' && pm2 delete '${instance_name}-frontend' >/dev/null 2>&1 || true && PORT=5000 HOSTNAME=0.0.0.0 pm2 start 'node .next/standalone/apps/frontend/server.js' --name '${instance_name}-frontend' --cwd '${app_dir}/apps/frontend' --update-env"
+
     run_as_native_user "pm2 save"
 }
 

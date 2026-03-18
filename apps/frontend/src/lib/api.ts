@@ -89,12 +89,17 @@ const doLogout = () => {
     return;
   }
 
+  // Limpar os cookies para evitar loop infinito na Middleware de Autenticação
+  document.cookie = "accessToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+  document.cookie = "refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+
   window.dispatchEvent(new Event("auth:logout"));
 
   if (window.location.pathname !== ROUTE_CONFIG.unauthenticatedFallback) {
     window.location.href = ROUTE_CONFIG.unauthenticatedFallback;
   }
 };
+
 
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
