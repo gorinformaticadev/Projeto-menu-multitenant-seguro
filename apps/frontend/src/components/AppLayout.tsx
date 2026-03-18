@@ -12,6 +12,14 @@ import { ModuleLoader } from "@/core/ModuleLoader";
 import { RouteGuard } from "./RouteGuard";
 import { useTheme } from "next-themes";
 
+function normalizeAppThemePreference(theme?: string | null): "light" | "dark" | "system" {
+  if (theme === "dark" || theme === "system") {
+    return theme;
+  }
+
+  return "light";
+}
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
@@ -20,8 +28,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Sincroniza tema do backend com o next-themes no primeiro load
   useEffect(() => {
-    if (user?.preferences?.theme && user.preferences.theme !== theme) {
-      setTheme(user.preferences.theme);
+    const preferredTheme = normalizeAppThemePreference(user?.preferences?.theme);
+    if (preferredTheme !== theme) {
+      setTheme(preferredTheme);
     }
   }, [user, theme, setTheme]);
 
@@ -63,7 +72,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
             <p className="text-muted-foreground">Inicializando sistema modular...</p>
             {error && (
-              <p className="text-red-500 text-sm mt-2">Erro: {error}</p>
+              <p className="mt-2 text-sm text-skin-danger">Erro: {error}</p>
             )}
           </div>
         </div>
@@ -86,7 +95,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <aside className="hidden h-full min-h-0 flex-shrink-0 md:flex">
             <Sidebar />
           </aside>
-          <main className="min-h-0 flex-1 overflow-y-auto bg-background p-0">
+          <main className="min-h-0 flex-1 overflow-y-auto bg-skin-background p-0 text-skin-text">
             {children}
           </main>
         </div>

@@ -1,0 +1,27 @@
+import { ThemeTokens } from "./theme-types";
+
+export const themeTokenVars: Record<keyof ThemeTokens, string> = {
+  background: '--color-background',
+  backgroundElevated: '--color-background-elevated',
+  surface: '--color-surface',
+  surfaceHover: '--color-surface-hover',
+  border: '--color-border',
+  borderStrong: '--color-border-strong',
+  text: '--color-text',
+  textMuted: '--color-text-muted',
+  textInverse: '--color-text-inverse',
+  primary: '--color-primary',
+  primaryHover: '--color-primary-hover',
+  secondary: '--color-secondary',
+  success: '--color-success',
+  warning: '--color-warning',
+  danger: '--color-danger',
+  info: '--color-info',
+  inputBackground: '--color-input-background',
+  inputBorder: '--color-input-border',
+  focusRing: '--color-focus-ring',
+  sidebarBackground: '--color-sidebar-background',
+  sidebarText: '--color-sidebar-text',
+  sidebarActive: '--color-sidebar-active',
+  menuHover: '--color-menu-hover',
+} as const;

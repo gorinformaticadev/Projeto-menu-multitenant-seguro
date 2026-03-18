@@ -202,11 +202,11 @@ export function TopBar() {
   );
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-border/80 bg-card/95 shadow-[0_1px_2px_rgba(15,23,42,0.04)] backdrop-blur supports-[backdrop-filter]:bg-card/85 dark:bg-card/90">
+    <div className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-skin-border/80 bg-skin-surface/95 shadow-[0_1px_2px_rgba(15,23,42,0.04)] backdrop-blur supports-[backdrop-filter]:bg-skin-surface/85 dark:bg-skin-surface/90">
 
       {/* OVERLAY DE BUSCA MOBILE */}
       <div
-        className={`absolute inset-0 z-50 flex items-center bg-card/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-card/90 transition-transform duration-300 ${showMobileSearch ? 'translate-y-0' : '-translate-y-full'
+        className={`absolute inset-0 z-50 flex items-center bg-skin-surface/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-skin-surface/90 transition-transform duration-300 ${showMobileSearch ? 'translate-y-0' : '-translate-y-full'
           }`}
       >
         <Button
@@ -232,16 +232,16 @@ export function TopBar() {
                 className="h-10 w-auto max-w-40 object-contain"
               />
             ) : (
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-[0_10px_24px_rgba(37,99,235,0.18)]">
-                <span className="text-white font-bold text-lg">S</span>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-skin-primary shadow-[0_10px_24px_rgba(37,99,235,0.18)]">
+                <span className="text-skin-text-inverse font-bold text-lg">S</span>
               </div>
             )}
           </div>
           {/* Nome e Tenant responsivos */}
           <div className="flex flex-col max-w-[120px] md:max-w-none">
-            <h1 className="truncate text-sm font-bold leading-tight text-foreground md:text-lg">{platformName}</h1>
+            <h1 className="truncate text-sm font-bold leading-tight text-skin-text md:text-lg">{platformName}</h1>
             {user?.tenant && (
-              <p className="truncate text-xs text-muted-foreground">{user.tenant.nomeFantasia}</p>
+              <p className="truncate text-xs text-skin-text-muted">{user.tenant.nomeFantasia}</p>
             )}
           </div>
         </div>
@@ -257,7 +257,7 @@ export function TopBar() {
           <Button
             variant="ghost"
             size="icon"
-            className="rounded-full text-muted-foreground hover:bg-accent lg:hidden"
+            className="rounded-full text-skin-text-muted hover:bg-skin-menu-hover lg:hidden"
             onClick={() => setShowMobileSearch(true)}
           >
             <Search className="h-5 w-5" />
@@ -279,7 +279,7 @@ export function TopBar() {
             >
               {/* Logo do Tenant do Usuario */}
               {userMenuImageSrc ? (
-                <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-border bg-secondary">
+                <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-skin-border bg-skin-secondary">
                   <Image
                     src={userMenuImageSrc}
                     alt="Logo Tenant"
@@ -298,32 +298,32 @@ export function TopBar() {
                       handleTenantLogoError(e.currentTarget, 'menu');
                     }}
                   />
-                  <div className="w-full h-full rounded-full bg-primary flex items-center justify-center text-white font-semibold fallback-avatar hidden">
+                  <div className="fallback-avatar hidden w-full h-full rounded-full bg-skin-primary flex items-center justify-center text-skin-text-inverse font-semibold">
                     {user?.name?.charAt(0).toUpperCase()}
                   </div>
                 </div>
               ) : (
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white shadow-[0_6px_16px_rgba(37,99,235,0.18)]">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-skin-primary text-skin-text-inverse shadow-[0_6px_16px_rgba(37,99,235,0.18)]">
                   {user?.name?.charAt(0).toUpperCase()}
                 </div>
               )}
               <div className="hidden md:block text-left">
                 {user?.tenant?.nomeFantasia && (
-                  <p className="truncate text-sm font-medium text-primary">{user.tenant.nomeFantasia}</p>
+                  <p className="truncate text-sm font-medium text-skin-primary">{user.tenant.nomeFantasia}</p>
                 )}
-                <p className="text-sm font-medium text-foreground">{user?.name}</p>
-                <p className="text-[10px] text-muted-foreground">{user?.role}</p>
+                <p className="text-sm font-medium text-skin-text">{user?.name}</p>
+                <p className="text-[10px] text-skin-text-muted">{user?.role}</p>
               </div>
             </Button>
 
             {/* Dropdown Menu */}
             {showUserMenu && (
-              <div className="absolute right-0 z-50 mt-2 w-56 rounded-xl border border-border/80 bg-popover py-2 shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:shadow-[0_18px_36px_rgba(2,6,23,0.3)]">
-                <div className="border-b border-border px-4 py-2">
+              <div className="absolute right-0 z-50 mt-2 w-56 rounded-xl border border-skin-border/80 bg-skin-surface py-2 shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:shadow-[0_18px_36px_rgba(2,6,23,0.3)]">
+                <div className="border-b border-skin-border px-4 py-2">
                   <div className="flex items-center gap-3 mb-2">
                     {/* Logo da Tenant no Menu */}
                     {userMenuImageSrc ? (
-                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-secondary">
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-skin-border bg-skin-secondary">
                         <Image
                           src={userMenuImageSrc}
                           alt="Logo Tenant"
@@ -342,37 +342,37 @@ export function TopBar() {
                              handleTenantLogoError(e.currentTarget, 'dropdown');
                            }}
                          />
-                        <div className="w-full h-full rounded-full bg-primary flex items-center justify-center text-white font-semibold fallback-avatar-dropdown hidden">
+                        <div className="fallback-avatar-dropdown hidden w-full h-full rounded-full bg-skin-primary flex items-center justify-center text-skin-text-inverse font-semibold">
                           {user?.name?.charAt(0).toUpperCase()}
                         </div>
                       </div>
                     ) : (
-                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-[0_8px_18px_rgba(37,99,235,0.18)]">
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-skin-primary text-skin-text-inverse shadow-[0_8px_18px_rgba(37,99,235,0.18)]">
                         {user?.name?.charAt(0).toUpperCase()}
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
                       {user?.tenant?.nomeFantasia && (
-                        <p className="mb-1 truncate text-sm font-medium text-primary">{user.tenant.nomeFantasia}</p>
+                        <p className="mb-1 truncate text-sm font-medium text-skin-primary">{user.tenant.nomeFantasia}</p>
                       )}
-                      <p className="truncate text-sm font-medium text-foreground">{user?.name}</p>
-                      <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+                      <p className="truncate text-sm font-medium text-skin-text">{user?.name}</p>
+                      <p className="truncate text-xs text-skin-text-muted">{user?.email}</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Seletor de Tema */}
-                <div className="border-b border-border px-4 py-2">
-                  <div className="mb-2 text-xs font-semibold text-muted-foreground">Tema</div>
+                <div className="border-b border-skin-border px-4 py-2">
+                  <div className="mb-2 text-xs font-semibold text-skin-text-muted">Tema</div>
                   <ThemeToggle />
                 </div>
 
                 <a
                   href="/perfil"
                   onClick={() => setShowUserMenu(false)}
-                  className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent"
+                  className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-skin-text transition-colors hover:bg-skin-menu-hover"
                 >
-                  <User className="h-4 w-4 text-muted-foreground" />
+                  <User className="h-4 w-4 text-skin-text-muted" />
                   Meu Perfil
                 </a>
 
@@ -384,32 +384,32 @@ export function TopBar() {
                   <a
                     href="/configuracoes/sistema/updates"
                     onClick={() => setShowUserMenu(false)}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent"
+                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-skin-text transition-colors hover:bg-skin-menu-hover"
                     title="Clique para gerenciar atualizacoes"
                   >
-                    <Info className="h-4 w-4 text-muted-foreground" />
+                    <Info className="h-4 w-4 text-skin-text-muted" />
                     <div>
-                      <span className="text-xs text-muted-foreground">Versao do Sistema</span>
-                      <div className="text-xs font-mono font-medium text-foreground">{systemVersion}</div>
+                      <span className="text-xs text-skin-text-muted">Versao do Sistema</span>
+                      <div className="text-xs font-mono font-medium text-skin-text">{systemVersion}</div>
                     </div>
                   </a>
                 ) : (
-                  <div className="flex cursor-default items-center gap-2 px-4 py-2 text-left text-sm text-muted-foreground">
-                    <Info className="h-4 w-4 text-muted-foreground/70" />
+                  <div className="flex cursor-default items-center gap-2 px-4 py-2 text-left text-sm text-skin-text-muted">
+                    <Info className="h-4 w-4 text-skin-text-muted/70" />
                     <div>
                       <span className="text-xs">Versao do Sistema</span>
-                      <div className="text-xs font-mono font-medium text-foreground/85">{systemVersion}</div>
+                      <div className="text-xs font-mono font-medium text-skin-text/85">{systemVersion}</div>
                     </div>
                   </div>
                 )}
 
-                <div className="mt-2 border-t border-border pt-2">
+                <div className="mt-2 border-t border-skin-border pt-2">
                   <button
                     onClick={() => {
                       setShowUserMenu(false);
                       logout();
                     }}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-skin-danger transition-colors hover:bg-skin-danger/10"
                   >
                     <LogOut className="h-4 w-4" />
                     Sair

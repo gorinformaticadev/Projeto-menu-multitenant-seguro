@@ -1,20 +1,20 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useToast } from "@/hooks/use-toast";
 import { PlatformName } from "@/components/PlatformInfo";
-import { PasswordInput } from "@/components/ui/password-input";
-import { ArrowLeft, CheckCircle } from "lucide-react";
-import Link from "next/link";
 import { API_URL } from "@/lib/api";
 import { useSecurityConfig } from "@/contexts/SecurityConfigContext";
 import { validatePasswordWithPolicy } from "@/hooks/usePasswordValidation";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 function ResetPasswordForm() {
   const [newPassword, setNewPassword] = useState("");
@@ -33,10 +33,9 @@ function ResetPasswordForm() {
     if (!token) {
       toast({
         variant: "destructive",
-        title: "Link inválido",
-        description: "Token de redefinição não encontrado.",
+        title: "Link invalido",
+        description: "Token de redefinicao nao encontrado.",
       });
-      // Delay redirect to let toast show
       setTimeout(() => router.push("/login"), 2000);
     }
   }, [token, router, toast]);
@@ -47,8 +46,8 @@ function ResetPasswordForm() {
     if (newPassword !== confirmPassword) {
       toast({
         variant: "destructive",
-        title: "Senhas não conferem",
-        description: "A confirmação da senha não corresponde à nova senha.",
+        title: "Senhas nao conferem",
+        description: "A confirmacao da senha nao corresponde a nova senha.",
       });
       return;
     }
@@ -68,10 +67,10 @@ function ResetPasswordForm() {
       );
       toast({
         variant: "destructive",
-        title: "Senha fora da política",
+        title: "Senha fora da politica",
         description:
           firstInvalidRequirement?.label ||
-          "A nova senha não atende à política de segurança ativa.",
+          "A nova senha nao atende a politica de seguranca ativa.",
       });
       return;
     }
@@ -99,9 +98,7 @@ function ResetPasswordForm() {
         description: "Sua senha foi alterada com sucesso.",
       });
 
-      // Redirect after success
       setTimeout(() => router.push("/login"), 3000);
-
     } catch (error: unknown) {
       toast({
         variant: "destructive",
@@ -115,22 +112,22 @@ function ResetPasswordForm() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-background">
-        <Card className="w-full max-w-md shadow-lg border-2 border-primary/20">
-          <CardHeader className="text-center space-y-2">
-            <div className="mx-auto h-16 w-16 flex items-center justify-center rounded-full bg-green-100 dark:bg-green-900/20 mb-2">
-              <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+      <div className="auth-theme flex min-h-screen items-center justify-center bg-auth-background px-4 py-12 text-auth-text">
+        <Card className="w-full max-w-md border-auth-border bg-auth-surface text-auth-text shadow-xl">
+          <CardHeader className="space-y-2 text-center">
+            <div className="mx-auto mb-2 flex h-16 w-16 items-center justify-center rounded-full bg-skin-success/15">
+              <CheckCircle className="h-8 w-8 text-skin-success" />
             </div>
-            <CardTitle className="text-2xl font-bold text-foreground">
+            <CardTitle className="text-2xl font-bold text-auth-text">
               Senha Alterada!
             </CardTitle>
-            <CardDescription>
-              Sua senha foi redefinida com sucesso. Você será redirecionado para o login.
+            <CardDescription className="text-auth-text-muted">
+              Sua senha foi redefinida com sucesso. Voce sera redirecionado para o login.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-4">
             <Button
-              className="w-full"
+              className="w-full bg-auth-primary text-white hover:bg-auth-primary-hover"
               onClick={() => router.push("/login")}
             >
               Ir para Login agora
@@ -142,41 +139,43 @@ function ResetPasswordForm() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-background">
+    <div className="auth-theme flex min-h-screen flex-col items-center justify-center bg-auth-background px-4 py-12 text-auth-text sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8">
-        <div className="text-center mb-8">
-          <PlatformName className="justify-center text-3xl mb-2" />
-          <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground">
+        <div className="mb-8 text-center">
+          <PlatformName className="justify-center text-3xl mb-2 text-auth-text" />
+          <h2 className="mt-6 text-3xl font-bold tracking-tight text-auth-text">
             Redefinir Senha
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 text-sm text-auth-text-muted">
             Digite sua nova senha abaixo
           </p>
         </div>
 
-        <Card className="border-border shadow-sm">
+        <Card className="border-auth-border bg-auth-surface text-auth-text shadow-xl">
           <CardContent className="pt-6">
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="password">Nova Senha</Label>
+                  <Label htmlFor="password" className="text-auth-text">Nova Senha</Label>
                   <PasswordInput
                     id="password"
                     value={newPassword}
                     onChange={(val) => setNewPassword(val)}
-                    placeholder="••••••••"
+                    placeholder="********"
                     required
+                    className="border-auth-border bg-auth-background text-auth-text placeholder:text-auth-text-muted"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirmar Senha</Label>
+                  <Label htmlFor="confirmPassword" className="text-auth-text">Confirmar Senha</Label>
                   <PasswordInput
                     id="confirmPassword"
                     value={confirmPassword}
                     onChange={(val) => setConfirmPassword(val)}
-                    placeholder="••••••••"
+                    placeholder="********"
                     required
+                    className="border-auth-border bg-auth-background text-auth-text placeholder:text-auth-text-muted"
                   />
                 </div>
               </div>
@@ -184,7 +183,7 @@ function ResetPasswordForm() {
               <div className="space-y-4">
                 <Button
                   type="submit"
-                  className="w-full"
+                  className="w-full bg-auth-primary text-white hover:bg-auth-primary-hover"
                   disabled={isLoading}
                 >
                   {isLoading ? "Redefinindo..." : "Definir Nova Senha"}
@@ -193,7 +192,7 @@ function ResetPasswordForm() {
                 <div className="text-center">
                   <Link
                     href="/login"
-                    className="flex items-center justify-center text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+                    className="flex items-center justify-center text-sm font-medium text-auth-text-muted transition-colors hover:text-auth-text"
                   >
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Voltar para o Login
@@ -210,7 +209,7 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={<div className="flex h-screen items-center justify-center">Carregando...</div>}>
+    <Suspense fallback={<div className="auth-theme flex h-screen items-center justify-center bg-auth-background text-auth-text">Carregando...</div>}>
       <ResetPasswordForm />
     </Suspense>
   );

@@ -101,7 +101,7 @@ export default function LoginPage() {
 
   // Wrapper with Glassmorphism Context
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#020617] p-4 gap-4 font-sans selection:bg-indigo-500/30 text-slate-200">
+    <div className="auth-theme min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#020617] p-4 gap-4 font-sans text-auth-text selection:bg-indigo-500/30">
       {/* Background Blobs for Glass Effect Enhancement */}
       <div className="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-600/20 rounded-full blur-[100px] opacity-50 animate-pulse" />
@@ -155,7 +155,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#020617] p-4 gap-3 font-sans selection:bg-indigo-500/30 text-slate-200 relative overflow-hidden">
+    <div className="auth-theme min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#020617] p-4 gap-3 font-sans text-auth-text selection:bg-indigo-500/30 relative overflow-hidden">
 
       {/* Background Glows to enhance Glass Effect */}
       <div className="absolute top-1/4 -left-10 w-72 h-72 bg-indigo-500/30 rounded-full blur-[100px] opacity-40 animate-pulse" />

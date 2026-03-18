@@ -676,8 +676,8 @@ export function Sidebar() {
                 "group h-auto w-full rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200",
                 isExpanded ? "justify-between" : "justify-center px-0",
                 isActive || isSubmenuOpen
-                  ? "border border-primary/15 bg-card text-primary shadow-sm"
-                  : "text-muted-foreground hover:bg-card/80 hover:text-foreground",
+                  ? "border border-skin-sidebar-active/15 bg-skin-surface text-skin-primary shadow-sm"
+                  : "text-skin-sidebar-text hover:bg-skin-menu-hover hover:text-skin-text",
               )}
               title={!isExpanded ? item.label : undefined}
             >
@@ -689,7 +689,7 @@ export function Sidebar() {
                 <ChevronRight
                   className={cn(
                     "h-4 w-4 transition-transform",
-                    isSubmenuOpen && "translate-x-0.5 text-primary",
+                    isSubmenuOpen && "translate-x-0.5 text-skin-primary",
                   )}
                 />
               )}
@@ -705,8 +705,8 @@ export function Sidebar() {
             className={cn(
               "group relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200",
               isActive
-                ? "border border-primary/15 bg-card text-primary shadow-sm"
-                : "text-muted-foreground hover:bg-card/80 hover:text-foreground",
+                ? "border border-skin-sidebar-active/15 bg-skin-surface text-skin-primary shadow-sm"
+                : "text-skin-sidebar-text hover:bg-skin-menu-hover hover:text-skin-text",
               !isExpanded && "justify-center px-0",
             )}
             title={!isExpanded ? item.label : undefined}
@@ -735,8 +735,8 @@ export function Sidebar() {
               "group h-auto w-full rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200",
               isExpanded ? "justify-between" : "justify-center px-0",
               hasActiveItem || isSubmenuOpen
-                ? "border border-primary/15 bg-card text-primary shadow-sm"
-                : "text-muted-foreground hover:bg-card/80 hover:text-foreground",
+                ? "border border-skin-sidebar-active/15 bg-skin-surface text-skin-primary shadow-sm"
+                : "text-skin-sidebar-text hover:bg-skin-menu-hover hover:text-skin-text",
             )}
             title={!isExpanded ? config.name : undefined}
           >
@@ -748,7 +748,7 @@ export function Sidebar() {
               <ChevronRight
                 className={cn(
                   "h-4 w-4 transition-transform",
-                  isSubmenuOpen && "translate-x-0.5 text-primary",
+                    isSubmenuOpen && "translate-x-0.5 text-skin-primary",
                 )}
               />
             )}
@@ -771,7 +771,7 @@ export function Sidebar() {
     <div
       ref={sidebarRef}
       className={cn(
-        "relative z-20 flex h-full flex-col border-r border-border/80 bg-secondary shadow-[6px_0_24px_rgba(15,23,42,0.05)] transition-all duration-300 dark:shadow-[8px_0_28px_rgba(2,6,23,0.24)]",
+        "relative z-20 flex h-full flex-col border-r border-skin-border/80 bg-skin-sidebar-background text-skin-sidebar-text shadow-[6px_0_24px_rgba(15,23,42,0.05)] transition-all duration-300 dark:shadow-[8px_0_28px_rgba(2,6,23,0.24)]",
         isExpanded ? "w-56" : "w-16",
       )}
     >
@@ -782,8 +782,8 @@ export function Sidebar() {
         }}
         className={cn(
           "absolute -right-3 top-0 z-50",
-          "flex h-6 w-6 items-center justify-center rounded-full border border-border/80 bg-card shadow-sm",
-          "text-muted-foreground transition-all duration-300 hover:text-primary hover:shadow-md",
+          "flex h-6 w-6 items-center justify-center rounded-full border border-skin-border/80 bg-skin-surface shadow-sm",
+          "text-skin-text-muted transition-all duration-300 hover:text-skin-primary hover:shadow-md",
           "focus:outline-none",
         )}
         title={isExpanded ? "Recolher" : "Expandir"}
@@ -802,7 +802,7 @@ export function Sidebar() {
       {openSubmenu && submenuPosition && (
         <div
           ref={submenuPanelRef}
-          className="fixed z-50 hidden min-h-0 overflow-hidden rounded-2xl border border-border/80 bg-card shadow-[0_20px_45px_rgba(15,23,42,0.16)] md:flex md:flex-col dark:shadow-[0_22px_50px_rgba(2,6,23,0.45)]"
+          className="fixed z-50 hidden min-h-0 overflow-hidden rounded-2xl border border-skin-border/80 bg-skin-surface shadow-[0_20px_45px_rgba(15,23,42,0.16)] md:flex md:flex-col dark:shadow-[0_22px_50px_rgba(2,6,23,0.45)]"
           style={{
             top: submenuPosition.top,
             left: submenuPosition.left,
@@ -811,11 +811,11 @@ export function Sidebar() {
             maxHeight: submenuPosition.maxHeight,
           }}
         >
-          <div className="border-b border-border/70 px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/80">
+          <div className="border-b border-skin-border/70 px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-skin-text-muted/80">
               Navegação
             </p>
-            <h3 className="mt-1 text-sm font-semibold text-foreground">{openSubmenu.title}</h3>
+            <h3 className="mt-1 text-sm font-semibold text-skin-text">{openSubmenu.title}</h3>
           </div>
 
           <div
@@ -824,7 +824,7 @@ export function Sidebar() {
             className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto p-2 pb-16"
           >
             {submenuScrollHint.canScrollUp && (
-              <div className="pointer-events-none sticky top-0 z-10 -mx-2 -mt-2 mb-2 h-6 bg-gradient-to-b from-card via-card/90 to-transparent" />
+              <div className="pointer-events-none sticky top-0 z-10 -mx-2 -mt-2 mb-2 h-6 bg-gradient-to-b from-skin-surface via-skin-surface/90 to-transparent" />
             )}
             <div className="space-y-1">
               {openSubmenu.items.map((item) => {
@@ -849,8 +849,8 @@ export function Sidebar() {
                       className={cn(
                         "group flex h-auto w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
                         hasNestedActiveItem || isNestedOpen
-                          ? "border border-primary/15 bg-primary/10 text-primary shadow-sm"
-                          : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                          ? "border border-skin-primary/15 bg-skin-primary/10 text-skin-primary shadow-sm"
+                          : "text-skin-text-muted hover:bg-skin-menu-hover hover:text-skin-text",
                       )}
                     >
                       <Icon className="h-4 w-4 flex-shrink-0 opacity-75 transition-opacity group-hover:opacity-100" />
@@ -858,7 +858,7 @@ export function Sidebar() {
                       <ChevronRight
                         className={cn(
                           "h-4 w-4 flex-shrink-0 transition-transform",
-                          isNestedOpen && "translate-x-0.5 text-primary",
+                          isNestedOpen && "translate-x-0.5 text-skin-primary",
                         )}
                       />
                     </Button>
@@ -873,8 +873,8 @@ export function Sidebar() {
                     className={cn(
                       "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
                       isActive
-                        ? "border border-primary/15 bg-primary/10 text-primary shadow-sm"
-                        : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                        ? "border border-skin-primary/15 bg-skin-primary/10 text-skin-primary shadow-sm"
+                        : "text-skin-text-muted hover:bg-skin-menu-hover hover:text-skin-text",
                     )}
                   >
                     <Icon className="h-4 w-4 flex-shrink-0 opacity-75 transition-opacity group-hover:opacity-100" />
@@ -885,7 +885,7 @@ export function Sidebar() {
             </div>
 
             {submenuScrollHint.canScrollDown && (
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-20 bg-gradient-to-t from-card via-card/95 to-transparent" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-20 bg-gradient-to-t from-skin-surface via-skin-surface/95 to-transparent" />
             )}
           </div>
 
@@ -896,7 +896,7 @@ export function Sidebar() {
                 variant="outline"
                 size="icon"
                 onClick={() => scrollPanelByStep(submenuScrollRef.current, "down")}
-                className="pointer-events-auto h-9 w-9 rounded-full border-border/80 bg-card/95 text-muted-foreground shadow-md backdrop-blur hover:text-primary"
+                className="pointer-events-auto h-9 w-9 rounded-full border-skin-border/80 bg-skin-surface/95 text-skin-text-muted shadow-md backdrop-blur hover:text-skin-primary"
                 aria-label="Ver mais itens do submenu"
               >
                 <ChevronRight className="h-4 w-4 rotate-90" />
@@ -909,7 +909,7 @@ export function Sidebar() {
       {nestedSubmenu && nestedSubmenuPosition && (
         <div
           ref={nestedSubmenuPanelRef}
-          className="fixed z-[60] hidden min-h-0 overflow-hidden rounded-2xl border border-border/80 bg-card shadow-[0_20px_45px_rgba(15,23,42,0.16)] md:flex md:flex-col dark:shadow-[0_22px_50px_rgba(2,6,23,0.45)]"
+          className="fixed z-[60] hidden min-h-0 overflow-hidden rounded-2xl border border-skin-border/80 bg-skin-surface shadow-[0_20px_45px_rgba(15,23,42,0.16)] md:flex md:flex-col dark:shadow-[0_22px_50px_rgba(2,6,23,0.45)]"
           style={{
             top: nestedSubmenuPosition.top,
             left: nestedSubmenuPosition.left,
@@ -918,11 +918,11 @@ export function Sidebar() {
             maxHeight: nestedSubmenuPosition.maxHeight,
           }}
         >
-          <div className="border-b border-border/70 px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/80">
+          <div className="border-b border-skin-border/70 px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-skin-text-muted/80">
               Navegação
             </p>
-            <h3 className="mt-1 text-sm font-semibold text-foreground">{nestedSubmenu.title}</h3>
+            <h3 className="mt-1 text-sm font-semibold text-skin-text">{nestedSubmenu.title}</h3>
           </div>
 
           <div
@@ -931,7 +931,7 @@ export function Sidebar() {
             className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto p-2 pb-16"
           >
             {nestedSubmenuScrollHint.canScrollUp && (
-              <div className="pointer-events-none sticky top-0 z-10 -mx-2 -mt-2 mb-2 h-6 bg-gradient-to-b from-card via-card/90 to-transparent" />
+              <div className="pointer-events-none sticky top-0 z-10 -mx-2 -mt-2 mb-2 h-6 bg-gradient-to-b from-skin-surface via-skin-surface/90 to-transparent" />
             )}
             <div className="space-y-1">
               {nestedSubmenu.items.map((item) => {
@@ -946,8 +946,8 @@ export function Sidebar() {
                     className={cn(
                       "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
                       isActive
-                        ? "border border-primary/15 bg-primary/10 text-primary shadow-sm"
-                        : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                        ? "border border-skin-primary/15 bg-skin-primary/10 text-skin-primary shadow-sm"
+                        : "text-skin-text-muted hover:bg-skin-menu-hover hover:text-skin-text",
                     )}
                   >
                     <Icon className="h-4 w-4 flex-shrink-0 opacity-75 transition-opacity group-hover:opacity-100" />
@@ -958,7 +958,7 @@ export function Sidebar() {
             </div>
 
             {nestedSubmenuScrollHint.canScrollDown && (
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-20 bg-gradient-to-t from-card via-card/95 to-transparent" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-20 bg-gradient-to-t from-skin-surface via-skin-surface/95 to-transparent" />
             )}
           </div>
 
@@ -969,7 +969,7 @@ export function Sidebar() {
                 variant="outline"
                 size="icon"
                 onClick={() => scrollPanelByStep(nestedSubmenuScrollRef.current, "down")}
-                className="pointer-events-auto h-9 w-9 rounded-full border-border/80 bg-card/95 text-muted-foreground shadow-md backdrop-blur hover:text-primary"
+                className="pointer-events-auto h-9 w-9 rounded-full border-skin-border/80 bg-skin-surface/95 text-skin-text-muted shadow-md backdrop-blur hover:text-skin-primary"
                 aria-label="Ver mais itens do submenu"
               >
                 <ChevronRight className="h-4 w-4 rotate-90" />
@@ -979,7 +979,7 @@ export function Sidebar() {
         </div>
       )}
 
-      <div className="border-t border-border/70 p-1">
+      <div className="border-t border-skin-border/70 p-1">
         {footerRenderQueue.length > 0 && (
           <nav className="space-y-1 pb-1">
             {footerRenderQueue.map(renderQueueEntry)}

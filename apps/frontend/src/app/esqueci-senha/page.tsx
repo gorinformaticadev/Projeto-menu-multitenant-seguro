@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { ArrowLeft, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-// import { PlatformName } from "@/components/PlatformInfo";
-import { ArrowLeft, Mail } from "lucide-react";
-import Link from "next/link";
 import { API_URL } from "@/lib/api";
 
 export default function ForgotPasswordPage() {
@@ -51,14 +50,14 @@ export default function ForgotPasswordPage() {
       } else {
         toast({
           title: "Erro",
-          description: data.message || "Erro ao enviar email de recuperação",
+          description: data.message || "Erro ao enviar email de recuperacao",
           variant: "destructive",
         });
       }
     } catch {
       toast({
         title: "Erro",
-        description: "Erro de conexão. Tente novamente.",
+        description: "Erro de conexao. Tente novamente.",
         variant: "destructive",
       });
     } finally {
@@ -68,31 +67,31 @@ export default function ForgotPasswordPage() {
 
   if (emailSent) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-        <Card className="w-full max-w-md">
+      <div className="auth-theme flex min-h-screen items-center justify-center bg-auth-background p-4 text-auth-text">
+        <Card className="w-full max-w-md border-auth-border bg-auth-surface text-auth-text shadow-xl">
           <CardHeader className="space-y-1">
-            <div className="flex flex-col items-center justify-center mb-4 space-y-3">
-              <div className="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center">
-                <Mail className="h-8 w-8 text-green-600" />
+            <div className="mb-4 flex flex-col items-center justify-center space-y-3">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-skin-success/15">
+                <Mail className="h-8 w-8 text-skin-success" />
               </div>
             </div>
-            <CardTitle className="text-2xl text-center">Email Enviado!</CardTitle>
-            <CardDescription className="text-center">
-              Verifique sua caixa de entrada e siga as instruções para redefinir sua senha
+            <CardTitle className="text-center text-2xl text-auth-text">Email Enviado!</CardTitle>
+            <CardDescription className="text-center text-auth-text-muted">
+              Verifique sua caixa de entrada e siga as instrucoes para redefinir sua senha
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
-                <strong>Não recebeu o email?</strong>
+            <div className="rounded-lg border border-auth-border bg-auth-background/60 p-4">
+              <p className="text-sm text-auth-text">
+                <strong>Nao recebeu o email?</strong>
               </p>
-              <ul className="text-sm text-blue-700 mt-2 space-y-1">
-                <li>• Verifique sua pasta de spam</li>
-                <li>• Aguarde alguns minutos</li>
-                <li>• Certifique-se de que digitou o email correto</li>
+              <ul className="mt-2 space-y-1 text-sm text-auth-text-muted">
+                <li>- Verifique sua pasta de spam</li>
+                <li>- Aguarde alguns minutos</li>
+                <li>- Certifique-se de que digitou o email correto</li>
               </ul>
             </div>
-            
+
             <div className="flex flex-col space-y-2">
               <Button
                 variant="outline"
@@ -100,14 +99,14 @@ export default function ForgotPasswordPage() {
                   setEmailSent(false);
                   setEmail("");
                 }}
-                className="w-full"
+                className="w-full border-auth-border bg-auth-surface text-auth-text hover:bg-auth-background"
               >
                 Tentar outro email
               </Button>
-              
+
               <Link href="/login">
-                <Button variant="ghost" className="w-full">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
+                <Button variant="ghost" className="w-full text-auth-text hover:bg-auth-background">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
                   Voltar ao login
                 </Button>
               </Link>
@@ -119,18 +118,18 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <Card className="w-full max-w-md">
+    <div className="auth-theme flex min-h-screen items-center justify-center bg-auth-background p-4 text-auth-text">
+      <Card className="w-full max-w-md border-auth-border bg-auth-surface text-auth-text shadow-xl">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl text-center">Esqueci minha senha</CardTitle>
-          <CardDescription className="text-center">
-            Digite seu email para receber as instruções de recuperação
+          <CardTitle className="text-center text-2xl text-auth-text">Esqueci minha senha</CardTitle>
+          <CardDescription className="text-center text-auth-text-muted">
+            Digite seu email para receber as instrucoes de recuperacao
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-auth-text">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -139,18 +138,19 @@ export default function ForgotPasswordPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
                 autoFocus
+                className="border-auth-border bg-auth-background text-auth-text placeholder:text-auth-text-muted"
               />
             </div>
-            
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Enviando..." : "Enviar instruções"}
+
+            <Button type="submit" className="w-full bg-auth-primary text-white hover:bg-auth-primary-hover" disabled={loading}>
+              {loading ? "Enviando..." : "Enviar instrucoes"}
             </Button>
           </form>
 
           <div className="mt-4 text-center">
             <Link href="/login">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
+              <Button variant="ghost" size="sm" className="text-auth-text hover:bg-auth-background">
+                <ArrowLeft className="mr-2 h-4 w-4" />
                 Voltar ao login
               </Button>
             </Link>

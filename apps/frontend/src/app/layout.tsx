@@ -13,6 +13,8 @@ import { MaintenanceProvider } from "@/contexts/MaintenanceContext";
 import { MaintenanceBanner } from "@/components/MaintenanceBanner";
 import { SystemNotificationsProvider } from "@/contexts/SystemNotificationsContext";
 
+const AVAILABLE_APP_THEMES = ["light", "dark", "system"] as const;
+
 export const metadata: Metadata = {
   title: "Sistema Multitenant", // Será atualizado dinamicamente pelo DynamicTitle
   description: "Sistema com isolamento de dados e controle de acesso",
@@ -59,7 +61,7 @@ export default function RootLayout({
                       defaultTheme="light"
                       enableSystem
                       disableTransitionOnChange
-                      themes={['light', 'dark', 'system', 'theme-blue', 'theme-emerald', 'theme-violet']}
+                      themes={[...AVAILABLE_APP_THEMES]}
                     >
                       <MaintenanceBanner />
                       <InactivityLogout />

@@ -1,110 +1,81 @@
 "use client";
 
-
 import * as React from "react";
-import { Moon, Sun, Monitor } from "lucide-react";
+import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
 
+function normalizeAppTheme(theme?: string | null): "light" | "dark" | "system" {
+  if (theme === "dark" || theme === "system") {
+    return theme;
+  }
+
+  return "light";
+}
+
 export function ThemeToggle() {
-    const { theme, setTheme } = useTheme();
-    const { user } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const { user } = useAuth();
+  const currentTheme = normalizeAppTheme(theme);
 
-    const updateTheme = async (newTheme: string) => {
-        setTheme(newTheme);
+  const updateTheme = async (newTheme: "light" | "dark" | "system") => {
+    setTheme(newTheme);
 
-        // Persistir apenas se usuário estiver logado
-        if (!user) return;
+    if (!user) {
+      return;
+    }
 
-        try {
-            await api.patch('/users/preferences', { theme: newTheme });
-        } catch (error: unknown) {
-            // Silencioso para o usuário, apenas log
-            let errorData = error;
-            if (
-                typeof error === 'object' &&
-                error !== null &&
-                'response' in error &&
-                (error as { response: { data: unknown } }).response &&
-                typeof (error as { response: { data: unknown } }).response.data === 'object'
-            ) {
-                errorData = (error as { response: { data: unknown } }).response.data;
-            }
-            console.warn('Não foi possível salvar a preferência de tema:', errorData);
-        }
-    };
+    try {
+      await api.patch("/users/preferences", { theme: newTheme });
+    } catch (error: unknown) {
+      let errorData = error;
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        (error as { response: { data: unknown } }).response &&
+        typeof (error as { response: { data: unknown } }).response.data === "object"
+      ) {
+        errorData = (error as { response: { data: unknown } }).response.data;
+      }
+      console.warn("Nao foi possivel salvar a preferencia de tema:", errorData);
+    }
+  };
 
-        return (
-        <div className="px-2 py-2">
-            <div className="mb-2 text-xs font-semibold text-muted-foreground">Modo</div>
-            <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg border border-border">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`flex-1 h-7 px-2 ${theme === 'light' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground'}`}
-                    onClick={() => updateTheme('light')}
-                    title="Claro"
-                >
-                    <Sun className="h-4 w-4" />
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`flex-1 h-7 px-2 ${theme === 'dark' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground'}`}
-                    onClick={() => updateTheme('dark')}
-                    title="Escuro"
-                >
-                    <Moon className="h-4 w-4" />
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`flex-1 h-7 px-2 ${theme === 'system' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground'}`}
-                    onClick={() => updateTheme('system')}
-                    title="Sistema"
-                >
-                    <Monitor className="h-4 w-4" />
-                </Button>
-            </div>
-
-            <div className="mt-3 mb-2 text-xs font-semibold text-muted-foreground">Cores do Sistema</div>
-            <div className="grid grid-cols-4 gap-2">
-                <button
-                    className={`flex items-center justify-center h-8 rounded-full border ${theme === 'light' || theme === 'dark' ? 'border-primary ring-2 ring-offset-1 ring-primary' : 'border-border'}`}
-                    onClick={() => updateTheme('light')}
-                    title="Padrão"
-                    style={{ background: '#2563EB' }}
-                >
-                    { (theme === 'light' || theme === 'dark') && <div className="w-2 h-2 rounded-full bg-white"></div> }
-                </button>
-                <button
-                    className={`flex items-center justify-center h-8 rounded-full border ${theme === 'theme-blue' ? 'border-primary ring-2 ring-offset-1 ring-primary' : 'border-border'}`}
-                    onClick={() => updateTheme('theme-blue')}
-                    style={{ background: '#1d4ed8' }}
-                    title="Azul Safira"
-                >
-                    { theme === 'theme-blue' && <div className="w-2 h-2 rounded-full bg-white"></div> }
-                </button>
-                <button
-                    className={`flex items-center justify-center h-8 rounded-full border ${theme === 'theme-emerald' ? 'border-primary ring-2 ring-offset-1 ring-primary' : 'border-border'}`}
-                    onClick={() => updateTheme('theme-emerald')}
-                    style={{ background: '#059669' }}
-                    title="Esmeralda"
-                >
-                    { theme === 'theme-emerald' && <div className="w-2 h-2 rounded-full bg-white"></div> }
-                </button>
-                <button
-                    className={`flex items-center justify-center h-8 rounded-full border ${theme === 'theme-violet' ? 'border-primary ring-2 ring-offset-1 ring-primary' : 'border-border'}`}
-                    onClick={() => updateTheme('theme-violet')}
-                    style={{ background: '#8b5cf6' }}
-                    title="Violeta"
-                >
-                    { theme === 'theme-violet' && <div className="w-2 h-2 rounded-full bg-white"></div> }
-                </button>
-            </div>
-        </div>
-    );
-
+  return (
+    <div className="px-2 py-2">
+      <div className="mb-2 text-xs font-semibold text-muted-foreground">Modo</div>
+      <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          className={`h-7 flex-1 px-2 ${currentTheme === "light" ? "bg-background text-primary shadow-sm" : "text-muted-foreground"}`}
+          onClick={() => updateTheme("light")}
+          title="Claro"
+        >
+          <Sun className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={`h-7 flex-1 px-2 ${currentTheme === "dark" ? "bg-background text-primary shadow-sm" : "text-muted-foreground"}`}
+          onClick={() => updateTheme("dark")}
+          title="Escuro"
+        >
+          <Moon className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={`h-7 flex-1 px-2 ${currentTheme === "system" ? "bg-background text-primary shadow-sm" : "text-muted-foreground"}`}
+          onClick={() => updateTheme("system")}
+          title="Sistema"
+        >
+          <Monitor className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
 }

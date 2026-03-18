@@ -43,6 +43,31 @@
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
+
+    /* Semantic theme tokens - Light */
+    --color-background: 241 245 249;
+    --color-background-elevated: 248 250 252;
+    --color-surface: 255 255 255;
+    --color-surface-hover: 241 245 249;
+    --color-border: 226 232 240;
+    --color-border-strong: 148 163 184;
+    --color-text: 15 23 42;
+    --color-text-muted: 100 116 139;
+    --color-text-inverse: 255 255 255;
+    --color-primary: 37 99 235;
+    --color-primary-hover: 29 78 216;
+    --color-secondary: 241 245 249;
+    --color-success: 34 197 94;
+    --color-warning: 245 158 11;
+    --color-danger: 239 68 68;
+    --color-info: 14 165 233;
+    --color-input-background: 255 255 255;
+    --color-input-border: 226 232 240;
+    --color-focus-ring: 59 130 246;
+    --color-sidebar-background: 255 255 255;
+    --color-sidebar-text: 71 85 105;
+    --color-sidebar-active: 37 99 235;
+    --color-menu-hover: 241 245 249;
   }
 
   .dark {
@@ -91,22 +116,31 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-  }
 
-  /* Temas de Cor (Accent) */
-  .theme-blue {
-    --primary: 221.2 83.2% 53.3%;
-    --primary-hover: 221.2 75.2% 45.3%;
-  }
-
-  .theme-emerald {
-    --primary: 142.1 76.2% 36.3%;
-    --primary-hover: 142.1 70.2% 30.3%;
-  }
-
-  .theme-violet {
-    --primary: 262.1 83.3% 57.8%;
-    --primary-hover: 262.1 75.3% 50.8%;
+    /* Semantic theme tokens - Dark */
+    --color-background: 10 10 10;
+    --color-background-elevated: 15 15 15;
+    --color-surface: 10 10 10;
+    --color-surface-hover: 38 38 38;
+    --color-border: 38 38 38;
+    --color-border-strong: 70 70 70;
+    --color-text: 250 250 250;
+    --color-text-muted: 163 163 163;
+    --color-text-inverse: 10 10 10;
+    --color-primary: 250 250 250;
+    --color-primary-hover: 226 228 234;
+    --color-secondary: 24 24 27;
+    --color-success: 34 197 94;
+    --color-warning: 245 158 11;
+    --color-danger: 127 29 29;
+    --color-info: 14 165 233;
+    --color-input-background: 10 10 10;
+    --color-input-border: 38 38 38;
+    --color-focus-ring: 60 130 246;
+    --color-sidebar-background: 10 10 10;
+    --color-sidebar-text: 226 232 240;
+    --color-sidebar-active: 250 250 250;
+    --color-menu-hover: 38 38 38;
   }
 }
 
@@ -178,6 +212,17 @@
 
   .text-xs {
     font-size: 0.7rem !important;
+  }
+
+  /* Auth theme is fixed and isolated from app theme switching */
+  .auth-theme {
+    --color-auth-background: 15 23 42;
+    --color-auth-surface: 30 41 59;
+    --color-auth-border: 51 65 85;
+    --color-auth-text: 248 250 252;
+    --color-auth-text-muted: 148 163 184;
+    --color-auth-primary: 79 70 229;
+    --color-auth-primary-hover: 67 56 202;
   }
 }
 
