@@ -4,7 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { moduleRegistry } from "@/lib/module-registry";
-import { isProtectedRoute, isSafeCallbackUrl, ROUTE_CONFIG } from "@/lib/routes";
+import { isProtectedRoute, isAuthRoute, isSafeCallbackUrl, ROUTE_CONFIG } from "@/lib/routes";
 
 export type Role = "SUPER_ADMIN" | "ADMIN" | "USER" | "CLIENT";
 
@@ -182,7 +182,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const loadUser = async () => {
+      if (typeof window !== "undefined" && isAuthRoute(window.location.pathname)) {
+        setLoading(false);
+        return;
+      }
+
       try {
+
         const response = await api.get<User>("/auth/me", {
           timeout: AUTH_REQUEST_TIMEOUT_MS,
         });
