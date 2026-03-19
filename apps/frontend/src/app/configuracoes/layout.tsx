@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { getConfigurationPanelItems } from "@/lib/configuration-menu";
@@ -13,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 export default function ConfiguracoesLayout({
   children,
@@ -22,83 +24,45 @@ export default function ConfiguracoesLayout({
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
-  const layoutRef = useRef<HTMLDivElement>(null);
-  const lastScrollTopRef = useRef(0);
-  const lastToggleScrollTopRef = useRef(0);
-  const [isTopMenuHidden, setIsTopMenuHidden] = useState(false);
+  const desktopNavRef = useRef<HTMLDivElement>(null);
 
-  const visibleItems = getConfigurationPanelItems(user?.role);
+  const visibleItems = useMemo(
+    () => getConfigurationPanelItems(user?.role),
+    [user?.role],
+  );
+
   const activeItem = visibleItems.find(
     (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
   );
 
   useEffect(() => {
-    setIsTopMenuHidden(false);
-    lastToggleScrollTopRef.current = 0;
+    const activeLink = desktopNavRef.current?.querySelector("[aria-current='page']");
+    if (activeLink instanceof HTMLElement) {
+      activeLink.scrollIntoView({
+        inline: "center",
+        block: "nearest",
+        behavior: "smooth",
+      });
+    }
   }, [pathname]);
 
-  useEffect(() => {
-    const scrollContainer = layoutRef.current?.closest("main");
-    if (!(scrollContainer instanceof HTMLElement)) {
+  const scrollDesktopMenu = (direction: "left" | "right") => {
+    const container = desktopNavRef.current;
+    if (!container) {
       return;
     }
 
-    lastScrollTopRef.current = scrollContainer.scrollTop;
-    lastToggleScrollTopRef.current = scrollContainer.scrollTop;
-    let frameId = 0;
-
-    const syncVisibility = () => {
-      const currentScrollTop = scrollContainer.scrollTop;
-      const previousScrollTop = lastScrollTopRef.current;
-      const scrollingDown = currentScrollTop > previousScrollTop;
-      const scrollingUp = currentScrollTop < previousScrollTop;
-      const distanceSinceToggle = Math.abs(currentScrollTop - lastToggleScrollTopRef.current);
-
-      if (currentScrollTop <= 12) {
-        setIsTopMenuHidden(false);
-        lastToggleScrollTopRef.current = currentScrollTop;
-      } else if (!isTopMenuHidden && scrollingDown && distanceSinceToggle >= 96) {
-        setIsTopMenuHidden(true);
-        lastToggleScrollTopRef.current = currentScrollTop;
-      } else if (isTopMenuHidden && scrollingUp && distanceSinceToggle >= 64) {
-        setIsTopMenuHidden(false);
-        lastToggleScrollTopRef.current = currentScrollTop;
-      }
-
-      lastScrollTopRef.current = currentScrollTop;
-      frameId = 0;
-    };
-
-    const handleScroll = () => {
-      if (frameId) {
-        return;
-      }
-
-      frameId = window.requestAnimationFrame(syncVisibility);
-    };
-
-    scrollContainer.addEventListener("scroll", handleScroll, { passive: true });
-
-    return () => {
-      if (frameId) {
-        window.cancelAnimationFrame(frameId);
-      }
-      scrollContainer.removeEventListener("scroll", handleScroll);
-    };
-  }, [isTopMenuHidden]);
+    const amount = Math.max(220, Math.floor(container.clientWidth * 0.65));
+    container.scrollBy({
+      left: direction === "left" ? -amount : amount,
+      behavior: "smooth",
+    });
+  };
 
   return (
-    <div ref={layoutRef} className="min-h-full bg-skin-surface">
+    <div className="min-h-full bg-skin-surface">
       <div className="flex min-h-full min-w-0 flex-1 flex-col pb-20 md:pb-0">
-        <div
-          className={cn(
-            "sticky top-0 z-30 overflow-hidden bg-skin-surface/95 backdrop-blur supports-[backdrop-filter]:bg-skin-surface/85",
-            "transition-[max-height,opacity,transform,border-color] duration-200 ease-out",
-            isTopMenuHidden
-              ? "max-h-0 -translate-y-2 border-b border-transparent opacity-0 pointer-events-none"
-              : "max-h-24 translate-y-0 border-b border-border opacity-100",
-          )}
-        >
+        <div className="sticky top-0 z-30 border-b border-border bg-skin-surface/95 backdrop-blur supports-[backdrop-filter]:bg-skin-surface/90">
           <div className="px-3 py-2 md:px-6">
             <div className="md:hidden">
               <Select
@@ -110,7 +74,7 @@ export default function ConfiguracoesLayout({
                 }}
               >
                 <SelectTrigger className="h-11 rounded-2xl border-border/80 bg-card text-sm font-semibold">
-                  <SelectValue placeholder="Abrir seção de configurações" />
+                  <SelectValue placeholder="Abrir secao de configuracoes" />
                 </SelectTrigger>
                 <SelectContent position="popper" className="max-h-[60vh]">
                   {visibleItems.map((item) => (
@@ -122,30 +86,71 @@ export default function ConfiguracoesLayout({
               </Select>
             </div>
 
-            <nav className="no-scrollbar hidden overflow-x-auto md:block">
-              <div className="flex min-w-max items-center gap-2 pb-1">
-                {visibleItems.map((item) => {
-                  const isActive =
-                    pathname === item.href || pathname.startsWith(`${item.href}/`);
+            <div className="hidden items-center gap-2 md:flex">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => scrollDesktopMenu("left")}
+                className="h-9 w-9 flex-shrink-0 rounded-full border border-border/80 bg-card"
+                aria-label="Ver itens anteriores do menu de configuracoes"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
 
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      aria-current={isActive ? "page" : undefined}
-                      className={cn(
-                        "inline-flex min-h-10 items-center rounded-full border px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition-all",
-                        isActive
-                          ? "border-skin-primary bg-skin-primary text-skin-text-inverse shadow-md shadow-skin-primary/20"
-                          : "border-border/80 bg-card text-skin-text-muted hover:border-skin-primary/20 hover:text-skin-text",
-                      )}
-                    >
-                      {item.name}
-                    </Link>
-                  );
-                })}
-              </div>
-            </nav>
+              <nav
+                ref={desktopNavRef}
+                className="no-scrollbar flex-1 overflow-x-auto scroll-smooth"
+                aria-label="Secoes de configuracoes"
+              >
+                <div className="flex min-w-max items-center gap-2 pb-1">
+                  <Link
+                    href="/configuracoes"
+                    aria-current={pathname === "/configuracoes" ? "page" : undefined}
+                    className={cn(
+                      "inline-flex min-h-10 items-center rounded-full border px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition-all",
+                      pathname === "/configuracoes"
+                        ? "border-skin-primary bg-skin-primary text-skin-text-inverse shadow-md shadow-skin-primary/20"
+                        : "border-border/80 bg-card text-skin-text-muted hover:border-skin-primary/20 hover:text-skin-text",
+                    )}
+                  >
+                    Visao geral
+                  </Link>
+
+                  {visibleItems.map((item) => {
+                    const isActive =
+                      pathname === item.href || pathname.startsWith(`${item.href}/`);
+
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        aria-current={isActive ? "page" : undefined}
+                        className={cn(
+                          "inline-flex min-h-10 items-center rounded-full border px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition-all",
+                          isActive
+                            ? "border-skin-primary bg-skin-primary text-skin-text-inverse shadow-md shadow-skin-primary/20"
+                            : "border-border/80 bg-card text-skin-text-muted hover:border-skin-primary/20 hover:text-skin-text",
+                        )}
+                      >
+                        {item.name}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </nav>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => scrollDesktopMenu("right")}
+                className="h-9 w-9 flex-shrink-0 rounded-full border border-border/80 bg-card"
+                aria-label="Ver proximos itens do menu de configuracoes"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
