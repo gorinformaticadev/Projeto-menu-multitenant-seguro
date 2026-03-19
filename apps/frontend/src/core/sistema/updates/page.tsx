@@ -264,17 +264,17 @@ export default function UpdatesPage() {
    */
   const renderStatusBadge = (logStatus: string) => {
     const statusConfig = {
-      STARTED: { color: 'bg-blue-500', icon: Clock, text: 'Em Andamento' },
-      SUCCESS: { color: 'bg-green-500', icon: CheckCircle, text: 'Sucesso' },
-      FAILED: { color: 'bg-red-500', icon: XCircle, text: 'Falhou' },
-      ROLLED_BACK: { color: 'bg-yellow-500', icon: AlertTriangle, text: 'Rollback' },
+      STARTED: { color: 'bg-skin-info', icon: Clock, text: 'Em Andamento' },
+      SUCCESS: { color: 'bg-skin-success', icon: CheckCircle, text: 'Sucesso' },
+      FAILED: { color: 'bg-skin-danger', icon: XCircle, text: 'Falhou' },
+      ROLLED_BACK: { color: 'bg-skin-warning', icon: AlertTriangle, text: 'Rollback' },
     };
 
     const config = statusConfig[logStatus as keyof typeof statusConfig] || statusConfig.FAILED;
     const Icon = config.icon;
 
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color} text-white`}>
+      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${config.color} text-skin-text-inverse`}>
         <Icon className="w-3 h-3 mr-1" />
         {config.text}
       </span>
@@ -358,7 +358,7 @@ export default function UpdatesPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Versão Atual</Label>
-                      <div className="text-2xl font-bold text-blue-600">
+                      <div className="text-2xl font-bold text-skin-info">
                         {status.currentVersion}
                       </div>
                     </div>
@@ -367,9 +367,9 @@ export default function UpdatesPage() {
                       <Label className="text-sm font-medium">Versão Disponível</Label>
                       <div className="text-2xl font-bold">
                         {status.availableVersion ? (
-                          <span className="text-green-600">{status.availableVersion}</span>
+                          <span className="text-skin-success">{status.availableVersion}</span>
                         ) : (
-                          <span className="text-gray-500">N/A</span>
+                          <span className="text-skin-text-muted">N/A</span>
                         )}
                       </div>
                     </div>
@@ -378,12 +378,12 @@ export default function UpdatesPage() {
                       <Label className="text-sm font-medium">Status</Label>
                       <div>
                         {status.updateAvailable ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500 text-white">
+                        <span className="inline-flex items-center rounded-full bg-skin-success px-2.5 py-0.5 text-xs font-medium text-skin-text-inverse">
                             <Download className="w-3 h-3 mr-1" />
                             Atualização Disponível
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        <span className="inline-flex items-center rounded-full bg-skin-background-elevated px-2.5 py-0.5 text-xs font-medium text-skin-text">
                             <CheckCircle className="w-3 h-3 mr-1" />
                             Atualizado
                           </span>
@@ -403,18 +403,18 @@ export default function UpdatesPage() {
 
             {/* Alertas e Ações */}
             {!status?.isConfigured && (
-              <div className="flex items-start gap-3 p-4 border border-yellow-200 bg-yellow-50 rounded-lg">
-                <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-yellow-800">
+            <div className="flex items-start gap-3 rounded-lg border border-skin-warning/30 bg-skin-warning/10 p-4">
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-skin-warning" />
+              <div className="text-sm text-skin-warning">
                   Sistema não configurado. Configure o repositório Git na aba &quot;Configurações&quot; para habilitar atualizações automáticas.
                 </div>
               </div>
             )}
 
             {status?.updateAvailable && (
-              <div className="flex items-start gap-3 p-4 border border-blue-200 bg-blue-50 rounded-lg">
-                <Download className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-blue-800">
+            <div className="flex items-start gap-3 rounded-lg border border-skin-info/30 bg-skin-info/10 p-4">
+              <Download className="mt-0.5 h-4 w-4 flex-shrink-0 text-skin-info" />
+              <div className="text-sm text-skin-info">
                   Nova versão disponível: {status.availableVersion}.
                   Clique em &quot;Executar Atualização&quot; para atualizar o sistema.
                 </div>
@@ -436,7 +436,7 @@ export default function UpdatesPage() {
                 <Button
                   onClick={() => setShowUpdateConfirm(true)}
                   disabled={loading.update}
-                  className="bg-green-600 hover:bg-green-700"
+                className="bg-skin-success text-skin-text-inverse hover:bg-skin-success/90"
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Executar Atualização
@@ -446,10 +446,10 @@ export default function UpdatesPage() {
 
             {/* Modal de Confirmação */}
             {showUpdateConfirm && (
-              <div className="p-4 border border-yellow-200 bg-yellow-50 rounded-lg">
+              <div className="rounded-lg border border-skin-warning/30 bg-skin-warning/10 p-4">
                 <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                  <div className="text-yellow-800 space-y-3">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-skin-warning" />
+                  <div className="space-y-3 text-skin-warning">
                     <p className="font-medium">
                       Confirma a atualização para a versão {status?.availableVersion}?
                     </p>
@@ -468,7 +468,7 @@ export default function UpdatesPage() {
                         onClick={executeUpdate}
                         disabled={loading.update}
                         size="sm"
-                        className="bg-green-600 hover:bg-green-700"
+                        className="bg-skin-success text-skin-text-inverse hover:bg-skin-success/90"
                       >
                         {loading.update ? (
                           <>
@@ -556,7 +556,7 @@ export default function UpdatesPage() {
                       id="packageManager"
                       value={config.packageManager}
                       onChange={(e) => setConfig(prev => ({ ...prev, packageManager: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-md border border-skin-input-border bg-skin-input-background px-3 py-2 text-skin-text focus:outline-none focus:ring-2 focus:ring-skin-focus-ring"
                     >
                       <option value="npm">npm</option>
                       <option value="pnpm">pnpm</option>
@@ -661,18 +661,18 @@ export default function UpdatesPage() {
                         </div>
 
                         {log.errorMessage && (
-                          <div className="flex items-start gap-2 mt-2 p-3 border border-red-200 bg-red-50 rounded-lg">
-                            <XCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
-                            <div className="text-sm text-red-800">
+                          <div className="mt-2 flex items-start gap-2 rounded-lg border border-skin-danger/30 bg-skin-danger/10 p-3">
+                            <XCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-skin-danger" />
+                            <div className="text-sm text-skin-danger">
                               <strong>Erro:</strong> {log.errorMessage}
                             </div>
                           </div>
                         )}
 
                         {log.rollbackReason && (
-                          <div className="flex items-start gap-2 mt-2 p-3 border border-yellow-200 bg-yellow-50 rounded-lg">
-                            <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                            <div className="text-sm text-yellow-800">
+                          <div className="mt-2 flex items-start gap-2 rounded-lg border border-skin-warning/30 bg-skin-warning/10 p-3">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-skin-warning" />
+                            <div className="text-sm text-skin-warning">
                               <strong>Rollback:</strong> {log.rollbackReason}
                             </div>
                           </div>
@@ -689,4 +689,3 @@ export default function UpdatesPage() {
     </div>
   );
 }
-

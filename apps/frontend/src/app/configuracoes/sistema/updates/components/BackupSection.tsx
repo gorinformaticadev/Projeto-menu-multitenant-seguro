@@ -180,17 +180,17 @@ export function BackupSection({
       </CardHeader>
       <CardContent className="space-y-4">
         {disabled && (
-          <div className="flex items-start gap-3 p-4 border border-amber-200 bg-amber-50 rounded-lg">
-            <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-amber-800">
+          <div className="flex items-start gap-3 rounded-lg border border-skin-warning/30 bg-skin-warning/10 p-4">
+            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-skin-warning" />
+            <div className="text-sm text-skin-warning">
               {disabledReason || 'Acoes de backup estao bloqueadas enquanto o sistema esta em manutencao.'}
             </div>
           </div>
         )}
 
-        <div className="flex items-start gap-3 p-4 border border-blue-200 bg-blue-50 rounded-lg">
-          <AlertCircle className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-blue-800">
+        <div className="flex items-start gap-3 rounded-lg border border-skin-info/30 bg-skin-info/10 p-4">
+          <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-skin-info" />
+          <div className="text-sm text-skin-info">
             <p className="font-medium mb-1">Sobre o Backup:</p>
             <ul className="list-disc list-inside space-y-1">
               <li>Formato PostgreSQL custom (.dump/.backup)</li>
@@ -200,7 +200,7 @@ export function BackupSection({
           </div>
         </div>
 
-        <Button onClick={handleCreateBackup} disabled={loading || disabled} className="bg-blue-600 hover:bg-blue-700">
+        <Button onClick={handleCreateBackup} disabled={loading || disabled} className="bg-skin-primary text-skin-text-inverse hover:bg-skin-primary-hover">
           {loading ? (
             <>
               <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -215,22 +215,22 @@ export function BackupSection({
         </Button>
 
         {loading && (
-          <div className="space-y-2 p-3 border rounded bg-gray-50">
+          <div className="space-y-2 rounded border border-skin-border bg-skin-background-elevated p-3">
             <p className="text-sm font-medium">{progress}</p>
-            <p className="text-xs text-gray-500">Tempo decorrido: {elapsedTime}s</p>
+            <p className="text-xs text-skin-text-muted">Tempo decorrido: {elapsedTime}s</p>
             {progressMessages.map((msg, index) => (
-              <p key={index} className="text-xs text-gray-600 font-mono">
+              <p key={index} className="font-mono text-xs text-skin-text-muted">
                 {msg}
               </p>
             ))}
           </div>
         )}
 
-        <div className="mt-6 pt-6 border-t border-gray-200">
+        <div className="mt-6 border-t border-skin-border pt-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-sm font-semibold text-gray-900">Backups Disponiveis</h3>
-              <p className="text-xs text-gray-500 mt-1">Arquivos salvos no servidor</p>
+              <h3 className="text-sm font-semibold text-skin-text">Backups Disponiveis</h3>
+              <p className="mt-1 text-xs text-skin-text-muted">Arquivos salvos no servidor</p>
             </div>
             <Button onClick={loadAvailableBackups} disabled={loadingBackups || disabled} variant="outline" size="sm">
               <RefreshCw className={`w-3 h-3 mr-1 ${loadingBackups ? 'animate-spin' : ''}`} />
@@ -239,17 +239,17 @@ export function BackupSection({
           </div>
 
           {availableBackups.length === 0 ? (
-            <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
-              <FileDown className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">Nenhum backup encontrado</p>
+            <div className="rounded-lg border border-skin-border bg-skin-background-elevated py-8 text-center">
+              <FileDown className="mx-auto mb-2 h-8 w-8 text-skin-text-muted/50" />
+              <p className="text-sm text-skin-text-muted">Nenhum backup encontrado</p>
             </div>
           ) : (
             <div className="space-y-2">
               {availableBackups.map((backup) => (
-                <div key={backup.id} className="border rounded p-3 flex items-center justify-between">
+                <div key={backup.id} className="flex items-center justify-between rounded border border-skin-border bg-skin-surface p-3">
                   <div>
                     <p className="text-sm font-medium">{backup.fileName}</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-skin-text-muted">
                       {(backup.fileSize / 1024 / 1024).toFixed(2)} MB {' '}•{' '}
                       {new Date(backup.createdAt).toLocaleString('pt-BR')}
                     </p>
