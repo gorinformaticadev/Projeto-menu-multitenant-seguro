@@ -15,7 +15,7 @@ export default function IdentidadePage() {
             <Building2 className="h-8 w-8" />
             Identidade da Plataforma
           </h1>
-          <p className="text-muted-foreground mt-2">
+          <p className="mt-2 text-skin-text-muted">
             Configure as informações básicas da plataforma que serão exibidas no sistema
           </p>
         </div>

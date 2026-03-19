@@ -202,7 +202,7 @@ export function TopBar() {
   );
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-skin-border/80 bg-skin-surface/95 shadow-[0_1px_2px_rgba(15,23,42,0.04)] backdrop-blur supports-[backdrop-filter]:bg-skin-surface/85 dark:bg-skin-surface/90">
+    <div className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-skin-border/80 bg-skin-surface/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-skin-surface/85 dark:bg-skin-surface/90">
 
       {/* OVERLAY DE BUSCA MOBILE */}
       <div
@@ -213,7 +213,7 @@ export function TopBar() {
           variant="ghost"
           size="icon"
           onClick={() => setShowMobileSearch(false)}
-          className="mr-2 flex-shrink-0 text-muted-foreground"
+          className="mr-2 flex-shrink-0 text-skin-text-muted"
         >
           <ArrowLeftIcon className="h-5 w-5" />
         </Button>
@@ -232,7 +232,7 @@ export function TopBar() {
                 className="h-10 w-auto max-w-40 object-contain"
               />
             ) : (
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-skin-primary shadow-[0_10px_24px_rgba(37,99,235,0.18)]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-skin-primary shadow-md">
                 <span className="text-skin-text-inverse font-bold text-lg">S</span>
               </div>
             )}
@@ -303,7 +303,7 @@ export function TopBar() {
                   </div>
                 </div>
               ) : (
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-skin-primary text-skin-text-inverse shadow-[0_6px_16px_rgba(37,99,235,0.18)]">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-skin-primary text-skin-text-inverse shadow-md">
                   {user?.name?.charAt(0).toUpperCase()}
                 </div>
               )}
@@ -318,7 +318,7 @@ export function TopBar() {
 
             {/* Dropdown Menu */}
             {showUserMenu && (
-              <div className="absolute right-0 z-50 mt-2 w-56 rounded-xl border border-skin-border/80 bg-skin-surface py-2 shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:shadow-[0_18px_36px_rgba(2,6,23,0.3)]">
+              <div className="absolute right-0 z-50 mt-2 w-56 rounded-xl border border-skin-border/80 bg-skin-surface py-2 shadow-lg">
                 <div className="border-b border-skin-border px-4 py-2">
                   <div className="flex items-center gap-3 mb-2">
                     {/* Logo da Tenant no Menu */}
@@ -347,7 +347,7 @@ export function TopBar() {
                         </div>
                       </div>
                     ) : (
-                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-skin-primary text-skin-text-inverse shadow-[0_8px_18px_rgba(37,99,235,0.18)]">
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-skin-primary text-skin-text-inverse shadow-md">
                         {user?.name?.charAt(0).toUpperCase()}
                       </div>
                     )}

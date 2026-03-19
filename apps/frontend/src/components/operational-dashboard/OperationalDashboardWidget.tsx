@@ -26,15 +26,15 @@ interface OperationalDashboardWidgetProps {
 
 const toneClassName: Record<WidgetTone, string> = {
   neutral:
-    "border-skin-border/85 bg-skin-surface/96 text-skin-text shadow-[0_16px_34px_-28px_rgba(15,23,42,0.18)]",
+    "border-skin-border/85 bg-skin-surface/96 text-skin-text shadow-sm",
   modern:
-    "border-skin-border-strong/90 bg-skin-surface/95 text-skin-text shadow-[0_22px_48px_-34px_rgba(37,99,235,0.28)]",
+    "border-skin-border-strong/90 bg-skin-surface/95 text-skin-text shadow-md",
   good:
-    "border-skin-success/30 bg-skin-surface/95 text-skin-text shadow-[0_16px_34px_-28px_rgba(16,185,129,0.18)]",
+    "border-skin-success/30 bg-skin-surface/95 text-skin-text shadow-sm",
   warn:
-    "border-skin-warning/30 bg-skin-surface/95 text-skin-text shadow-[0_16px_34px_-28px_rgba(245,158,11,0.18)]",
+    "border-skin-warning/30 bg-skin-surface/95 text-skin-text shadow-sm",
   danger:
-    "border-skin-danger/30 bg-skin-surface/95 text-skin-text shadow-[0_16px_34px_-28px_rgba(244,63,94,0.18)]",
+    "border-skin-danger/30 bg-skin-surface/95 text-skin-text shadow-sm",
 };
 
 const toneDotClassName: Record<WidgetTone, string> = {
@@ -135,8 +135,8 @@ export function OperationalDashboardWidget({
         "relative flex h-full flex-col overflow-hidden rounded-[24px] border backdrop-blur-sm transition-all duration-200",
         toneClassName[tone],
         isInteractive &&
-          "cursor-pointer hover:-translate-y-0.5 hover:border-skin-info/70 hover:shadow-[0_20px_44px_-32px_rgba(37,99,235,0.22)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/80 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        isEditing && "ring-1 ring-skin-info/70 shadow-[0_0_0_1px_rgba(59,130,246,0.18)]",
+          "cursor-pointer hover:-translate-y-0.5 hover:border-skin-info/70 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/80 focus-visible:ring-offset-2 focus-visible:ring-offset-skin-surface",
+        isEditing && "ring-1 ring-skin-info/70 shadow-sm",
       )}
     >
       <div className="pointer-events-none absolute inset-x-8 top-[-3.5rem] h-24 rounded-full bg-skin-info/10 blur-3xl" />
@@ -185,7 +185,7 @@ export function OperationalDashboardWidget({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 shrink-0 rounded-xl text-muted-foreground hover:bg-skin-background-elevated/70 hover:text-foreground"
+                className="h-8 w-8 shrink-0 rounded-xl text-skin-text-muted hover:bg-skin-background-elevated/70 hover:text-skin-text"
                 onClick={() => onHide(id)}
                 title="Ocultar widget"
                 aria-label={`Ocultar widget ${title}`}
@@ -222,7 +222,7 @@ export function OperationalDashboardWidgetSkeleton({
 }) {
   return (
     <Card
-      className="relative flex h-full flex-col overflow-hidden rounded-[24px] border border-skin-border/85 bg-skin-surface/96 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.14)]"
+      className="relative flex h-full flex-col overflow-hidden rounded-[24px] border border-skin-border/85 bg-skin-surface/96 shadow-sm"
       data-testid="operational-dashboard-widget-skeleton"
     >
       <div className="pointer-events-none absolute inset-x-8 top-[-3.5rem] h-24 rounded-full bg-skin-info/10 blur-3xl" />

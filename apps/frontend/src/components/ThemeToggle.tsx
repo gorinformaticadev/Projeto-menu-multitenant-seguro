@@ -46,12 +46,12 @@ export function ThemeToggle() {
 
   return (
     <div className="px-2 py-2">
-      <div className="mb-2 text-xs font-semibold text-muted-foreground">Modo</div>
-      <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+      <div className="mb-2 text-xs font-semibold text-skin-text-muted">Modo</div>
+      <div className="flex items-center gap-1 rounded-lg border border-border bg-skin-background-elevated/60 p-1">
         <Button
           variant="ghost"
           size="sm"
-          className={`h-7 flex-1 px-2 ${currentTheme === "light" ? "bg-background text-primary shadow-sm" : "text-muted-foreground"}`}
+          className={`h-7 flex-1 px-2 ${currentTheme === "light" ? "bg-skin-surface text-skin-primary shadow-sm" : "text-skin-text-muted"}`}
           onClick={() => updateTheme("light")}
           title="Claro"
         >
@@ -60,7 +60,7 @@ export function ThemeToggle() {
         <Button
           variant="ghost"
           size="sm"
-          className={`h-7 flex-1 px-2 ${currentTheme === "dark" ? "bg-background text-primary shadow-sm" : "text-muted-foreground"}`}
+          className={`h-7 flex-1 px-2 ${currentTheme === "dark" ? "bg-skin-surface text-skin-primary shadow-sm" : "text-skin-text-muted"}`}
           onClick={() => updateTheme("dark")}
           title="Escuro"
         >
@@ -69,7 +69,7 @@ export function ThemeToggle() {
         <Button
           variant="ghost"
           size="sm"
-          className={`h-7 flex-1 px-2 ${currentTheme === "system" ? "bg-background text-primary shadow-sm" : "text-muted-foreground"}`}
+          className={`h-7 flex-1 px-2 ${currentTheme === "system" ? "bg-skin-surface text-skin-primary shadow-sm" : "text-skin-text-muted"}`}
           onClick={() => updateTheme("system")}
           title="Sistema"
         >

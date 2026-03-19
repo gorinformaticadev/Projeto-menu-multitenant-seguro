@@ -86,6 +86,30 @@ import {
   OperationalDashboardWidgetSkeleton,
 } from "@/components/operational-dashboard/OperationalDashboardWidget";
 
+const DASHBOARD_TOOLTIP_STYLE = {
+  borderRadius: 14,
+  border: "1px solid var(--dashboard-tooltip-border)",
+  background: "var(--dashboard-tooltip-background)",
+  color: "var(--dashboard-tooltip-text)",
+  fontSize: 11,
+} as const;
+
+const DASHBOARD_TOOLTIP_STYLE_LG = {
+  borderRadius: 16,
+  border: "1px solid var(--dashboard-tooltip-border)",
+  background: "var(--dashboard-tooltip-background)",
+  color: "var(--dashboard-tooltip-text)",
+} as const;
+
+const DASHBOARD_CHART_INFO = "var(--dashboard-chart-info)";
+const DASHBOARD_CHART_INFO_SOFT = "var(--dashboard-chart-info-soft)";
+const DASHBOARD_CHART_SUCCESS = "var(--dashboard-chart-success)";
+const DASHBOARD_CHART_SUCCESS_SOFT = "var(--dashboard-chart-success-soft)";
+const DASHBOARD_CHART_WARNING = "var(--dashboard-chart-warning)";
+const DASHBOARD_CHART_DANGER = "var(--dashboard-chart-danger)";
+const DASHBOARD_CHART_MUTED = "var(--dashboard-chart-muted)";
+const DASHBOARD_CHART_AXIS = "var(--dashboard-chart-axis)";
+
 export type OperationalDashboardFiltersState = {
   periodMinutes: number;
   tenantId: string;
@@ -485,13 +509,7 @@ function MiniTrendSparkline({
                 ? `${numeric.toFixed(0)}${config.valueSuffix || ""}`
                 : "--";
             }}
-            contentStyle={{
-              borderRadius: 14,
-              border: "1px solid rgba(148,163,184,0.18)",
-              background: "rgba(2,6,23,0.96)",
-              color: "#e2e8f0",
-              fontSize: 11,
-            }}
+            contentStyle={DASHBOARD_TOOLTIP_STYLE}
           />
         </AreaChart>
       </ResponsiveContainer>
@@ -1627,9 +1645,9 @@ export function OperationalDashboard({
 
     return {
       statusChart: [
-        { name: "Saudavel", value: counts.good, color: "#22c55e" },
-        { name: "Atencao", value: counts.attention, color: "#f59e0b" },
-        { name: "Restrito", value: counts.restricted, color: "#64748b" },
+        { name: "Saudavel", value: counts.good, color: DASHBOARD_CHART_SUCCESS },
+        { name: "Atencao", value: counts.attention, color: DASHBOARD_CHART_WARNING },
+        { name: "Restrito", value: counts.restricted, color: DASHBOARD_CHART_MUTED },
       ].filter((item) => item.value > 0),
       counts,
       healthDetails,
@@ -1642,8 +1660,8 @@ export function OperationalDashboard({
         ? {
           id: "overview-api-latency-history",
           data: apiHistory,
-          strokeColor: "#38bdf8",
-          fillColor: "rgba(56,189,248,0.24)",
+          strokeColor: DASHBOARD_CHART_INFO,
+          fillColor: DASHBOARD_CHART_INFO_SOFT,
           valueSuffix: "ms",
           emptyLabel: "Sem historico recente de latencia",
         }
@@ -1665,8 +1683,8 @@ export function OperationalDashboard({
             ? {
               id: "overview-api-latency-history",
               data: apiHistory,
-              strokeColor: "#38bdf8",
-              fillColor: "rgba(56,189,248,0.24)",
+              strokeColor: DASHBOARD_CHART_INFO,
+              fillColor: DASHBOARD_CHART_INFO_SOFT,
               valueSuffix: "ms",
               emptyLabel: "Sem historico recente de latencia",
             }
@@ -1692,8 +1710,8 @@ export function OperationalDashboard({
         ? {
           id: "server-memory-history",
           data: memoryHistory,
-          strokeColor: "#22c55e",
-          fillColor: "rgba(34,197,94,0.24)",
+          strokeColor: DASHBOARD_CHART_SUCCESS,
+          fillColor: DASHBOARD_CHART_SUCCESS_SOFT,
           valueSuffix: "%",
           emptyLabel: "Sem historico curto de memoria",
         }
@@ -1909,8 +1927,8 @@ export function OperationalDashboard({
                 config={{
                   id: "widget-api-latency-history",
                   data: apiHistory,
-                  strokeColor: "#38bdf8",
-                  fillColor: "rgba(56,189,248,0.24)",
+                  strokeColor: DASHBOARD_CHART_INFO,
+                  fillColor: DASHBOARD_CHART_INFO_SOFT,
                   valueSuffix: "ms",
                   emptyLabel: "Sem historico recente de latencia",
                 }}
@@ -1923,10 +1941,10 @@ export function OperationalDashboard({
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={apiData} layout="vertical" margin={{ top: 0, right: 0, left: 30, bottom: 0 }}>
                   <XAxis type="number" hide />
-                  <YAxis dataKey="category" type="category" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10 }} width={70} />
-                  <Bar dataKey="latency" fill="#3b82f6" radius={[0, 4, 4, 0]} isAnimationActive={false}>
+                  <YAxis dataKey="category" type="category" axisLine={false} tickLine={false} tick={{ fill: DASHBOARD_CHART_AXIS, fontSize: 10 }} width={70} />
+                  <Bar dataKey="latency" fill={DASHBOARD_CHART_INFO} radius={[0, 4, 4, 0]} isAnimationActive={false}>
                     {apiData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.latency > 1000 ? "#ef4444" : entry.latency > 500 ? "#f59e0b" : "#3b82f6"} />
+                      <Cell key={`cell-${index}`} fill={entry.latency > 1000 ? DASHBOARD_CHART_DANGER : entry.latency > 500 ? DASHBOARD_CHART_WARNING : DASHBOARD_CHART_INFO} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -1965,14 +1983,14 @@ export function OperationalDashboard({
                 <AreaChart data={cpuLoadData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorLoad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                      <stop offset="5%" stopColor={DASHBOARD_CHART_INFO} stopOpacity={0.3} />
+                      <stop offset="95%" stopColor={DASHBOARD_CHART_INFO} stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <Area
                     type="monotone"
                     dataKey="load"
-                    stroke="#3b82f6"
+                    stroke={DASHBOARD_CHART_INFO}
                     strokeWidth={2}
                     fillOpacity={1}
                     fill="url(#colorLoad)"
@@ -1992,8 +2010,8 @@ export function OperationalDashboard({
     const memUsed = Number(memoryMetric?.usedBytes) || 0;
     const memFree = Number(memoryMetric?.freeBytes) || 0;
     const memData = [
-      { name: "Usado", value: memUsed, color: "#ef4444" },
-      { name: "Livre", value: memFree, color: "#22c55e" },
+      { name: "Usado", value: memUsed, color: DASHBOARD_CHART_DANGER },
+      { name: "Livre", value: memFree, color: DASHBOARD_CHART_SUCCESS },
     ];
 
     map.set(
@@ -2043,8 +2061,8 @@ export function OperationalDashboard({
     const diskUsed = Number(diskMetric?.usedBytes) || 0;
     const diskFree = Number(diskMetric?.freeBytes) || 0;
     const diskData = [
-      { name: "Usado", value: diskUsed, color: "#3b82f6" },
-      { name: "Livre", value: diskFree, color: "#334155" },
+      { name: "Usado", value: diskUsed, color: DASHBOARD_CHART_INFO },
+      { name: "Livre", value: diskFree, color: DASHBOARD_CHART_MUTED },
     ];
 
     map.set(
@@ -3114,12 +3132,7 @@ export function OperationalDashboard({
                             `${value} widgets`,
                             String(payload?.payload?.name || "Status"),
                           ]}
-                          contentStyle={{
-                            borderRadius: 16,
-                            border: "1px solid rgba(148,163,184,0.2)",
-                            background: "rgba(2,6,23,0.96)",
-                            color: "#e2e8f0",
-                          }}
+                          contentStyle={DASHBOARD_TOOLTIP_STYLE_LG}
                         />
                       </PieChart>
                     </ResponsiveContainer>

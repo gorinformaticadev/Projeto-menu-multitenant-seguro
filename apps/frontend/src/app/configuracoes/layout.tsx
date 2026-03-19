@@ -88,11 +88,11 @@ export default function ConfiguracoesLayout({
   }, [isTopMenuHidden]);
 
   return (
-    <div ref={layoutRef} className="min-h-full bg-background">
+    <div ref={layoutRef} className="min-h-full bg-skin-surface">
       <div className="flex min-h-full min-w-0 flex-1 flex-col pb-20 md:pb-0">
         <div
           className={cn(
-            "sticky top-0 z-30 overflow-hidden bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85",
+            "sticky top-0 z-30 overflow-hidden bg-skin-surface/95 backdrop-blur supports-[backdrop-filter]:bg-skin-surface/85",
             "transition-[max-height,opacity,transform,border-color] duration-200 ease-out",
             isTopMenuHidden
               ? "max-h-0 -translate-y-2 border-b border-transparent opacity-0 pointer-events-none"
@@ -136,8 +136,8 @@ export default function ConfiguracoesLayout({
                       className={cn(
                         "inline-flex min-h-10 items-center rounded-full border px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition-all",
                         isActive
-                          ? "border-primary bg-primary text-primary-foreground shadow-md shadow-primary/20"
-                          : "border-border/80 bg-card text-muted-foreground hover:border-primary/20 hover:text-foreground",
+                          ? "border-skin-primary bg-skin-primary text-skin-text-inverse shadow-md shadow-skin-primary/20"
+                          : "border-border/80 bg-card text-skin-text-muted hover:border-skin-primary/20 hover:text-skin-text",
                       )}
                     >
                       {item.name}

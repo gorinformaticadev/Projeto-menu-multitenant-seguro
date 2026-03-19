@@ -41,10 +41,10 @@ interface SecurityConfig {
 }
 
 const uncheckedSwitchClassName =
-  "data-[state=unchecked]:bg-destructive/80 disabled:opacity-100 disabled:data-[state=unchecked]:bg-destructive/80";
+  "data-[state=unchecked]:bg-skin-danger/80 disabled:opacity-100 disabled:data-[state=unchecked]:bg-skin-danger/80";
 
 const dashboardCardBaseClassName =
-  "rounded-[28px] border shadow-[0_20px_55px_-36px_rgba(15,23,42,0.35)] backdrop-blur-sm";
+  "rounded-[28px] border shadow-sm backdrop-blur-sm";
 
 const dashboardCardToneClassName = {
   neutral:
@@ -77,12 +77,12 @@ function InfoButton({
         <button
           type="button"
           aria-label={label}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-full text-skin-text-muted transition-colors hover:bg-skin-surface-hover hover:text-skin-text"
         >
           <HelpCircle className="h-4 w-4" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="max-w-xs text-sm leading-6 text-muted-foreground">
+      <PopoverContent align="start" className="max-w-xs text-sm leading-6 text-skin-text-muted">
         {children}
       </PopoverContent>
     </Popover>
@@ -276,7 +276,7 @@ export default function SecurityConfigPage() {
           data-testid="legacy-security-section-loading"
           className={cn(dashboardCardBaseClassName, dashboardCardToneClassName.neutral)}
         >
-          <CardContent className="flex min-h-[120px] items-center justify-center pt-6 text-sm text-muted-foreground">
+          <CardContent className="flex min-h-[120px] items-center justify-center pt-6 text-sm text-skin-text-muted">
             Carregando configurações principais de segurança...
           </CardContent>
         </Card>
@@ -286,9 +286,9 @@ export default function SecurityConfigPage() {
           className={cn(dashboardCardBaseClassName, dashboardCardToneClassName.danger)}
         >
           <CardHeader>
-            <CardTitle className="text-destructive">Falha ao carregar configurações principais</CardTitle>
+            <CardTitle className="text-skin-danger">Falha ao carregar configurações principais</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm text-muted-foreground">
+          <CardContent className="space-y-2 text-sm text-skin-text-muted">
             <p>As configurações antigas baseadas em /security-config não puderam ser carregadas.</p>
             <p>{legacyError ?? "Tente novamente em instantes."}</p>
           </CardContent>
@@ -360,7 +360,7 @@ export default function SecurityConfigPage() {
               </InfoButton>
             </span>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-normal text-muted-foreground">
+              <span className="text-xs font-normal text-skin-text-muted">
                 {process.env.NODE_ENV === 'production' ? 'Status (Produção)' : 'Status (Desenvolvimento)'}
               </span>
               <Switch

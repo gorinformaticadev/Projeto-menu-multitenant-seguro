@@ -50,7 +50,7 @@ export default function ConfiguracoesPage() {
       <div className="p-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold">Configurações</h1>
-          <p className="text-muted-foreground">
+          <p className="text-skin-text-muted">
             Gerencie as configurações do sistema
           </p>
         </div>
@@ -79,16 +79,16 @@ export default function ConfiguracoesPage() {
                 <CardContent>
                   {isRestricted ? (
                     <div>
-                      <p className="text-muted-foreground text-sm mb-4">
+                      <p className="mb-4 text-sm text-skin-text-muted">
                         Funcionalidades em desenvolvimento.
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-skin-text-muted">
                         🚧 Em breve
                       </p>
                     </div>
                   ) : (
                     <div className="flex items-center justify-between">
-                      <p className="text-muted-foreground text-sm">
+                      <p className="text-sm text-skin-text-muted">
                         Clique para acessar
                       </p>
                       <Button asChild variant="outline" size="sm">
@@ -108,17 +108,17 @@ export default function ConfiguracoesPage() {
         {/* Informações do usuário */}
         <div className="mt-8 p-4 bg-muted rounded-lg">
           <div className="flex items-center gap-2 mb-2">
-            <Shield className="h-4 w-4 text-muted-foreground" />
+            <Shield className="h-4 w-4 text-skin-text-muted" />
             <span className="text-sm font-medium">Informações de Acesso</span>
           </div>
-          <div className="text-sm text-muted-foreground">
+          <div className="text-sm text-skin-text-muted">
             <p>Usuário: <span className="font-medium">{user?.name}</span></p>
             <p>Nível de acesso: <span className="font-medium">{user?.role}</span></p>
             {user?.role === "SUPER_ADMIN" && (
-              <p className="text-green-600 mt-1">✓ Acesso completo a todas as configurações</p>
+              <p className="mt-1 text-skin-success">✓ Acesso completo a todas as configurações</p>
             )}
             {user?.role === "ADMIN" && (
-              <p className="text-blue-600 mt-1">ℹ Acesso limitado às configurações da empresa</p>
+              <p className="mt-1 text-skin-info">ℹ Acesso limitado às configurações da empresa</p>
             )}
           </div>
         </div>
