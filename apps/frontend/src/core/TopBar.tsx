@@ -208,7 +208,7 @@ export function TopBar() {
   }, []);
 
   return (
-    <div className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 shadow-sm z-50">
+    <div className="fixed top-0 left-0 right-0 h-16 bg-skin-surface border-b border-skin-border shadow-sm z-50">
       <div className="h-full px-4 flex items-center justify-between">
         {/* Logo e Nome do Sistema */}
         <div className="flex items-center gap-3">
@@ -227,9 +227,9 @@ export function TopBar() {
             )}
           </div>
           <div className="hidden md:block">
-            <h1 className="text-lg font-bold text-gray-900">{platformName}</h1>
+            <h1 className="text-lg font-bold text-skin-text">{platformName}</h1>
             {user?.tenant && (
-              <p className="text-xs text-gray-500">{user.tenant.nomeFantasia}</p>
+              <p className="text-xs text-skin-text-muted">{user.tenant.nomeFantasia}</p>
             )}
           </div>
         </div>
@@ -237,11 +237,11 @@ export function TopBar() {
         {/* Barra de Busca (Centro) */}
         <div className="hidden lg:flex flex-1 max-w-xl mx-4">
           <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-skin-text-muted" />
             <input
               type="text"
               placeholder="Buscar..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-skin-border-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             />
           </div>
         </div>
@@ -263,37 +263,37 @@ export function TopBar() {
             >
               <Bell className="h-5 w-5" />
               {notifications.length > 0 && (
-                <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
+                <span className="absolute top-1 right-1 h-2 w-2 bg-skin-danger rounded-full"></span>
               )}
             </Button>
 
             {/* Dropdown de Notificações */}
             {showNotifications && (
-              <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                <div className="px-4 py-2 border-b border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-900">Notificações</h3>
+              <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-skin-border py-2 z-50">
+                <div className="px-4 py-2 border-b border-skin-border">
+                  <h3 className="text-sm font-semibold text-skin-text">Notificações</h3>
                 </div>
 
                 {notifications.length === 0 ? (
                   <div className="px-4 py-8 text-center">
-                    <Bell className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">Sem notificações</p>
-                    <p className="text-xs text-gray-400 mt-1">Você está em dia!</p>
+                    <Bell className="h-8 w-8 text-skin-text-muted/60 mx-auto mb-2" />
+                    <p className="text-sm text-skin-text-muted">Sem notificações</p>
+                    <p className="text-xs text-skin-text-muted mt-1">Você está em dia!</p>
                   </div>
                 ) : (
                   <div className="max-h-96 overflow-y-auto">
                     {notifications.map((notification, index) => (
-                      <div key={index} className="px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0">
+                      <div key={index} className="px-4 py-3 hover:bg-skin-background-elevated border-b border-skin-border/60 last:border-b-0">
                         <div className="flex items-start gap-3">
-                          <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                          <div className="w-2 h-2 bg-skin-info rounded-full mt-2 flex-shrink-0"></div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">
+                            <p className="text-sm font-medium text-skin-text truncate">
                               {notification.title}
                             </p>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className="text-xs text-skin-text-muted mt-1">
                               {notification.message}
                             </p>
-                            <p className="text-xs text-gray-400 mt-1">
+                            <p className="text-xs text-skin-text-muted mt-1">
                               {notification.time}
                             </p>
                           </div>
@@ -304,9 +304,9 @@ export function TopBar() {
                 )}
 
                 {notifications.length > 0 && (
-                  <div className="px-4 py-2 border-t border-gray-200">
+                  <div className="px-4 py-2 border-t border-skin-border">
                     <button
-                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                      className="text-xs text-skin-info hover:text-skin-info font-medium"
                       onClick={() => {
                         setNotifications([]);
                         setShowNotifications(false);
@@ -329,7 +329,7 @@ export function TopBar() {
             >
               {/* Logo do Tenant do Usuário */}
               {userMenuImageSrc ? (
-                <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 relative">
+                <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-skin-background-elevated relative">
                   <Image
                     src={userMenuImageSrc}
                     alt="Logo Tenant"
@@ -363,21 +363,21 @@ export function TopBar() {
               )}
               <div className="hidden md:block text-left">
                 {user?.tenant?.nomeFantasia && (
-                  <p className="text-sm text-blue-600 font-medium truncate">{user.tenant.nomeFantasia}</p>
+                  <p className="text-sm text-skin-info font-medium truncate">{user.tenant.nomeFantasia}</p>
                 )}
                 <p className="text-sm font-medium">{user?.name}</p>
-                <p className="text-[10px] text-gray-500">{user?.role}</p>
+                <p className="text-[10px] text-skin-text-muted">{user?.role}</p>
               </div>
             </Button>
 
             {/* Dropdown Menu */}
             {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                <div className="px-4 py-2 border-b border-gray-200">
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-skin-border py-2 z-50">
+                <div className="px-4 py-2 border-b border-skin-border">
                   <div className="flex items-center gap-3 mb-2">
                     {/* Logo da Tenant no Menu */}
                     {userMenuImageSrc ? (
-                      <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 flex-shrink-0 relative">
+                      <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-skin-background-elevated flex-shrink-0 relative">
                         <Image
                           src={userMenuImageSrc}
                           alt="Logo Tenant"
@@ -411,17 +411,17 @@ export function TopBar() {
                     )}
                     <div className="flex-1 min-w-0">
                       {user?.tenant?.nomeFantasia && (
-                        <p className="text-sm text-blue-600 font-medium truncate mb-1">{user.tenant.nomeFantasia}</p>
+                        <p className="text-sm text-skin-info font-medium truncate mb-1">{user.tenant.nomeFantasia}</p>
                       )}
-                      <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
-                      <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                      <p className="text-sm font-medium text-skin-text truncate">{user?.name}</p>
+                      <p className="text-xs text-skin-text-muted truncate">{user?.email}</p>
                     </div>
                   </div>
                 </div>
                 <a
                   href="/perfil"
                   onClick={() => setShowUserMenu(false)}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-skin-background-elevated flex items-center gap-2"
                 >
                   <User className="h-4 w-4" />
                   Meu Perfil
@@ -432,32 +432,32 @@ export function TopBar() {
                   <a
                     href="/configuracoes/sistema/updates"
                     onClick={() => setShowUserMenu(false)}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-skin-background-elevated flex items-center gap-2"
                     title="Clique para gerenciar atualizações"
                   >
                     <Info className="h-4 w-4" />
                     <div>
-                      <span className="text-xs text-gray-600">Versão do Sistema</span>
-                      <div className="text-xs font-mono font-medium text-gray-800">{systemVersion}</div>
+                      <span className="text-xs text-skin-text-muted">Versão do Sistema</span>
+                      <div className="text-xs font-mono font-medium text-skin-text">{systemVersion}</div>
                     </div>
                   </a>
                 ) : (
-                  <div className="px-4 py-2 text-left text-sm text-gray-500 flex items-center gap-2 cursor-default">
+                  <div className="px-4 py-2 text-left text-sm text-skin-text-muted flex items-center gap-2 cursor-default">
                     <Info className="h-4 w-4" />
                     <div>
                       <span className="text-xs">Versão do Sistema</span>
-                      <div className="text-xs font-mono font-medium text-gray-700">{systemVersion}</div>
+                      <div className="text-xs font-mono font-medium text-skin-text">{systemVersion}</div>
                     </div>
                   </div>
                 )}
 
-                <div className="border-t border-gray-200 mt-2 pt-2">
+                <div className="border-t border-skin-border mt-2 pt-2">
                   <button
                     onClick={() => {
                       setShowUserMenu(false);
                       logout();
                     }}
-                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                    className="w-full px-4 py-2 text-left text-sm text-skin-danger hover:bg-skin-danger/10 flex items-center gap-2"
                   >
                     <LogOut className="h-4 w-4" />
                     Sair
@@ -471,3 +471,5 @@ export function TopBar() {
     </div>
   );
 }
+
+

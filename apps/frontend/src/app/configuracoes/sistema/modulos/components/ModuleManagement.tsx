@@ -526,7 +526,7 @@ export function ModuleManagement() {
         description:
           response.data.message ||
           "Migracoes e seeds pendentes foram executados com sucesso.",
-        className: "bg-green-50 border-green-200 text-green-800",
+        className: "bg-skin-success/10 border-skin-success/30 text-skin-success",
       });
 
       await refreshModuleData(moduleName);
@@ -658,7 +658,7 @@ export function ModuleManagement() {
           disabled: false,
           description: "Ativa o modulo globalmente no sistema.",
           variant: "default",
-          className: "bg-green-600 hover:bg-green-700",
+          className: "bg-skin-success hover:bg-skin-success",
         };
       }
 
@@ -796,7 +796,7 @@ export function ModuleManagement() {
             </CardHeader>
             <CardContent>
               {!loadingCapabilities && installerCapabilities && !moduleUploadEnabled && (
-                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <div className="mb-4 rounded-lg border border-skin-warning/30 bg-skin-warning/10 p-4 text-sm text-skin-warning">
                   <p className="font-medium">Instalador interno em modo restrito</p>
                   <p className="mt-1">
                     Ambiente atual: <strong>{installerCapabilities.environment}</strong>.{" "}
@@ -829,28 +829,28 @@ export function ModuleManagement() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="rounded-2xl border border-green-200 bg-green-50 p-4">
+                  <div className="rounded-2xl border border-skin-success/30 bg-skin-success/10 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="rounded-xl bg-green-100 p-2">
-                          <Package className="h-6 w-6 text-green-600" />
+                        <div className="rounded-xl bg-skin-success/15 p-2">
+                          <Package className="h-6 w-6 text-skin-success" />
                         </div>
                         <div>
-                          <h3 className="font-semibold text-green-800">Arquivo selecionado</h3>
-                          <p className="text-sm text-green-700">Pronto para instalacao</p>
+                          <h3 className="font-semibold text-skin-success">Arquivo selecionado</h3>
+                          <p className="text-sm text-skin-success">Pronto para instalacao</p>
                         </div>
                       </div>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={clearSelectedFile}
-                        className="text-green-600 hover:text-green-700"
+                        className="text-skin-success hover:text-skin-success"
                       >
                         x
                       </Button>
                     </div>
 
-                    <div className="mt-4 grid gap-2 text-sm text-green-800 sm:grid-cols-2">
+                    <div className="mt-4 grid gap-2 text-sm text-skin-success sm:grid-cols-2">
                       <p>
                         <span className="font-medium">Nome:</span> {selectedFile.name}
                       </p>
@@ -928,12 +928,12 @@ export function ModuleManagement() {
                 </div>
               </div>
 
-              <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 p-4">
-                <h4 className="mb-2 flex items-center gap-2 font-medium text-blue-800">
+              <div className="mt-4 rounded-2xl border border-skin-info/30 bg-skin-info/10 p-4">
+                <h4 className="mb-2 flex items-center gap-2 font-medium text-skin-info">
                   <Settings className="h-4 w-4" />
                   Instalacao global
                 </h4>
-                <p className="text-sm text-blue-700">
+                <p className="text-sm text-skin-info">
                   Os modulos instalados aqui ficam disponiveis para todos os tenants do sistema.
                   Cada tenant pode ativa-los ou desativa-los individualmente em suas configuracoes.
                 </p>
@@ -1270,8 +1270,8 @@ export function ModuleManagement() {
                           </div>
                         )}
 
-                        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
-                          <p className="text-sm text-blue-800">
+                        <div className="rounded-2xl border border-skin-info/30 bg-skin-info/10 p-4">
+                          <p className="text-sm text-skin-info">
                             Este modulo esta instalado globalmente. A habilitacao por tenant
                             continua sendo feita nas configuracoes da empresa.
                           </p>
@@ -1372,13 +1372,13 @@ export function ModuleManagement() {
                                   <Badge variant="outline" className="bg-white/70">
                                     Total {selectedModule.npmDependencies?.total ?? 0}
                                   </Badge>
-                                  <Badge variant="outline" className="bg-green-50 text-green-800">
+                                  <Badge variant="outline" className="bg-skin-success/10 text-skin-success">
                                     Instaladas {selectedModule.npmDependencies?.installed ?? 0}
                                   </Badge>
-                                  <Badge variant="outline" className="bg-amber-50 text-amber-900">
+                                  <Badge variant="outline" className="bg-skin-warning/10 text-skin-warning">
                                     Pendentes {selectedModule.npmDependencies?.pending ?? 0}
                                   </Badge>
-                                  <Badge variant="outline" className="bg-red-50 text-red-800">
+                                  <Badge variant="outline" className="bg-skin-danger/10 text-skin-danger">
                                     Conflitos {selectedModule.npmDependencies?.conflicts ?? 0}
                                   </Badge>
                                 </div>
@@ -1412,11 +1412,11 @@ export function ModuleManagement() {
                                                   className={cn(
                                                     "text-[10px]",
                                                     dep.status === "installed" &&
-                                                      "bg-green-50 text-green-800 border-green-200",
+                                                      "bg-skin-success/10 text-skin-success border-skin-success/30",
                                                     dep.status === "pending" &&
-                                                      "bg-amber-50 text-amber-900 border-amber-200",
+                                                      "bg-skin-warning/10 text-skin-warning border-skin-warning/30",
                                                     dep.status === "conflict" &&
-                                                      "bg-red-50 text-red-800 border-red-200",
+                                                      "bg-skin-danger/10 text-skin-danger border-skin-danger/30",
                                                   )}
                                                 >
                                                   {dep.status}
@@ -1443,11 +1443,11 @@ export function ModuleManagement() {
                             </div>
 
                             {selectedModule.lifecycle.blockers.length > 0 && (
-                              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                                <p className="text-sm font-medium text-amber-900">
+                              <div className="rounded-2xl border border-skin-warning/30 bg-skin-warning/10 p-4">
+                                <p className="text-sm font-medium text-skin-warning">
                                   Bloqueios detectados
                                 </p>
-                                <ul className="mt-2 space-y-1 text-sm text-amber-800">
+                                <ul className="mt-2 space-y-1 text-sm text-skin-warning">
                                   {selectedModule.lifecycle.blockers.map((blocker) => (
                                     <li key={blocker}>- {blocker}</li>
                                   ))}
@@ -1596,3 +1596,5 @@ export function ModuleManagement() {
     </div>
   );
 }
+
+

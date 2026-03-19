@@ -435,10 +435,10 @@ export default function UpdatesPage() {
    */
   const renderStatusBadge = (logStatus: string) => {
     const statusConfig = {
-      STARTED: { color: 'bg-blue-500', icon: Clock, text: 'Em Andamento' },
-      SUCCESS: { color: 'bg-green-500', icon: CheckCircle, text: 'Sucesso' },
-      FAILED: { color: 'bg-red-500', icon: XCircle, text: 'Falhou' },
-      ROLLED_BACK: { color: 'bg-yellow-500', icon: AlertTriangle, text: 'Rollback' },
+      STARTED: { color: 'bg-skin-info/100', icon: Clock, text: 'Em Andamento' },
+      SUCCESS: { color: 'bg-skin-success/100', icon: CheckCircle, text: 'Sucesso' },
+      FAILED: { color: 'bg-skin-danger/100', icon: XCircle, text: 'Falhou' },
+      ROLLED_BACK: { color: 'bg-skin-warning/100', icon: AlertTriangle, text: 'Rollback' },
     };
 
     const config = statusConfig[logStatus as keyof typeof statusConfig] || statusConfig.FAILED;
@@ -491,9 +491,9 @@ export default function UpdatesPage() {
 
 
       {isMaintenanceActive && (
-        <div className="flex items-start gap-3 p-4 border border-amber-200 bg-amber-50 rounded-lg">
-          <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-amber-800">
+        <div className="flex items-start gap-3 p-4 border border-skin-warning/30 bg-skin-warning/10 rounded-lg">
+          <AlertTriangle className="h-4 w-4 text-skin-warning flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-skin-warning">
             Sistema em manutencao: {maintenanceReason}. Acoes criticas estao temporariamente bloqueadas.
           </div>
         </div>
@@ -547,7 +547,7 @@ export default function UpdatesPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Versão Atual</Label>
-                      <div className="text-2xl font-bold text-blue-600">
+                      <div className="text-2xl font-bold text-skin-info">
                         {versionLoading ? 'carregando...' : version}
                       </div>
                     </div>
@@ -556,9 +556,9 @@ export default function UpdatesPage() {
                       <Label className="text-sm font-medium">Versão Disponível</Label>
                       <div className="text-2xl font-bold">
                         {status.availableVersion ? (
-                          <span className="text-green-600">{status.availableVersion}</span>
+                          <span className="text-skin-success">{status.availableVersion}</span>
                         ) : (
-                          <span className="text-gray-500">N/A</span>
+                          <span className="text-skin-text-muted">N/A</span>
                         )}
                       </div>
                     </div>
@@ -567,12 +567,12 @@ export default function UpdatesPage() {
                       <Label className="text-sm font-medium">Status</Label>
                       <div>
                         {status.updateAvailable ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500 text-white">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-skin-success/100 text-white">
                             <Download className="w-3 h-3 mr-1" />
                             Atualização Disponível
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-skin-background-elevated text-skin-text">
                             <CheckCircle className="w-3 h-3 mr-1" />
                             Atualizado
                           </span>
@@ -584,12 +584,12 @@ export default function UpdatesPage() {
                       <Label className="text-sm font-medium">Modo de Instalação</Label>
                       <div className="flex items-center gap-2">
                         {status.mode === 'docker' ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-skin-info/15 text-skin-info">
                             <Settings className="w-3 h-3 mr-1" />
                             Container Docker
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-skin-secondary/20 text-skin-text">
                             <Monitor className="w-3 h-3 mr-1" />
                             Nativo (PM2)
                           </span>
@@ -626,7 +626,7 @@ export default function UpdatesPage() {
                       Última verificação: {new Date(status.lastCheck).toLocaleString('pt-BR')}
                     </div>
                     {status.mode === 'native' && (
-                      <div className="flex items-center text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                      <div className="flex items-center text-xs text-skin-warning bg-skin-warning/10 px-2 py-1 rounded">
                         <AlertTriangle className="w-3 h-3 mr-1" />
                         Aviso: Build nativo pode levar até 10 minutos.
                       </div>
@@ -652,9 +652,9 @@ export default function UpdatesPage() {
                     </span>
                     <span className="font-medium">{Math.max(0, Math.min(100, status.updateLifecycle.progress || 0))}%</span>
                   </div>
-                  <div className="h-2 w-full rounded bg-slate-200 overflow-hidden">
+                  <div className="h-2 w-full rounded bg-skin-border overflow-hidden">
                     <div
-                      className="h-2 rounded bg-blue-600 transition-all duration-300"
+                      className="h-2 rounded bg-skin-primary transition-all duration-300"
                       style={{ width: `${Math.max(0, Math.min(100, status.updateLifecycle.progress || 0))}%` }}
                     />
                   </div>
@@ -664,9 +664,9 @@ export default function UpdatesPage() {
                     </div>
                   )}
                   {status.updateLifecycle.error && (
-                    <div className="flex items-start gap-2 p-3 border border-red-200 bg-red-50 rounded-lg">
-                      <XCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
-                      <div className="text-sm text-red-800 space-y-1">
+                    <div className="flex items-start gap-2 p-3 border border-skin-danger/30 bg-skin-danger/10 rounded-lg">
+                      <XCircle className="h-4 w-4 text-skin-danger flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-skin-danger space-y-1">
                         <div>
                           <strong>Falha:</strong> {status.updateLifecycle.error.userMessage}
                         </div>
@@ -680,18 +680,18 @@ export default function UpdatesPage() {
               </Card>
             )}
             {!status?.isConfigured && (
-              <div className="flex items-start gap-3 p-4 border border-yellow-200 bg-yellow-50 rounded-lg">
-                <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-yellow-800">
+              <div className="flex items-start gap-3 p-4 border border-skin-warning/30 bg-skin-warning/10 rounded-lg">
+                <AlertTriangle className="h-4 w-4 text-skin-warning flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-skin-warning">
                   Sistema não configurado. Configure o repositório Git na aba &quot;Configurações&quot; para habilitar atualizações automáticas.
                 </div>
               </div>
             )}
 
             {status?.updateAvailable && (
-              <div className="flex items-start gap-3 p-4 border border-blue-200 bg-blue-50 rounded-lg">
-                <Download className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-blue-800">
+              <div className="flex items-start gap-3 p-4 border border-skin-info/30 bg-skin-info/10 rounded-lg">
+                <Download className="h-4 w-4 text-skin-info flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-skin-info">
                   Nova versão disponível: {status.availableVersion}.
                   Clique em &quot;Executar Atualização&quot; para atualizar o sistema.
                 </div>
@@ -713,7 +713,7 @@ export default function UpdatesPage() {
                 <Button
                   onClick={() => setShowUpdateConfirm(true)}
                   disabled={isUpdateRunning || isMaintenanceActive}
-                  className="bg-green-600 hover:bg-green-700"
+                  className="bg-skin-success hover:bg-skin-success"
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Executar Atualização
@@ -723,10 +723,10 @@ export default function UpdatesPage() {
 
             {/* Modal de Confirmação */}
             {showUpdateConfirm && (
-              <div className="p-4 border border-yellow-200 bg-yellow-50 rounded-lg">
+              <div className="p-4 border border-skin-warning/30 bg-skin-warning/10 rounded-lg">
                 <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                  <div className="text-yellow-800 space-y-3">
+                  <AlertTriangle className="h-4 w-4 text-skin-warning flex-shrink-0 mt-0.5" />
+                  <div className="text-skin-warning space-y-3">
                     <p className="font-medium">
                       Confirma a atualização para a versão {status?.availableVersion}?
                     </p>
@@ -745,7 +745,7 @@ export default function UpdatesPage() {
                         onClick={executeUpdate}
                         disabled={isUpdateRunning || isMaintenanceActive}
                         size="sm"
-                        className="bg-green-600 hover:bg-green-700"
+                        className="bg-skin-success hover:bg-skin-success"
                       >
                         {loading.update ? (
                           <>
@@ -824,7 +824,7 @@ export default function UpdatesPage() {
                       id="packageManager"
                       value={config.packageManager}
                       onChange={(e) => setConfig(prev => ({ ...prev, packageManager: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-skin-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-skin-focus-ring"
                     >
                       <option value="docker">docker</option>
                       <option value="npm">npm</option>
@@ -913,9 +913,9 @@ export default function UpdatesPage() {
                               <span className="font-medium">
                                 {log.operationType === 'BACKUP' ? '💾 Backup' : '⬆️ Restore'}
                               </span>
-                              <span className={`px-2 py-1 text-xs rounded-full ${log.status === 'SUCCESS' ? 'bg-green-100 text-green-800' :
-                                log.status === 'FAILED' ? 'bg-red-100 text-red-800' :
-                                  'bg-gray-100 text-gray-800'
+                              <span className={`px-2 py-1 text-xs rounded-full ${log.status === 'SUCCESS' ? 'bg-skin-success/15 text-skin-success' :
+                                log.status === 'FAILED' ? 'bg-skin-danger/15 text-skin-danger' :
+                                  'bg-skin-background-elevated text-skin-text'
                                 }`}>
                                 {log.status}
                               </span>
@@ -943,9 +943,9 @@ export default function UpdatesPage() {
                           </div>
 
                           {log.errorMessage && (
-                            <div className="flex items-start gap-2 mt-2 p-3 border border-red-200 bg-red-50 rounded-lg">
-                              <XCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
-                              <div className="text-sm text-red-800">
+                            <div className="flex items-start gap-2 mt-2 p-3 border border-skin-danger/30 bg-skin-danger/10 rounded-lg">
+                              <XCircle className="h-4 w-4 text-skin-danger flex-shrink-0 mt-0.5" />
+                              <div className="text-sm text-skin-danger">
                                 <strong>Erro:</strong> {log.errorMessage}
                               </div>
                             </div>
@@ -1029,7 +1029,7 @@ export default function UpdatesPage() {
                       id="packageManager"
                       value={config.packageManager}
                       onChange={(e) => setConfig(prev => ({ ...prev, packageManager: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-skin-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-skin-focus-ring"
                     >
                       <option value="docker">docker</option>
                       <option value="npm">npm</option>
@@ -1135,18 +1135,18 @@ export default function UpdatesPage() {
                         </div>
 
                         {log.errorMessage && (
-                          <div className="flex items-start gap-2 mt-2 p-3 border border-red-200 bg-red-50 rounded-lg">
-                            <XCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
-                            <div className="text-sm text-red-800">
+                          <div className="flex items-start gap-2 mt-2 p-3 border border-skin-danger/30 bg-skin-danger/10 rounded-lg">
+                            <XCircle className="h-4 w-4 text-skin-danger flex-shrink-0 mt-0.5" />
+                            <div className="text-sm text-skin-danger">
                               <strong>Erro:</strong> {log.errorMessage}
                             </div>
                           </div>
                         )}
 
                         {log.rollbackReason && (
-                          <div className="flex items-start gap-2 mt-2 p-3 border border-yellow-200 bg-yellow-50 rounded-lg">
-                            <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                            <div className="text-sm text-yellow-800">
+                          <div className="flex items-start gap-2 mt-2 p-3 border border-skin-warning/30 bg-skin-warning/10 rounded-lg">
+                            <AlertTriangle className="h-4 w-4 text-skin-warning flex-shrink-0 mt-0.5" />
+                            <div className="text-sm text-skin-warning">
                               <strong>Rollback:</strong> {log.rollbackReason}
                             </div>
                           </div>
@@ -1163,6 +1163,8 @@ export default function UpdatesPage() {
     </div>
   );
 }
+
+
 
 
 

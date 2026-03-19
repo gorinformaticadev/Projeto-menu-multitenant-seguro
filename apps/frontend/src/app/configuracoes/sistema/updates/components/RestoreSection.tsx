@@ -213,26 +213,26 @@ export function RestoreSection({
   const restoreStatusUi =
     normalizedRestoreStatus === 'SUCCESS'
       ? {
-          container: 'border-emerald-200 bg-emerald-50',
-          text: 'text-emerald-900',
-          icon: 'text-emerald-600',
-          step: 'text-emerald-800',
-          error: 'text-emerald-800',
+          container: 'border-skin-success/30 bg-skin-success/10',
+          text: 'text-skin-success',
+          icon: 'text-skin-success',
+          step: 'text-skin-success',
+          error: 'text-skin-success',
         }
       : normalizedRestoreStatus === 'FAILED' || normalizedRestoreStatus === 'CANCELED'
         ? {
-            container: 'border-red-200 bg-red-50',
-            text: 'text-red-900',
-            icon: 'text-red-600',
-            step: 'text-red-800',
-            error: 'text-red-800',
+            container: 'border-skin-danger/30 bg-skin-danger/10',
+            text: 'text-skin-danger',
+            icon: 'text-skin-danger',
+            step: 'text-skin-danger',
+            error: 'text-skin-danger',
           }
         : {
-            container: 'border-blue-200 bg-blue-50',
-            text: 'text-blue-900',
-            icon: 'text-blue-600',
-            step: 'text-blue-800',
-            error: 'text-blue-800',
+            container: 'border-skin-info/30 bg-skin-info/10',
+            text: 'text-skin-info',
+            icon: 'text-skin-info',
+            step: 'text-skin-info',
+            error: 'text-skin-info',
           };
 
   return (
@@ -246,17 +246,17 @@ export function RestoreSection({
       </CardHeader>
       <CardContent className="space-y-4">
         {disabled && (
-          <div className="flex items-start gap-3 p-4 border border-amber-200 bg-amber-50 rounded-lg">
-            <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-amber-800">
+          <div className="flex items-start gap-3 rounded-lg border border-skin-warning/30 bg-skin-warning/10 p-4">
+            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-skin-warning" />
+            <div className="text-sm text-skin-warning">
               {disabledReason || 'Acoes de restore estao bloqueadas enquanto o sistema esta em manutencao.'}
             </div>
           </div>
         )}
 
-        <div className="flex items-start gap-3 p-4 border border-red-200 bg-red-50 rounded-lg">
-          <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-red-800">
+        <div className="flex items-start gap-3 rounded-lg border border-skin-danger/30 bg-skin-danger/10 p-4">
+          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-skin-danger" />
+          <div className="text-sm text-skin-danger">
             <p className="font-bold mb-1">Operacao destrutiva</p>
             <ul className="list-disc list-inside space-y-1">
               <li>Cria staging + validacao antes do cutover</li>
@@ -307,7 +307,7 @@ export function RestoreSection({
           </div>
           <select
             id="backup-select"
-            className="w-full px-3 py-2 border rounded-md"
+            className="w-full rounded-md border border-skin-input-border bg-skin-input-background px-3 py-2 text-skin-text"
             value={selectedBackupId}
             onChange={(e) => {
               const selected = availableBackups.find((item) => item.id === e.target.value);
@@ -353,7 +353,7 @@ export function RestoreSection({
         <Button
           onClick={handleRestore}
           disabled={loadingRestore || !selectedBackupId || confirmationText !== expectedConfirmation || disabled}
-          className="bg-red-600 hover:bg-red-700"
+          className="bg-skin-danger text-skin-text-inverse hover:bg-skin-danger/90"
         >
           {loadingRestore ? (
             <>
