@@ -74,6 +74,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Frontend theming guard
+        run: pnpm check:theming
+
       - name: Frontend build
         run: pnpm -C apps/frontend build
 

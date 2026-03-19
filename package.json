@@ -14,6 +14,7 @@
     "release": "standard-version",
     "versao": "pnpm run release && git push --follow-tags",
     "install:all": "pnpm install",
+    "check:theming": "node scripts/check-no-hardcoded-colors.js",
     "dev:backend": "pnpm --filter backend start:dev",
     "dev:frontend": "pnpm --filter frontend dev",
     "build:all": "pnpm -r run build",

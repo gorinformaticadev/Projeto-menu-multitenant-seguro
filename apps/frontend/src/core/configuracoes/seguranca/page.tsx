@@ -168,7 +168,7 @@ export default function SecurityConfigPage() {
   if (!config) {
     return (
       <div className="p-6 flex items-center justify-center h-64">
-        <div className="text-center text-muted-foreground">
+        <div className="text-center text-skin-text-muted">
           Erro ao carregar configurações
         </div>
       </div>
@@ -184,7 +184,7 @@ export default function SecurityConfigPage() {
             <Shield className="h-6 w-6" />
             Configurações de Segurança
           </h1>
-          <p className="text-muted-foreground mt-2">
+          <p className="mt-2 text-skin-text-muted">
             Gerencie as políticas de segurança do sistema
           </p>
         </div>
@@ -237,7 +237,7 @@ export default function SecurityConfigPage() {
                     updateConfig("loginMaxAttempts", parseInt(e.target.value))
                   }
                 />
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="mt-1 text-xs text-skin-text-muted">
                   Número de tentativas antes de bloquear a conta (1-100)
                 </p>
               </div>
@@ -256,7 +256,7 @@ export default function SecurityConfigPage() {
                     updateConfig("loginLockDurationMinutes", parseInt(e.target.value))
                   }
                 />
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="mt-1 text-xs text-skin-text-muted">
                   Tempo que a conta ficará bloqueada (5-1440 minutos / até 24h)
                 </p>
               </div>
@@ -288,7 +288,7 @@ export default function SecurityConfigPage() {
                     updateConfig("globalMaxRequests", parseInt(e.target.value))
                   }
                 />
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="mt-1 text-xs text-skin-text-muted">
                   Número máximo de requisições globais (10-1000)
                 </p>
               </div>
@@ -307,7 +307,7 @@ export default function SecurityConfigPage() {
                     updateConfig("globalWindowMinutes", parseInt(e.target.value))
                   }
                 />
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="mt-1 text-xs text-skin-text-muted">
                   Período para contagem de requisições globais (1-60 minutos)
                 </p>
               </div>
@@ -338,7 +338,7 @@ export default function SecurityConfigPage() {
                   updateConfig("passwordMinLength", parseInt(e.target.value))
                 }
               />
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="mt-1 text-xs text-skin-text-muted">
                 Número mínimo de caracteres (6-32)
               </p>
             </div>
@@ -349,7 +349,7 @@ export default function SecurityConfigPage() {
                   <Label htmlFor="passwordRequireUppercase">
                     Exigir Letra Maiúscula
                   </Label>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-skin-text-muted">
                     Senha deve conter pelo menos uma letra maiúscula
                   </p>
                 </div>
@@ -367,7 +367,7 @@ export default function SecurityConfigPage() {
                   <Label htmlFor="passwordRequireLowercase">
                     Exigir Letra Minúscula
                   </Label>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-skin-text-muted">
                     Senha deve conter pelo menos uma letra minúscula
                   </p>
                 </div>
@@ -385,7 +385,7 @@ export default function SecurityConfigPage() {
                   <Label htmlFor="passwordRequireNumbers">
                     Exigir Números
                   </Label>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-skin-text-muted">
                     Senha deve conter pelo menos um número
                   </p>
                 </div>
@@ -403,7 +403,7 @@ export default function SecurityConfigPage() {
                   <Label htmlFor="passwordRequireSpecial">
                     Exigir Caractere Especial
                   </Label>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-skin-text-muted">
                     Senha deve conter pelo menos um caractere especial (!@#$%...)
                   </p>
                 </div>
@@ -434,7 +434,7 @@ export default function SecurityConfigPage() {
                   <Label htmlFor="twoFactorEnabled">
                     Habilitar 2FA Globalmente
                   </Label>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-skin-text-muted">
                     Permite que usuários configurem autenticação de dois fatores em suas contas
                   </p>
                 </div>
@@ -452,7 +452,7 @@ export default function SecurityConfigPage() {
                   <Label htmlFor="twoFactorRequired">
                     Tornar 2FA Obrigatório
                   </Label>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-skin-text-muted">
                     Todos os usuários devem configurar 2FA para acessar o sistema
                   </p>
                 </div>
@@ -518,7 +518,7 @@ export default function SecurityConfigPage() {
                     updateConfig("accessTokenExpiresIn", e.target.value)
                   }
                 />
-                <p className="text-xs text-muted-foreground mt-1">
+                  <p className="mt-1 text-xs text-skin-text-muted">
                   Formato: 15m (minutos), 1h (horas), 1d (dias)
                 </p>
               </div>
@@ -536,7 +536,7 @@ export default function SecurityConfigPage() {
                     updateConfig("refreshTokenExpiresIn", e.target.value)
                   }
                 />
-                <p className="text-xs text-muted-foreground mt-1">
+              <p className="mt-1 text-xs text-skin-text-muted">
                   Formato: 7d (dias), 30d (dias)
                 </p>
               </div>
@@ -555,7 +555,7 @@ export default function SecurityConfigPage() {
                     updateConfig("sessionTimeoutMinutes", parseInt(e.target.value))
                   }
                 />
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="mt-1 text-xs text-skin-text-muted">
                   Tempo de inatividade antes de deslogar automaticamente (5-1440 minutos / até 24h)
                 </p>
               </div>

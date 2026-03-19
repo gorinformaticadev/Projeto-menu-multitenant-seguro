@@ -71,7 +71,7 @@ const EMPTY_CONFIRMATION: ConfirmationState = {
 };
 
 const uncheckedSwitchClassName =
-  "data-[state=unchecked]:bg-destructive/80 disabled:opacity-100 disabled:data-[state=unchecked]:bg-destructive/80";
+  "data-[state=unchecked]:bg-skin-danger/80 disabled:opacity-100 disabled:data-[state=unchecked]:bg-skin-danger/80";
 
 const dashboardCardBaseClassName =
   "rounded-[28px] border shadow-[0_20px_55px_-36px_rgba(15,23,42,0.35)] backdrop-blur-sm";
@@ -113,12 +113,12 @@ function InfoButton({
         <button
           type="button"
           aria-label={label}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-full text-skin-text-muted transition-colors hover:bg-skin-surface-hover hover:text-skin-text"
         >
           <HelpCircle className="h-4 w-4" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="max-w-xs text-sm leading-6 text-muted-foreground">
+      <PopoverContent align="start" className="max-w-xs text-sm leading-6 text-skin-text-muted">
         {children}
       </PopoverContent>
     </Popover>
@@ -133,7 +133,7 @@ function SettingInfoContent({ item }: { item: SecuritySettingItem }) {
       <p>{item.description}</p>
       {notes.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-foreground/80">
+          <p className="text-xs font-semibold uppercase tracking-wide text-skin-text/80">
             Observacoes operacionais
           </p>
           <ul className="list-disc space-y-1 pl-4">
@@ -205,7 +205,7 @@ function SettingRow({
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 flex-1 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-sm font-semibold text-foreground">{item.label}</h3>
+            <h3 className="text-sm font-semibold text-skin-text">{item.label}</h3>
             <InfoButton label={`Ajuda da configuracao dinamica ${item.label}`}>
               <SettingInfoContent item={item} />
             </InfoButton>
@@ -220,7 +220,7 @@ function SettingRow({
             {item.requiresConfirmation ? <Badge variant="outline">Exige confirmacao</Badge> : null}
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-skin-text-muted">
             <span>Valor atual: {formatVisibleValue(item)}</span>
             {lastUpdated ? <span>Ultima alteracao: {lastUpdated}</span> : null}
           </div>
@@ -244,12 +244,12 @@ function SettingRow({
                 className={uncheckedSwitchClassName}
               />
             ) : (
-              <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs text-muted-foreground">
+              <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs text-skin-text-muted">
                 {item.valueHidden ? <ShieldOff className="h-3.5 w-3.5" /> : <Shield className="h-3.5 w-3.5" />}
                 {item.editableInPanel ? "Sem controle visual" : "Somente leitura"}
               </div>
             )}
-            {isBusy ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
+            {isBusy ? <Loader2 className="h-4 w-4 animate-spin text-skin-text-muted" /> : null}
           </div>
 
           {canRestoreInPanel ? (
@@ -258,11 +258,11 @@ function SettingRow({
               Restaurar fallback
             </Button>
           ) : item.hasDatabaseOverride ? (
-            <div className="text-right text-xs text-muted-foreground">
+            <div className="text-right text-xs text-skin-text-muted">
               Override em banco ativo; restauracao bloqueada neste painel
             </div>
           ) : (
-            <div className="text-right text-xs text-muted-foreground">Sem override em banco</div>
+            <div className="text-right text-xs text-skin-text-muted">Sem override em banco</div>
           )}
         </div>
       </div>
@@ -410,18 +410,18 @@ export function DynamicSecuritySettingsSection() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-2 rounded-[18px] border border-skin-border/80 bg-skin-background-elevated/70 p-3 text-sm text-muted-foreground ">
+          <div className="flex items-center gap-2 rounded-[18px] border border-skin-border/80 bg-skin-background-elevated/70 p-3 text-sm text-skin-text-muted ">
             <AlertTriangle className="h-4 w-4" />
-            <span className="font-medium text-foreground">Alteracoes por item</span>
+            <span className="font-medium text-skin-text">Alteracoes por item</span>
             <InfoButton label="Ajuda das alteracoes por item nas configuracoes dinamicas">
               <p>Cada mudanca e salva individualmente, com auditoria no backend e restore para ENV ou Padrao quando necessario.</p>
             </InfoButton>
           </div>
 
-          <div className="rounded-[18px] border border-skin-border/80 bg-skin-surface/80 p-4 text-sm text-muted-foreground shadow-sm ">
+          <div className="rounded-[18px] border border-skin-border/80 bg-skin-surface/80 p-4 text-sm text-skin-text-muted shadow-sm ">
             <div className="flex items-center gap-2">
               <ShieldAlert className="h-4 w-4 text-skin-warning" />
-              <span className="font-medium text-foreground">Como ler esta secao</span>
+              <span className="font-medium text-skin-text">Como ler esta secao</span>
             </div>
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <div className="space-y-2">
@@ -448,7 +448,7 @@ export function DynamicSecuritySettingsSection() {
           </div>
 
           {loading ? (
-            <div className="flex min-h-[120px] items-center justify-center text-sm text-muted-foreground">
+            <div className="flex min-h-[120px] items-center justify-center text-sm text-skin-text-muted">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Carregando configuracoes dinamicas...
             </div>
@@ -459,7 +459,7 @@ export function DynamicSecuritySettingsSection() {
               <AlertDescription>{error.description}</AlertDescription>
             </Alert>
           ) : groups.length === 0 ? (
-            <div className="flex min-h-[120px] items-center justify-center text-sm text-muted-foreground">
+            <div className="flex min-h-[120px] items-center justify-center text-sm text-skin-text-muted">
               Nenhuma configuracao dinamica aprovada foi encontrada para esta tela.
             </div>
           ) : (

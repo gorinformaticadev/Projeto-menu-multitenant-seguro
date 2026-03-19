@@ -85,9 +85,9 @@ export default function NotificationsPage() {
       <div className="p-6 max-w-4xl mx-auto">
         <Card>
           <CardContent className="p-6 text-center">
-            <Bell className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+            <Bell className="mx-auto mb-3 h-10 w-10 text-skin-text-muted" />
             <p className="text-sm font-medium">Central de notificacoes indisponivel.</p>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="mt-1 text-xs text-skin-text-muted">
               Este recurso e exclusivo para SUPER_ADMIN.
             </p>
           </CardContent>
@@ -101,7 +101,7 @@ export default function NotificationsPage() {
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Central de notificacoes</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="mt-1 text-sm text-skin-text-muted">
             Eventos operacionais persistidos para acompanhamento do SUPER_ADMIN.
           </p>
         </div>
@@ -137,19 +137,19 @@ export default function NotificationsPage() {
       <div className="grid gap-3 sm:grid-cols-3">
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Total carregadas</p>
+            <p className="text-xs uppercase tracking-wide text-skin-text-muted">Total carregadas</p>
             <p className="text-2xl font-semibold mt-1">{items.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Nao lidas</p>
+            <p className="text-xs uppercase tracking-wide text-skin-text-muted">Nao lidas</p>
             <p className="text-2xl font-semibold mt-1">{unreadCount}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Criticas nao lidas</p>
+            <p className="text-xs uppercase tracking-wide text-skin-text-muted">Criticas nao lidas</p>
             <p className="text-2xl font-semibold mt-1">{criticalUnreadCount}</p>
           </CardContent>
         </Card>
@@ -162,9 +162,9 @@ export default function NotificationsPage() {
         <CardContent className="pt-0">
           <div className="grid gap-3 md:grid-cols-4">
             <label className="space-y-1">
-              <span className="text-xs font-medium text-muted-foreground">Busca</span>
+              <span className="text-xs font-medium text-skin-text-muted">Busca</span>
               <div className="relative">
-                <Search className="h-4 w-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-skin-text-muted" />
                 <Input
                   className="pl-8"
                   value={searchTerm}
@@ -175,9 +175,9 @@ export default function NotificationsPage() {
             </label>
 
             <label className="space-y-1">
-              <span className="text-xs font-medium text-muted-foreground">Leitura</span>
+              <span className="text-xs font-medium text-skin-text-muted">Leitura</span>
               <select
-                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                className="h-9 w-full rounded-md border border-skin-input-border bg-skin-input-background px-2 text-sm text-skin-text"
                 value={readFilter}
                 onChange={(event) => setReadFilter(event.target.value as NotificationReadFilter)}
               >
@@ -188,9 +188,9 @@ export default function NotificationsPage() {
             </label>
 
             <label className="space-y-1">
-              <span className="text-xs font-medium text-muted-foreground">Severidade</span>
+              <span className="text-xs font-medium text-skin-text-muted">Severidade</span>
               <select
-                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                className="h-9 w-full rounded-md border border-skin-input-border bg-skin-input-background px-2 text-sm text-skin-text"
                 value={severityFilter}
                 onChange={(event) =>
                   setSeverityFilter(event.target.value as NotificationSeverityFilter)
@@ -204,9 +204,9 @@ export default function NotificationsPage() {
             </label>
 
             <label className="space-y-1">
-              <span className="text-xs font-medium text-muted-foreground">Categoria</span>
+              <span className="text-xs font-medium text-skin-text-muted">Categoria</span>
               <select
-                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                className="h-9 w-full rounded-md border border-skin-input-border bg-skin-input-background px-2 text-sm text-skin-text"
                 value={categoryFilter}
                 onChange={(event) =>
                   setCategoryFilter(event.target.value as NotificationCategoryFilter)
