@@ -450,7 +450,7 @@ function MiniTrendSparkline({
 }) {
   if (!hasTrendData(config.data)) {
     return (
-      <div className={`flex items-center text-[10px] text-muted-foreground/80 ${className}`}>
+      <div className={`flex items-center text-[10px] text-skin-text-muted/80 ${className}`}>
         {config.emptyLabel || "Sem historico recente"}
       </div>
     );
@@ -535,7 +535,7 @@ function DashboardChartState({
       description={description}
       centered
       className={dark
-        ? "h-full border-white/10 bg-skin-surface/5 text-skin-text"
+        ? "h-full border-skin-border/20 bg-skin-surface/5 text-skin-text"
         : "h-full border-dashed border-skin-border/80 bg-skin-background-elevated/50/70 dark:border-skin-border/80 dark:bg-background/35"}
     />
   );
@@ -752,8 +752,8 @@ function QuickActionButton({
       className="group flex min-w-0 flex-1 items-start justify-between gap-3 rounded-[22px] border border-skin-border/80 bg-skin-surface/80 px-4 py-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-skin-primary/30 hover:bg-skin-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-skin-surface sm:min-w-[220px]"
     >
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-foreground dark:text-foreground">{label}</p>
-        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground dark:text-muted-foreground/80">
+        <p className="text-sm font-semibold text-foreground dark:text-skin-text">{label}</p>
+        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-skin-text-muted dark:text-skin-text-muted/80">
           {description}
         </p>
       </div>
@@ -800,11 +800,11 @@ function OverviewStat({
   const content = (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground dark:text-skin-text-muted/80">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-skin-text-muted dark:text-skin-text-muted/80">
           {label}
         </p>
         <p className="mt-1.5 text-[1.35rem] font-semibold tracking-tight text-foreground dark:text-white">{value}</p>
-        <p className="mt-1 text-[10px] text-muted-foreground dark:text-skin-text-muted/80">{hint}</p>
+        <p className="mt-1 text-[10px] text-skin-text-muted dark:text-skin-text-muted/80">{hint}</p>
         {trend ? <MiniTrendSparkline config={trend} className="mt-3 h-14" /> : null}
       </div>
       <div className="space-y-2 text-right">
@@ -825,7 +825,7 @@ function OverviewStat({
       <div
         className={`rounded-[20px] border px-3.5 py-3 text-left backdrop-blur-sm ${tone === "danger"
           ? "border-skin-danger/30 bg-skin-danger/10 text-foreground"
-          : "border-skin-border/80 bg-skin-surface/82 text-foreground dark:border-white/10 dark:bg-skin-surface/6 dark:text-foreground"
+          : "border-skin-border/80 bg-skin-surface/82 text-skin-text dark:border-skin-border/20 dark:bg-skin-surface/6 dark:text-skin-text"
           }`}
       >
         {content}
@@ -839,7 +839,7 @@ function OverviewStat({
       onClick={onClick}
       className={`rounded-[20px] border px-3.5 py-3 text-left backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-skin-primary/30 hover:bg-skin-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${tone === "danger"
         ? "border-skin-danger/30 bg-skin-danger/10 text-foreground"
-        : "border-skin-border/80 bg-skin-surface/82 text-foreground dark:border-white/10 dark:bg-skin-surface/6 dark:text-foreground"
+        : "border-skin-border/80 bg-skin-surface/82 text-skin-text dark:border-skin-border/20 dark:bg-skin-surface/6 dark:text-skin-text"
         }`}
     >
       {content}
@@ -874,13 +874,13 @@ function PanoramaSignal({
     >
       <div className="flex items-start justify-between gap-2">
         <div className={`h-1.5 w-10 rounded-full ${accentClassName}`} />
-        {hasDetails ? <ChevronDown className="mt-0.5 h-3.5 w-3.5 text-muted-foreground/80 dark:text-muted-foreground" /> : null}
+        {hasDetails ? <ChevronDown className="mt-0.5 h-3.5 w-3.5 text-skin-text-muted/80 dark:text-skin-text-muted" /> : null}
       </div>
-      <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground dark:text-skin-text-muted/80">
+      <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-skin-text-muted dark:text-skin-text-muted/80">
         {label}
       </p>
       <p className="mt-1.5 text-[1.1rem] font-semibold tracking-tight text-foreground dark:text-white">{value}</p>
-      <p className="mt-1 truncate text-[10px] text-muted-foreground dark:text-muted-foreground/80">{hint}</p>
+      <p className="mt-1 truncate text-[10px] text-skin-text-muted dark:text-skin-text-muted/80">{hint}</p>
       {isInteractive ? (
         <p className="mt-2 text-[10px] font-medium text-skin-info">{actionLabel || "Abrir"}</p>
       ) : null}
@@ -2899,7 +2899,7 @@ export function OperationalDashboard({
                         className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950 ${
                           draftFilters.periodMinutes === minutes
                             ? "border-skin-info/30 bg-skin-info/15 text-skin-info"
-                            : "border-skin-border bg-skin-surface text-skin-text-muted hover:border-skin-border hover:text-foreground/90"
+                            : "border-skin-border bg-skin-surface text-skin-text-muted hover:border-skin-border hover:text-skin-text"
                         }`}
                       >
                         {minutes} min
@@ -3076,7 +3076,7 @@ export function OperationalDashboard({
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-skin-border/80 bg-skin-surface/78 p-4 backdrop-blur-sm dark:border-white/10 dark:bg-skin-surface/5">
+              <div className="rounded-[28px] border border-skin-border/80 bg-skin-surface/78 p-4 backdrop-blur-sm dark:border-skin-border/20 dark:bg-skin-surface/5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground dark:text-skin-text-muted">
