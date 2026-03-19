@@ -103,7 +103,7 @@ const CPFCNPJInput = React.forwardRef<HTMLInputElement, CPFCNPJInputProps>(
     return (
       <div className="space-y-2">
         {label && (
-          <Label htmlFor={props.id} className={cn(displayError && "text-destructive")}>
+          <Label htmlFor={props.id} className={cn(displayError && "text-skin-danger")}>
             {label}
           </Label>
         )}
@@ -118,7 +118,7 @@ const CPFCNPJInput = React.forwardRef<HTMLInputElement, CPFCNPJInputProps>(
             onBlur={handleBlur}
             placeholder={getPlaceholder()}
             className={cn(
-              displayError && "border-destructive focus-visible:ring-destructive",
+              displayError && "border-skin-danger focus-visible:ring-skin-danger",
               className
             )}
             autoComplete="off"
@@ -130,8 +130,8 @@ const CPFCNPJInput = React.forwardRef<HTMLInputElement, CPFCNPJInputProps>(
               <span className={cn(
                 "text-xs px-2 py-1 rounded-full font-medium",
                 documentType === 'cpf' 
-                  ? "bg-blue-100 text-blue-700" 
-                  : "bg-green-100 text-green-700"
+                  ? "bg-skin-info/15 text-skin-info"
+                  : "bg-skin-success/15 text-skin-success"
               )}>
                 {documentType.toUpperCase()}
               </span>
@@ -141,14 +141,14 @@ const CPFCNPJInput = React.forwardRef<HTMLInputElement, CPFCNPJInputProps>(
 
         {/* Helper text */}
         {showValidation && value && !displayError && (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-skin-text-muted">
             {getHelperText()}
           </p>
         )}
 
         {/* Error message */}
         {displayError && (
-          <p className="text-sm text-destructive">
+          <p className="text-sm text-skin-danger">
             {displayError}
           </p>
         )}

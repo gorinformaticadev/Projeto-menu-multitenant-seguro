@@ -509,12 +509,12 @@ function DashboardCollectionState({
   minHeight?: string;
 }) {
   return (
-    <div className={`flex ${minHeight} items-center justify-center rounded-[28px] border border-dashed border-skin-border bg-skin-background-elevated/50/85 p-4 dark:border-skin-border dark:bg-background/30`}>
+    <div className={`flex ${minHeight} items-center justify-center rounded-[28px] border border-dashed border-skin-border bg-skin-background-elevated/50/85 p-4 dark:border-skin-border dark:bg-skin-surface/30`}>
       <DashboardSurfaceState
         title={title}
         description={description}
         centered
-        className="max-w-sm border-skin-border/90 bg-skin-surface/80 dark:border-skin-border/80 dark:bg-background/50"
+        className="max-w-sm border-skin-border/90 bg-skin-surface/80 dark:border-skin-border/80 dark:bg-skin-surface/50"
       />
     </div>
   );
@@ -536,7 +536,7 @@ function DashboardChartState({
       centered
       className={dark
         ? "h-full border-skin-border/20 bg-skin-surface/5 text-skin-text"
-        : "h-full border-dashed border-skin-border/80 bg-skin-background-elevated/50/70 dark:border-skin-border/80 dark:bg-background/35"}
+        : "h-full border-dashed border-skin-border/80 bg-skin-background-elevated/50/70 dark:border-skin-border/80 dark:bg-skin-surface/35"}
     />
   );
 }
@@ -544,7 +544,7 @@ function DashboardChartState({
 function DashboardOverviewSkeleton() {
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.9fr)]">
-      <section className="overflow-hidden rounded-[32px] border border-skin-border bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_30%),linear-gradient(150deg,_rgba(2,6,23,0.98),_rgba(15,23,42,0.96))] px-5 py-5 text-skin-text shadow-[0_35px_90px_-45px_rgba(15,23,42,0.85)]">
+      <section className="overflow-hidden rounded-[32px] border border-skin-border bg-skin-surface px-5 py-5 text-skin-text shadow-[0_35px_90px_-45px_rgba(15,23,42,0.85)]">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_220px]">
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
@@ -553,7 +553,7 @@ function DashboardOverviewSkeleton() {
             </div>
             <div className="grid gap-3 md:grid-cols-3">
               {Array.from({ length: 3 }).map((_, index) => (
-                <div key={`overview-stat-skeleton-${index}`} className="rounded-[20px] border border-white/10 bg-skin-surface/6 px-3.5 py-3">
+                <div key={`overview-stat-skeleton-${index}`} className="rounded-[20px] border border-skin-border/20 bg-skin-surface/6 px-3.5 py-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1 space-y-2">
                       <div className="h-2.5 w-20 animate-pulse rounded-full bg-skin-surface/15" />
@@ -567,7 +567,7 @@ function DashboardOverviewSkeleton() {
             </div>
             <div className="grid gap-3 md:grid-cols-3">
               {Array.from({ length: 3 }).map((_, index) => (
-                <div key={`panorama-signal-skeleton-${index}`} className="rounded-[20px] border border-white/10 bg-skin-surface/5 px-3.5 py-3">
+                <div key={`panorama-signal-skeleton-${index}`} className="rounded-[20px] border border-skin-border/20 bg-skin-surface/5 px-3.5 py-3">
                   <div className="h-1.5 w-10 animate-pulse rounded-full bg-skin-surface/15" />
                   <div className="mt-3 h-2.5 w-24 animate-pulse rounded-full bg-skin-surface/10" />
                   <div className="mt-2 h-7 w-16 animate-pulse rounded-2xl bg-skin-surface/15" />
@@ -577,7 +577,7 @@ function DashboardOverviewSkeleton() {
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-white/10 bg-skin-surface/5 p-4 backdrop-blur-sm">
+          <div className="rounded-[28px] border border-skin-border/20 bg-skin-surface/5 p-4 backdrop-blur-sm">
             <div className="flex items-center justify-between gap-3">
               <div className="space-y-2">
                 <div className="h-2.5 w-28 animate-pulse rounded-full bg-skin-surface/10" />
@@ -586,11 +586,11 @@ function DashboardOverviewSkeleton() {
               <div className="h-10 w-10 animate-pulse rounded-2xl bg-skin-surface/10" />
             </div>
             <div className="mt-4 flex h-32 items-center justify-center">
-              <div className="h-24 w-24 animate-pulse rounded-full border-8 border-white/10 border-t-cyan-300/40" />
+              <div className="h-24 w-24 animate-pulse rounded-full border-8 border-skin-border/20 border-t-skin-info/40" />
             </div>
             <div className="mt-3 space-y-2">
               {Array.from({ length: 3 }).map((_, index) => (
-                <div key={`health-skeleton-${index}`} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-skin-surface/5 px-3 py-2">
+                <div key={`health-skeleton-${index}`} className="flex items-center justify-between gap-3 rounded-2xl border border-skin-border/20 bg-skin-surface/5 px-3 py-2">
                   <div className="flex items-center gap-2">
                     <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-skin-surface/20" />
                     <div className="h-2.5 w-20 animate-pulse rounded-full bg-skin-surface/10" />
@@ -603,7 +603,7 @@ function DashboardOverviewSkeleton() {
         </div>
       </section>
 
-      <section className="rounded-[32px] border border-skin-border/80 bg-skin-surface/80 p-4 shadow-[0_25px_60px_-38px_rgba(15,23,42,0.35)] backdrop-blur-sm dark:border-skin-border/80 dark:bg-background/45">
+      <section className="rounded-[32px] border border-skin-border/80 bg-skin-surface/80 p-4 shadow-[0_25px_60px_-38px_rgba(15,23,42,0.35)] backdrop-blur-sm dark:border-skin-border/80 dark:bg-skin-surface/45">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-2">
             <div className="h-3 w-28 animate-pulse rounded-full bg-skin-border/80" />
@@ -613,7 +613,7 @@ function DashboardOverviewSkeleton() {
         </div>
         <div className="mt-4 space-y-3">
           {Array.from({ length: 3 }).map((_, index) => (
-            <div key={`resource-skeleton-${index}`} className="rounded-[18px] border border-skin-border/80 bg-skin-surface/75 p-2.5 shadow-sm dark:border-skin-border/80 dark:bg-background/45">
+            <div key={`resource-skeleton-${index}`} className="rounded-[18px] border border-skin-border/80 bg-skin-surface/75 p-2.5 shadow-sm dark:border-skin-border/80 dark:bg-skin-surface/45">
               <div className="flex items-center justify-between gap-3">
                 <div className="h-2.5 w-20 animate-pulse rounded-full bg-skin-border/80" />
                 <div className="h-4 w-10 animate-pulse rounded-full bg-skin-border/80" />
@@ -724,8 +724,8 @@ function ToolbarIconButton({
           disabled={disabled}
           aria-label={label}
           className={`h-11 w-11 rounded-xl border transition-all ${active
-            ? "border-primary bg-primary text-white hover:bg-primary/90 hover:text-primary-foreground"
-            : "border-skin-border bg-skin-surface text-skin-text-muted hover:border-skin-border hover:bg-skin-background-elevated/50 hover:text-foreground"
+            ? "border-skin-primary bg-skin-primary text-skin-text-inverse hover:bg-skin-primary/90 hover:text-skin-text-inverse"
+            : "border-skin-border bg-skin-surface text-skin-text-muted hover:border-skin-border hover:bg-skin-background-elevated/50 hover:text-skin-text"
             }`}
         >
           {children}
@@ -752,7 +752,7 @@ function QuickActionButton({
       className="group flex min-w-0 flex-1 items-start justify-between gap-3 rounded-[22px] border border-skin-border/80 bg-skin-surface/80 px-4 py-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-skin-primary/30 hover:bg-skin-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-skin-surface sm:min-w-[220px]"
     >
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-foreground dark:text-skin-text">{label}</p>
+        <p className="text-sm font-semibold text-skin-text dark:text-skin-text">{label}</p>
         <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-skin-text-muted dark:text-skin-text-muted/80">
           {description}
         </p>
@@ -803,12 +803,12 @@ function OverviewStat({
         <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-skin-text-muted dark:text-skin-text-muted/80">
           {label}
         </p>
-        <p className="mt-1.5 text-[1.35rem] font-semibold tracking-tight text-foreground dark:text-white">{value}</p>
+        <p className="mt-1.5 text-[1.35rem] font-semibold tracking-tight text-skin-text dark:text-skin-text">{value}</p>
         <p className="mt-1 text-[10px] text-skin-text-muted dark:text-skin-text-muted/80">{hint}</p>
         {trend ? <MiniTrendSparkline config={trend} className="mt-3 h-14" /> : null}
       </div>
       <div className="space-y-2 text-right">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-skin-border bg-skin-background-elevated/50 text-foreground">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-skin-border bg-skin-background-elevated/50 text-skin-text">
           {icon}
         </div>
         {isInteractive ? (
@@ -824,7 +824,7 @@ function OverviewStat({
     return (
       <div
         className={`rounded-[20px] border px-3.5 py-3 text-left backdrop-blur-sm ${tone === "danger"
-          ? "border-skin-danger/30 bg-skin-danger/10 text-foreground"
+          ? "border-skin-danger/30 bg-skin-danger/10 text-skin-text"
           : "border-skin-border/80 bg-skin-surface/82 text-skin-text dark:border-skin-border/20 dark:bg-skin-surface/6 dark:text-skin-text"
           }`}
       >
@@ -837,8 +837,8 @@ function OverviewStat({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-[20px] border px-3.5 py-3 text-left backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-skin-primary/30 hover:bg-skin-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${tone === "danger"
-        ? "border-skin-danger/30 bg-skin-danger/10 text-foreground"
+      className={`rounded-[20px] border px-3.5 py-3 text-left backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-skin-primary/30 hover:bg-skin-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-skin-surface ${tone === "danger"
+        ? "border-skin-danger/30 bg-skin-danger/10 text-skin-text"
         : "border-skin-border/80 bg-skin-surface/82 text-skin-text dark:border-skin-border/20 dark:bg-skin-surface/6 dark:text-skin-text"
         }`}
     >
@@ -879,7 +879,7 @@ function PanoramaSignal({
       <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-skin-text-muted dark:text-skin-text-muted/80">
         {label}
       </p>
-      <p className="mt-1.5 text-[1.1rem] font-semibold tracking-tight text-foreground dark:text-white">{value}</p>
+      <p className="mt-1.5 text-[1.1rem] font-semibold tracking-tight text-skin-text dark:text-skin-text">{value}</p>
       <p className="mt-1 truncate text-[10px] text-skin-text-muted dark:text-skin-text-muted/80">{hint}</p>
       {isInteractive ? (
         <p className="mt-2 text-[10px] font-medium text-skin-info">{actionLabel || "Abrir"}</p>
@@ -892,7 +892,7 @@ function PanoramaSignal({
       <button
         type="button"
         onClick={onClick}
-        className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background "
+        className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-skin-surface "
       >
         {card}
       </button>
@@ -908,7 +908,7 @@ function PanoramaSignal({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background "
+          className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-skin-surface "
         >
           {card}
         </button>
@@ -917,13 +917,13 @@ function PanoramaSignal({
         side="bottom"
         align="start"
         sideOffset={10}
-        className="w-80 rounded-[20px] border border-skin-border bg-skin-surface/95 p-3 text-foreground shadow-xl /70 dark:bg-background/95 dark:text-foreground dark:shadow-2xl"
+        className="w-80 rounded-[20px] border border-skin-border bg-skin-surface/95 p-3 text-skin-text shadow-xl /70 dark:bg-skin-surface/95 dark:text-skin-text dark:shadow-2xl"
       >
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-skin-text-muted">
             {detailsTitle || label}
           </p>
-          <p className="mt-1 text-[11px] text-muted-foreground dark:text-muted-foreground/80">
+          <p className="mt-1 text-[11px] text-skin-text-muted dark:text-skin-text-muted/80">
             Historico recente disponivel para consulta rapida.
           </p>
         </div>
@@ -931,11 +931,11 @@ function PanoramaSignal({
           {detailsItems.map((item, index) => (
             <div
               key={`${item.label}-${index}`}
-              className="rounded-2xl border border-skin-border bg-skin-background-elevated/50/80 px-3 py-2 dark:border-white/10 dark:bg-skin-surface/5"
+              className="rounded-2xl border border-skin-border bg-skin-background-elevated/50/80 px-3 py-2 dark:border-skin-border/20 dark:bg-skin-surface/5"
             >
-              <p className="text-sm font-medium text-foreground dark:text-foreground">{item.label}</p>
+              <p className="text-sm font-medium text-skin-text dark:text-skin-text">{item.label}</p>
               {item.hint ? (
-                <p className="mt-1 text-[10px] leading-snug text-muted-foreground dark:text-muted-foreground/80">{item.hint}</p>
+                <p className="mt-1 text-[10px] leading-snug text-skin-text-muted dark:text-skin-text-muted/80">{item.hint}</p>
               ) : null}
             </div>
           ))}
@@ -961,12 +961,12 @@ function ResourceMeter({
   const boundedValue = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
 
   return (
-    <div className="space-y-1.5 rounded-[18px] border border-skin-border/80 bg-skin-surface/75 p-2.5 shadow-sm dark:border-skin-border/80 dark:bg-background/45">
+    <div className="space-y-1.5 rounded-[18px] border border-skin-border/80 bg-skin-surface/75 p-2.5 shadow-sm dark:border-skin-border/80 dark:bg-skin-surface/45">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground dark:text-muted-foreground/80">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-skin-text-muted dark:text-skin-text-muted/80">
           {label}
         </p>
-        <span className="text-[13px] font-semibold text-foreground dark:text-foreground">
+        <span className="text-[13px] font-semibold text-skin-text dark:text-skin-text">
           {Number.isFinite(value) ? `${Math.round(value)}${suffix}` : "--"}
         </span>
       </div>
@@ -1025,12 +1025,12 @@ function HealthBucketLegendRow({
         </span>
       </div>
       <div className="flex items-center gap-2">
-        <p className="shrink-0 text-base font-semibold tracking-tight text-foreground dark:text-white">
+        <p className="shrink-0 text-base font-semibold tracking-tight text-skin-text dark:text-skin-text">
           {value}
         </p>
         {hasItems ? (
           <ChevronDown
-            className={`h-3.5 w-3.5 text-muted-foreground/80 transition-transform ${open ? "rotate-180" : ""}`}
+            className={`h-3.5 w-3.5 text-skin-text-muted/80 transition-transform ${open ? "rotate-180" : ""}`}
           />
         ) : null}
       </div>
@@ -1039,7 +1039,7 @@ function HealthBucketLegendRow({
 
   if (!hasItems) {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-skin-border/80 bg-skin-surface/82 px-3 py-2 dark:border-white/10 dark:bg-skin-surface/5">
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-skin-border/80 bg-skin-surface/82 px-3 py-2 dark:border-skin-border/20 dark:bg-skin-surface/5">
         {content}
       </div>
     );
@@ -1050,7 +1050,7 @@ function HealthBucketLegendRow({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-skin-border/80 bg-skin-surface/82 px-3 py-2 text-left transition-colors hover:border-primary/30 hover:bg-skin-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-skin-surface/5 dark:hover:border-white/20 dark:hover:bg-skin-surface/10 "
+          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-skin-border/80 bg-skin-surface/82 px-3 py-2 text-left transition-colors hover:border-skin-primary/30 hover:bg-skin-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-skin-surface dark:border-skin-border/20 dark:bg-skin-surface/5 dark:hover:border-skin-border/30 dark:hover:bg-skin-surface/10 "
           onClick={() => {
             clearCloseTimeout();
             setOpen((current) => !current);
@@ -1070,7 +1070,7 @@ function HealthBucketLegendRow({
         side="left"
         align="start"
         sideOffset={10}
-        className="w-72 rounded-[20px] border border-skin-border bg-skin-surface/95 p-3 text-foreground shadow-xl /70 dark:bg-background/95 dark:text-foreground dark:shadow-2xl"
+        className="w-72 rounded-[20px] border border-skin-border bg-skin-surface/95 p-3 text-skin-text shadow-xl /70 dark:bg-skin-surface/95 dark:text-skin-text dark:shadow-2xl"
         onMouseEnter={clearCloseTimeout}
         onMouseLeave={scheduleClose}
       >
@@ -1079,7 +1079,7 @@ function HealthBucketLegendRow({
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-skin-text-muted">
               {label}
             </p>
-            <p className="mt-1 text-[11px] text-muted-foreground dark:text-muted-foreground/80">
+            <p className="mt-1 text-[11px] text-skin-text-muted dark:text-skin-text-muted/80">
               {value} widgets identificados neste grupo
             </p>
           </div>
@@ -1089,9 +1089,9 @@ function HealthBucketLegendRow({
           {items.map((item) => (
             <div
               key={item.id}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-skin-border bg-skin-background-elevated/50/80 px-3 py-2 dark:border-white/10 dark:bg-skin-surface/5"
+              className="flex items-center justify-between gap-3 rounded-2xl border border-skin-border bg-skin-background-elevated/50/80 px-3 py-2 dark:border-skin-border/20 dark:bg-skin-surface/5"
             >
-              <span className="min-w-0 truncate text-sm text-foreground dark:text-foreground">
+              <span className="min-w-0 truncate text-sm text-skin-text dark:text-skin-text">
                 {item.label}
               </span>
               <span className="shrink-0 rounded-full border border-skin-border bg-skin-surface px-2 py-0.5 text-[10px] font-medium text-skin-text-muted">
@@ -1794,7 +1794,7 @@ export function OperationalDashboard({
             <p className="truncate text-[1.55rem] font-semibold leading-none tracking-tight">
               {String(versionMetric?.version || "--")}
             </p>
-            <p className="mt-1 truncate text-[10px] text-muted-foreground">
+            <p className="mt-1 truncate text-[10px] text-skin-text-muted">
               Build {versionMetric?.buildDate ? formatDateTime(versionMetric.buildDate) : "--"}
             </p>
           </div>
@@ -1820,7 +1820,7 @@ export function OperationalDashboard({
         <div className="mt-auto flex items-end justify-between gap-2">
           <div>
             <p className="text-[1.55rem] font-semibold leading-none tracking-tight">{String(uptimeMetric?.human || "--")}</p>
-            <p className="mt-1 text-[10px] text-muted-foreground">
+            <p className="mt-1 text-[10px] text-skin-text-muted">
               Desde {uptimeMetric?.startedAt ? formatDateTime(uptimeMetric.startedAt) : "--"}
             </p>
           </div>
@@ -1854,7 +1854,7 @@ export function OperationalDashboard({
             >
               {maintenanceMetric?.enabled ? "Ativo" : "Estavel"}
             </p>
-            <p className="mt-1 truncate text-[10px] text-muted-foreground/80">
+            <p className="mt-1 truncate text-[10px] text-skin-text-muted/80">
               {maintenanceMetric?.enabled
                 ? `Motivo: ${String(maintenanceMetric?.reason || "Nao informado")}`
                 : "Sem janela ativa"}
@@ -1896,12 +1896,12 @@ export function OperationalDashboard({
       >
         <div className="flex flex-col h-full">
           <div className="px-3 pt-3 flex items-end justify-between">
-            <p className="text-4xl font-bold text-foreground text-skin-info">
+            <p className="text-4xl font-bold text-skin-info">
               {apiMetric?.avgResponseTimeMs !== null && apiMetric?.avgResponseTimeMs !== undefined
                 ? `${apiMetric.avgResponseTimeMs}ms`
                 : "--"}
             </p>
-            <p className="mb-1 text-xs text-muted-foreground dark:text-muted-foreground/80">Amostras: {String(apiMetric?.sampleSize ?? 0)}</p>
+            <p className="mb-1 text-xs text-skin-text-muted dark:text-skin-text-muted/80">Amostras: {String(apiMetric?.sampleSize ?? 0)}</p>
           </div>
           {apiHistory.length > 0 ? (
             <div className="px-3">
@@ -1956,8 +1956,8 @@ export function OperationalDashboard({
       >
         <div className="flex flex-col h-full">
           <div className="px-3 pt-3 flex items-end justify-between">
-            <p className="text-4xl font-bold text-foreground text-skin-info">{formatPercent(cpuMetric?.usagePercent)}</p>
-            <p className="mb-1 text-xs text-muted-foreground dark:text-muted-foreground/80">Cores: {String(cpuMetric?.cores ?? "--")}</p>
+            <p className="text-4xl font-bold text-skin-info">{formatPercent(cpuMetric?.usagePercent)}</p>
+            <p className="mb-1 text-xs text-skin-text-muted dark:text-skin-text-muted/80">Cores: {String(cpuMetric?.cores ?? "--")}</p>
           </div>
           <div className="flex-1 min-h-0 w-full mt-2">
             {cpuLoadData.length > 0 ? (
@@ -2008,9 +2008,9 @@ export function OperationalDashboard({
       >
         <div className="flex h-full items-center">
           <div className="flex-1 space-y-1">
-            <p className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">{formatPercent(memoryMetric?.usedPercent)}</p>
-            <p className="text-xs text-muted-foreground dark:text-muted-foreground/80">Usado: <span className="text-skin-text">{formatBytes(memUsed)}</span></p>
-            <p className="text-xs text-muted-foreground dark:text-muted-foreground/80">Total: <span className="text-skin-text">{formatBytes(memoryMetric?.totalBytes)}</span></p>
+            <p className="text-3xl font-bold tracking-tight text-skin-text dark:text-skin-text">{formatPercent(memoryMetric?.usedPercent)}</p>
+            <p className="text-xs text-skin-text-muted dark:text-skin-text-muted/80">Usado: <span className="text-skin-text">{formatBytes(memUsed)}</span></p>
+            <p className="text-xs text-skin-text-muted dark:text-skin-text-muted/80">Total: <span className="text-skin-text">{formatBytes(memoryMetric?.totalBytes)}</span></p>
           </div>
           <div className="h-24 w-24 shrink-0">
             {memUsed > 0 ? (
@@ -2059,9 +2059,9 @@ export function OperationalDashboard({
       >
         <div className="flex h-full items-center">
           <div className="flex-1 space-y-1">
-            <p className="text-3xl font-bold tracking-tight text-foreground dark:text-foreground">{formatPercent(diskMetric?.usedPercent)}</p>
-            <p className="text-xs text-muted-foreground dark:text-muted-foreground/80">Usado: <span className="text-skin-text">{formatBytes(diskUsed)}</span></p>
-            <p className="text-xs text-muted-foreground dark:text-muted-foreground/80">Total: <span className="text-skin-text">{formatBytes(diskMetric?.totalBytes)}</span></p>
+            <p className="text-3xl font-bold tracking-tight text-skin-text dark:text-skin-text">{formatPercent(diskMetric?.usedPercent)}</p>
+            <p className="text-xs text-skin-text-muted dark:text-skin-text-muted/80">Usado: <span className="text-skin-text">{formatBytes(diskUsed)}</span></p>
+            <p className="text-xs text-skin-text-muted dark:text-skin-text-muted/80">Total: <span className="text-skin-text">{formatBytes(diskMetric?.totalBytes)}</span></p>
           </div>
           <div className="h-24 w-24 shrink-0">
             {diskUsed > 0 ? (
@@ -2139,7 +2139,7 @@ export function OperationalDashboard({
                   ? `${databaseMetric.latencyMs}ms`
                   : "--"}
               </p>
-              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground dark:text-muted-foreground/80/80">
+              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-skin-text-muted dark:text-skin-text-muted/80/80">
                 banco
               </p>
             </div>
@@ -2174,7 +2174,7 @@ export function OperationalDashboard({
                   ? `${redisMetric.latencyMs}ms`
                   : "--"}
               </p>
-              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground dark:text-muted-foreground/80/80">
+              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-skin-text-muted dark:text-skin-text-muted/80/80">
                 cache
               </p>
             </div>
@@ -2203,14 +2203,14 @@ export function OperationalDashboard({
           <DashboardMetricState metric={workersMetric} />
         ) : (
           <div className="mt-auto flex items-end justify-between gap-2">
-            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-foreground text-skin-info/90">
+            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-skin-info/90">
               {String(workersMetric?.activeWorkers ?? workersMetric?.runningJobs ?? "--")}
             </p>
             <div className="text-right">
-              <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">
+              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80/80">
                 Executando: <span className="font-medium text-skin-text">{String(workersMetric?.runningJobs ?? "--")}</span>
               </p>
-              <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">
+              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80/80">
                 Pendentes: <span className="font-medium text-skin-warning/80">{String(workersMetric?.pendingJobs ?? "--")}</span>
               </p>
             </div>
@@ -2236,12 +2236,12 @@ export function OperationalDashboard({
           <DashboardMetricState metric={jobsMetric} />
         ) : (
           <div className="mt-auto flex items-end justify-between gap-2">
-            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-foreground text-skin-info/90">
+            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-skin-info/90">
               {String(jobsMetric?.running ?? "--")}
             </p>
             <div className="text-right">
-              <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">Pendentes: <span className="text-skin-warning/80">{String(jobsMetric?.pending ?? "--")}</span></p>
-              <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">Falhas 24h: <span className="text-skin-danger">{String(jobsMetric?.failedLast24h ?? "--")}</span></p>
+              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80/80">Pendentes: <span className="text-skin-warning/80">{String(jobsMetric?.pending ?? "--")}</span></p>
+              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80/80">Falhas 24h: <span className="text-skin-danger">{String(jobsMetric?.failedLast24h ?? "--")}</span></p>
             </div>
           </div>
         )}
@@ -2278,7 +2278,7 @@ export function OperationalDashboard({
                 {String(lastBackup.status || "--")}
               </span>
             </div>
-            <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+            <div className="flex flex-wrap gap-2 text-[11px] text-skin-text-muted">
               <span className="rounded-full border border-skin-border px-2 py-1 ">
                 {formatBytes(lastBackup.sizeBytes)}
               </span>
@@ -2291,7 +2291,7 @@ export function OperationalDashboard({
             </div>
             {recentBackups.length > 1 ? (
               <div className="border-t border-skin-border/70 pt-2 dark:border-skin-border/70">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/80">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-skin-text-muted/80">
                   Historico recente
                 </p>
                 <div className="mt-2 space-y-1.5">
@@ -2305,7 +2305,7 @@ export function OperationalDashboard({
                         <span className="min-w-0 truncate text-skin-text-muted">
                           {String(row.fileName || row.id || "--")}
                         </span>
-                        <span className="shrink-0 text-muted-foreground dark:text-muted-foreground/80">
+                        <span className="shrink-0 text-skin-text-muted dark:text-skin-text-muted/80">
                           {row.finishedAt ? formatDateTime(row.finishedAt) : "--"}
                         </span>
                       </div>
@@ -2350,11 +2350,11 @@ export function OperationalDashboard({
                     ? `${routeLatencyMetric.avgResponseMs}ms`
                     : "--"}
                 </p>
-                <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground/80">
+                <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-skin-text-muted dark:text-skin-text-muted/80">
                   media recente
                 </p>
               </div>
-              <div className="text-right text-[11px] text-muted-foreground dark:text-muted-foreground/80">
+              <div className="text-right text-[11px] text-skin-text-muted dark:text-skin-text-muted/80">
                 <p>{String(routeLatencyMetric?.totalRequestsRecent ?? 0)} req</p>
                 <p>{String(routeLatencyMetric?.windowSeconds ?? "--")}s janela</p>
               </div>
@@ -2367,13 +2367,13 @@ export function OperationalDashboard({
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="flex items-center gap-2 text-[11px] font-semibold text-foreground dark:text-foreground">
+                      <p className="flex items-center gap-2 text-[11px] font-semibold text-skin-text dark:text-skin-text">
                         <span className="rounded-full border border-skin-info/30 bg-skin-info/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-skin-info">
                           {item.method}
                         </span>
                         <span className="truncate">{item.route}</span>
                       </p>
-                      <p className="mt-1 text-[10px] text-muted-foreground dark:text-muted-foreground/80">
+                      <p className="mt-1 text-[10px] text-skin-text-muted dark:text-skin-text-muted/80">
                         {item.requestCount} req - p95 {item.p95Ms !== null ? `${item.p95Ms}ms` : "--"}
                       </p>
                     </div>
@@ -2418,11 +2418,11 @@ export function OperationalDashboard({
                 <p className="text-[1.7rem] font-bold leading-none tracking-tight text-skin-danger">
                   {String(routeErrorsMetric?.totalErrorCount ?? "--")}
                 </p>
-                <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground/80">
+                <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-skin-text-muted dark:text-skin-text-muted/80">
                   erros recentes
                 </p>
               </div>
-              <div className="text-right text-[11px] text-muted-foreground dark:text-muted-foreground/80">
+              <div className="text-right text-[11px] text-skin-text-muted dark:text-skin-text-muted/80">
                 <p>{formatPercent(routeErrorsMetric?.errorRateRecent)}</p>
                 <p>{String(routeErrorsMetric?.totalRequestsRecent ?? 0)} req</p>
               </div>
@@ -2435,17 +2435,17 @@ export function OperationalDashboard({
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="flex items-center gap-2 text-[11px] font-semibold text-foreground dark:text-foreground">
+                      <p className="flex items-center gap-2 text-[11px] font-semibold text-skin-text dark:text-skin-text">
                         <span className="rounded-full border border-skin-danger/30 bg-skin-danger/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-skin-danger">
                           {item.method}
                         </span>
                         <span className="truncate">{item.route}</span>
                       </p>
-                      <p className="mt-1 text-[10px] text-muted-foreground dark:text-muted-foreground/80">
+                      <p className="mt-1 text-[10px] text-skin-text-muted dark:text-skin-text-muted/80">
                         {item.errorCount} erros - 5xx {item.status5xx} - {formatPercent(item.errorRate)}
                       </p>
                     </div>
-                    <p className="shrink-0 text-right text-[10px] text-muted-foreground dark:text-muted-foreground/80">
+                    <p className="shrink-0 text-right text-[10px] text-skin-text-muted dark:text-skin-text-muted/80">
                       {item.lastErrorAt ? formatDateTime(item.lastErrorAt) : "--"}
                     </p>
                   </div>
@@ -2491,10 +2491,10 @@ export function OperationalDashboard({
                   key={`${row.id || index}`}
                   className="flex items-center justify-between gap-3 rounded border border-skin-danger/30 px-2.5 py-2"
                 >
-                  <p className="min-w-0 truncate text-[11px] font-medium text-foreground dark:text-foreground">
+                  <p className="min-w-0 truncate text-[11px] font-medium text-skin-text dark:text-skin-text">
                     {buildAuditEventLine(row)}
                   </p>
-                  <p className="shrink-0 text-[10px] text-muted-foreground">
+                  <p className="shrink-0 text-[10px] text-skin-text-muted">
                     {formatDateTime(row.createdAt)}
                   </p>
                 </div>
@@ -2536,24 +2536,24 @@ export function OperationalDashboard({
                 <p className="text-[1.45rem] font-bold tracking-tight text-skin-danger">
                   {deniedIps.reduce((acc, item) => acc + item.count, 0)}
                 </p>
-                <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground/80">negados</p>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-skin-text-muted dark:text-skin-text-muted/80">negados</p>
               </div>
               <div className="rounded-[18px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70">
                 <p className="text-[1.45rem] font-bold tracking-tight text-skin-warning">
                   {rateLimitedIps.reduce((acc, item) => acc + item.count, 0)}
                 </p>
-                <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground/80">429 recentes</p>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-skin-text-muted dark:text-skin-text-muted/80">429 recentes</p>
               </div>
               <div className="rounded-[18px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70">
                 <p className="text-[1.45rem] font-bold tracking-tight text-skin-info">
                   {String(securityMetric?.maintenanceBypassAttemptsRecent ?? 0)}
                 </p>
-                <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground/80">bypass</p>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-skin-text-muted dark:text-skin-text-muted/80">bypass</p>
               </div>
             </div>
             <div className="grid flex-1 gap-3 lg:grid-cols-[1.2fr_1fr]">
               <div className="space-y-2">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground dark:text-muted-foreground/80">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-skin-text-muted dark:text-skin-text-muted/80">
                   IPs com mais negacoes
                 </p>
                 {deniedIps.slice(0, 4).map((item) => (
@@ -2563,8 +2563,8 @@ export function OperationalDashboard({
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-[11px] font-semibold text-foreground dark:text-foreground">{item.ip}</p>
-                        <p className="mt-1 truncate text-[10px] text-muted-foreground dark:text-muted-foreground/80">
+                        <p className="truncate text-[11px] font-semibold text-skin-text dark:text-skin-text">{item.ip}</p>
+                        <p className="mt-1 truncate text-[10px] text-skin-text-muted dark:text-skin-text-muted/80">
                           {item.route || "rota nao informada"}
                         </p>
                       </div>
@@ -2574,7 +2574,7 @@ export function OperationalDashboard({
                 ))}
               </div>
               <div className="space-y-2">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground dark:text-muted-foreground/80">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-skin-text-muted dark:text-skin-text-muted/80">
                   Pressao recente
                 </p>
                 {(rateLimitedIps.length > 0 ? rateLimitedIps : recentSecurityEvents.slice(0, 4)).slice(0, 4).map((item, index) => {
@@ -2586,8 +2586,8 @@ export function OperationalDashboard({
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="truncate text-[11px] font-semibold text-foreground dark:text-foreground">{item.ip}</p>
-                            <p className="mt-1 truncate text-[10px] text-muted-foreground dark:text-muted-foreground/80">{item.route || "429"}</p>
+                            <p className="truncate text-[11px] font-semibold text-skin-text dark:text-skin-text">{item.ip}</p>
+                            <p className="mt-1 truncate text-[10px] text-skin-text-muted dark:text-skin-text-muted/80">{item.route || "429"}</p>
                           </div>
                           <span className="shrink-0 text-sm font-semibold text-skin-warning">{item.count}</span>
                         </div>
@@ -2600,10 +2600,10 @@ export function OperationalDashboard({
                       key={`${item.type}:${item.at}:${index}`}
                       className="rounded-[18px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70"
                     >
-                      <p className="truncate text-[11px] font-semibold text-foreground dark:text-foreground">
+                      <p className="truncate text-[11px] font-semibold text-skin-text dark:text-skin-text">
                         {formatSecurityEventType(item.type)} - {item.method} {item.route}
                       </p>
-                      <p className="mt-1 truncate text-[10px] text-muted-foreground dark:text-muted-foreground/80">
+                      <p className="mt-1 truncate text-[10px] text-skin-text-muted dark:text-skin-text-muted/80">
                         {item.ip} - {item.statusCode} - {item.at ? formatDateTime(item.at) : "--"}
                       </p>
                     </div>
@@ -2636,8 +2636,8 @@ export function OperationalDashboard({
         compact
       >
         <div className="mt-auto flex items-end justify-between gap-2">
-          <p className="text-[1.7rem] font-bold leading-none tracking-tight text-foreground text-skin-info/90">{String(tenantsMetric?.active ?? "--")}</p>
-          <div className="text-right text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">
+          <p className="text-[1.7rem] font-bold leading-none tracking-tight text-skin-info/90">{String(tenantsMetric?.active ?? "--")}</p>
+          <div className="text-right text-[10px] text-skin-text-muted dark:text-skin-text-muted/80/80">
             <p>ativas</p>
             <p>{String(tenantsMetric?.total ?? "--")} total</p>
           </div>
@@ -2665,32 +2665,32 @@ export function OperationalDashboard({
       >
         <div className="mt-auto space-y-3">
           <div className="flex items-end justify-between gap-2">
-            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-foreground text-skin-info/90">
+            <p className="text-[1.7rem] font-bold leading-none tracking-tight text-skin-info/90">
               {String(notificationsMetric?.criticalUnread ?? "--")}
             </p>
             <div className="text-right">
-              <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">Nao lidas</p>
-              <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">
+              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80/80">Nao lidas</p>
+              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80/80">
                 Criticas no periodo: <span className="font-medium text-skin-text">{String(notificationsMetric?.criticalRecent ?? "--")}</span>
               </p>
-              <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">
+              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80/80">
                 Alertas operacionais: <span className="font-medium text-skin-text">{String(notificationsMetric?.operationalRecentCount ?? "--")}</span>
               </p>
             </div>
           </div>
-          <div className="space-y-1.5 border-t border-skin-border/80 pt-2 dark:border-white/10">
+          <div className="space-y-1.5 border-t border-skin-border/80 pt-2 dark:border-skin-border/20">
             {recentOperationalAlerts.length > 0 ? (
               recentOperationalAlerts.map((alert) => (
                 <div key={alert.id} className="flex items-start justify-between gap-2 text-[10px]">
                   <div className="min-w-0">
-                    <p className="truncate font-medium text-foreground dark:text-foreground">{alert.title}</p>
-                    <p className="truncate text-muted-foreground dark:text-muted-foreground/80/80">{alert.body}</p>
+                    <p className="truncate font-medium text-skin-text dark:text-skin-text">{alert.title}</p>
+                    <p className="truncate text-skin-text-muted dark:text-skin-text-muted/80/80">{alert.body}</p>
                   </div>
-                  <span className="shrink-0 text-muted-foreground dark:text-muted-foreground">{formatTimeOfDay(alert.createdAt)}</span>
+                  <span className="shrink-0 text-skin-text-muted dark:text-skin-text-muted">{formatTimeOfDay(alert.createdAt)}</span>
                 </div>
               ))
             ) : (
-              <p className="text-[10px] text-muted-foreground dark:text-muted-foreground/80/80">Sem alertas operacionais recentes.</p>
+              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80/80">Sem alertas operacionais recentes.</p>
             )}
           </div>
         </div>
@@ -2715,7 +2715,7 @@ export function OperationalDashboard({
       <div className={embedded ? "space-y-4" : "mx-auto max-w-[1600px] space-y-4 p-4 md:p-6"}>
         <div className="space-y-3">
           {!embedded ? (
-            <div className="rounded-[24px] border border-skin-border/80 bg-skin-surface/88 px-4 py-3 text-foreground shadow-[0_18px_40px_-30px_rgba(15,23,42,0.18)] dark:border-skin-border dark:bg-background dark:text-foreground dark:shadow-xl">
+            <div className="rounded-[24px] border border-skin-border/80 bg-skin-surface/88 px-4 py-3 text-skin-text shadow-[0_18px_40px_-30px_rgba(15,23,42,0.18)] dark:border-skin-border dark:bg-skin-surface dark:text-skin-text dark:shadow-xl">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
@@ -2724,21 +2724,21 @@ export function OperationalDashboard({
                         Visao operacional
                       </span>
                     </div>
-                    <h1 className="text-lg font-semibold tracking-tight text-foreground dark:text-white">
+                    <h1 className="text-lg font-semibold tracking-tight text-skin-text dark:text-skin-text">
                       Dashboard Operacional
                     </h1>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground dark:text-skin-text-muted">
-                    <span className="rounded-full border border-skin-border bg-skin-surface px-2.5 py-1 dark:border-white/10 dark:bg-skin-surface/5">
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-skin-text-muted dark:text-skin-text-muted">
+                    <span className="rounded-full border border-skin-border bg-skin-surface px-2.5 py-1 dark:border-skin-border/20 dark:bg-skin-surface/5">
                       Snapshot: {dashboard?.generatedAt ? formatDateTime(dashboard.generatedAt) : "--"}
                     </span>
-                    <span className="rounded-full border border-skin-border bg-skin-surface px-2.5 py-1 dark:border-white/10 dark:bg-skin-surface/5">
+                    <span className="rounded-full border border-skin-border bg-skin-surface px-2.5 py-1 dark:border-skin-border/20 dark:bg-skin-surface/5">
                       Layout:{" "}
                       {lastLayoutUpdateAt
                         ? `salvo em ${formatDateTime(lastLayoutUpdateAt)}`
                         : "padrao ativo"}
                     </span>
-                    <span className="rounded-full border border-skin-border bg-skin-surface px-2.5 py-1 dark:border-white/10 dark:bg-skin-surface/5">
+                    <span className="rounded-full border border-skin-border bg-skin-surface px-2.5 py-1 dark:border-skin-border/20 dark:bg-skin-surface/5">
                       Auto refresh {Math.floor(POLL_INTERVAL_MS / 1000)}s
                     </span>
                     {isMobileViewport ? (
@@ -2791,11 +2791,11 @@ export function OperationalDashboard({
             </div>
           ) : null}
 
-          <div className="rounded-[24px] border border-skin-border/80 bg-skin-surface/80 px-4 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.35)] dark:border-skin-border/80 dark:bg-background/45">
+          <div className="rounded-[24px] border border-skin-border/80 bg-skin-surface/80 px-4 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.35)] dark:border-skin-border/80 dark:bg-skin-surface/45">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-foreground dark:text-foreground">
+                  <p className="text-sm font-semibold text-skin-text dark:text-skin-text">
                     Acoes rapidas
                   </p>
                   <span className="rounded-full bg-skin-background-elevated px-2 py-0.5 text-[10px] font-medium text-skin-text-muted">
@@ -2813,7 +2813,7 @@ export function OperationalDashboard({
                       />
                     ))
                   ) : (
-                    <div className="rounded-[20px] border border-dashed border-skin-border/80 px-4 py-3 text-sm text-muted-foreground dark:border-skin-border/80 dark:text-muted-foreground/80">
+                    <div className="rounded-[20px] border border-dashed border-skin-border/80 px-4 py-3 text-sm text-skin-text-muted dark:border-skin-border/80 dark:text-skin-text-muted/80">
                       Nenhuma acao contextual disponivel para a role atual.
                     </div>
                   )}
@@ -2823,10 +2823,10 @@ export function OperationalDashboard({
               <div className="xl:max-w-[34rem] xl:min-w-[28rem]">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-foreground dark:text-foreground">
+                    <p className="text-sm font-semibold text-skin-text dark:text-skin-text">
                       Foco rapido
                     </p>
-                    <p className="text-xs text-muted-foreground dark:text-muted-foreground/80">
+                    <p className="text-xs text-skin-text-muted dark:text-skin-text-muted/80">
                       Filtra apenas os blocos visiveis nesta tela sem persistir no backend.
                     </p>
                   </div>
@@ -2834,7 +2834,7 @@ export function OperationalDashboard({
                     <button
                       type="button"
                       onClick={() => setActiveQuickFilter("all")}
-                      className="text-xs font-medium text-skin-info hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-skin-surface"
+                      className="text-xs font-medium text-skin-info hover:text-skin-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-skin-surface"
                     >
                       Limpar
                     </button>
@@ -2846,9 +2846,9 @@ export function OperationalDashboard({
                       key={option.id}
                       type="button"
                       onClick={() => setActiveQuickFilter(option.id)}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950 ${activeQuickFilter === option.id
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-skin-surface dark:focus-visible:ring-offset-skin-surface ${activeQuickFilter === option.id
                         ? "border-skin-info/30 bg-skin-info/15 text-skin-info"
-                        : "border-skin-border bg-skin-surface text-skin-text-muted hover:border-skin-border hover:text-foreground/90"
+                        : "border-skin-border bg-skin-surface text-skin-text-muted hover:border-skin-border hover:text-skin-text"
                         }`}
                       aria-pressed={activeQuickFilter === option.id}
                       title={option.description}
@@ -2860,10 +2860,10 @@ export function OperationalDashboard({
                 <div className="mt-4 rounded-[22px] border border-skin-border/80 bg-skin-background-elevated/50/80 p-3 dark:border-skin-border/80 /40">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-foreground dark:text-foreground">
+                      <p className="text-sm font-semibold text-skin-text dark:text-skin-text">
                         Recorte operacional
                       </p>
-                      <p className="text-xs text-muted-foreground dark:text-muted-foreground/80">
+                      <p className="text-xs text-skin-text-muted dark:text-skin-text-muted/80">
                         Periodo e tenant ficam disponiveis direto nas acoes rapidas.
                       </p>
                     </div>
@@ -2896,7 +2896,7 @@ export function OperationalDashboard({
                         onClick={() =>
                           setDraftFilters((current) => ({ ...current, periodMinutes: minutes }))
                         }
-                        className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950 ${
+                        className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-skin-surface dark:focus-visible:ring-offset-skin-surface ${
                           draftFilters.periodMinutes === minutes
                             ? "border-skin-info/30 bg-skin-info/15 text-skin-info"
                             : "border-skin-border bg-skin-surface text-skin-text-muted hover:border-skin-border hover:text-skin-text"
@@ -3023,7 +3023,7 @@ export function OperationalDashboard({
           <DashboardOverviewSkeleton />
         ) : (
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.9fr)]">
-          <section className="overflow-hidden rounded-[32px] border border-skin-border/80 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.09),_transparent_30%),radial-gradient(circle_at_right,_rgba(59,130,246,0.12),_transparent_26%),linear-gradient(180deg,_rgba(255,255,255,0.96),_rgba(248,250,252,0.95))] px-5 py-5 text-foreground shadow-[0_22px_55px_-38px_rgba(15,23,42,0.2)] dark:border-skin-border dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.2),_transparent_30%),radial-gradient(circle_at_right,_rgba(59,130,246,0.24),_transparent_26%),linear-gradient(150deg,_rgba(2,6,23,0.98),_rgba(15,23,42,0.96))] dark:text-foreground dark:shadow-[0_35px_90px_-45px_rgba(15,23,42,0.85)]">
+          <section className="overflow-hidden rounded-[32px] border border-skin-border/80 bg-skin-surface px-5 py-5 text-skin-text shadow-[0_22px_55px_-38px_rgba(15,23,42,0.2)] dark:border-skin-border dark:bg-skin-surface/5 dark:text-skin-text dark:shadow-[0_35px_90px_-45px_rgba(15,23,42,0.85)]">
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_220px]">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -3079,11 +3079,11 @@ export function OperationalDashboard({
               <div className="rounded-[28px] border border-skin-border/80 bg-skin-surface/78 p-4 backdrop-blur-sm dark:border-skin-border/20 dark:bg-skin-surface/5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground dark:text-skin-text-muted">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-skin-text-muted dark:text-skin-text-muted">
                       Saude do painel
                     </p>
                   </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-skin-border bg-skin-background-elevated/50 text-foreground">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-skin-border bg-skin-background-elevated/50 text-skin-text">
                     <Server className="h-4 w-4" />
                   </div>
                 </div>
@@ -3152,7 +3152,7 @@ export function OperationalDashboard({
                       id: "restricted" as const,
                       label: "Restrito",
                       value: dashboardOverview.counts.restricted,
-                      color: "bg-skin-background-elevated/500",
+                      color: "bg-skin-background-elevated/50",
                       items: dashboardOverview.healthDetails.restricted,
                     },
                   ].map((item) => (
@@ -3169,14 +3169,14 @@ export function OperationalDashboard({
             </div>
           </section>
 
-          <section className="rounded-[32px] border border-skin-border/80 bg-skin-surface/80 p-4 shadow-[0_25px_60px_-38px_rgba(15,23,42,0.35)] backdrop-blur-sm dark:border-skin-border/80 dark:bg-background/45">
+          <section className="rounded-[32px] border border-skin-border/80 bg-skin-surface/80 p-4 shadow-[0_25px_60px_-38px_rgba(15,23,42,0.35)] backdrop-blur-sm dark:border-skin-border/80 dark:bg-skin-surface/45">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="mt-1 text-xl font-semibold tracking-tight text-foreground dark:text-foreground">
+                <h3 className="mt-1 text-xl font-semibold tracking-tight text-skin-text dark:text-skin-text">
                   Monitoramento do Servidor
                 </h3>
               </div>
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-skin-border bg-skin-background-elevated/50 text-foreground">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-skin-border bg-skin-background-elevated/50 text-skin-text">
                 <Maximize2 className="h-4 w-4" />
               </div>
             </div>
@@ -3249,7 +3249,7 @@ export function OperationalDashboard({
 
         <div className="flex flex-col gap-2 rounded-[24px] border border-skin-border bg-skin-surface/80 px-4 py-3 text-xs text-skin-text-muted shadow-sm md:flex-row md:items-center md:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium text-foreground/90 dark:text-foreground">Contexto ativo</span>
+            <span className="font-medium text-skin-text">Contexto ativo</span>
             <span className="rounded-full border border-skin-border px-2 py-1 ">
               Periodo: {appliedFilters.periodMinutes} min
             </span>

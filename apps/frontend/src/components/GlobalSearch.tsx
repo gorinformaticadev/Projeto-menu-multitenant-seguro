@@ -162,7 +162,7 @@ export function GlobalSearch({ onClose, mobile }: GlobalSearchProps) {
                     placeholder={mobile ? "Buscar no sistema..." : "Buscar no sistema... (Ctrl+K)"}
                     className={cn(
                         "w-full rounded-full border px-4 py-2 pl-10 pr-4 text-sm transition-all",
-                        "border-skin-border/70 bg-skin-background-elevated text-skin-text focus:border-primary/50 focus:bg-skin-surface focus:ring-2 focus:ring-skin-focus-ring/20",
+                        "border-skin-border/70 bg-skin-background-elevated text-skin-text focus:border-skin-primary/50 focus:bg-skin-surface focus:ring-2 focus:ring-skin-focus-ring/20",
                         "placeholder:text-skin-text-muted",
                         mobile && "border-none bg-transparent"
                     )}
@@ -204,13 +204,13 @@ export function GlobalSearch({ onClose, mobile }: GlobalSearchProps) {
                                     className={cn(
                                         "flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors",
                                         index === selectedIndex
-                                            ? "bg-primary/10 text-primary"
+                                            ? "bg-skin-primary/10 text-skin-primary"
                                             : "text-skin-text hover:bg-skin-surface-hover"
                                     )}
                                 >
                                     <div className={cn(
                                         "p-2 rounded-lg",
-                                        index === selectedIndex ? "bg-primary/20" : "bg-skin-background-elevated"
+                                        index === selectedIndex ? "bg-skin-primary/20" : "bg-skin-background-elevated"
                                     )}>
                                         <Icon className="h-4 w-4" />
                                     </div>

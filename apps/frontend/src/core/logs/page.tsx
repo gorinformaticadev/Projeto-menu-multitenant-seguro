@@ -130,7 +130,7 @@ export default function LogsPage() {
           <FileText className="h-8 w-8" />
           Logs de Auditoria
         </h1>
-        <p className="text-muted-foreground mt-2">
+        <p className="mt-2 text-skin-text-muted">
           Visualize todas as ações realizadas no sistema
         </p>
       </div>
@@ -141,7 +141,7 @@ export default function LogsPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total de Logs</CardTitle>
-                <Activity className="h-4 w-4 text-muted-foreground" />
+                <Activity className="h-4 w-4 text-skin-text-muted" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{stats.total}</div>
@@ -151,13 +151,13 @@ export default function LogsPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Ação Mais Comum</CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
+                <FileText className="h-4 w-4 text-skin-text-muted" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
                   {stats.byAction[0]?.actionLabel || stats.byAction[0]?.action || "N/A"}
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-skin-text-muted">
                   {stats.byAction[0]?.count || 0} ocorrências
                 </p>
               </CardContent>
@@ -166,11 +166,11 @@ export default function LogsPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Usuários Ativos</CardTitle>
-                <User className="h-4 w-4 text-muted-foreground" />
+                <User className="h-4 w-4 text-skin-text-muted" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{stats.byUser.length}</div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-skin-text-muted">
                   Usuários com atividade
                 </p>
               </CardContent>
@@ -240,7 +240,7 @@ export default function LogsPage() {
             {loading ? (
               <div className="text-center py-8">Carregando...</div>
             ) : logs.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="py-8 text-center text-skin-text-muted">
                 Nenhum log encontrado
               </div>
             ) : (
@@ -248,7 +248,7 @@ export default function LogsPage() {
                 {logs.map((log) => (
                   <div
                     key={log.id}
-                    className="border rounded-lg p-4 hover:bg-accent/50 transition-colors"
+                    className="rounded-lg border p-4 transition-colors hover:bg-skin-surface-hover/50"
                   >
 
                     <div className="flex items-start justify-between">
@@ -261,13 +261,13 @@ export default function LogsPage() {
                           >
                             {log.actionLabel || log.action}
                           </span>
-                          <span className="text-sm text-muted-foreground">
+                          <span className="text-sm text-skin-text-muted">
                             {formatDate(log.createdAt)}
                           </span>
                         </div>
 
                         {log.message && log.message !== (log.actionLabel || log.action) ? (
-                          <p className="text-sm text-foreground">
+                          <p className="text-sm text-skin-text">
                             {log.message}
                           </p>
                         ) : null}
@@ -275,14 +275,14 @@ export default function LogsPage() {
                         {log.user && (
                           <div className="text-sm">
                             <span className="font-medium">{log.user.name}</span>
-                            <span className="text-muted-foreground"> ({log.user.email})</span>
+                            <span className="text-skin-text-muted"> ({log.user.email})</span>
                             <span className="ml-2 rounded bg-skin-background-elevated px-2 py-1 text-xs text-skin-text">
                               {log.user.role}
                             </span>
                           </div>
                         )}
 
-                        <div className="text-sm text-muted-foreground space-y-1">
+                        <div className="space-y-1 text-sm text-skin-text-muted">
                           {log.ipAddress && (
                             <div>IP: {log.ipAddress}</div>
                           )}
@@ -291,7 +291,7 @@ export default function LogsPage() {
                           )}
                           {log.details && (
                             <details className="mt-2">
-                              <summary className="cursor-pointer text-primary hover:underline">
+                              <summary className="cursor-pointer text-skin-primary hover:underline">
                                 Ver detalhes
                               </summary>
                               <pre className="mt-2 overflow-auto rounded bg-skin-background-elevated p-2 text-xs text-skin-text">

@@ -177,7 +177,7 @@ export default function PlatformConfigSection() {
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <div className="text-muted-foreground">Carregando...</div>
+            <div className="text-skin-text-muted">Carregando...</div>
           </div>
         </CardContent>
       </Card>
@@ -199,13 +199,13 @@ export default function PlatformConfigSection() {
         <div className="space-y-4 rounded-lg border p-4">
           <div>
             <h4 className="font-medium">Logo principal da plataforma</h4>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-skin-text-muted">
               Esta imagem aparece no TopBar ao lado do nome da plataforma
             </p>
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="relative h-20 w-20 overflow-hidden rounded-xl border bg-muted">
+            <div className="relative h-20 w-20 overflow-hidden rounded-xl border border-skin-border bg-skin-background-elevated">
               {logoPreview || platformLogoSrc ? (
                 <Image
                   src={logoPreview || platformLogoSrc || ""}
@@ -216,7 +216,7 @@ export default function PlatformConfigSection() {
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center">
-                  <Building2 className="h-8 w-8 text-muted-foreground" />
+                  <Building2 className="h-8 w-8 text-skin-text-muted" />
                 </div>
               )}
             </div>
@@ -229,7 +229,7 @@ export default function PlatformConfigSection() {
                 onChange={handleLogoFileChange}
                 disabled={logoSubmitting}
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-skin-text-muted">
                 Formatos aceitos: JPG, PNG, GIF e WEBP (maximo 5MB)
               </p>
             </div>
@@ -259,10 +259,10 @@ export default function PlatformConfigSection() {
           </div>
         </div>
 
-        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="rounded-lg border border-skin-info/30 bg-skin-info/10 p-4">
           <div className="flex items-start gap-2">
-            <Info className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-blue-800">
+            <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-skin-info" />
+            <div className="text-sm text-skin-info">
               <p className="font-medium mb-1">Informacoes da Plataforma</p>
               <ul className="text-xs space-y-1">
                 <li>Nome: exibido em emails, titulos e cabecalhos</li>

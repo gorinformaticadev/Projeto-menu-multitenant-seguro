@@ -294,7 +294,7 @@ export default function EmailConfigSection() {
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <div className="text-muted-foreground">Carregando...</div>
+            <div className="text-skin-text-muted">Carregando...</div>
           </div>
         </CardContent>
       </Card>
@@ -315,10 +315,10 @@ export default function EmailConfigSection() {
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Informações importantes */}
-        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="rounded-lg border border-skin-info/30 bg-skin-info/10 p-4">
           <div className="flex items-start gap-2">
-            <Mail className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-blue-800">
+            <Mail className="mt-0.5 h-4 w-4 flex-shrink-0 text-skin-info" />
+            <div className="text-sm text-skin-info">
               <p className="font-medium mb-1">Configuração de Email Principal</p>
               <ul className="text-xs space-y-1">
                 <li>• Esta é a configuração de email principal da aplicação</li>
@@ -345,7 +345,7 @@ export default function EmailConfigSection() {
                     <div className="flex flex-col">
                       <span>{provider.providerName}</span>
                       {provider.description && (
-                        <span className="text-xs text-muted-foreground">{provider.description}</span>
+                        <span className="text-xs text-skin-text-muted">{provider.description}</span>
                       )}
                     </div>
                   </SelectItem>
@@ -353,12 +353,12 @@ export default function EmailConfigSection() {
                 <SelectItem value="custom">
                   <div className="flex flex-col">
                     <span>Personalizado</span>
-                    <span className="text-xs text-muted-foreground">Configure manualmente</span>
+                    <span className="text-xs text-skin-text-muted">Configure manualmente</span>
                   </div>
                 </SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="mt-1 text-xs text-skin-text-muted">
               <strong>Gmail, Hotmail/Outlook e Titan</strong> já estão pré-configurados. 
               Selecione um provedor e informe apenas suas credenciais de acesso.
             </p>
@@ -469,7 +469,7 @@ export default function EmailConfigSection() {
         </div>
 
         {showTestInput && (
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-4">
+          <div className="space-y-4 rounded-lg border border-skin-info/30 bg-skin-info/10 p-4">
             <div>
               <Label htmlFor="test-email">
                 Email de destino para teste
@@ -492,10 +492,10 @@ export default function EmailConfigSection() {
         )}
 
         {activeConfig && (
-          <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="rounded-lg border border-skin-success/30 bg-skin-success/10 p-4">
             <div className="flex items-start gap-2">
-              <Mail className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-green-800">
+              <Mail className="mt-0.5 h-4 w-4 flex-shrink-0 text-skin-success" />
+              <div className="text-sm text-skin-success">
                 <p className="font-medium mb-1">Configuração Ativa</p>
                 <p><strong>Provedor:</strong> {activeConfig.providerName}</p>
                 <p><strong>Servidor:</strong> {activeConfig.smtpHost}:{activeConfig.smtpPort}</p>
@@ -509,10 +509,10 @@ export default function EmailConfigSection() {
         )}
 
         {!activeConfig && (
-          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="rounded-lg border border-skin-warning/30 bg-skin-warning/10 p-4">
             <div className="flex items-start gap-2">
-              <Mail className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-yellow-800">
+              <Mail className="mt-0.5 h-4 w-4 flex-shrink-0 text-skin-warning" />
+              <div className="text-sm text-skin-warning">
                 <p className="font-medium mb-1">Nenhuma Configuração Ativa</p>
                 <p>Configure um provedor de email para que o sistema possa enviar mensagens.</p>
               </div>

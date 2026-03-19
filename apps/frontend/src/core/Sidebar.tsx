@@ -89,7 +89,7 @@ export function Sidebar() {
     <div
       ref={sidebarRef}
       className={cn(
-        "flex flex-col h-full bg-card border-r transition-all duration-300",
+        "flex h-full flex-col border-r border-skin-border/80 bg-skin-sidebar-background text-skin-sidebar-text transition-all duration-300",
         isExpanded ? "w-64" : "w-20"
       )}
     >
@@ -123,8 +123,8 @@ export function Sidebar() {
                 className={cn(
                   "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                    ? "bg-skin-primary text-skin-text-inverse"
+                    : "text-skin-text-muted hover:bg-skin-menu-hover hover:text-skin-text",
                   !isExpanded && "justify-center"
                 )}
                 title={!isExpanded ? item.name : undefined}

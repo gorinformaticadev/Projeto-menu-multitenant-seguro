@@ -148,8 +148,8 @@ export function RouteGuard({ children }: RouteGuardProps) {
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground text-lg">Verificando autenticação...</p>
-          <p className="text-sm text-muted-foreground mt-2">Aguarde um momento</p>
+          <p className="text-skin-text-muted text-lg">Verificando autenticação...</p>
+          <p className="mt-2 text-sm text-skin-text-muted">Aguarde um momento</p>
         </div>
       </div>
     );
@@ -160,26 +160,26 @@ export function RouteGuard({ children }: RouteGuardProps) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center max-w-md mx-auto p-6">
-          <div className="text-red-500 text-6xl mb-4">🔒</div>
-          <h2 className="text-2xl font-bold text-red-600 mb-2">Acesso Negado</h2>
-          <p className="text-muted-foreground mb-4">
+          <div className="mb-4 text-6xl text-skin-danger">🔒</div>
+          <h2 className="mb-2 text-2xl font-bold text-skin-danger">Acesso Negado</h2>
+          <p className="mb-4 text-skin-text-muted">
             Sua sessão expirou ou você não tem permissão para acessar esta página.
           </p>
           {validationState.error && (
-            <p className="text-sm text-red-500 mb-4 bg-red-50 p-3 rounded-md border border-red-200">
+            <p className="mb-4 rounded-md border border-skin-danger/30 bg-skin-danger/10 p-3 text-sm text-skin-danger">
               <strong>Erro:</strong> {validationState.error}
             </p>
           )}
           <div className="space-y-2">
             <button
               onClick={() => router.push(ROUTE_CONFIG.publicRoutes[0] || '/')}
-              className="w-full bg-primary text-primary-foreground px-6 py-2 rounded-md hover:bg-primary/90 transition-colors"
+              className="w-full rounded-md bg-skin-primary px-6 py-2 text-skin-text-inverse transition-colors hover:bg-skin-primary/90"
             >
               Voltar ao Início
             </button>
             <button
               onClick={() => router.push(ROUTE_CONFIG.unauthenticatedFallback)}
-              className="w-full bg-secondary text-secondary-foreground px-6 py-2 rounded-md hover:bg-secondary/90 transition-colors"
+              className="w-full rounded-md border border-skin-border bg-skin-surface px-6 py-2 text-skin-text transition-colors hover:bg-skin-surface-hover"
             >
               Fazer Login Novamente
             </button>

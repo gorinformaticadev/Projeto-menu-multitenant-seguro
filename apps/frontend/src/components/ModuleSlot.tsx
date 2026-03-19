@@ -1,7 +1,7 @@
-import { useModuleFeatures } from "@/hooks/useModuleFeatures";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Info } from "lucide-react";
 import { useMemo } from "react";
+import { Info } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useModuleFeatures } from "@/hooks/useModuleFeatures";
 
 interface ModuleSlotProps {
     position: string;
@@ -11,46 +11,50 @@ interface ModuleSlotProps {
 export function ModuleSlot({ position, className }: ModuleSlotProps) {
     const { features, loading } = useModuleFeatures();
 
-    // Usa useMemo para evitar recalcular slots desnecessariamente
     const slots = useMemo(() => {
         if (loading || !features.slots) return [];
-        return features.slots.filter(s => s.position === position);
+        return features.slots.filter((slot) => slot.position === position);
     }, [features.slots, position, loading]);
 
     if (loading || slots.length === 0) return null;
 
     return (
-        <div className={`space-y-4 ${className || ''}`}>
+        <div className={`space-y-4 ${className || ""}`}>
             {slots.map((slot, index) => {
-                if (slot.type === 'alert-info') {
+                if (slot.type === "alert-info") {
                     return (
-                        <Alert key={index} className="bg-blue-50 border-blue-200">
-                            <Info className="h-4 w-4 text-blue-600" />
-                            <AlertTitle className="text-blue-800">Informação do Módulo</AlertTitle>
-                            <AlertDescription className="text-blue-700">
+                        <Alert key={index} className="border-skin-info/30 bg-skin-info/10">
+                            <Info className="h-4 w-4 text-skin-info" />
+                            <AlertTitle className="text-skin-info">Informacao do modulo</AlertTitle>
+                            <AlertDescription className="text-skin-info">
                                 {slot.content}
                             </AlertDescription>
                         </Alert>
                     );
                 }
 
-                if (slot.type === 'text-highlight') {
+                if (slot.type === "text-highlight") {
                     return (
-                        <div key={index} className="bg-yellow-100 p-2 rounded text-yellow-800 text-sm font-medium text-center">
+                        <div
+                            key={index}
+                            className="rounded bg-skin-warning/15 p-2 text-center text-sm font-medium text-skin-warning"
+                        >
                             {slot.content}
                         </div>
-                    )
+                    );
                 }
 
-                if (slot.type === 'banner') {
+                if (slot.type === "banner") {
                     return (
-                        <div key={index} className="bg-gradient-to-r from-purple-500 to-indigo-600 text-white p-4 rounded-lg shadow-md">
-                            <h3 className="font-bold text-lg">{slot.content}</h3>
+                        <div
+                            key={index}
+                            className="rounded-lg bg-skin-primary p-4 text-skin-text-inverse shadow-md"
+                        >
+                            <h3 className="text-lg font-bold">{slot.content}</h3>
                         </div>
-                    )
+                    );
                 }
 
-                // Default text
                 return <div key={index}>{slot.content}</div>;
             })}
         </div>
