@@ -2,9 +2,14 @@ import { Injectable, type NestMiddleware } from '@nestjs/common';
 import { resolveApiRouteContractPolicy } from '@contracts/api-routes';
 import type { NextFunction, Request, Response } from 'express';
 import { brotliCompressSync, gzipSync } from 'node:zlib';
+import { OperationalObservabilityService } from '../services/operational-observability.service';
 
 @Injectable()
 export class ResponseProtectionMiddleware implements NestMiddleware {
+  constructor(
+    private readonly operationalObservabilityService?: OperationalObservabilityService,
+  ) {}
+
   use(req: Request, res: Response, next: NextFunction) {
     const routePolicy = resolveApiRouteContractPolicy(req.originalUrl || req.url || req.path || '/');
     const originalSend = res.send.bind(res);
@@ -34,6 +39,19 @@ export class ResponseProtectionMiddleware implements NestMiddleware {
 
       if (finalBuffer.length > routePolicy.response.maxBytes) {
         const errorStatus = routePolicy.response.overflowStatusCode;
+        this.operationalObservabilityService?.record({
+          type: 'response_overflow',
+          route: req.originalUrl || req.url || req.path || '/',
+          request: req as unknown as Record<string, any>,
+          statusCode: errorStatus,
+          severity: 'warn',
+          detail: `response ${finalBuffer.length} exceeds ${routePolicy.response.maxBytes} bytes for ${routePolicy.id}`,
+          extra: {
+            routeId: routePolicy.id,
+            responseBytes: finalBuffer.length,
+            limitBytes: routePolicy.response.maxBytes,
+          },
+        });
         const errorBody = Buffer.from(
           JSON.stringify({
             statusCode: errorStatus,

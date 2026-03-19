@@ -2,6 +2,7 @@ import { HttpException } from '@nestjs/common';
 import * as fs from 'fs';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { SystemVersionService } from '@common/services/system-version.service';
+import { OperationalCircuitBreakerService } from '@common/services/operational-circuit-breaker.service';
 import { AuditService } from '../audit/audit.service';
 import { SystemUpdateAdminService } from './system-update-admin.service';
 import { UpdateService } from './update.service';
@@ -109,11 +110,16 @@ function createService() {
     })),
   };
 
+  const operationalCircuitBreakerServiceMock = {
+    execute: jest.fn(async (_options, action: () => Promise<unknown>) => action()),
+  };
+
   const service = new UpdateService(
     prismaMock as unknown as PrismaService,
     auditMock as unknown as AuditService,
     systemVersionMock as unknown as SystemVersionService,
     systemUpdateAdminServiceMock as unknown as SystemUpdateAdminService,
+    operationalCircuitBreakerServiceMock as unknown as OperationalCircuitBreakerService,
   );
 
   return {

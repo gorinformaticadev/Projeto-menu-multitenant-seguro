@@ -23,12 +23,37 @@ export type ResponseContractPolicy = {
   executionTimeoutMs: number;
 };
 
+export type RateLimitScope = "ip" | "user" | "tenant" | "tenant-user" | "api-key";
+export type FairQueueScope = "global" | "tenant" | "tenant-user" | "user";
+
+export type RateLimitWindowPolicy = {
+  limit: number;
+  ttlMs: number;
+  burstLimit?: number;
+  burstTtlMs?: number;
+};
+
+export type RouteRateLimitPolicy = Partial<Record<RateLimitScope, RateLimitWindowPolicy>>;
+
+export type RouteRuntimeProtectionPolicy = {
+  shedOnCpuPressure: boolean;
+  queueIsolationRequired: boolean;
+  fairQueueScope: FairQueueScope;
+  maxConcurrentRequests: number;
+  maxConcurrentPerPartition: number;
+  maxQueueDepth: number;
+  maxQueueDepthPerPartition: number;
+  maxQueueWaitMs: number;
+};
+
 export type SharedApiRouteContractPolicy = {
   id: string;
   patterns: string[];
   request?: Partial<RequestContractLimits>;
   response?: Partial<ResponseContractPolicy>;
   supportedVersions?: readonly ApiVersion[];
+  rateLimit?: RouteRateLimitPolicy;
+  runtime?: Partial<RouteRuntimeProtectionPolicy>;
 };
 
 export type ResolvedApiRouteContractPolicy = {
@@ -37,6 +62,8 @@ export type ResolvedApiRouteContractPolicy = {
   request: RequestContractLimits;
   response: ResponseContractPolicy;
   supportedVersions: readonly ApiVersion[];
+  rateLimit: RouteRateLimitPolicy;
+  runtime: RouteRuntimeProtectionPolicy;
 };
 
 export const DEFAULT_REQUEST_CONTRACT_LIMITS: RequestContractLimits = {
@@ -60,6 +87,17 @@ export const DEFAULT_RESPONSE_CONTRACT_POLICY: ResponseContractPolicy = {
   executionTimeoutMs: 12_000,
 };
 
+export const DEFAULT_ROUTE_RUNTIME_PROTECTION_POLICY: RouteRuntimeProtectionPolicy = {
+  shedOnCpuPressure: false,
+  queueIsolationRequired: false,
+  fairQueueScope: "tenant",
+  maxConcurrentRequests: 1,
+  maxConcurrentPerPartition: 1,
+  maxQueueDepth: 0,
+  maxQueueDepthPerPartition: 1,
+  maxQueueWaitMs: 15_000,
+};
+
 export const SHARED_API_ROUTE_CONTRACT_POLICIES: SharedApiRouteContractPolicy[] = [
   {
     id: "auth",
@@ -80,6 +118,20 @@ export const SHARED_API_ROUTE_CONTRACT_POLICIES: SharedApiRouteContractPolicy[] 
       compressionThresholdBytes: 768,
       executionTimeoutMs: 8_000,
     },
+    rateLimit: {
+      ip: {
+        limit: 20,
+        ttlMs: 60_000,
+        burstLimit: 6,
+        burstTtlMs: 10_000,
+      },
+      user: {
+        limit: 10,
+        ttlMs: 60_000,
+        burstLimit: 4,
+        burstTtlMs: 10_000,
+      },
+    },
   },
   {
     id: "dashboard-aggregate",
@@ -99,6 +151,29 @@ export const SHARED_API_ROUTE_CONTRACT_POLICIES: SharedApiRouteContractPolicy[] 
       compressionThresholdBytes: 1536,
       executionTimeoutMs: 6_000,
     },
+    rateLimit: {
+      ip: {
+        limit: 120,
+        ttlMs: 60_000,
+        burstLimit: 18,
+        burstTtlMs: 10_000,
+      },
+      user: {
+        limit: 90,
+        ttlMs: 60_000,
+        burstLimit: 12,
+        burstTtlMs: 10_000,
+      },
+      tenant: {
+        limit: 240,
+        ttlMs: 60_000,
+        burstLimit: 30,
+        burstTtlMs: 10_000,
+      },
+    },
+    runtime: {
+      shedOnCpuPressure: true,
+    },
   },
   {
     id: "dashboard-layout",
@@ -116,6 +191,29 @@ export const SHARED_API_ROUTE_CONTRACT_POLICIES: SharedApiRouteContractPolicy[] 
       maxBytes: 192 * 1024,
       compressionThresholdBytes: 1024,
       executionTimeoutMs: 8_000,
+    },
+    rateLimit: {
+      ip: {
+        limit: 60,
+        ttlMs: 60_000,
+        burstLimit: 10,
+        burstTtlMs: 10_000,
+      },
+      user: {
+        limit: 45,
+        ttlMs: 60_000,
+        burstLimit: 8,
+        burstTtlMs: 10_000,
+      },
+      tenant: {
+        limit: 120,
+        ttlMs: 60_000,
+        burstLimit: 16,
+        burstTtlMs: 10_000,
+      },
+    },
+    runtime: {
+      shedOnCpuPressure: true,
     },
   },
   {
@@ -142,6 +240,29 @@ export const SHARED_API_ROUTE_CONTRACT_POLICIES: SharedApiRouteContractPolicy[] 
       maxBytes: 256 * 1024,
       executionTimeoutMs: 15_000,
     },
+    rateLimit: {
+      ip: {
+        limit: 120,
+        ttlMs: 60_000,
+        burstLimit: 20,
+        burstTtlMs: 10_000,
+      },
+      user: {
+        limit: 90,
+        ttlMs: 60_000,
+        burstLimit: 15,
+        burstTtlMs: 10_000,
+      },
+      tenant: {
+        limit: 240,
+        ttlMs: 60_000,
+        burstLimit: 30,
+        burstTtlMs: 10_000,
+      },
+    },
+    runtime: {
+      shedOnCpuPressure: true,
+    },
   },
   {
     id: "users",
@@ -160,6 +281,29 @@ export const SHARED_API_ROUTE_CONTRACT_POLICIES: SharedApiRouteContractPolicy[] 
       maxBytes: 256 * 1024,
       executionTimeoutMs: 15_000,
     },
+    rateLimit: {
+      ip: {
+        limit: 120,
+        ttlMs: 60_000,
+        burstLimit: 20,
+        burstTtlMs: 10_000,
+      },
+      user: {
+        limit: 90,
+        ttlMs: 60_000,
+        burstLimit: 15,
+        burstTtlMs: 10_000,
+      },
+      tenant: {
+        limit: 240,
+        ttlMs: 60_000,
+        burstLimit: 30,
+        burstTtlMs: 10_000,
+      },
+    },
+    runtime: {
+      shedOnCpuPressure: true,
+    },
   },
   {
     id: "notifications",
@@ -177,6 +321,29 @@ export const SHARED_API_ROUTE_CONTRACT_POLICIES: SharedApiRouteContractPolicy[] 
       compressionThresholdBytes: 768,
       executionTimeoutMs: 10_000,
     },
+    rateLimit: {
+      ip: {
+        limit: 90,
+        ttlMs: 60_000,
+        burstLimit: 20,
+        burstTtlMs: 10_000,
+      },
+      user: {
+        limit: 60,
+        ttlMs: 60_000,
+        burstLimit: 12,
+        burstTtlMs: 10_000,
+      },
+      tenant: {
+        limit: 180,
+        ttlMs: 60_000,
+        burstLimit: 24,
+        burstTtlMs: 10_000,
+      },
+    },
+    runtime: {
+      shedOnCpuPressure: true,
+    },
   },
   {
     id: "security-email-config",
@@ -192,6 +359,26 @@ export const SHARED_API_ROUTE_CONTRACT_POLICIES: SharedApiRouteContractPolicy[] 
     response: {
       maxBytes: 160 * 1024,
       executionTimeoutMs: 12_000,
+    },
+    rateLimit: {
+      ip: {
+        limit: 60,
+        ttlMs: 60_000,
+        burstLimit: 12,
+        burstTtlMs: 10_000,
+      },
+      user: {
+        limit: 40,
+        ttlMs: 60_000,
+        burstLimit: 8,
+        burstTtlMs: 10_000,
+      },
+      tenant: {
+        limit: 120,
+        ttlMs: 60_000,
+        burstLimit: 16,
+        burstTtlMs: 10_000,
+      },
     },
   },
   {
@@ -209,6 +396,26 @@ export const SHARED_API_ROUTE_CONTRACT_POLICIES: SharedApiRouteContractPolicy[] 
       maxBytes: 160 * 1024,
       executionTimeoutMs: 15_000,
     },
+    rateLimit: {
+      ip: {
+        limit: 40,
+        ttlMs: 60_000,
+        burstLimit: 8,
+        burstTtlMs: 10_000,
+      },
+      user: {
+        limit: 30,
+        ttlMs: 60_000,
+        burstLimit: 6,
+        burstTtlMs: 10_000,
+      },
+      tenant: {
+        limit: 90,
+        ttlMs: 60_000,
+        burstLimit: 12,
+        burstTtlMs: 10_000,
+      },
+    },
   },
   {
     id: "cron-system-settings",
@@ -225,6 +432,36 @@ export const SHARED_API_ROUTE_CONTRACT_POLICIES: SharedApiRouteContractPolicy[] 
     response: {
       maxBytes: 192 * 1024,
       executionTimeoutMs: 20_000,
+    },
+    rateLimit: {
+      ip: {
+        limit: 40,
+        ttlMs: 60_000,
+        burstLimit: 8,
+        burstTtlMs: 10_000,
+      },
+      user: {
+        limit: 24,
+        ttlMs: 60_000,
+        burstLimit: 4,
+        burstTtlMs: 10_000,
+      },
+      tenant: {
+        limit: 72,
+        ttlMs: 60_000,
+        burstLimit: 10,
+        burstTtlMs: 10_000,
+      },
+    },
+    runtime: {
+      shedOnCpuPressure: true,
+      queueIsolationRequired: true,
+      fairQueueScope: "tenant",
+      maxConcurrentRequests: 1,
+      maxConcurrentPerPartition: 1,
+      maxQueueDepth: 2,
+      maxQueueDepthPerPartition: 1,
+      maxQueueWaitMs: 20_000,
     },
   },
   {
@@ -246,6 +483,36 @@ export const SHARED_API_ROUTE_CONTRACT_POLICIES: SharedApiRouteContractPolicy[] 
       compressionThresholdBytes: 1536,
       executionTimeoutMs: 60_000,
     },
+    rateLimit: {
+      ip: {
+        limit: 20,
+        ttlMs: 60_000,
+        burstLimit: 4,
+        burstTtlMs: 15_000,
+      },
+      user: {
+        limit: 12,
+        ttlMs: 60_000,
+        burstLimit: 3,
+        burstTtlMs: 15_000,
+      },
+      tenant: {
+        limit: 36,
+        ttlMs: 60_000,
+        burstLimit: 6,
+        burstTtlMs: 15_000,
+      },
+    },
+    runtime: {
+      shedOnCpuPressure: true,
+      queueIsolationRequired: true,
+      fairQueueScope: "tenant",
+      maxConcurrentRequests: 1,
+      maxConcurrentPerPartition: 1,
+      maxQueueDepth: 1,
+      maxQueueDepthPerPartition: 1,
+      maxQueueWaitMs: 15_000,
+    },
   },
   {
     id: "modules",
@@ -263,6 +530,29 @@ export const SHARED_API_ROUTE_CONTRACT_POLICIES: SharedApiRouteContractPolicy[] 
       maxBytes: 256 * 1024,
       compressionThresholdBytes: 1024,
       executionTimeoutMs: 15_000,
+    },
+    rateLimit: {
+      ip: {
+        limit: 60,
+        ttlMs: 60_000,
+        burstLimit: 10,
+        burstTtlMs: 10_000,
+      },
+      user: {
+        limit: 30,
+        ttlMs: 60_000,
+        burstLimit: 6,
+        burstTtlMs: 10_000,
+      },
+      tenant: {
+        limit: 90,
+        ttlMs: 60_000,
+        burstLimit: 12,
+        burstTtlMs: 10_000,
+      },
+    },
+    runtime: {
+      shedOnCpuPressure: true,
     },
   },
   {
@@ -282,6 +572,26 @@ export const SHARED_API_ROUTE_CONTRACT_POLICIES: SharedApiRouteContractPolicy[] 
       compressionThresholdBytes: 512,
       executionTimeoutMs: 10_000,
     },
+    rateLimit: {
+      ip: {
+        limit: 90,
+        ttlMs: 60_000,
+        burstLimit: 18,
+        burstTtlMs: 10_000,
+      },
+      user: {
+        limit: 60,
+        ttlMs: 60_000,
+        burstLimit: 10,
+        burstTtlMs: 10_000,
+      },
+      tenant: {
+        limit: 180,
+        ttlMs: 60_000,
+        burstLimit: 24,
+        burstTtlMs: 10_000,
+      },
+    },
   },
   {
     id: "misc-features",
@@ -299,6 +609,29 @@ export const SHARED_API_ROUTE_CONTRACT_POLICIES: SharedApiRouteContractPolicy[] 
       maxBytes: 192 * 1024,
       compressionThresholdBytes: 768,
       executionTimeoutMs: 12_000,
+    },
+    rateLimit: {
+      ip: {
+        limit: 60,
+        ttlMs: 60_000,
+        burstLimit: 10,
+        burstTtlMs: 10_000,
+      },
+      user: {
+        limit: 40,
+        ttlMs: 60_000,
+        burstLimit: 8,
+        burstTtlMs: 10_000,
+      },
+      tenant: {
+        limit: 120,
+        ttlMs: 60_000,
+        burstLimit: 16,
+        burstTtlMs: 10_000,
+      },
+    },
+    runtime: {
+      shedOnCpuPressure: true,
     },
   },
 ];
@@ -341,5 +674,10 @@ export function resolveApiRouteContractPolicy(path: string): ResolvedApiRouteCon
       ...(matchedPolicy?.response || {}),
     },
     supportedVersions: matchedPolicy?.supportedVersions || ["1", "2"],
+    rateLimit: matchedPolicy?.rateLimit || {},
+    runtime: {
+      ...DEFAULT_ROUTE_RUNTIME_PROTECTION_POLICY,
+      ...(matchedPolicy?.runtime || {}),
+    },
   };
 }

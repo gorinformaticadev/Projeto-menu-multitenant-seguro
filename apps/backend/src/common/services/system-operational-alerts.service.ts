@@ -11,6 +11,7 @@ import { PushNotificationService } from '../../notifications/push-notification.s
 import { ConfigResolverService } from '../../system-settings/config-resolver.service';
 import {
   ApiTelemetrySnapshot,
+  OperationalTelemetrySnapshot,
   RouteTelemetrySummary,
   SecurityTelemetrySnapshot,
   SystemTelemetryService,
@@ -30,6 +31,12 @@ type EvaluatorConfig = {
   minDeniedSample: number;
   jobFailureStormThreshold: number;
   infraDegradedMinConsecutive: number;
+  versionFallbackThreshold: number;
+  requestRetryStormThreshold: number;
+  runtimePressureThreshold: number;
+  queueSaturationThreshold: number;
+  circuitInstabilityThreshold: number;
+  correlatedOperationalRouteThreshold: number;
 };
 
 type AlertDispatchInput = {
@@ -49,6 +56,16 @@ type InfraHealthMetric = {
   latencyMs: number | null;
 };
 
+type CorrelatedOperationalRoute = {
+  route: string;
+  signalCount: number;
+  signalFamilies: string[];
+  runtimePressureEvents: number;
+  queueSaturationEvents: number;
+  circuitOpenEvents: number;
+  requestRetryEvents: number;
+};
+
 const DEFAULT_ALERT_WINDOW_MINUTES = 5;
 const DEFAULT_ALERT_COOLDOWN_MINUTES = 15;
 const DEFAULT_ALERT_5XX_RATE_THRESHOLD = 10;
@@ -59,6 +76,12 @@ const DEFAULT_ALERT_DENIED_SPIKE_THRESHOLD = 15;
 const DEFAULT_ALERT_MIN_DENIED_SAMPLE = 12;
 const DEFAULT_ALERT_JOB_FAILURE_STORM_THRESHOLD = 4;
 const DEFAULT_ALERT_INFRA_DEGRADED_MIN_CONSECUTIVE = 3;
+const DEFAULT_ALERT_VERSION_FALLBACK_THRESHOLD = 5;
+const DEFAULT_ALERT_REQUEST_RETRY_STORM_THRESHOLD = 10;
+const DEFAULT_ALERT_RUNTIME_PRESSURE_THRESHOLD = 4;
+const DEFAULT_ALERT_QUEUE_SATURATION_THRESHOLD = 4;
+const DEFAULT_ALERT_CIRCUIT_INSTABILITY_THRESHOLD = 3;
+const DEFAULT_ALERT_CORRELATED_OPERATIONAL_ROUTE_THRESHOLD = 4;
 
 @Injectable()
 export class SystemOperationalAlertsService implements OnModuleInit {
@@ -108,8 +131,7 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     }
 
     try {
-      await this.evaluateOperationalAlerts(); // Kept original evaluation logic
-      await this.evaluateInfraMetrics(); // Added from instruction, assuming it's a new evaluation
+      await this.evaluateOperationalAlerts();
     } catch (error) {
       this.logger.error('Operational alerts evaluator failed.', error as Error);
     } finally {
@@ -128,6 +150,7 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     const windowMs = config.windowMinutes * 60 * 1000;
     const apiSnapshot = this.systemTelemetryService.getApiSnapshot(windowMs);
     const securitySnapshot = this.systemTelemetryService.getSecuritySnapshot(windowMs);
+    const operationalSnapshot = this.systemTelemetryService.getOperationalSnapshot(windowMs);
     const emitted: string[] = [];
     const skipped: string[] = [];
 
@@ -184,6 +207,14 @@ export class SystemOperationalAlertsService implements OnModuleInit {
       skipped.push('OPS_JOB_FAILURE_STORM');
     }
 
+    const operationalAlerts = await this.evaluateOperationalSignalsAlerts(
+      operationalSnapshot,
+      config,
+      nowMs,
+    );
+    emitted.push(...operationalAlerts.emitted);
+    skipped.push(...operationalAlerts.skipped);
+
     const infraAlerts = await this.evaluateInfraAlerts(config, nowMs);
     emitted.push(...infraAlerts.emitted);
     skipped.push(...infraAlerts.skipped);
@@ -226,11 +257,6 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     nowMs = Date.now(),
     cooldownMinutes = this.getEvaluatorConfig().cooldownMinutes,
   ): Promise<boolean> {
-    // this.pruneCooldownState(nowMs); // Removed as cooldownState is replaced by RedisLockService
-    // The original emitAlertIfNeeded is still used here, so I'll keep it.
-    // The instruction provided a new emitAlertIfNeeded signature, which implies a refactor.
-    // For now, I'll assume the new emitAlertIfNeeded is for specific cases and the old one remains for dispatchOperationalAlert.
-    // If the intent was to replace all calls to emitAlertIfNeeded with the new signature, that would be a larger refactor.
     return this.emitAlertIfNeeded(input, nowMs, cooldownMinutes);
   }
 
@@ -354,6 +380,265 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     );
   }
 
+  private async evaluateOperationalSignalsAlerts(
+    snapshot: OperationalTelemetrySnapshot,
+    config: EvaluatorConfig,
+    nowMs: number,
+  ): Promise<{
+    emitted: string[];
+    skipped: string[];
+  }> {
+    const emitted: string[] = [];
+    const skipped: string[] = [];
+
+    const versionFallbacks = this.getOperationalCount(snapshot, 'version_fallback');
+    if (
+      versionFallbacks >= config.versionFallbackThreshold &&
+      (await this.emitAlertIfNeeded(
+        {
+          action: 'OPS_VERSION_FALLBACK_SPIKE',
+          cooldownKey: 'OPS_VERSION_FALLBACK_SPIKE',
+          severity: 'warning',
+          title: 'Spike de fallback de contrato',
+          body: 'A API esta respondendo com contratos legados acima do limite tolerado.',
+          data: {
+            windowMinutes: config.windowMinutes,
+            versionFallbacks,
+            threshold: config.versionFallbackThreshold,
+          },
+        },
+        nowMs,
+        config.cooldownMinutes,
+      ))
+    ) {
+      emitted.push('OPS_VERSION_FALLBACK_SPIKE');
+    } else {
+      skipped.push('OPS_VERSION_FALLBACK_SPIKE');
+    }
+
+    const requestRetries = this.getOperationalCount(snapshot, 'request_retry');
+    if (
+      requestRetries >= config.requestRetryStormThreshold &&
+      (await this.emitAlertIfNeeded(
+        {
+          action: 'OPS_REQUEST_RETRY_STORM',
+          cooldownKey: 'OPS_REQUEST_RETRY_STORM',
+          severity: 'warning',
+          title: 'Tempestade de retries',
+          body: 'O frontend/backend entrou em padrao de retry acima do esperado.',
+          data: {
+            windowMinutes: config.windowMinutes,
+            requestRetries,
+            threshold: config.requestRetryStormThreshold,
+          },
+        },
+        nowMs,
+        config.cooldownMinutes,
+      ))
+    ) {
+      emitted.push('OPS_REQUEST_RETRY_STORM');
+    } else {
+      skipped.push('OPS_REQUEST_RETRY_STORM');
+    }
+
+    const runtimePressureEvents = this.getOperationalCount(snapshot, 'runtime_pressure');
+    if (
+      runtimePressureEvents >= config.runtimePressureThreshold &&
+      (await this.emitAlertIfNeeded(
+        {
+          action: 'OPS_RUNTIME_PRESSURE_RECENT',
+          cooldownKey: 'OPS_RUNTIME_PRESSURE_RECENT',
+          severity: 'critical',
+          title: 'Pressao de runtime recorrente',
+          body: 'O backend esta descartando requisicoes por pressao de runtime.',
+          data: {
+            windowMinutes: config.windowMinutes,
+            runtimePressureEvents,
+            threshold: config.runtimePressureThreshold,
+          },
+          pushEligible: true,
+          audit: true,
+        },
+        nowMs,
+        config.cooldownMinutes,
+      ))
+    ) {
+      emitted.push('OPS_RUNTIME_PRESSURE_RECENT');
+    } else {
+      skipped.push('OPS_RUNTIME_PRESSURE_RECENT');
+    }
+
+    const queueSaturationEvents =
+      this.getOperationalCount(snapshot, 'request_queue_rejected') +
+      this.getOperationalCount(snapshot, 'request_queue_timeout');
+    if (
+      queueSaturationEvents >= config.queueSaturationThreshold &&
+      (await this.emitAlertIfNeeded(
+        {
+          action: 'OPS_QUEUE_SATURATION',
+          cooldownKey: 'OPS_QUEUE_SATURATION',
+          severity: 'warning',
+          title: 'Fila de isolamento saturada',
+          body: 'Operacoes pesadas estao esgotando a fila de isolamento.',
+          data: {
+            windowMinutes: config.windowMinutes,
+            queueSaturationEvents,
+            queueRejectedEvents: this.getOperationalCount(snapshot, 'request_queue_rejected'),
+            queueTimeoutEvents: this.getOperationalCount(snapshot, 'request_queue_timeout'),
+            threshold: config.queueSaturationThreshold,
+          },
+        },
+        nowMs,
+        config.cooldownMinutes,
+      ))
+    ) {
+      emitted.push('OPS_QUEUE_SATURATION');
+    } else {
+      skipped.push('OPS_QUEUE_SATURATION');
+    }
+
+    const circuitOpenEvents = this.getOperationalCount(snapshot, 'circuit_open');
+    if (
+      circuitOpenEvents >= config.circuitInstabilityThreshold &&
+      (await this.emitAlertIfNeeded(
+        {
+          action: 'OPS_CIRCUIT_BREAKER_INSTABILITY',
+          cooldownKey: 'OPS_CIRCUIT_BREAKER_INSTABILITY',
+          severity: 'critical',
+          title: 'Circuit breaker instavel',
+          body: 'Dependencias criticas estao abrindo circuit breaker repetidamente.',
+          data: {
+            windowMinutes: config.windowMinutes,
+            circuitOpenEvents,
+            circuitHalfOpenEvents: this.getOperationalCount(snapshot, 'circuit_half_open'),
+            circuitRecoveredEvents: this.getOperationalCount(snapshot, 'circuit_recovered'),
+            threshold: config.circuitInstabilityThreshold,
+          },
+          pushEligible: true,
+          audit: true,
+        },
+        nowMs,
+        config.cooldownMinutes,
+      ))
+    ) {
+      emitted.push('OPS_CIRCUIT_BREAKER_INSTABILITY');
+    } else {
+      skipped.push('OPS_CIRCUIT_BREAKER_INSTABILITY');
+    }
+
+    const correlatedRoute = this.findCorrelatedOperationalRoute(snapshot, config);
+    if (
+      correlatedRoute &&
+      (await this.emitAlertIfNeeded(
+        {
+          action: 'OPS_CORRELATED_OPERATIONAL_DEGRADATION',
+          cooldownKey: `OPS_CORRELATED_OPERATIONAL_DEGRADATION:${correlatedRoute.route}`,
+          severity: 'critical',
+          title: 'Degradacao operacional correlacionada',
+          body: `A rota ${correlatedRoute.route} acumula sinais de degradacao operacional no mesmo intervalo.`,
+          data: {
+            route: correlatedRoute.route,
+            signalCount: correlatedRoute.signalCount,
+            signalFamilies: correlatedRoute.signalFamilies,
+            runtimePressureEvents: correlatedRoute.runtimePressureEvents,
+            queueSaturationEvents: correlatedRoute.queueSaturationEvents,
+            circuitOpenEvents: correlatedRoute.circuitOpenEvents,
+            requestRetryEvents: correlatedRoute.requestRetryEvents,
+            threshold: config.correlatedOperationalRouteThreshold,
+          },
+          pushEligible: true,
+          audit: true,
+        },
+        nowMs,
+        config.cooldownMinutes,
+      ))
+    ) {
+      emitted.push(`OPS_CORRELATED_OPERATIONAL_DEGRADATION:${correlatedRoute.route}`);
+    } else {
+      skipped.push('OPS_CORRELATED_OPERATIONAL_DEGRADATION');
+    }
+
+    return { emitted, skipped };
+  }
+
+  private getOperationalCount(
+    snapshot: OperationalTelemetrySnapshot,
+    type: OperationalTelemetrySnapshot['byType'][number]['type'],
+  ): number {
+    return snapshot.byType.find((entry) => entry.type === type)?.count || 0;
+  }
+
+  private findCorrelatedOperationalRoute(
+    snapshot: OperationalTelemetrySnapshot,
+    config: EvaluatorConfig,
+  ): CorrelatedOperationalRoute | null {
+    const byRoute = new Map<string, CorrelatedOperationalRoute>();
+
+    for (const event of snapshot.recent) {
+      const route = String(event.route || '').trim();
+      if (!route || route === '/') {
+        continue;
+      }
+
+      const bucket =
+        byRoute.get(route) ||
+        ({
+          route,
+          signalCount: 0,
+          signalFamilies: [],
+          runtimePressureEvents: 0,
+          queueSaturationEvents: 0,
+          circuitOpenEvents: 0,
+          requestRetryEvents: 0,
+        } satisfies CorrelatedOperationalRoute);
+
+      if (event.type === 'runtime_pressure') {
+        bucket.runtimePressureEvents += 1;
+      } else if (
+        event.type === 'request_queue_rejected' ||
+        event.type === 'request_queue_timeout'
+      ) {
+        bucket.queueSaturationEvents += 1;
+      } else if (event.type === 'circuit_open') {
+        bucket.circuitOpenEvents += 1;
+      } else if (event.type === 'request_retry') {
+        bucket.requestRetryEvents += 1;
+      } else {
+        continue;
+      }
+
+      const signalFamilies = [
+        bucket.runtimePressureEvents > 0 ? 'runtime_pressure' : null,
+        bucket.queueSaturationEvents > 0 ? 'queue_saturation' : null,
+        bucket.circuitOpenEvents > 0 ? 'circuit_open' : null,
+        bucket.requestRetryEvents > 0 ? 'request_retry' : null,
+      ].filter(Boolean) as string[];
+
+      bucket.signalFamilies = signalFamilies;
+      bucket.signalCount =
+        bucket.runtimePressureEvents +
+        bucket.queueSaturationEvents +
+        bucket.circuitOpenEvents +
+        bucket.requestRetryEvents;
+      byRoute.set(route, bucket);
+    }
+
+    const candidates = [...byRoute.values()]
+      .filter(
+        (entry) =>
+          entry.signalCount >= config.correlatedOperationalRouteThreshold &&
+          entry.signalFamilies.length >= 2,
+      )
+      .sort(
+        (left, right) =>
+          right.signalCount - left.signalCount ||
+          right.signalFamilies.length - left.signalFamilies.length ||
+          left.route.localeCompare(right.route),
+      );
+
+    return candidates[0] || null;
+  }
+
   private async evaluateInfraAlerts(
     config: EvaluatorConfig,
     nowMs: number,
@@ -444,8 +729,6 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     );
   }
 
-  // This is the original emitAlertIfNeeded, kept because dispatchOperationalAlert still uses it.
-  // The instruction provided a new emitAlertIfNeeded signature, which is implemented below as a separate method.
   private async emitAlertIfNeeded(
     input: AlertDispatchInput,
     nowMs: number,
@@ -455,7 +738,7 @@ export class SystemOperationalAlertsService implements OnModuleInit {
       return false;
     }
 
-    const cooldownKey = `alert:cooldown:${input.cooldownKey}`; // Use a consistent prefix for Redis
+    const cooldownKey = `alert:cooldown:${input.cooldownKey}`;
     const hasCooldown = await this.redisLock.hasCooldown(cooldownKey);
 
     if (hasCooldown) {
@@ -486,9 +769,7 @@ export class SystemOperationalAlertsService implements OnModuleInit {
       return false;
     }
 
-    // Set Cooldown
     await this.redisLock.setCooldown(cooldownKey, cooldownMinutes * 60 * 1000);
-
 
     const pushEnabled =
       Boolean(input.pushEligible) && Boolean(await this.pushNotificationService.getPublicKey());
@@ -509,8 +790,6 @@ export class SystemOperationalAlertsService implements OnModuleInit {
       });
     }
 
-    // Set cooldown using RedisLockService
-    await this.redisLock.setCooldown(cooldownKey, cooldownMinutes * 60 * 1000);
     return true;
   }
 
@@ -668,16 +947,44 @@ export class SystemOperationalAlertsService implements OnModuleInit {
         1,
         100,
       ),
+      versionFallbackThreshold: this.readIntFromEnv(
+        'OPS_ALERT_VERSION_FALLBACK_THRESHOLD',
+        DEFAULT_ALERT_VERSION_FALLBACK_THRESHOLD,
+        1,
+        10_000,
+      ),
+      requestRetryStormThreshold: this.readIntFromEnv(
+        'OPS_ALERT_REQUEST_RETRY_STORM_THRESHOLD',
+        DEFAULT_ALERT_REQUEST_RETRY_STORM_THRESHOLD,
+        1,
+        10_000,
+      ),
+      runtimePressureThreshold: this.readIntFromEnv(
+        'OPS_ALERT_RUNTIME_PRESSURE_THRESHOLD',
+        DEFAULT_ALERT_RUNTIME_PRESSURE_THRESHOLD,
+        1,
+        10_000,
+      ),
+      queueSaturationThreshold: this.readIntFromEnv(
+        'OPS_ALERT_QUEUE_SATURATION_THRESHOLD',
+        DEFAULT_ALERT_QUEUE_SATURATION_THRESHOLD,
+        1,
+        10_000,
+      ),
+      circuitInstabilityThreshold: this.readIntFromEnv(
+        'OPS_ALERT_CIRCUIT_INSTABILITY_THRESHOLD',
+        DEFAULT_ALERT_CIRCUIT_INSTABILITY_THRESHOLD,
+        1,
+        10_000,
+      ),
+      correlatedOperationalRouteThreshold: this.readIntFromEnv(
+        'OPS_ALERT_CORRELATED_OPERATIONAL_ROUTE_THRESHOLD',
+        DEFAULT_ALERT_CORRELATED_OPERATIONAL_ROUTE_THRESHOLD,
+        2,
+        10_000,
+      ),
     };
   }
-
-  // private pruneCooldownState(nowMs: number): void { // Removed as cooldownState is replaced by RedisLockService
-  //   for (const [key, expiresAt] of this.cooldownState.entries()) {
-  //     if (!Number.isFinite(expiresAt) || expiresAt <= nowMs) {
-  //       this.cooldownState.delete(key);
-  //     }
-  //   }
-  // }
 
   private readIntFromEnv(key: string, fallback: number, min: number, max: number): number {
     const raw = Number.parseInt(String(process.env[key] || ''), 10);

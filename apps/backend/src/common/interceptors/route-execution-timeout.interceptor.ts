@@ -8,9 +8,14 @@ import {
 import { resolveApiRouteContractPolicy } from '@contracts/api-routes';
 import { Observable, TimeoutError, throwError } from 'rxjs';
 import { catchError, timeout } from 'rxjs/operators';
+import { OperationalObservabilityService } from '../services/operational-observability.service';
 
 @Injectable()
 export class RouteExecutionTimeoutInterceptor implements NestInterceptor {
+  constructor(
+    private readonly operationalObservabilityService?: OperationalObservabilityService,
+  ) {}
+
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const httpContext = context.switchToHttp();
     const request = httpContext.getRequest<{
@@ -28,6 +33,18 @@ export class RouteExecutionTimeoutInterceptor implements NestInterceptor {
       }),
       catchError((error: unknown) => {
         if (error instanceof TimeoutError) {
+          this.operationalObservabilityService?.record({
+            type: 'request_timeout',
+            route: request?.originalUrl || request?.url || request?.path || '/',
+            request: request as Record<string, any>,
+            statusCode: 408,
+            severity: 'warn',
+            detail: `handler execution exceeded ${routePolicy.response.executionTimeoutMs}ms for ${routePolicy.id}`,
+            extra: {
+              routeId: routePolicy.id,
+              executionTimeoutMs: routePolicy.response.executionTimeoutMs,
+            },
+          });
           return throwError(
             () =>
               new RequestTimeoutException(

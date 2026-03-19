@@ -7,6 +7,7 @@ import { NotificationService } from '../../notifications/notification.service';
 import { PushNotificationService } from '../../notifications/push-notification.service';
 import { CronService } from '../../core/cron/cron.service';
 import { SystemTelemetryService } from './system-telemetry.service';
+import { RedisLockService } from './redis-lock.service';
 import { SystemOperationalAlertsService } from './system-operational-alerts.service';
 import { ConfigResolverService } from '../../system-settings/config-resolver.service';
 
@@ -53,6 +54,12 @@ describe('SystemOperationalAlertsService', () => {
 
   let telemetryService: SystemTelemetryService;
   let service: SystemOperationalAlertsService;
+  let redisLockMock: {
+    acquireLock: jest.Mock<Promise<boolean>, [string, number, string]>;
+    releaseLock: jest.Mock<Promise<boolean>, [string, string]>;
+    hasCooldown: jest.Mock<Promise<boolean>, [string]>;
+    setCooldown: jest.Mock<Promise<void>, [string, number]>;
+  };
   let previousEnv: Record<string, string | undefined>;
   let serviceInternals: {
     checkDatabaseHealth: () => Promise<{ status: 'healthy' | 'error'; latencyMs: number | null }>;
@@ -69,12 +76,38 @@ describe('SystemOperationalAlertsService', () => {
       auditServiceMock as unknown as AuditService,
       cronServiceMock as unknown as CronService,
       configResolverMock as unknown as ConfigResolverService,
+      redisLockMock as unknown as RedisLockService,
     );
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers().setSystemTime(new Date('2026-03-07T14:00:00.000Z'));
     telemetryService = new SystemTelemetryService();
+    const cooldownState = new Map<string, number>();
+    const lockState = new Map<string, string>();
+    redisLockMock = {
+      acquireLock: jest.fn(async (key: string, _ttlMs: number, ownerId: string) => {
+        if (lockState.has(key)) {
+          return false;
+        }
+        lockState.set(key, ownerId);
+        return true;
+      }),
+      releaseLock: jest.fn(async (key: string, ownerId: string) => {
+        if (lockState.get(key) !== ownerId) {
+          return false;
+        }
+        lockState.delete(key);
+        return true;
+      }),
+      hasCooldown: jest.fn(async (key: string) => {
+        const expiresAt = cooldownState.get(key);
+        return Number.isFinite(expiresAt) && Number(expiresAt) > Date.now();
+      }),
+      setCooldown: jest.fn(async (key: string, durationMs: number) => {
+        cooldownState.set(key, Date.now() + durationMs);
+      }),
+    };
     service = createService();
     serviceInternals = service as unknown as {
       checkDatabaseHealth: () => Promise<{ status: 'healthy' | 'error'; latencyMs: number | null }>;
@@ -93,6 +126,12 @@ describe('SystemOperationalAlertsService', () => {
         process.env.OPS_ALERT_INFRA_DEGRADED_MIN_CONSECUTIVE,
       OPS_ALERT_COOLDOWN_MINUTES: process.env.OPS_ALERT_COOLDOWN_MINUTES,
       OPS_ALERT_REDIS_REQUIRED: process.env.OPS_ALERT_REDIS_REQUIRED,
+      OPS_ALERT_VERSION_FALLBACK_THRESHOLD: process.env.OPS_ALERT_VERSION_FALLBACK_THRESHOLD,
+      OPS_ALERT_RUNTIME_PRESSURE_THRESHOLD: process.env.OPS_ALERT_RUNTIME_PRESSURE_THRESHOLD,
+      OPS_ALERT_QUEUE_SATURATION_THRESHOLD: process.env.OPS_ALERT_QUEUE_SATURATION_THRESHOLD,
+      OPS_ALERT_CIRCUIT_INSTABILITY_THRESHOLD: process.env.OPS_ALERT_CIRCUIT_INSTABILITY_THRESHOLD,
+      OPS_ALERT_CORRELATED_OPERATIONAL_ROUTE_THRESHOLD:
+        process.env.OPS_ALERT_CORRELATED_OPERATIONAL_ROUTE_THRESHOLD,
     };
 
     process.env.OPS_ALERT_5XX_RATE_THRESHOLD = '10';
@@ -106,6 +145,11 @@ describe('SystemOperationalAlertsService', () => {
     process.env.OPS_ALERT_INFRA_DEGRADED_MIN_CONSECUTIVE = '3';
     process.env.OPS_ALERT_COOLDOWN_MINUTES = '15';
     process.env.OPS_ALERT_REDIS_REQUIRED = 'false';
+    process.env.OPS_ALERT_VERSION_FALLBACK_THRESHOLD = '5';
+    process.env.OPS_ALERT_RUNTIME_PRESSURE_THRESHOLD = '4';
+    process.env.OPS_ALERT_QUEUE_SATURATION_THRESHOLD = '4';
+    process.env.OPS_ALERT_CIRCUIT_INSTABILITY_THRESHOLD = '3';
+    process.env.OPS_ALERT_CORRELATED_OPERATIONAL_ROUTE_THRESHOLD = '4';
 
     notificationServiceMock.createSystemNotificationEntity.mockResolvedValue(baseNotification);
     pushNotificationServiceMock.getPublicKey.mockResolvedValue('public-key');
@@ -433,5 +477,85 @@ describe('SystemOperationalAlertsService', () => {
     expect(notificationGatewayMock.emitNewNotification).not.toHaveBeenCalled();
     expect(pushNotificationServiceMock.getPublicKey).not.toHaveBeenCalled();
     expect(auditServiceMock.log).not.toHaveBeenCalled();
+  });
+
+  it('emits a correlated operational degradation alert when the same route accumulates multiple failure signals', async () => {
+    process.env.OPS_ALERT_RUNTIME_PRESSURE_THRESHOLD = '2';
+    process.env.OPS_ALERT_QUEUE_SATURATION_THRESHOLD = '2';
+    process.env.OPS_ALERT_CIRCUIT_INSTABILITY_THRESHOLD = '2';
+    process.env.OPS_ALERT_CORRELATED_OPERATIONAL_ROUTE_THRESHOLD = '4';
+
+    telemetryService.recordOperationalEvent({
+      type: 'runtime_pressure',
+      method: 'GET',
+      route: '/api/system/dashboard',
+      statusCode: 503,
+      detail: 'cpu pressure',
+    });
+    telemetryService.recordOperationalEvent({
+      type: 'runtime_pressure',
+      method: 'GET',
+      route: '/api/system/dashboard',
+      statusCode: 503,
+      detail: 'cpu pressure',
+    });
+    telemetryService.recordOperationalEvent({
+      type: 'request_queue_rejected',
+      method: 'GET',
+      route: '/api/system/dashboard',
+      statusCode: 429,
+      detail: 'queue full',
+    });
+    telemetryService.recordOperationalEvent({
+      type: 'request_queue_timeout',
+      method: 'GET',
+      route: '/api/system/dashboard',
+      statusCode: 503,
+      detail: 'queue wait timeout',
+    });
+    telemetryService.recordOperationalEvent({
+      type: 'circuit_open',
+      method: 'GET',
+      route: '/api/system/dashboard',
+      statusCode: 503,
+      detail: 'dependency unstable',
+    });
+    telemetryService.recordOperationalEvent({
+      type: 'circuit_open',
+      method: 'GET',
+      route: '/api/system/dashboard',
+      statusCode: 503,
+      detail: 'dependency unstable',
+    });
+    telemetryService.recordOperationalEvent({
+      type: 'request_retry',
+      method: 'GET',
+      route: '/api/system/dashboard',
+      statusCode: 503,
+      detail: 'retry transient',
+    });
+
+    const result = await service.evaluateOperationalAlerts(new Date());
+
+    expect(result.emitted).toEqual(
+      expect.arrayContaining([
+        'OPS_RUNTIME_PRESSURE_RECENT',
+        'OPS_QUEUE_SATURATION',
+        'OPS_CIRCUIT_BREAKER_INSTABILITY',
+        'OPS_CORRELATED_OPERATIONAL_DEGRADATION:/api/system/dashboard',
+      ]),
+    );
+    expect(notificationServiceMock.createSystemNotificationEntity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Degradacao operacional correlacionada',
+        data: expect.objectContaining({
+          route: '/api/system/dashboard',
+          runtimePressureEvents: 2,
+          queueSaturationEvents: 2,
+          circuitOpenEvents: 2,
+          requestRetryEvents: 1,
+        }),
+      }),
+    );
   });
 });

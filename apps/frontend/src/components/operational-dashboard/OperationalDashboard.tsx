@@ -182,6 +182,7 @@ type OperationalAlertListItem = {
 
 const POLL_INTERVAL_MS = 15000;
 const DASHBOARD_SNAPSHOT_TTL_MS = 2 * 60 * 1000;
+const STALE_SNAPSHOT_RETRY_MS = 10_000;
 
 const widgetLabelById: Record<string, string> = {
   version: "Versao",
@@ -813,16 +814,24 @@ function QuickActionButton({
   label,
   description,
   onClick,
+  disabled = false,
 }: {
   label: string;
   description: string;
   onClick: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group flex min-w-0 flex-1 items-start justify-between gap-3 rounded-[22px] border border-skin-border/80 bg-skin-surface/80 px-4 py-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-skin-primary/30 hover:bg-skin-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-skin-surface sm:min-w-[220px]"
+      disabled={disabled}
+      aria-disabled={disabled}
+      className={`group flex min-w-0 flex-1 items-start justify-between gap-3 rounded-[22px] border border-skin-border/80 bg-skin-surface/80 px-4 py-3 text-left shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-skin-focus-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-skin-surface sm:min-w-[220px] ${
+        disabled
+          ? "cursor-not-allowed opacity-60"
+          : "hover:-translate-y-0.5 hover:border-skin-primary/30 hover:bg-skin-surface"
+      }`}
     >
       <div className="min-w-0">
         <p className="text-sm font-semibold text-foreground dark:text-skin-text">{label}</p>
@@ -1312,6 +1321,7 @@ export function OperationalDashboard({
       }),
     [appliedFilters.periodMinutes, appliedFilters.severity, appliedFilters.tenantId],
   );
+  const staleSnapshotActive = staleSnapshotAt !== null;
 
   const hasPendingLayoutChanges = useMemo(() => {
     if (!layoutEditingActive) {
@@ -1357,6 +1367,7 @@ export function OperationalDashboard({
             attempts: 2,
             baseDelayMs: 300,
             maxDelayMs: 1_200,
+            context: "/system/dashboard",
             shouldRetry: (requestError) => isTransientRequestError(requestError),
           },
         );
@@ -1577,6 +1588,45 @@ export function OperationalDashboard({
   }, [isOperationalAllowed, refreshDashboard]);
 
   useEffect(() => {
+    if (!staleSnapshotActive || !isOperationalAllowed || loading || refreshing) {
+      return;
+    }
+
+    const retryTimeout = window.setTimeout(() => {
+      if (typeof document !== "undefined" && document.hidden) {
+        return;
+      }
+      void refreshDashboard(true);
+    }, STALE_SNAPSHOT_RETRY_MS);
+
+    const handleOnline = () => {
+      void refreshDashboard(true);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        return;
+      }
+      void refreshDashboard(true);
+    };
+
+    window.addEventListener("online", handleOnline);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearTimeout(retryTimeout);
+      window.removeEventListener("online", handleOnline);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [
+    isOperationalAllowed,
+    loading,
+    refreshDashboard,
+    refreshing,
+    staleSnapshotActive,
+  ]);
+
+  useEffect(() => {
     if (!isMobileViewport || !isLayoutEditing) {
       return;
     }
@@ -1630,14 +1680,14 @@ export function OperationalDashboard({
   }, [defaultFilters]);
 
   const beginLayoutEditing = useCallback(() => {
-    if (!canEditLayout) {
+    if (!canEditLayout || staleSnapshotActive) {
       return;
     }
 
     setEditingLayouts(cloneLayouts(layouts));
     setEditingHiddenWidgetIds([...hiddenWidgetIds]);
     setIsLayoutEditing(true);
-  }, [canEditLayout, hiddenWidgetIds, layouts]);
+  }, [canEditLayout, hiddenWidgetIds, layouts, staleSnapshotActive]);
 
   const cancelLayoutEditing = useCallback(() => {
     setEditingLayouts(cloneLayouts(layouts));
@@ -1652,6 +1702,15 @@ export function OperationalDashboard({
   }, [defaultGridWidgetIds]);
 
   const saveLayoutEditing = useCallback(async () => {
+    if (staleSnapshotActive) {
+      toast({
+        title: "Atualizacao obrigatoria",
+        description: "Atualize o dashboard antes de salvar alteracoes com snapshot desatualizado.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const nextLayouts = cloneLayouts(editingLayouts);
     const nextHidden = normalizeHiddenWidgetIds(editingHiddenWidgetIds, stableAvailableWidgetIds);
     const saved = await persistDashboardPreferences(nextLayouts, appliedFilters, nextHidden);
@@ -1674,6 +1733,7 @@ export function OperationalDashboard({
     editingHiddenWidgetIds,
     editingLayouts,
     persistDashboardPreferences,
+    staleSnapshotActive,
     stableAvailableWidgetIds,
     toast,
   ]);
@@ -2930,6 +2990,8 @@ export function OperationalDashboard({
                     label={
                       !canEditLayout
                         ? "Editar layout disponivel apenas em telas maiores"
+                        : staleSnapshotActive
+                          ? "Atualize o dashboard antes de editar o layout"
                         : layoutEditingActive
                           ? "Cancelar edicao de layout"
                           : "Editar layout"
@@ -2943,7 +3005,7 @@ export function OperationalDashboard({
                       beginLayoutEditing();
                     }}
                     active={layoutEditingActive}
-                    disabled={savingLayout || !canEditLayout}
+                    disabled={savingLayout || !canEditLayout || staleSnapshotActive}
                   >
                     {savingLayout ? (
                       <Loader2 className="h-5 w-5 animate-spin" />
@@ -2975,6 +3037,7 @@ export function OperationalDashboard({
                         label={action.label}
                         description={action.description}
                         onClick={() => executeDashboardIntent(action.intent)}
+                        disabled={staleSnapshotActive}
                       />
                     ))
                   ) : (
@@ -3135,7 +3198,7 @@ export function OperationalDashboard({
                   onClick={() => {
                     void saveLayoutEditing();
                   }}
-                  disabled={!hasPendingLayoutChanges || savingLayout}
+                  disabled={!hasPendingLayoutChanges || savingLayout || staleSnapshotActive}
                 >
                   {savingLayout ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -3202,6 +3265,22 @@ export function OperationalDashboard({
               <p className="text-xs text-skin-info/90">
                 Ultimo snapshot valido coletado ha {formatSnapshotAgeLabel(staleSnapshotAt)}.
               </p>
+              <p className="mt-1 text-xs text-skin-info/80">
+                O painel tenta uma nova leitura automaticamente enquanto a conectividade e o contrato se estabilizam.
+              </p>
+              <div className="mt-3">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 border-skin-info/30 bg-skin-surface/70 text-skin-info hover:bg-skin-info/10"
+                  onClick={() => {
+                    void refreshDashboard(true);
+                  }}
+                >
+                  Atualizar agora
+                </Button>
+              </div>
             </div>
           </div>
         ) : null}
@@ -3484,6 +3563,3 @@ export function OperationalDashboard({
     </TooltipProvider >
   );
 }
-
-
-

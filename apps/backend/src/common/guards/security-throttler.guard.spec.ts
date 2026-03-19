@@ -18,10 +18,17 @@ const createTestStorage = () => {
 
   return {
     increment: jest.fn(
-      async (key: string, ttl: number, limit: number, blockDuration: number) => {
+      async (
+        key: string,
+        ttl: number,
+        limit: number,
+        blockDuration: number,
+        throttlerName?: string,
+      ) => {
         const now = Date.now();
         const effectiveBlockDuration = Number.isFinite(blockDuration) && blockDuration > 0 ? blockDuration : ttl;
-        const existing = states.get(key);
+        const storageKey = throttlerName ? `${throttlerName}:${key}` : key;
+        const existing = states.get(storageKey);
         const baseState: InMemoryThrottleState =
           !existing || existing.expiresAt <= now
             ? {
@@ -34,7 +41,7 @@ const createTestStorage = () => {
         if (baseState.blockedUntil > now) {
           const timeToBlockExpire = Math.ceil((baseState.blockedUntil - now) / 1000);
           const timeToExpire = Math.max(0, Math.ceil((baseState.expiresAt - now) / 1000));
-          states.set(key, baseState);
+          states.set(storageKey, baseState);
           return {
             totalHits: baseState.totalHits,
             timeToExpire,
@@ -50,7 +57,7 @@ const createTestStorage = () => {
           expiresAt: baseState.expiresAt,
           blockedUntil: isBlocked ? now + effectiveBlockDuration : 0,
         };
-        states.set(key, nextState);
+        states.set(storageKey, nextState);
 
         return {
           totalHits: nextState.totalHits,
@@ -165,6 +172,9 @@ describe('SecurityThrottlerGuard runtime enforcement', () => {
   const configService = {
     get: jest.fn(),
   };
+  const runtimePressureService = {
+    getSnapshot: jest.fn(),
+  };
   const jwtSigner = new JwtService({ secret: 'jwt-secret' });
 
   const createGuard = (storage: any = createTestStorage()) =>
@@ -177,6 +187,7 @@ describe('SecurityThrottlerGuard runtime enforcement', () => {
       rateLimitMetricsService as any,
       systemTelemetryService as any,
       configService as any,
+      runtimePressureService as any,
     );
 
   beforeEach(async () => {
@@ -195,6 +206,24 @@ describe('SecurityThrottlerGuard runtime enforcement', () => {
       backupPerHour: 1,
       restorePerHour: 1,
       updatePerHour: 1,
+    });
+    runtimePressureService.getSnapshot.mockReturnValue({
+      eventLoopLagP95Ms: 10,
+      eventLoopLagP99Ms: 20,
+      eventLoopLagMaxMs: 25,
+      eventLoopUtilization: 0.2,
+      heapUsedRatio: 0.4,
+      recentApiLatencyMs: 150,
+      gcPauseP95Ms: 0,
+      gcPauseMaxMs: 0,
+      gcEventsRecent: 0,
+      queueDepth: 0,
+      activeIsolatedRequests: 0,
+      pressureScore: 0,
+      consecutiveBreaches: 0,
+      adaptiveThrottleFactor: 1,
+      cause: 'normal',
+      overloaded: false,
     });
   });
 
@@ -358,5 +387,43 @@ describe('SecurityThrottlerGuard runtime enforcement', () => {
     const identity = (guard as any).resolveThrottleIdentity(context.req);
     expect(identity.scope).toBe('ip');
     expect(identity.tracker).toBe('ip:10.0.0.51');
+  });
+
+  it('shrinks global limits adaptively under runtime pressure on protected routes', async () => {
+    const guard = createGuard();
+    await guard.onModuleInit();
+    runtimePressureService.getSnapshot.mockReturnValue({
+      eventLoopLagP95Ms: 180,
+      eventLoopLagP99Ms: 320,
+      eventLoopLagMaxMs: 420,
+      eventLoopUtilization: 0.96,
+      heapUsedRatio: 0.9,
+      recentApiLatencyMs: 1900,
+      gcPauseP95Ms: 140,
+      gcPauseMaxMs: 280,
+      gcEventsRecent: 4,
+      queueDepth: 4,
+      activeIsolatedRequests: 2,
+      pressureScore: 2.7,
+      consecutiveBreaches: 2,
+      adaptiveThrottleFactor: 0.5,
+      cause: 'cpu',
+      overloaded: true,
+    });
+
+    const first = createHttpContext('/api/system/dashboard', { ip: '10.0.0.70' });
+    const second = createHttpContext('/api/system/dashboard', { ip: '10.0.0.70' });
+
+    await expect((guard as any).handleRequest(createRequestProps(first.context))).resolves.toBe(true);
+    await expect((guard as any).handleRequest(createRequestProps(second.context))).rejects.toMatchObject({
+      response: expect.objectContaining({
+        statusCode: 429,
+        policy: 'global',
+        adaptiveFactor: 0.5,
+        pressureCause: 'cpu',
+      }),
+    });
+    expect(second.resHeaders['X-RateLimit-Adaptive-Factor']).toBe('0.5');
+    expect(second.resHeaders['X-RateLimit-Pressure-Cause']).toBe('cpu');
   });
 });

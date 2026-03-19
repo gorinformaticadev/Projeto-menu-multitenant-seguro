@@ -18,9 +18,11 @@ import {
 } from '@nestjs/throttler';
 import { Reflector } from '@nestjs/core';
 import { createHash } from 'crypto';
+import { resolveApiRouteContractPolicy } from '@contracts/api-routes';
 import { SecurityRuntimeConfigService } from '@core/security-config/security-runtime-config.service';
 import { AuditService } from '../../audit/audit.service';
 import { RateLimitMetricsService } from '../services/rate-limit-metrics.service';
+import { RuntimePressureService } from '../services/runtime-pressure.service';
 import { SystemTelemetryService } from '@common/services/system-telemetry.service';
 import {
   CRITICAL_RATE_LIMIT_KEY,
@@ -58,6 +60,11 @@ type RateLimitExecution = {
   keyPrefix: string;
   limit: number;
   ttl: number;
+  scope?: ThrottleScope;
+  burst?: boolean;
+  routePolicyId?: string;
+  adaptiveFactor?: number;
+  pressureCause?: string;
 };
 
 type RateLimitTelemetry = {
@@ -87,6 +94,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     private readonly rateLimitMetricsService: RateLimitMetricsService,
     private readonly systemTelemetryService: SystemTelemetryService,
     private readonly configService: ConfigService,
+    private readonly runtimePressureService: RuntimePressureService,
   ) {
     super(options, storageService, reflector);
     const rawSecret = this.configService.get<string>('JWT_SECRET');
@@ -99,13 +107,22 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     const { context } = requestProps;
     const req = context.switchToHttp().getRequest();
     const identity = this.resolveThrottleIdentity(req);
-    const execution = await this.resolveRateLimitExecution(requestProps, identity);
+    const adaptiveContext = this.resolveAdaptiveRateLimitContext(identity.path);
+    const execution = await this.resolveRateLimitExecution(
+      requestProps,
+      identity,
+      adaptiveContext.factor,
+      adaptiveContext.cause,
+    );
 
     if (!execution) {
       return true;
     }
 
     req.__rateLimitContext = execution;
+    req.__rateLimitIdentityOverride = identity;
+
+    await this.enforceAdditionalRouteLimits(requestProps, identity, adaptiveContext);
 
     try {
       const allowed = await super.handleRequest({
@@ -168,7 +185,8 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
       ),
     );
     const windowSec = Math.max(1, Math.ceil(throttlerLimitDetail.ttl / 1000));
-    const identity = this.resolveThrottleIdentity(req);
+    const identity = (req.__rateLimitIdentityOverride ||
+      this.resolveThrottleIdentity(req)) as ThrottleIdentity;
     const execution = (req.__rateLimitContext || {}) as Partial<RateLimitExecution>;
 
     res.header('Retry-After', String(retryAfterSec));
@@ -179,6 +197,12 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     res.header('X-RateLimit-Limit', String(throttlerLimitDetail.limit));
     res.header('X-RateLimit-Remaining', '0');
     res.header('X-RateLimit-Reset', String(retryAfterSec));
+    if (execution.adaptiveFactor && execution.adaptiveFactor < 1) {
+      res.header('X-RateLimit-Adaptive-Factor', String(execution.adaptiveFactor));
+    }
+    if (execution.pressureCause) {
+      res.header('X-RateLimit-Pressure-Cause', execution.pressureCause);
+    }
 
     this.captureRateLimitTelemetry({
       req,
@@ -202,14 +226,228 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
         path: this.getRequestPath(req),
         policy: execution.kind ?? 'route',
         category: execution.category,
+        scope: execution.scope ?? identity.scope,
+        burst: execution.burst === true,
+        routePolicyId: execution.routePolicyId ?? null,
+        adaptiveFactor: execution.adaptiveFactor ?? 1,
+        pressureCause: execution.pressureCause ?? null,
       },
       HttpStatus.TOO_MANY_REQUESTS,
     );
   }
 
+  private async enforceAdditionalRouteLimits(
+    requestProps: ThrottlerRequest,
+    identity: ThrottleIdentity,
+    adaptiveContext: {
+      factor: number;
+      cause: string | null;
+    },
+  ): Promise<void> {
+    const req = requestProps.context.switchToHttp().getRequest();
+    const routePolicy = resolveApiRouteContractPolicy(identity.path);
+    const principal = this.resolvePrincipalIdentity(req);
+    const checks = this.buildAdditionalRouteLimitChecks(
+      routePolicy.id,
+      identity,
+      principal,
+      adaptiveContext.factor,
+    );
+
+    for (const check of checks) {
+      const record = await this.storageService.increment(
+        check.tracker,
+        check.ttl,
+        check.limit,
+        check.ttl,
+        check.throttlerName,
+      );
+
+      if (record.isBlocked) {
+        req.__rateLimitContext = {
+          kind: 'route',
+          tracker: check.tracker,
+          keyPrefix: check.throttlerName,
+          limit: check.limit,
+          ttl: check.ttl,
+          scope: check.scope,
+          routePolicyId: routePolicy.id,
+          adaptiveFactor: adaptiveContext.factor,
+          pressureCause: adaptiveContext.cause || undefined,
+        } satisfies Partial<RateLimitExecution>;
+        req.__rateLimitIdentityOverride = {
+          scope: check.scope,
+          tracker: check.tracker,
+          path: identity.path,
+          clientIp: identity.clientIp,
+        } satisfies ThrottleIdentity;
+
+        await this.throwThrottlingException(requestProps.context, {
+          key: `${check.throttlerName}:${check.tracker}`,
+          tracker: check.tracker,
+          ttl: check.ttl,
+          limit: check.limit,
+          totalHits: record.totalHits,
+          timeToExpire: record.timeToExpire,
+          isBlocked: record.isBlocked,
+          timeToBlockExpire: record.timeToBlockExpire,
+        });
+      }
+
+      if (!check.burstLimit || !check.burstTtl) {
+        continue;
+      }
+
+      const burstRecord = await this.storageService.increment(
+        check.tracker,
+        check.burstTtl,
+        check.burstLimit,
+        check.burstTtl,
+        `${check.throttlerName}:burst`,
+      );
+
+      if (burstRecord.isBlocked) {
+        req.__rateLimitContext = {
+          kind: 'route',
+          tracker: check.tracker,
+          keyPrefix: `${check.throttlerName}:burst`,
+          limit: check.burstLimit,
+          ttl: check.burstTtl,
+          scope: check.scope,
+          burst: true,
+          routePolicyId: routePolicy.id,
+          adaptiveFactor: adaptiveContext.factor,
+          pressureCause: adaptiveContext.cause || undefined,
+        } satisfies Partial<RateLimitExecution>;
+        req.__rateLimitIdentityOverride = {
+          scope: check.scope,
+          tracker: check.tracker,
+          path: identity.path,
+          clientIp: identity.clientIp,
+        } satisfies ThrottleIdentity;
+
+        await this.throwThrottlingException(requestProps.context, {
+          key: `${check.throttlerName}:burst:${check.tracker}`,
+          tracker: check.tracker,
+          ttl: check.burstTtl,
+          limit: check.burstLimit,
+          totalHits: burstRecord.totalHits,
+          timeToExpire: burstRecord.timeToExpire,
+          isBlocked: burstRecord.isBlocked,
+          timeToBlockExpire: burstRecord.timeToBlockExpire,
+        });
+      }
+    }
+  }
+
+  private buildAdditionalRouteLimitChecks(
+    routePolicyId: string,
+    identity: ThrottleIdentity,
+    principal: PrincipalIdentity,
+    adaptiveFactor: number,
+  ): Array<{
+    scope: ThrottleScope;
+    tracker: string;
+    throttlerName: string;
+    limit: number;
+    ttl: number;
+    burstLimit?: number;
+    burstTtl?: number;
+  }> {
+    const routeRateLimit = resolveApiRouteContractPolicy(identity.path).rateLimit;
+    const checks: Array<{
+      scope: ThrottleScope;
+      tracker: string;
+      throttlerName: string;
+      limit: number;
+      ttl: number;
+      burstLimit?: number;
+      burstTtl?: number;
+    }> = [];
+
+    if (routeRateLimit.ip) {
+      checks.push({
+        scope: 'ip',
+        tracker: `ip:${identity.clientIp}`,
+        throttlerName: `route-policy:${routePolicyId}:ip`,
+        limit: this.applyAdaptiveLimit(routeRateLimit.ip.limit, adaptiveFactor),
+        ttl: routeRateLimit.ip.ttlMs,
+        burstLimit:
+          routeRateLimit.ip.burstLimit !== undefined
+            ? this.applyAdaptiveLimit(routeRateLimit.ip.burstLimit, adaptiveFactor)
+            : undefined,
+        burstTtl: routeRateLimit.ip.burstTtlMs,
+      });
+    }
+
+    if (routeRateLimit.user && principal.userId) {
+      checks.push({
+        scope: 'user',
+        tracker: `user:${principal.userId}`,
+        throttlerName: `route-policy:${routePolicyId}:user`,
+        limit: this.applyAdaptiveLimit(routeRateLimit.user.limit, adaptiveFactor),
+        ttl: routeRateLimit.user.ttlMs,
+        burstLimit:
+          routeRateLimit.user.burstLimit !== undefined
+            ? this.applyAdaptiveLimit(routeRateLimit.user.burstLimit, adaptiveFactor)
+            : undefined,
+        burstTtl: routeRateLimit.user.burstTtlMs,
+      });
+    }
+
+    if (routeRateLimit.tenant && principal.tenantId) {
+      checks.push({
+        scope: 'tenant',
+        tracker: `tenant:${principal.tenantId}`,
+        throttlerName: `route-policy:${routePolicyId}:tenant`,
+        limit: this.applyAdaptiveLimit(routeRateLimit.tenant.limit, adaptiveFactor),
+        ttl: routeRateLimit.tenant.ttlMs,
+        burstLimit:
+          routeRateLimit.tenant.burstLimit !== undefined
+            ? this.applyAdaptiveLimit(routeRateLimit.tenant.burstLimit, adaptiveFactor)
+            : undefined,
+        burstTtl: routeRateLimit.tenant.burstTtlMs,
+      });
+    }
+
+    if (routeRateLimit['tenant-user'] && principal.userId && principal.tenantId) {
+      checks.push({
+        scope: 'tenant-user',
+        tracker: `tenant:${principal.tenantId}:user:${principal.userId}`,
+        throttlerName: `route-policy:${routePolicyId}:tenant-user`,
+        limit: this.applyAdaptiveLimit(routeRateLimit['tenant-user'].limit, adaptiveFactor),
+        ttl: routeRateLimit['tenant-user'].ttlMs,
+        burstLimit:
+          routeRateLimit['tenant-user'].burstLimit !== undefined
+            ? this.applyAdaptiveLimit(routeRateLimit['tenant-user'].burstLimit, adaptiveFactor)
+            : undefined,
+        burstTtl: routeRateLimit['tenant-user'].burstTtlMs,
+      });
+    }
+
+    if (routeRateLimit['api-key'] && principal.apiKeyId) {
+      checks.push({
+        scope: 'api-key',
+        tracker: `api-key:${principal.apiKeyId}`,
+        throttlerName: `route-policy:${routePolicyId}:api-key`,
+        limit: this.applyAdaptiveLimit(routeRateLimit['api-key'].limit, adaptiveFactor),
+        ttl: routeRateLimit['api-key'].ttlMs,
+        burstLimit:
+          routeRateLimit['api-key'].burstLimit !== undefined
+            ? this.applyAdaptiveLimit(routeRateLimit['api-key'].burstLimit, adaptiveFactor)
+            : undefined,
+        burstTtl: routeRateLimit['api-key'].burstTtlMs,
+      });
+    }
+
+    return checks;
+  }
+
   private async resolveRateLimitExecution(
     requestProps: ThrottlerRequest,
     identity: ThrottleIdentity,
+    adaptiveFactor: number,
+    pressureCause: string | null,
   ): Promise<RateLimitExecution | null> {
     const { context, throttler } = requestProps;
     const req = context.switchToHttp().getRequest();
@@ -227,6 +465,8 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
         keyPrefix: `critical:${criticalAction}`,
         limit: this.resolveCriticalLimit(criticalAction, criticalPolicy),
         ttl: criticalPolicy.windowMinutes * 60000,
+        adaptiveFactor: 1,
+        pressureCause: pressureCause || undefined,
       };
     }
 
@@ -241,8 +481,10 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
         kind: 'route',
         tracker: identity.tracker,
         keyPrefix: `route:${context.getClass().name}:${context.getHandler().name}`,
-        limit: routeLimit,
+        limit: this.applyAdaptiveLimit(routeLimit, adaptiveFactor),
         ttl: routeTtl,
+        adaptiveFactor,
+        pressureCause: pressureCause || undefined,
       };
     }
 
@@ -255,9 +497,44 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
       kind: 'global',
       tracker: identity.tracker,
       keyPrefix: 'global',
-      limit: globalPolicy.requests,
+      limit: this.applyAdaptiveLimit(globalPolicy.requests, adaptiveFactor),
       ttl: globalPolicy.windowMinutes * 60000,
+      adaptiveFactor,
+      pressureCause: pressureCause || undefined,
     };
+  }
+
+  private resolveAdaptiveRateLimitContext(path: string): {
+    factor: number;
+    cause: string | null;
+  } {
+    const routePolicy = resolveApiRouteContractPolicy(path);
+    if (!routePolicy.runtime.shedOnCpuPressure) {
+      return {
+        factor: 1,
+        cause: null,
+      };
+    }
+
+    const snapshot = this.runtimePressureService.getSnapshot();
+    const factor =
+      snapshot.overloaded || snapshot.adaptiveThrottleFactor < 1
+        ? snapshot.adaptiveThrottleFactor
+        : 1;
+
+    return {
+      factor,
+      cause: factor < 1 ? snapshot.cause : null,
+    };
+  }
+
+  private applyAdaptiveLimit(baseLimit: number, adaptiveFactor: number): number {
+    const normalizedBaseLimit = this.toPositiveNumber(baseLimit, 1);
+    const normalizedFactor =
+      Number.isFinite(adaptiveFactor) && adaptiveFactor > 0 && adaptiveFactor <= 1
+        ? adaptiveFactor
+        : 1;
+    return Math.max(1, Math.floor(normalizedBaseLimit * normalizedFactor));
   }
 
   private resolveCriticalLimit(

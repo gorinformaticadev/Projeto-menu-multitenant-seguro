@@ -3,6 +3,7 @@ import { resolveApiRouteContractPolicy } from '@contracts/api-routes';
 import { API_VERSION_HEADER } from '@contracts/http';
 import { type NextFunction, type Request, type Response } from 'express';
 import { resolveApiVersion, buildApiVersionResponseHeaders } from '../http/api-versioning.util';
+import { OperationalObservabilityService } from '../services/operational-observability.service';
 
 type VersionedRequest = Request & {
   apiVersion?: string;
@@ -11,6 +12,10 @@ type VersionedRequest = Request & {
 
 @Injectable()
 export class ApiVersioningMiddleware implements NestMiddleware {
+  constructor(
+    private readonly operationalObservabilityService?: OperationalObservabilityService,
+  ) {}
+
   use(req: VersionedRequest, res: Response, next: NextFunction) {
     const routePolicy = resolveApiRouteContractPolicy(req.originalUrl || req.url || req.path || '/');
     const resolution = resolveApiVersion(
@@ -31,6 +36,24 @@ export class ApiVersioningMiddleware implements NestMiddleware {
 
     req.apiVersion = resolution.resolvedVersion;
     req.apiVersionDefaulted = resolution.wasDefaulted;
+
+    if (resolution.resolvedVersion !== resolution.latestVersion) {
+      this.operationalObservabilityService?.record({
+        type: 'version_fallback',
+        route: req.originalUrl || req.url || req.path || '/',
+        request: req as unknown as Record<string, any>,
+        severity: resolution.wasDefaulted ? 'warn' : 'log',
+        detail: resolution.wasDefaulted
+          ? `missing ${API_VERSION_HEADER}; defaulted to v${resolution.resolvedVersion} while latest is v${resolution.latestVersion}`
+          : `requested v${resolution.resolvedVersion} while latest supported is v${resolution.latestVersion}`,
+        extra: {
+          routeId: routePolicy.id,
+          resolvedVersion: resolution.resolvedVersion,
+          latestVersion: resolution.latestVersion,
+          wasDefaulted: resolution.wasDefaulted,
+        },
+      });
+    }
 
     const headers = buildApiVersionResponseHeaders(resolution);
     for (const [headerName, headerValue] of Object.entries(headers)) {

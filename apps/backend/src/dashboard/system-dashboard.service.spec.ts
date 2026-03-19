@@ -5,6 +5,8 @@ import { PrismaService } from '../core/prisma/prisma.service';
 import { ModuleSecurityService } from '../core/module-security.service';
 import { SystemDashboardService } from './system-dashboard.service';
 import { ResponseTimeMetricsService } from './system-response-time-metrics.service';
+import { OperationalCircuitBreakerService } from '@common/services/operational-circuit-breaker.service';
+import { RuntimePressureService } from '@common/services/runtime-pressure.service';
 import { SystemTelemetryService } from '@common/services/system-telemetry.service';
 
 describe('SystemDashboardService', () => {
@@ -45,8 +47,32 @@ describe('SystemDashboardService', () => {
 
   const systemTelemetryServiceMock = {
     getApiSnapshot: jest.fn(),
+    getOperationalSnapshot: jest.fn(),
     getSecuritySnapshot: jest.fn(),
     maskIp: jest.fn((value) => 'masked:' + String(value)),
+  };
+  const operationalCircuitBreakerServiceMock = {
+    execute: jest.fn(async (_options, action: () => Promise<unknown>) => action()),
+  };
+  const runtimePressureServiceMock = {
+    getSnapshot: jest.fn(() => ({
+      eventLoopLagP95Ms: 4,
+      eventLoopLagP99Ms: 9,
+      eventLoopLagMaxMs: 12,
+      eventLoopUtilization: 0.18,
+      heapUsedRatio: 0.41,
+      recentApiLatencyMs: 42,
+      gcPauseP95Ms: 0,
+      gcPauseMaxMs: 0,
+      gcEventsRecent: 0,
+      queueDepth: 0,
+      activeIsolatedRequests: 0,
+      pressureScore: 0,
+      consecutiveBreaches: 0,
+      adaptiveThrottleFactor: 1,
+      cause: 'normal',
+      overloaded: false,
+    })),
   };
   const moduleSecurityServiceMock = {
     getAvailableModules: jest.fn(),
@@ -59,6 +85,8 @@ describe('SystemDashboardService', () => {
       maintenanceServiceMock as unknown as MaintenanceModeService,
       responseTimeMetricsServiceMock as unknown as ResponseTimeMetricsService,
       systemTelemetryServiceMock as unknown as SystemTelemetryService,
+      operationalCircuitBreakerServiceMock as unknown as OperationalCircuitBreakerService,
+      runtimePressureServiceMock as unknown as RuntimePressureService,
       moduleSecurityServiceMock as unknown as ModuleSecurityService,
     );
 
@@ -243,6 +271,12 @@ describe('SystemDashboardService', () => {
     moduleSecurityServiceMock.getAvailableModules.mockResolvedValue([]);
     prismaMock.user.count.mockResolvedValue(0);
     prismaMock.tenant.count.mockResolvedValue(0);
+    systemTelemetryServiceMock.getOperationalSnapshot.mockReturnValue({
+      total: 0,
+      windowMs: 300_000,
+      byType: [],
+      recent: [],
+    });
   });
 
   afterEach(() => {
@@ -435,7 +469,7 @@ describe('SystemDashboardService', () => {
       {
         layoutJson: 'invalid',
         filtersJson: null,
-      },
+      } as any,
     );
 
     expect(prismaMock.dashboardLayout.upsert).toHaveBeenCalledWith(
@@ -926,8 +960,6 @@ describe('SystemDashboardService', () => {
     );
   });
 });
-
-
 
 
 

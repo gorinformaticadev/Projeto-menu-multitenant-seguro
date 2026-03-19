@@ -21,8 +21,11 @@ import {
   createRequestBodyTimeoutMiddleware,
   PayloadProtectionMiddleware,
 } from './common/middleware/payload-protection.middleware';
+import { RouteIsolationInterceptor } from './common/interceptors/route-isolation.interceptor';
 import { RouteExecutionTimeoutInterceptor } from './common/interceptors/route-execution-timeout.interceptor';
+import { RequestTraceMiddleware } from './common/middleware/request-trace.middleware';
 import { ResponseProtectionMiddleware } from './common/middleware/response-protection.middleware';
+import { RuntimePressureMiddleware } from './common/middleware/runtime-pressure.middleware';
 import { AppModule } from './app.module';
 import {
   buildSecurityHeadersHelmetOptions,
@@ -32,6 +35,9 @@ import {
 import { SentryExceptionFilter } from './common/filters/sentry-exception.filter';
 import { SanitizationPipe } from './common/pipes/sanitization.pipe';
 import { SecretManagerService } from './common/services/secret-manager.nest.service';
+import { OperationalObservabilityService } from './common/services/operational-observability.service';
+import { OperationalRequestQueueService } from './common/services/operational-request-queue.service';
+import { RuntimePressureService } from './common/services/runtime-pressure.service';
 import { SentryService } from './common/services/sentry.service';
 import { validateSecurityConfig } from './common/utils/security.utils';
 import { PathsService } from './core/common/paths/paths.service';
@@ -74,10 +80,23 @@ async function bootstrap() {
     bodyParser: false,
   });
   const moduleRef = app.get(ModuleRef);
-  const apiVersioningMiddleware = new ApiVersioningMiddleware();
-  const payloadProtectionMiddleware = new PayloadProtectionMiddleware();
-  const responseProtectionMiddleware = new ResponseProtectionMiddleware();
-  const routeExecutionTimeoutInterceptor = new RouteExecutionTimeoutInterceptor();
+  const operationalObservabilityService = app.get(OperationalObservabilityService);
+  const operationalRequestQueueService = app.get(OperationalRequestQueueService);
+  const runtimePressureService = app.get(RuntimePressureService);
+  const requestTraceMiddleware = new RequestTraceMiddleware();
+  const apiVersioningMiddleware = new ApiVersioningMiddleware(operationalObservabilityService);
+  const payloadProtectionMiddleware = new PayloadProtectionMiddleware(operationalObservabilityService);
+  const responseProtectionMiddleware = new ResponseProtectionMiddleware(operationalObservabilityService);
+  const runtimePressureMiddleware = new RuntimePressureMiddleware(
+    runtimePressureService,
+    operationalObservabilityService,
+  );
+  const routeExecutionTimeoutInterceptor = new RouteExecutionTimeoutInterceptor(
+    operationalObservabilityService,
+  );
+  const routeIsolationInterceptor = new RouteIsolationInterceptor(
+    operationalRequestQueueService,
+  );
   // Bridge seguro para class-validator:
   // - resolve providers do Nest quando existirem (ex.: IsStrongPasswordConstraint)
   // - deixa class-validator usar fallback interno para constraints inline/nao registradas
@@ -104,13 +123,15 @@ async function bootstrap() {
     app.set('trust proxy', 1);
   }
 
-  app.use(createContentLengthLimitMiddleware());
-  app.use(createRequestBodyTimeoutMiddleware());
+  app.use(requestTraceMiddleware.use.bind(requestTraceMiddleware));
+  app.use(createContentLengthLimitMiddleware(operationalObservabilityService));
+  app.use(createRequestBodyTimeoutMiddleware(operationalObservabilityService));
   app.use(createDynamicBodyParserMiddleware());
-  app.use(createBodyParserErrorMiddleware());
+  app.use(createBodyParserErrorMiddleware(operationalObservabilityService));
   app.use(payloadProtectionMiddleware.use.bind(payloadProtectionMiddleware));
   app.use(cookieParser());
   app.use(apiVersioningMiddleware.use.bind(apiVersioningMiddleware));
+  app.use(runtimePressureMiddleware.use.bind(runtimePressureMiddleware));
   app.use(responseProtectionMiddleware.use.bind(responseProtectionMiddleware));
 
   app
@@ -217,6 +238,8 @@ async function bootstrap() {
       'Content-Type',
       'Content-Length',
       'Content-Encoding',
+      'X-Request-Id',
+      'X-Trace-Id',
       'X-Total-Count',
       'X-API-Version',
       'X-API-Latest-Version',
@@ -231,7 +254,7 @@ async function bootstrap() {
   });
 
   app.useGlobalPipes(new SanitizationPipe());
-  app.useGlobalInterceptors(routeExecutionTimeoutInterceptor);
+  app.useGlobalInterceptors(routeIsolationInterceptor, routeExecutionTimeoutInterceptor);
 
   app.useGlobalPipes(
     new ValidationPipe({

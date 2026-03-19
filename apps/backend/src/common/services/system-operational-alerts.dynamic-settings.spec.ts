@@ -8,6 +8,7 @@ import { ConfigResolverService } from '../../system-settings/config-resolver.ser
 import { SettingsRegistry } from '../../system-settings/settings-registry.service';
 import { SystemSettingsAuditService } from '../../system-settings/system-settings-audit.service';
 import { SystemSettingsWriteService } from '../../system-settings/system-settings-write.service';
+import { RedisLockService } from './redis-lock.service';
 import { SystemTelemetryService } from './system-telemetry.service';
 import { SystemOperationalAlertsService } from './system-operational-alerts.service';
 
@@ -194,6 +195,18 @@ describe('SystemOperationalAlertsService dynamic operations alerts toggle', () =
     const cronService = {
       register: jest.fn().mockResolvedValue(undefined),
     };
+    const cooldownState = new Map<string, number>();
+    const redisLock = {
+      acquireLock: jest.fn(async () => true),
+      releaseLock: jest.fn(async () => true),
+      hasCooldown: jest.fn(async (key: string) => {
+        const expiresAt = cooldownState.get(key);
+        return Number.isFinite(expiresAt) && Number(expiresAt) > Date.now();
+      }),
+      setCooldown: jest.fn(async (key: string, durationMs: number) => {
+        cooldownState.set(key, Date.now() + durationMs);
+      }),
+    };
     const service = new SystemOperationalAlertsService(
       prisma as unknown as PrismaService,
       new SystemTelemetryService(),
@@ -203,6 +216,7 @@ describe('SystemOperationalAlertsService dynamic operations alerts toggle', () =
       auditService as unknown as AuditService,
       cronService as unknown as CronService,
       resolver,
+      redisLock as unknown as RedisLockService,
     );
 
     return {

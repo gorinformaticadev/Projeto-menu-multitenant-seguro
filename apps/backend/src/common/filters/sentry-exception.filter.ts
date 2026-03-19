@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import * as Sentry from '@sentry/node';
+import { getRequestTrace, type RequestTraceContext } from '../http/request-trace.util';
 
 @Catch()
 export class SentryExceptionFilter implements ExceptionFilter {
@@ -24,6 +25,9 @@ export class SentryExceptionFilter implements ExceptionFilter {
       exception instanceof HttpException
         ? exception.getResponse()
         : 'Internal server error';
+    const trace = getRequestTrace(
+      request as unknown as { requestTrace?: RequestTraceContext },
+    );
 
     // Capturar no Sentry apenas erros 500+
     if (status >= 500) {
@@ -50,6 +54,8 @@ export class SentryExceptionFilter implements ExceptionFilter {
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
+      requestId: trace?.requestId || null,
+      traceId: trace?.traceId || null,
       message: typeof message === 'string' ? message : (message as any).message,
     });
   }

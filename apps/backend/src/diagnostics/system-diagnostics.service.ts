@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { BackupJobStatus, Role } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { BackupService } from '../backup/backup.service';
+import { SystemTelemetryService } from '@common/services/system-telemetry.service';
 import { CronJobDefinition, CronService } from '../core/cron/cron.service';
 import { PrismaService } from '../core/prisma/prisma.service';
 import { DashboardActor, SystemDashboardService } from '../dashboard/system-dashboard.service';
@@ -28,6 +29,18 @@ type OperationalSection = {
   redisStatus: string | null;
   apiErrorRateRecent: number | null;
   criticalErrorsRecent: number;
+  eventLoopLagP99Ms: number | null;
+  eventLoopUtilization: number | null;
+  versionFallbacksRecent: number;
+  requestRetriesRecent: number;
+  requestQueuedRecent: number;
+  requestQueueRejectedRecent: number;
+  requestQueueTimeoutsRecent: number;
+  requestTimeoutsRecent: number;
+  responseOverflowsRecent: number;
+  payloadRejectedRecent: number;
+  circuitOpenEventsRecent: number;
+  runtimePressureEventsRecent: number;
 };
 
 type SchedulerProblemType = 'runtime_missing' | 'stuck' | 'stale' | 'failed';
@@ -201,6 +214,7 @@ export class SystemDiagnosticsService {
     private readonly updateService: UpdateService,
     private readonly backupService: BackupService,
     private readonly auditService: AuditService,
+    private readonly systemTelemetryService: SystemTelemetryService,
   ) {}
 
   async getDiagnostics(actor: DashboardActor): Promise<SystemDiagnosticsResponse> {
@@ -245,6 +259,12 @@ export class SystemDiagnosticsService {
     const dashboard = await this.systemDashboardService.getDashboard(actor, {
       periodMinutes: DIAGNOSTICS_WINDOW_MINUTES,
     });
+    const operationalSnapshot = this.systemTelemetryService.getOperationalSnapshot(
+      DIAGNOSTICS_WINDOW_MINUTES * 60 * 1000,
+    );
+    const operationalCounts = new Map(
+      operationalSnapshot.byType.map((entry) => [entry.type, entry.count] as const),
+    );
 
     return {
       version: this.normalizeString(dashboard?.version?.version),
@@ -257,6 +277,18 @@ export class SystemDiagnosticsService {
       redisStatus: this.normalizeString(dashboard?.redis?.status),
       apiErrorRateRecent: this.toNumberOrNull(dashboard?.routeErrors?.errorRateRecent),
       criticalErrorsRecent: Array.isArray(dashboard?.errors?.recent) ? dashboard.errors.recent.length : 0,
+      eventLoopLagP99Ms: this.toNumberOrNull(dashboard?.cpu?.eventLoop?.eventLoopLagP99Ms),
+      eventLoopUtilization: this.toNumberOrNull(dashboard?.cpu?.eventLoop?.eventLoopUtilization),
+      versionFallbacksRecent: operationalCounts.get('version_fallback') || 0,
+      requestRetriesRecent: operationalCounts.get('request_retry') || 0,
+      requestQueuedRecent: operationalCounts.get('request_queued') || 0,
+      requestQueueRejectedRecent: operationalCounts.get('request_queue_rejected') || 0,
+      requestQueueTimeoutsRecent: operationalCounts.get('request_queue_timeout') || 0,
+      requestTimeoutsRecent: operationalCounts.get('request_timeout') || 0,
+      responseOverflowsRecent: operationalCounts.get('response_overflow') || 0,
+      payloadRejectedRecent: operationalCounts.get('payload_rejected') || 0,
+      circuitOpenEventsRecent: operationalCounts.get('circuit_open') || 0,
+      runtimePressureEventsRecent: operationalCounts.get('runtime_pressure') || 0,
     };
   }
 

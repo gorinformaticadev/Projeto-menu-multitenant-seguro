@@ -16,6 +16,21 @@ export type SecurityTelemetryEventType =
   | 'maintenance_blocked'
   | 'maintenance_bypass_attempt';
 
+export type OperationalTelemetryEventType =
+  | 'version_fallback'
+  | 'request_retry'
+  | 'request_queued'
+  | 'request_queue_rejected'
+  | 'request_queue_timeout'
+  | 'request_timeout'
+  | 'payload_rejected'
+  | 'response_overflow'
+  | 'circuit_open'
+  | 'circuit_half_open'
+  | 'circuit_recovered'
+  | 'runtime_pressure'
+  | 'stale_snapshot_served';
+
 export interface RouteTelemetrySummary {
   route: string;
   method: string;
@@ -44,6 +59,31 @@ export interface SecurityTelemetryRecentEvent {
   route: string;
   ip: string;
   at: string;
+}
+
+export interface OperationalTelemetrySnapshot {
+  status: 'ok';
+  windowStart: string;
+  windowSeconds: number;
+  totalEventsRecent: number;
+  byType: Array<{
+    type: OperationalTelemetryEventType;
+    count: number;
+  }>;
+  topRoutes: Array<{
+    route: string;
+    count: number;
+  }>;
+  recent: Array<{
+    type: OperationalTelemetryEventType;
+    statusCode: number | null;
+    method: string;
+    route: string;
+    requestId: string | null;
+    traceId: string | null;
+    detail: string | null;
+    at: string;
+  }>;
 }
 
 export interface ApiTelemetrySnapshot {
@@ -96,6 +136,17 @@ type SecurityTelemetryRecord = {
   statusCode: number;
 };
 
+type OperationalTelemetryRecord = {
+  at: number;
+  type: OperationalTelemetryEventType;
+  method: string;
+  route: string;
+  statusCode: number | null;
+  requestId: string | null;
+  traceId: string | null;
+  detail: string | null;
+};
+
 type RouteAggregate = {
   route: string;
   method: string;
@@ -119,8 +170,11 @@ const REQUEST_RETENTION_MS = 15 * 60 * 1000;
 const REQUEST_MAX_ENTRIES = 5_000;
 const SECURITY_RETENTION_MS = 6 * 60 * 60 * 1000;
 const SECURITY_MAX_ENTRIES = 2_000;
+const OPERATIONAL_RETENTION_MS = 60 * 60 * 1000;
+const OPERATIONAL_MAX_ENTRIES = 3_000;
 const DEFAULT_TOP_LIMIT = 5;
 const RECENT_SECURITY_LIMIT = 20;
+const RECENT_OPERATIONAL_LIMIT = 20;
 const MIN_REQUESTS_FOR_ROUTE_TOP_LIST = 3;
 const MIN_ERRORS_FOR_ROUTE_ERROR_LIST = 2;
 
@@ -128,6 +182,7 @@ const MIN_ERRORS_FOR_ROUTE_ERROR_LIST = 2;
 export class SystemTelemetryService {
   private readonly requestEvents: RequestTelemetryRecord[] = [];
   private readonly securityEvents: SecurityTelemetryRecord[] = [];
+  private readonly operationalEvents: OperationalTelemetryRecord[] = [];
 
   recordRequest(input: {
     method?: unknown;
@@ -195,6 +250,44 @@ export class SystemTelemetryService {
     });
 
     this.trimSecurityEvents();
+  }
+
+  recordOperationalEvent(input: {
+    type: OperationalTelemetryEventType;
+    method?: unknown;
+    route?: unknown;
+    request?: Record<string, any>;
+    statusCode?: number | null;
+    requestId?: unknown;
+    traceId?: unknown;
+    detail?: unknown;
+  }): void {
+    const method = normalizeTelemetryMethod(input.method || input.request?.method);
+    const route = normalizeTelemetryPath(
+      input.route || (input.request ? resolveTelemetryRoute(input.request) : '/'),
+    );
+
+    this.pruneOperationalEvents();
+    const lastAt =
+      this.operationalEvents.length > 0
+        ? this.operationalEvents[this.operationalEvents.length - 1].at
+        : undefined;
+
+    this.operationalEvents.push({
+      at: this.toMonotonicTimestamp(Date.now(), lastAt),
+      type: input.type,
+      method,
+      route,
+      statusCode:
+        input.statusCode === null || input.statusCode === undefined
+          ? null
+          : this.normalizeStatusCode(input.statusCode),
+      requestId: this.normalizeOperationalText(input.requestId),
+      traceId: this.normalizeOperationalText(input.traceId),
+      detail: this.normalizeOperationalDetail(input.detail),
+    });
+
+    this.trimOperationalEvents();
   }
 
   getApiSnapshot(windowMs = REQUEST_RETENTION_MS, topLimit = DEFAULT_TOP_LIMIT): ApiTelemetrySnapshot {
@@ -325,6 +418,51 @@ export class SystemTelemetryService {
         .sort((left, right) => right.count - left.count || left.route.localeCompare(right.route))
         .slice(0, Math.max(1, topLimit)),
       deniedAccess: this.mapSecurityAggregate(deniedIps, topLimit),
+    };
+  }
+
+  getOperationalSnapshot(
+    windowMs = OPERATIONAL_RETENTION_MS,
+    topLimit = DEFAULT_TOP_LIMIT,
+  ): OperationalTelemetrySnapshot {
+    const normalizedWindowMs = this.normalizeWindowMs(windowMs, OPERATIONAL_RETENTION_MS);
+    const cutoff = Date.now() - normalizedWindowMs;
+    this.pruneOperationalEvents(cutoff);
+
+    const relevant = this.operationalEvents.filter((event) => event.at >= cutoff);
+    const byType = new Map<OperationalTelemetryEventType, number>();
+    const byRoute = new Map<string, number>();
+
+    for (const event of relevant) {
+      byType.set(event.type, (byType.get(event.type) || 0) + 1);
+      byRoute.set(event.route, (byRoute.get(event.route) || 0) + 1);
+    }
+
+    return {
+      status: 'ok',
+      windowStart: new Date(cutoff).toISOString(),
+      windowSeconds: Math.floor(normalizedWindowMs / 1000),
+      totalEventsRecent: relevant.length,
+      byType: Array.from(byType.entries())
+        .map(([type, count]) => ({ type, count }))
+        .sort((left, right) => right.count - left.count || left.type.localeCompare(right.type)),
+      topRoutes: Array.from(byRoute.entries())
+        .map(([route, count]) => ({ route, count }))
+        .sort((left, right) => right.count - left.count || left.route.localeCompare(right.route))
+        .slice(0, Math.max(1, topLimit)),
+      recent: relevant
+        .slice(-RECENT_OPERATIONAL_LIMIT)
+        .reverse()
+        .map((event) => ({
+          type: event.type,
+          statusCode: event.statusCode,
+          method: event.method,
+          route: event.route,
+          requestId: event.requestId,
+          traceId: event.traceId,
+          detail: event.detail,
+          at: new Date(event.at).toISOString(),
+        })),
     };
   }
 
@@ -469,6 +607,18 @@ export class SystemTelemetryService {
     }
   }
 
+  private pruneOperationalEvents(cutoff = Date.now() - OPERATIONAL_RETENTION_MS) {
+    while (this.operationalEvents.length > 0 && this.operationalEvents[0].at < cutoff) {
+      this.operationalEvents.shift();
+    }
+  }
+
+  private trimOperationalEvents(limit = OPERATIONAL_MAX_ENTRIES) {
+    while (this.operationalEvents.length > limit) {
+      this.operationalEvents.shift();
+    }
+  }
+
   private normalizeStatusCode(statusCode: unknown): number {
     const numeric = Number(statusCode);
     if (!Number.isFinite(numeric)) {
@@ -501,5 +651,19 @@ export class SystemTelemetryService {
     }
 
     return Math.max(safeTimestamp, Number(previousTimestamp) + 1);
+  }
+
+  private normalizeOperationalText(value: unknown): string | null {
+    const normalized = String(value || '').trim();
+    return normalized.length > 0 ? normalized.slice(0, 128) : null;
+  }
+
+  private normalizeOperationalDetail(value: unknown): string | null {
+    const normalized = String(value || '').trim();
+    if (!normalized) {
+      return null;
+    }
+
+    return normalized.length > 240 ? `${normalized.slice(0, 237)}...` : normalized;
   }
 }

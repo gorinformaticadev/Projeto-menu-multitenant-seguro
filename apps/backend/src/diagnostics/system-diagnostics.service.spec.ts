@@ -1,4 +1,5 @@
 import { Role } from '@prisma/client';
+import { SystemTelemetryService } from '@common/services/system-telemetry.service';
 import { SystemDiagnosticsService } from './system-diagnostics.service';
 
 describe('SystemDiagnosticsService', () => {
@@ -30,6 +31,10 @@ describe('SystemDiagnosticsService', () => {
     findAll: jest.fn(),
   };
 
+  const systemTelemetryServiceMock = {
+    getOperationalSnapshot: jest.fn(),
+  };
+
   const actor = {
     userId: 'user-1',
     role: Role.ADMIN,
@@ -50,7 +55,14 @@ describe('SystemDiagnosticsService', () => {
       updateServiceMock as any,
       backupServiceMock as any,
       auditServiceMock as any,
+      systemTelemetryServiceMock as unknown as SystemTelemetryService,
     );
+    systemTelemetryServiceMock.getOperationalSnapshot.mockReturnValue({
+      total: 0,
+      windowMs: 60 * 60 * 1000,
+      byType: [],
+      recent: [],
+    });
   });
 
   it('derives a critical overall state when scheduler/runtime and alerts indicate real issues', async () => {

@@ -80,6 +80,7 @@ type MainDashboardCard = ModuleCardItem;
 
 const OPERATIONAL_OVERVIEW_CARD_ID = "operationalOverview";
 const DASHBOARD_HOME_SNAPSHOT_TTL_MS = 5 * 60 * 1000;
+const DASHBOARD_HOME_STALE_REFRESH_RETRY_MS = 15_000;
 const legacyCoreDashboardCardIds = new Set([
   "module:core:welcome-widget",
   "module:core:stats-widget",
@@ -586,6 +587,7 @@ export function DashboardHome() {
   const [operationalPinned, setOperationalPinned] = useState(false);
   const [contractDegradationMessage, setContractDegradationMessage] = useState<string | null>(null);
   const [staleSnapshotAt, setStaleSnapshotAt] = useState<number | null>(null);
+  const staleSnapshotActive = staleSnapshotAt !== null;
 
   const layoutRequestIdRef = useRef(0);
   const operationalPreferenceInitializedRef = useRef(false);
@@ -742,10 +744,14 @@ export function DashboardHome() {
     [role, stableAvailableCardIds, toast],
   );
 
-  const loadDashboardHome = useCallback(async () => {
+  const loadDashboardHome = useCallback(async (silent = false) => {
     const requestId = layoutRequestIdRef.current + 1;
     layoutRequestIdRef.current = requestId;
-    setLoading(true);
+    if (silent) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setContractDegradationMessage(null);
 
     try {
@@ -759,6 +765,7 @@ export function DashboardHome() {
           attempts: 2,
           baseDelayMs: 300,
           maxDelayMs: 1_200,
+          context: "/system/dashboard/home",
           shouldRetry: (requestError) => isTransientRequestError(requestError),
         },
       );
@@ -867,7 +874,9 @@ export function DashboardHome() {
       }
     } finally {
       if (layoutRequestIdRef.current === requestId) {
-        setLoading(false);
+        if (!silent) {
+          setLoading(false);
+        }
         setRefreshing(false);
       }
     }
@@ -876,6 +885,39 @@ export function DashboardHome() {
   useEffect(() => {
     void loadDashboardHome();
   }, [loadDashboardHome]);
+
+  useEffect(() => {
+    if (!staleSnapshotActive || loading || refreshing) {
+      return;
+    }
+
+    const retryTimeout = window.setTimeout(() => {
+      if (typeof document !== "undefined" && document.hidden) {
+        return;
+      }
+      void loadDashboardHome(true);
+    }, DASHBOARD_HOME_STALE_REFRESH_RETRY_MS);
+
+    const handleOnline = () => {
+      void loadDashboardHome(true);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        return;
+      }
+      void loadDashboardHome(true);
+    };
+
+    window.addEventListener("online", handleOnline);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearTimeout(retryTimeout);
+      window.removeEventListener("online", handleOnline);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [loadDashboardHome, loading, refreshing, staleSnapshotActive]);
 
   useEffect(() => {
     operationalPreferenceInitializedRef.current = false;
@@ -957,14 +999,14 @@ export function DashboardHome() {
   }, [editingHiddenCardIds, editingLayouts, hiddenCardIds, layoutEditingActive, layouts]);
 
   const beginLayoutEditing = useCallback(() => {
-    if (!canEditLayout) {
+    if (!canEditLayout || staleSnapshotActive) {
       return;
     }
 
     setEditingLayouts(cloneLayouts(layouts));
     setEditingHiddenCardIds([...hiddenCardIds]);
     setIsLayoutEditing(true);
-  }, [canEditLayout, hiddenCardIds, layouts]);
+  }, [canEditLayout, hiddenCardIds, layouts, staleSnapshotActive]);
 
   const cancelLayoutEditing = useCallback(() => {
     setEditingLayouts(cloneLayouts(layouts));
@@ -979,6 +1021,15 @@ export function DashboardHome() {
   }, [stableAvailableCardIds]);
 
   const saveLayoutEditing = useCallback(async () => {
+    if (staleSnapshotActive) {
+      toast({
+        title: "Atualizacao obrigatoria",
+        description: "Atualize os cards antes de salvar alteracoes com snapshot desatualizado.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const nextLayouts = cloneLayouts(editingLayouts);
     const nextHidden = normalizeMainHiddenCardIds(editingHiddenCardIds, stableAvailableCardIds);
     const saved = await persistDashboardLayout(
@@ -1007,6 +1058,7 @@ export function DashboardHome() {
     operationalFilters,
     operationalPinned,
     persistDashboardLayout,
+    staleSnapshotActive,
     stableAvailableCardIds,
     toast,
   ]);
@@ -1021,6 +1073,15 @@ export function DashboardHome() {
   }, [operationalPinned]);
 
   const handleOperationalPinToggle = useCallback(async () => {
+    if (staleSnapshotActive) {
+      toast({
+        title: "Atualizacao obrigatoria",
+        description: "Atualize o dashboard principal antes de alterar a abertura padrao da secao operacional.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const nextPinned = !operationalPinned;
     const previousExpanded = operationalExpanded;
     writeOperationalPinnedToStorage(operationalPinnedStorageKey, nextPinned);
@@ -1047,6 +1108,8 @@ export function DashboardHome() {
     operationalFilters,
     operationalPinned,
     persistDashboardLayout,
+    staleSnapshotActive,
+    toast,
   ]);
 
   if (!user) {
@@ -1090,8 +1153,7 @@ export function DashboardHome() {
             <DashboardShellActionButton
               label="Atualizar cards"
               onClick={() => {
-                setRefreshing(true);
-                void loadDashboardHome();
+                void loadDashboardHome(true);
               }}
               active={refreshing}
               disabled={refreshing}
@@ -1102,6 +1164,8 @@ export function DashboardHome() {
               label={
                 !canEditLayout
                   ? "Editar layout disponivel apenas em telas maiores"
+                  : staleSnapshotActive
+                    ? "Atualize os cards antes de editar o layout"
                   : layoutEditingActive
                     ? "Cancelar edicao de layout"
                     : "Editar layout"
@@ -1114,7 +1178,7 @@ export function DashboardHome() {
                 beginLayoutEditing();
               }}
               active={layoutEditingActive}
-              disabled={savingLayout || !canEditLayout}
+              disabled={savingLayout || !canEditLayout || staleSnapshotActive}
             >
               {savingLayout ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -1163,11 +1227,11 @@ export function DashboardHome() {
               <Button
                 type="button"
                 className="gap-2 bg-skin-primary text-skin-text-inverse hover:bg-skin-primary-hover"
-                onClick={() => {
-                  void saveLayoutEditing();
-                }}
-                disabled={!hasPendingLayoutChanges || savingLayout}
-              >
+              onClick={() => {
+                void saveLayoutEditing();
+              }}
+              disabled={!hasPendingLayoutChanges || savingLayout || staleSnapshotActive}
+            >
                 {savingLayout ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
@@ -1238,6 +1302,22 @@ export function DashboardHome() {
             <p className="text-xs text-skin-info/90">
               Ultimo layout valido coletado ha {formatSnapshotAgeLabel(staleSnapshotAt)}.
             </p>
+            <p className="mt-1 text-xs text-skin-info/80">
+              O dashboard tenta uma nova sincronizacao automaticamente quando a aba volta ao foco ou a conectividade retorna.
+            </p>
+            <div className="mt-3">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 border-skin-info/30 bg-skin-surface/70 text-skin-info hover:bg-skin-info/10"
+                onClick={() => {
+                  void loadDashboardHome(true);
+                }}
+              >
+                Atualizar agora
+              </Button>
+            </div>
           </div>
         </div>
       ) : null}
@@ -1271,6 +1351,7 @@ export function DashboardHome() {
                   ? "border-skin-info/30 bg-skin-info/15 text-skin-info hover:bg-skin-info/20 hover:text-skin-info"
                   : "border-white/10 bg-white/5 text-skin-text-muted hover:bg-white/10 hover:text-white"
                 }`}
+              disabled={staleSnapshotActive}
               onClick={(event) => {
                 event.stopPropagation();
                 void handleOperationalPinToggle();

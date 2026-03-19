@@ -12,6 +12,7 @@ import type {
   RequestHandler,
   Response,
 } from 'express';
+import { OperationalObservabilityService } from '../services/operational-observability.service';
 
 export const PAYLOAD_PROTECTION_LIMITS = DEFAULT_REQUEST_CONTRACT_LIMITS;
 
@@ -34,7 +35,9 @@ type PayloadValidationIssue = {
 const BODY_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const DANGEROUS_OBJECT_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
-export function createContentLengthLimitMiddleware(): RequestHandler {
+export function createContentLengthLimitMiddleware(
+  operationalObservabilityService?: OperationalObservabilityService,
+): RequestHandler {
   return (req, res, next) => {
     if (!BODY_METHODS.has(String(req.method || '').toUpperCase())) {
       next();
@@ -57,6 +60,14 @@ export function createContentLengthLimitMiddleware(): RequestHandler {
         : requestLimits.jsonBytes;
 
     if (contentLength > bodyLimit) {
+      operationalObservabilityService?.record({
+        type: 'payload_rejected',
+        route: req.originalUrl || req.url || req.path || '/',
+        request: req as unknown as Record<string, any>,
+        statusCode: 413,
+        severity: 'warn',
+        detail: `content-length ${contentLength} exceeds ${bodyLimit} bytes`,
+      });
       respondWithPayloadIssue(
         res,
         buildPayloadIssue(
@@ -104,7 +115,9 @@ export function createDynamicBodyParserMiddleware(): RequestHandler {
   };
 }
 
-export function createRequestBodyTimeoutMiddleware(): RequestHandler {
+export function createRequestBodyTimeoutMiddleware(
+  operationalObservabilityService?: OperationalObservabilityService,
+): RequestHandler {
   return (req, res, next) => {
     if (!BODY_METHODS.has(String(req.method || '').toUpperCase())) {
       next();
@@ -136,6 +149,14 @@ export function createRequestBodyTimeoutMiddleware(): RequestHandler {
       }
 
       cleanup();
+      operationalObservabilityService?.record({
+        type: 'payload_rejected',
+        route: req.originalUrl || req.url || req.path || '/',
+        request: req as unknown as Record<string, any>,
+        statusCode: 408,
+        severity: 'warn',
+        detail: `body read exceeded ${timeoutMs}ms`,
+      });
       respondWithPayloadIssue(
         res,
         buildPayloadIssue(
@@ -160,7 +181,9 @@ export function createRequestBodyTimeoutMiddleware(): RequestHandler {
   };
 }
 
-export function createBodyParserErrorMiddleware(): ErrorRequestHandler {
+export function createBodyParserErrorMiddleware(
+  operationalObservabilityService?: OperationalObservabilityService,
+): ErrorRequestHandler {
   return (error, req, res, next) => {
     const bodyParserError = error as { type?: string } | undefined;
     const routePolicy = resolveApiRouteContractPolicy(req.originalUrl || req.url || req.path || '/');
@@ -170,6 +193,14 @@ export function createBodyParserErrorMiddleware(): ErrorRequestHandler {
       : routePolicy.request.jsonBytes;
 
     if (bodyParserError?.type === 'entity.too.large') {
+      operationalObservabilityService?.record({
+        type: 'request_timeout',
+        route: req.originalUrl || req.url || req.path || '/',
+        request: req as unknown as Record<string, any>,
+        statusCode: 413,
+        severity: 'warn',
+        detail: `body parser rejected payload larger than ${bodyLimit} bytes`,
+      });
       respondWithPayloadIssue(
         res,
         buildPayloadIssue(
@@ -195,6 +226,10 @@ export function createBodyParserErrorMiddleware(): ErrorRequestHandler {
 
 @Injectable()
 export class PayloadProtectionMiddleware implements NestMiddleware {
+  constructor(
+    private readonly operationalObservabilityService?: OperationalObservabilityService,
+  ) {}
+
   use(req: Request, res: Response, next: NextFunction) {
     if (!BODY_METHODS.has(String(req.method || '').toUpperCase())) {
       next();
@@ -204,6 +239,14 @@ export class PayloadProtectionMiddleware implements NestMiddleware {
     const routePolicy = resolveApiRouteContractPolicy(req.originalUrl || req.url || req.path || '/');
     const issue = inspectPayloadValue(req.body, routePolicy.request);
     if (issue) {
+      this.operationalObservabilityService?.record({
+        type: 'payload_rejected',
+        route: req.originalUrl || req.url || req.path || '/',
+        request: req as unknown as Record<string, any>,
+        statusCode: issue.statusCode,
+        severity: 'warn',
+        detail: `${issue.code} ${issue.message}`,
+      });
       respondWithPayloadIssue(res, issue);
       return;
     }

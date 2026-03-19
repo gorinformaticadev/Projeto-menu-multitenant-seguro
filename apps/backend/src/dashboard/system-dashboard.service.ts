@@ -15,6 +15,11 @@ import { MaintenanceModeService } from '../maintenance/maintenance-mode.service'
 import { PrismaService } from '../core/prisma/prisma.service';
 import { ResponseTimeMetricsService } from './system-response-time-metrics.service';
 import { SystemTelemetryService } from '@common/services/system-telemetry.service';
+import {
+  CircuitBreakerOpenError,
+  OperationalCircuitBreakerService,
+} from '@common/services/operational-circuit-breaker.service';
+import { RuntimePressureService } from '@common/services/runtime-pressure.service';
 import { ModuleSecurityService } from '../core/module-security.service';
 import { registerCoreModule } from '../core/shared/modules/core-module';
 import { moduleRegistry } from '../core/shared/registry/module-registry';
@@ -128,6 +133,12 @@ interface SafeMetricOptions {
   cacheKey?: string;
   cacheTtlMs?: number;
   fallbackStatus?: DashboardMetricFallback['status'];
+  circuitKey?: string;
+  circuitFailureThreshold?: number;
+  circuitResetTimeoutMs?: number;
+  circuitHalfOpenMaxProbes?: number;
+  circuitHalfOpenSuccessThreshold?: number;
+  circuitJitterRatio?: number;
 }
 
 const DEFAULT_PERIOD_MINUTES = 60;
@@ -220,6 +231,8 @@ export class SystemDashboardService {
     private readonly maintenanceModeService: MaintenanceModeService,
     private readonly responseTimeMetricsService: ResponseTimeMetricsService,
     private readonly systemTelemetryService: SystemTelemetryService,
+    private readonly operationalCircuitBreakerService: OperationalCircuitBreakerService,
+    private readonly runtimePressureService: RuntimePressureService,
     private readonly moduleSecurityService: ModuleSecurityService,
   ) {}
 
@@ -266,7 +279,15 @@ export class SystemDashboardService {
     const database = await this.safeMetric(
       'database',
       async () => this.getDatabaseMetric(),
-      { fallbackStatus: 'error' },
+      {
+        fallbackStatus: 'error',
+        circuitKey: 'system-dashboard:database',
+        circuitFailureThreshold: 3,
+        circuitResetTimeoutMs: 30_000,
+        circuitHalfOpenMaxProbes: 2,
+        circuitHalfOpenSuccessThreshold: 2,
+        circuitJitterRatio: 0.15,
+      },
     );
     const redis = await this.safeMetric(
       'redis',
@@ -275,6 +296,12 @@ export class SystemDashboardService {
         cacheKey: 'redis',
         cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.redis,
         fallbackStatus: 'error',
+        circuitKey: 'system-dashboard:redis',
+        circuitFailureThreshold: 2,
+        circuitResetTimeoutMs: 30_000,
+        circuitHalfOpenMaxProbes: 1,
+        circuitHalfOpenSuccessThreshold: 1,
+        circuitJitterRatio: 0.2,
       },
     );
     const workers = await this.safeMetric(
@@ -523,6 +550,7 @@ export class SystemDashboardService {
       cores,
       loadAvg,
       usagePercent,
+      eventLoop: this.runtimePressureService.getSnapshot(),
     };
   }
 
@@ -670,6 +698,10 @@ export class SystemDashboardService {
     const windowMs = 5 * 60 * 1000;
     const snapshot = this.responseTimeMetricsService.getAverageForWindow(windowMs, 'business');
     const byCategory = this.responseTimeMetricsService.getCategorizedAverages(windowMs);
+    const operationalSnapshot = this.systemTelemetryService.getOperationalSnapshot(historyWindowMs);
+    const operationalCountByType = new Map(
+      operationalSnapshot.byType.map((entry) => [entry.type, entry.count] as const),
+    );
     const history = this.responseTimeMetricsService
       .getSeriesForWindow(historyWindowMs, 'business', API_HISTORY_BUCKETS)
       .map((point) => ({
@@ -687,6 +719,15 @@ export class SystemDashboardService {
       scope: 'business' as const,
       byCategory,
       history,
+      runtimePressureEventsRecent: operationalCountByType.get('runtime_pressure') || 0,
+      versionFallbacksRecent: operationalCountByType.get('version_fallback') || 0,
+      requestRetriesRecent: operationalCountByType.get('request_retry') || 0,
+      requestQueuedRecent: operationalCountByType.get('request_queued') || 0,
+      requestQueueRejectedRecent: operationalCountByType.get('request_queue_rejected') || 0,
+      requestQueueTimeoutsRecent: operationalCountByType.get('request_queue_timeout') || 0,
+      requestTimeoutsRecent: operationalCountByType.get('request_timeout') || 0,
+      responseOverflowsRecent: operationalCountByType.get('response_overflow') || 0,
+      circuitOpenEventsRecent: operationalCountByType.get('circuit_open') || 0,
     };
   }
 
@@ -1828,11 +1869,27 @@ export class SystemDashboardService {
     }
 
     try {
-      const metric = await producer();
+      const metric = options.circuitKey
+        ? await this.operationalCircuitBreakerService.execute(
+            {
+              key: options.circuitKey,
+              route: '/system/dashboard',
+              failureThreshold: options.circuitFailureThreshold || 3,
+              resetTimeoutMs: options.circuitResetTimeoutMs || 30_000,
+              halfOpenMaxProbes: options.circuitHalfOpenMaxProbes,
+              halfOpenSuccessThreshold: options.circuitHalfOpenSuccessThreshold,
+              jitterRatio: options.circuitJitterRatio,
+            },
+            producer,
+          )
+        : await producer();
       this.writeCachedMetric(options.cacheKey, options.cacheTtlMs, metric);
       return metric;
     } catch (error) {
-      const message = this.normalizeErrorMessage(error);
+      const message =
+        error instanceof CircuitBreakerOpenError
+          ? 'Circuit breaker aberto para preservar o backend'
+          : this.normalizeErrorMessage(error);
       this.logger.warn(`Falha ao coletar metrica ${metricName}: ${message}`);
       const fallback: DashboardMetricFallback = {
         status: options.fallbackStatus || 'unavailable',
@@ -2063,7 +2120,4 @@ export class SystemDashboardService {
     return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3)}...` : normalized;
   }
 }
-
-
-
 

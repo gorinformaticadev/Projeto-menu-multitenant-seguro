@@ -5,6 +5,7 @@ export type ContractDirection = "request" | "response";
 type VersionedContractSchemas = Partial<Record<ApiVersion, ZodTypeAny>>;
 
 export const CONTRACT_DEGRADATION_EVENT_NAME = "contract:degraded";
+export const CONTRACT_RUNTIME_EVENT_NAME = "contract:runtime";
 
 export type ContractVersionDowngradeDetail = {
   context: string;
@@ -13,6 +14,28 @@ export type ContractVersionDowngradeDetail = {
   parsedVersion: ApiVersion;
   reason: "missing_response_version_header" | "explicit_legacy_response_version";
 };
+
+export type ContractRuntimeEventDetail =
+  | {
+      type: "version_downgrade";
+      context: string;
+      expectedVersion: ApiVersion;
+      parsedVersion: ApiVersion;
+      reason: ContractVersionDowngradeDetail["reason"];
+    }
+  | {
+      type: "request_retry";
+      context: string;
+      attemptNumber: number;
+      delayMs: number;
+      classification: "transient";
+    }
+  | {
+      type: "request_retry_exhausted";
+      context: string;
+      attemptNumber: number;
+      classification: "exhausted_transient" | "non_retryable";
+    };
 
 function formatZodError(error: ZodError) {
   const firstIssue = error.issues[0];
@@ -203,6 +226,7 @@ export async function executeContractRequestWithRetry<T>(
     attempts?: number;
     baseDelayMs?: number;
     maxDelayMs?: number;
+    context?: string;
     shouldRetry?: (error: unknown, attemptNumber: number) => boolean;
   } = {},
 ): Promise<T> {
@@ -222,10 +246,25 @@ export async function executeContractRequestWithRetry<T>(
         (options.shouldRetry ? options.shouldRetry(error, attemptNumber) : false);
 
       if (!canRetry) {
+        if (attemptNumber > 1) {
+          emitContractRuntimeEvent({
+            type: "request_retry_exhausted",
+            context: options.context || "unknown",
+            attemptNumber,
+            classification: isTransientRequestError(error) ? "exhausted_transient" : "non_retryable",
+          });
+        }
         throw error;
       }
 
       const delayMs = Math.min(baseDelayMs * 2 ** (attemptNumber - 1), maxDelayMs);
+      emitContractRuntimeEvent({
+        type: "request_retry",
+        context: options.context || "unknown",
+        attemptNumber,
+        delayMs,
+        classification: "transient",
+      });
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
   }
@@ -280,6 +319,14 @@ function buildFallbackVersionCandidates(
 }
 
 function reportContractVersionDowngrade(detail: ContractVersionDowngradeDetail) {
+  emitContractRuntimeEvent({
+    type: "version_downgrade",
+    context: detail.context,
+    expectedVersion: detail.expectedVersion,
+    parsedVersion: detail.parsedVersion,
+    reason: detail.reason,
+  });
+
   if (typeof console !== "undefined") {
     console.warn(
       `[contracts] downgrade controlado em ${detail.context}: esperado v${detail.expectedVersion}, interpretado como v${detail.parsedVersion}.`,
@@ -289,6 +336,22 @@ function reportContractVersionDowngrade(detail: ContractVersionDowngradeDetail) 
   if (typeof window !== "undefined") {
     window.dispatchEvent(
       new CustomEvent<ContractVersionDowngradeDetail>(CONTRACT_DEGRADATION_EVENT_NAME, {
+        detail,
+      }),
+    );
+  }
+}
+
+function emitContractRuntimeEvent(detail: ContractRuntimeEventDetail) {
+  if (typeof console !== "undefined") {
+    const level =
+      detail.type === "request_retry" ? "info" : "warn";
+    console[level](`[contracts] ${JSON.stringify(detail)}`);
+  }
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent<ContractRuntimeEventDetail>(CONTRACT_RUNTIME_EVENT_NAME, {
         detail,
       }),
     );

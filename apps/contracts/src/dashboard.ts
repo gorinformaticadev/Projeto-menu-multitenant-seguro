@@ -344,6 +344,27 @@ const cpuMetricSchema = z.union([
       cores: z.number().int().min(1),
       loadAvg: z.tuple([boundedNumberSchema, boundedNumberSchema, boundedNumberSchema]),
       usagePercent: boundedNumberSchema.nullable(),
+      eventLoop: z
+        .object({
+          eventLoopLagP95Ms: boundedNumberSchema,
+          eventLoopLagP99Ms: boundedNumberSchema,
+          eventLoopLagMaxMs: boundedNumberSchema,
+          eventLoopUtilization: z.number().min(0).max(1),
+          heapUsedRatio: z.number().min(0).max(1),
+          recentApiLatencyMs: boundedNumberSchema.nullable(),
+          gcPauseP95Ms: boundedNumberSchema,
+          gcPauseMaxMs: boundedNumberSchema,
+          gcEventsRecent: nonNegativeIntegerSchema,
+          queueDepth: nonNegativeIntegerSchema,
+          activeIsolatedRequests: nonNegativeIntegerSchema,
+          pressureScore: boundedNumberSchema,
+          consecutiveBreaches: nonNegativeIntegerSchema,
+          adaptiveThrottleFactor: z.number().min(0).max(1),
+          cause: z.enum(["normal", "cpu", "gc", "io", "mixed"]),
+          overloaded: z.boolean(),
+        })
+        .strict()
+        .optional(),
     })
     .strict(),
   metricFallbackSchema,
@@ -458,9 +479,18 @@ const apiMetricSchema = z.union([
               sampleSize: nonNegativeIntegerSchema,
             })
             .strict(),
-        })
+      })
         .strict(),
       history: z.array(dashboardHistoryPointSchema).max(DASHBOARD_MAX_ROUTE_POINTS),
+      runtimePressureEventsRecent: nonNegativeIntegerSchema.optional(),
+      versionFallbacksRecent: nonNegativeIntegerSchema.optional(),
+      requestRetriesRecent: nonNegativeIntegerSchema.optional(),
+      requestQueuedRecent: nonNegativeIntegerSchema.optional(),
+      requestQueueRejectedRecent: nonNegativeIntegerSchema.optional(),
+      requestQueueTimeoutsRecent: nonNegativeIntegerSchema.optional(),
+      requestTimeoutsRecent: nonNegativeIntegerSchema.optional(),
+      responseOverflowsRecent: nonNegativeIntegerSchema.optional(),
+      circuitOpenEventsRecent: nonNegativeIntegerSchema.optional(),
     })
     .strict(),
   metricFallbackSchema,

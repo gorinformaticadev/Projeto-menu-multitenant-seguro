@@ -11,6 +11,7 @@ import * as fs from 'fs';
 import { Prisma, UpdateLog, UpdateSystemSettings } from '@prisma/client';
 import { SystemVersionService } from '@common/services/system-version.service';
 import { SystemUpdateAdminService } from './system-update-admin.service';
+import { OperationalCircuitBreakerService } from '@common/services/operational-circuit-breaker.service';
 
 type UpdateExecutionResult = { stdout: string; stderr: string };
 type UpdateLogListItem = Pick<
@@ -91,6 +92,7 @@ export class UpdateService implements OnModuleInit {
     private auditService: AuditService,
     private readonly systemVersionService: SystemVersionService,
     private readonly systemUpdateAdminService: SystemUpdateAdminService,
+    private readonly operationalCircuitBreakerService: OperationalCircuitBreakerService,
   ) {
     this.encryptionKey = this.resolveEncryptionKey();
   }
@@ -129,7 +131,18 @@ export class UpdateService implements OnModuleInit {
 
       const repoUrl = this.buildPublicGitRepoUrl(settings);
       decryptedTokenForSanitizer = this.tryDecryptToken(settings.gitToken);
-      const stdout = await this.getRemoteTagsOutput(repoUrl, settings.gitToken);
+      const stdout = await this.operationalCircuitBreakerService.execute(
+        {
+          key: 'update:remote-tags',
+          route: '/update/check',
+          failureThreshold: 2,
+          resetTimeoutMs: 60_000,
+          halfOpenMaxProbes: 1,
+          halfOpenSuccessThreshold: 1,
+          jitterRatio: 0.2,
+        },
+        () => this.getRemoteTagsOutput(repoUrl, settings.gitToken),
+      );
 
       const cleanTags = stdout
         .split('\n')
