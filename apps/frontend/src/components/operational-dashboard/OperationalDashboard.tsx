@@ -963,6 +963,35 @@ function PanoramaSignal({
   );
 }
 
+const RESOURCE_METER_WIDTH_CLASSES = [
+  "w-0",
+  "w-[5%]",
+  "w-[10%]",
+  "w-[15%]",
+  "w-[20%]",
+  "w-[25%]",
+  "w-[30%]",
+  "w-[35%]",
+  "w-[40%]",
+  "w-[45%]",
+  "w-[50%]",
+  "w-[55%]",
+  "w-[60%]",
+  "w-[65%]",
+  "w-[70%]",
+  "w-[75%]",
+  "w-[80%]",
+  "w-[85%]",
+  "w-[90%]",
+  "w-[95%]",
+  "w-full",
+] as const;
+
+function getResourceMeterWidthClass(value: number) {
+  const boundedValue = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
+  return RESOURCE_METER_WIDTH_CLASSES[Math.round(boundedValue / 5)] ?? "w-0";
+}
+
 function ResourceMeter({
   label,
   value,
@@ -990,8 +1019,7 @@ function ResourceMeter({
       </div>
       <div className="h-2 rounded-full bg-skin-border">
         <div
-          className={`h-2 rounded-full transition-[width] duration-300 ${toneClassName}`}
-          style={{ width: `${boundedValue}%` }}
+          className={`h-2 rounded-full transition-[width] duration-300 ${toneClassName} ${getResourceMeterWidthClass(boundedValue)}`}
         />
       </div>
       {trend ? <MiniTrendSparkline config={trend} className="h-11" /> : null}

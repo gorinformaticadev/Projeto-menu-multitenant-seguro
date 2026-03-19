@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 
-// Declaração de tipo global para propriedades dinâmicas do window
 declare global {
   interface Window {
     testModule?: () => unknown;
@@ -10,55 +9,50 @@ declare global {
 }
 
 export default function TestApiPage() {
-  const [result, setResult] = useState('');
+  const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
 
   const testApi = async () => {
     setLoading(true);
     try {
-      console.log('Testando API...');
-      const response = await fetch('/api/modules/test.js');
-      console.log('Response:', response.status, response.statusText);
-      
+      const response = await fetch("/api/modules/test.js");
+
       if (response.ok) {
         const code = await response.text();
-        console.log('Code received:', code);
-        setResult(`✅ Sucesso! Código recebido:\n${code}`);
-        
-        // Testar execução
-        const func = new Function('window', 'console', code);
+        setResult(`Sucesso. Codigo recebido:\n${code}`);
+
+        const func = new Function("window", "console", code);
         func(window, console);
-        
+
         if (window.testModule) {
           const testResult = window.testModule();
-          setResult(prev => prev + `\n\n✅ Execução: ${JSON.stringify(testResult)}`);
+          setResult((prev) => `${prev}\n\nExecucao: ${JSON.stringify(testResult)}`);
         }
       } else {
         const error = await response.text();
-        setResult(`❌ Erro ${response.status}: ${error}`);
+        setResult(`Erro ${response.status}: ${error}`);
       }
     } catch (error) {
-      console.error('Erro:', error);
-      setResult(`❌ Erro: ${error instanceof Error ? error.message : String(error)}`);
+      setResult(`Erro: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="container mx-auto py-6 px-4 max-w-2xl">
-      <h1 className="text-2xl font-bold mb-4">Teste da API de Módulos</h1>
-      
+    <div className="container mx-auto max-w-2xl px-4 py-6">
+      <h1 className="mb-4 text-2xl font-bold">Teste da API de Modulos</h1>
+
       <button
         onClick={testApi}
         disabled={loading}
-        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+        className="rounded bg-skin-primary px-4 py-2 text-skin-text-inverse hover:bg-skin-primary-hover disabled:opacity-50"
       >
-        {loading ? 'Testando...' : 'Testar API'}
+        {loading ? "Testando..." : "Testar API"}
       </button>
-      
+
       {result && (
-        <pre className="mt-4 p-4 bg-gray-100 rounded whitespace-pre-wrap text-sm">
+        <pre className="mt-4 whitespace-pre-wrap rounded bg-skin-background-elevated p-4 text-sm text-skin-text">
           {result}
         </pre>
       )}

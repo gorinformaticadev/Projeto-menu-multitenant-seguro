@@ -99,7 +99,7 @@ export function ModuleRegistryTaskbar() {
   return (
     <div className="fixed bottom-4 right-4 z-50">
       <div className="bg-card border rounded-lg shadow-lg p-2 flex gap-2">
-        <div className="text-xs text-muted-foreground px-2 py-1 border-r">
+        <div className="border-r px-2 py-1 text-xs text-skin-text-muted">
           Taskbar
         </div>
         {taskbarItems.map((item) => {
