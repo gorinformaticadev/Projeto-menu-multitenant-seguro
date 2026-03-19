@@ -11,7 +11,7 @@ import { ModuleRegistryTaskbar } from "./ModuleRegistryTaskbar";
 import { ModuleLoader } from "@/core/ModuleLoader";
 import { RouteGuard } from "./RouteGuard";
 import { useTheme } from "next-themes";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Button } from "./ui/button";
 
 function normalizeAppThemePreference(theme?: string | null): "light" | "dark" | "system" {
@@ -119,14 +119,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               variant="ghost"
               size="icon"
               onClick={() => setIsSidebarExpanded((current) => !current)}
-              className="absolute -right-3 top-1/2 z-10 h-7 w-7 -translate-y-1/2 rounded-full border border-skin-border bg-skin-surface text-skin-text-muted shadow-sm transition-colors duration-200 hover:bg-skin-surface-hover hover:text-skin-text"
+              className="absolute -right-3 top-1/2 z-10 h-8 w-8 -translate-y-1/2 rounded-full border border-skin-border/90 bg-skin-surface text-skin-text-muted shadow-sm transition-all duration-200 hover:bg-skin-surface-hover hover:text-skin-text"
               aria-label={isSidebarExpanded ? "Recolher barra lateral" : "Expandir barra lateral"}
               title={isSidebarExpanded ? "Recolher barra lateral" : "Expandir barra lateral"}
             >
               {isSidebarExpanded ? (
-                <PanelLeftClose className="h-3.5 w-3.5" />
+                <ChevronsLeft className="h-3.5 w-3.5" />
               ) : (
-                <PanelLeftOpen className="h-3.5 w-3.5" />
+                <ChevronsRight className="h-3.5 w-3.5" />
               )}
             </Button>
           </div>

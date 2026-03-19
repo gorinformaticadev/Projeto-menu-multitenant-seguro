@@ -8,7 +8,7 @@ import { TopBar } from "./TopBar";
 import { useModuleRegistry } from "@/hooks/useModuleRegistry";
 import { ModuleLoader } from "@/core/ModuleLoader";
 import { Button } from "./ui/button";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { ChevronsLeft, ChevronsRight } from "lucide-react";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -58,10 +58,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             variant="ghost"
             size="icon"
             onClick={() => setIsSidebarExpanded((current) => !current)}
-            className="absolute -right-3 top-1/2 z-10 h-7 w-7 -translate-y-1/2 rounded-full border border-skin-border bg-skin-surface text-skin-text-muted shadow-sm transition-colors duration-200 hover:bg-skin-surface-hover hover:text-skin-text"
+            className="absolute -right-3 top-1/2 z-10 h-8 w-8 -translate-y-1/2 rounded-full border border-skin-border/90 bg-skin-surface text-skin-text-muted shadow-sm transition-all duration-200 hover:bg-skin-surface-hover hover:text-skin-text"
             aria-label={isSidebarExpanded ? "Recolher barra lateral" : "Expandir barra lateral"}
           >
-            {isSidebarExpanded ? <PanelLeftClose className="h-3.5 w-3.5" /> : <PanelLeftOpen className="h-3.5 w-3.5" />}
+            {isSidebarExpanded ? <ChevronsLeft className="h-3.5 w-3.5" /> : <ChevronsRight className="h-3.5 w-3.5" />}
           </Button>
         </div>
         <main className="flex-1 overflow-y-auto bg-skin-background">

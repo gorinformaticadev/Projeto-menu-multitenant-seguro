@@ -72,7 +72,7 @@ export function Sidebar({ isExpanded }: SidebarProps) {
   return (
     <div
       className={cn(
-        "flex h-full flex-col border-r border-skin-border/80 bg-skin-sidebar-background text-skin-sidebar-text transition-all duration-300",
+        "flex h-full flex-col border-r border-skin-border/70 bg-skin-sidebar-background text-skin-sidebar-text shadow-sm transition-all duration-300",
         isExpanded ? "w-56" : "w-16"
       )}
     >
