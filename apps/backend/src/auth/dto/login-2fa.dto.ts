@@ -1,23 +1,5 @@
-import { IsBoolean, IsEmail, IsNotEmpty, IsOptional, IsString, Length } from 'class-validator';
-import { Trim, ToLowerCase } from '@core/common/decorators/sanitize.decorator';
+import { authLogin2faBodySchema, type AuthLogin2faBody } from '@contracts/auth';
 
-export class Login2FADto {
-  @Trim()
-  @ToLowerCase()
-  @IsEmail({}, { message: 'Email invalido' })
-  @IsNotEmpty({ message: 'Email e obrigatorio' })
-  email: string;
+export type Login2FADto = AuthLogin2faBody;
 
-  @IsString()
-  @IsNotEmpty({ message: 'Senha e obrigatoria' })
-  password: string;
-
-  @IsString()
-  @IsNotEmpty({ message: 'Codigo 2FA e obrigatorio' })
-  @Length(6, 6, { message: 'Codigo deve ter 6 digitos' })
-  twoFactorToken: string;
-
-  @IsOptional()
-  @IsBoolean()
-  trustDevice?: boolean;
-}
+export const login2FADtoSchema = authLogin2faBodySchema;

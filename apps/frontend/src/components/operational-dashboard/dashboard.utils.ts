@@ -1,3 +1,5 @@
+import type { AppRole } from "@contracts/auth";
+
 export type DashboardMetricStatus =
   | "ok"
   | "healthy"
@@ -13,7 +15,7 @@ export type DashboardMetric = {
   [key: string]: unknown;
 };
 
-export type DashboardRole = "SUPER_ADMIN" | "ADMIN" | "USER" | "CLIENT";
+export type DashboardRole = AppRole;
 
 type DashboardBreakpoint = "lg" | "md" | "sm";
 type LayoutEntry = Record<string, number | string>;
@@ -497,4 +499,3 @@ function clampOptional(value: number, min: number, max: number): number | undefi
 
   return clampValue(value, min, max);
 }
-

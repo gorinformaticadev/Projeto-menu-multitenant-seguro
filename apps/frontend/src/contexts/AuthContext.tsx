@@ -1,33 +1,30 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import type {
+  AppRole,
+  AuthAuthenticatedResponse,
+  AuthLoginFlowResponse,
+  AuthUser,
+} from "@contracts/auth";
 import { useRouter } from "next/navigation";
-import api from "@/lib/api";
+import {
+  getAuthSyncTabId,
+  publishAuthSyncEvent,
+  subscribeToAuthSyncEvents,
+} from "@/lib/auth-sync";
+import {
+  completeTwoFactorEnrollment as completeTwoFactorEnrollmentRequest,
+  getAuthenticatedUser,
+  loginWithPassword,
+  loginWithTwoFactor,
+  logoutSession,
+} from "@/lib/contracts/auth-client";
 import { moduleRegistry } from "@/lib/module-registry";
 import { isProtectedRoute, isAuthRoute, isSafeCallbackUrl, ROUTE_CONFIG } from "@/lib/routes";
 
-export type Role = "SUPER_ADMIN" | "ADMIN" | "USER" | "CLIENT";
-
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: Role;
-  tenantId: string | null;
-  avatarUrl?: string | null;
-  tenant?: {
-    id: string;
-    nomeFantasia: string;
-    cnpjCpf: string;
-    telefone: string;
-    logoUrl?: string;
-    email?: string;
-  } | null;
-  twoFactorEnabled?: boolean;
-  preferences?: {
-    theme?: string;
-  } | null;
-}
+export type Role = AppRole;
+export type User = AuthUser;
 
 export interface LoginResult {
   success: boolean;
@@ -50,36 +47,6 @@ interface ApiError {
   message?: string;
   code?: string;
 }
-
-type AuthenticatedResponsePayload = {
-  status: "AUTHENTICATED";
-  authenticated: true;
-  requiresTwoFactor: false;
-  mustEnrollTwoFactor: false;
-  accessTokenExpiresAt?: string | null;
-  refreshTokenExpiresAt?: string | null;
-  user: User;
-};
-
-type RequiresTwoFactorPayload = {
-  status: "REQUIRES_TWO_FACTOR";
-  authenticated: false;
-  requiresTwoFactor: true;
-  mustEnrollTwoFactor: false;
-};
-
-type MustEnrollTwoFactorPayload = {
-  status: "MUST_ENROLL_TWO_FACTOR";
-  authenticated: false;
-  requiresTwoFactor: false;
-  mustEnrollTwoFactor: true;
-  enrollmentExpiresAt?: string;
-};
-
-type LoginFlowPayload =
-  | AuthenticatedResponsePayload
-  | RequiresTwoFactorPayload
-  | MustEnrollTwoFactorPayload;
 
 const AUTH_REQUEST_TIMEOUT_MS = 15000;
 const MODULE_LOAD_TIMEOUT_MS = 10000;
@@ -143,7 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  const clearAuthState = (shouldRedirect = false) => {
+  const clearAuthState = useCallback((shouldRedirect = false) => {
     setUser(null);
     setToken(null);
 
@@ -161,10 +128,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         `${ROUTE_CONFIG.unauthenticatedFallback}?callbackUrl=${encodeURIComponent(window.location.pathname)}`,
       );
     }
-  };
+  }, [router]);
 
 
-  const handleAuthenticatedResponse = async (payload: AuthenticatedResponsePayload) => {
+  const handleAuthenticatedResponse = async (payload: AuthAuthenticatedResponse) => {
     setUser(payload.user);
     setToken(SESSION_MARKER);
 
@@ -191,12 +158,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-
-        const response = await api.get<User>("/auth/me", {
+        const userResponse = await getAuthenticatedUser({
           timeout: AUTH_REQUEST_TIMEOUT_MS,
         });
 
-        setUser(response.data);
+        setUser(userResponse);
         setToken(SESSION_MARKER);
         void loadModulesSafely();
       } catch (error: unknown) {
@@ -219,11 +185,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearAuthState(true);
     };
 
+    const unsubscribeAuthSync = subscribeToAuthSyncEvents((event) => {
+      if (event.sourceTabId === getAuthSyncTabId()) {
+        return;
+      }
+
+      if (event.type === "logout") {
+        clearAuthState(true);
+      }
+    });
+
     window.addEventListener("auth:logout", handleForcedLogout);
+
     return () => {
       window.removeEventListener("auth:logout", handleForcedLogout);
+      unsubscribeAuthSync();
     };
-  }, []);
+  }, [clearAuthState]);
 
   async function login(email: string, password: string) {
     const result = await loginWithCredentials(email, password);
@@ -244,13 +222,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      const response = await api.post<LoginFlowPayload>(
-        "/auth/login",
+      const payload: AuthLoginFlowResponse = await loginWithPassword(
         { email, password },
         { timeout: AUTH_REQUEST_TIMEOUT_MS },
       );
-
-      const payload = response.data;
 
       if (payload.status === "REQUIRES_TWO_FACTOR") {
         return {
@@ -303,8 +278,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      const response = await api.post<AuthenticatedResponsePayload>(
-        "/auth/login-2fa",
+      const payload = await loginWithTwoFactor(
         {
           email,
           password,
@@ -314,13 +288,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         { timeout: AUTH_REQUEST_TIMEOUT_MS },
       );
 
-      await handleAuthenticatedResponse(response.data);
+      await handleAuthenticatedResponse(payload);
 
       return {
         success: true,
         requires2FA: false,
         mustEnrollTwoFactor: false,
-        user: response.data.user,
+        user: payload.user,
       };
     } catch (error: unknown) {
       const apiError = error as ApiError;
@@ -347,8 +321,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      const response = await api.post<AuthenticatedResponsePayload>(
-        "/auth/2fa/enrollment/enable",
+      const payload = await completeTwoFactorEnrollmentRequest(
         {
           token: code,
           trustDevice,
@@ -356,13 +329,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         { timeout: AUTH_REQUEST_TIMEOUT_MS },
       );
 
-      await handleAuthenticatedResponse(response.data);
+      await handleAuthenticatedResponse(payload);
 
       return {
         success: true,
         requires2FA: false,
         mustEnrollTwoFactor: false,
-        user: response.data.user,
+        user: payload.user,
       };
     } catch (error: unknown) {
       const apiError = error as ApiError;
@@ -377,11 +350,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function logout() {
     try {
-      await api.post("/auth/logout", {}, { timeout: AUTH_REQUEST_TIMEOUT_MS });
+      await logoutSession({}, { timeout: AUTH_REQUEST_TIMEOUT_MS });
     } catch (error) {
       console.error("Erro ao fazer logout no backend:", error);
     } finally {
       clearAuthState(false);
+      publishAuthSyncEvent("logout");
       router.push("/login");
     }
   }

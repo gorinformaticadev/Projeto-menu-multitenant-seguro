@@ -63,6 +63,7 @@
     "styled-jsx": "^5.1.7",
     "tailwind-merge": "^2.6.1",
     "tailwindcss-animate": "^1.0.7",
+    "zod": "^3.25.76",
     "zustand": "^5.0.11"
   },
   "devDependencies": {

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
 import { useToast } from "@/hooks/use-toast";
 import { PlatformName } from "@/components/PlatformInfo";
-import { API_URL } from "@/lib/api";
+import { resetPassword } from "@/lib/contracts/auth-client";
 import { useSecurityConfig } from "@/contexts/SecurityConfigContext";
 import { validatePasswordWithPolicy } from "@/hooks/usePasswordValidation";
 
@@ -78,19 +78,7 @@ function ResetPasswordForm() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/auth/reset-password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ token, newPassword }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Erro ao redefinir senha");
-      }
+      await resetPassword({ token, newPassword });
 
       setSuccess(true);
       toast({

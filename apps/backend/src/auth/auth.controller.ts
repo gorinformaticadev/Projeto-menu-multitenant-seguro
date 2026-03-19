@@ -11,18 +11,28 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import {
+  authAuthenticatedResponseSchemasByVersion,
+  authLoginFlowResponseSchemasByVersion,
+  authMessageResponseSchema,
+  authPaths,
+  authTwoFactorSecretResponseSchema,
+  authTwoFactorStatusResponseSchema,
+  authUserSchemasByVersion,
+} from '@contracts/auth';
+import { API_CURRENT_VERSION, type ApiVersion } from '@contracts/http';
 import { AuthService, LoginFlowResponse } from './auth.service';
 import { TwoFactorService } from './two-factor.service';
 import { EmailVerificationService } from './email-verification.service';
 import { PasswordResetService } from './password-reset.service';
-import { LoginDto } from './dto/login.dto';
-import { Login2FADto } from './dto/login-2fa.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
-import { LogoutDto } from './dto/logout.dto';
-import { Verify2FADto } from './dto/verify-2fa.dto';
-import { VerifyEmailDto } from './dto/verify-email.dto';
-import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
+import { type LoginDto, loginDtoSchema } from './dto/login.dto';
+import { type Login2FADto, login2FADtoSchema } from './dto/login-2fa.dto';
+import { type RefreshTokenDto, refreshTokenDtoSchema } from './dto/refresh-token.dto';
+import { type LogoutDto, logoutDtoSchema } from './dto/logout.dto';
+import { type Verify2FADto, verify2FADtoSchema } from './dto/verify-2fa.dto';
+import { type VerifyEmailDto, verifyEmailDtoSchema } from './dto/verify-email.dto';
+import { type ForgotPasswordDto, forgotPasswordDtoSchema } from './dto/forgot-password.dto';
+import { type ResetPasswordDto, resetPasswordDtoSchema } from './dto/reset-password.dto';
 import { SecurityConfigService } from '@core/security-config/security-config.service';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '@core/common/guards/optional-jwt-auth.guard';
@@ -42,10 +52,16 @@ import {
   buildRefreshTokenCookieOptions,
   buildTwoFactorEnrollmentCookieOptions,
 } from './auth-cookie.constants';
-import { Complete2FAEnrollmentDto } from './dto/complete-2fa-enrollment.dto';
+import {
+  type Complete2FAEnrollmentDto,
+  complete2FAEnrollmentDtoSchema,
+} from './dto/complete-2fa-enrollment.dto';
+import { assertContractResponse } from '../common/contracts/contract-response.util';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 
 type AuthenticatedRequest = Request & {
   user: { id: string; email?: string; role?: string };
+  apiVersion?: string;
 };
 
 type AuthErrorWithCode = UnauthorizedException & { authCode?: string };
@@ -69,17 +85,22 @@ export class AuthController {
   @Post('login')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async login(
-    @Body() loginDto: LoginDto,
-    @Req() req: Request,
+    @Body(new ZodValidationPipe(loginDtoSchema)) loginDto: LoginDto,
+    @Req() req: Request & { apiVersion?: string },
     @Res({ passthrough: true }) res: Response,
     @Ip() ip: string,
   ) {
+    const apiVersion = this.getApiVersion(req);
     const userAgent = req.headers['user-agent'] || 'Unknown';
     const trustedDeviceToken = this.extractTrustedDeviceToken(req);
 
     try {
       const result = await this.authService.login(loginDto, ip, userAgent, trustedDeviceToken);
-      return this.finalizeAuthFlowResponse(result, res);
+      return assertContractResponse(
+        authLoginFlowResponseSchemasByVersion[apiVersion],
+        this.finalizeAuthFlowResponse(result, res, apiVersion),
+        authPaths.login,
+      );
     } catch (error) {
       this.rethrowAuthContractError(error);
     }
@@ -94,11 +115,12 @@ export class AuthController {
   @Post('refresh')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async refresh(
-    @Body() refreshTokenDto: RefreshTokenDto,
-    @Req() req: Request,
+    @Body(new ZodValidationPipe(refreshTokenDtoSchema)) refreshTokenDto: RefreshTokenDto,
+    @Req() req: Request & { apiVersion?: string },
     @Res({ passthrough: true }) res: Response,
     @Ip() ip: string,
   ) {
+    const apiVersion = this.getApiVersion(req);
     const userAgent = req.headers['user-agent'] || 'Unknown';
     const refreshToken =
       refreshTokenDto.refreshToken || this.extractRefreshToken(req) || '';
@@ -111,7 +133,11 @@ export class AuthController {
       result.accessTokenExpiresAt,
       result.refreshTokenExpiresAt,
     );
-    return this.buildAuthenticatedResponse(result);
+    return assertContractResponse(
+      authAuthenticatedResponseSchemasByVersion[apiVersion],
+      this.buildAuthenticatedResponse(result, apiVersion),
+      authPaths.refresh,
+    );
   }
 
   /**
@@ -121,8 +147,8 @@ export class AuthController {
   @Post('logout')
   @UseGuards(OptionalJwtAuthGuard)
   async logout(
-    @Body() logoutDto: LogoutDto,
-    @Req() req: Request & { user?: { id?: string } },
+    @Body(new ZodValidationPipe(logoutDtoSchema)) logoutDto: LogoutDto,
+    @Req() req: Request & { user?: { id?: string }; apiVersion?: string },
     @Res({ passthrough: true }) res: Response,
     @Ip() ip: string,
   ) {
@@ -149,7 +175,11 @@ export class AuthController {
       this.clearTwoFactorEnrollmentCookie(res);
     }
 
-    return { message: 'Logout realizado com sucesso' };
+    return assertContractResponse(
+      authMessageResponseSchema,
+      { message: 'Logout realizado com sucesso' },
+      authPaths.logout,
+    );
   }
 
 
@@ -162,11 +192,12 @@ export class AuthController {
   @Post('login-2fa')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async login2FA(
-    @Body() login2FADto: Login2FADto,
-    @Req() req: Request,
+    @Body(new ZodValidationPipe(login2FADtoSchema)) login2FADto: Login2FADto,
+    @Req() req: Request & { apiVersion?: string },
     @Res({ passthrough: true }) res: Response,
     @Ip() ip: string,
   ) {
+    const apiVersion = this.getApiVersion(req);
     const userAgent = req.headers['user-agent'] || 'Unknown';
 
     try {
@@ -184,7 +215,11 @@ export class AuthController {
       }
 
       this.clearTwoFactorEnrollmentCookie(res);
-      return this.buildAuthenticatedResponse(result);
+      return assertContractResponse(
+        authAuthenticatedResponseSchemasByVersion[apiVersion],
+        this.buildAuthenticatedResponse(result, apiVersion),
+        authPaths.login2fa,
+      );
     } catch (error) {
       this.rethrowAuthContractError(error);
     }
@@ -197,8 +232,12 @@ export class AuthController {
   @Get('2fa/enrollment/generate')
   @Throttle({ default: { limit: 5, ttl: 300000 } })
   async generateEnrollment2FA(@Req() req: Request) {
-    return this.authService.generateTwoFactorEnrollmentSecret(
-      this.extractTwoFactorEnrollmentToken(req) || '',
+    return assertContractResponse(
+      authTwoFactorSecretResponseSchema,
+      await this.authService.generateTwoFactorEnrollmentSecret(
+        this.extractTwoFactorEnrollmentToken(req) || '',
+      ),
+      authPaths.twoFactorEnrollmentGenerate,
     );
   }
 
@@ -209,11 +248,13 @@ export class AuthController {
   @Post('2fa/enrollment/enable')
   @Throttle({ default: { limit: 5, ttl: 300000 } })
   async enableEnrollment2FA(
-    @Body() complete2FAEnrollmentDto: Complete2FAEnrollmentDto,
-    @Req() req: Request,
+    @Body(new ZodValidationPipe(complete2FAEnrollmentDtoSchema))
+    complete2FAEnrollmentDto: Complete2FAEnrollmentDto,
+    @Req() req: Request & { apiVersion?: string },
     @Res({ passthrough: true }) res: Response,
     @Ip() ip: string,
   ) {
+    const apiVersion = this.getApiVersion(req);
     const userAgent = req.headers['user-agent'] || 'Unknown';
     const result = await this.authService.completeTwoFactorEnrollment(
       this.extractTwoFactorEnrollmentToken(req) || '',
@@ -235,7 +276,11 @@ export class AuthController {
     }
 
     this.clearTwoFactorEnrollmentCookie(res);
-    return this.buildAuthenticatedResponse(result);
+    return assertContractResponse(
+      authAuthenticatedResponseSchemasByVersion[apiVersion],
+      this.buildAuthenticatedResponse(result, apiVersion),
+      authPaths.twoFactorEnrollmentEnable,
+    );
   }
 
   /**
@@ -246,13 +291,17 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 5, ttl: 300000 } })
   async generate2FA(@Req() req: AuthenticatedRequest, @Ip() ip: string) {
-    return this.twoFactorService.generateSecret(req.user.id, {
-      actorUserId: req.user.id,
-      actorEmail: req.user.email,
-      actorRole: req.user.role,
-      ipAddress: ip,
-      userAgent: this.resolveUserAgent(req),
-    });
+    return assertContractResponse(
+      authTwoFactorSecretResponseSchema,
+      await this.twoFactorService.generateSecret(req.user.id, {
+        actorUserId: req.user.id,
+        actorEmail: req.user.email,
+        actorRole: req.user.role,
+        ipAddress: ip,
+        userAgent: this.resolveUserAgent(req),
+      }),
+      authPaths.twoFactorGenerate,
+    );
   }
 
   /**
@@ -263,17 +312,21 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 5, ttl: 300000 } })
   async enable2FA(
-    @Body() verify2FADto: Verify2FADto,
+    @Body(new ZodValidationPipe(verify2FADtoSchema)) verify2FADto: Verify2FADto,
     @Req() req: AuthenticatedRequest,
     @Ip() ip: string,
   ) {
-    return this.twoFactorService.enable(req.user.id, verify2FADto.token, {
-      actorUserId: req.user.id,
-      actorEmail: req.user.email,
-      actorRole: req.user.role,
-      ipAddress: ip,
-      userAgent: this.resolveUserAgent(req),
-    });
+    return assertContractResponse(
+      authMessageResponseSchema,
+      await this.twoFactorService.enable(req.user.id, verify2FADto.token, {
+        actorUserId: req.user.id,
+        actorEmail: req.user.email,
+        actorRole: req.user.role,
+        ipAddress: ip,
+        userAgent: this.resolveUserAgent(req),
+      }),
+      authPaths.twoFactorEnable,
+    );
   }
 
   /**
@@ -284,17 +337,21 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 5, ttl: 300000 } })
   async disable2FA(
-    @Body() verify2FADto: Verify2FADto,
+    @Body(new ZodValidationPipe(verify2FADtoSchema)) verify2FADto: Verify2FADto,
     @Req() req: AuthenticatedRequest,
     @Ip() ip: string,
   ) {
-    return this.twoFactorService.disable(req.user.id, verify2FADto.token, {
-      actorUserId: req.user.id,
-      actorEmail: req.user.email,
-      actorRole: req.user.role,
-      ipAddress: ip,
-      userAgent: this.resolveUserAgent(req),
-    });
+    return assertContractResponse(
+      authMessageResponseSchema,
+      await this.twoFactorService.disable(req.user.id, verify2FADto.token, {
+        actorUserId: req.user.id,
+        actorEmail: req.user.email,
+        actorRole: req.user.role,
+        ipAddress: ip,
+        userAgent: this.resolveUserAgent(req),
+      }),
+      authPaths.twoFactorDisable,
+    );
   }
 
   /**
@@ -306,13 +363,17 @@ export class AuthController {
   async get2FAStatus(@Req() req: AuthenticatedRequest) {
     const user = await this.authService.getProfile(req.user.id);
     const policy = await this.securityConfigService.getTwoFactorConfig();
-    return {
-      enabled: user.twoFactorEnabled || false,
-      globallyEnabled: policy.enabled === true,
-      required: policy.required === true,
-      requiredForAdmins: policy.requiredForAdmins === true,
-      suggested: policy.suggested !== false,
-    };
+    return assertContractResponse(
+      authTwoFactorStatusResponseSchema,
+      {
+        enabled: user.twoFactorEnabled || false,
+        globallyEnabled: policy.enabled === true,
+        required: policy.required === true,
+        requiredForAdmins: policy.requiredForAdmins === true,
+        suggested: policy.suggested !== false,
+      },
+      authPaths.twoFactorStatus,
+    );
   }
 
   /**
@@ -322,7 +383,12 @@ export class AuthController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   async getProfile(@Req() req: AuthenticatedRequest) {
-    return this.authService.getProfile(req.user.id);
+    const apiVersion = this.getApiVersion(req);
+    return assertContractResponse(
+      authUserSchemasByVersion[apiVersion],
+      this.projectUserForVersion(await this.authService.getProfile(req.user.id), apiVersion),
+      authPaths.me,
+    );
   }
 
   /**
@@ -344,8 +410,14 @@ export class AuthController {
   @SkipCsrf()
   @Post('email/verify')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
-    return this.emailVerificationService.verifyEmail(verifyEmailDto.token);
+  async verifyEmail(
+    @Body(new ZodValidationPipe(verifyEmailDtoSchema)) verifyEmailDto: VerifyEmailDto,
+  ) {
+    return assertContractResponse(
+      authMessageResponseSchema,
+      await this.emailVerificationService.verifyEmail(verifyEmailDto.token),
+      authPaths.emailVerify,
+    );
   }
 
   /**
@@ -366,8 +438,14 @@ export class AuthController {
   @SkipCsrf()
   @Post('forgot-password')
   @Throttle({ default: { limit: 3, ttl: 3600000 } })
-  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
-    return this.passwordResetService.requestPasswordReset(forgotPasswordDto.email);
+  async forgotPassword(
+    @Body(new ZodValidationPipe(forgotPasswordDtoSchema)) forgotPasswordDto: ForgotPasswordDto,
+  ) {
+    return assertContractResponse(
+      authMessageResponseSchema,
+      await this.passwordResetService.requestPasswordReset(forgotPasswordDto.email),
+      authPaths.forgotPassword,
+    );
   }
 
   /**
@@ -378,14 +456,24 @@ export class AuthController {
   @SkipCsrf()
   @Post('reset-password')
   @Throttle({ default: { limit: 5, ttl: 3600000 } })
-  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
-    return this.passwordResetService.resetPassword(
-      resetPasswordDto.token,
-      resetPasswordDto.newPassword,
+  async resetPassword(
+    @Body(new ZodValidationPipe(resetPasswordDtoSchema)) resetPasswordDto: ResetPasswordDto,
+  ) {
+    return assertContractResponse(
+      authMessageResponseSchema,
+      await this.passwordResetService.resetPassword(
+        resetPasswordDto.token,
+        resetPasswordDto.newPassword,
+      ),
+      authPaths.resetPassword,
     );
   }
 
-  private finalizeAuthFlowResponse(result: LoginFlowResponse, res: Response) {
+  private finalizeAuthFlowResponse(
+    result: LoginFlowResponse,
+    res: Response,
+    apiVersion: ApiVersion,
+  ) {
     if (result.status === 'AUTHENTICATED') {
       this.setAuthCookies(
         res,
@@ -395,7 +483,7 @@ export class AuthController {
         result.refreshTokenExpiresAt,
       );
       this.clearTwoFactorEnrollmentCookie(res);
-      return this.buildAuthenticatedResponse(result);
+      return this.buildAuthenticatedResponse(result, apiVersion);
     }
 
     if (result.status === 'REQUIRES_TWO_FACTOR') {
@@ -430,7 +518,7 @@ export class AuthController {
     accessTokenExpiresAt: string | null;
     refreshTokenExpiresAt: string;
     user: unknown;
-  }) {
+  }, apiVersion: ApiVersion) {
     return {
       status: result.status,
       authenticated: result.authenticated,
@@ -438,8 +526,17 @@ export class AuthController {
       mustEnrollTwoFactor: result.mustEnrollTwoFactor,
       accessTokenExpiresAt: result.accessTokenExpiresAt,
       refreshTokenExpiresAt: result.refreshTokenExpiresAt,
-      user: result.user,
+      user: this.projectUserForVersion(result.user, apiVersion),
     };
+  }
+
+  private projectUserForVersion(user: unknown, apiVersion: ApiVersion) {
+    if (apiVersion !== '1' || !user || typeof user !== 'object' || Array.isArray(user)) {
+      return user;
+    }
+
+    const { preferences: _preferences, ...legacyUser } = user as Record<string, unknown>;
+    return legacyUser;
   }
 
   private rethrowAuthContractError(error: unknown): never {
@@ -596,5 +693,9 @@ export class AuthController {
     return typeof userAgent === 'string' && userAgent.trim().length > 0
       ? userAgent.trim()
       : undefined;
+  }
+
+  private getApiVersion(req: { apiVersion?: string }): ApiVersion {
+    return req.apiVersion === '1' || req.apiVersion === '2' ? req.apiVersion : API_CURRENT_VERSION;
   }
 }

@@ -26,6 +26,9 @@
                                           "@/*":  [
                                                       "./src/*"
                                                   ],
+                                          "@contracts/*":  [
+                                                               "../contracts/src/*"
+                                                           ],
                                           "@modules/*":  [
                                                              "../../apps/backend/src/modules/*"
                                                          ]

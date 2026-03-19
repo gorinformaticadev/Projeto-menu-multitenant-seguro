@@ -1,7 +1,5 @@
-import { IsOptional, IsString } from 'class-validator';
+import { authLogoutBodySchema, type AuthLogoutBody } from '@contracts/auth';
 
-export class LogoutDto {
-  @IsOptional()
-  @IsString()
-  refreshToken?: string;
-}
+export type LogoutDto = AuthLogoutBody;
+
+export const logoutDtoSchema = authLogoutBodySchema;

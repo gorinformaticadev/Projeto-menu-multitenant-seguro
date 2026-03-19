@@ -1,10 +1,43 @@
 import { Body, Controller, Get, Put, Query, Request, UseGuards } from '@nestjs/common';
+import {
+  dashboardLayoutResponseSchema,
+  dashboardModuleCardsResponseSchema,
+  dashboardPaths,
+  systemDashboardResponseSchemasByVersion,
+} from '@contracts/dashboard';
+import { API_CURRENT_VERSION, type ApiVersion } from '@contracts/http';
 import { Role } from '@prisma/client';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
-import { SystemDashboardQueryDto, UpdateSystemDashboardLayoutDto } from './dto/system-dashboard.dto';
+import { assertContractResponse } from '../common/contracts/contract-response.util';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import {
+  type SystemDashboardQueryDto,
+  type UpdateSystemDashboardLayoutDto,
+  systemDashboardQueryDtoSchema,
+  updateSystemDashboardLayoutDtoSchema,
+} from './dto/system-dashboard.dto';
+import { assertRuntimeSystemDashboardContract } from './system-dashboard.runtime-contract';
 import { DashboardActor, DashboardModuleCardsResponse, SystemDashboardService } from './system-dashboard.service';
+
+type DashboardRequestUser = {
+  id?: string;
+  sub?: string;
+  role?: string;
+  tenantId?: string | null;
+  name?: string | null;
+  email?: string | null;
+  tenantName?: string | null;
+  tenant?: {
+    nomeFantasia?: string | null;
+  } | null;
+};
+
+type DashboardRequest = {
+  user?: DashboardRequestUser;
+  apiVersion?: string;
+};
 
 @Controller('system/dashboard')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -14,46 +47,62 @@ export class SystemDashboardController {
 
   @Get()
   @Roles(Role.SUPER_ADMIN)
-  async getDashboard(@Request() req: any, @Query() query: SystemDashboardQueryDto) {
-    return this.dashboardService.getDashboard(this.getActor(req), {
-      periodMinutes: this.parsePositiveInt(query.periodMinutes),
-      tenantId: query.tenantId,
-      severity: query.severity,
-    });
+  async getDashboard(
+    @Request() req: DashboardRequest,
+    @Query(new ZodValidationPipe(systemDashboardQueryDtoSchema)) query: SystemDashboardQueryDto,
+  ) {
+    const apiVersion = this.getApiVersion(req);
+    return assertContractResponse(
+      systemDashboardResponseSchemasByVersion[apiVersion],
+      await this.dashboardService.getDashboard(this.getActor(req), {
+        periodMinutes: query.periodMinutes,
+        tenantId: query.tenantId,
+        severity: query.severity,
+      }, apiVersion),
+      dashboardPaths.aggregate,
+      {
+        productionValidator: (value) => {
+          assertRuntimeSystemDashboardContract(value, apiVersion);
+        },
+      },
+    );
   }
 
   @Get('module-cards')
-  async getModuleCards(@Request() req: any): Promise<DashboardModuleCardsResponse> {
-    return this.dashboardService.getModuleCards(this.getActor(req));
+  async getModuleCards(@Request() req: DashboardRequest): Promise<DashboardModuleCardsResponse> {
+    return assertContractResponse(
+      dashboardModuleCardsResponseSchema,
+      await this.dashboardService.getModuleCards(this.getActor(req)),
+      dashboardPaths.moduleCards,
+    );
   }
 
   @Get('layout')
-  async getLayout(@Request() req: any) {
-    return this.dashboardService.getLayout(this.getActor(req));
+  async getLayout(@Request() req: DashboardRequest) {
+    return assertContractResponse(
+      dashboardLayoutResponseSchema,
+      await this.dashboardService.getLayout(this.getActor(req)),
+      dashboardPaths.layout,
+    );
   }
 
   @Put('layout')
-  async saveLayout(@Request() req: any, @Body() body: UpdateSystemDashboardLayoutDto) {
-    return this.dashboardService.saveLayout(this.getActor(req), {
-      layoutJson: body?.layoutJson,
-      filtersJson: body?.filtersJson,
-    });
+  async saveLayout(
+    @Request() req: DashboardRequest,
+    @Body(new ZodValidationPipe(updateSystemDashboardLayoutDtoSchema))
+    body: UpdateSystemDashboardLayoutDto,
+  ) {
+    return assertContractResponse(
+      dashboardLayoutResponseSchema,
+      await this.dashboardService.saveLayout(this.getActor(req), {
+        layoutJson: body?.layoutJson,
+        filtersJson: body?.filtersJson,
+      }),
+      dashboardPaths.layout,
+    );
   }
 
-  private parsePositiveInt(value?: string): number | undefined {
-    if (!value) {
-      return undefined;
-    }
-
-    const parsed = Number.parseInt(String(value), 10);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      return undefined;
-    }
-
-    return parsed;
-  }
-
-  private getActor(req: any): DashboardActor {
+  private getActor(req: DashboardRequest): DashboardActor {
     const roleRaw = String(req?.user?.role || '').trim().toUpperCase();
     const roleValues = new Set(Object.values(Role));
     const role = roleValues.has(roleRaw as Role) ? (roleRaw as Role) : Role.USER;
@@ -71,5 +120,9 @@ export class SystemDashboardController {
       email,
       tenantName,
     };
+  }
+
+  private getApiVersion(req: DashboardRequest): ApiVersion {
+    return req.apiVersion === '1' || req.apiVersion === '2' ? req.apiVersion : API_CURRENT_VERSION;
   }
 }

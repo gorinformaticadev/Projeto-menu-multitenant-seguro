@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { API_URL } from "@/lib/api";
+import { requestPasswordReset } from "@/lib/contracts/auth-client";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -31,29 +31,12 @@ export default function ForgotPasswordPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/auth/forgot-password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
+      const data = await requestPasswordReset({ email });
+      setEmailSent(true);
+      toast({
+        title: "Email enviado",
+        description: data.message,
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setEmailSent(true);
-        toast({
-          title: "Email enviado",
-          description: data.message,
-        });
-      } else {
-        toast({
-          title: "Erro",
-          description: data.message || "Erro ao enviar email de recuperacao",
-          variant: "destructive",
-        });
-      }
     } catch {
       toast({
         title: "Erro",

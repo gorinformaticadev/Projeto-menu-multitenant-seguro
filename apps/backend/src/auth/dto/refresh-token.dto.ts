@@ -1,7 +1,5 @@
-import { IsOptional, IsString } from 'class-validator';
+import { authRefreshBodySchema, type AuthRefreshBody } from '@contracts/auth';
 
-export class RefreshTokenDto {
-  @IsOptional()
-  @IsString()
-  refreshToken?: string;
-}
+export type RefreshTokenDto = AuthRefreshBody;
+
+export const refreshTokenDtoSchema = authRefreshBodySchema;

@@ -8,7 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useSecurityConfig } from "@/contexts/SecurityConfigContext";
-import api from "@/lib/api";
+import {
+  completeTwoFactorEnrollment,
+  disableTwoFactor,
+  enableTwoFactor,
+  generateTwoFactorSecret,
+} from "@/lib/contracts/auth-client";
 import { Shield, QrCode, Lock, Unlock, AlertCircle } from "lucide-react";
 import Image from "next/image";
 
@@ -34,8 +39,6 @@ export function TwoFactorSetup({
 
   const twoFactorGloballyEnabled = securityConfig?.twoFactorEnabled ?? false;
   const isEnrollmentMode = mode === "enrollment";
-  const generateEndpoint = isEnrollmentMode ? "/auth/2fa/enrollment/generate" : "/auth/2fa/generate";
-  const enableEndpoint = isEnrollmentMode ? "/auth/2fa/enrollment/enable" : "/auth/2fa/enable";
 
   const resolveErrorMessage = (error: unknown, fallback: string) => {
     if (
@@ -61,9 +64,9 @@ export function TwoFactorSetup({
   async function handleGenerate() {
     try {
       setLoading(true);
-      const response = await api.get(generateEndpoint);
-      setQrCode(response.data.qrCode);
-      setSecret(response.data.secret);
+      const response = await generateTwoFactorSecret(mode);
+      setQrCode(response.qrCode);
+      setSecret(response.secret);
       setShowSetup(true);
     } catch (error: unknown) {
       toast({
@@ -88,10 +91,14 @@ export function TwoFactorSetup({
 
     try {
       setLoading(true);
-      await api.post(enableEndpoint, {
-        token: verificationCode,
-        ...(isEnrollmentMode ? { trustDevice } : {}),
-      });
+      if (isEnrollmentMode) {
+        await completeTwoFactorEnrollment({
+          token: verificationCode,
+          trustDevice,
+        });
+      } else {
+        await enableTwoFactor({ token: verificationCode });
+      }
 
       toast({
         title: isEnrollmentMode ? "2FA configurado!" : "2FA ativado!",
@@ -143,7 +150,7 @@ export function TwoFactorSetup({
 
     try {
       setLoading(true);
-      await api.post("/auth/2fa/disable", { token: verificationCode });
+      await disableTwoFactor({ token: verificationCode });
       toast({
         title: "2FA desativado",
         description: "Autenticacao de dois fatores desativada",

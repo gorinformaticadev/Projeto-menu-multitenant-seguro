@@ -1,11 +1,8 @@
-import { IsBoolean, IsOptional, IsString, Length } from 'class-validator';
+import {
+  authCompleteTwoFactorEnrollmentBodySchema,
+  type AuthCompleteTwoFactorEnrollmentBody,
+} from '@contracts/auth';
 
-export class Complete2FAEnrollmentDto {
-  @IsString()
-  @Length(6, 6, { message: 'Codigo deve ter 6 digitos' })
-  token: string;
+export type Complete2FAEnrollmentDto = AuthCompleteTwoFactorEnrollmentBody;
 
-  @IsOptional()
-  @IsBoolean()
-  trustDevice?: boolean;
-}
+export const complete2FAEnrollmentDtoSchema = authCompleteTwoFactorEnrollmentBodySchema;

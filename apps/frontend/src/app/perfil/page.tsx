@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { getAuthenticatedUser } from "@/lib/contracts/auth-client";
 import api from "@/lib/api";
 import { User, Mail, Shield, Key, Edit, Upload, Trash2 } from "lucide-react";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -85,8 +86,7 @@ export default function PerfilPage() {
     }
 
     try {
-      const response = await api.get("/auth/me");
-      const userData = response.data;
+      const userData = await getAuthenticatedUser();
 
       setTwoFactorEnabled(userData.twoFactorEnabled || false);
       setProfileData({

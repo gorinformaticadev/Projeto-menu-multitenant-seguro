@@ -1005,9 +1005,41 @@ export class AuthService {
       role: user.role,
       tenantId: user.tenantId,
       avatarUrl,
-      tenant: user.tenant,
+      tenant: this.toTenantResponse(user.tenant),
       preferences: user.preferences ? { theme: user.preferences.theme } : null,
-      twoFactorSecret: undefined,
+    };
+  }
+
+  private toTenantResponse(tenant: unknown) {
+    if (!tenant || typeof tenant !== 'object' || Array.isArray(tenant)) {
+      return null;
+    }
+
+    const row = tenant as {
+      id?: string;
+      nomeFantasia?: string;
+      cnpjCpf?: string;
+      telefone?: string;
+      logoUrl?: string | null;
+      email?: string;
+    };
+
+    if (
+      typeof row.id !== 'string' ||
+      typeof row.nomeFantasia !== 'string' ||
+      typeof row.cnpjCpf !== 'string' ||
+      typeof row.telefone !== 'string'
+    ) {
+      return null;
+    }
+
+    return {
+      id: row.id,
+      nomeFantasia: row.nomeFantasia,
+      cnpjCpf: row.cnpjCpf,
+      telefone: row.telefone,
+      logoUrl: row.logoUrl || undefined,
+      email: typeof row.email === 'string' ? row.email : undefined,
     };
   }
 

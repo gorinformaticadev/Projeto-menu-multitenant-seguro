@@ -1,6 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type {
+  DashboardLayoutResponse,
+  SystemDashboardResponse,
+  SystemDashboardSeverity,
+} from "@contracts/dashboard";
 import { useRouter } from "next/navigation";
 import {
   Activity,
@@ -37,7 +42,18 @@ import {
   type Layout,
   type ResponsiveLayouts,
 } from "react-grid-layout";
-import api from "@/lib/api";
+import {
+  getSystemDashboard,
+  getSystemDashboardLayout,
+  saveSystemDashboardLayout,
+} from "@/lib/contracts/dashboard-client";
+import {
+  CONTRACT_DEGRADATION_EVENT_NAME,
+  executeContractRequestWithRetry,
+  isContractValidationError,
+  isTransientRequestError,
+  type ContractVersionDowngradeDetail,
+} from "@/lib/contracts/contract-runtime";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSystemNotificationsContext } from "@/contexts/SystemNotificationsContext";
 import { useToast } from "@/hooks/use-toast";
@@ -89,30 +105,7 @@ import {
 export type OperationalDashboardFiltersState = {
   periodMinutes: number;
   tenantId: string;
-  severity: "all" | "info" | "warning" | "critical";
-};
-
-type DashboardLayoutResponse = {
-  role?: DashboardRole;
-  layoutJson?: unknown;
-  filtersJson?: {
-    periodMinutes?: number;
-    tenantId?: string | null;
-    severity?: string;
-    hiddenWidgetIds?: unknown;
-  } | null;
-  updatedAt?: string | null;
-  resolution?: {
-    source?: "user_role" | "role_default";
-  } | null;
-};
-
-type DashboardPayload = {
-  generatedAt?: string;
-  widgets?: {
-    available?: string[];
-  };
-  [key: string]: unknown;
+  severity: SystemDashboardSeverity;
 };
 
 type Layouts = ReturnType<typeof normalizeLayoutForWidgets>;
@@ -188,6 +181,7 @@ type OperationalAlertListItem = {
 };
 
 const POLL_INTERVAL_MS = 15000;
+const DASHBOARD_SNAPSHOT_TTL_MS = 2 * 60 * 1000;
 
 const widgetLabelById: Record<string, string> = {
   version: "Versao",
@@ -441,6 +435,79 @@ function formatSecurityEventType(type: string): string {
   return normalized || "Seguranca";
 }
 
+function formatSnapshotAgeLabel(timestamp: number): string {
+  const ageMs = Math.max(0, Date.now() - timestamp);
+  const ageSeconds = Math.floor(ageMs / 1000);
+  if (ageSeconds < 60) {
+    return `${ageSeconds}s`;
+  }
+
+  const ageMinutes = Math.floor(ageSeconds / 60);
+  return `${ageMinutes}min`;
+}
+
+function DashboardResponsiveChart({
+  children,
+  className,
+  minHeight,
+  fallback = null,
+}: {
+  children: ReactNode;
+  className?: string;
+  minHeight?: number | string;
+  fallback?: ReactNode;
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node) {
+      return;
+    }
+
+    const measure = () => {
+      setSize({
+        width: node.clientWidth,
+        height: node.clientHeight,
+      });
+    };
+
+    measure();
+
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      measure();
+    });
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  const isReady = size.width > 0 && size.height > 0;
+  const style =
+    minHeight === undefined
+      ? undefined
+      : {
+          minHeight: typeof minHeight === "number" ? `${minHeight}px` : minHeight,
+        };
+
+  return (
+    <div ref={containerRef} className={className} style={style}>
+      {isReady ? (
+        <ResponsiveContainer width="100%" height="100%">
+          {children}
+        </ResponsiveContainer>
+      ) : (
+        fallback
+      )}
+    </div>
+  );
+}
+
 function MiniTrendSparkline({
   config,
   className = "mt-3 h-14",
@@ -457,8 +524,15 @@ function MiniTrendSparkline({
   }
 
   return (
-    <div className={className}>
-      <ResponsiveContainer width="100%" height="100%">
+    <DashboardResponsiveChart
+      className={className}
+      minHeight={56}
+      fallback={
+        <div className="flex h-full items-center text-[10px] text-skin-text-muted/80">
+          {config.emptyLabel || "Sem historico recente"}
+        </div>
+      }
+    >
         <AreaChart data={config.data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id={config.id} x1="0" y1="0" x2="0" y2="1">
@@ -494,8 +568,7 @@ function MiniTrendSparkline({
             }}
           />
         </AreaChart>
-      </ResponsiveContainer>
-    </div>
+    </DashboardResponsiveChart>
   );
 }
 
@@ -1169,7 +1242,7 @@ export function OperationalDashboard({
     normalizeLayoutForWidgets({}, defaultGridWidgetIds),
   );
   const [editingHiddenWidgetIds, setEditingHiddenWidgetIds] = useState<string[]>([]);
-  const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
+  const [dashboard, setDashboard] = useState<SystemDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [savingLayout, setSavingLayout] = useState(false);
@@ -1177,6 +1250,13 @@ export function OperationalDashboard({
   const [lastLayoutUpdateAt, setLastLayoutUpdateAt] = useState<string | null>(null);
   const [isLayoutEditing, setIsLayoutEditing] = useState(false);
   const [activeQuickFilter, setActiveQuickFilter] = useState<DashboardQuickFilter>("all");
+  const [contractDegradationMessage, setContractDegradationMessage] = useState<string | null>(null);
+  const [staleSnapshotAt, setStaleSnapshotAt] = useState<number | null>(null);
+  const lastSuccessfulDashboardRef = useRef<{
+    key: string;
+    capturedAt: number;
+    payload: SystemDashboardResponse | null;
+  } | null>(null);
 
   const { width, mounted, containerRef } = useContainerWidth({ initialWidth: 1280 });
   const isMobileViewport = isDashboardMobileViewport(width);
@@ -1223,6 +1303,15 @@ export function OperationalDashboard({
     () => hasActiveFilters(appliedFilters, defaultFilters),
     [appliedFilters, defaultFilters],
   );
+  const snapshotKey = useMemo(
+    () =>
+      JSON.stringify({
+        periodMinutes: appliedFilters.periodMinutes,
+        tenantId: appliedFilters.tenantId,
+        severity: appliedFilters.severity,
+      }),
+    [appliedFilters.periodMinutes, appliedFilters.severity, appliedFilters.tenantId],
+  );
 
   const hasPendingLayoutChanges = useMemo(() => {
     if (!layoutEditingActive) {
@@ -1238,6 +1327,9 @@ export function OperationalDashboard({
   const refreshDashboard = useCallback(
     async (silent = false) => {
       if (!isOperationalAllowed) {
+        lastSuccessfulDashboardRef.current = null;
+        setContractDegradationMessage(null);
+        setStaleSnapshotAt(null);
         setDashboard(null);
         setError(null);
         setLoading(false);
@@ -1251,23 +1343,62 @@ export function OperationalDashboard({
         setLoading(true);
       }
 
-      try {
-        const response = await api.get<DashboardPayload>("/system/dashboard", {
-          params: {
-            periodMinutes: appliedFilters.periodMinutes,
-            tenantId: appliedFilters.tenantId || undefined,
-            severity: appliedFilters.severity,
-          },
-        });
+      setContractDegradationMessage(null);
 
-        setDashboard(response.data || {});
+      try {
+        const response = await executeContractRequestWithRetry(
+          () =>
+            getSystemDashboard({
+              periodMinutes: appliedFilters.periodMinutes,
+              tenantId: appliedFilters.tenantId || undefined,
+              severity: appliedFilters.severity,
+            }),
+          {
+            attempts: 2,
+            baseDelayMs: 300,
+            maxDelayMs: 1_200,
+            shouldRetry: (requestError) => isTransientRequestError(requestError),
+          },
+        );
+
+        lastSuccessfulDashboardRef.current = {
+          key: snapshotKey,
+          capturedAt: Date.now(),
+          payload: response || null,
+        };
+        setStaleSnapshotAt(null);
+        setDashboard(response || {});
         setError(null);
       } catch (requestError: unknown) {
-        setError(
-          (requestError as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-          (requestError as Error)?.message ||
-          "Falha ao carregar dashboard operacional.",
-        );
+        const snapshot = lastSuccessfulDashboardRef.current;
+        const canReuseSnapshot =
+          snapshot?.payload &&
+          snapshot.key === snapshotKey &&
+          Date.now() - snapshot.capturedAt <= DASHBOARD_SNAPSHOT_TTL_MS;
+
+        if (
+          canReuseSnapshot &&
+          (isContractValidationError(requestError, "response") || isTransientRequestError(requestError))
+        ) {
+          setDashboard(snapshot.payload);
+          setStaleSnapshotAt(snapshot.capturedAt);
+          setError(
+            isContractValidationError(requestError, "response")
+              ? "Resposta do dashboard fora do contrato. Mantendo o ultimo snapshot valido enquanto a integracao e saneada."
+              : "Falha transitoria ao atualizar o dashboard. Mantendo o ultimo snapshot valido.",
+          );
+        } else {
+          if (snapshot && Date.now() - snapshot.capturedAt > DASHBOARD_SNAPSHOT_TTL_MS) {
+            lastSuccessfulDashboardRef.current = null;
+          }
+          setStaleSnapshotAt(null);
+          setError(
+            (requestError as { response?: { data?: { message?: string } } })?.response?.data
+              ?.message ||
+              (requestError as Error)?.message ||
+              "Falha ao carregar dashboard operacional.",
+          );
+        }
       } finally {
         if (silent) {
           setRefreshing(false);
@@ -1276,8 +1407,35 @@ export function OperationalDashboard({
         }
       }
     },
-    [appliedFilters.periodMinutes, appliedFilters.severity, appliedFilters.tenantId, isOperationalAllowed],
+    [
+      appliedFilters.periodMinutes,
+      appliedFilters.severity,
+      appliedFilters.tenantId,
+      isOperationalAllowed,
+      snapshotKey,
+    ],
   );
+
+  useEffect(() => {
+    const handleContractDegradation = (event: Event) => {
+      const detail = (event as CustomEvent<ContractVersionDowngradeDetail>).detail;
+      if (!detail || !detail.context.startsWith("/system/dashboard")) {
+        return;
+      }
+
+      setContractDegradationMessage(
+        `API respondeu com contrato legado v${detail.parsedVersion} para ${detail.context}. O painel entrou em modo degradado visivel.`,
+      );
+    };
+
+    window.addEventListener(CONTRACT_DEGRADATION_EVENT_NAME, handleContractDegradation as EventListener);
+    return () => {
+      window.removeEventListener(
+        CONTRACT_DEGRADATION_EVENT_NAME,
+        handleContractDegradation as EventListener,
+      );
+    };
+  }, []);
 
   const persistDashboardPreferences = useCallback(
     async (
@@ -1288,7 +1446,7 @@ export function OperationalDashboard({
       setSavingLayout(true);
 
       try {
-        const response = await api.put<DashboardLayoutResponse>("/system/dashboard/layout", {
+        const response = await saveSystemDashboardLayout({
           layoutJson: nextLayouts,
           filtersJson: {
             ...nextFilters,
@@ -1300,7 +1458,7 @@ export function OperationalDashboard({
           },
         });
 
-        setLastLayoutUpdateAt(response.data?.updatedAt || new Date().toISOString());
+        setLastLayoutUpdateAt(response.updatedAt || new Date().toISOString());
         setError(null);
         return true;
       } catch (requestError) {
@@ -1338,8 +1496,7 @@ export function OperationalDashboard({
     }
 
     try {
-      const response = await api.get<DashboardLayoutResponse>("/system/dashboard/layout");
-      const payload = response.data || {};
+      const payload: DashboardLayoutResponse = await getSystemDashboardLayout();
       const baseLayouts =
         payload.resolution?.source === "role_default"
           ? normalizeLayoutForWidgets({}, defaultGridWidgetIds)
@@ -1920,7 +2077,11 @@ export function OperationalDashboard({
           ) : null}
           <div className="flex-1 min-h-0 w-full mt-3 pr-3 pb-2">
             {apiData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <DashboardResponsiveChart
+                className="h-full w-full"
+                minHeight={160}
+                fallback={<DashboardChartState description="Sem latencia consolidada por categoria." />}
+              >
                 <BarChart data={apiData} layout="vertical" margin={{ top: 0, right: 0, left: 30, bottom: 0 }}>
                   <XAxis type="number" hide />
                   <YAxis dataKey="category" type="category" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10 }} width={70} />
@@ -1930,7 +2091,7 @@ export function OperationalDashboard({
                     ))}
                   </Bar>
                 </BarChart>
-              </ResponsiveContainer>
+              </DashboardResponsiveChart>
             ) : (
               <DashboardChartState description="Sem latencia consolidada por categoria." />
             )}
@@ -1961,7 +2122,11 @@ export function OperationalDashboard({
           </div>
           <div className="flex-1 min-h-0 w-full mt-2">
             {cpuLoadData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <DashboardResponsiveChart
+                className="h-full w-full"
+                minHeight={160}
+                fallback={<DashboardChartState description="Sem amostra curta de carga da CPU." />}
+              >
                 <AreaChart data={cpuLoadData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorLoad" x1="0" y1="0" x2="0" y2="1">
@@ -1979,7 +2144,7 @@ export function OperationalDashboard({
                     isAnimationActive={false}
                   />
                 </AreaChart>
-              </ResponsiveContainer>
+              </DashboardResponsiveChart>
             ) : (
               <DashboardChartState description="Sem amostra curta de carga da CPU." />
             )}
@@ -2014,7 +2179,7 @@ export function OperationalDashboard({
           </div>
           <div className="h-24 w-24 shrink-0">
             {memUsed > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <DashboardResponsiveChart className="h-full w-full" minHeight={96}>
                 <PieChart>
                   <Pie
                     data={memData}
@@ -2032,7 +2197,7 @@ export function OperationalDashboard({
                     ))}
                   </Pie>
                 </PieChart>
-              </ResponsiveContainer>
+              </DashboardResponsiveChart>
             ) : null}
           </div>
         </div>
@@ -2065,7 +2230,7 @@ export function OperationalDashboard({
           </div>
           <div className="h-24 w-24 shrink-0">
             {diskUsed > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <DashboardResponsiveChart className="h-full w-full" minHeight={96}>
                 <PieChart>
                   <Pie
                     data={diskData}
@@ -2083,7 +2248,7 @@ export function OperationalDashboard({
                     ))}
                   </Pie>
                 </PieChart>
-              </ResponsiveContainer>
+              </DashboardResponsiveChart>
             ) : null}
           </div>
         </div>
@@ -3019,6 +3184,28 @@ export function OperationalDashboard({
           </div>
         ) : null}
 
+        {contractDegradationMessage ? (
+          <div className="flex items-start gap-3 rounded-2xl border border-skin-warning/30 bg-skin-warning/10 px-4 py-3 text-skin-warning">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">Modo degradado de contrato</p>
+              <p className="text-xs text-skin-warning/90">{contractDegradationMessage}</p>
+            </div>
+          </div>
+        ) : null}
+
+        {staleSnapshotAt ? (
+          <div className="flex items-start gap-3 rounded-2xl border border-skin-info/30 bg-skin-info/10 px-4 py-3 text-skin-info">
+            <RefreshCw className="mt-0.5 h-4 w-4 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">Snapshot desatualizado em uso</p>
+              <p className="text-xs text-skin-info/90">
+                Ultimo snapshot valido coletado ha {formatSnapshotAgeLabel(staleSnapshotAt)}.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
         {showInitialSkeleton ? (
           <DashboardOverviewSkeleton />
         ) : (
@@ -3090,7 +3277,17 @@ export function OperationalDashboard({
 
                 <div className="mt-3 h-32">
                   {dashboardOverview.statusChart.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <DashboardResponsiveChart
+                      className="h-full w-full"
+                      minHeight={128}
+                      fallback={
+                        <DashboardChartState
+                          title="Sem dados"
+                          description="Sem saude consolidada neste ciclo."
+                          dark
+                        />
+                      }
+                    >
                       <PieChart>
                         <Pie
                           data={dashboardOverview.statusChart}
@@ -3122,7 +3319,7 @@ export function OperationalDashboard({
                           }}
                         />
                       </PieChart>
-                    </ResponsiveContainer>
+                    </DashboardResponsiveChart>
                   ) : (
                     <DashboardChartState
                       title="Sem dados"
@@ -3287,12 +3484,6 @@ export function OperationalDashboard({
     </TooltipProvider >
   );
 }
-
-
-
-
-
-
 
 
 

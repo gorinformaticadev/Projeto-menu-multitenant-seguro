@@ -5,6 +5,24 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
 import { useContainer } from 'class-validator';
+import { SHARED_API_ROUTE_CONTRACT_POLICIES } from '@contracts/api-routes';
+import {
+  API_CURRENT_VERSION,
+  API_DEFAULT_VERSION,
+  API_SUPPORTED_VERSIONS,
+  API_VERSION_DEPRECATIONS,
+  API_VERSIONING_DOCS_PATH,
+} from '@contracts/http';
+import { ApiVersioningMiddleware } from './common/middleware/api-versioning.middleware';
+import {
+  createBodyParserErrorMiddleware,
+  createContentLengthLimitMiddleware,
+  createDynamicBodyParserMiddleware,
+  createRequestBodyTimeoutMiddleware,
+  PayloadProtectionMiddleware,
+} from './common/middleware/payload-protection.middleware';
+import { RouteExecutionTimeoutInterceptor } from './common/interceptors/route-execution-timeout.interceptor';
+import { ResponseProtectionMiddleware } from './common/middleware/response-protection.middleware';
 import { AppModule } from './app.module';
 import {
   buildSecurityHeadersHelmetOptions,
@@ -52,8 +70,14 @@ async function bootstrap() {
   }
 
   const dynamicModule = await AppModule.register();
-  const app = await NestFactory.create<NestExpressApplication>(dynamicModule);
+  const app = await NestFactory.create<NestExpressApplication>(dynamicModule, {
+    bodyParser: false,
+  });
   const moduleRef = app.get(ModuleRef);
+  const apiVersioningMiddleware = new ApiVersioningMiddleware();
+  const payloadProtectionMiddleware = new PayloadProtectionMiddleware();
+  const responseProtectionMiddleware = new ResponseProtectionMiddleware();
+  const routeExecutionTimeoutInterceptor = new RouteExecutionTimeoutInterceptor();
   // Bridge seguro para class-validator:
   // - resolve providers do Nest quando existirem (ex.: IsStrongPasswordConstraint)
   // - deixa class-validator usar fallback interno para constraints inline/nao registradas
@@ -80,7 +104,31 @@ async function bootstrap() {
     app.set('trust proxy', 1);
   }
 
+  app.use(createContentLengthLimitMiddleware());
+  app.use(createRequestBodyTimeoutMiddleware());
+  app.use(createDynamicBodyParserMiddleware());
+  app.use(createBodyParserErrorMiddleware());
+  app.use(payloadProtectionMiddleware.use.bind(payloadProtectionMiddleware));
   app.use(cookieParser());
+  app.use(apiVersioningMiddleware.use.bind(apiVersioningMiddleware));
+  app.use(responseProtectionMiddleware.use.bind(responseProtectionMiddleware));
+
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .get(API_VERSIONING_DOCS_PATH, (_req: unknown, res: { json: (body: unknown) => void }) => {
+      res.json({
+        currentVersion: API_CURRENT_VERSION,
+        defaultVersion: API_DEFAULT_VERSION,
+        supportedVersions: API_SUPPORTED_VERSIONS,
+        deprecations: API_VERSION_DEPRECATIONS,
+        routes: SHARED_API_ROUTE_CONTRACT_POLICIES.map((policy) => ({
+          id: policy.id,
+          patterns: policy.patterns,
+          supportedVersions: policy.supportedVersions || API_SUPPORTED_VERSIONS,
+        })),
+      });
+    });
 
   app.get(SentryService);
   app.useGlobalFilters(new SentryExceptionFilter());
@@ -168,9 +216,14 @@ async function bootstrap() {
     exposedHeaders: [
       'Content-Type',
       'Content-Length',
+      'Content-Encoding',
       'X-Total-Count',
+      'X-API-Version',
+      'X-API-Latest-Version',
+      'X-API-Supported-Versions',
       'X-API-Deprecated',
       'Deprecation',
+      'Sunset',
       'Link',
       'Warning',
     ],
@@ -178,6 +231,7 @@ async function bootstrap() {
   });
 
   app.useGlobalPipes(new SanitizationPipe());
+  app.useGlobalInterceptors(routeExecutionTimeoutInterceptor);
 
   app.useGlobalPipes(
     new ValidationPipe({

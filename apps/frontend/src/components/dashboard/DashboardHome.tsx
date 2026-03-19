@@ -1,6 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type SVGProps } from "react";
+import type {
+  DashboardLayoutResponse,
+  DashboardModuleCard,
+} from "@contracts/dashboard";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -23,7 +27,14 @@ import {
   type Layout,
   type ResponsiveLayouts,
 } from "react-grid-layout";
-import api from "@/lib/api";
+import { getSystemDashboardLayout, getSystemDashboardModuleCards, saveSystemDashboardLayout } from "@/lib/contracts/dashboard-client";
+import {
+  CONTRACT_DEGRADATION_EVENT_NAME,
+  executeContractRequestWithRetry,
+  isContractValidationError,
+  isTransientRequestError,
+  type ContractVersionDowngradeDetail,
+} from "@/lib/contracts/contract-runtime";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -48,51 +59,7 @@ import {
 } from "@/components/operational-dashboard/OperationalDashboard";
 
 type Layouts = ReturnType<typeof normalizeLayoutForWidgets>;
-
-type DashboardLayoutResponse = {
-  role?: DashboardRole;
-  layoutJson?: unknown;
-  filtersJson?: {
-    periodMinutes?: number;
-    tenantId?: string | null;
-    severity?: string;
-    operationalPinned?: boolean;
-    hiddenWidgetIds?: unknown;
-  } | null;
-  updatedAt?: string | null;
-  resolution?: {
-    source?: "user_role" | "role_default";
-  } | null;
-};
-
-type ModuleCardItem = {
-  id: string;
-  title: string;
-  description?: string | null;
-  module: string;
-  visibilityRole?: DashboardRole;
-  kind?: "summary" | "list" | "kanban";
-  icon?: string | null;
-  href?: string | null;
-  actionLabel?: string | null;
-  size?: "small" | "medium" | "large";
-  stats?: Array<{
-    label: string;
-    value: string;
-  }>;
-  items?: Array<{
-    id: string;
-    label: string;
-    value?: string;
-    column?: string;
-    tone?: "neutral" | "good" | "warn" | "danger";
-  }>;
-};
-
-type ModuleCardsResponse = {
-  generatedAt?: string;
-  cards?: ModuleCardItem[];
-};
+type ModuleCardItem = DashboardModuleCard;
 
 type OperationalOverviewCard = {
   id: "operationalOverview";
@@ -112,6 +79,7 @@ type OperationalOverviewCard = {
 type MainDashboardCard = ModuleCardItem;
 
 const OPERATIONAL_OVERVIEW_CARD_ID = "operationalOverview";
+const DASHBOARD_HOME_SNAPSHOT_TTL_MS = 5 * 60 * 1000;
 const legacyCoreDashboardCardIds = new Set([
   "module:core:welcome-widget",
   "module:core:stats-widget",
@@ -146,7 +114,12 @@ function normalizeStoredFilters(
         ? Math.floor(periodMinutes)
         : fallback.periodMinutes,
     tenantId: role === "SUPER_ADMIN" ? String(rawFilters?.tenantId || "") : "",
-    severity: "all",
+    severity:
+      rawFilters?.severity === "info" ||
+      rawFilters?.severity === "warning" ||
+      rawFilters?.severity === "critical"
+        ? rawFilters.severity
+        : "all",
   };
 }
 
@@ -250,6 +223,16 @@ function writeOperationalPinnedToStorage(storageKey: string | null, value: boole
   } catch {
     // Ignora indisponibilidade de storage local sem quebrar o dashboard.
   }
+}
+
+function formatSnapshotAgeLabel(timestamp: number): string {
+  const ageMs = Math.max(0, Date.now() - timestamp);
+  const ageSeconds = Math.floor(ageMs / 1000);
+  if (ageSeconds < 60) {
+    return `${ageSeconds}s`;
+  }
+
+  return `${Math.floor(ageSeconds / 60)}min`;
 }
 
 function DashboardShellActionButton({
@@ -585,6 +568,7 @@ export function DashboardHome() {
     [actorStorageId, role],
   );
   const defaultFilters = useMemo(() => getDefaultOperationalFilters(role), [role]);
+  const homeSnapshotKey = useMemo(() => `${actorStorageId}:${role}`, [actorStorageId, role]);
 
   const [moduleCards, setModuleCards] = useState<ModuleCardItem[]>([]);
   const [layouts, setLayouts] = useState<Layouts>(() => normalizeLayoutForWidgets({}, []));
@@ -600,9 +584,22 @@ export function DashboardHome() {
   const [isLayoutEditing, setIsLayoutEditing] = useState(false);
   const [operationalExpanded, setOperationalExpanded] = useState(false);
   const [operationalPinned, setOperationalPinned] = useState(false);
+  const [contractDegradationMessage, setContractDegradationMessage] = useState<string | null>(null);
+  const [staleSnapshotAt, setStaleSnapshotAt] = useState<number | null>(null);
 
   const layoutRequestIdRef = useRef(0);
   const operationalPreferenceInitializedRef = useRef(false);
+  const lastSuccessfulHomeStateRef = useRef<{
+    key: string;
+    capturedAt: number;
+    moduleCards: ModuleCardItem[];
+    layouts: Layouts;
+    hiddenCardIds: string[];
+    operationalFilters: OperationalDashboardFiltersState;
+    operationalPinned: boolean;
+    operationalExpanded: boolean;
+    lastLayoutUpdateAt: string | null;
+  } | null>(null);
 
   const { width, mounted, containerRef } = useContainerWidth({ initialWidth: 1280 });
   const isMobileViewport = isDashboardMobileViewport(width);
@@ -715,18 +712,18 @@ export function DashboardHome() {
       setSavingLayout(true);
 
       try {
-        const response = await api.put<DashboardLayoutResponse>("/system/dashboard/layout", {
+        const response = await saveSystemDashboardLayout({
           layoutJson: nextLayouts,
           filtersJson: {
             periodMinutes: nextFilters.periodMinutes,
             tenantId: nextFilters.tenantId || null,
-            severity: "all",
+            severity: nextFilters.severity,
             operationalPinned: role === "SUPER_ADMIN" ? nextOperationalPinned : false,
             hiddenWidgetIds: normalizeMainHiddenCardIds(nextHiddenCardIds, stableAvailableCardIds),
           },
         });
 
-        setLastLayoutUpdateAt(response.data?.updatedAt || new Date().toISOString());
+        setLastLayoutUpdateAt(response.updatedAt || new Date().toISOString());
         setError(null);
         return true;
       } catch (requestError) {
@@ -749,24 +746,34 @@ export function DashboardHome() {
     const requestId = layoutRequestIdRef.current + 1;
     layoutRequestIdRef.current = requestId;
     setLoading(true);
+    setContractDegradationMessage(null);
 
     try {
-      const [cardsResponse, layoutResponse] = await Promise.all([
-        api.get<ModuleCardsResponse>("/system/dashboard/module-cards"),
-        api.get<DashboardLayoutResponse>("/system/dashboard/layout"),
-      ]);
+      const [cardsResponse, layoutResponse] = await executeContractRequestWithRetry(
+        () =>
+          Promise.all([
+            getSystemDashboardModuleCards(),
+            getSystemDashboardLayout(),
+          ] as const),
+        {
+          attempts: 2,
+          baseDelayMs: 300,
+          maxDelayMs: 1_200,
+          shouldRetry: (requestError) => isTransientRequestError(requestError),
+        },
+      );
 
       if (layoutRequestIdRef.current !== requestId) {
         return;
       }
 
       const nextModuleCards = normalizeDashboardHomeCards(
-        Array.isArray(cardsResponse.data?.cards)
-          ? cardsResponse.data.cards
+        Array.isArray(cardsResponse.cards)
+          ? cardsResponse.cards
           : [],
       );
       const nextCardIds = nextModuleCards.map((card) => card.id);
-      const layoutPayload = layoutResponse.data || {};
+      const layoutPayload = layoutResponse || {};
       const nextLayouts =
         layoutPayload.resolution?.source === "role_default"
           ? normalizeLayoutForWidgets({}, nextCardIds)
@@ -802,27 +809,69 @@ export function DashboardHome() {
       writeOperationalPinnedToStorage(operationalPinnedStorageKey, effectiveOperationalPinned);
       setLastLayoutUpdateAt(layoutPayload.updatedAt || null);
       setError(null);
+      setStaleSnapshotAt(null);
+      lastSuccessfulHomeStateRef.current = {
+        key: homeSnapshotKey,
+        capturedAt: Date.now(),
+        moduleCards: nextModuleCards,
+        layouts: cloneLayouts(nextLayouts),
+        hiddenCardIds: [...nextHidden],
+        operationalFilters: nextFilters,
+        operationalPinned: effectiveOperationalPinned,
+        operationalExpanded: effectiveOperationalPinned,
+        lastLayoutUpdateAt: layoutPayload.updatedAt || null,
+      };
     } catch (requestError) {
       if (layoutRequestIdRef.current !== requestId) {
         return;
       }
 
       const message = normalizeErrorMessage(requestError);
-      const fallbackLayouts = normalizeLayoutForWidgets({}, []);
-      setModuleCards([]);
-      setLayouts(fallbackLayouts);
-      setEditingLayouts(cloneLayouts(fallbackLayouts));
-      setHiddenCardIds([]);
-      setEditingHiddenCardIds([]);
-      setOperationalFilters(defaultFilters);
-      setError(`Falha ao carregar os cards do dashboard: ${message}`);
+      const snapshot = lastSuccessfulHomeStateRef.current;
+      const canReuseSnapshot =
+        snapshot &&
+        snapshot.key === homeSnapshotKey &&
+        Date.now() - snapshot.capturedAt <= DASHBOARD_HOME_SNAPSHOT_TTL_MS &&
+        (isContractValidationError(requestError, "response") || isTransientRequestError(requestError));
+
+      if (canReuseSnapshot) {
+        const safeSnapshot = snapshot;
+        setModuleCards(safeSnapshot.moduleCards);
+        setLayouts(cloneLayouts(safeSnapshot.layouts));
+        setEditingLayouts(cloneLayouts(safeSnapshot.layouts));
+        setHiddenCardIds([...safeSnapshot.hiddenCardIds]);
+        setEditingHiddenCardIds([...safeSnapshot.hiddenCardIds]);
+        setOperationalFilters(safeSnapshot.operationalFilters);
+        setOperationalPinned(safeSnapshot.operationalPinned);
+        setOperationalExpanded(safeSnapshot.operationalExpanded);
+        setLastLayoutUpdateAt(safeSnapshot.lastLayoutUpdateAt);
+        setStaleSnapshotAt(safeSnapshot.capturedAt);
+        setError(
+          isContractValidationError(requestError, "response")
+            ? "Resposta do dashboard principal fora do contrato. Mantendo o ultimo layout valido em modo degradado."
+            : "Falha transitoria ao atualizar o dashboard principal. Mantendo o ultimo layout valido.",
+        );
+      } else {
+        if (snapshot && Date.now() - snapshot.capturedAt > DASHBOARD_HOME_SNAPSHOT_TTL_MS) {
+          lastSuccessfulHomeStateRef.current = null;
+        }
+        setStaleSnapshotAt(null);
+        const fallbackLayouts = normalizeLayoutForWidgets({}, []);
+        setModuleCards([]);
+        setLayouts(fallbackLayouts);
+        setEditingLayouts(cloneLayouts(fallbackLayouts));
+        setHiddenCardIds([]);
+        setEditingHiddenCardIds([]);
+        setOperationalFilters(defaultFilters);
+        setError(`Falha ao carregar os cards do dashboard: ${message}`);
+      }
     } finally {
       if (layoutRequestIdRef.current === requestId) {
         setLoading(false);
         setRefreshing(false);
       }
     }
-  }, [defaultFilters, operationalPinnedStorageKey, role]);
+  }, [defaultFilters, homeSnapshotKey, operationalPinnedStorageKey, role]);
 
   useEffect(() => {
     void loadDashboardHome();
@@ -831,6 +880,27 @@ export function DashboardHome() {
   useEffect(() => {
     operationalPreferenceInitializedRef.current = false;
   }, [actorStorageId, role]);
+
+  useEffect(() => {
+    const handleContractDegradation = (event: Event) => {
+      const detail = (event as CustomEvent<ContractVersionDowngradeDetail>).detail;
+      if (!detail || !detail.context.startsWith("/system/dashboard")) {
+        return;
+      }
+
+      setContractDegradationMessage(
+        `API respondeu com contrato legado v${detail.parsedVersion} para ${detail.context}. O dashboard principal esta em modo degradado visivel.`,
+      );
+    };
+
+    window.addEventListener(CONTRACT_DEGRADATION_EVENT_NAME, handleContractDegradation as EventListener);
+    return () => {
+      window.removeEventListener(
+        CONTRACT_DEGRADATION_EVENT_NAME,
+        handleContractDegradation as EventListener,
+      );
+    };
+  }, []);
 
   useEffect(() => {
     const pinnedFromStorage = readOperationalPinnedFromStorage(operationalPinnedStorageKey);
@@ -1150,6 +1220,28 @@ export function DashboardHome() {
         </div>
       ) : null}
 
+      {contractDegradationMessage ? (
+        <div className="flex items-start gap-3 rounded-2xl border border-skin-warning/30 bg-skin-warning/10 px-4 py-3 text-skin-warning">
+          <Rows3 className="mt-0.5 h-4 w-4 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">Modo degradado de contrato</p>
+            <p className="text-xs text-skin-warning/90">{contractDegradationMessage}</p>
+          </div>
+        </div>
+      ) : null}
+
+      {staleSnapshotAt ? (
+        <div className="flex items-start gap-3 rounded-2xl border border-skin-info/30 bg-skin-info/10 px-4 py-3 text-skin-info">
+          <RefreshCw className="mt-0.5 h-4 w-4 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">Snapshot desatualizado em uso</p>
+            <p className="text-xs text-skin-info/90">
+              Ultimo layout valido coletado ha {formatSnapshotAgeLabel(staleSnapshotAt)}.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       {operationalCard ? (
         <OperationalDashboardWidget
           id={operationalCard.id}
@@ -1266,6 +1358,3 @@ export function DashboardHome() {
     </div>
   );
 }
-
-
-

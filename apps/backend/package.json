@@ -10,8 +10,9 @@
     "start": "nest start",
     "start:dev": "nest start --watch --exec \"ts-node -r tsconfig-paths/register src/main.ts\"",
     "start:prod": "node dist/main.js",
-    "build": "pnpm run prisma:generate && nest build",
-    "test": "pnpm run prisma:generate:test && node .\\scripts\\run-jest-cleanly.js",
+    "build": "prisma generate && nest build && node .\\scripts\\ensure-prisma-client.js && .\\node_modules\\.bin\\jest.CMD src/common/contracts/api-route-contract-enforcement.spec.ts --runInBand",
+    "contracts:enforce": "node .\\scripts\\ensure-prisma-client.js && .\\node_modules\\.bin\\jest.CMD src/common/contracts/api-route-contract-enforcement.spec.ts --runInBand",
+    "test": "node .\\scripts\\ensure-prisma-client.js && node .\\scripts\\run-jest-cleanly.js",
     "test:security-regression": "jest src/security-regression/security-architecture.regression.spec.ts src/security-regression/critical-endpoints.regression.spec.ts src/core/security-config/security-runtime-config.service.spec.ts src/common/guards/security-throttler.guard.spec.ts src/common/services/redis-throttler.storage.spec.ts src/auth/auth.service.spec.ts src/auth/user-session.service.spec.ts src/prisma-seed/default-users.seed.spec.ts --runInBand",
     "test:smoke": "jest --config ./test/jest-smoke.json --runInBand --passWithNoTests",
     "prisma:generate": "pnpm exec prisma generate",
@@ -79,7 +80,8 @@
     "socket.io": "^4.8.3",
     "speakeasy": "^2.0.0",
     "uuid": "^8.3.2",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.16",
@@ -131,7 +133,8 @@
       "^@common/(.*)$": "<rootDir>/common/$1",
       "^@config/(.*)$": "<rootDir>/config/$1",
       "^@database/(.*)$": "<rootDir>/database/$1",
-      "^@security/(.*)$": "<rootDir>/security/$1"
+      "^@security/(.*)$": "<rootDir>/security/$1",
+      "^@contracts/(.*)$": "<rootDir>/../../contracts/src/$1"
     }
   },
   "overrides": {

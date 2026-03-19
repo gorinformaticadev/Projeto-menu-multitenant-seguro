@@ -1,4 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
+import {
+  type SystemDashboardSeverity,
+  type UpdateSystemDashboardLayoutBody,
+} from '@contracts/dashboard';
+import type { ApiVersion } from '@contracts/http';
 import { BackupJobStatus, BackupJobType, Role } from '@prisma/client';
 import Redis from 'ioredis';
 import * as fs from 'fs/promises';
@@ -15,8 +20,6 @@ import { registerCoreModule } from '../core/shared/modules/core-module';
 import { moduleRegistry } from '../core/shared/registry/module-registry';
 import { ModuleDashboardWidget } from '../core/shared/types/module.types';
 
-type DashboardSeverity = 'all' | 'info' | 'warning' | 'critical';
-
 export interface DashboardActor {
   userId: string;
   role: Role;
@@ -29,13 +32,10 @@ export interface DashboardActor {
 export interface DashboardFiltersInput {
   periodMinutes?: number;
   tenantId?: string;
-  severity?: string;
+  severity?: SystemDashboardSeverity;
 }
 
-export interface DashboardLayoutInput {
-  layoutJson?: unknown;
-  filtersJson?: unknown;
-}
+export type DashboardLayoutInput = UpdateSystemDashboardLayoutBody;
 
 interface DashboardMetricFallback {
   status: 'error' | 'degraded' | 'unavailable';
@@ -223,7 +223,11 @@ export class SystemDashboardService {
     private readonly moduleSecurityService: ModuleSecurityService,
   ) {}
 
-  async getDashboard(actor: DashboardActor, filtersInput: DashboardFiltersInput = {}) {
+  async getDashboard(
+    actor: DashboardActor,
+    filtersInput: DashboardFiltersInput = {},
+    apiVersion: ApiVersion = '2',
+  ) {
     const filters = this.normalizeFilters(filtersInput);
     const startedAt = Date.now();
     const now = new Date();
@@ -373,7 +377,7 @@ export class SystemDashboardService {
       },
     };
 
-    return this.applyRoleProjection(payload, actor.role);
+    return this.applyRoleProjection(this.applyContractVersionProjection(payload, apiVersion), actor.role);
   }
 
   async getModuleCards(actor: DashboardActor): Promise<DashboardModuleCardsResponse> {
@@ -811,7 +815,7 @@ export class SystemDashboardService {
   private async getRecentCriticalErrorsMetric(
     windowStart: Date,
     tenantId: string | null | undefined,
-    severity: DashboardSeverity,
+    severity: SystemDashboardSeverity,
   ) {
     const effectiveSeverity = severity === 'all' ? 'critical' : severity;
     const where: any = {
@@ -1551,7 +1555,7 @@ export class SystemDashboardService {
   private normalizeFilters(input: DashboardFiltersInput): {
     periodMinutes: number;
     tenantId: string | null;
-    severity: DashboardSeverity;
+    severity: SystemDashboardSeverity;
   } {
     const periodRaw = Number(input.periodMinutes);
     const periodMinutes = Number.isFinite(periodRaw)
@@ -1568,7 +1572,7 @@ export class SystemDashboardService {
     };
   }
 
-  private normalizeSeverity(input?: string): DashboardSeverity {
+  private normalizeSeverity(input?: string): SystemDashboardSeverity {
     const normalized = String(input || '')
       .trim()
       .toLowerCase();
@@ -1627,6 +1631,38 @@ export class SystemDashboardService {
       jobs: { status: 'restricted' },
       errors: { status: 'restricted' },
       tenants: { status: 'restricted' },
+    };
+  }
+
+  private applyContractVersionProjection(payload: Record<string, any>, apiVersion: ApiVersion) {
+    if (apiVersion !== '1') {
+      return payload;
+    }
+
+    const notifications =
+      payload.notifications && typeof payload.notifications === 'object' && !Array.isArray(payload.notifications)
+        ? payload.notifications
+        : null;
+
+    if (!notifications || notifications.status !== 'ok' || !Array.isArray(notifications.recentOperationalAlerts)) {
+      return payload;
+    }
+
+    return {
+      ...payload,
+      notifications: {
+        ...notifications,
+        recentOperationalAlerts: notifications.recentOperationalAlerts.map(
+          (item: Record<string, unknown>) => {
+            if (!item || typeof item !== 'object' || Array.isArray(item)) {
+              return item;
+            }
+
+            const { action: _action, ...legacyAlert } = item;
+            return legacyAlert;
+          },
+        ),
+      },
     };
   }
 
@@ -1748,7 +1784,7 @@ export class SystemDashboardService {
     const normalized = this.normalizeFilters({
       periodMinutes: parsed.periodMinutes as number | undefined,
       tenantId: role === Role.SUPER_ADMIN ? (parsed.tenantId as string | undefined) : undefined,
-      severity: parsed.severity as string | undefined,
+      severity: parsed.severity as SystemDashboardSeverity | undefined,
     });
     const allowedWidgetIds = new Set(widgetIds);
     const hiddenWidgetIds = Array.isArray(parsed.hiddenWidgetIds)
@@ -2027,10 +2063,6 @@ export class SystemDashboardService {
     return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3)}...` : normalized;
   }
 }
-
-
-
-
 
 
 

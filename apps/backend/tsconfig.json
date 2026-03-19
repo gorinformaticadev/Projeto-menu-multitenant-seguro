@@ -33,6 +33,9 @@
                                           "@prisma/*":  [
                                                             "./node_modules/@prisma/*"
                                                         ],
+                                          "@contracts/*":  [
+                                                               "../contracts/src/*"
+                                                           ],
                                           "*":  [
                                                     "node_modules/*"
                                                 ]
@@ -40,6 +43,7 @@
                         },
     "include":  [
                     "src/**/*",
+                    "../contracts/src/**/*",
                     "../../packages/modules/**/backend/**/*",
                     "../../packages/modules/**/module.ts",
                     "../../packages/modules/**/permissions.ts"

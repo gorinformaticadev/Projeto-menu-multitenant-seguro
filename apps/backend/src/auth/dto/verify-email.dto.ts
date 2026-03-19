@@ -1,7 +1,5 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { authVerifyEmailBodySchema, type AuthVerifyEmailBody } from '@contracts/auth';
 
-export class VerifyEmailDto {
-  @IsString()
-  @IsNotEmpty({ message: 'Token é obrigatório' })
-  token: string;
-}
+export type VerifyEmailDto = AuthVerifyEmailBody;
+
+export const verifyEmailDtoSchema = authVerifyEmailBodySchema;

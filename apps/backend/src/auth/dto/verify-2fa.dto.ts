@@ -1,8 +1,5 @@
-import { IsString, IsNotEmpty, Length } from 'class-validator';
+import { authVerifyTwoFactorBodySchema, type AuthVerifyTwoFactorBody } from '@contracts/auth';
 
-export class Verify2FADto {
-  @IsString()
-  @IsNotEmpty({ message: 'Código é obrigatório' })
-  @Length(6, 6, { message: 'Código deve ter 6 dígitos' })
-  token: string;
-}
+export type Verify2FADto = AuthVerifyTwoFactorBody;
+
+export const verify2FADtoSchema = authVerifyTwoFactorBodySchema;

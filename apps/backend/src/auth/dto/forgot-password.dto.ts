@@ -1,9 +1,5 @@
-import { IsEmail, IsNotEmpty } from 'class-validator';
+import { authForgotPasswordBodySchema, type AuthForgotPasswordBody } from '@contracts/auth';
 
-export class ForgotPasswordDto {
-  @IsEmail({
-      // Empty implementation
-    }, { message: 'Email deve ter um formato válido' })
-  @IsNotEmpty({ message: 'Email é obrigatório' })
-  email: string;
-}
+export type ForgotPasswordDto = AuthForgotPasswordBody;
+
+export const forgotPasswordDtoSchema = authForgotPasswordBodySchema;

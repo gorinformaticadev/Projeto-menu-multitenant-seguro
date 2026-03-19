@@ -1,8 +1,29 @@
 import axios, { InternalAxiosRequestConfig } from "axios";
+import {
+  authAuthenticatedResponseSchemasByVersion,
+  authLogoutBodySchema,
+  authMessageResponseSchema,
+  authPaths,
+  authRefreshBodySchema,
+} from "@contracts/auth";
+import { API_CURRENT_VERSION, API_VERSION_HEADER } from "@contracts/http";
 import { ROUTE_CONFIG } from "@/lib/routes";
+import {
+  hasPeerRefreshLock,
+  publishAuthSyncEvent,
+  releaseAuthRefreshLock,
+  tryAcquireAuthRefreshLock,
+  waitForAuthSyncEvent,
+} from "@/lib/auth-sync";
+import {
+  parseContractValue,
+  parseVersionedContractValue,
+  resolveApiVersionFromHeaders,
+} from "@/lib/contracts/contract-runtime";
 
 interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
+  skipAuthRefresh?: boolean;
 }
 
 interface MaintenanceModePayload {
@@ -34,16 +55,27 @@ const normalizeApiUrl = (value?: string): string => {
 
 export const API_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
 const AXIOS_BASE_URL = API_URL === "/api" ? "/api" : API_URL;
+export const API_JSON_HEADERS = {
+  "Content-Type": "application/json",
+  [API_VERSION_HEADER]: API_CURRENT_VERSION,
+} as const;
+
+export const buildApiRequestHeaders = (
+  headers?: Record<string, string>,
+): Record<string, string> => ({
+  ...API_JSON_HEADERS,
+  ...(headers || {}),
+});
 
 const api = axios.create({
   baseURL: AXIOS_BASE_URL,
   withCredentials: true,
   xsrfCookieName: "XSRF-TOKEN",
   xsrfHeaderName: "X-CSRF-Token",
-  headers: {
-    "Content-Type": "application/json",
-  },
+  headers: buildApiRequestHeaders(),
 });
+api.defaults.headers.common[API_VERSION_HEADER] = API_CURRENT_VERSION;
+api.defaults.headers.common["Content-Type"] = "application/json";
 
 interface FailedRequest {
   resolve: () => void;
@@ -52,13 +84,14 @@ interface FailedRequest {
 
 let isRefreshing = false;
 let failedQueue: FailedRequest[] = [];
+let logoutPromise: Promise<void> | null = null;
 
 const processQueue = (error: unknown) => {
-  failedQueue.forEach((prom) => {
+  failedQueue.forEach((pending) => {
     if (error) {
-      prom.reject(error);
+      pending.reject(error);
     } else {
-      prom.resolve();
+      pending.resolve();
     }
   });
 
@@ -84,49 +117,96 @@ const publishMaintenanceState = (payload: MaintenanceModePayload) => {
   window.dispatchEvent(new CustomEvent(MAINTENANCE_EVENT_ACTIVE, { detail: normalized }));
 };
 
-const doLogout = async () => {
+const dispatchBrowserEvent = (eventName: string) => {
   if (typeof window === "undefined") {
     return;
   }
 
-  // Limpar os cookies para precaver (embora HttpOnly precise do backend)
-  document.cookie = "accessToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-  document.cookie = "refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-
-  try {
-    const isMaintenanceRequest = window.location.pathname.startsWith("/maintenance");
-    
-    // Se não estiver em manutenção, tenta o logout para limpar cookies HttpOnly no backend
-    if (!isMaintenanceRequest) {
-      await axios.post(
-        `${API_URL}/auth/logout`,
-        {},
-        {
-          withCredentials: true,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
-    }
-  } catch (e) {
-    console.warn("Forced logout request failed to propagate to server:", e);
-  }
-
-  window.dispatchEvent(new Event("auth:logout"));
-
-  if (window.location.pathname !== ROUTE_CONFIG.unauthenticatedFallback) {
-    window.location.href = ROUTE_CONFIG.unauthenticatedFallback;
-  }
+  window.dispatchEvent(new Event(eventName));
 };
 
+const waitForPeerRefreshOutcome = () =>
+  waitForAuthSyncEvent(
+    (event) =>
+      event.type === "refresh-success" ||
+      event.type === "refresh-failed" ||
+      event.type === "logout",
+  );
 
+const doLogout = async () => {
+  if (logoutPromise) {
+    return logoutPromise;
+  }
+
+  logoutPromise = (async () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    document.cookie = "accessToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    document.cookie = "refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+
+    try {
+      const isMaintenanceRequest = window.location.pathname.startsWith("/maintenance");
+      if (!isMaintenanceRequest) {
+        const logoutResponse = await axios.post(
+          `${API_URL}${authPaths.logout}`,
+          parseContractValue(authLogoutBodySchema, {}, authPaths.logout, "request"),
+          {
+            withCredentials: true,
+            headers: buildApiRequestHeaders(),
+          },
+        );
+        parseContractValue(
+          authMessageResponseSchema,
+          logoutResponse.data,
+          authPaths.logout,
+          "response",
+        );
+      }
+    } catch (error) {
+      console.warn("Forced logout request failed to propagate to server:", error);
+    }
+
+    publishAuthSyncEvent("logout");
+    dispatchBrowserEvent("auth:logout");
+
+    if (window.location.pathname !== ROUTE_CONFIG.unauthenticatedFallback) {
+      window.location.href = ROUTE_CONFIG.unauthenticatedFallback;
+    }
+  })();
+
+  try {
+    await logoutPromise;
+  } finally {
+    logoutPromise = null;
+  }
+};
 
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     if (config.url && !/^https?:\/\//i.test(config.url) && config.url.startsWith("/api/")) {
       config.url = config.url.replace(/^\/api/, "");
     }
+
+    if (!config.headers) {
+      config.headers = buildApiRequestHeaders();
+      return config;
+    }
+
+    const headersCandidate = config.headers as
+      | { set?: (name: string, value: string) => void; has?: (name: string) => boolean }
+      | Record<string, string>;
+
+    if (typeof headersCandidate.set === "function") {
+      if (!headersCandidate.has?.(API_VERSION_HEADER)) {
+        headersCandidate.set(API_VERSION_HEADER, API_CURRENT_VERSION);
+      }
+
+      return config;
+    }
+
+    config.headers = buildApiRequestHeaders(headersCandidate as Record<string, string>);
 
     return config;
   },
@@ -140,7 +220,7 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    const originalRequest = error.config as CustomAxiosRequestConfig;
+    const originalRequest = error.config as CustomAxiosRequestConfig | undefined;
     const maintenancePayload = error.response?.data as MaintenanceModePayload | undefined;
 
     if (
@@ -157,22 +237,23 @@ api.interceptors.response.use(
 
     const normalizedUrl = String(originalRequest.url || "");
     const isAuthLoginRequest =
-      normalizedUrl === "/auth/login" ||
-      normalizedUrl === "/auth/login-2fa" ||
-      normalizedUrl === "/auth/2fa/enrollment/enable";
-    const isRefreshRequest = normalizedUrl === "/auth/refresh";
+      normalizedUrl === authPaths.login ||
+      normalizedUrl === authPaths.login2fa ||
+      normalizedUrl === authPaths.twoFactorEnrollmentEnable;
+    const isRefreshRequest = normalizedUrl === authPaths.refresh;
+    const shouldSkipRefresh = originalRequest.skipAuthRefresh === true;
 
     if (error.response?.status === 401 && isRefreshRequest) {
       await doLogout();
       return Promise.reject(error);
     }
 
-
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
       !isRefreshRequest &&
-      !isAuthLoginRequest
+      !isAuthLoginRequest &&
+      !shouldSkipRefresh
     ) {
       if (isRefreshing) {
         return new Promise<void>((resolve, reject) => {
@@ -182,29 +263,69 @@ api.interceptors.response.use(
           .catch((refreshError) => Promise.reject(refreshError));
       }
 
+      if (hasPeerRefreshLock() && typeof window !== "undefined") {
+        const peerOutcome = await waitForPeerRefreshOutcome();
+        if (peerOutcome?.type === "refresh-success") {
+          return api(originalRequest);
+        }
+
+        if (peerOutcome?.type === "refresh-failed" || peerOutcome?.type === "logout") {
+          return Promise.reject(error);
+        }
+      }
+
+      if (!tryAcquireAuthRefreshLock()) {
+        const peerOutcome = await waitForPeerRefreshOutcome();
+        if (peerOutcome?.type === "refresh-success") {
+          return api(originalRequest);
+        }
+
+        if (peerOutcome?.type === "refresh-failed" || peerOutcome?.type === "logout") {
+          return Promise.reject(error);
+        }
+
+        await doLogout();
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true;
       isRefreshing = true;
+      publishAuthSyncEvent("refresh-start");
+      dispatchBrowserEvent("token-refresh-start");
 
       try {
-        await axios.post(
-          `${API_URL}/auth/refresh`,
-          {},
+        const refreshResponse = await axios.post(
+          `${API_URL}${authPaths.refresh}`,
+          parseContractValue(authRefreshBodySchema, {}, authPaths.refresh, "request"),
           {
             withCredentials: true,
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: buildApiRequestHeaders(),
+          },
+        );
+        parseVersionedContractValue(
+          authAuthenticatedResponseSchemasByVersion,
+          refreshResponse.data,
+          authPaths.refresh,
+          "response",
+          resolveApiVersionFromHeaders(refreshResponse.headers),
+          {
+            expectedVersion: API_CURRENT_VERSION,
+            allowVersionFallback: resolveApiVersionFromHeaders(refreshResponse.headers) == null,
           },
         );
 
+        publishAuthSyncEvent("refresh-success");
         processQueue(null);
         return api(originalRequest);
       } catch (refreshError: unknown) {
+        publishAuthSyncEvent("refresh-failed");
         processQueue(refreshError);
         await doLogout();
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
+        releaseAuthRefreshLock();
+        dispatchBrowserEvent("token-refresh-end");
       }
     }
 

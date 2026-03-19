@@ -242,6 +242,7 @@
 }
 
 .operational-dashboard-grid .react-grid-item {
+  min-width: 0;
   transition: box-shadow 160ms ease, transform 160ms ease;
 }
 
@@ -291,6 +292,7 @@
 
 .operational-dashboard-grid .react-grid-item > div {
   height: 100%;
+  min-width: 0;
 }
 
 .operational-dashboard-grid .react-grid-item .react-resizable-handle {
