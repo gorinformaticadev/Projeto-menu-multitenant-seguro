@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { moduleRegistry } from "@/lib/module-registry";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface SidebarItem {
   id: string;
