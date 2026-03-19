@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "./Sidebar";
@@ -28,13 +28,28 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { isInitialized, error } = useModuleRegistry();
   const { setTheme, theme } = useTheme();
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  const lastAppliedThemeRef = useRef<"light" | "dark" | "system" | null>(null);
 
-  // Sincroniza tema do backend com o next-themes no primeiro load
-  useEffect(() => {
-    const preferredTheme = normalizeAppThemePreference(user?.preferences?.theme);
-    if (preferredTheme !== theme) {
-      setTheme(preferredTheme);
+  // Sincroniza o tema do usuario antes da pintura para evitar flicker apos o login.
+  useLayoutEffect(() => {
+    if (!user) {
+      lastAppliedThemeRef.current = null;
+      return;
     }
+
+    const preferredTheme = normalizeAppThemePreference(user.preferences?.theme);
+
+    if (theme === preferredTheme) {
+      lastAppliedThemeRef.current = preferredTheme;
+      return;
+    }
+
+    if (lastAppliedThemeRef.current === preferredTheme) {
+      return;
+    }
+
+    lastAppliedThemeRef.current = preferredTheme;
+    setTheme(preferredTheme);
   }, [user, theme, setTheme]);
 
   // Páginas onde o sidebar e topbar NÃO devem aparecer
