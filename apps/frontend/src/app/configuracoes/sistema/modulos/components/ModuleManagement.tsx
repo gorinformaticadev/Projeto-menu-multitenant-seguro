@@ -770,7 +770,7 @@ export function ModuleManagement() {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-skin-primary" />
       </div>
     );
   }
@@ -807,9 +807,9 @@ export function ModuleManagement() {
 
               {!selectedFile ? (
                 <div className="rounded-2xl border-2 border-dashed border-muted-foreground/25 p-8 text-center">
-                  <Upload className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
+                  <Upload className="mx-auto mb-4 h-12 w-12 text-skin-text-muted/50" />
                   <h3 className="text-lg font-semibold">Selecione um arquivo ZIP</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">
+                  <p className="mt-2 text-sm text-skin-text-muted">
                     Arraste e solte ou clique para selecionar um modulo (.zip, max. 50MB)
                   </p>
                   <Button
@@ -905,23 +905,23 @@ export function ModuleManagement() {
                 </div>
               )}
 
-              <div className="mt-6 rounded-2xl bg-muted/50 p-4">
+              <div className="mt-6 rounded-2xl bg-skin-background-elevated/50 p-4">
                 <h4 className="mb-3 flex items-center gap-2 font-medium">
                   <Info className="h-4 w-4" />
                   Estrutura do modulo
                 </h4>
-                <div className="space-y-2 text-sm text-muted-foreground">
+                <div className="space-y-2 text-sm text-skin-text-muted">
                   <p>
-                    - <code className="rounded bg-muted px-1">module.json</code> - configuracao do
+                    - <code className="rounded bg-skin-background-elevated px-1">module.json</code> - configuracao do
                     modulo
                   </p>
                   <p>
-                    - <code className="rounded bg-muted px-1">migrations/</code> - scripts SQL
+                    - <code className="rounded bg-skin-background-elevated px-1">migrations/</code> - scripts SQL
                     opcionais
                   </p>
                   <p>
-                    - <code className="rounded bg-muted px-1">npmDependencies</code> dentro do{" "}
-                    <code className="rounded bg-muted px-1">module.json</code> para declarar
+                    - <code className="rounded bg-skin-background-elevated px-1">npmDependencies</code> dentro do{" "}
+                    <code className="rounded bg-skin-background-elevated px-1">module.json</code> para declarar
                     dependencias NPM de backend/frontend
                   </p>
                   <p>- Demais arquivos do modulo, como componentes e assets.</p>
@@ -957,9 +957,9 @@ export function ModuleManagement() {
             <CardContent className="p-4 sm:p-6">
               {modules.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-muted-foreground/25 px-6 py-12 text-center">
-                  <Package className="mx-auto mb-4 h-12 w-12 text-muted-foreground/40" />
+                  <Package className="mx-auto mb-4 h-12 w-12 text-skin-text-muted/40" />
                   <p className="text-base font-medium">Nenhum modulo instalado no sistema</p>
-                  <p className="mt-2 text-sm text-muted-foreground">
+                  <p className="mt-2 text-sm text-skin-text-muted">
                     Use a aba de instalacao para adicionar novos modulos.
                   </p>
                 </div>
@@ -983,8 +983,8 @@ export function ModuleManagement() {
                             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                               <div className="min-w-0 flex-1 space-y-3">
                                 <div className="flex flex-wrap items-start gap-3">
-                                  <div className="rounded-2xl border border-border/60 bg-muted/50 p-2.5">
-                                    <Package className="h-5 w-5 text-foreground/75" />
+                                  <div className="rounded-2xl border border-border/60 bg-skin-background-elevated/50 p-2.5">
+                                    <Package className="h-5 w-5 text-skin-text/75" />
                                   </div>
 
                                   <div className="min-w-0 flex-1 space-y-2">
@@ -1000,7 +1000,7 @@ export function ModuleManagement() {
                                       </Badge>
                                     </div>
 
-                                    <p className="line-clamp-2 text-sm text-muted-foreground">
+                                    <p className="line-clamp-2 text-sm text-skin-text-muted">
                                       {module.description}
                                     </p>
                                   </div>
@@ -1023,7 +1023,7 @@ export function ModuleManagement() {
                                   </div>
                                 )}
 
-                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-skin-text-muted">
                                   <span>Slug: {module.slug}</span>
                                   {module.stats && <span>{module.stats.tenants} tenant(s)</span>}
                                   {module.stats && <span>{module.stats.migrations} migration(s)</span>}
@@ -1033,7 +1033,7 @@ export function ModuleManagement() {
                                 </div>
 
                                 {lifecycleSummary && (
-                                  <p className="text-xs text-muted-foreground">{lifecycleSummary}</p>
+                                  <p className="text-xs text-skin-text-muted">{lifecycleSummary}</p>
                                 )}
                               </div>
 
@@ -1088,7 +1088,7 @@ export function ModuleManagement() {
                                     <div className="space-y-1">
                                       <div className="px-2 py-1.5">
                                         <p className="text-sm font-medium">Acoes do modulo</p>
-                                        <p className="text-xs text-muted-foreground">
+                                        <p className="text-xs text-skin-text-muted">
                                           Operacoes disponiveis para {module.name}
                                         </p>
                                       </div>
@@ -1110,14 +1110,14 @@ export function ModuleManagement() {
                                                   "mr-3 h-4 w-4 shrink-0",
                                                   action.loading && "animate-spin",
                                                   action.variant === "destructive" &&
-                                                    "text-destructive",
+                                                    "text-skin-danger",
                                                 )}
                                               />
                                               <span className="min-w-0 flex-1">
                                                 <span className="block text-sm font-medium">
                                                   {action.label}
                                                 </span>
-                                                <span className="block text-xs text-muted-foreground">
+                                                <span className="block text-xs text-skin-text-muted">
                                                   {action.description}
                                                 </span>
                                               </span>
@@ -1155,11 +1155,11 @@ export function ModuleManagement() {
         }}
       >
         <DialogContent className="left-0 top-0 h-dvh max-w-none translate-x-0 translate-y-0 rounded-none border-0 p-0 sm:left-auto sm:right-0 sm:w-[min(760px,100vw)] sm:border-l sm:border-border/70">
-          <div className="flex h-full flex-col bg-background">
+          <div className="flex h-full flex-col bg-skin-surface">
             <DialogHeader className="border-b px-6 py-5 text-left">
               <div className="pr-8">
                 <DialogTitle className="flex flex-wrap items-center gap-2 text-xl">
-                  <Package className="h-5 w-5 text-foreground/70" />
+                  <Package className="h-5 w-5 text-skin-text/70" />
                   {selectedModule?.name || "Detalhes do modulo"}
                   {selectedModule && (
                     <>
@@ -1184,7 +1184,7 @@ export function ModuleManagement() {
 
             {moduleDetailsLoading ? (
               <div className="flex flex-1 items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <Loader2 className="h-8 w-8 animate-spin text-skin-primary" />
               </div>
             ) : selectedModule ? (
               <Tabs
@@ -1193,7 +1193,7 @@ export function ModuleManagement() {
                 className="flex min-h-0 flex-1 flex-col"
               >
                 <div className="border-b px-4 py-3 sm:px-6">
-                  <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl bg-muted/60 p-1">
+                  <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl bg-skin-background-elevated/60 p-1">
                     <TabsTrigger value="overview" className="rounded-lg">
                       Visao geral
                     </TabsTrigger>
@@ -1214,25 +1214,25 @@ export function ModuleManagement() {
                           <p className="text-sm font-medium">
                             {getStatusGuidance(selectedModule.status).title}
                           </p>
-                          <p className="mt-1 text-sm text-muted-foreground">
+                          <p className="mt-1 text-sm text-skin-text-muted">
                             {getStatusGuidance(selectedModule.status).message}
                           </p>
-                          <p className="mt-2 text-xs text-primary">
+                          <p className="mt-2 text-xs text-skin-primary">
                             {getStatusGuidance(selectedModule.status).suggestion}
                           </p>
                         </div>
 
                         <div className="grid gap-3 text-sm sm:grid-cols-2">
-                          <div className="rounded-xl border bg-muted/30 p-3">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          <div className="rounded-xl border bg-skin-background-elevated/30 p-3">
+                            <p className="text-xs uppercase tracking-wide text-skin-text-muted">
                               Instalado em
                             </p>
                             <p className="mt-1 font-medium">
                               {formatDateTime(selectedModule.installedAt)}
                             </p>
                           </div>
-                          <div className="rounded-xl border bg-muted/30 p-3">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          <div className="rounded-xl border bg-skin-background-elevated/30 p-3">
+                            <p className="text-xs uppercase tracking-wide text-skin-text-muted">
                               Ativado em
                             </p>
                             <p className="mt-1 font-medium">
@@ -1243,24 +1243,24 @@ export function ModuleManagement() {
 
                         {selectedModule.stats && (
                           <div className="grid gap-3 sm:grid-cols-3">
-                            <div className="rounded-xl border bg-muted/30 p-3">
-                              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            <div className="rounded-xl border bg-skin-background-elevated/30 p-3">
+                              <p className="text-xs uppercase tracking-wide text-skin-text-muted">
                                 Tenants
                               </p>
                               <p className="mt-1 text-xl font-semibold">
                                 {selectedModule.stats.tenants}
                               </p>
                             </div>
-                            <div className="rounded-xl border bg-muted/30 p-3">
-                              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            <div className="rounded-xl border bg-skin-background-elevated/30 p-3">
+                              <p className="text-xs uppercase tracking-wide text-skin-text-muted">
                                 Migrations
                               </p>
                               <p className="mt-1 text-xl font-semibold">
                                 {selectedModule.stats.migrations}
                               </p>
                             </div>
-                            <div className="rounded-xl border bg-muted/30 p-3">
-                              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            <div className="rounded-xl border bg-skin-background-elevated/30 p-3">
+                              <p className="text-xs uppercase tracking-wide text-skin-text-muted">
                                 Menus
                               </p>
                               <p className="mt-1 text-xl font-semibold">
@@ -1338,22 +1338,22 @@ export function ModuleManagement() {
                             </div>
 
                             <div className="grid gap-3 text-sm sm:grid-cols-2">
-                              <div className="rounded-xl border bg-muted/30 p-3">
-                                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                              <div className="rounded-xl border bg-skin-background-elevated/30 p-3">
+                                <p className="text-xs uppercase tracking-wide text-skin-text-muted">
                                   Backend
                                 </p>
                                 <p className="mt-1 font-medium">
                                   {selectedModule.hasBackend ? "Disponivel" : "Nao encontrado"}
                                 </p>
                               </div>
-                              <div className="rounded-xl border bg-muted/30 p-3">
-                                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                              <div className="rounded-xl border bg-skin-background-elevated/30 p-3">
+                                <p className="text-xs uppercase tracking-wide text-skin-text-muted">
                                   Frontend
                                 </p>
                                 <p className="mt-1 font-medium">
                                   {selectedModule.hasFrontend ? "Disponivel" : "Nao encontrado"}
                                 </p>
-                                <p className="mt-1 text-xs text-muted-foreground">
+                                <p className="mt-1 text-xs text-skin-text-muted">
                                   {selectedModule.lifecycle.frontendValidationLevel ===
                                   "not_required"
                                     ? "Modulo sem frontend."
@@ -1365,7 +1365,7 @@ export function ModuleManagement() {
                               </div>
                             </div>
 
-                            <div className="rounded-2xl border bg-muted/20 p-4">
+                            <div className="rounded-2xl border bg-skin-background-elevated/20 p-4">
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <p className="text-sm font-medium">Dependencias NPM declaradas</p>
                                 <div className="flex items-center gap-2 text-xs">
@@ -1390,12 +1390,12 @@ export function ModuleManagement() {
                                     ["Backend", selectedModule.npmDependencies?.backend ?? []],
                                     ["Frontend", selectedModule.npmDependencies?.frontend ?? []],
                                   ] as const).map(([label, deps]) => (
-                                    <div key={label} className="rounded-xl border bg-background/80 p-3">
-                                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                    <div key={label} className="rounded-xl border bg-skin-surface/80 p-3">
+                                      <p className="text-xs uppercase tracking-wide text-skin-text-muted">
                                         {label}
                                       </p>
                                       {deps.length === 0 ? (
-                                        <p className="mt-2 text-xs text-muted-foreground">
+                                        <p className="mt-2 text-xs text-skin-text-muted">
                                           Nenhuma dependencia declarada.
                                         </p>
                                       ) : (
@@ -1422,11 +1422,11 @@ export function ModuleManagement() {
                                                   {dep.status}
                                                 </Badge>
                                               </div>
-                                              <p className="mt-1 font-mono text-muted-foreground">
+                                              <p className="mt-1 font-mono text-skin-text-muted">
                                                 {dep.version}
                                               </p>
                                               {dep.note && (
-                                                <p className="mt-1 text-muted-foreground">{dep.note}</p>
+                                                <p className="mt-1 text-skin-text-muted">{dep.note}</p>
                                               )}
                                             </li>
                                           ))}
@@ -1436,7 +1436,7 @@ export function ModuleManagement() {
                                   ))}
                                 </div>
                               ) : (
-                                <p className="mt-3 text-xs text-muted-foreground">
+                                <p className="mt-3 text-xs text-skin-text-muted">
                                   Este modulo nao declara dependencias NPM extras.
                                 </p>
                               )}
@@ -1456,7 +1456,7 @@ export function ModuleManagement() {
                             )}
                           </>
                         ) : (
-                          <div className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">
+                          <div className="rounded-2xl border border-dashed p-4 text-sm text-skin-text-muted">
                             O backend ainda nao retornou detalhes tecnicos do lifecycle para este
                             modulo.
                           </div>
@@ -1478,18 +1478,18 @@ export function ModuleManagement() {
                           <Card key={action.key} className="border-border/70">
                             <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                               <div className="flex min-w-0 items-start gap-3">
-                                <div className="rounded-xl border bg-muted/30 p-2">
+                                <div className="rounded-xl border bg-skin-background-elevated/30 p-2">
                                   <action.icon
                                     className={cn(
                                       "h-4 w-4",
                                       action.loading && "animate-spin",
-                                      action.variant === "destructive" && "text-destructive",
+                                      action.variant === "destructive" && "text-skin-danger",
                                     )}
                                   />
                                 </div>
                                 <div className="min-w-0">
                                   <p className="font-medium">{action.label}</p>
-                                  <p className="text-sm text-muted-foreground">
+                                  <p className="text-sm text-skin-text-muted">
                                     {action.description}
                                   </p>
                                 </div>
@@ -1517,7 +1517,7 @@ export function ModuleManagement() {
                 </div>
               </Tabs>
             ) : (
-              <div className="flex flex-1 items-center justify-center p-6 text-sm text-muted-foreground">
+              <div className="flex flex-1 items-center justify-center p-6 text-sm text-skin-text-muted">
                 Nenhum modulo selecionado.
               </div>
             )}
@@ -1534,7 +1534,7 @@ export function ModuleManagement() {
       <Dialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle className="text-destructive">Desinstalar modulo</DialogTitle>
+            <DialogTitle className="text-skin-danger">Desinstalar modulo</DialogTitle>
             <DialogDescription>
               Esta acao remove permanentemente o modulo do sistema.
             </DialogDescription>
@@ -1542,36 +1542,36 @@ export function ModuleManagement() {
 
           {selectedModule && (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4">
-                <p className="mb-2 text-sm font-medium text-destructive">Atencao</p>
-                <ul className="space-y-1 text-sm text-muted-foreground">
+              <div className="rounded-2xl border border-skin-danger/20 bg-skin-danger/10 p-4">
+                <p className="mb-2 text-sm font-medium text-skin-danger">Atencao</p>
+                <ul className="space-y-1 text-sm text-skin-text-muted">
                   <li>- Todos os arquivos do modulo serao removidos do sistema.</li>
                   <li>- O modulo sera desativado para todos os tenants.</li>
                   <li>- Esta acao nao pode ser desfeita.</li>
                 </ul>
               </div>
 
-              <div className="rounded-2xl border bg-muted/30 p-4 text-sm">
+              <div className="rounded-2xl border bg-skin-background-elevated/30 p-4 text-sm">
                 <p>
                   <strong>Modulo:</strong> {selectedModule.name}
                 </p>
                 <p className="mt-1">
                   <strong>Slug:</strong>{" "}
-                  <code className="rounded border bg-background px-1.5 py-0.5">
+                  <code className="rounded border bg-skin-surface px-1.5 py-0.5">
                     {selectedModule.slug}
                   </code>
                 </p>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">
+                <label className="text-sm font-medium text-skin-text-muted">
                   Digite o slug <strong>{selectedModule.slug}</strong> para confirmar:
                 </label>
                 <input
                   type="text"
                   value={confirmationInput}
                   onChange={(event) => setConfirmationInput(event.target.value)}
-                  className="w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none ring-offset-background transition focus-visible:ring-2 focus-visible:ring-destructive/40"
+                  className="w-full rounded-xl border bg-skin-surface px-3 py-2 text-sm outline-none ring-offset-skin-surface transition focus-visible:ring-2 focus-visible:ring-skin-danger/40"
                   placeholder={`Digite ${selectedModule.slug}`}
                 />
               </div>
