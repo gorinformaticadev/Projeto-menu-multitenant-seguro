@@ -90,11 +90,11 @@ export class ModuleBridge implements ModuleBridgeAPI {
     const card = this.createElement('div', { className: classes.card });
     
     const header = this.createElement('div', { className: 'px-4 py-5 sm:p-6' });
-    const titleEl = this.createElement('h3', { className: 'text-lg leading-6 font-medium text-gray-900 mb-4' }, title);
+    const titleEl = this.createElement('h3', { className: 'mb-4 text-lg font-medium leading-6 text-skin-text' }, title);
     header.appendChild(titleEl);
     
     if (typeof content === 'string') {
-      const contentEl = this.createElement('div', { className: 'text-sm text-gray-600' }, content);
+      const contentEl = this.createElement('div', { className: 'text-sm text-skin-text-muted' }, content);
       header.appendChild(contentEl);
     } else {
       header.appendChild(content);
@@ -198,17 +198,17 @@ export class ModuleBridge implements ModuleBridgeAPI {
   getSystemClasses() {
     return {
       button: {
-        primary: 'px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500',
-        secondary: 'px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500',
-        success: 'px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500',
-        danger: 'px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500'
+        primary: 'rounded-md bg-skin-primary px-4 py-2 text-skin-text-inverse transition-colors hover:bg-skin-primary-hover focus:outline-none focus:ring-2 focus:ring-skin-focus-ring',
+        secondary: 'rounded-md bg-skin-background-elevated px-4 py-2 text-skin-text transition-colors hover:bg-skin-surface-hover focus:outline-none focus:ring-2 focus:ring-skin-focus-ring',
+        success: 'rounded-md bg-skin-success px-4 py-2 text-skin-text-inverse transition-colors hover:bg-skin-success/90 focus:outline-none focus:ring-2 focus:ring-skin-focus-ring',
+        danger: 'rounded-md bg-skin-danger px-4 py-2 text-skin-text-inverse transition-colors hover:bg-skin-danger/90 focus:outline-none focus:ring-2 focus:ring-skin-focus-ring'
       },
-      card: 'bg-white overflow-hidden shadow rounded-lg',
+      card: 'overflow-hidden rounded-lg border border-skin-border bg-skin-surface shadow-sm',
       alert: {
-        info: 'bg-blue-50 border border-blue-200 rounded-lg p-4',
-        success: 'bg-green-50 border border-green-200 rounded-lg p-4',
-        warning: 'bg-yellow-50 border border-yellow-200 rounded-lg p-4',
-        error: 'bg-red-50 border border-red-200 rounded-lg p-4'
+        info: 'rounded-lg border border-skin-info/30 bg-skin-info/10 p-4',
+        success: 'rounded-lg border border-skin-success/30 bg-skin-success/10 p-4',
+        warning: 'rounded-lg border border-skin-warning/30 bg-skin-warning/10 p-4',
+        error: 'rounded-lg border border-skin-danger/30 bg-skin-danger/10 p-4'
       }
     };
   }

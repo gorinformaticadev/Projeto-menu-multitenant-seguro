@@ -41,15 +41,15 @@ export function SystemNotificationsDrawer() {
       }}
     >
       <DialogContent className="left-auto right-0 top-0 translate-x-0 translate-y-0 h-[100dvh] max-h-[100dvh] w-full max-w-[30rem] rounded-none border-l border-border p-0 gap-0 sm:rounded-none">
-        <DialogHeader className="px-4 py-3 border-b border-gray-200 dark:border-border text-left">
+        <DialogHeader className="border-b border-skin-border px-4 py-3 text-left">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
-              <Bell className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <DialogTitle className="text-sm font-semibold text-gray-900 dark:text-foreground">
+              <Bell className="h-4 w-4 text-skin-info" />
+              <DialogTitle className="text-sm font-semibold text-skin-text">
                 Notificacoes do sistema
               </DialogTitle>
               {unreadCount > 0 && (
-                <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 text-xs rounded-full font-medium">
+                <span className="rounded-full bg-skin-danger/10 px-2 py-1 text-xs font-medium text-skin-danger">
                   {unreadCount} nova{unreadCount === 1 ? "" : "s"}
                 </span>
               )}
