@@ -49,19 +49,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Layout com Sidebar e Conteúdo */}
       <div className="flex w-full pt-16">
-        <aside className="h-[calc(100vh-4rem)] flex-shrink-0">
-          <Sidebar isExpanded={isSidebarExpanded} />
-        </aside>
-        <div className="pt-4">
+        <div className="relative h-[calc(100vh-4rem)] flex-shrink-0">
+          <aside className="h-full">
+            <Sidebar isExpanded={isSidebarExpanded} />
+          </aside>
           <Button
             type="button"
             variant="ghost"
             size="icon"
             onClick={() => setIsSidebarExpanded((current) => !current)}
-            className="ml-2 h-8 w-8 rounded-full border border-skin-border bg-skin-surface text-skin-text-muted hover:bg-skin-menu-hover hover:text-skin-text"
+            className="absolute -right-3 top-1/2 z-10 h-7 w-7 -translate-y-1/2 rounded-full border border-skin-border bg-skin-surface text-skin-text-muted shadow-sm transition-colors duration-200 hover:bg-skin-surface-hover hover:text-skin-text"
             aria-label={isSidebarExpanded ? "Recolher barra lateral" : "Expandir barra lateral"}
           >
-            {isSidebarExpanded ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+            {isSidebarExpanded ? <PanelLeftClose className="h-3.5 w-3.5" /> : <PanelLeftOpen className="h-3.5 w-3.5" />}
           </Button>
         </div>
         <main className="flex-1 overflow-y-auto bg-skin-background">

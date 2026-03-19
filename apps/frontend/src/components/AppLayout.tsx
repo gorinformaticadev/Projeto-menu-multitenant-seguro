@@ -110,23 +110,23 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Layout com Sidebar e Conteúdo */}
         <div className="flex h-full min-h-0 w-full overflow-hidden pt-16 pb-16 md:pb-0">
-          <aside className="hidden h-full min-h-0 flex-shrink-0 md:flex">
-            <Sidebar isExpanded={isSidebarExpanded} />
-          </aside>
-          <div className="hidden md:flex md:items-start md:pt-4">
+          <div className="relative hidden h-full min-h-0 flex-shrink-0 md:flex">
+            <aside className="h-full min-h-0">
+              <Sidebar isExpanded={isSidebarExpanded} />
+            </aside>
             <Button
               type="button"
               variant="ghost"
               size="icon"
               onClick={() => setIsSidebarExpanded((current) => !current)}
-              className="ml-2 h-8 w-8 rounded-full border border-skin-border bg-skin-surface text-skin-text-muted hover:bg-skin-menu-hover hover:text-skin-text"
+              className="absolute -right-3 top-1/2 z-10 h-7 w-7 -translate-y-1/2 rounded-full border border-skin-border bg-skin-surface text-skin-text-muted shadow-sm transition-colors duration-200 hover:bg-skin-surface-hover hover:text-skin-text"
               aria-label={isSidebarExpanded ? "Recolher barra lateral" : "Expandir barra lateral"}
               title={isSidebarExpanded ? "Recolher barra lateral" : "Expandir barra lateral"}
             >
               {isSidebarExpanded ? (
-                <PanelLeftClose className="h-4 w-4" />
+                <PanelLeftClose className="h-3.5 w-3.5" />
               ) : (
-                <PanelLeftOpen className="h-4 w-4" />
+                <PanelLeftOpen className="h-3.5 w-3.5" />
               )}
             </Button>
           </div>
