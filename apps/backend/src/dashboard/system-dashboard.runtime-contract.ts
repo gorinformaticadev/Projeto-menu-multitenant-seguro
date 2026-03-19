@@ -27,6 +27,7 @@ const TOP_LEVEL_KEYS = [
   'errors',
   'tenants',
   'notifications',
+  'runtimeMitigation',
   'widgets',
 ] as const;
 
@@ -143,6 +144,41 @@ export function assertRuntimeSystemDashboardContract(
         );
       }
     }
+  }
+
+  const runtimeMitigation = toRecord(payload.runtimeMitigation, 'dashboard.runtimeMitigation');
+  if (!isNonNegativeNumber(runtimeMitigation.adaptiveThrottleFactor)) {
+    throw new Error('dashboard.runtimeMitigation.adaptiveThrottleFactor is invalid');
+  }
+  if (
+    runtimeMitigation.pressureCause !== 'normal' &&
+    runtimeMitigation.pressureCause !== 'cpu' &&
+    runtimeMitigation.pressureCause !== 'gc' &&
+    runtimeMitigation.pressureCause !== 'io' &&
+    runtimeMitigation.pressureCause !== 'mixed' &&
+    runtimeMitigation.pressureCause !== 'cluster'
+  ) {
+    throw new Error('dashboard.runtimeMitigation.pressureCause is invalid');
+  }
+  if (
+    !isNonNegativeNumber(runtimeMitigation.instanceCount) ||
+    !isNonNegativeNumber(runtimeMitigation.overloadedInstances) ||
+    !isNonNegativeNumber(runtimeMitigation.clusterQueueDepth)
+  ) {
+    throw new Error('dashboard.runtimeMitigation counters are invalid');
+  }
+  if (
+    runtimeMitigation.clusterRecentApiLatencyMs !== null &&
+    !isNonNegativeNumber(runtimeMitigation.clusterRecentApiLatencyMs)
+  ) {
+    throw new Error('dashboard.runtimeMitigation.clusterRecentApiLatencyMs is invalid');
+  }
+  if (
+    typeof runtimeMitigation.degradeHeavyFeatures !== 'boolean' ||
+    typeof runtimeMitigation.disableRemoteUpdateChecks !== 'boolean' ||
+    typeof runtimeMitigation.rejectHeavyMutations !== 'boolean'
+  ) {
+    throw new Error('dashboard.runtimeMitigation flags are invalid');
   }
 }
 

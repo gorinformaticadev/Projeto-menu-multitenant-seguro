@@ -6,6 +6,7 @@ import { ModuleSecurityService } from '../core/module-security.service';
 import { SystemDashboardService } from './system-dashboard.service';
 import { ResponseTimeMetricsService } from './system-response-time-metrics.service';
 import { OperationalCircuitBreakerService } from '@common/services/operational-circuit-breaker.service';
+import { OperationalLoadSheddingService } from '@common/services/operational-load-shedding.service';
 import { RuntimePressureService } from '@common/services/runtime-pressure.service';
 import { SystemTelemetryService } from '@common/services/system-telemetry.service';
 
@@ -74,6 +75,24 @@ describe('SystemDashboardService', () => {
       overloaded: false,
     })),
   };
+  const operationalLoadSheddingServiceMock = {
+    getSnapshot: jest.fn(() => ({
+      instanceId: 'instance-a',
+      instanceCount: 1,
+      overloadedInstances: 0,
+      adaptiveThrottleFactor: 1,
+      desiredAdaptiveThrottleFactor: 1,
+      pressureCause: 'normal',
+      local: runtimePressureServiceMock.getSnapshot(),
+      clusterRecentApiLatencyMs: 42,
+      clusterQueueDepth: 0,
+      mitigation: {
+        degradeHeavyFeatures: false,
+        disableRemoteUpdateChecks: false,
+        rejectHeavyMutations: false,
+      },
+    })),
+  };
   const moduleSecurityServiceMock = {
     getAvailableModules: jest.fn(),
   };
@@ -86,6 +105,7 @@ describe('SystemDashboardService', () => {
       responseTimeMetricsServiceMock as unknown as ResponseTimeMetricsService,
       systemTelemetryServiceMock as unknown as SystemTelemetryService,
       operationalCircuitBreakerServiceMock as unknown as OperationalCircuitBreakerService,
+      operationalLoadSheddingServiceMock as unknown as OperationalLoadSheddingService,
       runtimePressureServiceMock as unknown as RuntimePressureService,
       moduleSecurityServiceMock as unknown as ModuleSecurityService,
     );
@@ -960,7 +980,6 @@ describe('SystemDashboardService', () => {
     );
   });
 });
-
 
 
 

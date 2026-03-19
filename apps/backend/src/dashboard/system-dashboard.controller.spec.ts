@@ -65,6 +65,17 @@ describe('SystemDashboardController', () => {
         },
       ],
     },
+    runtimeMitigation: {
+      adaptiveThrottleFactor: 1,
+      pressureCause: 'normal',
+      instanceCount: 1,
+      overloadedInstances: 0,
+      clusterRecentApiLatencyMs: 42,
+      clusterQueueDepth: 0,
+      degradeHeavyFeatures: false,
+      disableRemoteUpdateChecks: false,
+      rejectHeavyMutations: false,
+    },
     widgets: { available: ['version'] },
   });
 

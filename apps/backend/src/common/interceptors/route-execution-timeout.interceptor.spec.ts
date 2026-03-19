@@ -34,6 +34,33 @@ describe('RouteExecutionTimeoutInterceptor', () => {
 
     jest.useRealTimers();
   });
+
+  it('shrinks the timeout budget under distributed pressure', async () => {
+    jest.useFakeTimers();
+
+    const interceptor = new RouteExecutionTimeoutInterceptor(undefined, {
+      getSnapshot: () => ({
+        adaptiveThrottleFactor: 0.5,
+        clusterRecentApiLatencyMs: 2_000,
+      }),
+    } as any);
+
+    const pending = lastValueFrom(
+      interceptor.intercept(createExecutionContext('/api/system/dashboard'), {
+        handle: () => timer(3_100).pipe(mapTo({ ok: true })),
+      } as any),
+    );
+
+    jest.advanceTimersByTime(3_100);
+
+    await expect(pending).rejects.toMatchObject({
+      response: {
+        statusCode: 408,
+      },
+    });
+
+    jest.useRealTimers();
+  });
 });
 
 function createExecutionContext(originalUrl: string) {

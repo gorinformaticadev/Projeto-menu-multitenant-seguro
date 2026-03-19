@@ -172,7 +172,7 @@ describe('SecurityThrottlerGuard runtime enforcement', () => {
   const configService = {
     get: jest.fn(),
   };
-  const runtimePressureService = {
+  const operationalLoadSheddingService = {
     getSnapshot: jest.fn(),
   };
   const jwtSigner = new JwtService({ secret: 'jwt-secret' });
@@ -187,7 +187,7 @@ describe('SecurityThrottlerGuard runtime enforcement', () => {
       rateLimitMetricsService as any,
       systemTelemetryService as any,
       configService as any,
-      runtimePressureService as any,
+      operationalLoadSheddingService as any,
     );
 
   beforeEach(async () => {
@@ -207,7 +207,10 @@ describe('SecurityThrottlerGuard runtime enforcement', () => {
       restorePerHour: 1,
       updatePerHour: 1,
     });
-    runtimePressureService.getSnapshot.mockReturnValue({
+    operationalLoadSheddingService.getSnapshot.mockReturnValue({
+      instanceId: 'instance-a',
+      instanceCount: 1,
+      overloadedInstances: 0,
       eventLoopLagP95Ms: 10,
       eventLoopLagP99Ms: 20,
       eventLoopLagMaxMs: 25,
@@ -222,8 +225,33 @@ describe('SecurityThrottlerGuard runtime enforcement', () => {
       pressureScore: 0,
       consecutiveBreaches: 0,
       adaptiveThrottleFactor: 1,
-      cause: 'normal',
-      overloaded: false,
+      desiredAdaptiveThrottleFactor: 1,
+      pressureCause: 'normal',
+      local: {
+        eventLoopLagP95Ms: 10,
+        eventLoopLagP99Ms: 20,
+        eventLoopLagMaxMs: 25,
+        eventLoopUtilization: 0.2,
+        heapUsedRatio: 0.4,
+        recentApiLatencyMs: 150,
+        gcPauseP95Ms: 0,
+        gcPauseMaxMs: 0,
+        gcEventsRecent: 0,
+        queueDepth: 0,
+        activeIsolatedRequests: 0,
+        pressureScore: 0,
+        consecutiveBreaches: 0,
+        adaptiveThrottleFactor: 1,
+        cause: 'normal',
+        overloaded: false,
+      },
+      clusterRecentApiLatencyMs: 150,
+      clusterQueueDepth: 0,
+      mitigation: {
+        degradeHeavyFeatures: false,
+        disableRemoteUpdateChecks: false,
+        rejectHeavyMutations: false,
+      },
     });
   });
 
@@ -392,7 +420,10 @@ describe('SecurityThrottlerGuard runtime enforcement', () => {
   it('shrinks global limits adaptively under runtime pressure on protected routes', async () => {
     const guard = createGuard();
     await guard.onModuleInit();
-    runtimePressureService.getSnapshot.mockReturnValue({
+    operationalLoadSheddingService.getSnapshot.mockReturnValue({
+      instanceId: 'instance-a',
+      instanceCount: 2,
+      overloadedInstances: 1,
       eventLoopLagP95Ms: 180,
       eventLoopLagP99Ms: 320,
       eventLoopLagMaxMs: 420,
@@ -407,8 +438,33 @@ describe('SecurityThrottlerGuard runtime enforcement', () => {
       pressureScore: 2.7,
       consecutiveBreaches: 2,
       adaptiveThrottleFactor: 0.5,
-      cause: 'cpu',
-      overloaded: true,
+      desiredAdaptiveThrottleFactor: 0.45,
+      pressureCause: 'cpu',
+      local: {
+        eventLoopLagP95Ms: 180,
+        eventLoopLagP99Ms: 320,
+        eventLoopLagMaxMs: 420,
+        eventLoopUtilization: 0.96,
+        heapUsedRatio: 0.9,
+        recentApiLatencyMs: 1900,
+        gcPauseP95Ms: 140,
+        gcPauseMaxMs: 280,
+        gcEventsRecent: 4,
+        queueDepth: 4,
+        activeIsolatedRequests: 2,
+        pressureScore: 2.7,
+        consecutiveBreaches: 2,
+        adaptiveThrottleFactor: 0.5,
+        cause: 'cpu',
+        overloaded: true,
+      },
+      clusterRecentApiLatencyMs: 1900,
+      clusterQueueDepth: 4,
+      mitigation: {
+        degradeHeavyFeatures: true,
+        disableRemoteUpdateChecks: true,
+        rejectHeavyMutations: false,
+      },
     });
 
     const first = createHttpContext('/api/system/dashboard', { ip: '10.0.0.70' });

@@ -7,6 +7,7 @@ const isoDateTimeSchema = z.string().datetime();
 const nonEmptyTrimmedString = z.string().trim().min(1);
 const nonNegativeIntegerSchema = z.number().int().min(0);
 const boundedNumberSchema = z.number().finite();
+const nonNegativeNumberSchema = z.number().min(0).finite();
 
 export const DASHBOARD_LAYOUT_MAX_WIDGETS_PER_BREAKPOINT = 48;
 export const DASHBOARD_MAX_HIDDEN_WIDGET_IDS = 64;
@@ -649,6 +650,20 @@ const notificationsMetricSchemaV2 = z.union([
   metricFallbackSchema,
 ]);
 
+const runtimeMitigationMetricSchema = z
+  .object({
+    adaptiveThrottleFactor: z.number().min(0.35).max(1),
+    pressureCause: z.enum(["normal", "cpu", "gc", "io", "mixed", "cluster"]),
+    instanceCount: nonNegativeIntegerSchema,
+    overloadedInstances: nonNegativeIntegerSchema,
+    clusterRecentApiLatencyMs: nonNegativeNumberSchema.nullable(),
+    clusterQueueDepth: nonNegativeIntegerSchema,
+    degradeHeavyFeatures: z.boolean(),
+    disableRemoteUpdateChecks: z.boolean(),
+    rejectHeavyMutations: z.boolean(),
+  })
+  .strict();
+
 const systemDashboardBaseResponseShape = {
   generatedAt: isoDateTimeSchema,
   responseTimeMs: nonNegativeIntegerSchema,
@@ -677,6 +692,7 @@ const systemDashboardBaseResponseShape = {
   jobs: jobsMetricSchema,
   errors: recentErrorsMetricSchema,
   tenants: tenantsMetricSchema,
+  runtimeMitigation: runtimeMitigationMetricSchema,
   widgets: z
     .object({
       available: z.array(nonEmptyTrimmedString).max(DASHBOARD_MAX_WIDGET_IDS),

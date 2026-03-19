@@ -1322,6 +1322,11 @@ export function OperationalDashboard({
     [appliedFilters.periodMinutes, appliedFilters.severity, appliedFilters.tenantId],
   );
   const staleSnapshotActive = staleSnapshotAt !== null;
+  const runtimeMitigation = dashboard?.runtimeMitigation;
+  const runtimeMitigationMessage =
+    runtimeMitigation && runtimeMitigation.degradeHeavyFeatures
+      ? `Mitigacao automatica ativa em ${runtimeMitigation.overloadedInstances}/${runtimeMitigation.instanceCount} instancia(s). Fator adaptativo ${runtimeMitigation.adaptiveThrottleFactor.toFixed(2)} por causa ${runtimeMitigation.pressureCause}.`
+      : null;
 
   const hasPendingLayoutChanges = useMemo(() => {
     if (!layoutEditingActive) {
@@ -3253,6 +3258,19 @@ export function OperationalDashboard({
             <div className="min-w-0">
               <p className="text-sm font-semibold">Modo degradado de contrato</p>
               <p className="text-xs text-skin-warning/90">{contractDegradationMessage}</p>
+            </div>
+          </div>
+        ) : null}
+
+        {runtimeMitigationMessage ? (
+          <div className="flex items-start gap-3 rounded-2xl border border-skin-warning/30 bg-skin-warning/10 px-4 py-3 text-skin-warning">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">Mitigacao automatica do cluster</p>
+              <p className="text-xs text-skin-warning/90">{runtimeMitigationMessage}</p>
+              <p className="mt-1 text-xs text-skin-warning/80">
+                Algumas metricas caras foram reduzidas automaticamente para preservar estabilidade e latencia.
+              </p>
             </div>
           </div>
         ) : null}

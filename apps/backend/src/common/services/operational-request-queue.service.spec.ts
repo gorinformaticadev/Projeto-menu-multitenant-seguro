@@ -1,5 +1,6 @@
 import { HttpException } from '@nestjs/common';
 import type { RouteRuntimeProtectionPolicy } from '@contracts/api-routes';
+import { DistributedOperationalStateService } from './distributed-operational-state.service';
 import { OperationalRequestQueueService } from './operational-request-queue.service';
 
 function createDeferred<T>() {
@@ -17,10 +18,28 @@ function createDeferred<T>() {
   };
 }
 
+async function waitForCondition(
+  predicate: () => boolean,
+  timeoutMs = 1_500,
+  intervalMs = 10,
+) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (predicate()) {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+
+  throw new Error('Timed out while waiting for distributed queue condition');
+}
+
 describe('OperationalRequestQueueService', () => {
   const operationalObservabilityServiceMock = {
     record: jest.fn(),
   };
+  const createdServices: OperationalRequestQueueService[] = [];
 
   const runtimePolicy: RouteRuntimeProtectionPolicy = {
     shedOnCpuPressure: true,
@@ -33,21 +52,31 @@ describe('OperationalRequestQueueService', () => {
     maxQueueWaitMs: 2_000,
   };
 
-  const createService = () =>
-    new OperationalRequestQueueService(operationalObservabilityServiceMock as any);
+  const createService = () => {
+    const service = new OperationalRequestQueueService(
+      operationalObservabilityServiceMock as any,
+      new DistributedOperationalStateService(),
+    );
+    createdServices.push(service);
+    return service;
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useRealTimers();
+    DistributedOperationalStateService.resetForTests();
   });
 
   afterEach(() => {
+    createdServices.splice(0).forEach((service) => service.onModuleDestroy());
     jest.useRealTimers();
+    DistributedOperationalStateService.resetForTests();
   });
 
   it('serializes heavy requests behind a single execution slot', async () => {
     const service = createService();
     const firstGate = createDeferred<void>();
+    const firstStarted = createDeferred<void>();
     const executionOrder: string[] = [];
 
     const first = service.run(
@@ -58,6 +87,7 @@ describe('OperationalRequestQueueService', () => {
       },
       async () => {
         executionOrder.push('first:start');
+        firstStarted.resolve();
         await firstGate.promise;
         executionOrder.push('first:end');
         return 'first';
@@ -77,7 +107,13 @@ describe('OperationalRequestQueueService', () => {
       },
     );
 
-    await Promise.resolve();
+    await firstStarted.promise;
+    await waitForCondition(
+      () =>
+        operationalObservabilityServiceMock.record.mock.calls.filter(
+          ([event]) => event?.type === 'request_queued',
+        ).length >= 1,
+    );
     expect(executionOrder).toEqual(['first:start']);
 
     firstGate.resolve();
@@ -191,6 +227,7 @@ describe('OperationalRequestQueueService', () => {
   it('alternates partitions fairly so one tenant does not starve another', async () => {
     const service = createService();
     const firstGate = createDeferred<void>();
+    const firstStarted = createDeferred<void>();
     const executionOrder: string[] = [];
     const fairRuntimePolicy: RouteRuntimeProtectionPolicy = {
       ...runtimePolicy,
@@ -212,6 +249,7 @@ describe('OperationalRequestQueueService', () => {
       },
       async () => {
         executionOrder.push('tenant-a:first:start');
+        firstStarted.resolve();
         await firstGate.promise;
         executionOrder.push('tenant-a:first:end');
         return 'tenant-a:first';
@@ -256,7 +294,13 @@ describe('OperationalRequestQueueService', () => {
       },
     );
 
-    await Promise.resolve();
+    await firstStarted.promise;
+    await waitForCondition(
+      () =>
+        operationalObservabilityServiceMock.record.mock.calls.filter(
+          ([event]) => event?.type === 'request_queued',
+        ).length >= 2,
+    );
     expect(executionOrder).toEqual(['tenant-a:first:start']);
 
     firstGate.resolve();
@@ -344,5 +388,100 @@ describe('OperationalRequestQueueService', () => {
     firstGate.resolve();
     await expect(first).resolves.toBe('first');
     await expect(second).resolves.toBe('second');
+  });
+
+  it('shares fairness globally across service instances so one tenant does not starve another', async () => {
+    const serviceA = createService();
+    const serviceB = createService();
+    const firstGate = createDeferred<void>();
+    const firstStarted = createDeferred<void>();
+    const executionOrder: string[] = [];
+    const fairRuntimePolicy: RouteRuntimeProtectionPolicy = {
+      ...runtimePolicy,
+      maxQueueDepth: 4,
+      maxQueueDepthPerPartition: 2,
+    };
+
+    const first = serviceA.run(
+      {
+        routePolicyId: 'cron-system-settings',
+        route: '/api/cron/run',
+        runtime: fairRuntimePolicy,
+        request: {
+          user: {
+            id: 'user-a-1',
+            tenantId: 'tenant-a',
+          },
+        },
+      },
+      async () => {
+        executionOrder.push('tenant-a:first:start');
+        firstStarted.resolve();
+        await firstGate.promise;
+        executionOrder.push('tenant-a:first:end');
+        return 'tenant-a:first';
+      },
+    );
+
+    const secondTenantA = serviceA.run(
+      {
+        routePolicyId: 'cron-system-settings',
+        route: '/api/cron/run',
+        runtime: fairRuntimePolicy,
+        request: {
+          user: {
+            id: 'user-a-2',
+            tenantId: 'tenant-a',
+          },
+        },
+      },
+      async () => {
+        executionOrder.push('tenant-a:second:start');
+        executionOrder.push('tenant-a:second:end');
+        return 'tenant-a:second';
+      },
+    );
+
+    const firstTenantB = serviceB.run(
+      {
+        routePolicyId: 'cron-system-settings',
+        route: '/api/cron/run',
+        runtime: fairRuntimePolicy,
+        request: {
+          user: {
+            id: 'user-b-1',
+            tenantId: 'tenant-b',
+          },
+        },
+      },
+      async () => {
+        executionOrder.push('tenant-b:first:start');
+        executionOrder.push('tenant-b:first:end');
+        return 'tenant-b:first';
+      },
+    );
+
+    await firstStarted.promise;
+    await waitForCondition(
+      () =>
+        operationalObservabilityServiceMock.record.mock.calls.filter(
+          ([event]) => event?.type === 'request_queued',
+        ).length >= 2,
+    );
+    expect(executionOrder).toEqual(['tenant-a:first:start']);
+
+    firstGate.resolve();
+
+    await expect(first).resolves.toBe('tenant-a:first');
+    await expect(firstTenantB).resolves.toBe('tenant-b:first');
+    await expect(secondTenantA).resolves.toBe('tenant-a:second');
+    expect(executionOrder).toEqual([
+      'tenant-a:first:start',
+      'tenant-a:first:end',
+      'tenant-b:first:start',
+      'tenant-b:first:end',
+      'tenant-a:second:start',
+      'tenant-a:second:end',
+    ]);
   });
 });

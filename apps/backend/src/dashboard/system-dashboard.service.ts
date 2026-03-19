@@ -19,6 +19,7 @@ import {
   CircuitBreakerOpenError,
   OperationalCircuitBreakerService,
 } from '@common/services/operational-circuit-breaker.service';
+import { OperationalLoadSheddingService } from '@common/services/operational-load-shedding.service';
 import { RuntimePressureService } from '@common/services/runtime-pressure.service';
 import { ModuleSecurityService } from '../core/module-security.service';
 import { registerCoreModule } from '../core/shared/modules/core-module';
@@ -42,7 +43,7 @@ export interface DashboardFiltersInput {
 
 export type DashboardLayoutInput = UpdateSystemDashboardLayoutBody;
 
-interface DashboardMetricFallback {
+interface DashboardMetricFallback extends Record<string, unknown> {
   status: 'error' | 'degraded' | 'unavailable';
   error: string;
 }
@@ -232,6 +233,7 @@ export class SystemDashboardService {
     private readonly responseTimeMetricsService: ResponseTimeMetricsService,
     private readonly systemTelemetryService: SystemTelemetryService,
     private readonly operationalCircuitBreakerService: OperationalCircuitBreakerService,
+    private readonly operationalLoadSheddingService: OperationalLoadSheddingService,
     private readonly runtimePressureService: RuntimePressureService,
     private readonly moduleSecurityService: ModuleSecurityService,
   ) {}
@@ -247,6 +249,7 @@ export class SystemDashboardService {
     const windowStart = new Date(now.getTime() - filters.periodMinutes * 60 * 1000);
     const tenantFilter = this.resolveTenantFilter(actor, filters.tenantId);
     const apiHistoryWindowMs = this.resolveApiHistoryWindowMs(filters.periodMinutes);
+    const loadShedding = this.operationalLoadSheddingService.getSnapshot();
 
     const version = await this.safeMetric(
       'version',
@@ -278,10 +281,15 @@ export class SystemDashboardService {
     );
     const database = await this.safeMetric(
       'database',
-      async () => this.getDatabaseMetric(),
+      async () =>
+        loadShedding.mitigation.degradeHeavyFeatures
+          ? this.buildAutoMitigatedMetric(
+              'Dependencia de banco degradada preventivamente sob pressao distribuida.',
+            )
+          : this.getDatabaseMetric(),
       {
         fallbackStatus: 'error',
-        circuitKey: 'system-dashboard:database',
+        circuitKey: 'dependency:database',
         circuitFailureThreshold: 3,
         circuitResetTimeoutMs: 30_000,
         circuitHalfOpenMaxProbes: 2,
@@ -291,12 +299,17 @@ export class SystemDashboardService {
     );
     const redis = await this.safeMetric(
       'redis',
-      async () => this.getRedisMetric(),
+      async () =>
+        loadShedding.mitigation.degradeHeavyFeatures
+          ? this.buildAutoMitigatedMetric(
+              'Dependencia Redis mitigada automaticamente sob pressao distribuida.',
+            )
+          : this.getRedisMetric(),
       {
         cacheKey: 'redis',
         cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.redis,
         fallbackStatus: 'error',
-        circuitKey: 'system-dashboard:redis',
+        circuitKey: 'dependency:redis',
         circuitFailureThreshold: 2,
         circuitResetTimeoutMs: 30_000,
         circuitHalfOpenMaxProbes: 1,
@@ -306,7 +319,12 @@ export class SystemDashboardService {
     );
     const workers = await this.safeMetric(
       'workers',
-      async () => this.getWorkersMetric(),
+      async () =>
+        loadShedding.mitigation.degradeHeavyFeatures
+          ? this.buildAutoMitigatedMetric(
+              'Metricas de workers reduzidas automaticamente para preservar o cluster.',
+            )
+          : this.getWorkersMetric(),
       {
         cacheKey: 'workers',
         cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.workers,
@@ -329,7 +347,12 @@ export class SystemDashboardService {
     );
     const security = await this.safeMetric(
       'security',
-      async () => this.getSecurityMetric(windowStart, tenantFilter),
+      async () =>
+        loadShedding.mitigation.degradeHeavyFeatures
+          ? this.buildAutoMitigatedMetric(
+              'Metricas de seguranca agregadas temporariamente reduzidas para estabilidade.',
+            )
+          : this.getSecurityMetric(windowStart, tenantFilter),
       {
         cacheKey: `security:${filters.periodMinutes}:${tenantFilter || 'all'}`,
         cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.security,
@@ -338,7 +361,12 @@ export class SystemDashboardService {
     );
     const backup = await this.safeMetric(
       'backup',
-      async () => this.getBackupMetric(tenantFilter),
+      async () =>
+        loadShedding.mitigation.degradeHeavyFeatures
+          ? this.buildAutoMitigatedMetric(
+              'Metricas de backup mitigadas automaticamente sob pressao operacional.',
+            )
+          : this.getBackupMetric(tenantFilter),
       {
         cacheKey: `backup:${tenantFilter || 'all'}`,
         cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.backup,
@@ -347,7 +375,12 @@ export class SystemDashboardService {
     );
     const jobs = await this.safeMetric(
       'jobs',
-      async () => this.getJobsMetric(),
+      async () =>
+        loadShedding.mitigation.degradeHeavyFeatures
+          ? this.buildAutoMitigatedMetric(
+              'Metricas de jobs reduzidas automaticamente para evitar efeito cascata.',
+            )
+          : this.getJobsMetric(),
       {
         cacheKey: 'jobs',
         cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.jobs,
@@ -356,7 +389,12 @@ export class SystemDashboardService {
     );
     const errors = await this.safeMetric(
       'errors',
-      async () => this.getRecentCriticalErrorsMetric(windowStart, tenantFilter, filters.severity),
+      async () =>
+        loadShedding.mitigation.degradeHeavyFeatures
+          ? this.buildAutoMitigatedMetric(
+              'Agregacao de erros recentes mitigada automaticamente sob latencia elevada.',
+            )
+          : this.getRecentCriticalErrorsMetric(windowStart, tenantFilter, filters.severity),
       {
         cacheKey: `errors:${filters.periodMinutes}:${tenantFilter || 'all'}:${filters.severity}`,
         cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.errors,
@@ -365,7 +403,12 @@ export class SystemDashboardService {
     );
     const tenants = await this.safeMetric(
       'tenants',
-      async () => this.getTenantsMetric(),
+      async () =>
+        loadShedding.mitigation.degradeHeavyFeatures
+          ? this.buildAutoMitigatedMetric(
+              'Metricas de tenants mitigadas automaticamente para preservar throughput.',
+            )
+          : this.getTenantsMetric(),
     );
     const notifications = await this.safeMetric(
       'notifications',
@@ -399,6 +442,17 @@ export class SystemDashboardService {
       errors,
       tenants,
       notifications,
+      runtimeMitigation: {
+        adaptiveThrottleFactor: loadShedding.adaptiveThrottleFactor,
+        pressureCause: loadShedding.pressureCause,
+        instanceCount: loadShedding.instanceCount,
+        overloadedInstances: loadShedding.overloadedInstances,
+        clusterRecentApiLatencyMs: loadShedding.clusterRecentApiLatencyMs,
+        clusterQueueDepth: loadShedding.clusterQueueDepth,
+        degradeHeavyFeatures: loadShedding.mitigation.degradeHeavyFeatures,
+        disableRemoteUpdateChecks: loadShedding.mitigation.disableRemoteUpdateChecks,
+        rejectHeavyMutations: loadShedding.mitigation.rejectHeavyMutations,
+      },
       widgets: {
         available: this.getOperationalWidgetIds(actor.role),
       },
@@ -691,6 +745,13 @@ export class SystemDashboardService {
       activeWorkers: runningJobs,
       runningJobs,
       pendingJobs,
+    };
+  }
+
+  private buildAutoMitigatedMetric(message: string): DashboardMetricFallback {
+    return {
+      status: 'degraded',
+      error: message,
     };
   }
 
@@ -2120,4 +2181,3 @@ export class SystemDashboardService {
     return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3)}...` : normalized;
   }
 }
-

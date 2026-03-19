@@ -2,6 +2,7 @@ import {
   CircuitBreakerOpenError,
   OperationalCircuitBreakerService,
 } from './operational-circuit-breaker.service';
+import { DistributedOperationalStateService } from './distributed-operational-state.service';
 
 function createDeferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -20,15 +21,20 @@ describe('OperationalCircuitBreakerService', () => {
   };
 
   const createService = () =>
-    new OperationalCircuitBreakerService(operationalObservabilityServiceMock as any);
+    new OperationalCircuitBreakerService(
+      operationalObservabilityServiceMock as any,
+      new DistributedOperationalStateService(),
+    );
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers().setSystemTime(new Date('2026-03-19T12:00:00.000Z'));
+    DistributedOperationalStateService.resetForTests();
   });
 
   afterEach(() => {
     jest.useRealTimers();
+    DistributedOperationalStateService.resetForTests();
   });
 
   it('opens after the failure threshold and rejects until the cooldown elapses', async () => {
@@ -82,6 +88,7 @@ describe('OperationalCircuitBreakerService', () => {
       await secondGate.promise;
       return 'probe-2';
     });
+    await jest.advanceTimersByTimeAsync(25);
     await expect(service.execute(options, async () => 'probe-3')).rejects.toBeInstanceOf(
       CircuitBreakerOpenError,
     );
@@ -94,6 +101,7 @@ describe('OperationalCircuitBreakerService', () => {
     });
 
     secondGate.resolve();
+    await jest.advanceTimersByTimeAsync(25);
     await expect(secondProbe).resolves.toBe('probe-2');
     expect(service.getSnapshot(options.key)).toMatchObject({
       mode: 'closed',
@@ -144,5 +152,33 @@ describe('OperationalCircuitBreakerService', () => {
     });
 
     randomSpy.mockRestore();
+  });
+
+  it('shares breaker state across service instances for the same dependency key', async () => {
+    const serviceA = createService();
+    const serviceB = createService();
+    const options = {
+      key: 'dependency:redis',
+      route: '/api/system/dashboard',
+      failureThreshold: 2,
+      resetTimeoutMs: 10_000,
+      jitterRatio: 0,
+    };
+
+    await expect(serviceA.execute(options, async () => Promise.reject(new Error('boom-1')))).rejects.toThrow(
+      'boom-1',
+    );
+    await expect(serviceA.execute(options, async () => Promise.reject(new Error('boom-2')))).rejects.toThrow(
+      'boom-2',
+    );
+
+    await expect(serviceB.execute(options, async () => 'ok')).rejects.toBeInstanceOf(
+      CircuitBreakerOpenError,
+    );
+    expect(serviceB.getSnapshot(options.key)).toMatchObject({
+      mode: 'open',
+      failures: 2,
+      openCount: 1,
+    });
   });
 });

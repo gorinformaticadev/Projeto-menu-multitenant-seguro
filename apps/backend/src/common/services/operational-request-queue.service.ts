@@ -1,5 +1,7 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, OnModuleDestroy } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import type { FairQueueScope, RouteRuntimeProtectionPolicy } from '@contracts/api-routes';
+import { DistributedOperationalStateService } from './distributed-operational-state.service';
 import { OperationalObservabilityService } from './operational-observability.service';
 
 type QueueOptions = {
@@ -16,22 +18,19 @@ type QueuePartitionIdentity = {
   clientIp: string | null;
 };
 
-type QueueWaiter = {
+type SharedQueueWaiter = {
+  id: string;
   enqueuedAt: number;
-  maxQueueWaitMs: number;
-  grant: (release: () => void) => void;
-  reject: (error: unknown) => void;
-  request?: Record<string, any>;
+  expiresAt: number;
   route: string;
   routePolicyId: string;
   partitionKey: string;
   tenantId: string | null;
   userId: string | null;
   clientIp: string | null;
-  timeout: NodeJS.Timeout | null;
 };
 
-type QueuePartitionState = {
+type SharedQueuePartitionState = {
   key: string;
   tenantId: string | null;
   userId: string | null;
@@ -39,12 +38,12 @@ type QueuePartitionState = {
   active: number;
   grantedCount: number;
   lastGrantedAt: number | null;
-  queue: QueueWaiter[];
+  queue: SharedQueueWaiter[];
 };
 
-type QueueState = {
+type SharedQueueState = {
   active: number;
-  partitions: Map<string, QueuePartitionState>;
+  partitions: Record<string, SharedQueuePartitionState>;
   maxConcurrentRequests: number;
   maxConcurrentPerPartition: number;
   maxQueueDepth: number;
@@ -62,13 +61,57 @@ export type OperationalRequestQueueSnapshot = {
   }>;
 };
 
+type AcquireQueueResult =
+  | { status: 'granted'; partitionKey: string }
+  | {
+      status: 'queued';
+      partitionKey: string;
+      routeQueueDepth: number;
+      partitionQueueDepth: number;
+    }
+  | {
+      status: 'rejected';
+      partitionKey: string;
+      routeQueueDepth: number;
+      partitionQueueDepth: number;
+      maxQueueDepth: number;
+      maxQueueDepthPerPartition: number;
+    };
+
+type GrantWaiterResult =
+  | { status: 'granted'; partitionKey: string }
+  | { status: 'waiting' }
+  | { status: 'missing' };
+
+const DISTRIBUTED_QUEUE_ROUTES_KEY = 'operational-request-queue:routes';
+const DISTRIBUTED_QUEUE_STATE_PREFIX = 'operational-request-queue:state:';
+const DISTRIBUTED_QUEUE_STATE_TTL_MS = 5 * 60 * 1000;
+const DISTRIBUTED_QUEUE_POLL_MS = 125;
+const DISTRIBUTED_QUEUE_SNAPSHOT_REFRESH_MS = 1_000;
+
 @Injectable()
-export class OperationalRequestQueueService {
-  private readonly queues = new Map<string, QueueState>();
+export class OperationalRequestQueueService implements OnModuleDestroy {
+  private latestSnapshot: OperationalRequestQueueSnapshot = {
+    totalActive: 0,
+    totalQueued: 0,
+    routes: [],
+  };
+  private readonly snapshotRefreshTimer: NodeJS.Timeout;
 
   constructor(
     private readonly operationalObservabilityService: OperationalObservabilityService,
-  ) {}
+    private readonly distributedOperationalStateService: DistributedOperationalStateService,
+  ) {
+    this.snapshotRefreshTimer = setInterval(() => {
+      void this.refreshSnapshot();
+    }, DISTRIBUTED_QUEUE_SNAPSHOT_REFRESH_MS);
+    this.snapshotRefreshTimer.unref?.();
+    void this.refreshSnapshot();
+  }
+
+  onModuleDestroy(): void {
+    clearInterval(this.snapshotRefreshTimer);
+  }
 
   async run<T>(options: QueueOptions, action: () => Promise<T>): Promise<T> {
     if (!options.runtime.queueIsolationRequired) {
@@ -79,75 +122,129 @@ export class OperationalRequestQueueService {
     try {
       return await action();
     } finally {
-      release();
+      await release();
     }
   }
 
   getSnapshot(): OperationalRequestQueueSnapshot {
-    const routes = [...this.queues.entries()]
-      .map(([routePolicyId, state]) => ({
-        routePolicyId,
-        active: state.active,
-        queued: this.getTotalQueued(state),
-        partitions: [...state.partitions.values()].filter(
-          (partition) => partition.active > 0 || partition.queue.length > 0,
-        ).length,
-      }))
-      .filter((entry) => entry.active > 0 || entry.queued > 0)
-      .sort((left, right) => right.queued - left.queued || right.active - left.active);
-
     return {
-      totalActive: routes.reduce((sum, route) => sum + route.active, 0),
-      totalQueued: routes.reduce((sum, route) => sum + route.queued, 0),
-      routes: routes.slice(0, 10),
+      totalActive: this.latestSnapshot.totalActive,
+      totalQueued: this.latestSnapshot.totalQueued,
+      routes: this.latestSnapshot.routes.map((entry) => ({ ...entry })),
     };
   }
 
-  private acquire(options: QueueOptions): Promise<() => void> {
-    const state = this.getQueueState(options.routePolicyId);
-    this.applyRuntimeLimits(state, options.runtime);
-
+  private async acquire(options: QueueOptions): Promise<() => Promise<void>> {
+    const stateKey = this.getStateKey(options.routePolicyId);
     const identity = this.resolvePartitionIdentity(
       options.request,
       options.runtime.fairQueueScope,
     );
-    const partition = this.getPartitionState(state, identity);
+    const maxQueueWaitMs = Math.max(1_000, options.runtime.maxQueueWaitMs || 15_000);
+    const waiter: SharedQueueWaiter = {
+      id: randomUUID(),
+      enqueuedAt: Date.now(),
+      expiresAt: Date.now() + maxQueueWaitMs,
+      route: options.route,
+      routePolicyId: options.routePolicyId,
+      partitionKey: identity.partitionKey,
+      tenantId: identity.tenantId,
+      userId: identity.userId,
+      clientIp: identity.clientIp,
+    };
 
-    const routeQueuedDepth = this.getTotalQueued(state);
-    const shouldGrantImmediately =
-      routeQueuedDepth === 0 &&
-      state.active < state.maxConcurrentRequests &&
-      partition.active < state.maxConcurrentPerPartition;
+    const acquireResult = await this.distributedOperationalStateService.mutateJson<
+      SharedQueueState,
+      AcquireQueueResult
+    >(
+      stateKey,
+      {
+        seed: this.createEmptyQueueState(),
+        ttlMs: DISTRIBUTED_QUEUE_STATE_TTL_MS,
+      },
+      (state) => {
+        const now = Date.now();
+        this.applyRuntimeLimits(state, options.runtime);
+        this.pruneExpiredWaiters(state, now);
+        const partition = this.getOrCreatePartitionState(state, identity);
+        const routeQueuedDepth = this.getTotalQueued(state);
+        const shouldGrantImmediately =
+          routeQueuedDepth === 0 &&
+          state.active < state.maxConcurrentRequests &&
+          partition.active < state.maxConcurrentPerPartition;
 
-    if (shouldGrantImmediately) {
-      state.active += 1;
-      partition.active += 1;
-      partition.grantedCount += 1;
-      partition.lastGrantedAt = Date.now();
-      return Promise.resolve(this.createRelease(options.routePolicyId, partition.key));
+        if (shouldGrantImmediately) {
+          state.active += 1;
+          partition.active += 1;
+          partition.grantedCount += 1;
+          partition.lastGrantedAt = now;
+          return {
+            next: this.normalizeQueueState(state),
+            result: {
+              status: 'granted',
+              partitionKey: partition.key,
+            },
+          };
+        }
+
+        if (
+          routeQueuedDepth >= state.maxQueueDepth ||
+          partition.queue.length >= state.maxQueueDepthPerPartition
+        ) {
+          return {
+            next: this.normalizeQueueState(state),
+            result: {
+              status: 'rejected',
+              partitionKey: partition.key,
+              routeQueueDepth: routeQueuedDepth,
+              partitionQueueDepth: partition.queue.length,
+              maxQueueDepth: state.maxQueueDepth,
+              maxQueueDepthPerPartition: state.maxQueueDepthPerPartition,
+            },
+          };
+        }
+
+        if (!partition.queue.some((entry) => entry.id === waiter.id)) {
+          partition.queue.push(waiter);
+        }
+
+        return {
+          next: this.normalizeQueueState(state),
+          result: {
+            status: 'queued',
+            partitionKey: partition.key,
+            routeQueueDepth: this.getTotalQueued(state),
+            partitionQueueDepth: partition.queue.length,
+          },
+        };
+      },
+    );
+
+    await this.trackRouteState(options.routePolicyId);
+
+    if (acquireResult.status === 'granted') {
+      void this.refreshSnapshot();
+      return this.createRelease(options.routePolicyId, acquireResult.partitionKey);
     }
 
-    if (
-      routeQueuedDepth >= state.maxQueueDepth ||
-      partition.queue.length >= state.maxQueueDepthPerPartition
-    ) {
+    if (acquireResult.status === 'rejected') {
       this.operationalObservabilityService.record({
         type: 'request_queue_rejected',
         route: options.route,
         request: options.request,
         statusCode: HttpStatus.TOO_MANY_REQUESTS,
         severity: 'warn',
-        detail: `queue full route=${options.routePolicyId} partition=${partition.key} routeDepth=${routeQueuedDepth} partitionDepth=${partition.queue.length}`,
+        detail: `queue full route=${options.routePolicyId} partition=${acquireResult.partitionKey} routeDepth=${acquireResult.routeQueueDepth} partitionDepth=${acquireResult.partitionQueueDepth}`,
         extra: {
           routeId: options.routePolicyId,
-          partitionKey: partition.key,
-          routeQueueDepth: routeQueuedDepth,
-          partitionQueueDepth: partition.queue.length,
-          maxQueueDepth: state.maxQueueDepth,
-          maxQueueDepthPerPartition: state.maxQueueDepthPerPartition,
-          active: state.active,
-          tenantId: partition.tenantId,
-          userId: partition.userId,
+          partitionKey: acquireResult.partitionKey,
+          routeQueueDepth: acquireResult.routeQueueDepth,
+          partitionQueueDepth: acquireResult.partitionQueueDepth,
+          maxQueueDepth: acquireResult.maxQueueDepth,
+          maxQueueDepthPerPartition: acquireResult.maxQueueDepthPerPartition,
+          tenantId: waiter.tenantId,
+          userId: waiter.userId,
+          distributed: this.distributedOperationalStateService.isDistributedReady(),
         },
       });
       throw new HttpException(
@@ -157,143 +254,383 @@ export class OperationalRequestQueueService {
           message:
             'A fila desta operacao pesada atingiu o limite de isolamento para a particao atual. Tente novamente em instantes.',
           routePolicyId: options.routePolicyId,
-          partitionKey: partition.key,
-          routeQueueDepth: routeQueuedDepth,
-          partitionQueueDepth: partition.queue.length,
-          maxQueueDepth: state.maxQueueDepth,
-          maxQueueDepthPerPartition: state.maxQueueDepthPerPartition,
+          partitionKey: acquireResult.partitionKey,
+          routeQueueDepth: acquireResult.routeQueueDepth,
+          partitionQueueDepth: acquireResult.partitionQueueDepth,
+          maxQueueDepth: acquireResult.maxQueueDepth,
+          maxQueueDepthPerPartition: acquireResult.maxQueueDepthPerPartition,
         },
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
 
-    return new Promise((resolve, reject) => {
-      const waiter: QueueWaiter = {
-        enqueuedAt: Date.now(),
-        maxQueueWaitMs: Math.max(1_000, options.runtime.maxQueueWaitMs || 15_000),
-        grant: resolve,
-        reject,
-        request: options.request,
-        route: options.route,
-        routePolicyId: options.routePolicyId,
-        partitionKey: partition.key,
-        tenantId: partition.tenantId,
-        userId: partition.userId,
-        clientIp: partition.clientIp,
-        timeout: null,
-      };
-
-      waiter.timeout = setTimeout(() => {
-        const queueState = this.getQueueState(options.routePolicyId);
-        const queuePartition = queueState.partitions.get(waiter.partitionKey);
-        if (queuePartition) {
-          queuePartition.queue = queuePartition.queue.filter((entry) => entry !== waiter);
-          this.cleanupPartitionIfIdle(queueState, queuePartition.key);
-        }
-        this.cleanupQueueIfIdle(options.routePolicyId, queueState);
-        this.operationalObservabilityService.record({
-          type: 'request_queue_timeout',
-          route: options.route,
-          request: options.request,
-          statusCode: HttpStatus.SERVICE_UNAVAILABLE,
-          severity: 'warn',
-          detail: `queue wait timeout route=${options.routePolicyId} partition=${waiter.partitionKey} waitMs=${waiter.maxQueueWaitMs}`,
-          extra: {
-            routeId: options.routePolicyId,
-            partitionKey: waiter.partitionKey,
-            maxQueueWaitMs: waiter.maxQueueWaitMs,
-            tenantId: waiter.tenantId,
-            userId: waiter.userId,
-          },
-        });
-        reject(
-          new HttpException(
-            {
-              statusCode: HttpStatus.SERVICE_UNAVAILABLE,
-              code: 'REQUEST_QUEUE_TIMEOUT',
-              message:
-                'A operacao aguardou tempo demais na fila de isolamento. O backend preservou a estabilidade e recusou a execucao tardia.',
-              routePolicyId: options.routePolicyId,
-              partitionKey: waiter.partitionKey,
-              maxQueueWaitMs: waiter.maxQueueWaitMs,
-            },
-            HttpStatus.SERVICE_UNAVAILABLE,
-          ),
-        );
-      }, waiter.maxQueueWaitMs);
-
-      partition.queue.push(waiter);
-      this.operationalObservabilityService.record({
-        type: 'request_queued',
-        route: options.route,
-        request: options.request,
-        severity: 'log',
-        detail: `queued route=${options.routePolicyId} partition=${partition.key} routeDepth=${this.getTotalQueued(state)} partitionDepth=${partition.queue.length}`,
-        extra: {
-          routeId: options.routePolicyId,
-          partitionKey: partition.key,
-          routeQueueDepth: this.getTotalQueued(state),
-          partitionQueueDepth: partition.queue.length,
-          maxQueueDepth: state.maxQueueDepth,
-          maxQueueDepthPerPartition: state.maxQueueDepthPerPartition,
-          active: state.active,
-          tenantId: partition.tenantId,
-          userId: partition.userId,
-        },
-      });
-      this.flushQueue(options.routePolicyId, state);
+    this.operationalObservabilityService.record({
+      type: 'request_queued',
+      route: options.route,
+      request: options.request,
+      severity: 'log',
+      detail: `queued route=${options.routePolicyId} partition=${acquireResult.partitionKey} routeDepth=${acquireResult.routeQueueDepth} partitionDepth=${acquireResult.partitionQueueDepth}`,
+      extra: {
+        routeId: options.routePolicyId,
+        partitionKey: acquireResult.partitionKey,
+        routeQueueDepth: acquireResult.routeQueueDepth,
+        partitionQueueDepth: acquireResult.partitionQueueDepth,
+        maxQueueDepth: options.runtime.maxQueueDepth,
+        maxQueueDepthPerPartition: options.runtime.maxQueueDepthPerPartition,
+        tenantId: waiter.tenantId,
+        userId: waiter.userId,
+        distributed: this.distributedOperationalStateService.isDistributedReady(),
+      },
     });
+    void this.refreshSnapshot();
+
+    const deadline = Date.now() + maxQueueWaitMs;
+    while (Date.now() < deadline) {
+      const grantResult = await this.distributedOperationalStateService.mutateJson<
+        SharedQueueState,
+        GrantWaiterResult
+      >(
+        stateKey,
+        {
+          seed: this.createEmptyQueueState(),
+          ttlMs: DISTRIBUTED_QUEUE_STATE_TTL_MS,
+        },
+        (state) => {
+          const now = Date.now();
+          this.applyRuntimeLimits(state, options.runtime);
+          this.pruneExpiredWaiters(state, now);
+          const partition = state.partitions[waiter.partitionKey];
+          const waiterExists = Boolean(
+            partition?.queue.some((entry) => entry.id === waiter.id),
+          );
+
+          if (!waiterExists) {
+            return {
+              next: this.normalizeQueueState(state),
+              result: {
+                status: 'missing',
+              },
+            };
+          }
+
+          if (state.active >= state.maxConcurrentRequests) {
+            return {
+              next: this.normalizeQueueState(state),
+              result: {
+                status: 'waiting',
+              },
+            };
+          }
+
+          const candidate = this.selectNextPartition(state);
+          if (!candidate) {
+            return {
+              next: this.normalizeQueueState(state),
+              result: {
+                status: 'waiting',
+              },
+            };
+          }
+
+          const nextWaiter = candidate.queue[0];
+          if (!nextWaiter || nextWaiter.id !== waiter.id) {
+            return {
+              next: this.normalizeQueueState(state),
+              result: {
+                status: 'waiting',
+              },
+            };
+          }
+
+          candidate.queue.shift();
+          state.active += 1;
+          candidate.active += 1;
+          candidate.grantedCount += 1;
+          candidate.lastGrantedAt = now;
+
+          return {
+            next: this.normalizeQueueState(state),
+            result: {
+              status: 'granted',
+              partitionKey: candidate.key,
+            },
+          };
+        },
+      );
+
+      if (grantResult.status === 'granted') {
+        void this.refreshSnapshot();
+        return this.createRelease(options.routePolicyId, grantResult.partitionKey);
+      }
+
+      if (grantResult.status === 'missing') {
+        break;
+      }
+
+      await this.sleep(DISTRIBUTED_QUEUE_POLL_MS);
+    }
+
+    await this.distributedOperationalStateService.mutateJson<SharedQueueState, void>(
+      stateKey,
+      {
+        seed: this.createEmptyQueueState(),
+        ttlMs: DISTRIBUTED_QUEUE_STATE_TTL_MS,
+      },
+      (state) => {
+        this.pruneExpiredWaiters(state, Date.now());
+        const partition = state.partitions[waiter.partitionKey];
+        if (partition) {
+          partition.queue = partition.queue.filter((entry) => entry.id !== waiter.id);
+        }
+        return {
+          next: this.normalizeQueueState(state),
+          result: undefined,
+        };
+      },
+    );
+    await this.cleanupRouteStateIfIdle(options.routePolicyId);
+    void this.refreshSnapshot();
+
+    this.operationalObservabilityService.record({
+      type: 'request_queue_timeout',
+      route: options.route,
+      request: options.request,
+      statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+      severity: 'warn',
+      detail: `queue wait timeout route=${options.routePolicyId} partition=${waiter.partitionKey} waitMs=${maxQueueWaitMs}`,
+      extra: {
+        routeId: options.routePolicyId,
+        partitionKey: waiter.partitionKey,
+        maxQueueWaitMs,
+        tenantId: waiter.tenantId,
+        userId: waiter.userId,
+        distributed: this.distributedOperationalStateService.isDistributedReady(),
+      },
+    });
+    throw new HttpException(
+      {
+        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+        code: 'REQUEST_QUEUE_TIMEOUT',
+        message:
+          'A operacao aguardou tempo demais na fila de isolamento. O backend preservou a estabilidade e recusou a execucao tardia.',
+        routePolicyId: options.routePolicyId,
+        partitionKey: waiter.partitionKey,
+        maxQueueWaitMs,
+      },
+      HttpStatus.SERVICE_UNAVAILABLE,
+    );
   }
 
-  private createRelease(routePolicyId: string, partitionKey: string): () => void {
+  private createRelease(routePolicyId: string, partitionKey: string): () => Promise<void> {
     let released = false;
-    return () => {
+    return async () => {
       if (released) {
         return;
       }
       released = true;
 
-      const state = this.getQueueState(routePolicyId);
-      const partition = state.partitions.get(partitionKey);
-      state.active = Math.max(0, state.active - 1);
-      if (partition) {
-        partition.active = Math.max(0, partition.active - 1);
-      }
-      this.cleanupPartitionIfIdle(state, partitionKey);
-      this.flushQueue(routePolicyId, state);
+      await this.distributedOperationalStateService.mutateJson<SharedQueueState, void>(
+        this.getStateKey(routePolicyId),
+        {
+          seed: this.createEmptyQueueState(),
+          ttlMs: DISTRIBUTED_QUEUE_STATE_TTL_MS,
+        },
+        (state) => {
+          const partition = state.partitions[partitionKey];
+          state.active = Math.max(0, state.active - 1);
+          if (partition) {
+            partition.active = Math.max(0, partition.active - 1);
+          }
+
+          return {
+            next: this.normalizeQueueState(state),
+            result: undefined,
+          };
+        },
+      );
+      await this.cleanupRouteStateIfIdle(routePolicyId);
+      void this.refreshSnapshot();
     };
   }
 
-  private flushQueue(routePolicyId: string, state: QueueState) {
-    while (state.active < state.maxConcurrentRequests) {
-      const candidate = this.selectNextPartition(state);
-      if (!candidate) {
-        break;
-      }
-
-      const waiter = candidate.queue.shift();
-      if (!waiter) {
-        this.cleanupPartitionIfIdle(state, candidate.key);
-        continue;
-      }
-
-      if (waiter.timeout) {
-        clearTimeout(waiter.timeout);
-      }
-
-      state.active += 1;
-      candidate.active += 1;
-      candidate.grantedCount += 1;
-      candidate.lastGrantedAt = Date.now();
-      waiter.grant(this.createRelease(routePolicyId, candidate.key));
-      this.cleanupPartitionIfIdle(state, candidate.key);
+  private async refreshSnapshot() {
+    const routeIds = await this.distributedOperationalStateService.listSetMembers(
+      DISTRIBUTED_QUEUE_ROUTES_KEY,
+    );
+    if (routeIds.length === 0) {
+      this.latestSnapshot = {
+        totalActive: 0,
+        totalQueued: 0,
+        routes: [],
+      };
+      return;
     }
 
-    this.cleanupQueueIfIdle(routePolicyId, state);
+    const routeStates = await this.distributedOperationalStateService.readJsonBatch<SharedQueueState>(
+      routeIds.map((routeId) => this.getStateKey(routeId)),
+    );
+
+    const routes = routeStates
+      .map(({ key, value }) => {
+        const routePolicyId = key.replace(DISTRIBUTED_QUEUE_STATE_PREFIX, '');
+        const state = value;
+        if (!state) {
+          return null;
+        }
+
+        const partitions = Object.values(state.partitions || {});
+        const queued = partitions.reduce((sum, partition) => sum + partition.queue.length, 0);
+        const active = Number(state.active || 0);
+        const activePartitions = partitions.filter(
+          (partition) => partition.active > 0 || partition.queue.length > 0,
+        ).length;
+
+        if (active === 0 && queued === 0) {
+          void this.distributedOperationalStateService.removeSetMember(
+            DISTRIBUTED_QUEUE_ROUTES_KEY,
+            routePolicyId,
+          );
+          return null;
+        }
+
+        return {
+          routePolicyId,
+          active,
+          queued,
+          partitions: activePartitions,
+        };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
+      .sort((left, right) => right.queued - left.queued || right.active - left.active)
+      .slice(0, 10);
+
+    this.latestSnapshot = {
+      totalActive: routes.reduce((sum, route) => sum + route.active, 0),
+      totalQueued: routes.reduce((sum, route) => sum + route.queued, 0),
+      routes,
+    };
   }
 
-  private selectNextPartition(state: QueueState): QueuePartitionState | null {
-    const eligiblePartitions = [...state.partitions.values()].filter(
+  private async trackRouteState(routePolicyId: string) {
+    await this.distributedOperationalStateService.addSetMember(
+      DISTRIBUTED_QUEUE_ROUTES_KEY,
+      routePolicyId,
+    );
+  }
+
+  private async cleanupRouteStateIfIdle(routePolicyId: string) {
+    const state = await this.distributedOperationalStateService.readJson<SharedQueueState>(
+      this.getStateKey(routePolicyId),
+    );
+    if (!state) {
+      await this.distributedOperationalStateService.removeSetMember(
+        DISTRIBUTED_QUEUE_ROUTES_KEY,
+        routePolicyId,
+      );
+      return;
+    }
+
+    const totalQueued = this.getTotalQueued(state);
+    if (state.active === 0 && totalQueued === 0) {
+      await Promise.all([
+        this.distributedOperationalStateService.deleteKey(this.getStateKey(routePolicyId)),
+        this.distributedOperationalStateService.removeSetMember(
+          DISTRIBUTED_QUEUE_ROUTES_KEY,
+          routePolicyId,
+        ),
+      ]);
+    }
+  }
+
+  private getStateKey(routePolicyId: string) {
+    return `${DISTRIBUTED_QUEUE_STATE_PREFIX}${routePolicyId}`;
+  }
+
+  private createEmptyQueueState(): SharedQueueState {
+    return {
+      active: 0,
+      partitions: {},
+      maxConcurrentRequests: 1,
+      maxConcurrentPerPartition: 1,
+      maxQueueDepth: 0,
+      maxQueueDepthPerPartition: 1,
+    };
+  }
+
+  private applyRuntimeLimits(
+    state: SharedQueueState,
+    runtime: RouteRuntimeProtectionPolicy,
+  ) {
+    state.maxConcurrentRequests = Math.max(1, runtime.maxConcurrentRequests || 1);
+    state.maxConcurrentPerPartition = Math.max(
+      1,
+      Math.min(
+        state.maxConcurrentRequests,
+        runtime.maxConcurrentPerPartition || 1,
+      ),
+    );
+    state.maxQueueDepth = Math.max(0, runtime.maxQueueDepth || 0);
+    state.maxQueueDepthPerPartition = Math.max(
+      1,
+      Math.min(
+        Math.max(state.maxQueueDepth, 1),
+        runtime.maxQueueDepthPerPartition || 1,
+      ),
+    );
+  }
+
+  private normalizeQueueState(state: SharedQueueState): SharedQueueState | null {
+    for (const [partitionKey, partition] of Object.entries(state.partitions)) {
+      if (partition.active === 0 && partition.queue.length === 0) {
+        delete state.partitions[partitionKey];
+      }
+    }
+
+    if (state.active === 0 && Object.keys(state.partitions).length === 0) {
+      return null;
+    }
+
+    return state;
+  }
+
+  private pruneExpiredWaiters(state: SharedQueueState, now: number) {
+    for (const partition of Object.values(state.partitions)) {
+      partition.queue = partition.queue.filter((waiter) => waiter.expiresAt > now);
+    }
+  }
+
+  private getOrCreatePartitionState(
+    state: SharedQueueState,
+    identity: QueuePartitionIdentity,
+  ): SharedQueuePartitionState {
+    const existing = state.partitions[identity.partitionKey];
+    if (existing) {
+      return existing;
+    }
+
+    const nextState: SharedQueuePartitionState = {
+      key: identity.partitionKey,
+      tenantId: identity.tenantId,
+      userId: identity.userId,
+      clientIp: identity.clientIp,
+      active: 0,
+      grantedCount: 0,
+      lastGrantedAt: null,
+      queue: [],
+    };
+    state.partitions[identity.partitionKey] = nextState;
+    return nextState;
+  }
+
+  private getTotalQueued(state: SharedQueueState): number {
+    return Object.values(state.partitions).reduce(
+      (sum, partition) => sum + partition.queue.length,
+      0,
+    );
+  }
+
+  private selectNextPartition(state: SharedQueueState): SharedQueuePartitionState | null {
+    const eligiblePartitions = Object.values(state.partitions).filter(
       (partition) =>
         partition.queue.length > 0 && partition.active < state.maxConcurrentPerPartition,
     );
@@ -323,93 +660,6 @@ export class OperationalRequestQueueService {
     });
 
     return eligiblePartitions[0] || null;
-  }
-
-  private applyRuntimeLimits(
-    state: QueueState,
-    runtime: RouteRuntimeProtectionPolicy,
-  ) {
-    state.maxConcurrentRequests = Math.max(1, runtime.maxConcurrentRequests || 1);
-    state.maxConcurrentPerPartition = Math.max(
-      1,
-      Math.min(
-        state.maxConcurrentRequests,
-        runtime.maxConcurrentPerPartition || 1,
-      ),
-    );
-    state.maxQueueDepth = Math.max(0, runtime.maxQueueDepth || 0);
-    state.maxQueueDepthPerPartition = Math.max(
-      1,
-      Math.min(
-        Math.max(state.maxQueueDepth, 1),
-        runtime.maxQueueDepthPerPartition || 1,
-      ),
-    );
-  }
-
-  private getQueueState(routePolicyId: string): QueueState {
-    const existing = this.queues.get(routePolicyId);
-    if (existing) {
-      return existing;
-    }
-
-    const nextState: QueueState = {
-      active: 0,
-      partitions: new Map<string, QueuePartitionState>(),
-      maxConcurrentRequests: 1,
-      maxConcurrentPerPartition: 1,
-      maxQueueDepth: 0,
-      maxQueueDepthPerPartition: 1,
-    };
-    this.queues.set(routePolicyId, nextState);
-    return nextState;
-  }
-
-  private getPartitionState(
-    state: QueueState,
-    identity: QueuePartitionIdentity,
-  ): QueuePartitionState {
-    const existing = state.partitions.get(identity.partitionKey);
-    if (existing) {
-      return existing;
-    }
-
-    const nextState: QueuePartitionState = {
-      key: identity.partitionKey,
-      tenantId: identity.tenantId,
-      userId: identity.userId,
-      clientIp: identity.clientIp,
-      active: 0,
-      grantedCount: 0,
-      lastGrantedAt: null,
-      queue: [],
-    };
-    state.partitions.set(identity.partitionKey, nextState);
-    return nextState;
-  }
-
-  private cleanupQueueIfIdle(routePolicyId: string, state: QueueState) {
-    if (state.active === 0 && this.getTotalQueued(state) === 0) {
-      this.queues.delete(routePolicyId);
-    }
-  }
-
-  private cleanupPartitionIfIdle(state: QueueState, partitionKey: string) {
-    const partition = state.partitions.get(partitionKey);
-    if (!partition) {
-      return;
-    }
-
-    if (partition.active === 0 && partition.queue.length === 0) {
-      state.partitions.delete(partitionKey);
-    }
-  }
-
-  private getTotalQueued(state: QueueState): number {
-    return [...state.partitions.values()].reduce(
-      (sum, partition) => sum + partition.queue.length,
-      0,
-    );
   }
 
   private resolvePartitionIdentity(
@@ -514,5 +764,9 @@ export class OperationalRequestQueueService {
 
     const normalized = String(value).trim().toLowerCase();
     return normalized.length > 0 ? normalized : null;
+  }
+
+  private sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

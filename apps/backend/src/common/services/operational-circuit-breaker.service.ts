@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { DistributedOperationalStateService } from './distributed-operational-state.service';
 import { OperationalObservabilityService } from './operational-observability.service';
 
 export class CircuitBreakerOpenError extends Error {
@@ -49,108 +50,194 @@ export type CircuitBreakerSnapshot = {
   lastTransitionAt: number;
 };
 
+type CircuitPreflightResult =
+  | {
+      status: 'blocked';
+      retryAfterMs: number;
+      snapshot: CircuitBreakerSnapshot;
+    }
+  | {
+      status: 'execute';
+      enteredHalfOpen: boolean;
+      halfOpenMaxProbes: number;
+      halfOpenSuccessThreshold: number;
+      snapshot: CircuitBreakerSnapshot;
+    };
+
+type CircuitFinalizeResult = {
+  snapshot: CircuitBreakerSnapshot;
+  becameOpen: boolean;
+  recovered: boolean;
+  openedUntil: number | null;
+};
+
 const DEFAULT_HALF_OPEN_MAX_PROBES = 1;
 const DEFAULT_JITTER_RATIO = 0.2;
+const CIRCUIT_STATE_TTL_MS = 6 * 60 * 60 * 1000;
+const CIRCUIT_STATE_PREFIX = 'operational-circuit-breaker:';
 
 @Injectable()
 export class OperationalCircuitBreakerService {
-  private readonly state = new Map<string, CircuitBreakerState>();
+  private readonly snapshots = new Map<string, CircuitBreakerSnapshot>();
 
   constructor(
     private readonly operationalObservabilityService: OperationalObservabilityService,
+    private readonly distributedOperationalStateService: DistributedOperationalStateService,
   ) {}
 
   async execute<T>(options: ExecuteCircuitOptions, action: () => Promise<T>): Promise<T> {
-    const entry = this.getState(options.key);
-    const now = Date.now();
     const halfOpenMaxProbes = Math.max(1, options.halfOpenMaxProbes || DEFAULT_HALF_OPEN_MAX_PROBES);
     const halfOpenSuccessThreshold = Math.max(
       1,
       Math.min(halfOpenMaxProbes, options.halfOpenSuccessThreshold || halfOpenMaxProbes),
     );
 
-    if (entry.mode === 'open' && entry.openedUntil && now < entry.openedUntil) {
-      const retryAfterMs = Math.max(1, entry.openedUntil - now);
+    const preflight = await this.distributedOperationalStateService.mutateJson<
+      CircuitBreakerState,
+      CircuitPreflightResult
+    >(
+      this.getStateKey(options.key),
+      {
+        seed: this.createState(),
+        ttlMs: CIRCUIT_STATE_TTL_MS,
+      },
+      (state) => {
+        const now = Date.now();
+
+        if (state.mode === 'open' && state.openedUntil && now < state.openedUntil) {
+          return {
+            next: state,
+            result: {
+              status: 'blocked',
+              retryAfterMs: Math.max(1, state.openedUntil - now),
+              snapshot: this.toSnapshot(options.key, state),
+            },
+          };
+        }
+
+        let enteredHalfOpen = false;
+        if (state.mode === 'open' && state.openedUntil && now >= state.openedUntil) {
+          this.transitionToHalfOpen(state);
+          enteredHalfOpen = true;
+        }
+
+        if (
+          state.mode === 'half-open' &&
+          (state.halfOpenInFlight >= halfOpenMaxProbes ||
+            state.halfOpenProbeAttempts >= halfOpenMaxProbes)
+        ) {
+          return {
+            next: state,
+            result: {
+              status: 'blocked',
+              retryAfterMs: Math.max(250, Math.floor(options.resetTimeoutMs * 0.25)),
+              snapshot: this.toSnapshot(options.key, state),
+            },
+          };
+        }
+
+        if (state.mode === 'half-open') {
+          state.halfOpenInFlight += 1;
+          state.halfOpenProbeAttempts += 1;
+        }
+
+        return {
+          next: state,
+          result: {
+            status: 'execute',
+            enteredHalfOpen,
+            halfOpenMaxProbes,
+            halfOpenSuccessThreshold,
+            snapshot: this.toSnapshot(options.key, state),
+          },
+        };
+      },
+    );
+
+    this.updateSnapshot(preflight.snapshot);
+
+    if (preflight.status === 'blocked') {
       this.operationalObservabilityService.record({
         type: 'circuit_open',
         route: options.route,
         request: options.request,
         severity: 'warn',
-        detail: `circuit open key=${options.key} retryAfterMs=${retryAfterMs}`,
+        detail: `circuit open key=${options.key} retryAfterMs=${preflight.retryAfterMs}`,
         extra: {
           key: options.key,
-          mode: entry.mode,
-          retryAfterMs,
-          openCount: entry.openCount,
+          mode: preflight.snapshot.mode,
+          retryAfterMs: preflight.retryAfterMs,
+          openCount: preflight.snapshot.openCount,
+          distributed: this.distributedOperationalStateService.isDistributedReady(),
         },
       });
-      throw new CircuitBreakerOpenError(options.key, retryAfterMs);
+      throw new CircuitBreakerOpenError(options.key, preflight.retryAfterMs);
     }
 
-    if (entry.mode === 'open' && entry.openedUntil && now >= entry.openedUntil) {
-      this.transitionToHalfOpen(entry);
+    if (preflight.enteredHalfOpen) {
       this.operationalObservabilityService.record({
         type: 'circuit_half_open',
         route: options.route,
         request: options.request,
         severity: 'warn',
-        detail: `circuit half-open key=${options.key} probes=${halfOpenMaxProbes}`,
+        detail: `circuit half-open key=${options.key} probes=${preflight.halfOpenMaxProbes}`,
         extra: {
           key: options.key,
-          halfOpenMaxProbes,
-          halfOpenSuccessThreshold,
-          openCount: entry.openCount,
+          halfOpenMaxProbes: preflight.halfOpenMaxProbes,
+          halfOpenSuccessThreshold: preflight.halfOpenSuccessThreshold,
+          openCount: preflight.snapshot.openCount,
+          distributed: this.distributedOperationalStateService.isDistributedReady(),
         },
       });
     }
 
-    if (
-      entry.mode === 'half-open' &&
-      (entry.halfOpenInFlight >= halfOpenMaxProbes ||
-        entry.halfOpenProbeAttempts >= halfOpenMaxProbes)
-    ) {
-      throw new CircuitBreakerOpenError(
-        options.key,
-        Math.max(250, Math.floor(options.resetTimeoutMs * 0.25)),
-      );
-    }
-
-    if (entry.mode === 'half-open') {
-      entry.halfOpenInFlight += 1;
-      entry.halfOpenProbeAttempts += 1;
-    }
-
     try {
       const result = await action();
+      const finalized = await this.distributedOperationalStateService.mutateJson<
+        CircuitBreakerState,
+        CircuitFinalizeResult
+      >(
+        this.getStateKey(options.key),
+        {
+          seed: this.createState(),
+          ttlMs: CIRCUIT_STATE_TTL_MS,
+        },
+        (state) => {
+          let recovered = false;
 
-      if (entry.mode === 'half-open') {
-        entry.halfOpenInFlight = Math.max(0, entry.halfOpenInFlight - 1);
-        entry.halfOpenSuccesses += 1;
-        entry.consecutiveSuccesses += 1;
+          if (state.mode === 'half-open') {
+            state.halfOpenInFlight = Math.max(0, state.halfOpenInFlight - 1);
+            state.halfOpenSuccesses += 1;
+            state.consecutiveSuccesses += 1;
 
-        if (entry.halfOpenSuccesses >= halfOpenSuccessThreshold) {
-          this.closeCircuit(entry, true);
-          this.operationalObservabilityService.record({
-            type: 'circuit_recovered',
-            route: options.route,
-            request: options.request,
-            severity: 'log',
-            detail: `circuit recovered key=${options.key} probes=${halfOpenSuccessThreshold}`,
-            extra: {
-              key: options.key,
-              halfOpenSuccessThreshold,
-              openCount: entry.openCount,
+            if (state.halfOpenSuccesses >= preflight.halfOpenSuccessThreshold) {
+              this.closeCircuit(state, true);
+              recovered = true;
+            }
+          } else {
+            if (state.failures > 0 || state.openCount > 0) {
+              recovered = true;
+              state.consecutiveSuccesses += 1;
+              state.failures = Math.max(0, state.failures - 1);
+              state.openCount = Math.max(0, state.openCount - 1);
+            }
+            this.closeCircuit(state, false);
+          }
+
+          return {
+            next: state,
+            result: {
+              snapshot: this.toSnapshot(options.key, state),
+              becameOpen: false,
+              recovered,
+              openedUntil: state.openedUntil,
             },
-          });
-        }
+          };
+        },
+      );
 
-        return result;
-      }
-
-      if (entry.failures > 0 || entry.openCount > 0) {
-        entry.consecutiveSuccesses += 1;
-        entry.failures = Math.max(0, entry.failures - 1);
-        entry.openCount = Math.max(0, entry.openCount - 1);
+      this.updateSnapshot(finalized.snapshot);
+      if (finalized.recovered) {
         this.operationalObservabilityService.record({
           type: 'circuit_recovered',
           route: options.route,
@@ -159,25 +246,68 @@ export class OperationalCircuitBreakerService {
           detail: `circuit recovered key=${options.key}`,
           extra: {
             key: options.key,
-            remainingFailures: entry.failures,
-            remainingOpenCount: entry.openCount,
+            openCount: finalized.snapshot.openCount,
+            failures: finalized.snapshot.failures,
+            distributed: this.distributedOperationalStateService.isDistributedReady(),
           },
         });
       }
 
-      this.closeCircuit(entry, false);
       return result;
     } catch (error) {
-      if (entry.mode === 'half-open') {
-        entry.halfOpenInFlight = Math.max(0, entry.halfOpenInFlight - 1);
-      }
+      const finalized = await this.distributedOperationalStateService.mutateJson<
+        CircuitBreakerState,
+        CircuitFinalizeResult
+      >(
+        this.getStateKey(options.key),
+        {
+          seed: this.createState(),
+          ttlMs: CIRCUIT_STATE_TTL_MS,
+        },
+        (state) => {
+          if (state.mode === 'half-open') {
+            state.halfOpenInFlight = Math.max(0, state.halfOpenInFlight - 1);
+          }
 
-      entry.consecutiveSuccesses = 0;
-      entry.failures += 1;
-      const shouldOpen = entry.mode === 'half-open' || entry.failures >= Math.max(1, options.failureThreshold);
+          state.consecutiveSuccesses = 0;
+          state.failures += 1;
+          const shouldOpen =
+            state.mode === 'half-open' || state.failures >= Math.max(1, options.failureThreshold);
 
-      if (shouldOpen) {
-        this.openCircuit(entry, options);
+          let becameOpen = false;
+          if (shouldOpen) {
+            this.openCircuit(state, options);
+            becameOpen = true;
+          }
+
+          return {
+            next: state,
+            result: {
+              snapshot: this.toSnapshot(options.key, state),
+              becameOpen,
+              recovered: false,
+              openedUntil: state.openedUntil,
+            },
+          };
+        },
+      );
+
+      this.updateSnapshot(finalized.snapshot);
+      if (finalized.becameOpen) {
+        this.operationalObservabilityService.record({
+          type: 'circuit_open',
+          route: options.route,
+          request: options.request,
+          severity: 'warn',
+          detail: `circuit opened key=${options.key} failures=${finalized.snapshot.failures} openCount=${finalized.snapshot.openCount}`,
+          extra: {
+            key: options.key,
+            failures: finalized.snapshot.failures,
+            openCount: finalized.snapshot.openCount,
+            openedUntil: finalized.openedUntil,
+            distributed: this.distributedOperationalStateService.isDistributedReady(),
+          },
+        });
       }
 
       throw error;
@@ -185,23 +315,62 @@ export class OperationalCircuitBreakerService {
   }
 
   getSnapshot(key: string): CircuitBreakerSnapshot {
-    const entry = this.getState(key);
-    return {
-      key,
-      mode: entry.mode,
-      failures: entry.failures,
-      openCount: entry.openCount,
-      openedUntil: entry.openedUntil,
-      halfOpenInFlight: entry.halfOpenInFlight,
-      halfOpenProbeAttempts: entry.halfOpenProbeAttempts,
-      halfOpenSuccesses: entry.halfOpenSuccesses,
-      consecutiveSuccesses: entry.consecutiveSuccesses,
-      lastTransitionAt: entry.lastTransitionAt,
-    };
+    return (
+      this.snapshots.get(key) || {
+        key,
+        mode: 'closed',
+        failures: 0,
+        openCount: 0,
+        openedUntil: null,
+        halfOpenInFlight: 0,
+        halfOpenProbeAttempts: 0,
+        halfOpenSuccesses: 0,
+        consecutiveSuccesses: 0,
+        lastTransitionAt: Date.now(),
+      }
+    );
   }
 
   reset(key: string): void {
-    this.state.delete(key);
+    this.snapshots.delete(key);
+    void this.distributedOperationalStateService.deleteKey(this.getStateKey(key));
+  }
+
+  private getStateKey(key: string) {
+    return `${CIRCUIT_STATE_PREFIX}${key}`;
+  }
+
+  private updateSnapshot(snapshot: CircuitBreakerSnapshot) {
+    this.snapshots.set(snapshot.key, snapshot);
+  }
+
+  private createState(): CircuitBreakerState {
+    return {
+      mode: 'closed',
+      failures: 0,
+      openCount: 0,
+      openedUntil: null,
+      halfOpenInFlight: 0,
+      halfOpenProbeAttempts: 0,
+      halfOpenSuccesses: 0,
+      consecutiveSuccesses: 0,
+      lastTransitionAt: Date.now(),
+    };
+  }
+
+  private toSnapshot(key: string, state: CircuitBreakerState): CircuitBreakerSnapshot {
+    return {
+      key,
+      mode: state.mode,
+      failures: state.failures,
+      openCount: state.openCount,
+      openedUntil: state.openedUntil,
+      halfOpenInFlight: state.halfOpenInFlight,
+      halfOpenProbeAttempts: state.halfOpenProbeAttempts,
+      halfOpenSuccesses: state.halfOpenSuccesses,
+      consecutiveSuccesses: state.consecutiveSuccesses,
+      lastTransitionAt: state.lastTransitionAt,
+    };
   }
 
   private openCircuit(entry: CircuitBreakerState, options: ExecuteCircuitOptions) {
@@ -212,21 +381,8 @@ export class OperationalCircuitBreakerService {
     entry.halfOpenSuccesses = 0;
     entry.lastTransitionAt = Date.now();
     entry.openedUntil =
-      Date.now() + this.calculateCooldownMs(options.resetTimeoutMs, entry.openCount, options.jitterRatio);
-
-    this.operationalObservabilityService.record({
-      type: 'circuit_open',
-      route: options.route,
-      request: options.request,
-      severity: 'warn',
-      detail: `circuit opened key=${options.key} failures=${entry.failures} openCount=${entry.openCount}`,
-      extra: {
-        key: options.key,
-        failures: entry.failures,
-        openCount: entry.openCount,
-        openedUntil: entry.openedUntil,
-      },
-    });
+      Date.now() +
+      this.calculateCooldownMs(options.resetTimeoutMs, entry.openCount, options.jitterRatio);
   }
 
   private transitionToHalfOpen(entry: CircuitBreakerState) {
@@ -260,26 +416,5 @@ export class OperationalCircuitBreakerService {
     const jitterWindow = baseDelay * Math.max(0, Math.min(0.5, jitterRatio));
     const random = (Math.random() * 2 - 1) * jitterWindow;
     return Math.max(250, Math.floor(baseDelay + random));
-  }
-
-  private getState(key: string): CircuitBreakerState {
-    const existing = this.state.get(key);
-    if (existing) {
-      return existing;
-    }
-
-    const nextState: CircuitBreakerState = {
-      mode: 'closed',
-      failures: 0,
-      openCount: 0,
-      openedUntil: null,
-      halfOpenInFlight: 0,
-      halfOpenProbeAttempts: 0,
-      halfOpenSuccesses: 0,
-      consecutiveSuccesses: 0,
-      lastTransitionAt: Date.now(),
-    };
-    this.state.set(key, nextState);
-    return nextState;
   }
 }

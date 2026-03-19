@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { SystemVersionService } from '@common/services/system-version.service';
 import { OperationalCircuitBreakerService } from '@common/services/operational-circuit-breaker.service';
+import { OperationalLoadSheddingService } from '@common/services/operational-load-shedding.service';
 import { AuditService } from '../audit/audit.service';
 import { SystemUpdateAdminService } from './system-update-admin.service';
 import { UpdateService } from './update.service';
@@ -113,6 +114,41 @@ function createService() {
   const operationalCircuitBreakerServiceMock = {
     execute: jest.fn(async (_options, action: () => Promise<unknown>) => action()),
   };
+  const operationalLoadSheddingServiceMock = {
+    getSnapshot: jest.fn(() => ({
+      instanceId: 'instance-a',
+      instanceCount: 1,
+      overloadedInstances: 0,
+      adaptiveThrottleFactor: 1,
+      desiredAdaptiveThrottleFactor: 1,
+      pressureCause: 'normal',
+      local: {
+        eventLoopLagP95Ms: 0,
+        eventLoopLagP99Ms: 0,
+        eventLoopLagMaxMs: 0,
+        eventLoopUtilization: 0,
+        heapUsedRatio: 0,
+        recentApiLatencyMs: 120,
+        gcPauseP95Ms: 0,
+        gcPauseMaxMs: 0,
+        gcEventsRecent: 0,
+        queueDepth: 0,
+        activeIsolatedRequests: 0,
+        pressureScore: 0,
+        consecutiveBreaches: 0,
+        adaptiveThrottleFactor: 1,
+        cause: 'normal',
+        overloaded: false,
+      },
+      clusterRecentApiLatencyMs: 120,
+      clusterQueueDepth: 0,
+      mitigation: {
+        degradeHeavyFeatures: false,
+        disableRemoteUpdateChecks: false,
+        rejectHeavyMutations: false,
+      },
+    })),
+  };
 
   const service = new UpdateService(
     prismaMock as unknown as PrismaService,
@@ -120,6 +156,7 @@ function createService() {
     systemVersionMock as unknown as SystemVersionService,
     systemUpdateAdminServiceMock as unknown as SystemUpdateAdminService,
     operationalCircuitBreakerServiceMock as unknown as OperationalCircuitBreakerService,
+    operationalLoadSheddingServiceMock as unknown as OperationalLoadSheddingService,
   );
 
   return {
@@ -127,6 +164,8 @@ function createService() {
     prismaMock,
     auditMock,
     systemUpdateAdminServiceMock,
+    operationalLoadSheddingServiceMock,
+    operationalCircuitBreakerServiceMock,
   };
 }
 
@@ -149,6 +188,50 @@ describe('UpdateService', () => {
         args: ['ls-remote', '--tags', 'https://github.com/org/repo.git'],
       },
     ]);
+  });
+
+  it('mitiga a verificacao remota de update automaticamente sob pressao distribuida', async () => {
+    const { service, operationalLoadSheddingServiceMock, operationalCircuitBreakerServiceMock } =
+      createService();
+    operationalLoadSheddingServiceMock.getSnapshot.mockReturnValue({
+      instanceId: 'instance-a',
+      instanceCount: 2,
+      overloadedInstances: 1,
+      adaptiveThrottleFactor: 0.55,
+      desiredAdaptiveThrottleFactor: 0.45,
+      pressureCause: 'cpu',
+      local: {
+        eventLoopLagP95Ms: 45,
+        eventLoopLagP99Ms: 80,
+        eventLoopLagMaxMs: 120,
+        eventLoopUtilization: 0.82,
+        heapUsedRatio: 0.71,
+        recentApiLatencyMs: 2100,
+        gcPauseP95Ms: 18,
+        gcPauseMaxMs: 40,
+        gcEventsRecent: 4,
+        queueDepth: 4,
+        activeIsolatedRequests: 1,
+        pressureScore: 0.86,
+        consecutiveBreaches: 3,
+        adaptiveThrottleFactor: 0.55,
+        cause: 'cpu',
+        overloaded: true,
+      },
+      clusterRecentApiLatencyMs: 2100,
+      clusterQueueDepth: 4,
+      mitigation: {
+        degradeHeavyFeatures: true,
+        disableRemoteUpdateChecks: true,
+        rejectHeavyMutations: false,
+      },
+    });
+
+    await expect(service.checkForUpdates()).resolves.toEqual({
+      updateAvailable: false,
+      availableVersion: undefined,
+    });
+    expect(operationalCircuitBreakerServiceMock.execute).not.toHaveBeenCalled();
   });
 
   it('repo privado com token usa http.extraHeader Authorization basic', async () => {

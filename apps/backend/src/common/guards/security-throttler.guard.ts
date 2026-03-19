@@ -21,8 +21,8 @@ import { createHash } from 'crypto';
 import { resolveApiRouteContractPolicy } from '@contracts/api-routes';
 import { SecurityRuntimeConfigService } from '@core/security-config/security-runtime-config.service';
 import { AuditService } from '../../audit/audit.service';
+import { OperationalLoadSheddingService } from '../services/operational-load-shedding.service';
 import { RateLimitMetricsService } from '../services/rate-limit-metrics.service';
-import { RuntimePressureService } from '../services/runtime-pressure.service';
 import { SystemTelemetryService } from '@common/services/system-telemetry.service';
 import {
   CRITICAL_RATE_LIMIT_KEY,
@@ -94,7 +94,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     private readonly rateLimitMetricsService: RateLimitMetricsService,
     private readonly systemTelemetryService: SystemTelemetryService,
     private readonly configService: ConfigService,
-    private readonly runtimePressureService: RuntimePressureService,
+    private readonly operationalLoadSheddingService: OperationalLoadSheddingService,
   ) {
     super(options, storageService, reflector);
     const rawSecret = this.configService.get<string>('JWT_SECRET');
@@ -516,15 +516,15 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
       };
     }
 
-    const snapshot = this.runtimePressureService.getSnapshot();
+    const snapshot = this.operationalLoadSheddingService.getSnapshot();
     const factor =
-      snapshot.overloaded || snapshot.adaptiveThrottleFactor < 1
+      snapshot.overloadedInstances > 0 || snapshot.adaptiveThrottleFactor < 1
         ? snapshot.adaptiveThrottleFactor
         : 1;
 
     return {
       factor,
-      cause: factor < 1 ? snapshot.cause : null,
+      cause: factor < 1 ? snapshot.pressureCause : null,
     };
   }
 

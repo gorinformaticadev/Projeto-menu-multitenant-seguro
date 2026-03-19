@@ -36,6 +36,7 @@ import { SentryExceptionFilter } from './common/filters/sentry-exception.filter'
 import { SanitizationPipe } from './common/pipes/sanitization.pipe';
 import { SecretManagerService } from './common/services/secret-manager.nest.service';
 import { OperationalObservabilityService } from './common/services/operational-observability.service';
+import { OperationalLoadSheddingService } from './common/services/operational-load-shedding.service';
 import { OperationalRequestQueueService } from './common/services/operational-request-queue.service';
 import { RuntimePressureService } from './common/services/runtime-pressure.service';
 import { SentryService } from './common/services/sentry.service';
@@ -81,6 +82,7 @@ async function bootstrap() {
   });
   const moduleRef = app.get(ModuleRef);
   const operationalObservabilityService = app.get(OperationalObservabilityService);
+  const operationalLoadSheddingService = app.get(OperationalLoadSheddingService);
   const operationalRequestQueueService = app.get(OperationalRequestQueueService);
   const runtimePressureService = app.get(RuntimePressureService);
   const requestTraceMiddleware = new RequestTraceMiddleware();
@@ -92,7 +94,8 @@ async function bootstrap() {
     operationalObservabilityService,
   );
   const routeExecutionTimeoutInterceptor = new RouteExecutionTimeoutInterceptor(
-    operationalObservabilityService,
+      operationalObservabilityService,
+      operationalLoadSheddingService,
   );
   const routeIsolationInterceptor = new RouteIsolationInterceptor(
     operationalRequestQueueService,
@@ -240,6 +243,7 @@ async function bootstrap() {
       'Content-Encoding',
       'X-Request-Id',
       'X-Trace-Id',
+      'Traceparent',
       'X-Total-Count',
       'X-API-Version',
       'X-API-Latest-Version',

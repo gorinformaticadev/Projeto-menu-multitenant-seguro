@@ -12,6 +12,7 @@ import { Prisma, UpdateLog, UpdateSystemSettings } from '@prisma/client';
 import { SystemVersionService } from '@common/services/system-version.service';
 import { SystemUpdateAdminService } from './system-update-admin.service';
 import { OperationalCircuitBreakerService } from '@common/services/operational-circuit-breaker.service';
+import { OperationalLoadSheddingService } from '@common/services/operational-load-shedding.service';
 
 type UpdateExecutionResult = { stdout: string; stderr: string };
 type UpdateLogListItem = Pick<
@@ -93,6 +94,7 @@ export class UpdateService implements OnModuleInit {
     private readonly systemVersionService: SystemVersionService,
     private readonly systemUpdateAdminService: SystemUpdateAdminService,
     private readonly operationalCircuitBreakerService: OperationalCircuitBreakerService,
+    private readonly operationalLoadSheddingService: OperationalLoadSheddingService,
   ) {
     this.encryptionKey = this.resolveEncryptionKey();
   }
@@ -123,17 +125,28 @@ export class UpdateService implements OnModuleInit {
     try {
       this.logger.log('Iniciando verificação de atualizações...');
       const settings = await this.getSystemSettings();
+      const loadShedding = this.operationalLoadSheddingService.getSnapshot();
 
       if (!settings.gitUsername || !settings.gitRepository) {
         this.logger.warn('Configurações do Git não encontradas');
         return { updateAvailable: false };
       }
 
+      if (loadShedding.mitigation.disableRemoteUpdateChecks) {
+        this.logger.warn(
+          `Verificacao remota de atualizacoes mitigada automaticamente. factor=${loadShedding.adaptiveThrottleFactor} cause=${loadShedding.pressureCause}`,
+        );
+        return {
+          updateAvailable: Boolean(settings.updateAvailable),
+          availableVersion: settings.availableVersion || undefined,
+        };
+      }
+
       const repoUrl = this.buildPublicGitRepoUrl(settings);
       decryptedTokenForSanitizer = this.tryDecryptToken(settings.gitToken);
       const stdout = await this.operationalCircuitBreakerService.execute(
         {
-          key: 'update:remote-tags',
+          key: 'dependency:github-remote-tags',
           route: '/update/check',
           failureThreshold: 2,
           resetTimeoutMs: 60_000,

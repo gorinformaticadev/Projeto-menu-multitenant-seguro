@@ -29,7 +29,9 @@ export type OperationalTelemetryEventType =
   | 'circuit_half_open'
   | 'circuit_recovered'
   | 'runtime_pressure'
-  | 'stale_snapshot_served';
+  | 'stale_snapshot_served'
+  | 'slow_success'
+  | 'auto_mitigation';
 
 export interface RouteTelemetrySummary {
   route: string;

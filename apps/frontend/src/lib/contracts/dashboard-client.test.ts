@@ -66,6 +66,17 @@ describe("dashboard-client contract enforcement", () => {
       operationalRecentCount: 0,
       recentOperationalAlerts: [],
     },
+    runtimeMitigation: {
+      adaptiveThrottleFactor: 1,
+      pressureCause: "normal",
+      instanceCount: 1,
+      overloadedInstances: 0,
+      clusterRecentApiLatencyMs: 180,
+      clusterQueueDepth: 0,
+      degradeHeavyFeatures: false,
+      disableRemoteUpdateChecks: false,
+      rejectHeavyMutations: false,
+    },
     widgets: { available: ["version"] },
   });
 

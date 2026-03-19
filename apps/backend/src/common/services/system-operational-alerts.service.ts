@@ -64,6 +64,8 @@ type CorrelatedOperationalRoute = {
   queueSaturationEvents: number;
   circuitOpenEvents: number;
   requestRetryEvents: number;
+  slowSuccessEvents: number;
+  autoMitigationEvents: number;
 };
 
 const DEFAULT_ALERT_WINDOW_MINUTES = 5;
@@ -544,6 +546,8 @@ export class SystemOperationalAlertsService implements OnModuleInit {
             queueSaturationEvents: correlatedRoute.queueSaturationEvents,
             circuitOpenEvents: correlatedRoute.circuitOpenEvents,
             requestRetryEvents: correlatedRoute.requestRetryEvents,
+            slowSuccessEvents: correlatedRoute.slowSuccessEvents,
+            autoMitigationEvents: correlatedRoute.autoMitigationEvents,
             threshold: config.correlatedOperationalRouteThreshold,
           },
           pushEligible: true,
@@ -590,6 +594,8 @@ export class SystemOperationalAlertsService implements OnModuleInit {
           queueSaturationEvents: 0,
           circuitOpenEvents: 0,
           requestRetryEvents: 0,
+          slowSuccessEvents: 0,
+          autoMitigationEvents: 0,
         } satisfies CorrelatedOperationalRoute);
 
       if (event.type === 'runtime_pressure') {
@@ -603,6 +609,10 @@ export class SystemOperationalAlertsService implements OnModuleInit {
         bucket.circuitOpenEvents += 1;
       } else if (event.type === 'request_retry') {
         bucket.requestRetryEvents += 1;
+      } else if (event.type === 'slow_success') {
+        bucket.slowSuccessEvents += 1;
+      } else if (event.type === 'auto_mitigation') {
+        bucket.autoMitigationEvents += 1;
       } else {
         continue;
       }
@@ -612,6 +622,8 @@ export class SystemOperationalAlertsService implements OnModuleInit {
         bucket.queueSaturationEvents > 0 ? 'queue_saturation' : null,
         bucket.circuitOpenEvents > 0 ? 'circuit_open' : null,
         bucket.requestRetryEvents > 0 ? 'request_retry' : null,
+        bucket.slowSuccessEvents > 0 ? 'slow_success' : null,
+        bucket.autoMitigationEvents > 0 ? 'auto_mitigation' : null,
       ].filter(Boolean) as string[];
 
       bucket.signalFamilies = signalFamilies;
@@ -619,7 +631,9 @@ export class SystemOperationalAlertsService implements OnModuleInit {
         bucket.runtimePressureEvents +
         bucket.queueSaturationEvents +
         bucket.circuitOpenEvents +
-        bucket.requestRetryEvents;
+        bucket.requestRetryEvents +
+        bucket.slowSuccessEvents +
+        bucket.autoMitigationEvents;
       byRoute.set(route, bucket);
     }
 
