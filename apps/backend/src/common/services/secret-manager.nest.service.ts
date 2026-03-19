@@ -1,9 +1,10 @@
+import { randomBytes } from 'crypto';
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { 
-  SecretManagerFactory, 
+import {
+  SecretManagerFactory,
   SecretLoaderMiddleware,
   SecretManager as ISecretManager,
-  Secret
+  Secret,
 } from './secret-manager.service';
 
 @Injectable()
@@ -15,92 +16,77 @@ export class SecretManagerService implements OnModuleInit {
     await this.initialize();
   }
 
-  /**
-   * Inicializa o secret manager
-   */
   async initialize(): Promise<void> {
-    if (this.isInitialized) return;
+    if (this.isInitialized) {
+      return;
+    }
 
     try {
       this.secretManager = await SecretManagerFactory.createSecretManager();
-      
-      // Carregar secrets da aplicação
+
+      await this.ensureLocalCriticalSecrets();
       await SecretLoaderMiddleware.loadSecrets();
-      
+
       this.isInitialized = true;
-      console.warn(`✅ Secret Manager inicializado (${this.secretManager.getProviderName()})`);
+      console.warn(`Secret Manager initialized (${this.secretManager.getProviderName()})`);
     } catch (error) {
-      console.error('❌ Falha ao inicializar Secret Manager:', error.message);
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('Failed to initialize Secret Manager:', message);
       throw error;
     }
   }
 
-  /**
-   * Obtém um secret pelo nome
-   */
   async getSecret(name: string): Promise<Secret | null> {
     if (!this.secretManager) {
-      throw new Error('Secret Manager não inicializado');
+      throw new Error('Secret Manager not initialized');
     }
-    
-    return await this.secretManager.getSecret(name);
+
+    return this.secretManager.getSecret(name);
   }
 
-  /**
-   * Cria ou atualiza um secret
-   */
   async putSecret(name: string, value: string, description?: string): Promise<Secret> {
     if (!this.secretManager) {
-      throw new Error('Secret Manager não inicializado');
+      throw new Error('Secret Manager not initialized');
     }
-    
-    return await this.secretManager.putSecret(name, value, description);
+
+    return this.secretManager.putSecret(name, value, description);
   }
 
-  /**
-   * Deleta um secret
-   */
   async deleteSecret(name: string): Promise<boolean> {
     if (!this.secretManager) {
-      throw new Error('Secret Manager não inicializado');
+      throw new Error('Secret Manager not initialized');
     }
-    
-    return await this.secretManager.deleteSecret(name);
+
+    return this.secretManager.deleteSecret(name);
   }
 
-  /**
-   * Lista secrets com prefixo opcional
-   */
   async listSecrets(prefix?: string): Promise<Secret[]> {
     if (!this.secretManager) {
-      throw new Error('Secret Manager não inicializado');
+      throw new Error('Secret Manager not initialized');
     }
-    
-    return await this.secretManager.listSecrets(prefix);
+
+    return this.secretManager.listSecrets(prefix);
   }
 
-  /**
-   * Verifica disponibilidade do secret manager
-   */
   async isAvailable(): Promise<boolean> {
-    if (!this.secretManager) return false;
-    return await this.secretManager.isAvailable();
+    if (!this.secretManager) {
+      return false;
+    }
+
+    return this.secretManager.isAvailable();
   }
 
-  /**
-   * Obtém o nome do provedor
-   */
   getProviderName(): string {
-    if (!this.secretManager) return 'Unknown';
+    if (!this.secretManager) {
+      return 'Unknown';
+    }
+
     return this.secretManager.getProviderName();
   }
 
-  /**
-   * Carrega secrets específicos para a aplicação
-   */
   async loadApplicationSecrets(): Promise<void> {
     if (!this.secretManager) {
-      throw new Error('Secret Manager não inicializado');
+      throw new Error('Secret Manager not initialized');
     }
 
     const secretsToLoad = [
@@ -109,7 +95,7 @@ export class SecretManagerService implements OnModuleInit {
       'TRUSTED_DEVICE_TOKEN_SECRET',
       'DATABASE_URL',
       'SMTP_PASSWORD',
-      'SENTRY_DSN'
+      'SENTRY_DSN',
     ];
 
     for (const secretName of secretsToLoad) {
@@ -117,18 +103,16 @@ export class SecretManagerService implements OnModuleInit {
         const secret = await this.getSecret(secretName);
         if (secret?.value) {
           process.env[secretName] = secret.value;
-          } else {
-          console.warn(`  ⚠️  ${secretName} não encontrado`);
+        } else {
+          console.warn(`Missing optional secret during load: ${secretName}`);
         }
       } catch (error) {
-        console.error(`  ❌ Erro ao carregar ${secretName}:`, error.message);
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`Failed to load secret ${secretName}:`, message);
       }
     }
   }
 
-  /**
-   * Valida se todos os secrets críticos estão presentes
-   */
   validateCriticalSecrets(): boolean {
     const criticalSecrets = [
       'JWT_SECRET',
@@ -137,10 +121,10 @@ export class SecretManagerService implements OnModuleInit {
     ];
 
     let allPresent = true;
-    
+
     for (const secretName of criticalSecrets) {
       if (!process.env[secretName]) {
-        console.error(`❌ Secret crítico ausente: ${secretName}`);
+        console.error(`Critical secret missing: ${secretName}`);
         allPresent = false;
       }
     }
@@ -148,25 +132,58 @@ export class SecretManagerService implements OnModuleInit {
     return allPresent;
   }
 
-  /**
-   * Método para uso em ambientes de desenvolvimento
-   * Permite definir secrets localmente para testes
-   */
   async setDevelopmentSecret(name: string, value: string): Promise<void> {
     if (process.env.NODE_ENV !== 'development') {
-      throw new Error('setDevelopmentSecret só pode ser usado em ambiente de desenvolvimento');
+      throw new Error('setDevelopmentSecret can only be used in development');
     }
 
-    await this.putSecret(name, value, `Desenvolvimento - ${new Date().toISOString()}`);
+    await this.putSecret(name, value, `Development secret - ${new Date().toISOString()}`);
     process.env[name] = value;
+  }
+
+  clearSensitiveData(): void {
+    console.warn('Clearing sensitive data from memory (best effort)');
+  }
+
+  private async ensureLocalCriticalSecrets(): Promise<void> {
+    if (!this.secretManager) {
+      return;
     }
 
-  /**
-   * Limpa secrets sensíveis da memória (quando possível)
-   */
-  clearSensitiveData(): void {
-    // Esta é uma operação limitada pois process.env é global
-    // Em produção, considere usar técnicas mais avançadas
-    console.warn('🧹 Limpando dados sensíveis da memória (limitado)');
+    if (this.secretManager.getProviderName() !== 'Local') {
+      return;
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+      return;
+    }
+
+    if (process.env.REQUIRE_SECRET_MANAGER === 'true') {
+      return;
+    }
+
+    const trustedDeviceSecret = String(
+      process.env.TRUSTED_DEVICE_TOKEN_SECRET || '',
+    ).trim();
+
+    if (trustedDeviceSecret) {
+      return;
+    }
+
+    let generatedSecret = randomBytes(48).toString('base64url');
+    if (generatedSecret === process.env.JWT_SECRET) {
+      generatedSecret = `${generatedSecret}-${randomBytes(8).toString('hex')}`;
+    }
+
+    await this.secretManager.putSecret(
+      'TRUSTED_DEVICE_TOKEN_SECRET',
+      generatedSecret,
+      `Auto-provisioned local secret at ${new Date().toISOString()}`,
+    );
+    process.env.TRUSTED_DEVICE_TOKEN_SECRET = generatedSecret;
+
+    console.warn(
+      'TRUSTED_DEVICE_TOKEN_SECRET was missing for the Local provider. A secure value was generated for this process.',
+    );
   }
 }

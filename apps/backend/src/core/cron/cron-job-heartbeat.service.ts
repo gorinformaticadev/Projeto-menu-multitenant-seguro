@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type CronJobHeartbeatStatus = 'idle' | 'running' | 'success' | 'failed';
@@ -36,9 +35,30 @@ type HeartbeatRow = {
   instanceId: string | null;
 };
 
+type OptionalHeartbeatColumns = {
+  lastHeartbeatAt: boolean;
+  cycleId: boolean;
+  instanceId: boolean;
+};
+
+type InformationSchemaColumnRow = {
+  column_name: string;
+};
+
+const OPTIONAL_COLUMN_QUERY = `
+  SELECT column_name
+  FROM information_schema.columns
+  WHERE table_schema = current_schema()
+    AND table_name = 'cron_job_heartbeats'
+    AND column_name IN ('lastHeartbeatAt', 'cycleId', 'instanceId')
+`;
+
 @Injectable()
 export class CronJobHeartbeatService {
   private readonly logger = new Logger(CronJobHeartbeatService.name);
+  private optionalColumnsCache: OptionalHeartbeatColumns | null = null;
+  private optionalColumnsPromise: Promise<OptionalHeartbeatColumns> | null = null;
+  private legacySchemaWarned = false;
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -57,6 +77,7 @@ export class CronJobHeartbeatService {
     if (rows.length === 0) {
       return null;
     }
+
     return this.mapRow(rows[0]);
   }
 
@@ -82,77 +103,89 @@ export class CronJobHeartbeatService {
     });
   }
 
-  /**
-   * Marca o inicio da execucao de um ciclo.
-   * Aplica Exclusive Guard no Banco para mitigar sobreposicao de ciclos.
-   */
   async markStarted(
     jobKey: string,
     startedAt: Date,
     nextExpectedRunAt: Date | null,
     cycleId: string,
     instanceId: string,
-    stuckAfterMs = 15 * 60 * 1000 // 15 mins default fallback
+    stuckAfterMs = 15 * 60 * 1000,
   ): Promise<boolean> {
+    const optionalColumns = await this.getOptionalColumns();
     const fallbackDate = new Date(Date.now() - stuckAfterMs);
+    const params: unknown[] = [];
+    const bind = (value: unknown) => {
+      params.push(value);
+      return `$${params.length}`;
+    };
+
+    const setClauses = [
+      `"lastStartedAt" = ${bind(startedAt)}`,
+      optionalColumns.lastHeartbeatAt ? `"lastHeartbeatAt" = NOW()` : null,
+      `"lastStatus" = 'running'`,
+      `"nextExpectedRunAt" = ${bind(nextExpectedRunAt)}`,
+      optionalColumns.cycleId ? `"cycleId" = ${bind(cycleId)}` : null,
+      optionalColumns.instanceId ? `"instanceId" = ${bind(instanceId)}` : null,
+      `"lastError" = NULL`,
+      `"updatedAt" = NOW()`,
+    ].filter((value): value is string => Boolean(value));
+
+    const staleRunningCondition = optionalColumns.lastHeartbeatAt
+      ? `"lastHeartbeatAt" < ${bind(fallbackDate)}`
+      : `"updatedAt" < ${bind(fallbackDate)}`;
+    const jobKeyParam = bind(jobKey);
 
     try {
-      // 1. Tentar update com Exclusive Guard
-      const result = await this.prisma.$executeRaw`
-        UPDATE "cron_job_heartbeats"
-        SET 
-          "lastStartedAt" = ${startedAt},
-          "lastHeartbeatAt" = NOW(),
-          "lastStatus" = 'running',
-          "nextExpectedRunAt" = ${nextExpectedRunAt},
-          "cycleId" = ${cycleId},
-          "instanceId" = ${instanceId},
-          "lastError" = NULL,
-          "updatedAt" = NOW()
-        WHERE "jobKey" = ${jobKey}
-          AND ("lastStatus" != 'running' OR "lastHeartbeatAt" < ${fallbackDate})
-      `;
+      const result = await this.prisma.$executeRawUnsafe(
+        `
+          UPDATE "cron_job_heartbeats"
+          SET ${setClauses.join(', ')}
+          WHERE "jobKey" = ${jobKeyParam}
+            AND ("lastStatus" != 'running' OR ${staleRunningCondition})
+        `,
+        ...params,
+      );
 
       if (result > 0) {
         return true;
       }
 
-      // 2. Se nao atualizou nenhuma linha, verificar se o registro existe
       const current = await this.get(jobKey);
       if (!current) {
-        // Primeira execucao, cria o registro
-        try {
-          await this.prisma.$executeRaw`
-            INSERT INTO "cron_job_heartbeats" (
-              "jobKey", "lastStartedAt", "lastHeartbeatAt", "lastStatus", "nextExpectedRunAt", "cycleId", "instanceId", "updatedAt"
-            ) VALUES (
-              ${jobKey}, ${startedAt}, NOW(), 'running', ${nextExpectedRunAt}, ${cycleId}, ${instanceId}, NOW()
-            )
-          `;
-          return true;
-        } catch {
-          return false; // Erro de unique/concorrencia ao criar
-        }
+        return this.insertStartedRecord(
+          optionalColumns,
+          jobKey,
+          startedAt,
+          nextExpectedRunAt,
+          cycleId,
+          instanceId,
+        );
       }
 
-      // Se existe e o update falhou, a condicao do Guard (nao rodando e nao travado) falhou!
       return false;
     } catch (error) {
-      this.logger.error(`Erro ao marcar início de ciclo (markStarted) para ${jobKey}: ${String(error)}`);
+      this.logger.error(
+        `Erro ao marcar inicio de ciclo (markStarted) para ${jobKey}: ${String(error)}`,
+      );
       return false;
     }
   }
 
-  /**
-   * Atualiza o heartbeat (sinal de vida) para um job em execução.
-   */
   async updateHeartbeat(jobKey: string): Promise<void> {
+    const optionalColumns = await this.getOptionalColumns();
+    const setClause = optionalColumns.lastHeartbeatAt
+      ? `"lastHeartbeatAt" = NOW(), "updatedAt" = NOW()`
+      : `"updatedAt" = NOW()`;
+
     try {
-      await this.prisma.$executeRaw`
-        UPDATE "cron_job_heartbeats"
-        SET "lastHeartbeatAt" = NOW()
-        WHERE "jobKey" = ${jobKey} AND "lastStatus" = 'running'
-      `;
+      await this.prisma.$executeRawUnsafe(
+        `
+          UPDATE "cron_job_heartbeats"
+          SET ${setClause}
+          WHERE "jobKey" = $1 AND "lastStatus" = 'running'
+        `,
+        jobKey,
+      );
     } catch (error) {
       this.logger.warn(`Falha ao atualizar heartbeat para ${jobKey}: ${String(error)}`);
     }
@@ -207,28 +240,34 @@ export class CronJobHeartbeatService {
     });
   }
 
-  /**
-   * Encontra jobs que estao 'running' há muito tempo sem progresso (stuck orphan)
-   * e os recupera para 'failed' para permitir novos ciclos.
-   */
   async reconcileOrphans(defaultUnstuckMs = 15 * 60 * 1000): Promise<number> {
+    const optionalColumns = await this.getOptionalColumns();
     const thresholdDate = new Date(Date.now() - defaultUnstuckMs);
+    const staleCondition = optionalColumns.lastHeartbeatAt
+      ? `("lastHeartbeatAt" < $1 OR ("lastHeartbeatAt" IS NULL AND "updatedAt" < $1))`
+      : `"updatedAt" < $1`;
+
     try {
-      const result = await this.prisma.$executeRaw`
-        UPDATE "cron_job_heartbeats"
-        SET 
-          "lastStatus" = 'failed',
-          "lastError" = 'STUCK_ORPHAN_RECOVERED',
-          "updatedAt" = NOW()
-        WHERE "lastStatus" = 'running'
-          AND ("lastHeartbeatAt" < ${thresholdDate} OR ("lastHeartbeatAt" IS NULL AND "updatedAt" < ${thresholdDate}))
-      `;
+      const result = await this.prisma.$executeRawUnsafe(
+        `
+          UPDATE "cron_job_heartbeats"
+          SET
+            "lastStatus" = 'failed',
+            "lastError" = 'STUCK_ORPHAN_RECOVERED',
+            "updatedAt" = NOW()
+          WHERE "lastStatus" = 'running'
+            AND (${staleCondition})
+        `,
+        thresholdDate,
+      );
+
       if (result > 0) {
-        this.logger.log(`[ORPHAN_RECONCILER] Forçados ${result} jobs travados para FAILED.`);
+        this.logger.log(`[ORPHAN_RECONCILER] Forcados ${result} jobs travados para FAILED.`);
       }
+
       return result;
     } catch (error) {
-      this.logger.error(`[ORPHAN_RECONCILER] Falha ao reconciliar órfãos: ${String(error)}`);
+      this.logger.error(`[ORPHAN_RECONCILER] Falha ao reconciliar orfaos: ${String(error)}`);
       return 0;
     }
   }
@@ -238,91 +277,214 @@ export class CronJobHeartbeatService {
       return [];
     }
 
-    if (!jobKeys || jobKeys.length === 0) {
-      return this.prisma.$queryRaw<HeartbeatRow[]>`
-        SELECT
-          "jobKey",
-          "lastStartedAt",
-          "lastHeartbeatAt",
-          "lastSucceededAt",
-          "lastFailedAt",
-          "lastDurationMs",
-          "lastStatus",
-          "lastError",
-          "nextExpectedRunAt",
-          "consecutiveFailureCount",
-          "updatedAt",
-          "cycleId",
-          "instanceId"
-        FROM "cron_job_heartbeats"
-      `;
+    const optionalColumns = await this.getOptionalColumns();
+    const selectColumns = [
+      `"jobKey"`,
+      `"lastStartedAt"`,
+      optionalColumns.lastHeartbeatAt
+        ? `"lastHeartbeatAt" AS "lastHeartbeatAt"`
+        : `NULL::TIMESTAMP AS "lastHeartbeatAt"`,
+      `"lastSucceededAt"`,
+      `"lastFailedAt"`,
+      `"lastDurationMs"`,
+      `"lastStatus"`,
+      `"lastError"`,
+      `"nextExpectedRunAt"`,
+      `"consecutiveFailureCount"`,
+      `"updatedAt"`,
+      optionalColumns.cycleId ? `"cycleId" AS "cycleId"` : `NULL::TEXT AS "cycleId"`,
+      optionalColumns.instanceId
+        ? `"instanceId" AS "instanceId"`
+        : `NULL::TEXT AS "instanceId"`,
+    ];
+
+    const params: unknown[] = [];
+    let whereClause = '';
+
+    if (jobKeys && jobKeys.length > 0) {
+      const placeholders = jobKeys.map((jobKey) => {
+        params.push(jobKey);
+        return `$${params.length}`;
+      });
+      whereClause = ` WHERE "jobKey" IN (${placeholders.join(', ')})`;
     }
 
-    return this.prisma.$queryRaw<HeartbeatRow[]>`
-      SELECT
-        "jobKey",
-        "lastStartedAt",
-        "lastHeartbeatAt",
-        "lastSucceededAt",
-        "lastFailedAt",
-        "lastDurationMs",
-        "lastStatus",
-        "lastError",
-        "nextExpectedRunAt",
-        "consecutiveFailureCount",
-        "updatedAt",
-        "cycleId",
-        "instanceId"
-      FROM "cron_job_heartbeats"
-      WHERE "jobKey" IN (${Prisma.join(jobKeys)})
-    `;
+    return this.prisma.$queryRawUnsafe<HeartbeatRow[]>(
+      `
+        SELECT
+          ${selectColumns.join(',\n          ')}
+        FROM "cron_job_heartbeats"${whereClause}
+      `,
+      ...params,
+    );
   }
 
   private async persist(record: CronJobHeartbeatRecord): Promise<void> {
-    await this.prisma.$executeRaw`
-      INSERT INTO "cron_job_heartbeats" (
-        "jobKey",
-        "lastStartedAt",
-        "lastHeartbeatAt",
-        "lastSucceededAt",
-        "lastFailedAt",
-        "lastDurationMs",
-        "lastStatus",
-        "lastError",
-        "nextExpectedRunAt",
-        "consecutiveFailureCount",
-        "updatedAt",
-        "cycleId",
-        "instanceId"
-      ) VALUES (
-        ${record.jobKey},
-        ${record.lastStartedAt},
-        ${record.lastHeartbeatAt},
-        ${record.lastSucceededAt},
-        ${record.lastFailedAt},
-        ${record.lastDurationMs},
-        ${record.lastStatus},
-        ${record.lastError},
-        ${record.nextExpectedRunAt},
-        ${record.consecutiveFailureCount},
-        ${record.updatedAt},
-        ${record.cycleId || null},
-        ${record.instanceId || null}
-      )
-      ON CONFLICT ("jobKey") DO UPDATE SET
-        "lastStartedAt" = EXCLUDED."lastStartedAt",
-        "lastHeartbeatAt" = EXCLUDED."lastHeartbeatAt",
-        "lastSucceededAt" = EXCLUDED."lastSucceededAt",
-        "lastFailedAt" = EXCLUDED."lastFailedAt",
-        "lastDurationMs" = EXCLUDED."lastDurationMs",
-        "lastStatus" = EXCLUDED."lastStatus",
-        "lastError" = EXCLUDED."lastError",
-        "nextExpectedRunAt" = EXCLUDED."nextExpectedRunAt",
-        "consecutiveFailureCount" = EXCLUDED."consecutiveFailureCount",
-        "updatedAt" = EXCLUDED."updatedAt",
-        "cycleId" = EXCLUDED."cycleId",
-        "instanceId" = EXCLUDED."instanceId"
-    `;
+    const optionalColumns = await this.getOptionalColumns();
+    const params: unknown[] = [];
+    const bind = (value: unknown) => {
+      params.push(value);
+      return `$${params.length}`;
+    };
+
+    const columnEntries: Array<{ column: string; placeholder: string }> = [
+      { column: `"jobKey"`, placeholder: bind(record.jobKey) },
+      { column: `"lastStartedAt"`, placeholder: bind(record.lastStartedAt) },
+      ...(optionalColumns.lastHeartbeatAt
+        ? [{ column: `"lastHeartbeatAt"`, placeholder: bind(record.lastHeartbeatAt) }]
+        : []),
+      { column: `"lastSucceededAt"`, placeholder: bind(record.lastSucceededAt) },
+      { column: `"lastFailedAt"`, placeholder: bind(record.lastFailedAt) },
+      { column: `"lastDurationMs"`, placeholder: bind(record.lastDurationMs) },
+      { column: `"lastStatus"`, placeholder: bind(record.lastStatus) },
+      { column: `"lastError"`, placeholder: bind(record.lastError) },
+      { column: `"nextExpectedRunAt"`, placeholder: bind(record.nextExpectedRunAt) },
+      {
+        column: `"consecutiveFailureCount"`,
+        placeholder: bind(record.consecutiveFailureCount),
+      },
+      { column: `"updatedAt"`, placeholder: bind(record.updatedAt) },
+      ...(optionalColumns.cycleId
+        ? [{ column: `"cycleId"`, placeholder: bind(record.cycleId || null) }]
+        : []),
+      ...(optionalColumns.instanceId
+        ? [{ column: `"instanceId"`, placeholder: bind(record.instanceId || null) }]
+        : []),
+    ];
+
+    const updateAssignments = columnEntries
+      .filter((entry) => entry.column !== `"jobKey"`)
+      .map((entry) => `${entry.column} = EXCLUDED.${entry.column}`);
+
+    await this.prisma.$executeRawUnsafe(
+      `
+        INSERT INTO "cron_job_heartbeats" (
+          ${columnEntries.map((entry) => entry.column).join(', ')}
+        ) VALUES (
+          ${columnEntries.map((entry) => entry.placeholder).join(', ')}
+        )
+        ON CONFLICT ("jobKey") DO UPDATE SET
+          ${updateAssignments.join(', ')}
+      `,
+      ...params,
+    );
+  }
+
+  private async insertStartedRecord(
+    optionalColumns: OptionalHeartbeatColumns,
+    jobKey: string,
+    startedAt: Date,
+    nextExpectedRunAt: Date | null,
+    cycleId: string,
+    instanceId: string,
+  ): Promise<boolean> {
+    const params: unknown[] = [];
+    const bind = (value: unknown) => {
+      params.push(value);
+      return `$${params.length}`;
+    };
+
+    const columnEntries: Array<{ column: string; placeholder: string }> = [
+      { column: `"jobKey"`, placeholder: bind(jobKey) },
+      { column: `"lastStartedAt"`, placeholder: bind(startedAt) },
+      ...(optionalColumns.lastHeartbeatAt
+        ? [{ column: `"lastHeartbeatAt"`, placeholder: 'NOW()' }]
+        : []),
+      { column: `"lastStatus"`, placeholder: `'running'` },
+      { column: `"nextExpectedRunAt"`, placeholder: bind(nextExpectedRunAt) },
+      ...(optionalColumns.cycleId
+        ? [{ column: `"cycleId"`, placeholder: bind(cycleId) }]
+        : []),
+      ...(optionalColumns.instanceId
+        ? [{ column: `"instanceId"`, placeholder: bind(instanceId) }]
+        : []),
+      { column: `"updatedAt"`, placeholder: 'NOW()' },
+    ];
+
+    try {
+      const inserted = await this.prisma.$executeRawUnsafe(
+        `
+          INSERT INTO "cron_job_heartbeats" (
+            ${columnEntries.map((entry) => entry.column).join(', ')}
+          ) VALUES (
+            ${columnEntries.map((entry) => entry.placeholder).join(', ')}
+          )
+          ON CONFLICT ("jobKey") DO NOTHING
+        `,
+        ...params,
+      );
+
+      return inserted > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  private async getOptionalColumns(): Promise<OptionalHeartbeatColumns> {
+    if (this.optionalColumnsCache) {
+      return this.optionalColumnsCache;
+    }
+
+    if (this.optionalColumnsPromise) {
+      return this.optionalColumnsPromise;
+    }
+
+    this.optionalColumnsPromise = this.loadOptionalColumns();
+
+    try {
+      const resolved = await this.optionalColumnsPromise;
+      this.optionalColumnsCache = resolved;
+      return resolved;
+    } finally {
+      this.optionalColumnsPromise = null;
+    }
+  }
+
+  private async loadOptionalColumns(): Promise<OptionalHeartbeatColumns> {
+    try {
+      const rows = await this.prisma.$queryRawUnsafe<InformationSchemaColumnRow[]>(
+        OPTIONAL_COLUMN_QUERY,
+      );
+      const presentColumns = new Set(rows.map((row) => row.column_name));
+      const optionalColumns: OptionalHeartbeatColumns = {
+        lastHeartbeatAt: presentColumns.has('lastHeartbeatAt'),
+        cycleId: presentColumns.has('cycleId'),
+        instanceId: presentColumns.has('instanceId'),
+      };
+
+      this.warnIfLegacySchema(optionalColumns);
+      return optionalColumns;
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao inspecionar schema de cron_job_heartbeats. Assumindo schema mais novo: ${String(error)}`,
+      );
+      return {
+        lastHeartbeatAt: true,
+        cycleId: true,
+        instanceId: true,
+      };
+    }
+  }
+
+  private warnIfLegacySchema(optionalColumns: OptionalHeartbeatColumns): void {
+    if (this.legacySchemaWarned) {
+      return;
+    }
+
+    const missingColumns = Object.entries(optionalColumns)
+      .filter(([, available]) => !available)
+      .map(([column]) => column);
+
+    if (missingColumns.length === 0) {
+      return;
+    }
+
+    this.legacySchemaWarned = true;
+    this.logger.warn(
+      `Schema legado detectado em cron_job_heartbeats. Colunas ausentes: ${missingColumns.join(
+        ', ',
+      )}. O backend entrou em modo de compatibilidade. Aplique a migration 20260318181500_add_last_heartbeat para restaurar todos os metadados de heartbeat.`,
+    );
   }
 
   private mapRow(row: HeartbeatRow): CronJobHeartbeatRecord {
@@ -347,6 +509,7 @@ export class CronJobHeartbeatService {
     if (value === 'running' || value === 'success' || value === 'failed') {
       return value;
     }
+
     return 'idle';
   }
 
