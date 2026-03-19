@@ -138,12 +138,12 @@ export default function LogsPage() {
   };
 
   const getActionBadgeColor = (action: string) => {
-    if (action.includes("SUCCESS")) return "bg-green-100 text-green-800";
-    if (action.includes("FAILED")) return "bg-red-100 text-red-800";
-    if (action.includes("CREATE")) return "bg-blue-100 text-blue-800";
-    if (action.includes("UPDATE")) return "bg-yellow-100 text-yellow-800";
-    if (action.includes("DELETE")) return "bg-red-100 text-red-800";
-    return "bg-gray-100 text-gray-800";
+    if (action.includes("SUCCESS")) return "bg-skin-success/10 text-skin-success";
+    if (action.includes("FAILED")) return "bg-skin-danger/10 text-skin-danger";
+    if (action.includes("CREATE")) return "bg-skin-info/10 text-skin-info";
+    if (action.includes("UPDATE")) return "bg-skin-warning/10 text-skin-warning";
+    if (action.includes("DELETE")) return "bg-skin-danger/10 text-skin-danger";
+    return "bg-skin-background-elevated text-skin-text";
   };
 
   const formatDate = (date: string) => {
@@ -302,7 +302,7 @@ export default function LogsPage() {
                         <div className="text-sm">
                           <span className="font-medium">{log.user.name}</span>
                           <span className="text-muted-foreground"> ({log.user.email})</span>
-                          <span className="ml-2 rounded bg-gray-100 px-2 py-1 text-xs">
+                          <span className="ml-2 rounded bg-skin-background-elevated px-2 py-1 text-xs text-skin-text">
                             {log.user.role}
                           </span>
                         </div>
@@ -316,7 +316,7 @@ export default function LogsPage() {
                             <summary className="cursor-pointer text-primary hover:underline">
                               Ver detalhes
                             </summary>
-                            <pre className="mt-2 overflow-auto rounded bg-gray-50 p-2 text-xs">
+                            <pre className="mt-2 overflow-auto rounded bg-skin-background-elevated p-2 text-xs text-skin-text">
                               {JSON.stringify(log.details, null, 2)}
                             </pre>
                           </details>

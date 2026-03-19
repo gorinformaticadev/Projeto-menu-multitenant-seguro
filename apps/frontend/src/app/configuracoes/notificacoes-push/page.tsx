@@ -162,11 +162,11 @@ export default function PushNotificationsConfigPage() {
           </Button>
         </div>
 
-        <Card className="border-yellow-200 bg-yellow-50">
+        <Card className="border-skin-warning/30 bg-skin-warning/10">
           <CardContent className="pt-6">
             <div className="flex gap-3">
-              <ShieldAlert className="h-5 w-5 text-yellow-700 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-yellow-900">
+              <ShieldAlert className="mt-0.5 h-5 w-5 flex-shrink-0 text-skin-warning" />
+              <div className="text-sm text-skin-warning">
                 <p className="font-semibold mb-1">Atenção com a chave privada</p>
                 <p>
                   A chave privada é sensível e fica armazenada de forma protegida no backend.
