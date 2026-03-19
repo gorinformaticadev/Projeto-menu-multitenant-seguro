@@ -37,7 +37,7 @@ export function CPFCNPJExample() {
     <div className="p-8 space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Exemplos de Uso - CPF/CNPJ Input</h1>
-        <p className="text-muted-foreground">
+        <p className="text-skin-text-muted">
           Demonstração do componente reutilizável de validação de CPF/CNPJ
         </p>
       </div>
@@ -92,7 +92,7 @@ export function CPFCNPJExample() {
               placeholder="Formatação automática"
             />
             
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-skin-text-muted">
               Valor formatado: <code>{document2}</code>
             </div>
           </CardContent>
@@ -142,21 +142,21 @@ export function CPFCNPJExample() {
               <div className="grid gap-4">
                 <div>
                   <label className="text-sm font-medium">Documento 1:</label>
-                  <div className="text-xs text-muted-foreground mb-2">
+                  <div className="mb-2 text-xs text-skin-text-muted">
                     {document1 ? `Formatado: ${document1}` : "Aguardando entrada..."}
                   </div>
                 </div>
                 
                 <div>
                   <label className="text-sm font-medium">Documento 2:</label>
-                  <div className="text-xs text-muted-foreground mb-2">
+                  <div className="mb-2 text-xs text-skin-text-muted">
                     {document2 ? `Formatado: ${document2}` : "Aguardando entrada..."}
                   </div>
                 </div>
                 
                 <div>
                   <label className="text-sm font-medium">Documento 3:</label>
-                  <div className="text-xs text-muted-foreground mb-2">
+                  <div className="mb-2 text-xs text-skin-text-muted">
                     {document3 ? `Formatado: ${document3}` : "Aguardando entrada..."}
                   </div>
                 </div>

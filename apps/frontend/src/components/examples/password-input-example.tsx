@@ -43,7 +43,7 @@ export function PasswordInputExample() {
     <div className="p-8 space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Exemplos de Uso - Password Input</h1>
-        <p className="text-muted-foreground">
+        <p className="text-skin-text-muted">
           Demonstração do componente reutilizável de validação de senhas
         </p>
       </div>

@@ -16,7 +16,7 @@ export default function EmpresaConfigPage() {
             <Building2 className="h-8 w-8" />
             Configurações da Empresa
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-skin-text-muted">
             Gerencie as configurações específicas da sua empresa
           </p>
         </div>
@@ -34,10 +34,10 @@ export default function EmpresaConfigPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <p className="text-muted-foreground">
+              <p className="text-skin-text-muted">
                 As configurações da empresa incluirão:
               </p>
-              <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground">
+              <ul className="list-inside list-disc space-y-2 text-sm text-skin-text-muted">
                 <li>Informações básicas da empresa</li>
                 <li>Logo e identidade visual</li>
                 <li>Configurações de notificações</li>

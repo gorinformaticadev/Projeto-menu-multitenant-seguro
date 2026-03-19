@@ -145,9 +145,9 @@ export function RouteGuard({ children }: RouteGuardProps) {
   // Se ainda está validando, mostra loading
   if (validationState.loading || authLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="flex min-h-screen items-center justify-center bg-skin-surface">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-skin-primary"></div>
           <p className="text-skin-text-muted text-lg">Verificando autenticação...</p>
           <p className="mt-2 text-sm text-skin-text-muted">Aguarde um momento</p>
         </div>
@@ -158,7 +158,7 @@ export function RouteGuard({ children }: RouteGuardProps) {
   // Se validação falhou, mostra erro
   if (!validationState.isValid) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="flex min-h-screen items-center justify-center bg-skin-surface">
         <div className="text-center max-w-md mx-auto p-6">
           <div className="mb-4 text-6xl text-skin-danger">🔒</div>
           <h2 className="mb-2 text-2xl font-bold text-skin-danger">Acesso Negado</h2>

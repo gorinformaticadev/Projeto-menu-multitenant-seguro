@@ -141,7 +141,7 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-skin-primary"></div>
       </div>
     );
   }
@@ -160,8 +160,8 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
         </CardHeader>
         <CardContent className="pt-0">
           {systemModules.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+            <div className="py-8 text-center text-skin-text-muted">
+              <Package className="mx-auto mb-4 h-12 w-12 text-skin-text-muted/50" />
               <p>Nenhum módulo disponível no momento</p>
             </div>
           ) : (
@@ -176,7 +176,7 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
                   <div key={module.slug} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
                     <div className="flex-1 space-y-1 min-w-0">
                       <h3 className="font-medium text-sm sm:text-base truncate">{module.name}</h3>
-                      <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 overflow-hidden">
+                      <p className="line-clamp-2 overflow-hidden text-xs text-skin-text-muted sm:text-sm">
                         {module.description || 'Sem descrição'}
                       </p>
                       <div className="flex items-center gap-2 mt-2">
@@ -216,7 +216,7 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
                         />
 
                         {!canToggle && (
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs text-skin-text-muted">
                             Módulo não ativo
                           </span>
                         )}
