@@ -25,7 +25,7 @@ export default function EmpresaConfigPage() {
         <Card className="mb-6">
           <CardHeader>
             <div className="flex items-center gap-2">
-              <Info className="h-5 w-5 text-blue-500" />
+              <Info className="h-5 w-5 text-skin-info" />
               <CardTitle>Em Desenvolvimento</CardTitle>
             </div>
             <CardDescription>
@@ -44,8 +44,8 @@ export default function EmpresaConfigPage() {
                 <li>Preferências de interface</li>
                 <li>Configurações de relatórios</li>
               </ul>
-              <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
+              <div className="mt-6 rounded-lg border border-skin-info/30 bg-skin-info/10 p-4">
+                <p className="text-sm text-skin-info">
                   <strong>Nota:</strong> Esta funcionalidade será implementada em breve. 
                   Por enquanto, você pode acessar outras áreas do sistema através do menu principal.
                 </p>
@@ -77,12 +77,12 @@ export default function EmpresaConfigPage() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium">Nível de Acesso:</span>
-                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                <span className="rounded bg-skin-info/10 px-2 py-1 text-xs font-medium text-skin-info">
                   {user?.role}
                 </span>
               </div>
-              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-green-800">
+              <div className="mt-4 rounded-lg border border-skin-success/30 bg-skin-success/10 p-3">
+                <p className="text-sm text-skin-success">
                   ✓ Você tem permissão para gerenciar configurações da empresa
                 </p>
               </div>

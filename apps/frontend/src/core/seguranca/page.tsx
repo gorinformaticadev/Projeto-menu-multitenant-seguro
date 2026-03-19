@@ -226,11 +226,11 @@ export default function SecurityConfigPage() {
       </div>
 
       {/* Aviso */}
-      <Card className="border-yellow-200 bg-yellow-50">
+      <Card className="border-skin-warning/30 bg-skin-warning/10">
         <CardContent className="pt-6">
             <div className="flex gap-3">
-              <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-yellow-800">
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-skin-warning" />
+              <div className="text-sm text-skin-warning">
                 <p className="font-medium mb-1">Atenção!</p>
                 <p>
                   Alterações nas configurações de segurança afetam todo o sistema.
@@ -629,9 +629,9 @@ export default function SecurityConfigPage() {
               </div>
 
               {!config.twoFactorEnabled && (
-                <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                  <div className="text-xs text-yellow-800">
+                <div className="flex items-start gap-2 rounded-lg border border-skin-warning/30 bg-skin-warning/10 p-3">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-skin-warning" />
+                  <div className="text-xs text-skin-warning">
                     <p className="font-medium mb-1">2FA Desabilitado</p>
                     <p>
                       Quando o 2FA estiver desabilitado, os usuários não poderão configurar
@@ -642,9 +642,9 @@ export default function SecurityConfigPage() {
               )}
 
               {config.twoFactorEnabled && config.twoFactorRequired && (
-                <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <Shield className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <div className="text-xs text-blue-800">
+                <div className="flex items-start gap-2 rounded-lg border border-skin-info/30 bg-skin-info/10 p-3">
+                  <Shield className="mt-0.5 h-4 w-4 flex-shrink-0 text-skin-info" />
+                  <div className="text-xs text-skin-info">
                     <p className="font-medium mb-1">2FA Obrigatório</p>
                     <p>
                       Todos os usuários serão obrigados a configurar 2FA no próximo login.

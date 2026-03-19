@@ -185,21 +185,21 @@ export function ModulesTab({ tenantId }: { tenantId: string }) {
                         </span>
 
                         {isCorrupted ? (
-                          <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded font-bold">
+                          <span className="rounded px-2 py-1 text-xs font-bold text-skin-danger bg-skin-danger/10">
                             Corrompido: {module.integrity?.message || 'Arquivos ausentes'}
                           </span>
                         ) : module.status === 'active' ? (
-                          <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                          <span className="rounded bg-skin-success/10 px-2 py-1 text-xs text-skin-success">
                             Sistema: Ativo
                           </span>
                         ) : (
-                          <span className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
+                          <span className="rounded bg-skin-warning/10 px-2 py-1 text-xs text-skin-warning">
                             Sistema: {module.status}
                           </span>
                         )}
 
                         {isEnabled && !isCorrupted && (
-                          <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                          <span className="rounded bg-skin-info/10 px-2 py-1 text-xs text-skin-info">
                             Tenant: Ativo
                           </span>
                         )}

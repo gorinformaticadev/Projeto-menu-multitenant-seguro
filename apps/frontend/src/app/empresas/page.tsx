@@ -709,7 +709,7 @@ export default function EmpresasPage() {
               <Card key={tenant.id} className="hover:shadow-lg transition-shadow duration-200">
                 <CardHeader className="pb-3">
                   <div className="flex items-start gap-3">
-                    <div className={`rounded-full shadow-sm ${tenant.ativo ? 'bg-gradient-to-br from-primary to-primary/80' : 'bg-gray-400'} relative overflow-hidden flex items-center justify-center w-12 h-12 p-0`}>
+                    <div className={`relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full p-0 shadow-sm ${tenant.ativo ? 'bg-gradient-to-br from-primary to-primary/80' : 'bg-skin-text-muted/60'}`}>
                       <Image
                         src={
                           resolveTenantLogoSrc(tenant.logoUrl, {
@@ -736,13 +736,13 @@ export default function EmpresasPage() {
                       </CardDescription>
                       <div className="mt-2 flex flex-wrap gap-1">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${tenant.ativo
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
+                          ? 'bg-skin-success/10 text-skin-success'
+                          : 'bg-skin-danger/10 text-skin-danger'
                           }`}>
                           {tenant.ativo ? 'Ativa' : 'Inativa'}
                         </span>
                         {(tenant.isMasterTenant || tenant.email === 'empresa1@example.com') && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                          <span className="inline-flex items-center rounded-full bg-skin-info/10 px-2 py-0.5 text-xs font-semibold text-skin-info">
                             Padrão
                           </span>
                         )}
@@ -918,8 +918,8 @@ export default function EmpresasPage() {
                       <Label className="text-muted-foreground text-xs sm:text-sm">Status</Label>
                       <div className="mt-1">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${selectedTenant.ativo
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
+                          ? 'bg-skin-success/10 text-skin-success'
+                          : 'bg-skin-danger/10 text-skin-danger'
                           }`}>
                           {selectedTenant.ativo ? 'Ativa' : 'Inativa'}
                         </span>
@@ -932,16 +932,16 @@ export default function EmpresasPage() {
                     <ModulesTab tenantId={selectedTenant.id} />
 
                     {user?.role === "SUPER_ADMIN" && (
-                      <Card className="border-blue-200 bg-blue-50">
+                      <Card className="border-skin-info/30 bg-skin-info/10">
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between">
                             <div>
-                              <h4 className="font-medium text-blue-800">Gerenciamento Global de Módulos</h4>
-                              <p className="text-sm text-blue-600 mt-1">
+                              <h4 className="font-medium text-skin-info">Gerenciamento Global de Módulos</h4>
+                              <p className="mt-1 text-sm text-skin-info">
                                 Instale, remova e gerencie módulos disponíveis para todo o sistema
                               </p>
                             </div>
-                            <Button asChild variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100">
+                            <Button asChild variant="outline" className="border-skin-info/40 text-skin-info hover:bg-skin-info/10">
                               <Link href="/configuracoes/sistema/modulos">
                                 <Package className="h-4 w-4 mr-2" />
                                 Gerenciar Módulos
@@ -1251,3 +1251,4 @@ export default function EmpresasPage() {
     </ProtectedRoute>
   );
 }
+
