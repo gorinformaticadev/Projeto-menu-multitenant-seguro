@@ -184,9 +184,9 @@ export function TwoFactorSetup({
       </CardHeader>
       <CardContent className="space-y-4">
         {!twoFactorGloballyEnabled && !isEnrollmentMode && (
-          <div className="flex items-start gap-2 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-yellow-800">
+          <div className="flex items-start gap-2 rounded-lg border border-skin-warning/30 bg-skin-warning/10 p-4">
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-skin-warning" />
+            <div className="text-sm text-skin-warning">
               <p className="font-medium mb-1">2FA Desabilitado pelo Administrador</p>
               <p>
                 A autenticacao de dois fatores esta temporariamente desabilitada nas configuracoes do sistema.
@@ -196,16 +196,16 @@ export function TwoFactorSetup({
         )}
 
         {!isEnrollmentMode && (
-          <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+          <div className="flex items-center justify-between rounded-lg bg-skin-background-elevated p-4">
             <div className="flex items-center gap-3">
               {isEnabled ? (
-                <Lock className="h-5 w-5 text-green-600" />
+                <Lock className="h-5 w-5 text-skin-success" />
               ) : (
-                <Unlock className="h-5 w-5 text-gray-400" />
+                <Unlock className="h-5 w-5 text-skin-text-muted" />
               )}
               <div>
                 <p className="font-medium">{isEnabled ? "2FA Ativado" : "2FA Desativado"}</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-skin-text-muted">
                   {isEnabled
                     ? "Sua conta esta protegida com 2FA"
                     : twoFactorGloballyEnabled
@@ -217,10 +217,10 @@ export function TwoFactorSetup({
             <div
               className={`px-3 py-1 rounded-full text-sm font-medium ${
                 isEnabled
-                  ? "bg-green-100 text-green-800"
+                  ? "bg-skin-success/15 text-skin-success"
                   : twoFactorGloballyEnabled
-                    ? "bg-gray-100 text-gray-800"
-                    : "bg-yellow-100 text-yellow-800"
+                    ? "bg-skin-background-elevated text-skin-text-muted"
+                    : "bg-skin-warning/15 text-skin-warning"
               }`}
             >
               {isEnabled ? "Ativo" : twoFactorGloballyEnabled ? "Inativo" : "Bloqueado"}
@@ -232,9 +232,9 @@ export function TwoFactorSetup({
           <>
             {!isEnabled && !showSetup && (
               <div className="space-y-4">
-                <div className="flex items-start gap-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm text-blue-800">
+                <div className="flex items-start gap-2 rounded-lg border border-skin-info/30 bg-skin-info/10 p-4">
+                  <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-skin-info" />
+                  <div className="text-sm text-skin-info">
                     <p className="font-medium mb-1">Como funciona?</p>
                     <ol className="list-decimal list-inside space-y-1">
                       <li>Clique em {isEnrollmentMode ? "&quot;Iniciar configuracao&quot;" : "&quot;Ativar 2FA&quot;"}</li>
@@ -266,9 +266,9 @@ export function TwoFactorSetup({
                       <Image src={qrCode} alt="QR Code 2FA" width={200} height={200} />
                     </div>
                   </div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-xs text-skin-text-muted">
                     <p>Ou digite manualmente o codigo:</p>
-                    <code className="bg-muted px-2 py-1 rounded">{secret}</code>
+                    <code className="rounded bg-skin-background-elevated px-2 py-1">{secret}</code>
                   </div>
                 </div>
 
@@ -355,7 +355,7 @@ export function TwoFactorSetup({
           </>
         ) : (
           <div className="text-center py-4">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-skin-text-muted">
               A funcionalidade de 2FA esta desabilitada pelo administrador do sistema.
             </p>
           </div>

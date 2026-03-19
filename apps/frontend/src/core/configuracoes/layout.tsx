@@ -59,7 +59,7 @@ export default function ConfiguracoesLayout({
   const visibleItems = menuItems.filter(item => item.show);
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-skin-surface">
       {/* Sidebar Mobile Overlay */}
       {sidebarOpen && (
         <div 
@@ -70,7 +70,7 @@ export default function ConfiguracoesLayout({
 
       {/* Sidebar */}
       <div className={cn(
-        "fixed inset-y-0 left-0 z-50 w-80 bg-card border-r transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
+        "fixed inset-y-0 left-0 z-50 w-80 border-r bg-skin-surface transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
@@ -78,7 +78,7 @@ export default function ConfiguracoesLayout({
           <div className="flex items-center justify-between p-6 border-b">
             <div>
               <h2 className="text-lg font-semibold">Configurações</h2>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-skin-text-muted">
                 Gerencie o sistema
               </p>
             </div>
@@ -107,8 +107,8 @@ export default function ConfiguracoesLayout({
                     className={cn(
                       "flex items-center gap-3 p-3 rounded-lg text-sm transition-colors group",
                       isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        ? "bg-skin-primary text-skin-text-inverse"
+                        : "text-skin-text-muted hover:bg-skin-surface-hover hover:text-skin-text"
                     )}
                     onClick={() => setSidebarOpen(false)}
                   >
@@ -118,8 +118,8 @@ export default function ConfiguracoesLayout({
                       <div className={cn(
                         "text-xs truncate",
                         isActive 
-                          ? "text-primary-foreground/80" 
-                          : "text-muted-foreground"
+                          ? "text-skin-text-inverse/80" 
+                          : "text-skin-text-muted"
                       )}>
                         {item.description}
                       </div>
@@ -134,12 +134,12 @@ export default function ConfiguracoesLayout({
             </nav>
 
             {/* Info Box */}
-            <div className="mt-8 p-4 bg-muted rounded-lg">
+            <div className="mt-8 rounded-lg bg-skin-background-elevated p-4">
               <div className="flex items-center gap-2 mb-2">
-                <Shield className="h-4 w-4 text-muted-foreground" />
+                <Shield className="h-4 w-4 text-skin-text-muted" />
                 <span className="text-sm font-medium">Acesso Restrito</span>
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-skin-text-muted">
                 {user?.role === "SUPER_ADMIN" 
                   ? "Você tem acesso completo a todas as configurações do sistema."
                   : "Algumas configurações são restritas a SUPER_ADMIN."
@@ -150,10 +150,10 @@ export default function ConfiguracoesLayout({
 
           {/* Footer */}
           <div className="p-6 border-t">
-            <div className="text-xs text-muted-foreground">
+            <div className="text-xs text-skin-text-muted">
               <div className="flex items-center justify-between">
                 <span>Usuário: {user?.name}</span>
-                <span className="px-2 py-1 bg-primary/10 text-primary rounded text-xs">
+                <span className="rounded bg-skin-primary/15 px-2 py-1 text-xs text-skin-primary">
                   {user?.role}
                 </span>
               </div>
@@ -165,7 +165,7 @@ export default function ConfiguracoesLayout({
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile Header */}
-        <div className="lg:hidden flex items-center justify-between p-4 border-b bg-card">
+        <div className="lg:hidden flex items-center justify-between border-b bg-skin-surface p-4">
           <Button
             variant="ghost"
             size="icon"

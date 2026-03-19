@@ -69,7 +69,7 @@ export function ModuleRegistryUserMenu({ onItemClick }: Props) {
             key={item.id}
             href={item.href}
             onClick={onItemClick}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+            className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-skin-surface-hover"
           >
             <Icon className="h-4 w-4" />
             {item.label}

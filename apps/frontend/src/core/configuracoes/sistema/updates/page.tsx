@@ -298,7 +298,7 @@ export default function UpdatesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Sistema de Atualizações</h1>
-          <p className="text-muted-foreground">
+          <p className="text-skin-text-muted">
             Gerencie atualizações automáticas do sistema via Git
           </p>
         </div>
@@ -394,7 +394,7 @@ export default function UpdatesPage() {
                 )}
 
                 {status?.lastCheck && (
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-sm text-skin-text-muted">
                     Última verificação: {new Date(status.lastCheck).toLocaleString('pt-BR')}
                   </div>
                 )}
@@ -574,7 +574,7 @@ export default function UpdatesPage() {
                       />
                       Verificação Automática
                     </Label>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-skin-text-muted">
                       Verificar atualizações automaticamente (diariamente)
                     </p>
                   </div>
@@ -628,7 +628,7 @@ export default function UpdatesPage() {
                     Carregando histórico...
                   </div>
                 ) : logs.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
+                  <div className="text-center py-8 text-skin-text-muted">
                     Nenhuma atualização registrada
                   </div>
                 ) : (
@@ -640,7 +640,7 @@ export default function UpdatesPage() {
                             <span className="font-medium">Versão {log.version}</span>
                             {renderStatusBadge(log.status)}
                           </div>
-                          <div className="text-sm text-muted-foreground">
+                          <div className="text-sm text-skin-text-muted">
                             {new Date(log.startedAt).toLocaleString('pt-BR')}
                           </div>
                         </div>

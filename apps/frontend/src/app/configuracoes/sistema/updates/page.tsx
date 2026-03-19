@@ -472,7 +472,7 @@ export default function UpdatesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Sistema de Atualizações</h1>
-          <p className="text-muted-foreground">
+          <p className="text-skin-text-muted">
             Gerencie atualizações automáticas do sistema via Git
           </p>
         </div>
@@ -599,14 +599,14 @@ export default function UpdatesPage() {
 
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Commit</Label>
-                      <div className="text-sm font-mono break-all text-muted-foreground">
+                      <div className="text-sm font-mono break-all text-skin-text-muted">
                         {versionInfo.commitSha || 'N/A'}
                       </div>
                     </div>
 
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Data do Build</Label>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-sm text-skin-text-muted">
                         {formatBuildDate(versionInfo.buildDate)}
                       </div>
                     </div>
@@ -614,14 +614,14 @@ export default function UpdatesPage() {
                     {canShowVersionSource && (
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Origem da Versão</Label>
-                        <div className="text-sm font-mono text-muted-foreground">{versionInfo.source}</div>
+                        <div className="text-sm font-mono text-skin-text-muted">{versionInfo.source}</div>
                       </div>
                     )}
                   </div>
                 )}
 
                 {status?.lastCheck && (
-                  <div className="flex items-center justify-between text-sm text-muted-foreground pt-2">
+                  <div className="flex items-center justify-between pt-2 text-sm text-skin-text-muted">
                     <div>
                       Última verificação: {new Date(status.lastCheck).toLocaleString('pt-BR')}
                     </div>
@@ -647,7 +647,7 @@ export default function UpdatesPage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
+                    <span className="text-skin-text-muted">
                       Etapa: {formatUpdateStage(status.updateLifecycle.step)}
                     </span>
                     <span className="font-medium">{Math.max(0, Math.min(100, status.updateLifecycle.progress || 0))}%</span>
@@ -659,7 +659,7 @@ export default function UpdatesPage() {
                     />
                   </div>
                   {status.updateLifecycle.operation?.operationId && (
-                    <div className="text-xs text-muted-foreground font-mono break-all">
+                    <div className="text-xs font-mono break-all text-skin-text-muted">
                       operationId: {status.updateLifecycle.operation.operationId}
                     </div>
                   )}
@@ -843,7 +843,7 @@ export default function UpdatesPage() {
                       />
                       Verificação Automática
                     </Label>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-skin-text-muted">
                       Verificar atualizações automaticamente (diariamente)
                     </p>
                   </div>
@@ -899,7 +899,7 @@ export default function UpdatesPage() {
               </CardHeader>
               <CardContent>
                 {backupLogs.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
+                  <div className="py-8 text-center text-skin-text-muted">
                     Nenhuma operação registrada
                   </div>
                 ) : (
@@ -920,7 +920,7 @@ export default function UpdatesPage() {
                                 {log.status}
                               </span>
                             </div>
-                            <div className="text-sm text-muted-foreground">
+                            <div className="text-sm text-skin-text-muted">
                               {new Date(log.startedAt).toLocaleString('pt-BR')}
                             </div>
                           </div>
@@ -956,7 +956,7 @@ export default function UpdatesPage() {
 
                     {/* Indicador de total de registros */}
                     {backupLogs.length > 5 && (
-                      <div className="text-center pt-2 text-sm text-muted-foreground border-t">
+                      <div className="border-t pt-2 text-center text-sm text-skin-text-muted">
                         Total de {backupLogs.length} registros (role para ver todos)
                       </div>
                     )}
@@ -1048,7 +1048,7 @@ export default function UpdatesPage() {
                       />
                       Verificação Automática
                     </Label>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-skin-text-muted">
                       Verificar atualizações automaticamente (diariamente)
                     </p>
                   </div>
@@ -1102,7 +1102,7 @@ export default function UpdatesPage() {
                     Carregando histórico...
                   </div>
                 ) : logs.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
+                  <div className="py-8 text-center text-skin-text-muted">
                     Nenhuma atualização registrada
                   </div>
                 ) : (
@@ -1114,7 +1114,7 @@ export default function UpdatesPage() {
                             <span className="font-medium">Versão {log.version}</span>
                             {renderStatusBadge(log.status)}
                           </div>
-                          <div className="text-sm text-muted-foreground">
+                          <div className="text-sm text-skin-text-muted">
                             {new Date(log.startedAt).toLocaleString('pt-BR')}
                           </div>
                         </div>

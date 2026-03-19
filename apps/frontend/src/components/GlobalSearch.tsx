@@ -148,7 +148,7 @@ export function GlobalSearch({ onClose, mobile }: GlobalSearchProps) {
     return (
         <div ref={containerRef} className={cn("relative w-full", mobile ? "flex-1" : "max-w-xl mx-4")}>
             <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-skin-text-muted" />
                 <input
                     ref={inputRef}
                     type="text"
@@ -161,16 +161,16 @@ export function GlobalSearch({ onClose, mobile }: GlobalSearchProps) {
                     onFocus={() => setIsOpen(true)}
                     placeholder={mobile ? "Buscar no sistema..." : "Buscar no sistema... (Ctrl+K)"}
                     className={cn(
-                        "w-full pl-10 pr-4 py-2 rounded-full border transition-all",
-                        "bg-gray-100 dark:bg-secondary/50 border-transparent focus:bg-white dark:focus:bg-card focus:border-primary/50 focus:ring-2 focus:ring-primary/20",
-                        "text-sm dark:text-foreground placeholder:text-gray-400 dark:placeholder:text-muted-foreground/50",
+                        "w-full rounded-full border px-4 py-2 pl-10 pr-4 text-sm transition-all",
+                        "border-skin-border/70 bg-skin-background-elevated text-skin-text focus:border-skin-primary/50 focus:bg-skin-surface focus:ring-2 focus:ring-skin-focus-ring/20",
+                        "placeholder:text-skin-text-muted",
                         mobile && "border-none bg-transparent"
                     )}
                 />
                 {query && (
                     <button
                         onClick={() => setQuery("")}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-skin-text-muted transition-colors hover:text-skin-text"
                     >
                         <X className="h-4 w-4" />
                     </button>
@@ -180,15 +180,15 @@ export function GlobalSearch({ onClose, mobile }: GlobalSearchProps) {
             {/* Resultados Dropdown */}
             {isOpen && results.length > 0 && (
                 <div className={cn(
-                    "absolute mt-2 w-full bg-white dark:bg-popover border border-gray-200 dark:border-border rounded-xl shadow-2xl z-[100] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200",
+                    "absolute z-[100] mt-2 w-full overflow-hidden rounded-xl border border-skin-border bg-skin-surface shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200",
                     mobile ? "fixed top-16 left-0 right-0 h-auto max-h-[60vh] mx-4 w-auto" : ""
                 )}>
-                    <div className="p-2 border-b border-gray-100 dark:border-border flex items-center justify-between bg-gray-50/50 dark:bg-muted/30">
-                        <span className="text-[10px] font-semibold text-gray-400 dark:text-muted-foreground uppercase tracking-wider ml-2">
+                    <div className="flex items-center justify-between border-b border-skin-border bg-skin-background-elevated/50 p-2">
+                        <span className="ml-2 text-[10px] font-semibold uppercase tracking-wider text-skin-text-muted">
                             Resultados ({results.length})
                         </span>
                         <div className="hidden md:flex items-center gap-1.5 mr-2">
-                            <span className="text-[10px] text-gray-400 dark:text-muted-foreground flex items-center gap-1">
+                            <span className="flex items-center gap-1 text-[10px] text-skin-text-muted">
                                 <Keyboard className="h-3 w-3" /> Navegar
                             </span>
                         </div>
@@ -204,19 +204,19 @@ export function GlobalSearch({ onClose, mobile }: GlobalSearchProps) {
                                     className={cn(
                                         "flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors",
                                         index === selectedIndex
-                                            ? "bg-primary/10 text-primary"
-                                            : "text-gray-700 dark:text-foreground hover:bg-gray-50 dark:hover:bg-muted/50"
+                                            ? "bg-skin-primary/10 text-skin-primary"
+                                            : "text-skin-text hover:bg-skin-surface-hover"
                                     )}
                                 >
                                     <div className={cn(
                                         "p-2 rounded-lg",
-                                        index === selectedIndex ? "bg-primary/20" : "bg-gray-100 dark:bg-muted"
+                                        index === selectedIndex ? "bg-skin-primary/20" : "bg-skin-background-elevated"
                                     )}>
                                         <Icon className="h-4 w-4" />
                                     </div>
                                     <div className="flex flex-col min-w-0">
                                         <span className="text-sm font-medium truncate">{result.label}</span>
-                                        <span className="text-[10px] text-gray-400 dark:text-muted-foreground truncate opacity-80">
+                                        <span className="truncate text-[10px] text-skin-text-muted opacity-80">
                                             {result.source}
                                         </span>
                                     </div>
@@ -229,8 +229,8 @@ export function GlobalSearch({ onClose, mobile }: GlobalSearchProps) {
                             );
                         })}
                     </div>
-                    <div className="p-2 border-t border-gray-100 dark:border-border bg-gray-50 dark:bg-muted/30 flex justify-center">
-                        <p className="text-[10px] text-gray-400 dark:text-muted-foreground">
+                    <div className="flex justify-center border-t border-skin-border bg-skin-background-elevated/50 p-2">
+                        <p className="text-[10px] text-skin-text-muted">
                             Pressione <kbd className="font-sans">Enter</kbd> para selecionar ou <kbd className="font-sans">Esc</kbd> para fechar
                         </p>
                     </div>
@@ -240,15 +240,15 @@ export function GlobalSearch({ onClose, mobile }: GlobalSearchProps) {
             {/* Estado Vazio (quando tem query mas não tem resultados) */}
             {isOpen && query.trim().length >= 2 && results.length === 0 && (
                 <div className={cn(
-                    "absolute mt-2 w-full bg-white dark:bg-popover border border-gray-200 dark:border-border rounded-xl shadow-2xl z-[100] p-8 text-center",
+                    "absolute z-[100] mt-2 w-full rounded-xl border border-skin-border bg-skin-surface p-8 text-center shadow-2xl",
                     mobile ? "fixed top-16 left-0 right-0 mx-4 w-auto" : ""
                 )}>
                     <div className="flex flex-col items-center gap-2">
-                        <Search className="h-8 w-8 text-gray-300 dark:text-muted/30" />
-                        <p className="text-sm text-gray-500 dark:text-muted-foreground font-medium">
+                        <Search className="h-8 w-8 text-skin-text-muted/60" />
+                        <p className="text-sm font-medium text-skin-text-muted">
                             Nenhum resultado encontrado para &quot;{query}&quot;
                         </p>
-                        <p className="text-xs text-gray-400 dark:text-muted-foreground/60">
+                        <p className="text-xs text-skin-text-muted/80">
                             Tente buscar por termos mais genéricos como &quot;Usuários&quot;, &quot;Configurações&quot; ou o nome de um módulo.
                         </p>
                     </div>

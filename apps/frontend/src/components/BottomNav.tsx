@@ -31,7 +31,7 @@ export function BottomNav() {
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-16 items-center justify-between border-t border-border/80 bg-card/95 px-2 shadow-[0_-6px_18px_rgba(15,23,42,0.06)] backdrop-blur-lg pb-safe md:hidden supports-[backdrop-filter]:bg-card/88">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-16 items-center justify-between border-t border-border/80 bg-card/95 px-2 shadow-lg backdrop-blur-lg pb-safe md:hidden supports-[backdrop-filter]:bg-card/88">
 
         {/* Esquerda: Home, Empresas */}
         <div className="flex flex-1 justify-around">
@@ -44,7 +44,7 @@ export function BottomNav() {
                 href={item.href}
                 className={cn(
                   "flex flex-col items-center gap-1 transition-all active:scale-95",
-                  isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                  isActive ? "text-skin-primary" : "text-skin-text-muted hover:text-skin-text"
                 )}
               >
                 <Icon size={20} className={isActive ? "fill-primary/10" : ""} />
@@ -58,7 +58,7 @@ export function BottomNav() {
         <div className="flex-shrink-0 px-2">
           <button
             onClick={() => setIsLauncherOpen(true)}
-            className="flex h-14 w-14 -translate-y-5 flex-col items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[0_12px_26px_rgba(37,99,235,0.24)] ring-4 ring-background transition-all hover:brightness-110 active:scale-90"
+            className="flex h-14 w-14 -translate-y-5 flex-col items-center justify-center rounded-2xl bg-skin-primary text-skin-text-inverse shadow-lg ring-4 ring-skin-surface transition-all hover:brightness-110 active:scale-90"
             aria-label="Launcher de Módulos"
           >
             <Image
@@ -85,7 +85,7 @@ export function BottomNav() {
                 href={item.href}
                 className={cn(
                   "flex flex-col items-center gap-1 transition-all active:scale-95",
-                  isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                  isActive ? "text-skin-primary" : "text-skin-text-muted hover:text-skin-text"
                 )}
               >
                 <Icon size={20} className={isActive ? "fill-primary/10" : ""} />
@@ -101,7 +101,7 @@ export function BottomNav() {
         <DialogContent className="sm:max-w-[425px] rounded-t-[32px] sm:rounded-lg overflow-hidden border-none pb-12">
           <DialogHeader className="pt-4">
             <DialogTitle className="text-center text-xl font-bold">Módulos do Sistema</DialogTitle>
-            <p className="text-center text-xs text-muted-foreground">Acesse suas ferramentas modulares</p>
+            <p className="text-center text-xs text-skin-text-muted">Acesse suas ferramentas modulares</p>
           </DialogHeader>
           <div className="grid grid-cols-3 gap-y-8 gap-x-4 py-8 max-h-[60vh] overflow-y-auto no-scrollbar">
             {taskbarItems.length > 0 ? (
@@ -112,7 +112,7 @@ export function BottomNav() {
                   onClick={() => setIsLauncherOpen(false)}
                   className="flex flex-col items-center gap-2 group transition-all active:scale-95"
                 >
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-border/70 bg-secondary text-primary shadow-sm transition-all duration-300 group-hover:border-primary/20 group-hover:bg-primary group-hover:text-primary-foreground">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-border/70 bg-secondary text-skin-primary shadow-sm transition-all duration-300 group-hover:border-skin-primary/20 group-hover:bg-skin-primary group-hover:text-skin-text-inverse">
                     <LayoutGrid size={32} />
                   </div>
                   <span className="text-[11px] font-bold text-center truncate w-full px-1">
@@ -121,7 +121,7 @@ export function BottomNav() {
                 </Link>
               ))
             ) : (
-              <div className="col-span-3 py-10 text-center text-muted-foreground text-sm flex flex-col items-center gap-2">
+              <div className="col-span-3 flex flex-col items-center gap-2 py-10 text-center text-sm text-skin-text-muted">
                 <LayoutGrid className="opacity-20" size={48} />
                 <p>Nenhum módulo modular carregado.</p>
               </div>

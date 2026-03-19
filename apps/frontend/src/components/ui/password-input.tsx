@@ -205,7 +205,7 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
         {/* Campo de senha principal */}
         <div className="space-y-2">
           {label && (
-            <Label htmlFor={props.id} className={cn(error && "text-destructive")}>
+            <Label htmlFor={props.id} className={cn(error && "text-skin-danger")}>
               {label}
             </Label>
           )}
@@ -218,7 +218,7 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
               value={value}
               onChange={handleChange}
               className={cn(
-                error && "border-destructive focus-visible:ring-destructive",
+                error && "border-skin-danger focus-visible:ring-skin-danger",
                 "pr-10",
                 className
               )}
@@ -234,9 +234,9 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
               tabIndex={-1}
             >
               {showPassword ? (
-                <EyeOff className="h-4 w-4 text-muted-foreground" />
+                <EyeOff className="h-4 w-4 text-skin-text-muted" />
               ) : (
-                <Eye className="h-4 w-4 text-muted-foreground" />
+                <Eye className="h-4 w-4 text-skin-text-muted" />
               )}
             </Button>
           </div>
@@ -246,7 +246,7 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
         {showStrengthMeter && value && (
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Força da senha:</span>
+              <span className="text-skin-text-muted">Força da senha:</span>
               <span className={cn(
                 "font-medium",
                 validation.strength === 'very-strong' && "text-skin-success",
@@ -271,8 +271,8 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
         {showValidation && value && requirements.length > 0 && (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Shield className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">
+              <Shield className="h-4 w-4 text-skin-text-muted" />
+              <span className="text-sm font-medium text-skin-text-muted">
                 Requisitos de segurança:
               </span>
             </div>
@@ -311,7 +311,7 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
                 onChange={handleConfirmChange}
                 placeholder="Digite a senha novamente"
                 className={cn(
-                  confirmValue && !passwordsMatch && "border-destructive focus-visible:ring-destructive",
+                  confirmValue && !passwordsMatch && "border-skin-danger focus-visible:ring-skin-danger",
                   "pr-10"
                 )}
                 autoComplete="new-password"
@@ -326,9 +326,9 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
                 tabIndex={-1}
               >
                 {showConfirmPassword ? (
-                  <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  <EyeOff className="h-4 w-4 text-skin-text-muted" />
                 ) : (
-                  <Eye className="h-4 w-4 text-muted-foreground" />
+                  <Eye className="h-4 w-4 text-skin-text-muted" />
                 )}
               </Button>
             </div>
@@ -354,7 +354,7 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
 
         {/* Mensagem de erro */}
         {error && (
-          <p className="text-sm text-destructive">
+          <p className="text-sm text-skin-danger">
             {error}
           </p>
         )}

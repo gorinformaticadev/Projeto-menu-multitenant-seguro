@@ -15,7 +15,7 @@ export default function ModulosPage() {
             <Package className="h-8 w-8" />
             Gerenciamento de Módulos
           </h1>
-          <p className="text-muted-foreground mt-2">
+          <p className="mt-2 text-skin-text-muted">
             Instalar, remover e gerenciar módulos do sistema globalmente
           </p>
         </div>

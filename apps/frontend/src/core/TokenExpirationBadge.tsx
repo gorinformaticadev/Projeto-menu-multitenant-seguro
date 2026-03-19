@@ -16,14 +16,14 @@ export function TokenExpirationBadge() {
   const seconds = timeRemaining % 60;
 
   const getColor = () => {
-    if (timeRemaining > 300) return "bg-green-500"; // > 5 min
-    if (timeRemaining > 60) return "bg-yellow-500"; // > 1 min
-    return "bg-red-500"; // < 1 min
+    if (timeRemaining > 300) return "bg-skin-success"; // > 5 min
+    if (timeRemaining > 60) return "bg-skin-warning"; // > 1 min
+    return "bg-skin-danger"; // < 1 min
   };
 
   return (
     <div
-      className={`fixed top-4 right-4 ${getColor()} text-white px-3 py-1 rounded-full shadow-lg flex items-center gap-2 text-xs z-50`}
+      className={`fixed top-4 right-4 z-50 flex items-center gap-2 rounded-full px-3 py-1 text-xs text-skin-text-inverse shadow-lg ${getColor()}`}
     >
       <Clock className="h-3 w-3" />
       <span>

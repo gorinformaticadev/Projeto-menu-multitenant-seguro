@@ -43,7 +43,6 @@ export default function RootLayout({
         <link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#F7F8FA" />
       </head>
       <body
         className="font-sans"

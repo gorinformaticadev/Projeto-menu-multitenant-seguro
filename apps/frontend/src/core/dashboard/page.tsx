@@ -1,10 +1,10 @@
 "use client";
 
-import { useAuth } from "@/contexts/AuthContext";
-import { use2FAStatus } from "@/hooks/use2FAStatus";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Shield, Building2, Users, Settings, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
+import { use2FAStatus } from "@/hooks/use2FAStatus";
 import { DashboardWidgets } from "./DashboardWidgets";
 
 export default function DashboardPage() {
@@ -15,25 +15,24 @@ export default function DashboardPage() {
     <div className="p-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Bem-vindo ao sistema, {user?.name}!
-        </p>
+        <p className="text-skin-text-muted">Bem-vindo ao sistema, {user?.name}!</p>
       </div>
 
-      {/* Aviso de 2FA */}
       {!twoFactorLoading && twoFactorStatus && !twoFactorStatus.enabled && twoFactorStatus.suggested && (
-        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
-          <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-skin-warning/30 bg-skin-warning/10 p-4">
+          <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-skin-warning" />
           <div>
-            <h3 className="font-medium text-yellow-800">Recomendação de Segurança</h3>
-            <p className="text-sm text-yellow-700 mt-1">
-              Ative a Autenticação de Dois Fatores (2FA) para aumentar a segurança da sua conta.
+            <h3 className="font-medium text-skin-warning">Recomendacao de Seguranca</h3>
+            <p className="mt-1 text-sm text-skin-warning">
+              Ative a Autenticacao de Dois Fatores (2FA) para aumentar a seguranca da sua conta.
             </p>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="mt-2 bg-white border-yellow-300 text-yellow-700 hover:bg-yellow-50"
-              onClick={() => window.location.href = '/perfil'}
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-2 border-skin-warning/40 bg-skin-warning/15 text-skin-warning hover:bg-skin-warning/20"
+              onClick={() => {
+                window.location.href = "/perfil";
+              }}
             >
               Configurar 2FA
             </Button>
@@ -41,21 +40,17 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Widgets dinâmicos do Module Registry */}
       <DashboardWidgets />
 
-      {/* Cards de informações básicas */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-8">
+      <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Seu Perfil</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
+            <Shield className="h-4 w-4 text-skin-text-muted" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{user?.role}</div>
-            <p className="text-xs text-muted-foreground">
-              Nível de acesso
-            </p>
+            <p className="text-xs text-skin-text-muted">Nivel de acesso</p>
           </CardContent>
         </Card>
 
@@ -63,15 +58,11 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Empresa</CardTitle>
-              <Building2 className="h-4 w-4 text-muted-foreground" />
+              <Building2 className="h-4 w-4 text-skin-text-muted" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold truncate">
-                {user.tenant.nomeFantasia}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Seu tenant
-              </p>
+              <div className="truncate text-2xl font-bold">{user.tenant.nomeFantasia}</div>
+              <p className="text-xs text-skin-text-muted">Seu tenant</p>
             </CardContent>
           </Card>
         )}
@@ -79,26 +70,22 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Status</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <Users className="h-4 w-4 text-skin-text-muted" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">Ativo</div>
-            <p className="text-xs text-muted-foreground">
-              Sistema operacional
-            </p>
+            <div className="text-2xl font-bold text-skin-success">Ativo</div>
+            <p className="text-xs text-skin-text-muted">Sistema operacional</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Segurança</CardTitle>
-            <Settings className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Seguranca</CardTitle>
+            <Settings className="h-4 w-4 text-skin-text-muted" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">Alta</div>
-            <p className="text-xs text-muted-foreground">
-              Isolamento ativo
-            </p>
+            <div className="text-2xl font-bold text-skin-info">Alta</div>
+            <p className="text-xs text-skin-text-muted">Isolamento ativo</p>
           </CardContent>
         </Card>
       </div>

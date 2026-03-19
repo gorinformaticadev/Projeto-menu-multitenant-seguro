@@ -10,8 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
-import { User, Mail, Shield, Key, Edit, Upload, Trash2 } from "lucide-react";
+import { User, Mail, Shield, Key, Edit, Upload, Trash2, Palette } from "lucide-react";
 import { PasswordInput } from "@/components/ui/password-input";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { DEFAULT_TENANT_LOGO_PATH, resolveTenantLogoSrc } from "@/lib/tenant-logo";
 
 export default function PerfilPage() {
@@ -376,7 +377,7 @@ export default function PerfilPage() {
           <User className="h-8 w-8" />
           Meu Perfil
         </h1>
-        <p className="text-muted-foreground mt-2">
+        <p className="mt-2 text-skin-text-muted">
           Gerencie suas informacoes e configuracoes de seguranca
         </p>
       </div>
@@ -390,7 +391,7 @@ export default function PerfilPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
-            <div className="relative h-20 w-20 overflow-hidden rounded-full border bg-muted">
+            <div className="relative h-20 w-20 overflow-hidden rounded-full border bg-skin-background-elevated">
               <Image
                 src={currentAvatarSrc}
                 alt="Avatar do usuario"
@@ -402,7 +403,7 @@ export default function PerfilPage() {
                 }}
               />
             </div>
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-skin-text-muted">
               <p>
                 {user?.avatarUrl
                   ? "Imagem personalizada ativa"
@@ -462,22 +463,22 @@ export default function PerfilPage() {
                 <div>
                   <Label>Nome</Label>
                   <div className="flex items-center gap-2 mt-1">
-                    <User className="h-4 w-4 text-muted-foreground" />
+                    <User className="h-4 w-4 text-skin-text-muted" />
                     <span>{user?.name}</span>
                   </div>
                 </div>
                 <div>
                   <Label>Email</Label>
                   <div className="flex items-center gap-2 mt-1">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <Mail className="h-4 w-4 text-skin-text-muted" />
                     <span>{user?.email}</span>
                   </div>
                 </div>
                 <div>
                   <Label>Funcao</Label>
                   <div className="flex items-center gap-2 mt-1">
-                    <Shield className="h-4 w-4 text-muted-foreground" />
-                    <span className="px-2 py-1 bg-primary/10 text-primary rounded text-sm">
+                    <Shield className="h-4 w-4 text-skin-text-muted" />
+                    <span className="rounded bg-skin-primary/15 px-2 py-1 text-sm text-skin-primary">
                       {user?.role}
                     </span>
                   </div>
@@ -542,6 +543,27 @@ export default function PerfilPage() {
               </div>
             </form>
           )}
+        </CardContent>
+      </Card>
+
+      <Card id="aparencia">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Palette className="h-5 w-5" />
+            Aparencia e tema
+          </CardTitle>
+          <CardDescription>
+            Escolha como o shell do sistema deve aparecer para voce.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-lg border border-skin-border bg-skin-background-elevated/70 p-4">
+            <p className="text-sm font-medium text-skin-text">Tema da interface</p>
+            <p className="mt-1 text-sm text-skin-text-muted">
+              A selecao abaixo usa o sistema de temas atual e salva sua preferencia de verdade.
+            </p>
+          </div>
+          <ThemeToggle className="max-w-sm rounded-xl border border-skin-border bg-skin-surface" />
         </CardContent>
       </Card>
 
@@ -635,21 +657,21 @@ export default function PerfilPage() {
                   <div>
                     <Label>Nome Fantasia</Label>
                     <div className="flex items-center gap-2 mt-1">
-                      <User className="h-4 w-4 text-muted-foreground" />
+                      <User className="h-4 w-4 text-skin-text-muted" />
                       <span>{user.tenant.nomeFantasia}</span>
                     </div>
                   </div>
                   <div>
                     <Label>CNPJ/CPF</Label>
                     <div className="flex items-center gap-2 mt-1">
-                      <Shield className="h-4 w-4 text-muted-foreground" />
+                      <Shield className="h-4 w-4 text-skin-text-muted" />
                       <span>{user.tenant.cnpjCpf}</span>
                     </div>
                   </div>
                   <div>
                     <Label>Telefone</Label>
                     <div className="flex items-center gap-2 mt-1">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <Mail className="h-4 w-4 text-skin-text-muted" />
                       <span>{user.tenant.telefone || "Nao informado"}</span>
                     </div>
                   </div>

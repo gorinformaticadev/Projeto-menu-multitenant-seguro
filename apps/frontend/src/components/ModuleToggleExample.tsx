@@ -33,7 +33,7 @@ export function ModuleToggleExample() {
         <div key={module.slug} className="flex items-center justify-between p-4 border rounded">
           <div>
             <h4 className="font-medium">{module.name || module.slug}</h4>
-            <p className="text-sm text-muted-foreground">{module.description}</p>
+            <p className="text-sm text-skin-text-muted">{module.description}</p>
           </div>
           <div className="flex items-center gap-2">
             {isToggling && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "./Sidebar";
@@ -11,6 +11,8 @@ import { ModuleRegistryTaskbar } from "./ModuleRegistryTaskbar";
 import { ModuleLoader } from "@/core/ModuleLoader";
 import { RouteGuard } from "./RouteGuard";
 import { useTheme } from "next-themes";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Button } from "./ui/button";
 
 function normalizeAppThemePreference(theme?: string | null): "light" | "dark" | "system" {
   if (theme === "dark" || theme === "system") {
@@ -25,6 +27,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const { isInitialized, error } = useModuleRegistry();
   const { setTheme, theme } = useTheme();
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
 
   // Sincroniza tema do backend com o next-themes no primeiro load
   useEffect(() => {
@@ -69,8 +72,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <RouteGuard>
         <div className="flex items-center justify-center h-screen">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Inicializando sistema modular...</p>
+            <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-skin-primary"></div>
+            <p className="text-skin-text-muted">Inicializando sistema modular...</p>
             {error && (
               <p className="mt-2 text-sm text-skin-danger">Erro: {error}</p>
             )}
@@ -93,8 +96,25 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Layout com Sidebar e Conteúdo */}
         <div className="flex h-full min-h-0 w-full overflow-hidden pt-16 pb-16 md:pb-0">
           <aside className="hidden h-full min-h-0 flex-shrink-0 md:flex">
-            <Sidebar />
+            <Sidebar isExpanded={isSidebarExpanded} />
           </aside>
+          <div className="hidden md:flex md:items-start md:pt-4">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsSidebarExpanded((current) => !current)}
+              className="ml-2 h-8 w-8 rounded-full border border-skin-border bg-skin-surface text-skin-text-muted hover:bg-skin-menu-hover hover:text-skin-text"
+              aria-label={isSidebarExpanded ? "Recolher barra lateral" : "Expandir barra lateral"}
+              title={isSidebarExpanded ? "Recolher barra lateral" : "Expandir barra lateral"}
+            >
+              {isSidebarExpanded ? (
+                <PanelLeftClose className="h-4 w-4" />
+              ) : (
+                <PanelLeftOpen className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
           <main className="min-h-0 flex-1 overflow-y-auto bg-skin-background p-0 text-skin-text">
             {children}
           </main>

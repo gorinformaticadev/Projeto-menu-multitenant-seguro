@@ -27,9 +27,9 @@ const toastVariants = cva(
   {
     variants: {
       variant: {
-        default: "border bg-background text-foreground",
+        default: "border border-skin-border bg-skin-surface text-skin-text",
         destructive:
-          "destructive group border-destructive bg-destructive text-destructive-foreground",
+          "destructive group border-skin-danger/30 bg-skin-danger/10 text-skin-danger",
       },
     },
     defaultVariants: {
@@ -60,7 +60,7 @@ const ToastAction = React.forwardRef<
   <ToastPrimitives.Action
     ref={ref}
     className={cn(
-      "inline-flex h-8 shrink-0 items-center justify-center rounded-md border bg-transparent px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 group-[.destructive]:border-muted/40 group-[.destructive]:hover:border-destructive/30 group-[.destructive]:hover:bg-destructive group-[.destructive]:hover:text-destructive-foreground group-[.destructive]:focus:ring-destructive",
+      "inline-flex h-8 shrink-0 items-center justify-center rounded-md border border-skin-border bg-transparent px-3 text-sm font-medium text-skin-text ring-offset-skin-surface transition-colors hover:bg-skin-surface-hover focus:outline-none focus:ring-2 focus:ring-skin-focus-ring focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 group-[.destructive]:border-skin-danger/30 group-[.destructive]:text-skin-danger group-[.destructive]:hover:border-skin-danger/40 group-[.destructive]:hover:bg-skin-danger/15 group-[.destructive]:hover:text-skin-danger group-[.destructive]:focus:ring-skin-danger",
       className
     )}
     {...props}
@@ -75,7 +75,7 @@ const ToastClose = React.forwardRef<
   <ToastPrimitives.Close
     ref={ref}
     className={cn(
-      "absolute right-2 top-2 rounded-md p-1 text-foreground/50 opacity-0 transition-opacity hover:text-foreground focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100 group-[.destructive]:text-skin-danger/80 group-[.destructive]:hover:text-skin-text-inverse group-[.destructive]:focus:ring-skin-danger group-[.destructive]:focus:ring-offset-skin-danger",
+      "absolute right-2 top-2 rounded-md p-1 text-skin-text-muted/70 opacity-0 transition-opacity hover:text-skin-text focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-skin-focus-ring group-hover:opacity-100 group-[.destructive]:text-skin-danger/80 group-[.destructive]:hover:text-skin-danger group-[.destructive]:focus:ring-skin-danger",
       className
     )}
     toast-close=""

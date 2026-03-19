@@ -152,7 +152,7 @@ export default function PushNotificationsConfigPage() {
               <BellRing className="h-6 w-6" />
               Notificações Push (PWA/Windows)
             </h1>
-            <p className="text-muted-foreground mt-2">
+            <p className="mt-2 text-skin-text-muted">
               Configure as chaves VAPID para notificações em background.
             </p>
           </div>
@@ -214,7 +214,7 @@ export default function PushNotificationsConfigPage() {
                 placeholder={hasPrivateKey ? "Nova chave (deixe em branco para manter)" : "Informe a chave privada"}
               />
               <div className="flex items-center justify-between gap-3">
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-skin-text-muted">
                   Status atual: {hasPrivateKey ? "chave privada configurada" : "nenhuma chave privada salva"}.
                 </p>
                 {hasPrivateKey && (
@@ -240,7 +240,7 @@ export default function PushNotificationsConfigPage() {
                 onChange={(e) => updateForm("webPushSubject", e.target.value)}
                 placeholder="mailto:suporte@example.com"
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-skin-text-muted">
                 Use um e-mail de contato no formato <code>mailto:contato@dominio.com</code>.
               </p>
             </div>

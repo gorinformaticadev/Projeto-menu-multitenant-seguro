@@ -345,7 +345,7 @@ export function RestoreSection({
             placeholder={expectedConfirmation}
             disabled={loadingRestore || disabled}
           />
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-skin-text-muted">
             Digite exatamente: <strong>{expectedConfirmation}</strong>
           </p>
         </div>

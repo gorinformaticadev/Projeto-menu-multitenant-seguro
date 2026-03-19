@@ -469,7 +469,7 @@ export default function EmpresasPage() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold">Empresas</h1>
-            <p className="text-muted-foreground">
+            <p className="text-skin-text-muted">
               Gerencie as empresas (tenants) do sistema
             </p>
           </div>
@@ -499,7 +499,7 @@ export default function EmpresasPage() {
                     <div className="space-y-2">
                       <Label htmlFor="email">Email da Empresa</Label>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-skin-text-muted" />
                         <Input
                           id="email"
                           type="email"
@@ -524,7 +524,7 @@ export default function EmpresasPage() {
                     <div className="space-y-2">
                       <Label htmlFor="nomeFantasia">Nome Fantasia</Label>
                       <div className="relative">
-                        <Building2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Building2 className="absolute left-3 top-3 h-4 w-4 text-skin-text-muted" />
                         <Input
                           id="nomeFantasia"
                           placeholder="Empresa LTDA"
@@ -539,7 +539,7 @@ export default function EmpresasPage() {
                     <div className="space-y-2">
                       <Label htmlFor="nomeResponsavel">Nome do Responsável</Label>
                       <div className="relative">
-                        <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <User className="absolute left-3 top-3 h-4 w-4 text-skin-text-muted" />
                         <Input
                           id="nomeResponsavel"
                           placeholder="João Silva"
@@ -554,7 +554,7 @@ export default function EmpresasPage() {
                     <div className="space-y-2">
                       <Label htmlFor="telefone">Telefone</Label>
                       <div className="relative">
-                        <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Phone className="absolute left-3 top-3 h-4 w-4 text-skin-text-muted" />
                         <Input
                           id="telefone"
                           placeholder="(11) 98765-4321"
@@ -578,7 +578,7 @@ export default function EmpresasPage() {
                     <div className="space-y-2">
                       <Label htmlFor="adminName">Nome do Administrador</Label>
                       <div className="relative">
-                        <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <User className="absolute left-3 top-3 h-4 w-4 text-skin-text-muted" />
                         <Input
                           id="adminName"
                           placeholder="Maria Santos"
@@ -593,7 +593,7 @@ export default function EmpresasPage() {
                     <div className="space-y-2">
                       <Label htmlFor="adminEmail">Email do Administrador</Label>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-skin-text-muted" />
                         <Input
                           id="adminEmail"
                           type="email"
@@ -620,7 +620,7 @@ export default function EmpresasPage() {
                         disabled={submitting}
                         placeholder="Digite a senha do administrador"
                       />
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-skin-text-muted">
                         Esta será a senha de acesso do administrador da empresa
                       </p>
                     </div>
@@ -699,20 +699,20 @@ export default function EmpresasPage() {
                 <CardContent className="space-y-3">
                   <div className="space-y-2.5">
                     <div className="flex items-start gap-2.5 group">
-                      <Mail className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-muted-foreground truncate">
+                      <Mail className="mt-0.5 h-4 w-4 flex-shrink-0 text-skin-text-muted" />
+                      <span className="truncate text-sm text-skin-text-muted">
                         {tenant.email}
                       </span>
                     </div>
                     <div className="flex items-start gap-2.5 group">
-                      <User className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-muted-foreground">
+                      <User className="mt-0.5 h-4 w-4 flex-shrink-0 text-skin-text-muted" />
+                      <span className="text-sm text-skin-text-muted">
                         {tenant.nomeResponsavel}
                       </span>
                     </div>
                     <div className="flex items-start gap-2.5 group">
-                      <Phone className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-muted-foreground">
+                      <Phone className="mt-0.5 h-4 w-4 flex-shrink-0 text-skin-text-muted" />
+                      <span className="text-sm text-skin-text-muted">
                         {tenant.telefone}
                       </span>
                     </div>
@@ -721,10 +721,10 @@ export default function EmpresasPage() {
                   {tenant._count && (
                     <div className="pt-3 mt-3 border-t">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-muted-foreground">
+                        <span className="text-xs font-medium text-skin-text-muted">
                           Usuários
                         </span>
-                        <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary">
+                        <span className="inline-flex items-center justify-center rounded-full bg-skin-primary/15 px-2.5 py-0.5 text-xs font-semibold text-skin-primary">
                           {tenant._count.users}
                         </span>
                       </div>
@@ -803,8 +803,8 @@ export default function EmpresasPage() {
         {!loading && tenants.length === 0 && (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">Nenhuma empresa cadastrada</p>
+              <Building2 className="mb-4 h-12 w-12 text-skin-text-muted" />
+              <p className="text-skin-text-muted">Nenhuma empresa cadastrada</p>
               <Button className="mt-4" onClick={() => setShowForm(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Cadastrar Primeira Empresa
@@ -831,27 +831,27 @@ export default function EmpresasPage() {
                 <TabsContent value="details" className="mt-4">
                   <div className="space-y-4">
                     <div>
-                      <Label className="text-muted-foreground">Nome Fantasia</Label>
+                      <Label className="text-skin-text-muted">Nome Fantasia</Label>
                       <p className="font-medium">{selectedTenant.nomeFantasia}</p>
                     </div>
                     <div>
-                      <Label className="text-muted-foreground">CNPJ/CPF</Label>
+                      <Label className="text-skin-text-muted">CNPJ/CPF</Label>
                       <p className="font-medium">{selectedTenant.cnpjCpf}</p>
                     </div>
                     <div>
-                      <Label className="text-muted-foreground">Email</Label>
+                      <Label className="text-skin-text-muted">Email</Label>
                       <p className="font-medium">{selectedTenant.email}</p>
                     </div>
                     <div>
-                      <Label className="text-muted-foreground">Responsável</Label>
+                      <Label className="text-skin-text-muted">Responsável</Label>
                       <p className="font-medium">{selectedTenant.nomeResponsavel}</p>
                     </div>
                     <div>
-                      <Label className="text-muted-foreground">Telefone</Label>
+                      <Label className="text-skin-text-muted">Telefone</Label>
                       <p className="font-medium">{selectedTenant.telefone}</p>
                     </div>
                     <div>
-                      <Label className="text-muted-foreground">Status</Label>
+                      <Label className="text-skin-text-muted">Status</Label>
                       <p className="font-medium">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
                           selectedTenant.ativo 
@@ -1011,7 +1011,7 @@ export default function EmpresasPage() {
               {selectedTenant && !logoPreview && (
                 <div className="space-y-2">
                   <Label>{selectedTenant?.logoUrl?.trim() ? "Logo Atual" : "Logo Padrão"}</Label>
-                  <div className="flex items-center justify-center p-4 border rounded-lg bg-muted">
+                  <div className="flex items-center justify-center rounded-lg border bg-skin-background-elevated p-4">
                     <img 
                       src={
                         resolveTenantLogoSrc(selectedTenant.logoUrl, {
@@ -1053,7 +1053,7 @@ export default function EmpresasPage() {
                   onChange={handleLogoFileChange}
                   disabled={submitting}
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-skin-text-muted">
                   Formatos aceitos: JPG, PNG, GIF, WEBP (máx. 5MB)
                 </p>
               </div>
@@ -1061,7 +1061,7 @@ export default function EmpresasPage() {
               {logoPreview && (
                 <div className="space-y-2">
                   <Label>Pré-visualização</Label>
-                  <div className="flex items-center justify-center p-4 border rounded-lg bg-muted">
+                  <div className="flex items-center justify-center rounded-lg border bg-skin-background-elevated p-4">
                     <img 
                       src={logoPreview} 
                       alt="Pré-visualização"
@@ -1098,16 +1098,16 @@ export default function EmpresasPage() {
         <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle className="text-destructive">Deletar Empresa</DialogTitle>
+              <DialogTitle className="text-skin-danger">Deletar Empresa</DialogTitle>
               <DialogDescription>
                 Esta ação é irreversível e deletará permanentemente a empresa.
               </DialogDescription>
             </DialogHeader>
             {selectedTenant && (
               <div className="space-y-4">
-                <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-                  <p className="text-sm font-medium text-destructive mb-2">⚠️ Atenção!</p>
-                  <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                <div className="rounded-lg border border-skin-danger/20 bg-skin-danger/10 p-4">
+                  <p className="mb-2 text-sm font-medium text-skin-danger">⚠️ Atenção!</p>
+                  <ul className="list-inside list-disc space-y-1 text-sm text-skin-text-muted">
                     <li>Todos os dados da empresa serão perdidos</li>
                     <li>Esta ação não pode ser desfeita</li>
                     <li>Certifique-se de que não há usuários vinculados</li>
@@ -1127,7 +1127,7 @@ export default function EmpresasPage() {
                   />
                 </div>
 
-                <div className="p-3 bg-muted rounded-lg">
+                <div className="rounded-lg bg-skin-background-elevated p-3">
                   <p className="text-sm"><strong>Empresa:</strong> {selectedTenant.nomeFantasia}</p>
                   <p className="text-sm"><strong>CNPJ/CPF:</strong> {selectedTenant.cnpjCpf}</p>
                   <p className="text-sm"><strong>Usuários:</strong> {selectedTenant._count?.users || 0}</p>

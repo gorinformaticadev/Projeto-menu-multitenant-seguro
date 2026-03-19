@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useSecurityConfig } from "@/contexts/SecurityConfigContext";
+import { useEffect, useState } from "react";
 import { Check, X } from "lucide-react";
+import { useSecurityConfig } from "@/contexts/SecurityConfigContext";
 
 interface PasswordValidatorProps {
   password: string;
@@ -42,7 +42,12 @@ export function PasswordValidator({ password, showRequirements = true }: Passwor
       isValid: false,
     };
 
-    result.isValid = result.minLength && result.hasUppercase && result.hasLowercase && result.hasNumbers && result.hasSpecial;
+    result.isValid =
+      result.minLength &&
+      result.hasUppercase &&
+      result.hasLowercase &&
+      result.hasNumbers &&
+      result.hasSpecial;
     setValidation(result);
   }, [password, config]);
 
@@ -53,68 +58,68 @@ export function PasswordValidator({ password, showRequirements = true }: Passwor
   const policy = config.passwordPolicy;
   const requirements = [
     {
-      key: 'minLength',
-      label: `${policy.minLength} caracteres mínimo`,
+      key: "minLength",
+      label: `${policy.minLength} caracteres minimo`,
       valid: validation.minLength,
     },
     {
-      key: 'hasUppercase',
-      label: 'Pelo menos uma letra maiúscula (A-Z)',
+      key: "hasUppercase",
+      label: "Pelo menos uma letra maiuscula (A-Z)",
       valid: validation.hasUppercase,
       required: policy.requireUppercase,
     },
     {
-      key: 'hasLowercase',
-      label: 'Pelo menos uma letra minúscula (a-z)',
+      key: "hasLowercase",
+      label: "Pelo menos uma letra minuscula (a-z)",
       valid: validation.hasLowercase,
       required: policy.requireLowercase,
     },
     {
-      key: 'hasNumbers',
-      label: 'Pelo menos um número (0-9)',
+      key: "hasNumbers",
+      label: "Pelo menos um numero (0-9)",
       valid: validation.hasNumbers,
       required: policy.requireNumbers,
     },
     {
-      key: 'hasSpecial',
-      label: 'Pelo menos um caractere especial (!@#$%...)',
+      key: "hasSpecial",
+      label: "Pelo menos um caractere especial (!@#$%...)",
       valid: validation.hasSpecial,
       required: policy.requireSpecial,
     },
-  ].filter(req => req.required);
+  ].filter((req) => req.required);
 
   return (
-    <div className="space-y-2 mt-2">
-      <p className="text-sm font-medium text-muted-foreground">Requisitos da senha:</p>
+    <div className="mt-2 space-y-2">
+      <p className="text-sm font-medium text-skin-text-muted">Requisitos da senha:</p>
       <div className="space-y-1">
         {requirements.map((req) => (
           <div key={req.key} className="flex items-center gap-2 text-sm">
             {req.valid ? (
-              <Check className="h-4 w-4 text-green-600" />
+              <Check className="h-4 w-4 text-skin-success" />
             ) : (
-              <X className="h-4 w-4 text-red-500" />
+              <X className="h-4 w-4 text-skin-danger" />
             )}
-            <span className={req.valid ? "text-green-700" : "text-red-600"}>
+            <span className={req.valid ? "text-skin-success" : "text-skin-danger"}>
               {req.label}
             </span>
           </div>
         ))}
       </div>
-      {password && (
+      {password ? (
         <div className="text-sm">
           {validation.isValid ? (
-            <span className="text-green-700 font-medium">✓ Senha válida</span>
+            <span className="font-medium text-skin-success">Senha valida</span>
           ) : (
-            <span className="text-red-600 font-medium">✗ Senha não atende aos requisitos</span>
+            <span className="font-medium text-skin-danger">
+              Senha nao atende aos requisitos
+            </span>
           )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
 
-// Função utilitária para validar senha
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function validatePassword(password: string, policy: any): ValidationResult {
   return {
     minLength: password.length >= (policy.minLength || 8),
@@ -126,7 +131,6 @@ export function validatePassword(password: string, policy: any): ValidationResul
   };
 }
 
-// Hook personalizado para validação de senha
 export function usePasswordValidation(password: string) {
   const { config } = useSecurityConfig();
   const [validation, setValidation] = useState<ValidationResult>({
@@ -142,7 +146,12 @@ export function usePasswordValidation(password: string) {
     if (!config?.passwordPolicy) return;
 
     const result = validatePassword(password, config.passwordPolicy);
-    result.isValid = result.minLength && result.hasUppercase && result.hasLowercase && result.hasNumbers && result.hasSpecial;
+    result.isValid =
+      result.minLength &&
+      result.hasUppercase &&
+      result.hasLowercase &&
+      result.hasNumbers &&
+      result.hasSpecial;
     setValidation(result);
   }, [password, config]);
 

@@ -4,14 +4,13 @@ import { useEffect, useState } from "react";
 import { Shield } from "lucide-react";
 
 /**
- * Componente que mostra um indicador quando o token está sendo renovado
- * Útil para debug e feedback ao usuário
+ * Componente que mostra um indicador quando o token esta sendo renovado
+ * Util para debug e feedback ao usuario
  */
 export function TokenRefreshIndicator() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
-    // Listener para eventos de renovação de token
     const handleRefreshStart = () => setIsRefreshing(true);
     const handleRefreshEnd = () => setIsRefreshing(false);
 
@@ -27,9 +26,9 @@ export function TokenRefreshIndicator() {
   if (!isRefreshing) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-pulse z-50">
+    <div className="fixed bottom-4 right-4 z-50 flex animate-pulse items-center gap-2 rounded-lg bg-skin-info px-4 py-2 text-skin-text-inverse shadow-lg">
       <Shield className="h-4 w-4" />
-      <span className="text-sm">Renovando sessão...</span>
+      <span className="text-sm">Renovando sessao...</span>
     </div>
   );
 }

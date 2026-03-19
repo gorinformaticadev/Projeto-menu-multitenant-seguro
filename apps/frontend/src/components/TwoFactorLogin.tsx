@@ -60,7 +60,7 @@ export function TwoFactorLogin({
               autoFocus
               disabled={loading}
             />
-            <p className="text-xs text-muted-foreground text-center">
+            <p className="text-center text-xs text-skin-text-muted">
               Abra o Google Authenticator e digite o código
             </p>
           </div>
@@ -97,7 +97,7 @@ export function TwoFactorLogin({
             </Button>
           </div>
 
-          <div className="text-xs text-center text-muted-foreground">
+          <div className="text-center text-xs text-skin-text-muted">
             <p>Não tem acesso ao seu aplicativo?</p>
             <p>Entre em contato com o administrador</p>
           </div>

@@ -37,14 +37,14 @@ export default function PlatformInfo({
       </div>
       
       {showEmail && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex items-center gap-2 text-sm text-skin-text-muted">
           <Mail className="h-3 w-3" />
           <span>{config.platformEmail}</span>
         </div>
       )}
       
       {showPhone && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex items-center gap-2 text-sm text-skin-text-muted">
           <Phone className="h-3 w-3" />
           <span>{config.platformPhone}</span>
         </div>

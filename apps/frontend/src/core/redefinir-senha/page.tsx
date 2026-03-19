@@ -1,17 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import { PlatformName } from "@/components/PlatformInfo";
-import { PasswordInput } from "@/components/ui/password-input";
-import { ArrowLeft, Eye, EyeOff, CheckCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft, CheckCircle } from "lucide-react";
+
 import { API_URL } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PasswordInput } from "@/components/ui/password-input";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ResetPasswordPage() {
   const [newPassword, setNewPassword] = useState("");
@@ -21,7 +19,7 @@ export default function ResetPasswordPage() {
   const [token, setToken] = useState<string | null>(null);
   const [isPasswordValid, setIsPasswordValid] = useState(false);
   const [passwordsMatch, setPasswordsMatch] = useState(false);
-  
+
   const searchParams = useSearchParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -30,17 +28,15 @@ export default function ResetPasswordPage() {
     const tokenParam = searchParams.get("token");
     if (!tokenParam) {
       toast({
-        title: "Token inválido",
-        description: "Link de recuperação inválido ou expirado",
+        title: "Token invalido",
+        description: "Link de recuperacao invalido ou expirado",
         variant: "destructive",
       });
       router.push("/login");
       return;
     }
     setToken(tokenParam);
-  }, [searchParams, router, toast]);
-
-
+  }, [router, searchParams, toast]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,7 +44,7 @@ export default function ResetPasswordPage() {
     if (!token) {
       toast({
         title: "Erro",
-        description: "Token inválido",
+        description: "Token invalido",
         variant: "destructive",
       });
       return;
@@ -66,7 +62,7 @@ export default function ResetPasswordPage() {
     if (!isPasswordValid) {
       toast({
         title: "Erro",
-        description: "A senha não atende aos requisitos de segurança",
+        description: "A senha nao atende aos requisitos de seguranca",
         variant: "destructive",
       });
       return;
@@ -75,7 +71,7 @@ export default function ResetPasswordPage() {
     if (!passwordsMatch) {
       toast({
         title: "Erro",
-        description: "As senhas não coincidem",
+        description: "As senhas nao coincidem",
         variant: "destructive",
       });
       return;
@@ -110,10 +106,10 @@ export default function ResetPasswordPage() {
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Erro",
-        description: "Erro de conexão. Tente novamente.",
+        description: "Erro de conexao. Tente novamente.",
         variant: "destructive",
       });
     } finally {
@@ -123,24 +119,22 @@ export default function ResetPasswordPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="auth-theme auth-page flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="space-y-1">
-            <div className="flex flex-col items-center justify-center mb-4 space-y-3">
-              <div className="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center">
-                <CheckCircle className="h-8 w-8 text-green-600" />
+            <div className="mb-4 flex flex-col items-center justify-center space-y-3">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-skin-success/15">
+                <CheckCircle className="h-8 w-8 text-skin-success" />
               </div>
             </div>
-            <CardTitle className="text-2xl text-center">Senha Redefinida!</CardTitle>
+            <CardTitle className="text-center text-2xl">Senha redefinida</CardTitle>
             <CardDescription className="text-center">
-              Sua senha foi alterada com sucesso. Agora você pode fazer login com sua nova senha.
+              Sua senha foi alterada com sucesso. Agora voce pode fazer login com a nova senha.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Link href="/login">
-              <Button className="w-full">
-                Fazer Login
-              </Button>
+              <Button className="w-full">Fazer login</Button>
             </Link>
           </CardContent>
         </Card>
@@ -149,27 +143,27 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="auth-theme auth-page flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl text-center">Redefinir Senha</CardTitle>
+          <CardTitle className="text-center text-2xl">Redefinir senha</CardTitle>
           <CardDescription className="text-center">
-            Digite sua nova senha
+            Digite sua nova senha.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <PasswordInput
               id="newPassword"
-              label="Nova Senha"
+              label="Nova senha"
               value={newPassword}
               onChange={(value, isValid) => {
                 setNewPassword(value);
                 setIsPasswordValid(isValid);
               }}
-              showValidation={true}
-              showStrengthMeter={true}
-              showConfirmation={true}
+              showValidation
+              showStrengthMeter
+              showConfirmation
               confirmPassword={confirmPassword}
               onConfirmChange={(value, matches) => {
                 setConfirmPassword(value);
@@ -178,20 +172,20 @@ export default function ResetPasswordPage() {
               placeholder="Digite sua nova senha"
               disabled={loading}
             />
-            
-            <Button 
-              type="submit" 
-              className="w-full" 
+
+            <Button
+              type="submit"
+              className="w-full"
               disabled={loading || !isPasswordValid || !passwordsMatch}
             >
-              {loading ? "Redefinindo..." : "Redefinir Senha"}
+              {loading ? "Redefinindo..." : "Redefinir senha"}
             </Button>
           </form>
 
           <div className="mt-4 text-center">
             <Link href="/login">
               <Button variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
+                <ArrowLeft className="mr-2 h-4 w-4" />
                 Voltar ao login
               </Button>
             </Link>

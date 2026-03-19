@@ -370,7 +370,7 @@ function UsuariosContent() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold">Gerenciar Usuários</h1>
-            <p className="text-muted-foreground">Selecione uma empresa para gerenciar seus usuários</p>
+            <p className="text-skin-text-muted">Selecione uma empresa para gerenciar seus usuários</p>
           </div>
           <Button onClick={openCreateDialog} disabled={!selectedTenantId || user?.role === "CLIENT"}>
             <Plus className="h-4 w-4 mr-2" />
@@ -399,7 +399,7 @@ function UsuariosContent() {
                 <select
                   value={selectedTenantId}
                   onChange={handleTenantSelectChange}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="flex h-10 w-full rounded-md border border-skin-border bg-skin-surface px-3 py-2 text-sm ring-offset-skin-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   <option value="">Selecione uma empresa...</option>
                   {tenants.map((tenant) => (
@@ -426,9 +426,9 @@ function UsuariosContent() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="p-4 bg-muted rounded-lg">
+              <div className="rounded-lg bg-skin-background-elevated p-4">
                 <h3 className="font-semibold">{user.tenant.nomeFantasia}</h3>
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="mt-1 text-sm text-skin-text-muted">
                   CNPJ/CPF: {user.tenant.cnpjCpf}
                 </p>
               </div>
@@ -440,10 +440,10 @@ function UsuariosContent() {
         {selectedTenantId && (
           <>
             {selectedTenant && (
-              <div className="mb-4 p-4 bg-muted rounded-lg">
+              <div className="mb-4 rounded-lg bg-skin-background-elevated p-4">
                 <h3 className="font-semibold">Empresa Selecionada:</h3>
-                <p className="text-sm text-muted-foreground">{selectedTenant.nomeFantasia}</p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-sm text-skin-text-muted">{selectedTenant.nomeFantasia}</p>
+                <p className="mt-1 text-xs text-skin-text-muted">
                   {users.length} {users.length === 1 ? "usuário" : "usuários"}
                 </p>
               </div>
@@ -456,8 +456,8 @@ function UsuariosContent() {
             ) : users.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">
-                  <User className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">Nenhum usuário cadastrado nesta empresa</p>
+                  <User className="mb-4 h-12 w-12 text-skin-text-muted" />
+                  <p className="text-skin-text-muted">Nenhum usuário cadastrado nesta empresa</p>
                   <Button className="mt-4" onClick={openCreateDialog}>
                     <Plus className="h-4 w-4 mr-2" />
                     Criar Primeiro Usuário
@@ -467,28 +467,28 @@ function UsuariosContent() {
             ) : (
               <div className="grid gap-4">
                 {users.map((user) => (
-                  <Card key={user.id} className={user.isLocked ? "border-red-300 bg-red-50/50" : ""}>
+                  <Card key={user.id} className={user.isLocked ? "border-skin-danger/30 bg-skin-danger/10" : ""}>
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className={`rounded-full w-10 h-10 flex items-center justify-center ${user.isLocked ? "bg-red-500" : "bg-primary"}`}>
+                          <div className={`rounded-full w-10 h-10 flex items-center justify-center ${user.isLocked ? "bg-skin-danger" : "bg-skin-primary"}`}>
                             {user.isLocked ? (
-                              <Lock className="h-5 w-5 text-white" />
+                              <Lock className="h-5 w-5 text-skin-text-inverse" />
                             ) : (
-                              <User className="h-5 w-5 text-white" />
+                              <User className="h-5 w-5 text-skin-text-inverse" />
                             )}
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
                               <CardTitle className="text-lg">{user.name}</CardTitle>
                               {user.isLocked && (
-                                <span className="inline-flex items-center px-2 py-1 rounded-md bg-red-100 text-red-800 text-xs font-medium">
+                                <span className="inline-flex items-center rounded-md bg-skin-danger/15 px-2 py-1 text-xs font-medium text-skin-danger">
                                   <Lock className="h-3 w-3 mr-1" />
                                   BLOQUEADO
                                 </span>
                               )}
                               {!user.isLocked && user.loginAttempts > 0 && (
-                                <span className="inline-flex items-center px-2 py-1 rounded-md bg-yellow-100 text-yellow-800 text-xs font-medium">
+                                <span className="inline-flex items-center rounded-md bg-skin-warning/15 px-2 py-1 text-xs font-medium text-skin-warning">
                                   <AlertTriangle className="h-3 w-3 mr-1" />
                                   {user.loginAttempts} tentativa(s) falha(s)
                                 </span>
@@ -499,13 +499,13 @@ function UsuariosContent() {
                               {user.email}
                             </CardDescription>
                             {user.isLocked && user.lockedUntil && (
-                              <p className="text-xs text-red-600 mt-1">
+                              <p className="mt-1 text-xs text-skin-danger">
                                 Bloqueado até: {new Date(user.lockedUntil).toLocaleString("pt-BR")}
                               </p>
                             )}
                           </div>
                         </div>
-                        <span className="inline-flex items-center px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium">
+                        <span className="inline-flex items-center rounded-md bg-skin-primary/15 px-2 py-1 text-xs font-medium text-skin-primary">
                           <Shield className="h-3 w-3 mr-1" />
                           {user.role}
                         </span>
@@ -518,7 +518,7 @@ function UsuariosContent() {
                             variant="default"
                             size="sm"
                             onClick={() => handleUnlock(user.id, user.name)}
-                            className="bg-green-600 hover:bg-green-700 text-white"
+                            className="bg-skin-success text-skin-text-inverse hover:bg-skin-success/90"
                           >
                             <Unlock className="h-4 w-4 mr-1" />
                             Desbloquear
@@ -529,7 +529,7 @@ function UsuariosContent() {
                             variant="default"
                             size="sm"
                             onClick={() => handleLock(user.id, user.name)}
-                            className="bg-orange-500 hover:bg-orange-600 text-white"
+                            className="bg-skin-warning text-skin-text-inverse hover:bg-skin-warning/90"
                           >
                             <Lock className="h-4 w-4 mr-1" />
                             Bloquear
@@ -602,7 +602,7 @@ function UsuariosContent() {
                   id="role"
                   value={formData.role}
                   onChange={handleRoleSelectChange}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-10 w-full rounded-md border border-skin-border bg-skin-surface px-3 py-2 text-sm ring-offset-skin-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   required
                   disabled={isEditingSuperAdmin}
                   title={isEditingSuperAdmin ? "Não é possível alterar a função de um SUPER_ADMIN" : ""}
@@ -612,7 +612,7 @@ function UsuariosContent() {
                   <option value="CLIENT">CLIENT</option>
                 </select>
                 {isEditingSuperAdmin && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-skin-text-muted">
                     A função SUPER_ADMIN não pode ser alterada
                   </p>
                 )}
@@ -642,7 +642,7 @@ function UsuariosContent() {
                       onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
                       placeholder="Digite a senha novamente"
                       required={!editingUser || formData.password.length > 0}
-                      className={formData.password && formData.confirmPassword && formData.password !== formData.confirmPassword ? "border-destructive pr-10" : "pr-10"}
+                      className={formData.password && formData.confirmPassword && formData.password !== formData.confirmPassword ? "border-skin-danger pr-10" : "pr-10"}
                     />
                     <Button
                       type="button"
@@ -653,21 +653,21 @@ function UsuariosContent() {
                       tabIndex={-1}
                     >
                       {showConfirmPassword ? (
-                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                        <EyeOff className="h-4 w-4 text-skin-text-muted" />
                       ) : (
-                        <Eye className="h-4 w-4 text-muted-foreground" />
+                        <Eye className="h-4 w-4 text-skin-text-muted" />
                       )}
                     </Button>
                   </div>
                   {formData.confirmPassword && formData.password !== formData.confirmPassword && (
-                    <p className="text-sm text-destructive">As senhas não coincidem</p>
+                    <p className="text-sm text-skin-danger">As senhas não coincidem</p>
                   )}
                 </div>
               )}
               {editingUser && user?.role === "SUPER_ADMIN" && (
-                <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
+                <div className="rounded-md border border-skin-danger/40 bg-skin-danger/10 p-3">
                   <p className="text-sm font-medium">Acao administrativa de seguranca</p>
-                  <p className="mb-3 text-xs text-muted-foreground">
+                  <p className="mb-3 text-xs text-skin-text-muted">
                     Revoga imediatamente todos os dispositivos confiaveis deste usuario.
                   </p>
                   <Button

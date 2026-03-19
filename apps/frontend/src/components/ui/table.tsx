@@ -8,7 +8,7 @@ const Table = React.forwardRef<
     HTMLTableElement,
     React.HTMLAttributes<HTMLTableElement> & { className?: string }
 >(({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto rounded-xl border border-border/80 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+    <div className="relative w-full overflow-auto rounded-xl border border-border/80 bg-card shadow-sm">
         <table
             ref={ref}
             className={cn("w-full caption-bottom text-sm", className)}
@@ -37,7 +37,7 @@ const TableBody = React.forwardRef<
     <tbody
         ref={ref}
         className={cn(
-            "[&_tr:last-child]:border-0 [&_tr:nth-child(even)]:bg-slate-50/70 dark:[&_tr:nth-child(even)]:bg-slate-900/35",
+            "[&_tr:last-child]:border-0 [&_tr:nth-child(even)]:bg-skin-background-elevated/70 dark:[&_tr:nth-child(even)]:bg-skin-background-elevated/30",
             className
         )}
         {...props}
@@ -67,7 +67,7 @@ const TableRow = React.forwardRef<
     <tr
         ref={ref}
         className={cn(
-            "border-b border-border/70 transition-colors hover:bg-slate-100/80 data-[state=selected]:bg-muted dark:hover:bg-muted/60",
+            "border-b border-border/70 transition-colors hover:bg-skin-surface-hover/80 data-[state=selected]:bg-muted dark:hover:bg-muted/60",
             className
         )}
         {...props}
@@ -82,7 +82,7 @@ const TableHead = React.forwardRef<
     <th
         ref={ref}
         className={cn(
-            "h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
+            "h-12 px-4 text-left align-middle font-medium text-skin-text-muted [&:has([role=checkbox])]:pr-0",
             className
         )}
         {...props}
@@ -109,7 +109,7 @@ const TableCaption = React.forwardRef<
 >(({ className, ...props }, ref) => (
     <caption
         ref={ref}
-        className={cn("mt-4 text-sm text-muted-foreground", className)}
+        className={cn("mt-4 text-sm text-skin-text-muted", className)}
         {...props}
     />
 ))

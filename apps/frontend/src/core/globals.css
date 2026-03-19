@@ -54,7 +54,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-skin-surface text-skin-text;
     font-size: 14px; /* Reduzindo o tamanho base da fonte */
   }
   
