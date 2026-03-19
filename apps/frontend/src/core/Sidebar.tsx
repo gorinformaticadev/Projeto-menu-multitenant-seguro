@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { moduleRegistry } from "@/lib/module-registry";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
 interface SidebarItem {
   id: string;
@@ -47,6 +48,7 @@ export function Sidebar({ isExpanded }: SidebarProps) {
   const { user, logout } = useAuth();
   const [menuItems, setMenuItems] = useState<SidebarItem[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSettingsPopoverOpen, setIsSettingsPopoverOpen] = useState(false);
 
   const configurationItems = useMemo(
     () => getConfigurationPanelItems(user?.role),
@@ -56,17 +58,7 @@ export function Sidebar({ isExpanded }: SidebarProps) {
   const hasSettingsItems = configurationItems.length > 0;
   const isSettingsSectionActive = pathname.startsWith("/configuracoes");
 
-  useEffect(() => {
-    loadMenuItems();
-  }, [user]);
-
-  useEffect(() => {
-    if (isSettingsSectionActive) {
-      setIsSettingsOpen(true);
-    }
-  }, [isSettingsSectionActive]);
-
-  const loadMenuItems = () => {
+  const loadMenuItems = useCallback(() => {
     try {
       const rawItems = moduleRegistry.getSidebarItems(user?.role);
       const items: SidebarItem[] = rawItems.map((item) => ({
@@ -89,7 +81,58 @@ export function Sidebar({ isExpanded }: SidebarProps) {
         },
       ]);
     }
-  };
+  }, [user?.role]);
+
+  useEffect(() => {
+    loadMenuItems();
+  }, [loadMenuItems]);
+
+  useEffect(() => {
+    if (isSettingsSectionActive) {
+      setIsSettingsOpen(true);
+      setIsSettingsPopoverOpen(false);
+    }
+  }, [isSettingsSectionActive]);
+
+  const renderSettingsLinks = (onNavigate?: () => void) => (
+    <>
+      <Link
+        href="/configuracoes"
+        onClick={onNavigate}
+        className={cn(
+          "flex items-center rounded-lg px-3 py-2 text-sm transition-colors",
+          pathname === "/configuracoes"
+            ? "bg-skin-primary/15 text-skin-primary"
+            : "text-skin-text-muted hover:bg-skin-menu-hover hover:text-skin-text",
+        )}
+      >
+        Visao geral
+      </Link>
+
+      {hasSettingsItems &&
+        configurationItems.map((item) => {
+          const isActive =
+            pathname === item.href || pathname.startsWith(`${item.href}/`);
+
+          return (
+            <Link
+              key={item.id}
+              href={item.href}
+              onClick={onNavigate}
+              className={cn(
+                "flex items-center rounded-lg px-3 py-2 text-sm transition-colors",
+                isActive
+                  ? "bg-skin-primary/15 text-skin-primary"
+                  : "text-skin-text-muted hover:bg-skin-menu-hover hover:text-skin-text",
+              )}
+              title={item.description}
+            >
+              <span className="truncate">{item.name}</span>
+            </Link>
+          );
+        })}
+    </>
+  );
 
   return (
     <div
@@ -158,56 +201,37 @@ export function Sidebar({ isExpanded }: SidebarProps) {
               )}
             >
               <div className="mt-2 space-y-1 pl-3">
-                <Link
-                  href="/configuracoes"
-                  className={cn(
-                    "flex items-center rounded-lg px-3 py-2 text-sm transition-colors",
-                    pathname === "/configuracoes"
-                      ? "bg-skin-primary/15 text-skin-primary"
-                      : "text-skin-text-muted hover:bg-skin-menu-hover hover:text-skin-text",
-                  )}
-                >
-                  Visao geral
-                </Link>
-
-                {hasSettingsItems &&
-                  configurationItems.map((item) => {
-                    const isActive =
-                      pathname === item.href || pathname.startsWith(`${item.href}/`);
-
-                    return (
-                      <Link
-                        key={item.id}
-                        href={item.href}
-                        className={cn(
-                          "flex items-center rounded-lg px-3 py-2 text-sm transition-colors",
-                          isActive
-                            ? "bg-skin-primary/15 text-skin-primary"
-                            : "text-skin-text-muted hover:bg-skin-menu-hover hover:text-skin-text",
-                        )}
-                        title={item.description}
-                      >
-                        <span className="truncate">{item.name}</span>
-                      </Link>
-                    );
-                  })}
+                {renderSettingsLinks()}
               </div>
             </div>
           </div>
         ) : (
-          <Link
-            href="/configuracoes"
-            className={cn(
-              "mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              isSettingsSectionActive
-                ? "bg-skin-primary text-skin-text-inverse"
-                : "text-skin-text-muted hover:bg-skin-menu-hover hover:text-skin-text",
-              "justify-center",
-            )}
-            title="Configuracoes"
-          >
-            <Settings className="h-5 w-5 flex-shrink-0" />
-          </Link>
+          <Popover open={isSettingsPopoverOpen} onOpenChange={setIsSettingsPopoverOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "mb-1 flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  isSettingsSectionActive
+                    ? "bg-skin-primary text-skin-text-inverse"
+                    : "text-skin-text-muted hover:bg-skin-menu-hover hover:text-skin-text",
+                )}
+                title="Configuracoes"
+                aria-label="Abrir submenu de configuracoes"
+              >
+                <Settings className="h-5 w-5 flex-shrink-0" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="right" align="start" className="w-72 rounded-2xl border border-skin-border bg-skin-surface p-3 shadow-lg">
+              <div className="mb-2 px-1">
+                <p className="text-sm font-semibold text-skin-text">Configuracoes</p>
+                <p className="text-xs text-skin-text-muted">Acesse diretamente as abas deste grupo.</p>
+              </div>
+              <div className="space-y-1">
+                {renderSettingsLinks(() => setIsSettingsPopoverOpen(false))}
+              </div>
+            </PopoverContent>
+          </Popover>
         )}
 
         <Button
