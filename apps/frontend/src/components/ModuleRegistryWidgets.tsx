@@ -73,24 +73,24 @@ function getModuleColors(moduleSlug: string) {
   };
   const colorSchemes: Record<string, ColorScheme> = {
     sistema: {
-      border: 'border-purple-200',
-      bg: 'bg-purple-50/50',
-      title: 'text-purple-900',
-      badge: 'bg-purple-100',
-      value: 'text-purple-600',
-      description: 'text-purple-700',
-      label: 'text-purple-600',
-      status: 'text-purple-700'
+      border: 'border-skin-primary/30',
+      bg: 'bg-skin-primary/10',
+      title: 'text-skin-text',
+      badge: 'bg-skin-primary/15 text-skin-primary',
+      value: 'text-skin-primary',
+      description: 'text-skin-text-muted',
+      label: 'text-skin-text-muted',
+      status: 'text-skin-primary'
     },
     default: {
-      border: 'border-blue-200',
-      bg: 'bg-blue-50/50',
-      title: 'text-blue-900',
-      badge: 'bg-blue-100',
-      value: 'text-blue-600',
-      description: 'text-blue-700',
-      label: 'text-blue-600',
-      status: 'text-blue-700'
+      border: 'border-skin-info/30',
+      bg: 'bg-skin-info/10',
+      title: 'text-skin-text',
+      badge: 'bg-skin-info/15 text-skin-info',
+      value: 'text-skin-info',
+      description: 'text-skin-text-muted',
+      label: 'text-skin-text-muted',
+      status: 'text-skin-info'
     }
   };
 

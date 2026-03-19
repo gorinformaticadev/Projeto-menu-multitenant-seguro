@@ -12,9 +12,9 @@ type DashboardMetricStateViewModel = {
 };
 
 const toneClassName: Record<DashboardMetricStateTone, string> = {
-  neutral: "border-slate-200/80 bg-white/80 text-slate-700 dark:border-slate-800/80 dark:bg-slate-900/50 dark:text-slate-200",
-  warn: "border-amber-200/80 bg-amber-50/65 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/35 dark:text-amber-100",
-  danger: "border-rose-200/80 bg-rose-50/65 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/35 dark:text-rose-100",
+  neutral: "border-skin-border/80 bg-skin-surface/80 text-skin-text",
+  warn: "border-skin-warning/30 bg-skin-warning/10 text-skin-warning",
+  danger: "border-skin-danger/30 bg-skin-danger/10 text-skin-danger",
 };
 
 export function resolveDashboardMetricState(
