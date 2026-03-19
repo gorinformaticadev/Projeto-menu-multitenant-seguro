@@ -1,8 +1,8 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { PlatformConfig, DEFAULT_PLATFORM_CONFIG } from '@/hooks/usePlatformConfig';
-import api from '@/lib/api';
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { PlatformConfig, DEFAULT_PLATFORM_CONFIG } from "@/hooks/usePlatformConfig";
+import api from "@/lib/api";
 
 interface PlatformConfigContextType {
   config: PlatformConfig;
@@ -23,9 +23,8 @@ export function PlatformConfigProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setError(null);
 
-      // Cache simples para evitar múltiplas chamadas
-      const cacheKey = 'platform-config-cache';
-      const cacheTTL = 60 * 1000; // 1 minuto (reduzido para atualização mais rápida)
+      const cacheKey = "platform-config-cache";
+      const cacheTTL = 60 * 1000;
       const cached = localStorage.getItem(cacheKey);
 
       if (cached) {
@@ -34,7 +33,7 @@ export function PlatformConfigProvider({ children }: { children: ReactNode }) {
           setConfig({
             platformName: String(data?.platformName || DEFAULT_PLATFORM_CONFIG.platformName),
             platformLogoUrl:
-              typeof data?.platformLogoUrl === 'string' && data.platformLogoUrl.trim()
+              typeof data?.platformLogoUrl === "string" && data.platformLogoUrl.trim()
                 ? data.platformLogoUrl
                 : null,
             platformEmail: String(data?.platformEmail || DEFAULT_PLATFORM_CONFIG.platformEmail),
@@ -45,29 +44,32 @@ export function PlatformConfigProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      const response = await api.get('/api/platform-config');
+      const response = await api.get("/api/platform-config");
       const responseData = response.data || {};
       const normalizedConfig: PlatformConfig = {
         platformName: String(responseData.platformName || DEFAULT_PLATFORM_CONFIG.platformName),
         platformLogoUrl:
-          typeof responseData.platformLogoUrl === 'string' && responseData.platformLogoUrl.trim()
+          typeof responseData.platformLogoUrl === "string" && responseData.platformLogoUrl.trim()
             ? responseData.platformLogoUrl
             : null,
         platformEmail: String(responseData.platformEmail || DEFAULT_PLATFORM_CONFIG.platformEmail),
         platformPhone: String(responseData.platformPhone || DEFAULT_PLATFORM_CONFIG.platformPhone),
       };
-      setConfig(normalizedConfig);
 
-      // Salvar no cache
+      setConfig(normalizedConfig);
       localStorage.setItem(cacheKey, JSON.stringify({
         data: normalizedConfig,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       }));
-
     } catch (err: unknown) {
-      console.warn('Failed to fetch platform config:', err);
-      let errorMessage = 'Failed to load platform configuration';
-      if (typeof err === 'object' && err !== null && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
+      console.warn("Failed to fetch platform config:", err);
+      let errorMessage = "Failed to load platform configuration";
+      if (
+        typeof err === "object" &&
+        err !== null &&
+        "message" in err &&
+        typeof (err as { message: unknown }).message === "string"
+      ) {
         errorMessage = (err as { message: string }).message;
       }
       setError(errorMessage);
@@ -78,7 +80,6 @@ export function PlatformConfigProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // Debounce para evitar múltiplas chamadas em React StrictMode
     const timeoutId = setTimeout(() => {
       fetchConfig();
     }, 100);
@@ -87,49 +88,18 @@ export function PlatformConfigProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshConfig = async () => {
-    // Invalidar cache antes de buscar novos dados
-    localStorage.removeItem('platform-config-cache');
+    localStorage.removeItem("platform-config-cache");
     await fetchConfig();
   };
 
-  // Update document title and favicon when config changes
   useEffect(() => {
-    if (!loading && config) {
-      // Atualizar título
-      if (config.platformName) {
-        document.title = config.platformName;
-      }
-
-      // Atualizar favicon se houver URL
-      if (config.platformLogoUrl) {
-        const updateFavicon = (url: string) => {
-          let link = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
-          if (!link) {
-            link = document.createElement('link');
-            link.rel = 'icon';
-            document.head.appendChild(link);
-          }
-          link.href = url;
-
-          // Atualizar outros tamanhos de ícone se existirem
-          const iconLinks = document.querySelectorAll("link[rel='icon']");
-          iconLinks.forEach(iconLink => {
-            (iconLink as HTMLLinkElement).href = url;
-          });
-        };
-
-        updateFavicon(config.platformLogoUrl);
-      }
+    if (!loading && config.platformName) {
+      document.title = config.platformName;
     }
-  }, [config, loading]);
+  }, [config.platformName, loading]);
 
   return (
-    <PlatformConfigContext.Provider value={{
-      config,
-      loading,
-      error,
-      refreshConfig
-    }}>
+    <PlatformConfigContext.Provider value={{ config, loading, error, refreshConfig }}>
       {children}
     </PlatformConfigContext.Provider>
   );
@@ -138,7 +108,7 @@ export function PlatformConfigProvider({ children }: { children: ReactNode }) {
 export function usePlatformConfigContext() {
   const context = useContext(PlatformConfigContext);
   if (context === undefined) {
-    throw new Error('usePlatformConfigContext must be used within a PlatformConfigProvider');
+    throw new Error("usePlatformConfigContext must be used within a PlatformConfigProvider");
   }
   return context;
 }

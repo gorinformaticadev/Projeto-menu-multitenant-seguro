@@ -13,6 +13,7 @@ import { RouteGuard } from "./RouteGuard";
 import { useTheme } from "next-themes";
 import { ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Button } from "./ui/button";
+import { DEFAULT_TENANT_LOGO_PATH, resolveTenantLogoSrc } from "@/lib/tenant-logo";
 
 function normalizeAppThemePreference(theme?: string | null): "light" | "dark" | "system" {
   if (theme === "dark" || theme === "system") {
@@ -20,6 +21,29 @@ function normalizeAppThemePreference(theme?: string | null): "light" | "dark" | 
   }
 
   return "light";
+}
+
+function updateDocumentIcons(iconHref: string) {
+  const resolvedHref = iconHref || DEFAULT_TENANT_LOGO_PATH;
+  const iconSelectors = [
+    "link[rel='icon']",
+    "link[rel='shortcut icon']",
+    "link[rel='apple-touch-icon']",
+  ];
+
+  iconSelectors.forEach((selector) => {
+    const links = document.querySelectorAll(selector);
+    links.forEach((link) => {
+      (link as HTMLLinkElement).href = resolvedHref;
+    });
+  });
+
+  if (!document.querySelector("link[rel='icon']")) {
+    const link = document.createElement("link");
+    link.rel = "icon";
+    link.href = resolvedHref;
+    document.head.appendChild(link);
+  }
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -71,6 +95,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       body.style.overflow = previousBodyOverflow;
     };
   }, [isPublicPage, loading, user]);
+
+  useEffect(() => {
+    const faviconSrc =
+      resolveTenantLogoSrc(user?.tenant?.logoUrl, {
+        tenantId: user?.tenantId,
+        fallbackToDefault: true,
+      }) || DEFAULT_TENANT_LOGO_PATH;
+
+    updateDocumentIcons(faviconSrc);
+  }, [user?.tenant?.logoUrl, user?.tenantId]);
 
   // Se está carregando ou é página pública, não mostra sidebar nem topbar
   if (loading || isPublicPage || !user) {
