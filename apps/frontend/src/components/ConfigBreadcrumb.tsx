@@ -14,10 +14,10 @@ interface ConfigBreadcrumbProps {
 
 export function ConfigBreadcrumb({ items }: ConfigBreadcrumbProps) {
   return (
-    <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-6">
+    <nav className="mb-6 flex items-center space-x-2 text-sm text-skin-text-muted">
       <Link 
         href="/configuracoes" 
-        className="flex items-center gap-1 hover:text-foreground transition-colors"
+        className="flex items-center gap-1 transition-colors hover:text-skin-text"
       >
         <Settings className="h-4 w-4" />
         Configurações
@@ -29,12 +29,12 @@ export function ConfigBreadcrumb({ items }: ConfigBreadcrumbProps) {
           {item.href ? (
             <Link 
               href={item.href} 
-              className="hover:text-foreground transition-colors"
+              className="transition-colors hover:text-skin-text"
             >
               {item.label}
             </Link>
           ) : (
-            <span className="text-foreground font-medium">{item.label}</span>
+            <span className="font-medium text-skin-text">{item.label}</span>
           )}
         </div>
       ))}

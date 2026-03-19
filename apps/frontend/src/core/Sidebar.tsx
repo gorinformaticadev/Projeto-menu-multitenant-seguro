@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Building2, Settings, LogOut, ChevronLeft, User, Menu, Shield, FileText } from "lucide-react";
+import { LayoutDashboard, Building2, Settings, LogOut, User, Menu, Shield, FileText } from "lucide-react";
 import { Button } from "./ui/button";
 import { moduleRegistry } from "@/lib/module-registry";
 
@@ -28,30 +28,14 @@ const iconMap: Record<string, React.ComponentType> = {
   Menu,
 };
 
-export function Sidebar() {
+interface SidebarProps {
+  isExpanded: boolean;
+}
+
+export function Sidebar({ isExpanded }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const [isExpanded, setIsExpanded] = useState(false);
   const [menuItems, setMenuItems] = useState<SidebarItem[]>([]);
-  const sidebarRef = useRef<HTMLDivElement>(null);
-
-  // Recolhe o menu ao clicar fora dele
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        isExpanded &&
-        sidebarRef.current &&
-        !sidebarRef.current.contains(event.target as Node)
-      ) {
-        setIsExpanded(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isExpanded]);
 
   // Carrega itens do menu do Module Registry
   useEffect(() => {
@@ -87,30 +71,13 @@ export function Sidebar() {
 
   return (
     <div
-      ref={sidebarRef}
       className={cn(
         "flex h-full flex-col border-r border-skin-border/80 bg-skin-sidebar-background text-skin-sidebar-text transition-all duration-300",
-        isExpanded ? "w-64" : "w-20"
+        isExpanded ? "w-56" : "w-16"
       )}
     >
-      {/* Header */}
-      <div className="p-4 border-b flex items-center justify-center">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="h-8 w-8"
-        >
-          {isExpanded ? (
-            <ChevronLeft className="h-4 w-4" />
-          ) : (
-            <Menu className="h-4 w-4" />
-          )}
-        </Button>
-      </div>
-
       {/* Navigation */}
-      <div className="flex-1 p-4">
+      <div className="flex-1 p-3">
         <nav className="space-y-1">
           {menuItems.map((item) => {
             const isActive = pathname === item.href;
@@ -137,8 +104,22 @@ export function Sidebar() {
         </nav>
       </div>
 
-      {/* Logout Button */}
-      <div className="p-4 border-t">
+      <div className="border-t p-3">
+        <Link
+          href="/configuracoes"
+          className={cn(
+            "mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+            pathname.startsWith("/configuracoes")
+              ? "bg-skin-primary text-skin-text-inverse"
+              : "text-skin-text-muted hover:bg-skin-menu-hover hover:text-skin-text",
+            !isExpanded && "justify-center",
+          )}
+          title={!isExpanded ? "Configuracoes" : undefined}
+        >
+          <Settings className="h-5 w-5 flex-shrink-0" />
+          {isExpanded && <span>Configuracoes</span>}
+        </Link>
+
         <Button
           variant="ghost"
           className={cn(

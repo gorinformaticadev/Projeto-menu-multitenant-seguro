@@ -87,11 +87,11 @@ type SaveError = {
 };
 
 const cronModalPopoverClassName =
-  "rounded-[24px] border border-border/70 bg-popover/95 text-popover-foreground shadow-[0_20px_55px_-36px_rgba(15,23,42,0.35)] backdrop-blur-sm";
+  "rounded-[24px] border border-border/70 bg-popover/95 text-popover-foreground shadow-md backdrop-blur-sm";
 const cronModalSurfaceClassName = "bg-skin-surface text-skin-text";
 const cronModalChromeClassName = "border-border/70 bg-skin-surface/95 backdrop-blur-sm";
 const cronModalCardClassName =
-  "rounded-[28px] border border-border/70 bg-card/95 shadow-[0_20px_55px_-36px_rgba(15,23,42,0.28)] backdrop-blur-sm";
+  "rounded-[28px] border border-border/70 bg-card/95 shadow-md backdrop-blur-sm";
 const cronModalMutedCardClassName = "rounded-[22px] border border-border/70 bg-skin-background-elevated/30 shadow-sm";
 const cronModalFieldClassName = "border-border/70 bg-skin-surface/95 dark:bg-skin-surface/80";
 
@@ -309,7 +309,7 @@ export default function CronJobsPage() {
             <Card
               key={job.key}
               className={cn(
-                "rounded-[28px] shadow-[0_20px_55px_-36px_rgba(15,23,42,0.35)] transition-shadow hover:shadow-[0_24px_60px_-36px_rgba(15,23,42,0.45)]",
+                "rounded-[28px] shadow-md transition-shadow hover:shadow-lg",
                 hasIssue
                   ? "border-skin-danger/30 bg-skin-surface/95"
                   : "border-skin-info/30 bg-skin-surface/95",
@@ -644,7 +644,7 @@ export default function CronJobsPage() {
       <Dialog open={Boolean(editingJob && editorForm)} onOpenChange={(open) => !open && closeEditor()}>
         <DialogContent className="inset-0 h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 gap-0 rounded-none border-0 bg-transparent p-0 shadow-none sm:left-[50%] sm:top-[50%] sm:right-auto sm:bottom-auto sm:h-auto sm:max-h-[90dvh] sm:w-[min(860px,calc(100vw-2rem))] sm:max-w-[860px] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-[28px] sm:border-0 sm:p-0">
           {editingJob && editorForm && (
-            <div className={cn("flex h-full max-h-dvh flex-col shadow-[0_24px_60px_-38px_rgba(15,23,42,0.4)] sm:max-h-[90dvh] sm:rounded-[28px] sm:border", cronModalSurfaceClassName, "sm:border-border/70")}>
+            <div className={cn("flex h-full max-h-dvh flex-col shadow-lg sm:max-h-[90dvh] sm:rounded-[28px] sm:border", cronModalSurfaceClassName, "sm:border-border/70")}>
               <DialogHeader className={cn("border-b px-6 pb-4 pt-6 text-left", cronModalChromeClassName)}>
                 <DialogTitle>Editar tarefa</DialogTitle>
                 <DialogDescription className="text-skin-text-muted">

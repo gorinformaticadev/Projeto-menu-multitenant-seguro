@@ -985,7 +985,7 @@ export function DashboardHome() {
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-4 p-4 md:p-6">
-      <div className="rounded-[28px] border border-skin-border/80 bg-skin-surface/85 px-4 py-4 shadow-[0_20px_55px_-36px_rgba(15,23,42,0.35)] backdrop-blur-sm ">
+      <div className="rounded-[28px] border border-skin-border/80 bg-skin-surface/85 px-4 py-4 shadow-md backdrop-blur-sm ">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -1193,7 +1193,7 @@ export function DashboardHome() {
       ) : null}
 
       {isSuperAdmin && operationalExpanded ? (
-        <div className="rounded-[32px] border border-skin-border/80 bg-skin-surface/60 p-3 shadow-[0_24px_60px_-38px_rgba(15,23,42,0.4)] backdrop-blur-sm /80  md:p-4">
+              <div className="rounded-[32px] border border-skin-border/80 bg-skin-surface/60 p-3 shadow-lg backdrop-blur-sm /80  md:p-4">
           <OperationalDashboard
             embedded
             storedFilters={operationalFilters}

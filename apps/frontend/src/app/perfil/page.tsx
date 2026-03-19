@@ -10,8 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
-import { User, Mail, Shield, Key, Edit, Upload, Trash2 } from "lucide-react";
+import { User, Mail, Shield, Key, Edit, Upload, Trash2, Palette } from "lucide-react";
 import { PasswordInput } from "@/components/ui/password-input";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { DEFAULT_TENANT_LOGO_PATH, resolveTenantLogoSrc } from "@/lib/tenant-logo";
 
 export default function PerfilPage() {
@@ -542,6 +543,27 @@ export default function PerfilPage() {
               </div>
             </form>
           )}
+        </CardContent>
+      </Card>
+
+      <Card id="aparencia">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Palette className="h-5 w-5" />
+            Aparencia e tema
+          </CardTitle>
+          <CardDescription>
+            Escolha como o shell do sistema deve aparecer para voce.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-lg border border-skin-border bg-skin-background-elevated/70 p-4">
+            <p className="text-sm font-medium text-skin-text">Tema da interface</p>
+            <p className="mt-1 text-sm text-skin-text-muted">
+              A selecao abaixo usa o sistema de temas atual e salva sua preferencia de verdade.
+            </p>
+          </div>
+          <ThemeToggle className="max-w-sm rounded-xl border border-skin-border bg-skin-surface" />
         </CardContent>
       </Card>
 

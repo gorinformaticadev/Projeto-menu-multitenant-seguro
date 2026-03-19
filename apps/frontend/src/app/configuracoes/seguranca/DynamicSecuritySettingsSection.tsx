@@ -74,7 +74,7 @@ const uncheckedSwitchClassName =
   "data-[state=unchecked]:bg-skin-danger/80 disabled:opacity-100 disabled:data-[state=unchecked]:bg-skin-danger/80";
 
 const dashboardCardBaseClassName =
-  "rounded-[28px] border shadow-[0_20px_55px_-36px_rgba(15,23,42,0.35)] backdrop-blur-sm";
+  "rounded-[28px] border shadow-md backdrop-blur-sm";
 
 const dashboardCardToneClassName = {
   neutral:
@@ -469,7 +469,7 @@ export function DynamicSecuritySettingsSection() {
                 className={cn(
                   dashboardCardBaseClassName,
                   getDynamicCategoryClassName(group.category),
-                  "space-y-4 p-4 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.18)]",
+                  "space-y-4 p-4 shadow-sm",
                 )}
               >
                 <div className="flex items-center gap-2">

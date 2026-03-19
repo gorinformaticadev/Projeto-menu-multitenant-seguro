@@ -562,7 +562,7 @@ function DashboardChartState({
 function DashboardOverviewSkeleton() {
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.9fr)]">
-      <section className="overflow-hidden rounded-[32px] border border-skin-border bg-skin-surface px-5 py-5 text-skin-text shadow-[0_35px_90px_-45px_rgba(15,23,42,0.85)]">
+      <section className="overflow-hidden rounded-[32px] border border-skin-border bg-skin-surface px-5 py-5 text-skin-text shadow-lg">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_220px]">
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
@@ -621,7 +621,7 @@ function DashboardOverviewSkeleton() {
         </div>
       </section>
 
-      <section className="rounded-[32px] border border-skin-border/80 bg-skin-surface/80 p-4 shadow-[0_25px_60px_-38px_rgba(15,23,42,0.35)] backdrop-blur-sm dark:border-skin-border/80 dark:bg-skin-surface/45">
+      <section className="rounded-[32px] border border-skin-border/80 bg-skin-surface/80 p-4 shadow-md backdrop-blur-sm dark:border-skin-border/80 dark:bg-skin-surface/45">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-2">
             <div className="h-3 w-28 animate-pulse rounded-full bg-skin-border/80" />
@@ -2733,7 +2733,7 @@ export function OperationalDashboard({
       <div className={embedded ? "space-y-4" : "mx-auto max-w-[1600px] space-y-4 p-4 md:p-6"}>
         <div className="space-y-3">
           {!embedded ? (
-            <div className="rounded-[24px] border border-skin-border/80 bg-skin-surface/88 px-4 py-3 text-skin-text shadow-[0_18px_40px_-30px_rgba(15,23,42,0.18)] dark:border-skin-border dark:bg-skin-surface dark:text-skin-text dark:shadow-xl">
+            <div className="rounded-[24px] border border-skin-border/80 bg-skin-surface/88 px-4 py-3 text-skin-text shadow-sm dark:border-skin-border dark:bg-skin-surface dark:text-skin-text dark:shadow-xl">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
@@ -2809,7 +2809,7 @@ export function OperationalDashboard({
             </div>
           ) : null}
 
-          <div className="rounded-[24px] border border-skin-border/80 bg-skin-surface/80 px-4 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.35)] dark:border-skin-border/80 dark:bg-skin-surface/45">
+                    <div className="rounded-[24px] border border-skin-border/80 bg-skin-surface/80 px-4 py-4 shadow-md dark:border-skin-border/80 dark:bg-skin-surface/45">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
@@ -3041,7 +3041,7 @@ export function OperationalDashboard({
           <DashboardOverviewSkeleton />
         ) : (
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.9fr)]">
-          <section className="overflow-hidden rounded-[32px] border border-skin-border/80 bg-skin-surface px-5 py-5 text-skin-text shadow-[0_22px_55px_-38px_rgba(15,23,42,0.2)] dark:border-skin-border dark:bg-skin-surface/5 dark:text-skin-text dark:shadow-[0_35px_90px_-45px_rgba(15,23,42,0.85)]">
+          <section className="overflow-hidden rounded-[32px] border border-skin-border/80 bg-skin-surface px-5 py-5 text-skin-text shadow-md dark:border-skin-border dark:bg-skin-surface/5 dark:text-skin-text dark:shadow-xl">
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_220px]">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -3182,7 +3182,7 @@ export function OperationalDashboard({
             </div>
           </section>
 
-          <section className="rounded-[32px] border border-skin-border/80 bg-skin-surface/80 p-4 shadow-[0_25px_60px_-38px_rgba(15,23,42,0.35)] backdrop-blur-sm dark:border-skin-border/80 dark:bg-skin-surface/45">
+          <section className="rounded-[32px] border border-skin-border/80 bg-skin-surface/80 p-4 shadow-md backdrop-blur-sm dark:border-skin-border/80 dark:bg-skin-surface/45">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="mt-1 text-xl font-semibold tracking-tight text-skin-text dark:text-skin-text">

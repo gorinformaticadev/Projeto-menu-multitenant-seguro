@@ -6,10 +6,9 @@ import { usePlatformConfigContext } from "@/contexts/PlatformConfigContext";
 import { useSystemVersion } from "@/hooks/useSystemVersion";
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { Button } from "./ui/button";
-import { Search, User, LogOut, Info } from "lucide-react";
+import { Search, User, LogOut, Info, Palette } from "lucide-react";
 import api from "@/lib/api";
 import { ModuleRegistryUserMenu } from "./ModuleRegistryUserMenu";
-import { ThemeToggle } from "./ThemeToggle";
 import Image from "next/image";
 import { GlobalSearch } from "./GlobalSearch";
 import { SystemNotificationsBell } from "@/components/system-notifications/SystemNotificationsBell";
@@ -361,12 +360,6 @@ export function TopBar() {
                   </div>
                 </div>
 
-                {/* Seletor de Tema */}
-                <div className="border-b border-skin-border px-4 py-2">
-                  <div className="mb-2 text-xs font-semibold text-skin-text-muted">Tema</div>
-                  <ThemeToggle />
-                </div>
-
                 <a
                   href="/perfil"
                   onClick={() => setShowUserMenu(false)}
@@ -374,6 +367,15 @@ export function TopBar() {
                 >
                   <User className="h-4 w-4 text-skin-text-muted" />
                   Meu Perfil
+                </a>
+
+                <a
+                  href="/perfil#aparencia"
+                  onClick={() => setShowUserMenu(false)}
+                  className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-skin-text transition-colors hover:bg-skin-menu-hover"
+                >
+                  <Palette className="h-4 w-4 text-skin-text-muted" />
+                  Aparencia e tema
                 </a>
 
                 {/* Itens do Menu do Usuario (Module Registry) */}
