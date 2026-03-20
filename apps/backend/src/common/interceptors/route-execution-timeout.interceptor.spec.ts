@@ -69,7 +69,7 @@ describe('RouteExecutionTimeoutInterceptor', () => {
     } as any);
 
     const pending = lastValueFrom(
-      interceptor.intercept(createExecutionContext('/api/ops-runtime-test/rate-limit/ping'), {
+      interceptor.intercept(createExecutionContext('/api/auth/me'), {
         handle: () => timer(4_200).pipe(mapTo({ ok: true })),
       } as any),
     );

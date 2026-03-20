@@ -39,7 +39,6 @@ import { SystemTelemetryInterceptor } from './common/interceptors/system-telemet
 import { SystemDashboardModule } from './dashboard/system-dashboard.module';
 import { SystemDiagnosticsModule } from './diagnostics/system-diagnostics.module';
 import { SystemSettingsModule } from './system-settings/system-settings.module';
-import { OpsRuntimeTestModule } from './ops-runtime-test/ops-runtime-test.module';
 
 @Module({
   imports: [
@@ -154,13 +153,9 @@ export class AppModule implements NestModule {
     // ou usarÃƒÂ¯Ã‚Â¿Ã‚Â½o o PrismaModule global)
     await prisma.$disconnect();
 
-    const optionalModules = process.env.OPS_RUNTIME_TESTS_ENABLED === 'true'
-      ? [OpsRuntimeTestModule]
-      : [];
-
     return {
       module: AppModule,
-      imports: [...dynamicModules, ...optionalModules],
+      imports: [...dynamicModules],
     };
   }
 

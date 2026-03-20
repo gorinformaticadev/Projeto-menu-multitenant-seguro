@@ -253,7 +253,7 @@ describe('OperationalCircuitBreakerService', () => {
     process.env.NODE_APP_INSTANCE = originalNodeAppInstance;
     const options = {
       key: 'dependency:quorum-recovery',
-      route: '/api/ops-runtime-test/dependency/check',
+      route: '/api/update/check',
       failureThreshold: 1,
       failureQuorum: 1,
       recoveryQuorum: 2,
