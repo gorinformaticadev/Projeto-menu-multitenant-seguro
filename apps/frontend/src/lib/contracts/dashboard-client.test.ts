@@ -3,6 +3,7 @@ import { API_VERSION_HEADER } from "@contracts/http";
 import {
   getSystemDashboard,
   getSystemDashboardLayout,
+  getSystemDashboardModuleCards,
 } from "@/lib/contracts/dashboard-client";
 import api from "@/lib/api";
 
@@ -107,6 +108,65 @@ describe("dashboard-client contract enforcement", () => {
     });
 
     await expect(getSystemDashboardLayout()).rejects.toThrow(/Contrato invalido de response/i);
+  });
+
+  it("accepts public module cards but still rejects internal fields that leak into the response", async () => {
+    mockedApi.get.mockResolvedValueOnce({
+      data: {
+        generatedAt: new Date().toISOString(),
+        cards: [
+          {
+            id: "platform:welcome",
+            title: "Bem-vindo",
+            description: "Resumo inicial",
+            module: "platform",
+            visibilityRole: "CLIENT",
+            kind: "summary",
+            icon: "Handshake",
+            href: null,
+            actionLabel: null,
+            size: "large",
+            stats: [{ label: "Perfil", value: "Admin" }],
+            items: [],
+          },
+        ],
+        widgets: {
+          available: ["platform:welcome"],
+        },
+      },
+    });
+
+    await expect(getSystemDashboardModuleCards()).resolves.toMatchObject({
+      cards: [expect.objectContaining({ id: "platform:welcome" })],
+    });
+
+    mockedApi.get.mockResolvedValueOnce({
+      data: {
+        generatedAt: new Date().toISOString(),
+        cards: [
+          {
+            id: "platform:welcome",
+            title: "Bem-vindo",
+            description: "Resumo inicial",
+            module: "platform",
+            visibilityRole: "CLIENT",
+            kind: "summary",
+            icon: "Handshake",
+            href: null,
+            actionLabel: null,
+            size: "large",
+            order: 1,
+            stats: [{ label: "Perfil", value: "Admin" }],
+            items: [],
+          },
+        ],
+        widgets: {
+          available: ["platform:welcome"],
+        },
+      },
+    });
+
+    await expect(getSystemDashboardModuleCards()).rejects.toThrow(/Contrato invalido de response/i);
   });
 
   it("keeps a new frontend compatible with an older backend as long as the v1 body still matches the contract", async () => {

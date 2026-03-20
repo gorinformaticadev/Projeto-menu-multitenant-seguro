@@ -459,10 +459,6 @@ export class OperationalLoadSheddingService implements OnModuleDestroy {
     const overloadedRatio =
       input.instanceCount > 0 ? input.overloadedInstances / input.instanceCount : 0;
 
-    if (input.stateConsistency === 'local_fallback') {
-      flags.push('degrade-heavy-features');
-    }
-
     if (
       input.adaptiveThrottleFactor <= 0.7 ||
       overloadedRatio >= 0.25 ||

@@ -252,7 +252,7 @@ describe('OperationalLoadSheddingService', () => {
     expect(service.getSnapshot().adaptiveThrottleFactor).toBeGreaterThan(0.45);
   });
 
-  it('forces heavy-feature degradation when distributed state falls back to local mode', async () => {
+  it('keeps redis fallback visible without degrading heavy features when there is no operational pressure', async () => {
     const runtimePressure = createRuntimePressureServiceMock(() => ({
       eventLoopLagP95Ms: 20,
       eventLoopLagP99Ms: 30,
@@ -287,11 +287,13 @@ describe('OperationalLoadSheddingService', () => {
     expect(service.getSnapshot()).toMatchObject({
       stateConsistency: 'local_fallback',
       mitigation: expect.objectContaining({
-        degradeHeavyFeatures: true,
+        degradeHeavyFeatures: false,
+        disableRemoteUpdateChecks: false,
+        rejectHeavyMutations: false,
       }),
     });
     expect(service.getSnapshot().mitigation.featureFlags).toEqual(
-      expect.arrayContaining(['degrade-heavy-features', 'redis-fallback-visible']),
+      expect.arrayContaining(['redis-fallback-visible']),
     );
   });
 });

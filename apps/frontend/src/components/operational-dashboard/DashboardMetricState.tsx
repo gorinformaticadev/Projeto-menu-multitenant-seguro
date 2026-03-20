@@ -17,10 +17,49 @@ const toneClassName: Record<DashboardMetricStateTone, string> = {
   danger: "border-skin-danger/30 bg-skin-danger/10 text-skin-danger",
 };
 
+function getMetricMessage(value: unknown): string | null {
+  const normalized = String(value || "").trim();
+  return normalized ? normalized : null;
+}
+
+function humanizeMetricDetail(detail: unknown): string | null {
+  const normalized = getMetricMessage(detail);
+  if (!normalized) {
+    return null;
+  }
+
+  switch (normalized) {
+    case "redis-connection-refused":
+      return "Redis local nao esta acessivel neste ambiente.";
+    case "redis-timeout":
+      return "Redis demorou acima do limite operacional deste ciclo.";
+    case "redis-dns-resolution-failed":
+      return "Host do Redis nao pode ser resolvido neste ambiente.";
+    case "redis-cluster-partial-unavailable":
+      return "Cluster Redis esta parcialmente indisponivel.";
+    case "redis-sentinel-unreachable":
+      return "Os sentinels do Redis estao indisponiveis.";
+    case "redis-sentinels-missing":
+      return "Sentinels do Redis nao foram configurados.";
+    case "redis-standalone-host-missing":
+      return "Host Redis nao configurado neste ambiente.";
+    case "redis-topology-invalid":
+      return "A topologia Redis configurada para este ambiente e invalida.";
+    case "redis-ping-failed":
+      return "Redis nao respondeu ao health check deste ciclo.";
+    case "redis-ping-unexpected-response":
+      return "Redis respondeu de forma inesperada ao health check.";
+    default:
+      return normalized;
+  }
+}
+
 export function resolveDashboardMetricState(
   metric: DashboardMetric | null | undefined,
 ): DashboardMetricStateViewModel | null {
   const status = String(metric?.status || "").trim().toLowerCase();
+  const contextualMessage =
+    getMetricMessage(metric?.error) || humanizeMetricDetail(metric?.detail);
 
   if (status === "ok" || status === "healthy") {
     return null;
@@ -29,7 +68,7 @@ export function resolveDashboardMetricState(
   if (status === "degraded") {
     return {
       title: "Degradado",
-      description: "Dados parciais neste ciclo.",
+      description: contextualMessage || "Dados parciais neste ciclo.",
       tone: "warn",
     };
   }
@@ -37,8 +76,16 @@ export function resolveDashboardMetricState(
   if (status === "error" || status === "down" || status === "unavailable") {
     return {
       title: "Indisponivel",
-      description: "Tentando recuperar.",
+      description: contextualMessage || "Tentando recuperar.",
       tone: "danger",
+    };
+  }
+
+  if (status === "not_configured") {
+    return {
+      title: "Nao configurado",
+      description: contextualMessage || "Dependencia opcional nao configurada neste ambiente.",
+      tone: "neutral",
     };
   }
 

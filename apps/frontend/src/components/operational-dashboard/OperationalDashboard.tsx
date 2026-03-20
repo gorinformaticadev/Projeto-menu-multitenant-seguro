@@ -97,6 +97,7 @@ import {
   DashboardMetricState,
   resolveDashboardMetricState,
 } from "@/components/operational-dashboard/DashboardMetricState";
+import { resolveRuntimeMitigationBanner } from "@/components/operational-dashboard/runtime-mitigation";
 import {
   OperationalDashboardWidget,
   OperationalDashboardWidgetSkeleton,
@@ -252,6 +253,23 @@ function formatTimeOfDay(value: unknown): string {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+}
+
+function formatVersionBuildLabel(metric: DashboardMetric | null | undefined): string {
+  if (metric?.buildDate) {
+    return `Build ${formatDateTime(metric.buildDate)}`;
+  }
+
+  const source = String(metric?.source || "").trim().toLowerCase();
+  if (source === "file" || source === "env") {
+    return "Build local/dev";
+  }
+
+  if (source === "unknown") {
+    return "Build sem metadata";
+  }
+
+  return "Build --";
 }
 
 function normalizeTrendSeries(value: unknown): TrendPoint[] {
@@ -1323,10 +1341,7 @@ export function OperationalDashboard({
   );
   const staleSnapshotActive = staleSnapshotAt !== null;
   const runtimeMitigation = dashboard?.runtimeMitigation;
-  const runtimeMitigationMessage =
-    runtimeMitigation && runtimeMitigation.degradeHeavyFeatures
-      ? `Mitigacao automatica ativa em ${runtimeMitigation.overloadedInstances}/${runtimeMitigation.instanceCount} instancia(s). Fator adaptativo ${runtimeMitigation.adaptiveThrottleFactor.toFixed(2)} por causa ${runtimeMitigation.pressureCause}. Consistencia ${runtimeMitigation.stateConsistency}. ${runtimeMitigation.businessImpact?.[0] || ""}`.trim()
-      : null;
+  const runtimeMitigationBanner = resolveRuntimeMitigationBanner(runtimeMitigation || null);
 
   const hasPendingLayoutChanges = useMemo(() => {
     if (!layoutEditingActive) {
@@ -2017,7 +2032,7 @@ export function OperationalDashboard({
               {String(versionMetric?.version || "--")}
             </p>
             <p className="mt-1 truncate text-[10px] text-muted-foreground">
-              Build {versionMetric?.buildDate ? formatDateTime(versionMetric.buildDate) : "--"}
+              {formatVersionBuildLabel(versionMetric)}
             </p>
           </div>
           <span className="shrink-0 rounded-full border border-skin-border px-2 py-0.5 text-[10px] font-medium text-skin-text-muted">
@@ -3262,15 +3277,21 @@ export function OperationalDashboard({
           </div>
         ) : null}
 
-        {runtimeMitigationMessage ? (
-          <div className="flex items-start gap-3 rounded-2xl border border-skin-warning/30 bg-skin-warning/10 px-4 py-3 text-skin-warning">
+        {runtimeMitigationBanner ? (
+          <div
+            className={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${
+              runtimeMitigationBanner.tone === "info"
+                ? "border-skin-info/30 bg-skin-info/10 text-skin-info"
+                : "border-skin-warning/30 bg-skin-warning/10 text-skin-warning"
+            }`}
+          >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <div className="min-w-0">
-              <p className="text-sm font-semibold">Mitigacao automatica do cluster</p>
-              <p className="text-xs text-skin-warning/90">{runtimeMitigationMessage}</p>
-              <p className="mt-1 text-xs text-skin-warning/80">
-                Algumas metricas caras foram reduzidas automaticamente para preservar estabilidade e latencia.
-              </p>
+              <p className="text-sm font-semibold">{runtimeMitigationBanner.title}</p>
+              <p className="text-xs opacity-90">{runtimeMitigationBanner.message}</p>
+              {runtimeMitigationBanner.detail ? (
+                <p className="mt-1 text-xs opacity-80">{runtimeMitigationBanner.detail}</p>
+              ) : null}
             </div>
           </div>
         ) : null}

@@ -11,23 +11,36 @@ describe("DashboardMetricState", () => {
     render(<DashboardMetricState metric={{ status: "error", error: "timeout" }} />);
 
     expect(screen.getByText("Indisponivel")).toBeInTheDocument();
-    expect(screen.getByText("Tentando recuperar.")).toBeInTheDocument();
+    expect(screen.getByText("timeout")).toBeInTheDocument();
     expect(screen.getByTestId("dashboard-metric-state")).toHaveAttribute("data-tone", "danger");
   });
 
   it("renderiza widget degradado quando status vem parcial", () => {
-    render(<DashboardMetricState metric={{ status: "degraded" }} />);
+    render(
+      <DashboardMetricState
+        metric={{
+          status: "degraded",
+          error: "Metricas de backup mitigadas automaticamente sob pressao operacional.",
+        }}
+      />,
+    );
 
     expect(screen.getByText("Degradado")).toBeInTheDocument();
-    expect(screen.getByText("Dados parciais neste ciclo.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Metricas de backup mitigadas automaticamente sob pressao operacional."),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("dashboard-metric-state")).toHaveAttribute("data-tone", "warn");
   });
 
   it("renderiza sem dados para widget sem leitura utilizavel", () => {
-    render(<DashboardMetricState metric={{ status: "not_configured" }} />);
+    render(
+      <DashboardMetricState
+        metric={{ status: "not_configured", detail: "redis-standalone-host-missing" }}
+      />,
+    );
 
-    expect(screen.getByText("Sem dados")).toBeInTheDocument();
-    expect(screen.getByText("Sem leitura disponivel.")).toBeInTheDocument();
+    expect(screen.getByText("Nao configurado")).toBeInTheDocument();
+    expect(screen.getByText("Host Redis nao configurado neste ambiente.")).toBeInTheDocument();
     expect(screen.getByTestId("dashboard-metric-state")).toHaveAttribute("data-tone", "neutral");
   });
 

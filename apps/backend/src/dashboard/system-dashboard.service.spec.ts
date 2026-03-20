@@ -1,4 +1,5 @@
 import { Role } from '@prisma/client';
+import { dashboardModuleCardsResponseSchema } from '@contracts/dashboard';
 import { SystemVersionService } from '../common/services/system-version.service';
 import { MaintenanceModeService } from '../maintenance/maintenance-mode.service';
 import { PrismaService } from '../core/prisma/prisma.service';
@@ -6,6 +7,7 @@ import { ModuleSecurityService } from '../core/module-security.service';
 import { SystemDashboardService } from './system-dashboard.service';
 import { ResponseTimeMetricsService } from './system-response-time-metrics.service';
 import { OperationalCircuitBreakerService } from '@common/services/operational-circuit-breaker.service';
+import { DistributedOperationalStateService } from '@common/services/distributed-operational-state.service';
 import { OperationalLoadSheddingService } from '@common/services/operational-load-shedding.service';
 import { RuntimePressureService } from '@common/services/runtime-pressure.service';
 import { SystemTelemetryService } from '@common/services/system-telemetry.service';
@@ -54,6 +56,21 @@ describe('SystemDashboardService', () => {
   };
   const operationalCircuitBreakerServiceMock = {
     execute: jest.fn(async (_options, action: () => Promise<unknown>) => action()),
+  };
+  const distributedOperationalStateServiceMock = {
+    getHealth: jest.fn(() => ({
+      enabled: false,
+      valid: true,
+      configured: false,
+      mode: 'disabled',
+      ready: false,
+      fallbackActive: false,
+      required: false,
+      fallbackMode: 'explicit',
+      status: 'disabled',
+      detail: null,
+    })),
+    isDistributedReady: jest.fn(() => false),
   };
   const runtimePressureServiceMock = {
     getSnapshot: jest.fn(() => ({
@@ -105,6 +122,7 @@ describe('SystemDashboardService', () => {
       responseTimeMetricsServiceMock as unknown as ResponseTimeMetricsService,
       systemTelemetryServiceMock as unknown as SystemTelemetryService,
       operationalCircuitBreakerServiceMock as unknown as OperationalCircuitBreakerService,
+      distributedOperationalStateServiceMock as unknown as DistributedOperationalStateService,
       operationalLoadSheddingServiceMock as unknown as OperationalLoadSheddingService,
       runtimePressureServiceMock as unknown as RuntimePressureService,
       moduleSecurityServiceMock as unknown as ModuleSecurityService,
@@ -567,6 +585,8 @@ describe('SystemDashboardService', () => {
         }),
       ]),
     );
+    expect(cards.cards[0]).not.toHaveProperty('order');
+    expect(() => dashboardModuleCardsResponseSchema.parse(cards)).not.toThrow();
     expect(layout.layoutJson).toEqual(
       expect.objectContaining({
         lg: expect.any(Array),
@@ -980,7 +1000,5 @@ describe('SystemDashboardService', () => {
     );
   });
 });
-
-
 
 

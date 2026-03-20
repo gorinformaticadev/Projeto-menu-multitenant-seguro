@@ -10,6 +10,12 @@ interface BuildInfoPayload {
   branch?: unknown;
 }
 
+interface PackageJsonPayload {
+  version?: unknown;
+  private?: unknown;
+  workspaces?: unknown;
+}
+
 export interface ResolvedSystemVersion {
   version: string;
   source: VersionSource;
@@ -124,6 +130,41 @@ function readBuildInfo(cwd: string, env: NodeJS.ProcessEnv): BuildInfoPayload {
   }
 }
 
+function readPackageJsonVersion(cwd: string, env: NodeJS.ProcessEnv): string | undefined {
+  const roots = getRootCandidates(cwd, env);
+  const workspacePackageJsonCandidates: string[] = [];
+  const packageJsonCandidates: string[] = [];
+
+  for (const root of roots) {
+    const candidate = path.join(root, 'package.json');
+    try {
+      if (!fs.existsSync(candidate) || !fs.statSync(candidate).isFile()) {
+        continue;
+      }
+
+      const parsed = JSON.parse(fs.readFileSync(candidate, 'utf8')) as PackageJsonPayload;
+      if (!parsed || typeof parsed !== 'object') {
+        continue;
+      }
+
+      const version = asNonEmptyString(parsed.version);
+      if (!version) {
+        continue;
+      }
+
+      if (parsed.private === true || parsed.workspaces) {
+        workspacePackageJsonCandidates.push(version);
+      } else {
+        packageJsonCandidates.push(version);
+      }
+    } catch {
+      // Ignore malformed package.json files and continue.
+    }
+  }
+
+  return workspacePackageJsonCandidates[0] || packageJsonCandidates[0];
+}
+
 function composeVersion(
   version: string,
   source: VersionSource,
@@ -164,6 +205,11 @@ export function resolveSystemVersion(options?: { cwd?: string; env?: NodeJS.Proc
   const buildInfoVersion = asNonEmptyString(buildInfo.version);
   if (buildInfoVersion) {
     return composeVersion(buildInfoVersion, 'build_info', env, buildInfo);
+  }
+
+  const packageJsonVersion = readPackageJsonVersion(cwd, env);
+  if (packageJsonVersion) {
+    return composeVersion(packageJsonVersion, 'file', env, buildInfo);
   }
 
   return composeVersion('unknown', 'unknown', env, buildInfo);

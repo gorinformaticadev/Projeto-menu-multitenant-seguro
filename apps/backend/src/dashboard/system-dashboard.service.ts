@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
+  type DashboardModuleCard as DashboardModuleCardResponse,
   type SystemDashboardSeverity,
   type UpdateSystemDashboardLayoutBody,
 } from '@contracts/dashboard';
@@ -131,7 +132,7 @@ export interface DashboardModuleCard {
 
 export interface DashboardModuleCardsResponse {
   generatedAt: string;
-  cards: DashboardModuleCard[];
+  cards: DashboardModuleCardResponse[];
   widgets: {
     available: string[];
   };
@@ -471,7 +472,7 @@ export class SystemDashboardService {
 
     return {
       generatedAt: new Date().toISOString(),
-      cards,
+      cards: cards.map((card) => this.toModuleCardResponse(card)),
       widgets: {
         available: cards.map((card) => card.id),
       },
@@ -680,13 +681,16 @@ export class SystemDashboardService {
   private async getRedisMetric() {
     const distributedStateHealth = this.distributedOperationalStateService.getHealth();
     const topology = resolveRedisTopologyConfig();
+    const stateConsistency = this.distributedOperationalStateService.isDistributedReady()
+      ? 'distributed'
+      : 'local_fallback';
 
     if (!topology.enabled) {
       return {
         status: 'not_configured' as const,
         latencyMs: null,
         topology: topology.mode,
-        stateConsistency: distributedStateHealth.fallbackActive ? 'local_fallback' : 'distributed',
+        stateConsistency,
         detail: distributedStateHealth.detail || topology.invalidReason || null,
       };
     }
@@ -697,7 +701,7 @@ export class SystemDashboardService {
         status: 'degraded' as const,
         latencyMs: null,
         topology: topology.mode,
-        stateConsistency: distributedStateHealth.fallbackActive ? 'local_fallback' : 'distributed',
+        stateConsistency,
         detail: distributedStateHealth.detail || topology.invalidReason || 'redis-topology-invalid',
       };
     }
@@ -712,7 +716,7 @@ export class SystemDashboardService {
         status: pong === 'PONG' ? ('healthy' as const) : ('degraded' as const),
         latencyMs,
         topology: topology.mode,
-        stateConsistency: distributedStateHealth.fallbackActive ? 'local_fallback' : 'distributed',
+        stateConsistency,
         detail:
           distributedStateHealth.fallbackActive || pong !== 'PONG'
             ? distributedStateHealth.detail || 'redis-ping-unexpected-response'
@@ -723,7 +727,7 @@ export class SystemDashboardService {
         status: 'down' as const,
         latencyMs: null,
         topology: topology.mode,
-        stateConsistency: distributedStateHealth.fallbackActive ? 'local_fallback' : 'distributed',
+        stateConsistency,
         detail: distributedStateHealth.detail || 'redis-ping-failed',
       };
     } finally {
@@ -758,6 +762,11 @@ export class SystemDashboardService {
       status: 'degraded',
       error: message,
     };
+  }
+
+  private toModuleCardResponse(card: DashboardModuleCard): DashboardModuleCardResponse {
+    const { order: _order, ...publicCard } = card;
+    return publicCard;
   }
 
   private async getApiMetric(historyWindowMs: number) {
