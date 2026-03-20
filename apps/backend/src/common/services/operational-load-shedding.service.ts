@@ -1,4 +1,5 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { resolveApiRouteContractPolicy } from '@contracts/api-routes';
 import type { RuntimePressureCause, RuntimePressureSnapshot } from './runtime-pressure.service';
 import { DistributedOperationalStateService } from './distributed-operational-state.service';
 import { OperationalObservabilityService } from './operational-observability.service';
@@ -15,6 +16,20 @@ type SharedLoadReport = {
   queueDepth: number;
 };
 
+type GranularPressureSignal = 'rate_limit' | 'queue_rejected' | 'queue_timeout' | 'runtime_pressure';
+
+type GranularRouteTenantPressureState = {
+  routePolicyId: string;
+  tenantId: string | null;
+  updatedAt: number;
+  signalScore: number;
+  rateLimitEvents: number;
+  queueRejectedEvents: number;
+  queueTimeoutEvents: number;
+  runtimePressureEvents: number;
+  lastSignal: GranularPressureSignal;
+};
+
 export type OperationalLoadSheddingSnapshot = {
   instanceId: string;
   instanceCount: number;
@@ -22,6 +37,7 @@ export type OperationalLoadSheddingSnapshot = {
   adaptiveThrottleFactor: number;
   desiredAdaptiveThrottleFactor: number;
   pressureCause: RuntimePressureCause | 'cluster';
+  stateConsistency: 'distributed' | 'local_fallback';
   local: RuntimePressureSnapshot;
   clusterRecentApiLatencyMs: number | null;
   clusterQueueDepth: number;
@@ -29,13 +45,17 @@ export type OperationalLoadSheddingSnapshot = {
     degradeHeavyFeatures: boolean;
     disableRemoteUpdateChecks: boolean;
     rejectHeavyMutations: boolean;
+    featureFlags: string[];
+    businessImpact: string[];
   };
 };
 
 const LOAD_SHEDDING_INSTANCES_KEY = 'operational-load-shedding:instances';
 const LOAD_SHEDDING_REPORT_PREFIX = 'operational-load-shedding:instance:';
+const LOAD_SHEDDING_GRANULAR_PREFIX = 'operational-load-shedding:granular:';
 const LOAD_SHEDDING_TTL_MS = 10_000;
 const LOAD_SHEDDING_SAMPLE_MS = 1_000;
+const LOAD_SHEDDING_GRANULAR_TTL_MS = 60_000;
 const LOAD_SHEDDING_EMA_DOWN_ALPHA = 0.45;
 const LOAD_SHEDDING_EMA_UP_ALPHA = 0.2;
 const LOAD_SHEDDING_MIN_STEP_UP = 0.05;
@@ -64,6 +84,7 @@ export class OperationalLoadSheddingService implements OnModuleDestroy {
       adaptiveThrottleFactor: local.adaptiveThrottleFactor,
       desiredAdaptiveThrottleFactor: local.adaptiveThrottleFactor,
       pressureCause: local.cause,
+      stateConsistency: 'local_fallback',
       local,
       clusterRecentApiLatencyMs: local.recentApiLatencyMs,
       clusterQueueDepth: local.queueDepth,
@@ -71,6 +92,8 @@ export class OperationalLoadSheddingService implements OnModuleDestroy {
         degradeHeavyFeatures: false,
         disableRemoteUpdateChecks: false,
         rejectHeavyMutations: false,
+        featureFlags: [],
+        businessImpact: [],
       },
     };
 
@@ -89,7 +112,118 @@ export class OperationalLoadSheddingService implements OnModuleDestroy {
     return {
       ...this.latestSnapshot,
       local: { ...this.latestSnapshot.local },
-      mitigation: { ...this.latestSnapshot.mitigation },
+      mitigation: {
+        ...this.latestSnapshot.mitigation,
+        featureFlags: [...this.latestSnapshot.mitigation.featureFlags],
+        businessImpact: [...this.latestSnapshot.mitigation.businessImpact],
+      },
+    };
+  }
+
+  async recordGranularPressure(input: {
+    path: string;
+    tenantId?: string | null;
+    signal: GranularPressureSignal;
+    weight?: number;
+  }): Promise<void> {
+    const routePolicy = resolveApiRouteContractPolicy(input.path);
+    const normalizedTenantId = this.normalizeTenantId(input.tenantId);
+    const weight = Math.max(1, Math.min(5, Math.floor(input.weight || 1)));
+    const key = this.getGranularStateKey(routePolicy.id, normalizedTenantId);
+
+    await this.distributedOperationalStateService.mutateJson<
+      GranularRouteTenantPressureState,
+      void
+    >(
+      key,
+      {
+        seed: {
+          routePolicyId: routePolicy.id,
+          tenantId: normalizedTenantId,
+          updatedAt: 0,
+          signalScore: 0,
+          rateLimitEvents: 0,
+          queueRejectedEvents: 0,
+          queueTimeoutEvents: 0,
+          runtimePressureEvents: 0,
+          lastSignal: input.signal,
+        },
+        ttlMs: LOAD_SHEDDING_GRANULAR_TTL_MS,
+      },
+      (state) => {
+        state.updatedAt = Date.now();
+        state.signalScore = Math.min(20, state.signalScore + weight);
+        state.lastSignal = input.signal;
+
+        if (input.signal === 'rate_limit') {
+          state.rateLimitEvents += 1;
+        } else if (input.signal === 'queue_rejected') {
+          state.queueRejectedEvents += 1;
+        } else if (input.signal === 'queue_timeout') {
+          state.queueTimeoutEvents += 1;
+        } else {
+          state.runtimePressureEvents += 1;
+        }
+
+        return {
+          next: state,
+          result: undefined,
+        };
+      },
+    );
+  }
+
+  async resolveAdaptiveRateLimitContext(path: string, tenantId?: string | null): Promise<{
+    factor: number;
+    cause: string | null;
+    scope: 'cluster' | 'tenant-route';
+    signalScore: number;
+  }> {
+    const routePolicy = resolveApiRouteContractPolicy(path);
+    const clusterSnapshot = this.getSnapshot();
+    const normalizedTenantId = this.normalizeTenantId(tenantId);
+    const granularState = await this.distributedOperationalStateService.readJson<GranularRouteTenantPressureState>(
+      this.getGranularStateKey(routePolicy.id, normalizedTenantId),
+    );
+
+    let granularFactor = 1;
+    if (granularState?.signalScore && granularState.signalScore >= 6) {
+      granularFactor = 0.45;
+    } else if (granularState?.signalScore && granularState.signalScore >= 4) {
+      granularFactor = 0.6;
+    } else if (granularState?.signalScore && granularState.signalScore >= 2) {
+      granularFactor = 0.8;
+    }
+
+    const clusterFactor =
+      clusterSnapshot.overloadedInstances > 0 || clusterSnapshot.adaptiveThrottleFactor < 1
+        ? clusterSnapshot.adaptiveThrottleFactor
+        : 1;
+    const factor = Number(Math.min(clusterFactor, granularFactor).toFixed(2));
+
+    if (factor >= 1) {
+      return {
+        factor: 1,
+        cause: null,
+        scope: 'cluster',
+        signalScore: granularState?.signalScore || 0,
+      };
+    }
+
+    if (granularFactor < clusterFactor) {
+      return {
+        factor,
+        cause: `tenant-route:${routePolicy.id}`,
+        scope: 'tenant-route',
+        signalScore: granularState?.signalScore || 0,
+      };
+    }
+
+    return {
+      factor,
+      cause: clusterSnapshot.pressureCause,
+      scope: 'cluster',
+      signalScore: granularState?.signalScore || 0,
     };
   }
 
@@ -149,19 +283,23 @@ export class OperationalLoadSheddingService implements OnModuleDestroy {
         .filter((value): value is number => Number.isFinite(value)),
     );
     const pressureCause = this.resolvePressureCause(reports, local);
+    const stateConsistency = this.distributedOperationalStateService.isDistributedReady()
+      ? 'distributed'
+      : 'local_fallback';
+    const featureFlags = this.resolveMitigationFeatureFlags({
+      adaptiveThrottleFactor,
+      overloadedInstances,
+      instanceCount,
+      clusterRecentApiLatencyMs,
+      clusterQueueDepth,
+    });
+    const businessImpact = this.resolveMitigationBusinessImpact(featureFlags);
     const mitigation = {
-      degradeHeavyFeatures:
-        adaptiveThrottleFactor <= 0.75 ||
-        overloadedInstances > 0 ||
-        (clusterRecentApiLatencyMs || 0) >= 1_500 ||
-        clusterQueueDepth >= 3,
-      disableRemoteUpdateChecks:
-        adaptiveThrottleFactor <= 0.65 ||
-        overloadedInstances > 0 ||
-        (clusterRecentApiLatencyMs || 0) >= 2_000,
-      rejectHeavyMutations:
-        adaptiveThrottleFactor <= 0.5 ||
-        overloadedInstances >= Math.max(1, Math.ceil(instanceCount / 2)),
+      degradeHeavyFeatures: featureFlags.includes('degrade-heavy-features'),
+      disableRemoteUpdateChecks: featureFlags.includes('disable-remote-update-checks'),
+      rejectHeavyMutations: featureFlags.includes('reject-heavy-mutations'),
+      featureFlags,
+      businessImpact,
     };
 
     const previousSnapshot = this.latestSnapshot;
@@ -172,6 +310,7 @@ export class OperationalLoadSheddingService implements OnModuleDestroy {
       adaptiveThrottleFactor,
       desiredAdaptiveThrottleFactor,
       pressureCause,
+      stateConsistency,
       local,
       clusterRecentApiLatencyMs,
       clusterQueueDepth,
@@ -196,6 +335,7 @@ export class OperationalLoadSheddingService implements OnModuleDestroy {
           adaptiveThrottleFactor,
           desiredAdaptiveThrottleFactor,
           pressureCause,
+          stateConsistency,
           clusterQueueDepth,
           clusterRecentApiLatencyMs,
           mitigation,
@@ -289,6 +429,65 @@ export class OperationalLoadSheddingService implements OnModuleDestroy {
     return 'cluster';
   }
 
+  private resolveMitigationFeatureFlags(input: {
+    adaptiveThrottleFactor: number;
+    overloadedInstances: number;
+    instanceCount: number;
+    clusterRecentApiLatencyMs: number | null;
+    clusterQueueDepth: number;
+  }): string[] {
+    const flags: string[] = [];
+
+    if (
+      input.adaptiveThrottleFactor <= 0.75 ||
+      input.overloadedInstances > 0 ||
+      (input.clusterRecentApiLatencyMs || 0) >= 1_500 ||
+      input.clusterQueueDepth >= 3
+    ) {
+      flags.push('degrade-heavy-features');
+    }
+
+    if (
+      input.adaptiveThrottleFactor <= 0.65 ||
+      input.overloadedInstances > 0 ||
+      (input.clusterRecentApiLatencyMs || 0) >= 2_000
+    ) {
+      flags.push('disable-remote-update-checks');
+    }
+
+    if (
+      input.adaptiveThrottleFactor <= 0.5 ||
+      input.overloadedInstances >= Math.max(1, Math.ceil(input.instanceCount / 2))
+    ) {
+      flags.push('reject-heavy-mutations');
+    }
+
+    if (!this.distributedOperationalStateService.isDistributedReady()) {
+      flags.push('redis-fallback-visible');
+    }
+
+    return flags;
+  }
+
+  private resolveMitigationBusinessImpact(featureFlags: string[]): string[] {
+    const impacts: string[] = [];
+
+    if (featureFlags.includes('degrade-heavy-features')) {
+      impacts.push('Widgets pesados do dashboard e agregacoes caras podem operar em modo reduzido.');
+    }
+    if (featureFlags.includes('disable-remote-update-checks')) {
+      impacts.push('Verificacoes remotas de atualizacao ficam temporariamente suspensas.');
+    }
+    if (featureFlags.includes('reject-heavy-mutations')) {
+      impacts.push('Operacoes mutantes pesadas podem ser recusadas para preservar o cluster.');
+    }
+    if (featureFlags.includes('redis-fallback-visible')) {
+      impacts.push('Coordenacao distribuida esta em fallback local; consistencia global reduzida ate a recuperacao do Redis.');
+    }
+
+    return impacts;
+  }
+
   private average(values: number[]): number | null {
     if (values.length === 0) {
       return null;
@@ -300,5 +499,14 @@ export class OperationalLoadSheddingService implements OnModuleDestroy {
 
   private getReportKey(instanceId: string) {
     return `${LOAD_SHEDDING_REPORT_PREFIX}${instanceId}`;
+  }
+
+  private getGranularStateKey(routePolicyId: string, tenantId: string | null) {
+    return `${LOAD_SHEDDING_GRANULAR_PREFIX}${routePolicyId}:${tenantId || 'anonymous'}`;
+  }
+
+  private normalizeTenantId(value: string | null | undefined): string | null {
+    const normalized = String(value || '').trim().toLowerCase();
+    return normalized.length > 0 ? normalized : null;
   }
 }

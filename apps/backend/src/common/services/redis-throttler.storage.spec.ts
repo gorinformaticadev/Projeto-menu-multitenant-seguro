@@ -35,15 +35,32 @@ jest.mock('ioredis', () => ({
 describe('RedisThrottlerStorage', () => {
   let warnSpy: jest.SpyInstance;
   let errorSpy: jest.SpyInstance;
+  const originalRedisEnv = {
+    REDIS_HOST: process.env.REDIS_HOST,
+    REDIS_PORT: process.env.REDIS_PORT,
+    REDIS_MODE: process.env.REDIS_MODE,
+    REDIS_ENABLED: process.env.REDIS_ENABLED,
+  };
 
   beforeEach(() => {
     redisInstances.length = 0;
     warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     jest.useRealTimers();
+    process.env.REDIS_HOST = '127.0.0.1';
+    process.env.REDIS_PORT = '6379';
+    delete process.env.REDIS_MODE;
+    delete process.env.REDIS_ENABLED;
   });
 
   afterEach(() => {
+    for (const [key, value] of Object.entries(originalRedisEnv)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
     warnSpy.mockRestore();
     errorSpy.mockRestore();
     jest.restoreAllMocks();

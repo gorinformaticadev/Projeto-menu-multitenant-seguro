@@ -426,12 +426,17 @@ const redisMetricSchema = z.union([
     .object({
       status: z.enum(["healthy", "degraded", "down"]),
       latencyMs: nonNegativeIntegerSchema.nullable(),
+      topology: z.enum(["disabled", "standalone", "sentinel", "cluster"]).optional(),
+      stateConsistency: z.enum(["distributed", "local_fallback"]).optional(),
+      detail: z.string().trim().min(1).optional(),
     })
     .strict(),
   z
     .object({
       status: z.literal("not_configured"),
       latencyMs: z.null(),
+      topology: z.enum(["disabled", "standalone", "sentinel", "cluster"]).optional(),
+      stateConsistency: z.enum(["distributed", "local_fallback"]).optional(),
     })
     .strict(),
   metricFallbackSchema,
@@ -650,7 +655,7 @@ const notificationsMetricSchemaV2 = z.union([
   metricFallbackSchema,
 ]);
 
-const runtimeMitigationMetricSchema = z
+const runtimeMitigationMetricSchemaV1 = z
   .object({
     adaptiveThrottleFactor: z.number().min(0.35).max(1),
     pressureCause: z.enum(["normal", "cpu", "gc", "io", "mixed", "cluster"]),
@@ -661,6 +666,23 @@ const runtimeMitigationMetricSchema = z
     degradeHeavyFeatures: z.boolean(),
     disableRemoteUpdateChecks: z.boolean(),
     rejectHeavyMutations: z.boolean(),
+  })
+  .strict();
+
+const runtimeMitigationMetricSchemaV2 = z
+  .object({
+    adaptiveThrottleFactor: z.number().min(0.35).max(1),
+    pressureCause: z.enum(["normal", "cpu", "gc", "io", "mixed", "cluster"]),
+    instanceCount: nonNegativeIntegerSchema,
+    overloadedInstances: nonNegativeIntegerSchema,
+    stateConsistency: z.enum(["distributed", "local_fallback"]),
+    clusterRecentApiLatencyMs: nonNegativeNumberSchema.nullable(),
+    clusterQueueDepth: nonNegativeIntegerSchema,
+    degradeHeavyFeatures: z.boolean(),
+    disableRemoteUpdateChecks: z.boolean(),
+    rejectHeavyMutations: z.boolean(),
+    featureFlags: z.array(nonEmptyTrimmedString).max(8),
+    businessImpact: z.array(nonEmptyTrimmedString).max(8),
   })
   .strict();
 
@@ -692,7 +714,6 @@ const systemDashboardBaseResponseShape = {
   jobs: jobsMetricSchema,
   errors: recentErrorsMetricSchema,
   tenants: tenantsMetricSchema,
-  runtimeMitigation: runtimeMitigationMetricSchema,
   widgets: z
     .object({
       available: z.array(nonEmptyTrimmedString).max(DASHBOARD_MAX_WIDGET_IDS),
@@ -704,6 +725,7 @@ export const systemDashboardResponseSchemaV1 = z
   .object({
     ...systemDashboardBaseResponseShape,
     notifications: notificationsMetricSchemaV1,
+    runtimeMitigation: runtimeMitigationMetricSchemaV1,
   })
   .strict();
 
@@ -711,6 +733,7 @@ export const systemDashboardResponseSchemaV2 = z
   .object({
     ...systemDashboardBaseResponseShape,
     notifications: notificationsMetricSchemaV2,
+    runtimeMitigation: runtimeMitigationMetricSchemaV2,
   })
   .strict();
 

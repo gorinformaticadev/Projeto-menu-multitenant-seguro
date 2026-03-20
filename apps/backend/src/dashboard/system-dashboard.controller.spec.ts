@@ -70,11 +70,14 @@ describe('SystemDashboardController', () => {
       pressureCause: 'normal',
       instanceCount: 1,
       overloadedInstances: 0,
+      stateConsistency: 'distributed',
       clusterRecentApiLatencyMs: 42,
       clusterQueueDepth: 0,
       degradeHeavyFeatures: false,
       disableRemoteUpdateChecks: false,
       rejectHeavyMutations: false,
+      featureFlags: [],
+      businessImpact: [],
     },
     widgets: { available: ['version'] },
   });
@@ -147,6 +150,17 @@ describe('SystemDashboardController', () => {
                 ({ action: _action, ...legacyAlert }) => legacyAlert,
               ),
             },
+            runtimeMitigation: {
+              adaptiveThrottleFactor: response.runtimeMitigation.adaptiveThrottleFactor,
+              pressureCause: response.runtimeMitigation.pressureCause,
+              instanceCount: response.runtimeMitigation.instanceCount,
+              overloadedInstances: response.runtimeMitigation.overloadedInstances,
+              clusterRecentApiLatencyMs: response.runtimeMitigation.clusterRecentApiLatencyMs,
+              clusterQueueDepth: response.runtimeMitigation.clusterQueueDepth,
+              degradeHeavyFeatures: response.runtimeMitigation.degradeHeavyFeatures,
+              disableRemoteUpdateChecks: response.runtimeMitigation.disableRemoteUpdateChecks,
+              rejectHeavyMutations: response.runtimeMitigation.rejectHeavyMutations,
+            },
           };
         }
 
@@ -170,6 +184,13 @@ describe('SystemDashboardController', () => {
     ).toEqual(
       expect.not.objectContaining({
         action: expect.anything(),
+      }),
+    );
+    expect(legacyResponse.runtimeMitigation).toEqual(
+      expect.not.objectContaining({
+        stateConsistency: expect.anything(),
+        featureFlags: expect.anything(),
+        businessImpact: expect.anything(),
       }),
     );
   });

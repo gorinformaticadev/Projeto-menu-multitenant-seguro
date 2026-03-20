@@ -244,6 +244,7 @@ async function bootstrap() {
       'X-Request-Id',
       'X-Trace-Id',
       'Traceparent',
+      'Baggage',
       'X-Total-Count',
       'X-API-Version',
       'X-API-Latest-Version',

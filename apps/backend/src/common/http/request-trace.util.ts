@@ -3,6 +3,14 @@ import { randomUUID } from 'crypto';
 export const REQUEST_ID_HEADER = 'x-request-id';
 export const TRACE_ID_HEADER = 'x-trace-id';
 export const TRACEPARENT_HEADER = 'traceparent';
+export const BAGGAGE_HEADER = 'baggage';
+
+export type RequestTraceMitigationFlag =
+  | 'redis_fallback'
+  | 'feature_degraded'
+  | 'update_checks_disabled'
+  | 'heavy_mutations_rejected'
+  | 'tenant_shed';
 
 export type RequestTraceContext = {
   requestId: string;
@@ -10,6 +18,10 @@ export type RequestTraceContext = {
   spanId: string;
   traceparent: string;
   startedAt: number;
+  tenantId: string | null;
+  userId: string | null;
+  apiVersion: string | null;
+  mitigationFlags: RequestTraceMitigationFlag[];
 };
 
 type HeaderCarrier = {
@@ -26,6 +38,39 @@ function readHeader(carrier: HeaderCarrier, headerName: string): string | null {
 
   const normalized = value.trim();
   return normalized.length > 0 ? normalized : null;
+}
+
+function parseBaggage(rawBaggage: string | null): Record<string, string> {
+  if (!rawBaggage) {
+    return {};
+  }
+
+  return rawBaggage
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0 && item.includes('='))
+    .reduce<Record<string, string>>((accumulator, entry) => {
+      const [keyPart, valuePart] = entry.split('=');
+      const key = sanitizeOpaqueId(keyPart || '', 64)?.toLowerCase();
+      const value = sanitizeOpaqueId(valuePart || '', 128);
+      if (key && value) {
+        accumulator[key] = value;
+      }
+      return accumulator;
+    }, {});
+}
+
+function buildBaggageValue(trace: RequestTraceContext): string | null {
+  const entries = [
+    trace.tenantId ? `tenant_id=${trace.tenantId}` : null,
+    trace.userId ? `user_id=${trace.userId}` : null,
+    trace.apiVersion ? `api_version=${trace.apiVersion}` : null,
+    trace.mitigationFlags.length > 0
+      ? `mitigation_flags=${trace.mitigationFlags.join('.')}`
+      : null,
+  ].filter(Boolean) as string[];
+
+  return entries.length > 0 ? entries.join(',') : null;
 }
 
 function sanitizeOpaqueId(value: string | null, maxLength = 128): string | null {
@@ -76,6 +121,7 @@ export function ensureRequestTrace(carrier: HeaderCarrier): RequestTraceContext 
     return carrier.requestTrace;
   }
 
+  const baggage = parseBaggage(readHeader(carrier, BAGGAGE_HEADER));
   const requestId =
     sanitizeOpaqueId(readHeader(carrier, REQUEST_ID_HEADER), 96) || randomUUID();
   const traceId =
@@ -92,6 +138,13 @@ export function ensureRequestTrace(carrier: HeaderCarrier): RequestTraceContext 
     spanId,
     traceparent,
     startedAt: Date.now(),
+    tenantId: sanitizeOpaqueId(baggage.tenant_id || null, 96),
+    userId: sanitizeOpaqueId(baggage.user_id || null, 96),
+    apiVersion: sanitizeOpaqueId(baggage.api_version || null, 16),
+    mitigationFlags: String(baggage.mitigation_flags || '')
+      .split('.')
+      .map((value) => sanitizeOpaqueId(value, 64))
+      .filter((value): value is RequestTraceMitigationFlag => Boolean(value)),
   };
 
   carrier.requestTrace = trace;
@@ -106,15 +159,53 @@ export function getRequestTrace(carrier: HeaderCarrier | null | undefined): Requ
   return carrier.requestTrace || null;
 }
 
+export function annotateRequestTrace(
+  carrier: HeaderCarrier | null | undefined,
+  input: Partial<Pick<RequestTraceContext, 'tenantId' | 'userId' | 'apiVersion'>> & {
+    mitigationFlags?: RequestTraceMitigationFlag[];
+  },
+): RequestTraceContext | null {
+  if (!carrier) {
+    return null;
+  }
+
+  const trace = ensureRequestTrace(carrier);
+  if (input.tenantId !== undefined) {
+    trace.tenantId = sanitizeOpaqueId(input.tenantId, 96);
+  }
+  if (input.userId !== undefined) {
+    trace.userId = sanitizeOpaqueId(input.userId, 96);
+  }
+  if (input.apiVersion !== undefined) {
+    trace.apiVersion = sanitizeOpaqueId(input.apiVersion, 16);
+  }
+  if (Array.isArray(input.mitigationFlags) && input.mitigationFlags.length > 0) {
+    const combined = new Set<RequestTraceMitigationFlag>([
+      ...trace.mitigationFlags,
+      ...input.mitigationFlags,
+    ]);
+    trace.mitigationFlags = [...combined];
+  }
+
+  return trace;
+}
+
 export function buildOutgoingTraceHeaders(carrier: HeaderCarrier | null | undefined) {
   const trace = carrier ? ensureRequestTrace(carrier) : null;
   if (!trace) {
     return {};
   }
 
-  return {
+  const headers: Record<string, string> = {
     [REQUEST_ID_HEADER]: trace.requestId,
     [TRACE_ID_HEADER]: trace.traceId,
     [TRACEPARENT_HEADER]: trace.traceparent,
   };
+
+  const baggage = buildBaggageValue(trace);
+  if (baggage) {
+    headers[BAGGAGE_HEADER] = baggage;
+  }
+
+  return headers;
 }

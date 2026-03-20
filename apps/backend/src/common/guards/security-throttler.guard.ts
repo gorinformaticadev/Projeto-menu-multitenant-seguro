@@ -29,6 +29,7 @@ import {
   CriticalRateLimitAction,
 } from '../decorators/critical-rate-limit.decorator';
 import { SharedThrottlerStorageUnavailableError } from '../services/redis-throttler.storage';
+import { annotateRequestTrace } from '../http/request-trace.util';
 
 type ThrottleScope = 'ip' | 'user' | 'tenant-user' | 'tenant' | 'api-key';
 
@@ -107,7 +108,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     const { context } = requestProps;
     const req = context.switchToHttp().getRequest();
     const identity = this.resolveThrottleIdentity(req);
-    const adaptiveContext = this.resolveAdaptiveRateLimitContext(identity.path);
+    const adaptiveContext = await this.resolveAdaptiveRateLimitContext(identity.path, req);
     const execution = await this.resolveRateLimitExecution(
       requestProps,
       identity,
@@ -121,6 +122,14 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
 
     req.__rateLimitContext = execution;
     req.__rateLimitIdentityOverride = identity;
+    if (adaptiveContext.factor < 1) {
+      annotateRequestTrace(req, {
+        mitigationFlags:
+          adaptiveContext.scope === 'tenant-route'
+            ? ['tenant_shed']
+            : ['feature_degraded'],
+      });
+    }
 
     await this.enforceAdditionalRouteLimits(requestProps, identity, adaptiveContext);
 
@@ -242,6 +251,8 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     adaptiveContext: {
       factor: number;
       cause: string | null;
+      scope: 'cluster' | 'tenant-route';
+      signalScore: number;
     },
   ): Promise<void> {
     const req = requestProps.context.switchToHttp().getRequest();
@@ -504,28 +515,27 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     };
   }
 
-  private resolveAdaptiveRateLimitContext(path: string): {
+  private async resolveAdaptiveRateLimitContext(path: string, req: Record<string, any>): Promise<{
     factor: number;
     cause: string | null;
-  } {
+    scope: 'cluster' | 'tenant-route';
+    signalScore: number;
+  }> {
     const routePolicy = resolveApiRouteContractPolicy(path);
     if (!routePolicy.runtime.shedOnCpuPressure) {
       return {
         factor: 1,
         cause: null,
+        scope: 'cluster',
+        signalScore: 0,
       };
     }
 
-    const snapshot = this.operationalLoadSheddingService.getSnapshot();
-    const factor =
-      snapshot.overloadedInstances > 0 || snapshot.adaptiveThrottleFactor < 1
-        ? snapshot.adaptiveThrottleFactor
-        : 1;
-
-    return {
-      factor,
-      cause: factor < 1 ? snapshot.pressureCause : null,
-    };
+    const principal = this.resolvePrincipalIdentity(req);
+    return this.operationalLoadSheddingService.resolveAdaptiveRateLimitContext(
+      path,
+      principal.tenantId,
+    );
   }
 
   private applyAdaptiveLimit(baseLimit: number, adaptiveFactor: number): number {
@@ -585,6 +595,14 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     if (!data.blocked) {
       return;
     }
+
+    const routePolicy = resolveApiRouteContractPolicy(data.identity.path);
+    await this.operationalLoadSheddingService.recordGranularPressure({
+      path: data.identity.path,
+      tenantId,
+      signal: 'rate_limit',
+      weight: data.kind === 'critical' ? 3 : routePolicy.runtime.shedOnCpuPressure ? 2 : 1,
+    });
 
     this.logger.warn(
       `rate_limit_blocked kind=${data.kind} category=${data.category || 'none'} path=${data.identity.path} tracker=${data.identity.tracker} limit=${data.limit} windowSec=${data.windowSec} retryAfterSec=${data.retryAfterSec || 0}`,

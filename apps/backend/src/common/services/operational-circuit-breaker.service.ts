@@ -24,6 +24,8 @@ type CircuitBreakerState = {
   halfOpenSuccesses: number;
   consecutiveSuccesses: number;
   lastTransitionAt: number;
+  failureVotes: Record<string, number>;
+  recoveryVotes: Record<string, number>;
 };
 
 type ExecuteCircuitOptions = {
@@ -35,6 +37,9 @@ type ExecuteCircuitOptions = {
   halfOpenMaxProbes?: number;
   halfOpenSuccessThreshold?: number;
   jitterRatio?: number;
+  failureQuorum?: number;
+  recoveryQuorum?: number;
+  voteWindowMs?: number;
 };
 
 export type CircuitBreakerSnapshot = {
@@ -48,6 +53,8 @@ export type CircuitBreakerSnapshot = {
   halfOpenSuccesses: number;
   consecutiveSuccesses: number;
   lastTransitionAt: number;
+  failureVoters: number;
+  recoveryVoters: number;
 };
 
 type CircuitPreflightResult =
@@ -73,12 +80,15 @@ type CircuitFinalizeResult = {
 
 const DEFAULT_HALF_OPEN_MAX_PROBES = 1;
 const DEFAULT_JITTER_RATIO = 0.2;
+const DEFAULT_VOTE_WINDOW_MS = 30_000;
 const CIRCUIT_STATE_TTL_MS = 6 * 60 * 60 * 1000;
 const CIRCUIT_STATE_PREFIX = 'operational-circuit-breaker:';
 
 @Injectable()
 export class OperationalCircuitBreakerService {
   private readonly snapshots = new Map<string, CircuitBreakerSnapshot>();
+  private readonly instanceId =
+    process.env.NODE_APP_INSTANCE || process.env.HOSTNAME || `instance-${process.pid}`;
 
   constructor(
     private readonly operationalObservabilityService: OperationalObservabilityService,
@@ -91,6 +101,9 @@ export class OperationalCircuitBreakerService {
       1,
       Math.min(halfOpenMaxProbes, options.halfOpenSuccessThreshold || halfOpenMaxProbes),
     );
+    const failureQuorum = Math.max(1, options.failureQuorum || this.readQuorumFromEnv('OPS_CIRCUIT_BREAKER_FAILURE_QUORUM', 1));
+    const recoveryQuorum = Math.max(1, options.recoveryQuorum || this.readQuorumFromEnv('OPS_CIRCUIT_BREAKER_RECOVERY_QUORUM', failureQuorum));
+    const voteWindowMs = Math.max(1_000, options.voteWindowMs || DEFAULT_VOTE_WINDOW_MS);
 
     const preflight = await this.distributedOperationalStateService.mutateJson<
       CircuitBreakerState,
@@ -103,6 +116,7 @@ export class OperationalCircuitBreakerService {
       },
       (state) => {
         const now = Date.now();
+        this.pruneVotes(state, now, voteWindowMs);
 
         if (state.mode === 'open' && state.openedUntil && now < state.openedUntil) {
           return {
@@ -174,20 +188,22 @@ export class OperationalCircuitBreakerService {
       throw new CircuitBreakerOpenError(options.key, preflight.retryAfterMs);
     }
 
-    if (preflight.enteredHalfOpen) {
+        if (preflight.enteredHalfOpen) {
       this.operationalObservabilityService.record({
         type: 'circuit_half_open',
         route: options.route,
         request: options.request,
         severity: 'warn',
         detail: `circuit half-open key=${options.key} probes=${preflight.halfOpenMaxProbes}`,
-        extra: {
-          key: options.key,
-          halfOpenMaxProbes: preflight.halfOpenMaxProbes,
-          halfOpenSuccessThreshold: preflight.halfOpenSuccessThreshold,
-          openCount: preflight.snapshot.openCount,
-          distributed: this.distributedOperationalStateService.isDistributedReady(),
-        },
+          extra: {
+            key: options.key,
+            halfOpenMaxProbes: preflight.halfOpenMaxProbes,
+            halfOpenSuccessThreshold: preflight.halfOpenSuccessThreshold,
+            failureQuorum,
+            recoveryQuorum,
+            openCount: preflight.snapshot.openCount,
+            distributed: this.distributedOperationalStateService.isDistributedReady(),
+          },
       });
     }
 
@@ -204,13 +220,20 @@ export class OperationalCircuitBreakerService {
         },
         (state) => {
           let recovered = false;
+          const now = Date.now();
+          this.pruneVotes(state, now, voteWindowMs);
+          state.recoveryVotes[this.instanceId] = now;
+          delete state.failureVotes[this.instanceId];
 
           if (state.mode === 'half-open') {
             state.halfOpenInFlight = Math.max(0, state.halfOpenInFlight - 1);
             state.halfOpenSuccesses += 1;
             state.consecutiveSuccesses += 1;
 
-            if (state.halfOpenSuccesses >= preflight.halfOpenSuccessThreshold) {
+            if (
+              state.halfOpenSuccesses >= preflight.halfOpenSuccessThreshold &&
+              this.countVotes(state.recoveryVotes) >= recoveryQuorum
+            ) {
               this.closeCircuit(state, true);
               recovered = true;
             }
@@ -248,6 +271,7 @@ export class OperationalCircuitBreakerService {
             key: options.key,
             openCount: finalized.snapshot.openCount,
             failures: finalized.snapshot.failures,
+            recoveryVoters: finalized.snapshot.recoveryVoters,
             distributed: this.distributedOperationalStateService.isDistributedReady(),
           },
         });
@@ -269,10 +293,16 @@ export class OperationalCircuitBreakerService {
             state.halfOpenInFlight = Math.max(0, state.halfOpenInFlight - 1);
           }
 
+          const now = Date.now();
+          this.pruneVotes(state, now, voteWindowMs);
+          state.failureVotes[this.instanceId] = now;
+          delete state.recoveryVotes[this.instanceId];
           state.consecutiveSuccesses = 0;
           state.failures += 1;
           const shouldOpen =
-            state.mode === 'half-open' || state.failures >= Math.max(1, options.failureThreshold);
+            state.mode === 'half-open' ||
+            (state.failures >= Math.max(1, options.failureThreshold) &&
+              this.countVotes(state.failureVotes) >= failureQuorum);
 
           let becameOpen = false;
           if (shouldOpen) {
@@ -304,6 +334,8 @@ export class OperationalCircuitBreakerService {
             key: options.key,
             failures: finalized.snapshot.failures,
             openCount: finalized.snapshot.openCount,
+            failureVoters: finalized.snapshot.failureVoters,
+            failureQuorum,
             openedUntil: finalized.openedUntil,
             distributed: this.distributedOperationalStateService.isDistributedReady(),
           },
@@ -327,6 +359,8 @@ export class OperationalCircuitBreakerService {
         halfOpenSuccesses: 0,
         consecutiveSuccesses: 0,
         lastTransitionAt: Date.now(),
+        failureVoters: 0,
+        recoveryVoters: 0,
       }
     );
   }
@@ -355,6 +389,8 @@ export class OperationalCircuitBreakerService {
       halfOpenSuccesses: 0,
       consecutiveSuccesses: 0,
       lastTransitionAt: Date.now(),
+      failureVotes: {},
+      recoveryVotes: {},
     };
   }
 
@@ -370,6 +406,8 @@ export class OperationalCircuitBreakerService {
       halfOpenSuccesses: state.halfOpenSuccesses,
       consecutiveSuccesses: state.consecutiveSuccesses,
       lastTransitionAt: state.lastTransitionAt,
+      failureVoters: this.countVotes(state.failureVotes),
+      recoveryVoters: this.countVotes(state.recoveryVotes),
     };
   }
 
@@ -383,6 +421,7 @@ export class OperationalCircuitBreakerService {
     entry.openedUntil =
       Date.now() +
       this.calculateCooldownMs(options.resetTimeoutMs, entry.openCount, options.jitterRatio);
+    entry.recoveryVotes = {};
   }
 
   private transitionToHalfOpen(entry: CircuitBreakerState) {
@@ -403,6 +442,8 @@ export class OperationalCircuitBreakerService {
     entry.halfOpenProbeAttempts = 0;
     entry.halfOpenSuccesses = 0;
     entry.lastTransitionAt = Date.now();
+    entry.failureVotes = {};
+    entry.recoveryVotes = {};
   }
 
   private calculateCooldownMs(
@@ -416,5 +457,32 @@ export class OperationalCircuitBreakerService {
     const jitterWindow = baseDelay * Math.max(0, Math.min(0.5, jitterRatio));
     const random = (Math.random() * 2 - 1) * jitterWindow;
     return Math.max(250, Math.floor(baseDelay + random));
+  }
+
+  private countVotes(votes: Record<string, number>): number {
+    return Object.keys(votes).length;
+  }
+
+  private pruneVotes(
+    state: CircuitBreakerState,
+    now: number,
+    voteWindowMs: number,
+  ) {
+    const cutoff = now - voteWindowMs;
+    state.failureVotes = Object.fromEntries(
+      Object.entries(state.failureVotes).filter(([, at]) => Number(at) >= cutoff),
+    );
+    state.recoveryVotes = Object.fromEntries(
+      Object.entries(state.recoveryVotes).filter(([, at]) => Number(at) >= cutoff),
+    );
+  }
+
+  private readQuorumFromEnv(key: string, fallback: number): number {
+    const parsed = Number.parseInt(String(process.env[key] || ''), 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return fallback;
+    }
+
+    return parsed;
   }
 }

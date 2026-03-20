@@ -85,9 +85,11 @@ type GrantWaiterResult =
 
 const DISTRIBUTED_QUEUE_ROUTES_KEY = 'operational-request-queue:routes';
 const DISTRIBUTED_QUEUE_STATE_PREFIX = 'operational-request-queue:state:';
+const DISTRIBUTED_LOAD_SHEDDING_GRANULAR_PREFIX = 'operational-load-shedding:granular:';
 const DISTRIBUTED_QUEUE_STATE_TTL_MS = 5 * 60 * 1000;
 const DISTRIBUTED_QUEUE_POLL_MS = 125;
 const DISTRIBUTED_QUEUE_SNAPSHOT_REFRESH_MS = 1_000;
+const DISTRIBUTED_GRANULAR_PRESSURE_TTL_MS = 60_000;
 
 @Injectable()
 export class OperationalRequestQueueService implements OnModuleDestroy {
@@ -247,6 +249,12 @@ export class OperationalRequestQueueService implements OnModuleDestroy {
           distributed: this.distributedOperationalStateService.isDistributedReady(),
         },
       });
+      await this.recordGranularQueuePressure(
+        options.routePolicyId,
+        waiter.tenantId,
+        'queue_rejected',
+        3,
+      );
       throw new HttpException(
         {
           statusCode: HttpStatus.TOO_MANY_REQUESTS,
@@ -407,6 +415,12 @@ export class OperationalRequestQueueService implements OnModuleDestroy {
         distributed: this.distributedOperationalStateService.isDistributedReady(),
       },
     });
+    await this.recordGranularQueuePressure(
+      options.routePolicyId,
+      waiter.tenantId,
+      'queue_timeout',
+      2,
+    );
     throw new HttpException(
       {
         statusCode: HttpStatus.SERVICE_UNAVAILABLE,
@@ -768,5 +782,60 @@ export class OperationalRequestQueueService implements OnModuleDestroy {
 
   private sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private async recordGranularQueuePressure(
+    routePolicyId: string,
+    tenantId: string | null,
+    signal: 'queue_rejected' | 'queue_timeout',
+    weight: number,
+  ) {
+    const normalizedTenantId = tenantId || 'anonymous';
+    const key = `${DISTRIBUTED_LOAD_SHEDDING_GRANULAR_PREFIX}${routePolicyId}:${normalizedTenantId}`;
+
+    await this.distributedOperationalStateService.mutateJson<
+      {
+        routePolicyId: string;
+        tenantId: string | null;
+        updatedAt: number;
+        signalScore: number;
+        rateLimitEvents: number;
+        queueRejectedEvents: number;
+        queueTimeoutEvents: number;
+        runtimePressureEvents: number;
+        lastSignal: string;
+      },
+      void
+    >(
+      key,
+      {
+        seed: {
+          routePolicyId,
+          tenantId,
+          updatedAt: 0,
+          signalScore: 0,
+          rateLimitEvents: 0,
+          queueRejectedEvents: 0,
+          queueTimeoutEvents: 0,
+          runtimePressureEvents: 0,
+          lastSignal: signal,
+        },
+        ttlMs: DISTRIBUTED_GRANULAR_PRESSURE_TTL_MS,
+      },
+      (state) => {
+        state.updatedAt = Date.now();
+        state.signalScore = Math.min(20, state.signalScore + Math.max(1, weight));
+        state.lastSignal = signal;
+        if (signal === 'queue_rejected') {
+          state.queueRejectedEvents += 1;
+        } else {
+          state.queueTimeoutEvents += 1;
+        }
+        return {
+          next: state,
+          result: undefined,
+        };
+      },
+    );
   }
 }

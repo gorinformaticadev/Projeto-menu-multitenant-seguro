@@ -1325,7 +1325,7 @@ export function OperationalDashboard({
   const runtimeMitigation = dashboard?.runtimeMitigation;
   const runtimeMitigationMessage =
     runtimeMitigation && runtimeMitigation.degradeHeavyFeatures
-      ? `Mitigacao automatica ativa em ${runtimeMitigation.overloadedInstances}/${runtimeMitigation.instanceCount} instancia(s). Fator adaptativo ${runtimeMitigation.adaptiveThrottleFactor.toFixed(2)} por causa ${runtimeMitigation.pressureCause}.`
+      ? `Mitigacao automatica ativa em ${runtimeMitigation.overloadedInstances}/${runtimeMitigation.instanceCount} instancia(s). Fator adaptativo ${runtimeMitigation.adaptiveThrottleFactor.toFixed(2)} por causa ${runtimeMitigation.pressureCause}. Consistencia ${runtimeMitigation.stateConsistency}. ${runtimeMitigation.businessImpact?.[0] || ""}`.trim()
       : null;
 
   const hasPendingLayoutChanges = useMemo(() => {

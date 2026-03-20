@@ -10,6 +10,8 @@ import { SystemTelemetryService } from './system-telemetry.service';
 import { RedisLockService } from './redis-lock.service';
 import { SystemOperationalAlertsService } from './system-operational-alerts.service';
 import { ConfigResolverService } from '../../system-settings/config-resolver.service';
+import { DistributedOperationalStateService } from './distributed-operational-state.service';
+import { OperationalLoadSheddingService } from './operational-load-shedding.service';
 
 describe('SystemOperationalAlertsService', () => {
   const prismaMock = {
@@ -36,6 +38,12 @@ describe('SystemOperationalAlertsService', () => {
   };
   const configResolverMock = {
     getBoolean: jest.fn(),
+  };
+  const distributedOperationalStateServiceMock = {
+    getHealth: jest.fn(),
+  };
+  const operationalLoadSheddingServiceMock = {
+    getSnapshot: jest.fn(),
   };
 
   const baseNotification: Notification = {
@@ -77,6 +85,8 @@ describe('SystemOperationalAlertsService', () => {
       cronServiceMock as unknown as CronService,
       configResolverMock as unknown as ConfigResolverService,
       redisLockMock as unknown as RedisLockService,
+      distributedOperationalStateServiceMock as unknown as DistributedOperationalStateService,
+      operationalLoadSheddingServiceMock as unknown as OperationalLoadSheddingService,
     );
 
   beforeEach(() => {
@@ -156,6 +166,52 @@ describe('SystemOperationalAlertsService', () => {
     prismaMock.backupJob.findMany.mockResolvedValue([]);
     cronServiceMock.register.mockResolvedValue(undefined);
     configResolverMock.getBoolean.mockResolvedValue(true);
+    distributedOperationalStateServiceMock.getHealth.mockReturnValue({
+      enabled: false,
+      mode: 'disabled',
+      ready: false,
+      fallbackActive: false,
+      required: false,
+      fallbackMode: 'explicit',
+      status: 'disabled',
+      detail: null,
+    });
+    operationalLoadSheddingServiceMock.getSnapshot.mockReturnValue({
+      instanceId: 'instance-a',
+      instanceCount: 1,
+      overloadedInstances: 0,
+      adaptiveThrottleFactor: 1,
+      desiredAdaptiveThrottleFactor: 1,
+      pressureCause: 'normal',
+      stateConsistency: 'distributed',
+      local: {
+        eventLoopLagP95Ms: 10,
+        eventLoopLagP99Ms: 15,
+        eventLoopLagMaxMs: 20,
+        eventLoopUtilization: 0.1,
+        heapUsedRatio: 0.3,
+        recentApiLatencyMs: 80,
+        gcPauseP95Ms: 0,
+        gcPauseMaxMs: 0,
+        gcEventsRecent: 0,
+        queueDepth: 0,
+        activeIsolatedRequests: 0,
+        pressureScore: 0,
+        consecutiveBreaches: 0,
+        adaptiveThrottleFactor: 1,
+        cause: 'normal',
+        overloaded: false,
+      },
+      clusterRecentApiLatencyMs: 80,
+      clusterQueueDepth: 0,
+      mitigation: {
+        degradeHeavyFeatures: false,
+        disableRemoteUpdateChecks: false,
+        rejectHeavyMutations: false,
+        featureFlags: [],
+        businessImpact: [],
+      },
+    });
     jest
       .spyOn(serviceInternals, 'checkDatabaseHealth')
       .mockResolvedValue({ status: 'healthy', latencyMs: 12 });

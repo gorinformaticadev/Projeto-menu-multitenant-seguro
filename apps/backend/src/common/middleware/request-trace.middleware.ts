@@ -1,6 +1,7 @@
 import { NestMiddleware } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 import {
+  BAGGAGE_HEADER,
   ensureRequestTrace,
   REQUEST_ID_HEADER,
   TRACEPARENT_HEADER,
@@ -13,6 +14,21 @@ export class RequestTraceMiddleware implements NestMiddleware {
     res.setHeader(REQUEST_ID_HEADER, trace.requestId);
     res.setHeader(TRACE_ID_HEADER, trace.traceId);
     res.setHeader(TRACEPARENT_HEADER, trace.traceparent);
+    if (trace.tenantId || trace.userId || trace.apiVersion || trace.mitigationFlags.length > 0) {
+      const baggage = [
+        trace.tenantId ? `tenant_id=${trace.tenantId}` : null,
+        trace.userId ? `user_id=${trace.userId}` : null,
+        trace.apiVersion ? `api_version=${trace.apiVersion}` : null,
+        trace.mitigationFlags.length > 0
+          ? `mitigation_flags=${trace.mitigationFlags.join('.')}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(',');
+      if (baggage) {
+        res.setHeader(BAGGAGE_HEADER, baggage);
+      }
+    }
     next();
   }
 }

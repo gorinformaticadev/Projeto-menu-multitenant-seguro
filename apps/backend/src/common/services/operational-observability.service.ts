@@ -31,6 +31,10 @@ export class OperationalObservabilityService {
       statusCode: this.normalizeStatusCode(input.statusCode),
       requestId: requestTrace?.requestId || null,
       traceId: requestTrace?.traceId || null,
+      tenantId: requestTrace?.tenantId || null,
+      userId: requestTrace?.userId || null,
+      apiVersion: requestTrace?.apiVersion || null,
+      mitigationFlags: requestTrace?.mitigationFlags || [],
       detail: this.normalizeDetail(input.detail),
       ...(input.extra || {}),
     };
@@ -52,6 +56,10 @@ export class OperationalObservabilityService {
       statusCode: payload.statusCode,
       requestId: payload.requestId || undefined,
       traceId: payload.traceId || undefined,
+      tenantId: payload.tenantId || undefined,
+      userId: payload.userId || undefined,
+      apiVersion: payload.apiVersion || undefined,
+      mitigationFlags: Array.isArray(payload.mitigationFlags) ? payload.mitigationFlags : undefined,
       detail: payload.detail,
     });
   }
@@ -72,4 +80,3 @@ export class OperationalObservabilityService {
     return normalized.length > 240 ? `${normalized.slice(0, 237)}...` : normalized;
   }
 }
-

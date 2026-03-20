@@ -1,6 +1,7 @@
 import { HttpStatus, NestMiddleware } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 import { resolveApiRouteContractPolicy } from '@contracts/api-routes';
+import { annotateRequestTrace } from '../http/request-trace.util';
 import { OperationalObservabilityService } from '../services/operational-observability.service';
 import { RuntimePressureService } from '../services/runtime-pressure.service';
 
@@ -55,6 +56,9 @@ export class RuntimePressureMiddleware implements NestMiddleware {
         pressureScore: snapshot.pressureScore,
         adaptiveThrottleFactor: snapshot.adaptiveThrottleFactor,
       },
+    });
+    annotateRequestTrace(req as unknown as Record<string, any>, {
+      mitigationFlags: ['feature_degraded'],
     });
 
     res.status(HttpStatus.SERVICE_UNAVAILABLE).json({

@@ -48,6 +48,8 @@ describe('RateLimitMetricsService', () => {
     process.env = {
       ...originalEnv,
       RATE_LIMIT_REDIS_ENABLED: 'false',
+      REDIS_HOST: '127.0.0.1',
+      REDIS_PORT: '6379',
       RATE_LIMIT_METRICS_RETENTION_HOURS: '24',
       RATE_LIMIT_METRICS_MAX_QUERY_HOURS: '24',
       RATE_LIMIT_BLOCK_AUDIT_COOLDOWN_MS: '50',

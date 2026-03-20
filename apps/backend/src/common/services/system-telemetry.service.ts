@@ -83,6 +83,10 @@ export interface OperationalTelemetrySnapshot {
     route: string;
     requestId: string | null;
     traceId: string | null;
+    tenantId: string | null;
+    userId: string | null;
+    apiVersion: string | null;
+    mitigationFlags: string[];
     detail: string | null;
     at: string;
   }>;
@@ -146,6 +150,10 @@ type OperationalTelemetryRecord = {
   statusCode: number | null;
   requestId: string | null;
   traceId: string | null;
+  tenantId: string | null;
+  userId: string | null;
+  apiVersion: string | null;
+  mitigationFlags: string[];
   detail: string | null;
 };
 
@@ -262,6 +270,10 @@ export class SystemTelemetryService {
     statusCode?: number | null;
     requestId?: unknown;
     traceId?: unknown;
+    tenantId?: unknown;
+    userId?: unknown;
+    apiVersion?: unknown;
+    mitigationFlags?: unknown;
     detail?: unknown;
   }): void {
     const method = normalizeTelemetryMethod(input.method || input.request?.method);
@@ -286,6 +298,10 @@ export class SystemTelemetryService {
           : this.normalizeStatusCode(input.statusCode),
       requestId: this.normalizeOperationalText(input.requestId),
       traceId: this.normalizeOperationalText(input.traceId),
+      tenantId: this.normalizeOperationalText(input.tenantId),
+      userId: this.normalizeOperationalText(input.userId),
+      apiVersion: this.normalizeOperationalText(input.apiVersion),
+      mitigationFlags: this.normalizeOperationalFlags(input.mitigationFlags),
       detail: this.normalizeOperationalDetail(input.detail),
     });
 
@@ -462,6 +478,10 @@ export class SystemTelemetryService {
           route: event.route,
           requestId: event.requestId,
           traceId: event.traceId,
+          tenantId: event.tenantId,
+          userId: event.userId,
+          apiVersion: event.apiVersion,
+          mitigationFlags: event.mitigationFlags,
           detail: event.detail,
           at: new Date(event.at).toISOString(),
         })),
@@ -667,5 +687,16 @@ export class SystemTelemetryService {
     }
 
     return normalized.length > 240 ? `${normalized.slice(0, 237)}...` : normalized;
+  }
+
+  private normalizeOperationalFlags(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .map((entry) => this.normalizeOperationalText(entry))
+      .filter((entry): entry is string => Boolean(entry))
+      .slice(0, 8);
   }
 }

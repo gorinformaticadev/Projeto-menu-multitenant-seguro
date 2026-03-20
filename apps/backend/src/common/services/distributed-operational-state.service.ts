@@ -1,6 +1,18 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import Redis from 'ioredis';
+import {
+  buildRedisHealthSnapshot,
+  connectRedisClient,
+  createRedisClientFromTopology,
+  describeRedisTopology,
+  getRedisClientStatus,
+  isRedisClientReady,
+  type RedisClientLike,
+  type RedisHealthSnapshot,
+  type RedisTopologyConfig,
+  resolveRedisTopologyConfig,
+  quitRedisClient,
+} from './redis-topology.util';
 
 const REDIS_RELEASE_LOCK_SCRIPT = `
 if redis.call("GET", KEYS[1]) == ARGV[1] then
@@ -13,6 +25,13 @@ end
 type MemoryValueEntry = {
   value: string;
   expiresAt: number | null;
+};
+
+type DistributedStateEnvelope<TValue> = {
+  version: number;
+  updatedAt: number;
+  writerId: string;
+  value: TValue;
 };
 
 type MutateJsonOptions<TState> = {
@@ -30,7 +49,6 @@ type MutateJsonResult<TState, TResult> = {
 
 const DEFAULT_LOCK_TTL_MS = 2_000;
 const DEFAULT_LOCK_WAIT_TIMEOUT_MS = 2_500;
-const DEFAULT_REDIS_CONNECT_TIMEOUT_MS = 1_500;
 const MEMORY_LOCK_POLL_MS = 10;
 
 @Injectable()
@@ -40,85 +58,88 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
   private static readonly memoryLocks = new Map<string, { ownerId: string; expiresAt: number }>();
 
   private readonly logger = new Logger(DistributedOperationalStateService.name);
-  private readonly redisEnabled: boolean;
-  private redis?: Redis;
+  private readonly topologyConfig: RedisTopologyConfig;
+  private readonly instanceId =
+    process.env.NODE_APP_INSTANCE || process.env.HOSTNAME || `instance-${process.pid}`;
+  private redis?: RedisClientLike;
   private fallbackActive = false;
+  private lastFallbackDetail: string | null = null;
 
   constructor() {
-    this.redisEnabled = String(process.env.REDIS_HOST || '').trim().length > 0;
+    this.topologyConfig = resolveRedisTopologyConfig(process.env, {
+      fallbackModeEnvKey: 'DISTRIBUTED_STATE_FALLBACK_MODE',
+      requiredEnvKey: 'DISTRIBUTED_STATE_REQUIRED',
+    });
   }
 
   async onModuleInit(): Promise<void> {
-    if (!this.redisEnabled) {
+    if (!this.topologyConfig.enabled) {
       this.logger.warn(
-        'DistributedOperationalStateService: REDIS_HOST nao configurado. Coordenacao distribuida operara em memoria local.',
+        'DistributedOperationalStateService: Redis distribuido nao configurado. Coordenacao operara em fallback local explicito.',
       );
       return;
     }
 
-    const host = String(process.env.REDIS_HOST || '127.0.0.1').trim();
-    const port = Number.parseInt(String(process.env.REDIS_PORT || '6379'), 10);
-    const password = String(process.env.REDIS_PASSWORD || '').trim();
-    const username = String(process.env.REDIS_USERNAME || '').trim();
-    const db = Number.parseInt(String(process.env.REDIS_DB || '0'), 10);
-
-    this.redis = new Redis({
-      host,
-      port: Number.isFinite(port) ? port : 6379,
-      username: username || undefined,
-      password: password || undefined,
-      db: Number.isFinite(db) ? db : 0,
-      connectTimeout: DEFAULT_REDIS_CONNECT_TIMEOUT_MS,
-      lazyConnect: true,
-      maxRetriesPerRequest: 1,
-      enableOfflineQueue: false,
-    });
+    this.redis = createRedisClientFromTopology(this.topologyConfig);
+    if (!this.redis) {
+      this.logger.warn(
+        `DistributedOperationalStateService: topologia Redis invalida para ${describeRedisTopology(this.topologyConfig)}. Fallback local explicito ativo.`,
+      );
+      this.fallbackActive = true;
+      this.lastFallbackDetail = 'redis-topology-invalid';
+      return;
+    }
 
     this.redis.on('error', (error) => {
-      if (!this.fallbackActive) {
-        this.logger.error(
-          `Erro no store operacional distribuido: ${error.message}. Fallback local ativado.`,
-        );
-        this.fallbackActive = true;
-      }
+      this.markFallback(error);
     });
 
     this.redis.on('ready', () => {
       if (this.fallbackActive) {
-        this.logger.log('Store operacional distribuido reconectado.');
+        this.logger.log(
+          `Store operacional distribuido reconectado via ${describeRedisTopology(this.topologyConfig)}.`,
+        );
         this.fallbackActive = false;
+        this.lastFallbackDetail = null;
       }
     });
 
     try {
-      await this.redis.connect();
+      await connectRedisClient(this.redis);
     } catch (error) {
-      this.logger.error(`Falha ao conectar ao store operacional distribuido: ${String(error)}`);
-      this.fallbackActive = true;
+      this.markFallback(error);
+      if (this.topologyConfig.required && this.topologyConfig.fallbackMode === 'strict') {
+        throw error;
+      }
     }
   }
 
   async onModuleDestroy(): Promise<void> {
-    if (!this.redis) {
-      return;
-    }
-
-    try {
-      await this.redis.quit();
-    } catch {
-      this.redis.disconnect();
-    }
+    await quitRedisClient(this.redis);
   }
 
   isDistributedReady(): boolean {
-    return Boolean(this.redis && !this.fallbackActive && this.redis.status === 'ready');
+    return Boolean(this.redis && !this.fallbackActive && isRedisClientReady(this.redis));
+  }
+
+  isFallbackActive(): boolean {
+    return this.fallbackActive || !this.isDistributedReady();
+  }
+
+  getHealth(): RedisHealthSnapshot {
+    return buildRedisHealthSnapshot({
+      config: this.topologyConfig,
+      client: this.redis,
+      fallbackActive: this.isFallbackActive(),
+      detail: this.lastFallbackDetail,
+    });
   }
 
   async readJson<T>(key: string): Promise<T | null> {
     if (this.isDistributedReady()) {
       try {
         const raw = await this.redis!.get(key);
-        return this.deserialize<T>(raw);
+        return this.deserializeEnvelope<T>(raw)?.value || null;
       } catch (error) {
         this.markFallback(error);
       }
@@ -138,7 +159,7 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
         const values = await this.redis!.mget(...normalizedKeys);
         return normalizedKeys.map((key, index) => ({
           key,
-          value: this.deserialize<T>(values[index]),
+          value: this.deserializeEnvelope<T>(values[index])?.value || null,
         }));
       } catch (error) {
         this.markFallback(error);
@@ -152,9 +173,9 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
   }
 
   async writeJson<T>(key: string, value: T, ttlMs?: number): Promise<void> {
+    const serialized = JSON.stringify(this.createEnvelope(value));
     if (this.isDistributedReady()) {
       try {
-        const serialized = JSON.stringify(value);
         if (ttlMs && ttlMs > 0) {
           await this.redis!.set(key, serialized, 'PX', Math.floor(ttlMs));
         } else {
@@ -250,13 +271,19 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
       `distributed-state:${key}`,
       async () => {
         const current = (await this.readJson<TState>(key)) || this.cloneState(options.seed);
+        const currentEnvelope = await this.readEnvelope<TState>(key);
         const mutation = await mutator(current);
         const ttlMs = mutation.ttlMs ?? options.ttlMs;
 
         if (mutation.next === null) {
           await this.deleteKey(key);
         } else {
-          await this.writeJson(key, mutation.next, ttlMs);
+          await this.writeJsonEnvelope(
+            key,
+            mutation.next,
+            ttlMs,
+            (currentEnvelope?.version || 0) + 1,
+          );
         }
 
         return mutation.result;
@@ -278,6 +305,14 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
   ): Promise<TResult> {
     const lockTtlMs = Math.max(250, options.lockTtlMs || DEFAULT_LOCK_TTL_MS);
     const waitTimeoutMs = Math.max(lockTtlMs, options.waitTimeoutMs || DEFAULT_LOCK_WAIT_TIMEOUT_MS);
+
+    if (
+      !this.isDistributedReady() &&
+      this.topologyConfig.required &&
+      this.topologyConfig.fallbackMode === 'strict'
+    ) {
+      throw new Error(`Distributed operational state unavailable for ${lockKey}`);
+    }
 
     if (this.isDistributedReady()) {
       return this.withRedisLock(lockKey, action, lockTtlMs, waitTimeoutMs);
@@ -365,12 +400,12 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
       return null;
     }
 
-    return this.deserialize<T>(entry.value);
+    return this.deserializeEnvelope<T>(entry.value)?.value || null;
   }
 
   private writeJsonToMemory<T>(key: string, value: T, ttlMs?: number) {
     DistributedOperationalStateService.memoryJsonState.set(key, {
-      value: JSON.stringify(value),
+      value: JSON.stringify(this.createEnvelope(value)),
       expiresAt: ttlMs && ttlMs > 0 ? Date.now() + ttlMs : null,
     });
   }
@@ -387,17 +422,113 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
     }
   }
 
+  private deserializeEnvelope<T>(raw: string | null | undefined): DistributedStateEnvelope<T> | null {
+    const parsed = this.deserialize<DistributedStateEnvelope<T> | T>(raw);
+    if (!parsed) {
+      return null;
+    }
+
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      !Array.isArray(parsed) &&
+      Object.prototype.hasOwnProperty.call(parsed, 'value') &&
+      Object.prototype.hasOwnProperty.call(parsed, 'version') &&
+      Object.prototype.hasOwnProperty.call(parsed, 'updatedAt')
+    ) {
+      const envelope = parsed as DistributedStateEnvelope<T>;
+      if (
+        typeof envelope.version === 'number' &&
+        Number.isFinite(envelope.version) &&
+        typeof envelope.updatedAt === 'number' &&
+        Number.isFinite(envelope.updatedAt)
+      ) {
+        return envelope;
+      }
+    }
+
+    return {
+      version: 1,
+      updatedAt: Date.now(),
+      writerId: 'legacy',
+      value: parsed as T,
+    };
+  }
+
   private cloneState<T>(value: T): T {
     return this.deserialize<T>(JSON.stringify(value)) as T;
   }
 
+  private createEnvelope<T>(
+    value: T,
+    version = 1,
+  ): DistributedStateEnvelope<T> {
+    return {
+      version,
+      updatedAt: Date.now(),
+      writerId: this.instanceId,
+      value,
+    };
+  }
+
+  private async readEnvelope<T>(key: string): Promise<DistributedStateEnvelope<T> | null> {
+    if (this.isDistributedReady()) {
+      try {
+        const raw = await this.redis!.get(key);
+        return this.deserializeEnvelope<T>(raw);
+      } catch (error) {
+        this.markFallback(error);
+      }
+    }
+
+    const entry = DistributedOperationalStateService.memoryJsonState.get(key);
+    if (!entry) {
+      return null;
+    }
+
+    if (entry.expiresAt && entry.expiresAt <= Date.now()) {
+      DistributedOperationalStateService.memoryJsonState.delete(key);
+      return null;
+    }
+
+    return this.deserializeEnvelope<T>(entry.value);
+  }
+
+  private async writeJsonEnvelope<T>(
+    key: string,
+    value: T,
+    ttlMs: number | undefined,
+    version: number,
+  ) {
+    const serialized = JSON.stringify(this.createEnvelope(value, version));
+    if (this.isDistributedReady()) {
+      try {
+        if (ttlMs && ttlMs > 0) {
+          await this.redis!.set(key, serialized, 'PX', Math.floor(ttlMs));
+        } else {
+          await this.redis!.set(key, serialized);
+        }
+        return;
+      } catch (error) {
+        this.markFallback(error);
+      }
+    }
+
+    DistributedOperationalStateService.memoryJsonState.set(key, {
+      value: serialized,
+      expiresAt: ttlMs && ttlMs > 0 ? Date.now() + ttlMs : null,
+    });
+  }
+
   private markFallback(error: unknown) {
-    if (!this.fallbackActive) {
+    const detail = error instanceof Error ? error.message : String(error);
+    if (!this.fallbackActive || this.lastFallbackDetail !== detail) {
       this.logger.warn(
-        `Store operacional distribuido em fallback local. detalhe=${error instanceof Error ? error.message : String(error)}`,
+        `Store operacional distribuido em fallback local explicito. topology=${describeRedisTopology(this.topologyConfig)} status=${getRedisClientStatus(this.redis)} detalhe=${detail}`,
       );
     }
     this.fallbackActive = true;
+    this.lastFallbackDetail = detail;
   }
 
   private sleep(ms: number) {

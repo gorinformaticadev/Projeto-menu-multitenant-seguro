@@ -1,7 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { CronExpression } from '@nestjs/schedule';
 import { BackupJobStatus } from '@prisma/client';
-import Redis from 'ioredis';
 import { AuditService } from '../../audit/audit.service';
 import { CronService } from '../../core/cron/cron.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
@@ -9,6 +8,8 @@ import { NotificationGateway } from '../../notifications/notification.gateway';
 import { NotificationService, SystemNotificationSeverity } from '../../notifications/notification.service';
 import { PushNotificationService } from '../../notifications/push-notification.service';
 import { ConfigResolverService } from '../../system-settings/config-resolver.service';
+import { DistributedOperationalStateService } from './distributed-operational-state.service';
+import { OperationalLoadSheddingService } from './operational-load-shedding.service';
 import {
   ApiTelemetrySnapshot,
   OperationalTelemetrySnapshot,
@@ -84,12 +85,14 @@ const DEFAULT_ALERT_RUNTIME_PRESSURE_THRESHOLD = 4;
 const DEFAULT_ALERT_QUEUE_SATURATION_THRESHOLD = 4;
 const DEFAULT_ALERT_CIRCUIT_INSTABILITY_THRESHOLD = 3;
 const DEFAULT_ALERT_CORRELATED_OPERATIONAL_ROUTE_THRESHOLD = 4;
+const DEFAULT_ALERT_FEATURE_MITIGATION_THRESHOLD = 2;
 
 @Injectable()
 export class SystemOperationalAlertsService implements OnModuleInit {
   private readonly logger = new Logger(SystemOperationalAlertsService.name);
   private operationalAlertsEnabled = true;
   private readonly infraDegradedCounts = new Map<InfraServiceKey, number>();
+  private mitigationActiveCount = 0;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -101,6 +104,8 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     private readonly cronService: CronService,
     private readonly configResolver: ConfigResolverService,
     private readonly redisLock: RedisLockService,
+    private readonly distributedOperationalStateService: DistributedOperationalStateService,
+    private readonly operationalLoadSheddingService: OperationalLoadSheddingService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -220,6 +225,12 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     const infraAlerts = await this.evaluateInfraAlerts(config, nowMs);
     emitted.push(...infraAlerts.emitted);
     skipped.push(...infraAlerts.skipped);
+
+    if (await this.evaluateMitigationVisibilityAlert(config, nowMs)) {
+      emitted.push('OPS_FEATURE_MITIGATION_ACTIVE');
+    } else {
+      skipped.push('OPS_FEATURE_MITIGATION_ACTIVE');
+    }
 
     return { emitted, skipped };
   }
@@ -686,6 +697,57 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     return { emitted, skipped };
   }
 
+  private async evaluateMitigationVisibilityAlert(
+    config: EvaluatorConfig,
+    nowMs: number,
+  ): Promise<boolean> {
+    const snapshot = this.operationalLoadSheddingService.getSnapshot();
+    const activeFlags = snapshot.mitigation.featureFlags;
+
+    if (activeFlags.length === 0) {
+      this.mitigationActiveCount = 0;
+      return false;
+    }
+
+    this.mitigationActiveCount += 1;
+    const threshold = this.readIntFromEnv(
+      'OPS_ALERT_FEATURE_MITIGATION_THRESHOLD',
+      DEFAULT_ALERT_FEATURE_MITIGATION_THRESHOLD,
+      1,
+      100,
+    );
+
+    if (this.mitigationActiveCount < threshold) {
+      return false;
+    }
+
+    const redisHealth = this.distributedOperationalStateService.getHealth();
+    return this.emitAlertIfNeeded(
+      {
+        action: 'OPS_FEATURE_MITIGATION_ACTIVE',
+        cooldownKey: 'OPS_FEATURE_MITIGATION_ACTIVE',
+        severity: snapshot.mitigation.rejectHeavyMutations ? 'critical' : 'warning',
+        title: 'Mitigacao automatica ativa',
+        body: 'O cluster desativou recursos ou endureceu limites para preservar disponibilidade.',
+        data: {
+          stateConsistency: snapshot.stateConsistency,
+          adaptiveThrottleFactor: snapshot.adaptiveThrottleFactor,
+          pressureCause: snapshot.pressureCause,
+          featureFlags: activeFlags,
+          businessImpact: snapshot.mitigation.businessImpact,
+          overloadedInstances: snapshot.overloadedInstances,
+          instanceCount: snapshot.instanceCount,
+          redisTopologyMode: redisHealth.mode,
+          redisFallbackActive: redisHealth.fallbackActive,
+        },
+        pushEligible: snapshot.mitigation.rejectHeavyMutations,
+        audit: snapshot.mitigation.rejectHeavyMutations,
+      },
+      nowMs,
+      config.cooldownMinutes,
+    );
+  }
+
   private async evaluateInfraMetricAlert(
     serviceKey: InfraServiceKey,
     metric: InfraHealthMetric,
@@ -830,60 +892,32 @@ export class SystemOperationalAlertsService implements OnModuleInit {
   }
 
   private async checkRedisHealth(): Promise<InfraHealthMetric> {
-    if (!this.isRedisMonitoringRequired()) {
+    const health = this.distributedOperationalStateService.getHealth();
+    if (!this.isRedisMonitoringRequired() && !health.required) {
       return {
         status: 'not_configured',
         latencyMs: null,
       };
     }
 
-    const host = String(process.env.REDIS_HOST || '').trim();
-    const port = this.readIntFromEnv('REDIS_PORT', 6379, 1, 65535);
-    const password = String(process.env.REDIS_PASSWORD || '').trim();
-    const username = String(process.env.REDIS_USERNAME || '').trim();
-    const db = this.readIntFromEnv('REDIS_DB', 0, 0, Number.MAX_SAFE_INTEGER);
-
-    if (!host) {
+    if (!health.enabled) {
       return {
         status: 'not_configured',
         latencyMs: null,
       };
     }
 
-    const redis = new Redis({
-      host,
-      port,
-      username: username || undefined,
-      password: password || undefined,
-      db,
-      connectTimeout: 1500,
-      lazyConnect: true,
-      maxRetriesPerRequest: 1,
-      enableOfflineQueue: false,
-    });
-
-    try {
-      const startedAt = Date.now();
-      if (redis.status === 'wait') {
-        await redis.connect();
-      }
-      const pong = await redis.ping();
+    if (health.ready && !health.fallbackActive) {
       return {
-        status: pong === 'PONG' ? 'healthy' : 'degraded',
-        latencyMs: Date.now() - startedAt,
-      };
-    } catch {
-      return {
-        status: 'down',
+        status: 'healthy',
         latencyMs: null,
       };
-    } finally {
-      try {
-        await redis.quit();
-      } catch {
-        redis.disconnect();
-      }
     }
+
+    return {
+      status: health.fallbackActive ? 'degraded' : 'down',
+      latencyMs: null,
+    };
   }
 
   private isRedisMonitoringRequired(): boolean {

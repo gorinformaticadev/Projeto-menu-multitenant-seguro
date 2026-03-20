@@ -1,6 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
-import Redis from 'ioredis';
 import { createHash } from 'crypto';
+import {
+  connectRedisClient,
+  createRedisClientFromTopology,
+  getRedisClientStatus,
+  isRedisClientReady,
+  type RedisClientLike,
+  resolveRedisTopologyConfig,
+} from './redis-topology.util';
 
 const REDIS_RETRY_COOLDOWN_MS = 15000;
 
@@ -48,7 +55,8 @@ export class RateLimitMetricsService {
     'RATE_LIMIT_REDIS_RETRY_COOLDOWN_MS',
     REDIS_RETRY_COOLDOWN_MS,
   );
-  private readonly redis?: Redis;
+  private readonly topology = resolveRedisTopologyConfig();
+  private readonly redis?: RedisClientLike;
   private readonly memoryBuckets = new Map<string, MemoryBucket>();
   private readonly memoryAuditDedup = new Map<string, number>();
   private redisRetryAvailableAt = 0;
@@ -62,21 +70,17 @@ export class RateLimitMetricsService {
       return;
     }
 
-    const host = process.env.REDIS_HOST || '127.0.0.1';
-    const port = Number(process.env.REDIS_PORT || 6379);
-    const connectTimeout = this.readEnvNumber('RATE_LIMIT_REDIS_CONNECT_TIMEOUT', 1000);
-
-    this.redis = new Redis({
-      host,
-      port,
-      username: process.env.REDIS_USERNAME || undefined,
-      password: process.env.REDIS_PASSWORD || undefined,
-      db: Number(process.env.REDIS_DB || 0),
-      connectTimeout,
-      lazyConnect: true,
-      maxRetriesPerRequest: 1,
-      enableOfflineQueue: false,
+    this.redis = createRedisClientFromTopology({
+      ...this.topology,
+      connectTimeoutMs: this.readEnvNumber('RATE_LIMIT_REDIS_CONNECT_TIMEOUT', 1000),
     });
+    if (!this.redis) {
+      this.markRedisUnavailable(
+        'Topologia Redis de metricas de rate limit invalida; fallback em memoria ativo.',
+        'redis-topology-invalid',
+      );
+      return;
+    }
 
     this.redis.on('error', (error) => {
       this.markRedisUnavailable(
@@ -100,11 +104,11 @@ export class RateLimitMetricsService {
     if (this.redis && !this.shouldUseFallbackWithoutRetry()) {
       try {
         if (this.shouldAttemptReconnect()) {
-          await this.redis.connect();
+          await connectRedisClient(this.redis);
         }
 
-        if (this.redis.status !== 'ready') {
-          throw new Error(`Redis status ${this.redis.status}`);
+        if (!isRedisClientReady(this.redis)) {
+          throw new Error(`Redis status ${getRedisClientStatus(this.redis)}`);
         }
 
         const hashKey = `${this.redisPrefix}:metrics:h:${bucket}`;
@@ -161,11 +165,11 @@ export class RateLimitMetricsService {
     if (this.redis && !this.shouldUseFallbackWithoutRetry()) {
       try {
         if (this.shouldAttemptReconnect()) {
-          await this.redis.connect();
+          await connectRedisClient(this.redis);
         }
 
-        if (this.redis.status !== 'ready') {
-          throw new Error(`Redis status ${this.redis.status}`);
+        if (!isRedisClientReady(this.redis)) {
+          throw new Error(`Redis status ${getRedisClientStatus(this.redis)}`);
         }
 
         const multi = this.redis.multi();
@@ -231,11 +235,11 @@ export class RateLimitMetricsService {
     if (this.redis && !this.shouldUseFallbackWithoutRetry()) {
       try {
         if (this.shouldAttemptReconnect()) {
-          await this.redis.connect();
+          await connectRedisClient(this.redis);
         }
 
-        if (this.redis.status !== 'ready') {
-          throw new Error(`Redis status ${this.redis.status}`);
+        if (!isRedisClientReady(this.redis)) {
+          throw new Error(`Redis status ${getRedisClientStatus(this.redis)}`);
         }
 
         const keyHash = this.hashIdentifier(dedupToken);
@@ -568,11 +572,11 @@ export class RateLimitMetricsService {
   }
 
   private shouldUseFallbackWithoutRetry(): boolean {
-    return !!this.redis && this.redis.status !== 'ready' && Date.now() < this.redisRetryAvailableAt;
+    return !!this.redis && !isRedisClientReady(this.redis) && Date.now() < this.redisRetryAvailableAt;
   }
 
   private shouldAttemptReconnect(): boolean {
-    return !!this.redis && ['wait', 'end', 'close'].includes(this.redis.status);
+    return !!this.redis && ['wait', 'end', 'close', 'reconnecting'].includes(getRedisClientStatus(this.redis));
   }
 
   private markRedisUnavailable(prefix: string, detail: string): void {

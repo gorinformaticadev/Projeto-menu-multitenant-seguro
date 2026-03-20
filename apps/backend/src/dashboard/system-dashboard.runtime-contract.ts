@@ -180,6 +180,40 @@ export function assertRuntimeSystemDashboardContract(
   ) {
     throw new Error('dashboard.runtimeMitigation flags are invalid');
   }
+  if (apiVersion === '2') {
+    if (
+      runtimeMitigation.stateConsistency !== 'distributed' &&
+      runtimeMitigation.stateConsistency !== 'local_fallback'
+    ) {
+      throw new Error('dashboard.runtimeMitigation.stateConsistency is invalid');
+    }
+    if (
+      !Array.isArray(runtimeMitigation.featureFlags) ||
+      !runtimeMitigation.featureFlags.every(
+        (item: unknown) => typeof item === 'string' && item.trim().length > 0,
+      )
+    ) {
+      throw new Error('dashboard.runtimeMitigation.featureFlags are invalid');
+    }
+    if (
+      !Array.isArray(runtimeMitigation.businessImpact) ||
+      !runtimeMitigation.businessImpact.every(
+        (item: unknown) => typeof item === 'string' && item.trim().length > 0,
+      )
+    ) {
+      throw new Error('dashboard.runtimeMitigation.businessImpact are invalid');
+    }
+  } else {
+    if (Object.prototype.hasOwnProperty.call(runtimeMitigation, 'stateConsistency')) {
+      throw new Error('dashboard.runtimeMitigation.stateConsistency must not exist in v1');
+    }
+    if (Object.prototype.hasOwnProperty.call(runtimeMitigation, 'featureFlags')) {
+      throw new Error('dashboard.runtimeMitigation.featureFlags must not exist in v1');
+    }
+    if (Object.prototype.hasOwnProperty.call(runtimeMitigation, 'businessImpact')) {
+      throw new Error('dashboard.runtimeMitigation.businessImpact must not exist in v1');
+    }
+  }
 }
 
 function assertExactKeys(

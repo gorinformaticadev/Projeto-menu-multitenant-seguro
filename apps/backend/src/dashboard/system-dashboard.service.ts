@@ -5,7 +5,6 @@ import {
 } from '@contracts/dashboard';
 import type { ApiVersion } from '@contracts/http';
 import { BackupJobStatus, BackupJobType, Role } from '@prisma/client';
-import Redis from 'ioredis';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
@@ -19,12 +18,20 @@ import {
   CircuitBreakerOpenError,
   OperationalCircuitBreakerService,
 } from '@common/services/operational-circuit-breaker.service';
+import { DistributedOperationalStateService } from '@common/services/distributed-operational-state.service';
 import { OperationalLoadSheddingService } from '@common/services/operational-load-shedding.service';
 import { RuntimePressureService } from '@common/services/runtime-pressure.service';
 import { ModuleSecurityService } from '../core/module-security.service';
 import { registerCoreModule } from '../core/shared/modules/core-module';
 import { moduleRegistry } from '../core/shared/registry/module-registry';
 import { ModuleDashboardWidget } from '../core/shared/types/module.types';
+import {
+  connectRedisClient,
+  createRedisClientFromTopology,
+  pingRedisClient,
+  quitRedisClient,
+  resolveRedisTopologyConfig,
+} from '@common/services/redis-topology.util';
 
 export interface DashboardActor {
   userId: string;
@@ -233,6 +240,7 @@ export class SystemDashboardService {
     private readonly responseTimeMetricsService: ResponseTimeMetricsService,
     private readonly systemTelemetryService: SystemTelemetryService,
     private readonly operationalCircuitBreakerService: OperationalCircuitBreakerService,
+    private readonly distributedOperationalStateService: DistributedOperationalStateService,
     private readonly operationalLoadSheddingService: OperationalLoadSheddingService,
     private readonly runtimePressureService: RuntimePressureService,
     private readonly moduleSecurityService: ModuleSecurityService,
@@ -447,11 +455,14 @@ export class SystemDashboardService {
         pressureCause: loadShedding.pressureCause,
         instanceCount: loadShedding.instanceCount,
         overloadedInstances: loadShedding.overloadedInstances,
+        stateConsistency: loadShedding.stateConsistency,
         clusterRecentApiLatencyMs: loadShedding.clusterRecentApiLatencyMs,
         clusterQueueDepth: loadShedding.clusterQueueDepth,
         degradeHeavyFeatures: loadShedding.mitigation.degradeHeavyFeatures,
         disableRemoteUpdateChecks: loadShedding.mitigation.disableRemoteUpdateChecks,
         rejectHeavyMutations: loadShedding.mitigation.rejectHeavyMutations,
+        featureFlags: loadShedding.mitigation.featureFlags,
+        businessImpact: loadShedding.mitigation.businessImpact,
       },
       widgets: {
         available: this.getOperationalWidgetIds(actor.role),
@@ -673,56 +684,50 @@ export class SystemDashboardService {
   }
 
   private async getRedisMetric() {
-    const host = String(process.env.REDIS_HOST || '').trim();
-    const port = Number.parseInt(String(process.env.REDIS_PORT || '6379'), 10);
-    const password = String(process.env.REDIS_PASSWORD || '').trim();
-    const username = String(process.env.REDIS_USERNAME || '').trim();
-    const db = Number.parseInt(String(process.env.REDIS_DB || '0'), 10);
+    const distributedStateHealth = this.distributedOperationalStateService.getHealth();
+    const topology = resolveRedisTopologyConfig();
 
-    if (!host) {
+    if (!topology.enabled) {
       return {
         status: 'not_configured' as const,
         latencyMs: null,
+        topology: topology.mode,
+        stateConsistency: distributedStateHealth.fallbackActive ? 'local_fallback' : 'distributed',
       };
     }
 
-    const redis = new Redis({
-      host,
-      port: Number.isFinite(port) ? port : 6379,
-      username: username || undefined,
-      password: password || undefined,
-      db: Number.isFinite(db) ? db : 0,
-      connectTimeout: 1500,
-      lazyConnect: true,
-      maxRetriesPerRequest: 1,
-      enableOfflineQueue: false,
-    });
+    const redis = createRedisClientFromTopology(topology);
+    if (!redis) {
+      return {
+        status: 'degraded' as const,
+        latencyMs: null,
+        topology: topology.mode,
+        stateConsistency: distributedStateHealth.fallbackActive ? 'local_fallback' : 'distributed',
+        detail: 'redis-topology-invalid',
+      };
+    }
 
     try {
       const startedAt = Date.now();
-      if (redis.status === 'wait') {
-        await redis.connect();
-      }
-      const pong = await redis.ping();
+      await connectRedisClient(redis);
+      const pong = await pingRedisClient(redis);
       const latencyMs = Date.now() - startedAt;
 
       return {
         status: pong === 'PONG' ? ('healthy' as const) : ('degraded' as const),
         latencyMs,
+        topology: topology.mode,
+        stateConsistency: distributedStateHealth.fallbackActive ? 'local_fallback' : 'distributed',
       };
     } catch {
       return {
         status: 'down' as const,
         latencyMs: null,
+        topology: topology.mode,
+        stateConsistency: distributedStateHealth.fallbackActive ? 'local_fallback' : 'distributed',
       };
     } finally {
-      try {
-        await redis.quit();
-      } catch {
-        try {
-          redis.disconnect();
-        } catch {}
-      }
+      await quitRedisClient(redis);
     }
   }
 
@@ -1747,11 +1752,11 @@ export class SystemDashboardService {
         : null;
 
     if (!notifications || notifications.status !== 'ok' || !Array.isArray(notifications.recentOperationalAlerts)) {
-      return payload;
+      return this.stripV2RuntimeMitigationFields(payload);
     }
 
     return {
-      ...payload,
+      ...this.stripV2RuntimeMitigationFields(payload),
       notifications: {
         ...notifications,
         recentOperationalAlerts: notifications.recentOperationalAlerts.map(
@@ -1765,6 +1770,31 @@ export class SystemDashboardService {
           },
         ),
       },
+    };
+  }
+
+  private stripV2RuntimeMitigationFields(payload: Record<string, any>) {
+    const runtimeMitigation =
+      payload.runtimeMitigation &&
+      typeof payload.runtimeMitigation === 'object' &&
+      !Array.isArray(payload.runtimeMitigation)
+        ? payload.runtimeMitigation
+        : null;
+
+    if (!runtimeMitigation) {
+      return payload;
+    }
+
+    const {
+      stateConsistency: _stateConsistency,
+      featureFlags: _featureFlags,
+      businessImpact: _businessImpact,
+      ...legacyRuntimeMitigation
+    } = runtimeMitigation;
+
+    return {
+      ...payload,
+      runtimeMitigation: legacyRuntimeMitigation,
     };
   }
 

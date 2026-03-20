@@ -1,6 +1,14 @@
 import { Logger } from '@nestjs/common';
 import { ThrottlerStorage, ThrottlerStorageService } from '@nestjs/throttler';
-import Redis from 'ioredis';
+import {
+  connectRedisClient,
+  createRedisClientFromTopology,
+  describeRedisTopology,
+  getRedisClientStatus,
+  isRedisClientReady,
+  type RedisClientLike,
+  resolveRedisTopologyConfig,
+} from './redis-topology.util';
 
 type RedisThrottlerStorageOptions = {
   enabled?: boolean;
@@ -70,7 +78,8 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
   private readonly redisEnabled: boolean;
   private readonly retryCooldownMs: number;
   private readonly failureMode: 'memory' | 'strict';
-  private readonly redis?: Redis;
+  private readonly redis?: RedisClientLike;
+  private readonly topology = resolveRedisTopologyConfig();
   private redisRetryAvailableAt = 0;
   private fallbackActive = false;
   private lastFallbackLogAt = 0;
@@ -95,22 +104,31 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
       return;
     }
 
-    const host = options.host || '127.0.0.1';
-    const port = options.port || 6379;
-    const db = options.db ?? 0;
-    const connectTimeout = options.connectTimeout ?? 1000;
+    const resolvedTopology = {
+      ...this.topology,
+      connectTimeoutMs: options.connectTimeout ?? this.topology.connectTimeoutMs,
+      standalone: this.topology.standalone
+        ? {
+            ...this.topology.standalone,
+            host: options.host || this.topology.standalone.host,
+            port: options.port || this.topology.standalone.port,
+            username: options.username ?? this.topology.standalone.username,
+            password: options.password ?? this.topology.standalone.password,
+            db: options.db ?? this.topology.standalone.db,
+          }
+        : undefined,
+    };
 
-    this.redis = new Redis({
-      host,
-      port,
-      username: options.username,
-      password: options.password,
-      db,
-      connectTimeout,
-      lazyConnect: true,
-      maxRetriesPerRequest: 1,
-      enableOfflineQueue: false,
-    });
+    this.redis = createRedisClientFromTopology(resolvedTopology);
+    if (!this.redis) {
+      this.markRedisUnavailable(
+        this.failureMode === 'strict'
+          ? 'Topologia Redis invalida para rate limit; modo estrito exige storage compartilhado.'
+          : 'Topologia Redis invalida para rate limit; fallback em memoria ativo.',
+        describeRedisTopology(resolvedTopology),
+      );
+      return;
+    }
 
     this.redis.on('error', (error) => {
       this.markRedisUnavailable(
@@ -164,11 +182,11 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
 
     try {
       if (this.shouldAttemptReconnect()) {
-        await this.redis.connect();
+        await connectRedisClient(this.redis);
       }
 
-      if (this.redis.status !== 'ready') {
-        throw new Error(`Redis status ${this.redis.status}`);
+      if (!isRedisClientReady(this.redis)) {
+        throw new Error(`Redis status ${getRedisClientStatus(this.redis)}`);
       }
 
       const rawResult = await this.redis.eval(
@@ -215,11 +233,11 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
   }
 
   private shouldUseFallbackWithoutRetry(): boolean {
-    return !!this.redis && this.redis.status !== 'ready' && Date.now() < this.redisRetryAvailableAt;
+    return !!this.redis && !isRedisClientReady(this.redis) && Date.now() < this.redisRetryAvailableAt;
   }
 
   private shouldAttemptReconnect(): boolean {
-    return !!this.redis && ['wait', 'end', 'close'].includes(this.redis.status);
+    return !!this.redis && ['wait', 'end', 'close', 'reconnecting'].includes(getRedisClientStatus(this.redis));
   }
 
   private markRedisUnavailable(prefix: string, detail: string): void {
