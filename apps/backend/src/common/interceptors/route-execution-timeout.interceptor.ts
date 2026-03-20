@@ -71,6 +71,10 @@ export class RouteExecutionTimeoutInterceptor implements NestInterceptor {
       return normalizedBaseTimeoutMs;
     }
 
+    if (routeId === 'dashboard-aggregate') {
+      return normalizedBaseTimeoutMs;
+    }
+
     const adaptiveFactor =
       Number.isFinite(snapshot.adaptiveThrottleFactor) && snapshot.adaptiveThrottleFactor > 0
         ? snapshot.adaptiveThrottleFactor

@@ -143,6 +143,7 @@ interface SafeMetricOptions {
   fallbackStatus?: DashboardMetricFallback['status'];
   circuitKey?: string;
   circuitFailureThreshold?: number;
+  circuitFailureWindowMs?: number;
   circuitResetTimeoutMs?: number;
   circuitHalfOpenMaxProbes?: number;
   circuitHalfOpenSuccessThreshold?: number;
@@ -259,169 +260,162 @@ export class SystemDashboardService {
     const apiHistoryWindowMs = this.resolveApiHistoryWindowMs(filters.periodMinutes);
     const loadShedding = this.operationalLoadSheddingService.getSnapshot();
 
-    const version = await this.safeMetric(
-      'version',
-      async () => this.getVersionMetric(),
-    );
-    const uptime = await this.safeMetric(
-      'uptime',
-      async () => this.getUptimeMetric(),
-    );
-    const maintenance = await this.safeMetric(
-      'maintenance',
-      async () => this.getMaintenanceMetric(),
-    );
-    const system = await this.safeMetric(
-      'system',
-      async () => this.getSystemMetric(),
-    );
-    const cpu = await this.safeMetric(
-      'cpu',
-      async () => this.getCpuMetric(),
-    );
-    const memory = await this.safeMetric(
-      'memory',
-      async () => this.getMemoryMetric(),
-    );
-    const disk = await this.safeMetric(
-      'disk',
-      async () => this.getDiskMetric(),
-    );
-    const database = await this.safeMetric(
-      'database',
-      async () =>
-        loadShedding.mitigation.degradeHeavyFeatures
-          ? this.buildAutoMitigatedMetric(
-              'Dependencia de banco degradada preventivamente sob pressao distribuida.',
-            )
-          : this.getDatabaseMetric(),
-      {
-        fallbackStatus: 'error',
-        circuitKey: 'dependency:database',
-        circuitFailureThreshold: 3,
-        circuitResetTimeoutMs: 30_000,
-        circuitHalfOpenMaxProbes: 2,
-        circuitHalfOpenSuccessThreshold: 2,
-        circuitJitterRatio: 0.15,
-      },
-    );
-    const redis = await this.safeMetric(
-      'redis',
-      async () =>
-        loadShedding.mitigation.degradeHeavyFeatures
-          ? this.buildAutoMitigatedMetric(
-              'Dependencia Redis mitigada automaticamente sob pressao distribuida.',
-            )
-          : this.getRedisMetric(),
-      {
-        cacheKey: 'redis',
-        cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.redis,
-        fallbackStatus: 'error',
-        circuitKey: 'dependency:redis',
-        circuitFailureThreshold: 2,
-        circuitResetTimeoutMs: 30_000,
-        circuitHalfOpenMaxProbes: 1,
-        circuitHalfOpenSuccessThreshold: 1,
-        circuitJitterRatio: 0.2,
-      },
-    );
-    const workers = await this.safeMetric(
-      'workers',
-      async () =>
-        loadShedding.mitigation.degradeHeavyFeatures
-          ? this.buildAutoMitigatedMetric(
-              'Metricas de workers reduzidas automaticamente para preservar o cluster.',
-            )
-          : this.getWorkersMetric(),
-      {
-        cacheKey: 'workers',
-        cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.workers,
-        fallbackStatus: 'error',
-      },
-    );
-    const api = await this.safeMetric(
-      'api',
-      async () => this.getApiMetric(apiHistoryWindowMs),
-    );
-    const routeLatency = await this.safeMetric(
-      'routeLatency',
-      async () => this.getRouteLatencyMetric(filters.periodMinutes),
-      { fallbackStatus: 'degraded' },
-    );
-    const routeErrors = await this.safeMetric(
-      'routeErrors',
-      async () => this.getRouteErrorsMetric(filters.periodMinutes),
-      { fallbackStatus: 'degraded' },
-    );
-    const security = await this.safeMetric(
-      'security',
-      async () =>
-        loadShedding.mitigation.degradeHeavyFeatures
-          ? this.buildAutoMitigatedMetric(
-              'Metricas de seguranca agregadas temporariamente reduzidas para estabilidade.',
-            )
-          : this.getSecurityMetric(windowStart, tenantFilter),
-      {
-        cacheKey: `security:${filters.periodMinutes}:${tenantFilter || 'all'}`,
-        cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.security,
+    const [
+      version,
+      uptime,
+      maintenance,
+      system,
+      cpu,
+      memory,
+      disk,
+      database,
+      redis,
+      workers,
+      api,
+      routeLatency,
+      routeErrors,
+      security,
+      backup,
+      jobs,
+      errors,
+      tenants,
+      notifications,
+    ] = await Promise.all([
+      this.safeMetric('version', async () => this.getVersionMetric()),
+      this.safeMetric('uptime', async () => this.getUptimeMetric()),
+      this.safeMetric('maintenance', async () => this.getMaintenanceMetric()),
+      this.safeMetric('system', async () => this.getSystemMetric()),
+      this.safeMetric('cpu', async () => this.getCpuMetric()),
+      this.safeMetric('memory', async () => this.getMemoryMetric()),
+      this.safeMetric('disk', async () => this.getDiskMetric()),
+      this.safeMetric(
+        'database',
+        async () =>
+          loadShedding.mitigation.degradeHeavyFeatures
+            ? this.buildAutoMitigatedMetric(
+                'Dependencia de banco degradada preventivamente sob pressao distribuida.',
+              )
+            : this.getDatabaseMetric(),
+        {
+          fallbackStatus: 'error',
+          circuitKey: 'dependency:database',
+          circuitFailureThreshold: 2,
+          circuitFailureWindowMs: 15_000,
+          circuitResetTimeoutMs: 20_000,
+          circuitHalfOpenMaxProbes: 1,
+          circuitHalfOpenSuccessThreshold: 1,
+          circuitJitterRatio: 0.15,
+        },
+      ),
+      this.safeMetric(
+        'redis',
+        async () =>
+          loadShedding.mitigation.degradeHeavyFeatures
+            ? this.buildAutoMitigatedMetric(
+                'Dependencia Redis mitigada automaticamente sob pressao distribuida.',
+              )
+            : this.getRedisMetric(),
+        {
+          cacheKey: 'redis',
+          cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.redis,
+          fallbackStatus: 'error',
+          circuitKey: 'dependency:redis',
+          circuitFailureThreshold: 2,
+          circuitFailureWindowMs: 12_000,
+          circuitResetTimeoutMs: 20_000,
+          circuitHalfOpenMaxProbes: 1,
+          circuitHalfOpenSuccessThreshold: 1,
+          circuitJitterRatio: 0.15,
+        },
+      ),
+      this.safeMetric(
+        'workers',
+        async () =>
+          loadShedding.mitigation.degradeHeavyFeatures
+            ? this.buildAutoMitigatedMetric(
+                'Metricas de workers reduzidas automaticamente para preservar o cluster.',
+              )
+            : this.getWorkersMetric(),
+        {
+          cacheKey: 'workers',
+          cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.workers,
+          fallbackStatus: 'error',
+        },
+      ),
+      this.safeMetric('api', async () => this.getApiMetric(apiHistoryWindowMs)),
+      this.safeMetric('routeLatency', async () => this.getRouteLatencyMetric(filters.periodMinutes), {
         fallbackStatus: 'degraded',
-      },
-    );
-    const backup = await this.safeMetric(
-      'backup',
-      async () =>
-        loadShedding.mitigation.degradeHeavyFeatures
-          ? this.buildAutoMitigatedMetric(
-              'Metricas de backup mitigadas automaticamente sob pressao operacional.',
-            )
-          : this.getBackupMetric(tenantFilter),
-      {
-        cacheKey: `backup:${tenantFilter || 'all'}`,
-        cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.backup,
+      }),
+      this.safeMetric('routeErrors', async () => this.getRouteErrorsMetric(filters.periodMinutes), {
         fallbackStatus: 'degraded',
-      },
-    );
-    const jobs = await this.safeMetric(
-      'jobs',
-      async () =>
-        loadShedding.mitigation.degradeHeavyFeatures
-          ? this.buildAutoMitigatedMetric(
-              'Metricas de jobs reduzidas automaticamente para evitar efeito cascata.',
-            )
-          : this.getJobsMetric(),
-      {
-        cacheKey: 'jobs',
-        cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.jobs,
-        fallbackStatus: 'degraded',
-      },
-    );
-    const errors = await this.safeMetric(
-      'errors',
-      async () =>
-        loadShedding.mitigation.degradeHeavyFeatures
-          ? this.buildAutoMitigatedMetric(
-              'Agregacao de erros recentes mitigada automaticamente sob latencia elevada.',
-            )
-          : this.getRecentCriticalErrorsMetric(windowStart, tenantFilter, filters.severity),
-      {
-        cacheKey: `errors:${filters.periodMinutes}:${tenantFilter || 'all'}:${filters.severity}`,
-        cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.errors,
-        fallbackStatus: 'degraded',
-      },
-    );
-    const tenants = await this.safeMetric(
-      'tenants',
-      async () =>
-        loadShedding.mitigation.degradeHeavyFeatures
-          ? this.buildAutoMitigatedMetric(
-              'Metricas de tenants mitigadas automaticamente para preservar throughput.',
-            )
-          : this.getTenantsMetric(),
-    );
-    const notifications = await this.safeMetric(
-      'notifications',
-      async () => this.getNotificationsMetric(actor, windowStart),
-    );
+      }),
+      this.safeMetric(
+        'security',
+        async () =>
+          loadShedding.mitigation.degradeHeavyFeatures
+            ? this.buildAutoMitigatedMetric(
+                'Metricas de seguranca agregadas temporariamente reduzidas para estabilidade.',
+              )
+            : this.getSecurityMetric(windowStart, tenantFilter),
+        {
+          cacheKey: `security:${filters.periodMinutes}:${tenantFilter || 'all'}`,
+          cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.security,
+          fallbackStatus: 'degraded',
+        },
+      ),
+      this.safeMetric(
+        'backup',
+        async () =>
+          loadShedding.mitigation.degradeHeavyFeatures
+            ? this.buildAutoMitigatedMetric(
+                'Metricas de backup mitigadas automaticamente sob pressao operacional.',
+              )
+            : this.getBackupMetric(tenantFilter),
+        {
+          cacheKey: `backup:${tenantFilter || 'all'}`,
+          cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.backup,
+          fallbackStatus: 'degraded',
+        },
+      ),
+      this.safeMetric(
+        'jobs',
+        async () =>
+          loadShedding.mitigation.degradeHeavyFeatures
+            ? this.buildAutoMitigatedMetric(
+                'Metricas de jobs reduzidas automaticamente para evitar efeito cascata.',
+              )
+            : this.getJobsMetric(),
+        {
+          cacheKey: 'jobs',
+          cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.jobs,
+          fallbackStatus: 'degraded',
+        },
+      ),
+      this.safeMetric(
+        'errors',
+        async () =>
+          loadShedding.mitigation.degradeHeavyFeatures
+            ? this.buildAutoMitigatedMetric(
+                'Agregacao de erros recentes mitigada automaticamente sob latencia elevada.',
+              )
+            : this.getRecentCriticalErrorsMetric(windowStart, tenantFilter, filters.severity),
+        {
+          cacheKey: `errors:${filters.periodMinutes}:${tenantFilter || 'all'}:${filters.severity}`,
+          cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.errors,
+          fallbackStatus: 'degraded',
+        },
+      ),
+      this.safeMetric(
+        'tenants',
+        async () =>
+          loadShedding.mitigation.degradeHeavyFeatures
+            ? this.buildAutoMitigatedMetric(
+                'Metricas de tenants mitigadas automaticamente para preservar throughput.',
+              )
+            : this.getTenantsMetric(),
+      ),
+      this.safeMetric('notifications', async () => this.getNotificationsMetric(actor, windowStart)),
+    ]);
 
     const payload = {
       generatedAt: now.toISOString(),
@@ -693,6 +687,7 @@ export class SystemDashboardService {
         latencyMs: null,
         topology: topology.mode,
         stateConsistency: distributedStateHealth.fallbackActive ? 'local_fallback' : 'distributed',
+        detail: distributedStateHealth.detail || topology.invalidReason || null,
       };
     }
 
@@ -703,7 +698,7 @@ export class SystemDashboardService {
         latencyMs: null,
         topology: topology.mode,
         stateConsistency: distributedStateHealth.fallbackActive ? 'local_fallback' : 'distributed',
-        detail: 'redis-topology-invalid',
+        detail: distributedStateHealth.detail || topology.invalidReason || 'redis-topology-invalid',
       };
     }
 
@@ -718,6 +713,10 @@ export class SystemDashboardService {
         latencyMs,
         topology: topology.mode,
         stateConsistency: distributedStateHealth.fallbackActive ? 'local_fallback' : 'distributed',
+        detail:
+          distributedStateHealth.fallbackActive || pong !== 'PONG'
+            ? distributedStateHealth.detail || 'redis-ping-unexpected-response'
+            : null,
       };
     } catch {
       return {
@@ -725,6 +724,7 @@ export class SystemDashboardService {
         latencyMs: null,
         topology: topology.mode,
         stateConsistency: distributedStateHealth.fallbackActive ? 'local_fallback' : 'distributed',
+        detail: distributedStateHealth.detail || 'redis-ping-failed',
       };
     } finally {
       await quitRedisClient(redis);
@@ -1966,6 +1966,7 @@ export class SystemDashboardService {
               key: options.circuitKey,
               route: '/system/dashboard',
               failureThreshold: options.circuitFailureThreshold || 3,
+              failureWindowMs: options.circuitFailureWindowMs,
               resetTimeoutMs: options.circuitResetTimeoutMs || 30_000,
               halfOpenMaxProbes: options.circuitHalfOpenMaxProbes,
               halfOpenSuccessThreshold: options.circuitHalfOpenSuccessThreshold,

@@ -50,6 +50,10 @@ export class SentryExceptionFilter implements ExceptionFilter {
     }
 
     // Retornar resposta ao cliente
+    if (response.headersSent) {
+      return;
+    }
+
     response.status(status).json({
       statusCode: status,
       timestamp: new Date().toISOString(),

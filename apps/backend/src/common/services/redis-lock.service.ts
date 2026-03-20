@@ -1,11 +1,13 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import {
+  buildRedisHealthSnapshot,
   connectRedisClient,
   createRedisClientFromTopology,
   describeRedisTopology,
   getRedisClientStatus,
   isRedisClientReady,
   quitRedisClient,
+  type RedisHealthSnapshot,
   type RedisClientLike,
   resolveRedisTopologyConfig,
 } from './redis-topology.util';
@@ -24,6 +26,16 @@ export class RedisLockService implements OnModuleInit, OnModuleDestroy {
   private redis?: RedisClientLike;
   private readonly topologyConfig = resolveRedisTopologyConfig();
   private fallbackActive = false;
+  private lastFallbackDetail: string | null = null;
+
+  async getHealth(): Promise<RedisHealthSnapshot> {
+    return buildRedisHealthSnapshot({
+      config: this.topologyConfig,
+      client: this.redis,
+      fallbackActive: this.isDegraded(),
+      detail: this.lastFallbackDetail,
+    });
+  }
 
   constructor() {
     // A topologia e resolvida via ambiente compartilhado para manter
@@ -38,12 +50,22 @@ export class RedisLockService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    if (!this.topologyConfig.valid) {
+      this.logger.warn(
+        `RedisLockService: topologia invalida para ${describeRedisTopology(this.topologyConfig)}. Modo degradado ativo.`,
+      );
+      this.fallbackActive = true;
+      this.lastFallbackDetail = this.topologyConfig.invalidReason;
+      return;
+    }
+
     this.redis = createRedisClientFromTopology(this.topologyConfig);
     if (!this.redis) {
       this.logger.warn(
         `RedisLockService: topologia invalida para ${describeRedisTopology(this.topologyConfig)}. Modo degradado ativo.`,
       );
       this.fallbackActive = true;
+      this.lastFallbackDetail = this.topologyConfig.invalidReason || 'redis-topology-invalid';
       return;
     }
 
@@ -54,12 +76,14 @@ export class RedisLockService implements OnModuleInit, OnModuleDestroy {
         );
         this.fallbackActive = true;
       }
+      this.lastFallbackDetail = error.message;
     });
 
     this.redis.on('ready', () => {
       if (this.fallbackActive) {
         this.logger.log('RedisLockService reconectado.');
         this.fallbackActive = false;
+        this.lastFallbackDetail = null;
       }
     });
 
@@ -68,6 +92,7 @@ export class RedisLockService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.logger.error(`Falha ao conectar ao Redis no bootstrap: ${String(error)}`);
       this.fallbackActive = true;
+      this.lastFallbackDetail = error instanceof Error ? error.message : String(error);
     }
   }
 
@@ -76,7 +101,34 @@ export class RedisLockService implements OnModuleInit, OnModuleDestroy {
   }
 
   isDegraded(): boolean {
-    return !this.redis || this.fallbackActive || !isRedisClientReady(this.redis);
+    return (
+      (this.topologyConfig.enabled && !this.topologyConfig.valid) ||
+      !this.redis ||
+      this.fallbackActive ||
+      !isRedisClientReady(this.redis)
+    );
+  }
+
+  async acquireLockState(
+    key: string,
+    ttlMs: number,
+    ownerId: string,
+  ): Promise<'acquired' | 'busy' | 'degraded'> {
+    if (this.isDegraded()) {
+      return 'degraded';
+    }
+
+    try {
+      const result = await this.redis!.set(key, ownerId, 'PX', ttlMs, 'NX');
+      return result === 'OK' ? 'acquired' : 'busy';
+    } catch (error) {
+      this.lastFallbackDetail = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Falha ao adquirir lock ${key}. status=${getRedisClientStatus(this.redis)} detalhe=${String(error)}`,
+      );
+      this.fallbackActive = true;
+      return 'degraded';
+    }
   }
 
   /**
@@ -86,19 +138,7 @@ export class RedisLockService implements OnModuleInit, OnModuleDestroy {
    * @param ownerId Identificador do dono (instanceId ou token)
    */
   async acquireLock(key: string, ttlMs: number, ownerId: string): Promise<boolean> {
-    if (this.isDegraded()) {
-      return false; // Em degradado, nao garante exclusividade
-    }
-
-    try {
-      const result = await this.redis!.set(key, ownerId, 'PX', ttlMs, 'NX');
-      return result === 'OK';
-    } catch (error) {
-      this.logger.warn(
-        `Falha ao adquirir lock ${key}. status=${getRedisClientStatus(this.redis)} detalhe=${String(error)}`,
-      );
-      return false;
-    }
+    return (await this.acquireLockState(key, ttlMs, ownerId)) === 'acquired';
   }
 
   /**

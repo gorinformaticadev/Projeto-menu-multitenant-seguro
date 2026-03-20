@@ -16,6 +16,10 @@ export class ResponseProtectionMiddleware implements NestMiddleware {
     const originalJson = res.json.bind(res);
 
     const finalizeResponse = (payloadBuffer: Buffer, contentType: string) => {
+      if (res.headersSent) {
+        return originalSend(payloadBuffer);
+      }
+
       let finalBuffer = payloadBuffer;
       const acceptedEncodings = String(req.headers['accept-encoding'] || '').toLowerCase();
       const shouldCompress =
@@ -76,6 +80,10 @@ export class ResponseProtectionMiddleware implements NestMiddleware {
     };
 
     res.json = ((body: unknown) => {
+      if (res.headersSent) {
+        return originalJson(body);
+      }
+
       return finalizeResponse(
         Buffer.from(JSON.stringify(body ?? null)),
         'application/json; charset=utf-8',
@@ -83,6 +91,10 @@ export class ResponseProtectionMiddleware implements NestMiddleware {
     }) as typeof res.json;
 
     res.send = ((body: unknown) => {
+      if (res.headersSent) {
+        return originalSend(body as never);
+      }
+
       if (body === undefined || body === null) {
         return originalSend(body as never);
       }

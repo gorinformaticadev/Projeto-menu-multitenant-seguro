@@ -50,6 +50,7 @@ type MutateJsonResult<TState, TResult> = {
 const DEFAULT_LOCK_TTL_MS = 2_000;
 const DEFAULT_LOCK_WAIT_TIMEOUT_MS = 2_500;
 const MEMORY_LOCK_POLL_MS = 10;
+const DEFAULT_REDIS_OPERATION_TIMEOUT_MS = 750;
 
 @Injectable()
 export class DistributedOperationalStateService implements OnModuleInit, OnModuleDestroy {
@@ -61,6 +62,7 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
   private readonly topologyConfig: RedisTopologyConfig;
   private readonly instanceId =
     process.env.NODE_APP_INSTANCE || process.env.HOSTNAME || `instance-${process.pid}`;
+  private readonly redisOperationTimeoutMs: number;
   private redis?: RedisClientLike;
   private fallbackActive = false;
   private lastFallbackDetail: string | null = null;
@@ -70,6 +72,7 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
       fallbackModeEnvKey: 'DISTRIBUTED_STATE_FALLBACK_MODE',
       requiredEnvKey: 'DISTRIBUTED_STATE_REQUIRED',
     });
+    this.redisOperationTimeoutMs = this.resolveRedisOperationTimeoutMs();
   }
 
   async onModuleInit(): Promise<void> {
@@ -77,6 +80,15 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
       this.logger.warn(
         'DistributedOperationalStateService: Redis distribuido nao configurado. Coordenacao operara em fallback local explicito.',
       );
+      return;
+    }
+
+    if (!this.topologyConfig.valid) {
+      this.logger.warn(
+        `DistributedOperationalStateService: topologia Redis invalida para ${describeRedisTopology(this.topologyConfig)}. Fallback local explicito ativo.`,
+      );
+      this.fallbackActive = true;
+      this.lastFallbackDetail = this.topologyConfig.invalidReason;
       return;
     }
 
@@ -123,7 +135,10 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
   }
 
   isFallbackActive(): boolean {
-    return this.fallbackActive || !this.isDistributedReady();
+    return Boolean(
+      this.topologyConfig.enabled &&
+        (this.fallbackActive || !this.isDistributedReady()),
+    );
   }
 
   getHealth(): RedisHealthSnapshot {
@@ -138,7 +153,7 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
   async readJson<T>(key: string): Promise<T | null> {
     if (this.isDistributedReady()) {
       try {
-        const raw = await this.redis!.get(key);
+        const raw = await this.runRedisOperation(`get:${key}`, () => this.redis!.get(key));
         return this.deserializeEnvelope<T>(raw)?.value || null;
       } catch (error) {
         this.markFallback(error);
@@ -156,7 +171,9 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
 
     if (this.isDistributedReady()) {
       try {
-        const values = await this.redis!.mget(...normalizedKeys);
+        const values = await this.runRedisOperation(`mget:${normalizedKeys.length}`, () =>
+          this.redis!.mget(...normalizedKeys),
+        );
         return normalizedKeys.map((key, index) => ({
           key,
           value: this.deserializeEnvelope<T>(values[index])?.value || null,
@@ -177,9 +194,11 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
     if (this.isDistributedReady()) {
       try {
         if (ttlMs && ttlMs > 0) {
-          await this.redis!.set(key, serialized, 'PX', Math.floor(ttlMs));
+          await this.runRedisOperation(`set:${key}`, () =>
+            this.redis!.set(key, serialized, 'PX', Math.floor(ttlMs)),
+          );
         } else {
-          await this.redis!.set(key, serialized);
+          await this.runRedisOperation(`set:${key}`, () => this.redis!.set(key, serialized));
         }
         return;
       } catch (error) {
@@ -193,7 +212,7 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
   async deleteKey(key: string): Promise<void> {
     if (this.isDistributedReady()) {
       try {
-        await this.redis!.del(key);
+        await this.runRedisOperation(`del:${key}`, () => this.redis!.del(key));
         return;
       } catch (error) {
         this.markFallback(error);
@@ -211,7 +230,9 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
 
     if (this.isDistributedReady()) {
       try {
-        await this.redis!.sadd(setKey, normalizedMember);
+        await this.runRedisOperation(`sadd:${setKey}`, () =>
+          this.redis!.sadd(setKey, normalizedMember),
+        );
         return;
       } catch (error) {
         this.markFallback(error);
@@ -232,7 +253,9 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
 
     if (this.isDistributedReady()) {
       try {
-        await this.redis!.srem(setKey, normalizedMember);
+        await this.runRedisOperation(`srem:${setKey}`, () =>
+          this.redis!.srem(setKey, normalizedMember),
+        );
         return;
       } catch (error) {
         this.markFallback(error);
@@ -253,7 +276,7 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
   async listSetMembers(setKey: string): Promise<string[]> {
     if (this.isDistributedReady()) {
       try {
-        return await this.redis!.smembers(setKey);
+        return await this.runRedisOperation(`smembers:${setKey}`, () => this.redis!.smembers(setKey));
       } catch (error) {
         this.markFallback(error);
       }
@@ -270,8 +293,8 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
     return this.withLock(
       `distributed-state:${key}`,
       async () => {
-        const current = (await this.readJson<TState>(key)) || this.cloneState(options.seed);
         const currentEnvelope = await this.readEnvelope<TState>(key);
+        const current = currentEnvelope?.value || this.cloneState(options.seed);
         const mutation = await mutator(current);
         const ttlMs = mutation.ttlMs ?? options.ttlMs;
 
@@ -332,13 +355,17 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
 
     while (Date.now() - startedAt < waitTimeoutMs) {
       try {
-        const acquired = await this.redis!.set(lockKey, ownerId, 'PX', lockTtlMs, 'NX');
+        const acquired = await this.runRedisOperation(`lock-acquire:${lockKey}`, () =>
+          this.redis!.set(lockKey, ownerId, 'PX', lockTtlMs, 'NX'),
+        );
         if (acquired === 'OK') {
           try {
             return await action();
           } finally {
             try {
-              await this.redis!.eval(REDIS_RELEASE_LOCK_SCRIPT, 1, lockKey, ownerId);
+              await this.runRedisOperation(`lock-release:${lockKey}`, () =>
+                this.redis!.eval(REDIS_RELEASE_LOCK_SCRIPT, 1, lockKey, ownerId),
+              );
             } catch (error) {
               this.markFallback(error);
             }
@@ -474,7 +501,7 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
   private async readEnvelope<T>(key: string): Promise<DistributedStateEnvelope<T> | null> {
     if (this.isDistributedReady()) {
       try {
-        const raw = await this.redis!.get(key);
+        const raw = await this.runRedisOperation(`get-envelope:${key}`, () => this.redis!.get(key));
         return this.deserializeEnvelope<T>(raw);
       } catch (error) {
         this.markFallback(error);
@@ -504,9 +531,13 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
     if (this.isDistributedReady()) {
       try {
         if (ttlMs && ttlMs > 0) {
-          await this.redis!.set(key, serialized, 'PX', Math.floor(ttlMs));
+          await this.runRedisOperation(`set-envelope:${key}`, () =>
+            this.redis!.set(key, serialized, 'PX', Math.floor(ttlMs)),
+          );
         } else {
-          await this.redis!.set(key, serialized);
+          await this.runRedisOperation(`set-envelope:${key}`, () =>
+            this.redis!.set(key, serialized),
+          );
         }
         return;
       } catch (error) {
@@ -529,6 +560,45 @@ export class DistributedOperationalStateService implements OnModuleInit, OnModul
     }
     this.fallbackActive = true;
     this.lastFallbackDetail = detail;
+  }
+
+  private async runRedisOperation<TResult>(
+    operationName: string,
+    operation: () => Promise<TResult>,
+  ): Promise<TResult> {
+    let timeout: NodeJS.Timeout | null = null;
+
+    try {
+      return await Promise.race([
+        operation(),
+        new Promise<TResult>((_, reject) => {
+          timeout = setTimeout(() => {
+            reject(
+              new Error(
+                `redis-operation-timeout:${operationName}:${this.redisOperationTimeoutMs}ms`,
+              ),
+            );
+          }, this.redisOperationTimeoutMs);
+          timeout.unref?.();
+        }),
+      ]);
+    } finally {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    }
+  }
+
+  private resolveRedisOperationTimeoutMs(): number {
+    const raw = Number(process.env.DISTRIBUTED_STATE_REDIS_OPERATION_TIMEOUT_MS);
+    if (Number.isFinite(raw) && raw >= 100) {
+      return Math.min(5_000, Math.floor(raw));
+    }
+
+    return Math.min(
+      DEFAULT_REDIS_OPERATION_TIMEOUT_MS,
+      Math.max(250, this.topologyConfig.connectTimeoutMs),
+    );
   }
 
   private sleep(ms: number) {

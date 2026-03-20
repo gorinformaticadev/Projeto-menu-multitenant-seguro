@@ -17,6 +17,7 @@ type CircuitBreakerMode = 'closed' | 'open' | 'half-open';
 type CircuitBreakerState = {
   mode: CircuitBreakerMode;
   failures: number;
+  failureTimeline: number[];
   openCount: number;
   openedUntil: number | null;
   halfOpenInFlight: number;
@@ -40,6 +41,7 @@ type ExecuteCircuitOptions = {
   failureQuorum?: number;
   recoveryQuorum?: number;
   voteWindowMs?: number;
+  failureWindowMs?: number;
 };
 
 export type CircuitBreakerSnapshot = {
@@ -79,8 +81,9 @@ type CircuitFinalizeResult = {
 };
 
 const DEFAULT_HALF_OPEN_MAX_PROBES = 1;
-const DEFAULT_JITTER_RATIO = 0.2;
-const DEFAULT_VOTE_WINDOW_MS = 30_000;
+const DEFAULT_JITTER_RATIO = 0.15;
+const DEFAULT_VOTE_WINDOW_MS = 20_000;
+const DEFAULT_FAILURE_WINDOW_MS = 20_000;
 const CIRCUIT_STATE_TTL_MS = 6 * 60 * 60 * 1000;
 const CIRCUIT_STATE_PREFIX = 'operational-circuit-breaker:';
 
@@ -96,14 +99,28 @@ export class OperationalCircuitBreakerService {
   ) {}
 
   async execute<T>(options: ExecuteCircuitOptions, action: () => Promise<T>): Promise<T> {
-    const halfOpenMaxProbes = Math.max(1, options.halfOpenMaxProbes || DEFAULT_HALF_OPEN_MAX_PROBES);
-    const halfOpenSuccessThreshold = Math.max(
-      1,
-      Math.min(halfOpenMaxProbes, options.halfOpenSuccessThreshold || halfOpenMaxProbes),
-    );
     const failureQuorum = Math.max(1, options.failureQuorum || this.readQuorumFromEnv('OPS_CIRCUIT_BREAKER_FAILURE_QUORUM', 1));
     const recoveryQuorum = Math.max(1, options.recoveryQuorum || this.readQuorumFromEnv('OPS_CIRCUIT_BREAKER_RECOVERY_QUORUM', failureQuorum));
+    const configuredHalfOpenMaxProbes = Math.max(
+      1,
+      options.halfOpenMaxProbes || DEFAULT_HALF_OPEN_MAX_PROBES,
+    );
+    const configuredHalfOpenSuccessThreshold = Math.max(
+      1,
+      options.halfOpenSuccessThreshold || configuredHalfOpenMaxProbes,
+    );
+    // Evita configuracoes irrecuperaveis em que o quorum/threshold nunca caberiam dentro do half-open.
+    const halfOpenMaxProbes = Math.max(
+      configuredHalfOpenMaxProbes,
+      configuredHalfOpenSuccessThreshold,
+      recoveryQuorum,
+    );
+    const halfOpenSuccessThreshold = Math.max(
+      1,
+      Math.min(halfOpenMaxProbes, configuredHalfOpenSuccessThreshold),
+    );
     const voteWindowMs = Math.max(1_000, options.voteWindowMs || DEFAULT_VOTE_WINDOW_MS);
+    const failureWindowMs = Math.max(1_000, options.failureWindowMs || DEFAULT_FAILURE_WINDOW_MS);
 
     const preflight = await this.distributedOperationalStateService.mutateJson<
       CircuitBreakerState,
@@ -117,6 +134,7 @@ export class OperationalCircuitBreakerService {
       (state) => {
         const now = Date.now();
         this.pruneVotes(state, now, voteWindowMs);
+        this.pruneFailures(state, now, failureWindowMs);
 
         if (state.mode === 'open' && state.openedUntil && now < state.openedUntil) {
           return {
@@ -222,6 +240,7 @@ export class OperationalCircuitBreakerService {
           let recovered = false;
           const now = Date.now();
           this.pruneVotes(state, now, voteWindowMs);
+          this.pruneFailures(state, now, failureWindowMs);
           state.recoveryVotes[this.instanceId] = now;
           delete state.failureVotes[this.instanceId];
 
@@ -240,10 +259,8 @@ export class OperationalCircuitBreakerService {
           } else {
             if (state.failures > 0 || state.openCount > 0) {
               recovered = true;
-              state.consecutiveSuccesses += 1;
-              state.failures = Math.max(0, state.failures - 1);
-              state.openCount = Math.max(0, state.openCount - 1);
             }
+            state.consecutiveSuccesses += 1;
             this.closeCircuit(state, false);
           }
 
@@ -295,10 +312,12 @@ export class OperationalCircuitBreakerService {
 
           const now = Date.now();
           this.pruneVotes(state, now, voteWindowMs);
+          this.pruneFailures(state, now, failureWindowMs);
           state.failureVotes[this.instanceId] = now;
           delete state.recoveryVotes[this.instanceId];
           state.consecutiveSuccesses = 0;
-          state.failures += 1;
+          state.failureTimeline.push(now);
+          state.failures = state.failureTimeline.length;
           const shouldOpen =
             state.mode === 'half-open' ||
             (state.failures >= Math.max(1, options.failureThreshold) &&
@@ -382,6 +401,7 @@ export class OperationalCircuitBreakerService {
     return {
       mode: 'closed',
       failures: 0,
+      failureTimeline: [],
       openCount: 0,
       openedUntil: null,
       halfOpenInFlight: 0,
@@ -435,7 +455,8 @@ export class OperationalCircuitBreakerService {
 
   private closeCircuit(entry: CircuitBreakerState, fromHalfOpen: boolean) {
     entry.mode = 'closed';
-    entry.failures = fromHalfOpen ? 0 : Math.max(0, entry.failures);
+    entry.failures = 0;
+    entry.failureTimeline = [];
     entry.openCount = fromHalfOpen ? Math.max(0, entry.openCount - 1) : entry.openCount;
     entry.openedUntil = null;
     entry.halfOpenInFlight = 0;
@@ -475,6 +496,16 @@ export class OperationalCircuitBreakerService {
     state.recoveryVotes = Object.fromEntries(
       Object.entries(state.recoveryVotes).filter(([, at]) => Number(at) >= cutoff),
     );
+  }
+
+  private pruneFailures(
+    state: CircuitBreakerState,
+    now: number,
+    failureWindowMs: number,
+  ) {
+    const cutoff = now - failureWindowMs;
+    state.failureTimeline = state.failureTimeline.filter((at) => Number(at) >= cutoff);
+    state.failures = state.failureTimeline.length;
   }
 
   private readQuorumFromEnv(key: string, fallback: number): number {

@@ -4,6 +4,15 @@ export const REQUEST_ID_HEADER = 'x-request-id';
 export const TRACE_ID_HEADER = 'x-trace-id';
 export const TRACEPARENT_HEADER = 'traceparent';
 export const BAGGAGE_HEADER = 'baggage';
+export const MAX_TRACE_BAGGAGE_BYTES = 160;
+export const MAX_TRACE_BAGGAGE_PARSE_BYTES = 512;
+const MAX_TRACE_MITIGATION_FLAGS = 3;
+const BAGGAGE_KEYS = {
+  tenantId: 'tid',
+  userId: 'uid',
+  apiVersion: 'v',
+  mitigationFlags: 'mf',
+} as const;
 
 export type RequestTraceMitigationFlag =
   | 'redis_fallback'
@@ -45,6 +54,10 @@ function parseBaggage(rawBaggage: string | null): Record<string, string> {
     return {};
   }
 
+  if (Buffer.byteLength(rawBaggage, 'utf8') > MAX_TRACE_BAGGAGE_PARSE_BYTES) {
+    return {};
+  }
+
   return rawBaggage
     .split(',')
     .map((item) => item.trim())
@@ -58,19 +71,6 @@ function parseBaggage(rawBaggage: string | null): Record<string, string> {
       }
       return accumulator;
     }, {});
-}
-
-function buildBaggageValue(trace: RequestTraceContext): string | null {
-  const entries = [
-    trace.tenantId ? `tenant_id=${trace.tenantId}` : null,
-    trace.userId ? `user_id=${trace.userId}` : null,
-    trace.apiVersion ? `api_version=${trace.apiVersion}` : null,
-    trace.mitigationFlags.length > 0
-      ? `mitigation_flags=${trace.mitigationFlags.join('.')}`
-      : null,
-  ].filter(Boolean) as string[];
-
-  return entries.length > 0 ? entries.join(',') : null;
 }
 
 function sanitizeOpaqueId(value: string | null, maxLength = 128): string | null {
@@ -138,13 +138,15 @@ export function ensureRequestTrace(carrier: HeaderCarrier): RequestTraceContext 
     spanId,
     traceparent,
     startedAt: Date.now(),
-    tenantId: sanitizeOpaqueId(baggage.tenant_id || null, 96),
-    userId: sanitizeOpaqueId(baggage.user_id || null, 96),
-    apiVersion: sanitizeOpaqueId(baggage.api_version || null, 16),
-    mitigationFlags: String(baggage.mitigation_flags || '')
-      .split('.')
-      .map((value) => sanitizeOpaqueId(value, 64))
-      .filter((value): value is RequestTraceMitigationFlag => Boolean(value)),
+    tenantId: sanitizeOpaqueId(baggage.tid || baggage.tenant_id || null, 96),
+    userId: sanitizeOpaqueId(baggage.uid || baggage.user_id || null, 96),
+    apiVersion: sanitizeOpaqueId(baggage.v || baggage.api_version || null, 16),
+    mitigationFlags: normalizeMitigationFlags(
+      String(baggage.mf || baggage.mitigation_flags || '')
+        .split('.')
+        .map((value) => sanitizeOpaqueId(value, 64))
+        .filter((value): value is RequestTraceMitigationFlag => Boolean(value)),
+    ),
   };
 
   carrier.requestTrace = trace;
@@ -180,14 +182,77 @@ export function annotateRequestTrace(
     trace.apiVersion = sanitizeOpaqueId(input.apiVersion, 16);
   }
   if (Array.isArray(input.mitigationFlags) && input.mitigationFlags.length > 0) {
-    const combined = new Set<RequestTraceMitigationFlag>([
+    trace.mitigationFlags = normalizeMitigationFlags([
       ...trace.mitigationFlags,
       ...input.mitigationFlags,
     ]);
-    trace.mitigationFlags = [...combined];
   }
 
   return trace;
+}
+
+export function buildBaggageHeaderValue(
+  trace: RequestTraceContext | null | undefined,
+): string | null {
+  if (!trace) {
+    return null;
+  }
+
+  const buildValue = (input: {
+    includeTenantId: boolean;
+    includeUserId: boolean;
+    includeMitigationFlags: boolean;
+  }) => {
+    const entries = [
+      trace.apiVersion ? `${BAGGAGE_KEYS.apiVersion}=${trace.apiVersion}` : null,
+      input.includeTenantId && trace.tenantId
+        ? `${BAGGAGE_KEYS.tenantId}=${trace.tenantId}`
+        : null,
+      input.includeUserId && trace.userId ? `${BAGGAGE_KEYS.userId}=${trace.userId}` : null,
+      input.includeMitigationFlags && trace.mitigationFlags.length > 0
+        ? `${BAGGAGE_KEYS.mitigationFlags}=${trace.mitigationFlags.join('.')}`
+        : null,
+    ].filter(Boolean) as string[];
+
+    return entries.length > 0 ? entries.join(',') : null;
+  };
+
+  const candidates = [
+    {
+      includeTenantId: true,
+      includeUserId: true,
+      includeMitigationFlags: true,
+    },
+    {
+      includeTenantId: true,
+      includeUserId: true,
+      includeMitigationFlags: false,
+    },
+    {
+      includeTenantId: true,
+      includeUserId: false,
+      includeMitigationFlags: false,
+    },
+    {
+      includeTenantId: false,
+      includeUserId: false,
+      includeMitigationFlags: false,
+    },
+  ];
+
+  for (const candidate of candidates) {
+    const baggage = buildValue(candidate);
+    if (baggage && Buffer.byteLength(baggage, 'utf8') <= MAX_TRACE_BAGGAGE_BYTES) {
+      return baggage;
+    }
+  }
+
+  return null;
+}
+
+export function getTraceBaggageBytes(trace: RequestTraceContext | null | undefined): number {
+  const baggage = buildBaggageHeaderValue(trace);
+  return baggage ? Buffer.byteLength(baggage, 'utf8') : 0;
 }
 
 export function buildOutgoingTraceHeaders(carrier: HeaderCarrier | null | undefined) {
@@ -202,10 +267,33 @@ export function buildOutgoingTraceHeaders(carrier: HeaderCarrier | null | undefi
     [TRACEPARENT_HEADER]: trace.traceparent,
   };
 
-  const baggage = buildBaggageValue(trace);
+  const baggage = buildBaggageHeaderValue(trace);
   if (baggage) {
     headers[BAGGAGE_HEADER] = baggage;
   }
 
   return headers;
+}
+
+function normalizeMitigationFlags(
+  values: Array<RequestTraceMitigationFlag | null | undefined>,
+): RequestTraceMitigationFlag[] {
+  const deduped = [...new Set(values.filter(Boolean))] as RequestTraceMitigationFlag[];
+
+  const filtered = deduped.filter((value) => {
+    if (
+      value === 'feature_degraded' &&
+      deduped.some((candidate) =>
+        candidate === 'update_checks_disabled' ||
+        candidate === 'heavy_mutations_rejected' ||
+        candidate === 'tenant_shed',
+      )
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+
+  return filtered.slice(0, MAX_TRACE_MITIGATION_FLAGS);
 }

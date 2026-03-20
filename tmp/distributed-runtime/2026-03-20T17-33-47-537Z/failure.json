@@ -1,0 +1,72 @@
+{
+  "generatedAt": "2026-03-20T17:34:24.545Z",
+  "artifactsDir": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\tmp\\distributed-runtime\\2026-03-20T17-33-47-537Z",
+  "commands": [
+    {
+      "at": "2026-03-20T17:33:47.542Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker compose -f D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\docker-compose.yml down -v --remove-orphans"
+    },
+    {
+      "at": "2026-03-20T17:33:48.080Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker compose -f D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\docker-compose.yml up -d"
+    },
+    {
+      "at": "2026-03-20T17:33:49.468Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-redis redis-cli ping"
+    },
+    {
+      "at": "2026-03-20T17:33:49.789Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-postgres pg_isready -U postgres -d runtimeproof"
+    },
+    {
+      "at": "2026-03-20T17:33:51.103Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-postgres pg_isready -U postgres -d runtimeproof"
+    },
+    {
+      "at": "2026-03-20T17:33:52.439Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-postgres pg_isready -U postgres -d runtimeproof"
+    },
+    {
+      "at": "2026-03-20T17:33:53.777Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-postgres pg_isready -U postgres -d runtimeproof"
+    },
+    {
+      "at": "2026-03-20T17:33:54.142Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "node D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\dependency-stub.cjs"
+    },
+    {
+      "at": "2026-03-20T17:33:54.511Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend",
+      "command": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend\\node_modules\\.bin\\nest.CMD build"
+    },
+    {
+      "at": "2026-03-20T17:34:17.874Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend",
+      "command": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend\\node_modules\\.bin\\prisma.CMD migrate deploy --schema prisma/schema.prisma"
+    },
+    {
+      "at": "2026-03-20T17:34:22.509Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend",
+      "command": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend\\node_modules\\.bin\\tsx.CMD prisma/seed.ts deploy --force"
+    },
+    {
+      "at": "2026-03-20T17:34:24.222Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-postgres psql -U postgres -d runtimeproof -c INSERT INTO \"SecurityConfig\" (\"rateLimitDevEnabled\",\"globalMaxRequests\",\"globalWindowMinutes\") SELECT TRUE, 10000, 1 WHERE NOT EXISTS (SELECT 1 FROM \"SecurityConfig\"); UPDATE \"SecurityConfig\" SET \"rateLimitDevEnabled\" = TRUE, \"globalMaxRequests\" = 10000, \"globalWindowMinutes\" = 1;"
+    }
+  ],
+  "setup": null,
+  "scenarios": [],
+  "error": {
+    "message": "Command failed (1): docker exec codex-distributed-postgres psql -U postgres -d runtimeproof -c INSERT INTO \"SecurityConfig\" (\"rateLimitDevEnabled\",\"globalMaxRequests\",\"globalWindowMinutes\") SELECT TRUE, 10000, 1 WHERE NOT EXISTS (SELECT 1 FROM \"SecurityConfig\"); UPDATE \"SecurityConfig\" SET \"rateLimitDevEnabled\" = TRUE, \"globalMaxRequests\" = 10000, \"globalWindowMinutes\" = 1;\nERROR:  relation \"SecurityConfig\" does not exist\nLINE 1: INSERT INTO \"SecurityConfig\" (\"rateLimitDevEnabled\",\"globalM...\n                    ^\n",
+    "stack": "Error: Command failed (1): docker exec codex-distributed-postgres psql -U postgres -d runtimeproof -c INSERT INTO \"SecurityConfig\" (\"rateLimitDevEnabled\",\"globalMaxRequests\",\"globalWindowMinutes\") SELECT TRUE, 10000, 1 WHERE NOT EXISTS (SELECT 1 FROM \"SecurityConfig\"); UPDATE \"SecurityConfig\" SET \"rateLimitDevEnabled\" = TRUE, \"globalMaxRequests\" = 10000, \"globalWindowMinutes\" = 1;\nERROR:  relation \"SecurityConfig\" does not exist\nLINE 1: INSERT INTO \"SecurityConfig\" (\"rateLimitDevEnabled\",\"globalM...\n                    ^\n\n    at ChildProcess.<anonymous> (D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\run-proof.cjs:103:21)\n    at ChildProcess.emit (node:events:519:28)\n    at ChildProcess._handle.onexit (node:internal/child_process:293:12)"
+  }
+}

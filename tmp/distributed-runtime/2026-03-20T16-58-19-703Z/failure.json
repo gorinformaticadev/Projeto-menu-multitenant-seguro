@@ -1,0 +1,67 @@
+{
+  "generatedAt": "2026-03-20T16:59:56.249Z",
+  "artifactsDir": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\tmp\\distributed-runtime\\2026-03-20T16-58-19-703Z",
+  "commands": [
+    {
+      "at": "2026-03-20T16:58:19.732Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker compose -f D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\docker-compose.yml down -v --remove-orphans"
+    },
+    {
+      "at": "2026-03-20T16:58:20.184Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker compose -f D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\docker-compose.yml up -d"
+    },
+    {
+      "at": "2026-03-20T16:58:21.512Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-redis redis-cli ping"
+    },
+    {
+      "at": "2026-03-20T16:58:21.814Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-postgres pg_isready -U postgres -d runtimeproof"
+    },
+    {
+      "at": "2026-03-20T16:58:23.153Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-postgres pg_isready -U postgres -d runtimeproof"
+    },
+    {
+      "at": "2026-03-20T16:58:24.462Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-postgres pg_isready -U postgres -d runtimeproof"
+    },
+    {
+      "at": "2026-03-20T16:58:24.815Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "node D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\dependency-stub.cjs"
+    },
+    {
+      "at": "2026-03-20T16:58:25.187Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend",
+      "command": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend\\node_modules\\.bin\\nest.CMD build"
+    },
+    {
+      "at": "2026-03-20T16:58:48.388Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend",
+      "command": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend\\node_modules\\.bin\\prisma.CMD migrate deploy --schema prisma/schema.prisma"
+    },
+    {
+      "at": "2026-03-20T16:58:52.950Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend",
+      "command": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend\\node_modules\\.bin\\tsx.CMD prisma/seed.ts deploy --force"
+    },
+    {
+      "at": "2026-03-20T16:58:55.854Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend",
+      "command": "node dist/main.js"
+    }
+  ],
+  "setup": null,
+  "scenarios": [],
+  "error": {
+    "message": "Timed out waiting for HTTP 200 at http://127.0.0.1:4101/api/health",
+    "stack": "Error: Timed out waiting for HTTP 200 at http://127.0.0.1:4101/api/health\n    at waitForHttpOk (D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\run-proof.cjs:172:9)\n    at async startBackends (D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\run-proof.cjs:408:5)\n    at async main (D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\run-proof.cjs:1285:5)"
+  }
+}

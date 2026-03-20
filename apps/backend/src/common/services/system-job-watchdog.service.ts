@@ -59,9 +59,12 @@ export class SystemJobWatchdogService implements OnModuleInit {
     const instanceId = process.env.NODE_APP_INSTANCE || process.env.HOSTNAME || 'single-instance';
     const lockKey = 'watchdog:evaluator:lock';
     
-    // Evitar que multiplas instancias rodem o evaluator ao mesmo tempo
-    const lockAcquired = await this.redisLock.acquireLock(lockKey, 50000, instanceId); // 50s TTL
-    if (!lockAcquired) {
+    const lockState = await this.redisLock.acquireLockState(lockKey, 50000, instanceId);
+    if (lockState === 'degraded') {
+      return { emitted: [], skipped: ['redis_lock_degraded'] };
+    }
+
+    if (lockState === 'busy') {
       return { emitted: [], skipped: ['locked_by_other_instance'] };
     }
 

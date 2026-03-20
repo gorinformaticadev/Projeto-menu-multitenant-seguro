@@ -1,0 +1,1978 @@
+{
+  "generatedAt": "2026-03-20T17:25:40.283Z",
+  "artifactsDir": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\tmp\\distributed-runtime\\2026-03-20T17-24-05-443Z",
+  "commands": [
+    {
+      "at": "2026-03-20T17:24:05.447Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker compose -f D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\docker-compose.yml down -v --remove-orphans"
+    },
+    {
+      "at": "2026-03-20T17:24:05.915Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker compose -f D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\docker-compose.yml up -d"
+    },
+    {
+      "at": "2026-03-20T17:24:07.332Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-redis redis-cli ping"
+    },
+    {
+      "at": "2026-03-20T17:24:07.655Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-postgres pg_isready -U postgres -d runtimeproof"
+    },
+    {
+      "at": "2026-03-20T17:24:08.973Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-postgres pg_isready -U postgres -d runtimeproof"
+    },
+    {
+      "at": "2026-03-20T17:24:10.304Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-postgres pg_isready -U postgres -d runtimeproof"
+    },
+    {
+      "at": "2026-03-20T17:24:11.637Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-postgres pg_isready -U postgres -d runtimeproof"
+    },
+    {
+      "at": "2026-03-20T17:24:12.018Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "node D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\dependency-stub.cjs"
+    },
+    {
+      "at": "2026-03-20T17:24:12.394Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend",
+      "command": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend\\node_modules\\.bin\\nest.CMD build"
+    },
+    {
+      "at": "2026-03-20T17:24:34.589Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend",
+      "command": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend\\node_modules\\.bin\\prisma.CMD migrate deploy --schema prisma/schema.prisma"
+    },
+    {
+      "at": "2026-03-20T17:24:39.114Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend",
+      "command": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend\\node_modules\\.bin\\tsx.CMD prisma/seed.ts deploy --force"
+    },
+    {
+      "at": "2026-03-20T17:24:40.911Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend",
+      "command": "node D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend\\dist\\backend\\src\\main.js"
+    },
+    {
+      "at": "2026-03-20T17:24:45.545Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend",
+      "command": "node D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend\\dist\\backend\\src\\main.js"
+    },
+    {
+      "at": "2026-03-20T17:24:52.738Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker compose -f D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\docker-compose.yml stop redis"
+    },
+    {
+      "at": "2026-03-20T17:24:57.108Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker compose -f D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\docker-compose.yml start redis"
+    },
+    {
+      "at": "2026-03-20T17:24:57.992Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-redis redis-cli ping"
+    }
+  ],
+  "setup": {
+    "superadminJar": {
+      "cookies": {}
+    },
+    "tenantA": {
+      "id": "91692144-93a5-4551-95a7-4e7e92c9e2fe",
+      "email": "tenant-a@example.com",
+      "cnpjCpf": "11111111111180",
+      "nomeFantasia": "Tenant A Runtime Proof",
+      "nomeResponsavel": "Tenant A Responsavel",
+      "telefone": "(11) 90000-1001",
+      "logoUrl": null,
+      "ativo": true,
+      "createdAt": "2026-03-20T17:24:50.870Z",
+      "updatedAt": "2026-03-20T17:24:50.870Z",
+      "isMasterTenant": false
+    },
+    "tenantB": {
+      "id": "85f81757-b348-4203-a667-f4af808a38db",
+      "email": "tenant-b@example.com",
+      "cnpjCpf": "22222222222259",
+      "nomeFantasia": "Tenant B Runtime Proof",
+      "nomeResponsavel": "Tenant B Responsavel",
+      "telefone": "(11) 90000-1002",
+      "logoUrl": null,
+      "ativo": true,
+      "createdAt": "2026-03-20T17:24:51.045Z",
+      "updatedAt": "2026-03-20T17:24:51.045Z",
+      "isMasterTenant": false
+    },
+    "tenantAJar": {
+      "cookies": {}
+    },
+    "tenantBJar": {
+      "cookies": {}
+    }
+  },
+  "scenarios": [
+    {
+      "id": "fairness-global",
+      "title": "Fairness global por tenant",
+      "startedAt": "2026-03-20T17:24:51.368Z",
+      "finishedAt": "2026-03-20T17:24:52.737Z",
+      "durationMs": 1369,
+      "commands": [],
+      "logs": {
+        "dependency-stub": "",
+        "backend-a": "\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:24:51 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"request_queued\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=1200\",\"method\":\"POST\",\"statusCode\":null,\"requestId\":\"8ad2d346-a580-4c3a-b204-cf3e981e749f\",\"traceId\":\"a160fec633d841fa907028f0f629ee35\",\"tenantId\":\"91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"userId\":\"d29930d3-e532-4b01-8675-fc6867b76efa\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queued route=ops-runtime-test-fair-queue partition=tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe routeDepth=1 partitionDepth=1\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"routeQueueDepth\":1,\"partitionQueueDepth\":1,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":true}\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:24:51 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"request_queued\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=1200\",\"method\":\"POST\",\"statusCode\":null,\"requestId\":\"5589d737-d82f-4754-a069-c1b03ebc85ea\",\"traceId\":\"74dae5831e0846dbaca10deded95e093\",\"tenantId\":\"91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"userId\":\"d29930d3-e532-4b01-8675-fc6867b76efa\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queued route=ops-runtime-test-fair-queue partition=tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe routeDepth=2 partitionDepth=2\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"routeQueueDepth\":2,\"partitionQueueDepth\":2,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":true}\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:24:51 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"request_queued\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=600\",\"method\":\"POST\",\"statusCode\":null,\"requestId\":\"d8d49b19-197f-48ff-93b3-be0c2aa954fe\",\"traceId\":\"7a35d94eb53d402a9c918f68cbdb7d95\",\"tenantId\":\"85f81757-b348-4203-a667-f4af808a38db\",\"userId\":\"0274bda3-6a2f-414a-96da-5eb766a8881a\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queued route=ops-runtime-test-fair-queue partition=tenant:85f81757-b348-4203-a667-f4af808a38db routeDepth=5 partitionDepth=2\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:85f81757-b348-4203-a667-f4af808a38db\",\"routeQueueDepth\":5,\"partitionQueueDepth\":2,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":true}\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:24:51 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=0.8 desired=0.55 overloadedInstances=0/2\",\"instanceId\":\"backend-a\",\"instanceCount\":2,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":0.8,\"desiredAdaptiveThrottleFactor\":0.55,\"pressureCause\":\"normal\",\"stateConsistency\":\"distributed\",\"clusterQueueDepth\":8,\"clusterRecentApiLatencyMs\":167.29,\"mitigation\":{\"degradeHeavyFeatures\":true,\"disableRemoteUpdateChecks\":true,\"rejectHeavyMutations\":false,\"featureFlags\":[\"degrade-heavy-features\",\"disable-remote-update-checks\"],\"businessImpact\":[\"Widgets pesados do dashboard e agregacoes caras podem operar em modo reduzido.\",\"Verificacoes remotas de atualizacao ficam temporariamente suspensas.\"]},\"distributed\":true}\u001b[39m\n",
+        "backend-b": "\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:24:51 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"request_queued\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=1200\",\"method\":\"POST\",\"statusCode\":null,\"requestId\":\"f28ab4cf-ac6e-4210-9ac3-4220ffd81bea\",\"traceId\":\"c3b11c431d0e459b8c32d3015b749f7e\",\"tenantId\":\"91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"userId\":\"d29930d3-e532-4b01-8675-fc6867b76efa\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queued route=ops-runtime-test-fair-queue partition=tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe routeDepth=3 partitionDepth=3\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"routeQueueDepth\":3,\"partitionQueueDepth\":3,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":true}\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:24:51 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"request_queued\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=600\",\"method\":\"POST\",\"statusCode\":null,\"requestId\":\"0d5d6040-0619-42c6-aaad-ca3987cb0653\",\"traceId\":\"19eb0fa92e8845438eab503d1c79d2fe\",\"tenantId\":\"85f81757-b348-4203-a667-f4af808a38db\",\"userId\":\"0274bda3-6a2f-414a-96da-5eb766a8881a\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queued route=ops-runtime-test-fair-queue partition=tenant:85f81757-b348-4203-a667-f4af808a38db routeDepth=4 partitionDepth=1\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:85f81757-b348-4203-a667-f4af808a38db\",\"routeQueueDepth\":4,\"partitionQueueDepth\":1,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":true}\u001b[39m\n\u001b[33m[Nest] 17472  - \u001b[39m20/03/2026, 14:24:51 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[33m{\"event\":\"operational-observability\",\"type\":\"request_queue_rejected\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=1200\",\"method\":\"POST\",\"statusCode\":429,\"requestId\":\"56baa2bf-1380-477b-aa97-0a2ba3595652\",\"traceId\":\"c1907d7479cf4874a2e43cac5e811f16\",\"tenantId\":\"91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"userId\":\"d29930d3-e532-4b01-8675-fc6867b76efa\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queue full route=ops-runtime-test-fair-queue partition=tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe routeDepth=5 partitionDepth=3\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"routeQueueDepth\":5,\"partitionQueueDepth\":3,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":true}\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:24:51 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"request_queued\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=600\",\"method\":\"POST\",\"statusCode\":null,\"requestId\":\"7e6cbf82-f789-49f6-8c4b-957aa8a71ac5\",\"traceId\":\"1f06caa208864837a7bd73fe4dfec742\",\"tenantId\":\"85f81757-b348-4203-a667-f4af808a38db\",\"userId\":\"0274bda3-6a2f-414a-96da-5eb766a8881a\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queued route=ops-runtime-test-fair-queue partition=tenant:85f81757-b348-4203-a667-f4af808a38db routeDepth=6 partitionDepth=3\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:85f81757-b348-4203-a667-f4af808a38db\",\"routeQueueDepth\":6,\"partitionQueueDepth\":3,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":true}\u001b[39m\n\u001b[33m[Nest] 17472  - \u001b[39m20/03/2026, 14:24:51 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[33m{\"event\":\"operational-observability\",\"type\":\"request_queue_rejected\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=1200\",\"method\":\"POST\",\"statusCode\":429,\"requestId\":\"8a6d1999-225b-468c-a223-674b6a8447fd\",\"traceId\":\"f85a91658df443a1bd49da5a719b7fac\",\"tenantId\":\"91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"userId\":\"d29930d3-e532-4b01-8675-fc6867b76efa\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queue full route=ops-runtime-test-fair-queue partition=tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe routeDepth=6 partitionDepth=3\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"routeQueueDepth\":6,\"partitionQueueDepth\":3,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":true}\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:24:52 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=0.89 desired=0.75 overloadedInstances=0/2\",\"instanceId\":\"backend-b\",\"instanceCount\":2,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":0.89,\"desiredAdaptiveThrottleFactor\":0.75,\"pressureCause\":\"normal\",\"stateConsistency\":\"distributed\",\"clusterQueueDepth\":6,\"clusterRecentApiLatencyMs\":157.52,\"mitigation\":{\"degradeHeavyFeatures\":true,\"disableRemoteUpdateChecks\":false,\"rejectHeavyMutations\":false,\"featureFlags\":[\"degrade-heavy-features\"],\"businessImpact\":[\"Widgets pesados do dashboard e agregacoes caras podem operar em modo reduzido.\"]},\"distributed\":true}\u001b[39m\n"
+      },
+      "instanceCount": 2,
+      "loadApplied": {
+        "tenantA": {
+          "concurrency": 6,
+          "holdMs": 1200
+        },
+        "tenantB": {
+          "concurrency": 3,
+          "holdMs": 600
+        }
+      },
+      "expected": "Tenant B deve receber grants antes de Tenant A consumir toda a fila.",
+      "observed": {
+        "tenantA": {
+          "count": 6,
+          "avgDurationMs": 611.33,
+          "avgQueueWaitMs": 684.75,
+          "maxQueueWaitMs": 1243,
+          "rejected": 2
+        },
+        "tenantB": {
+          "count": 3,
+          "avgDurationMs": 818.67,
+          "avgQueueWaitMs": 694,
+          "maxQueueWaitMs": 1069,
+          "rejected": 0
+        },
+        "orderedStarts": [
+          {
+            "label": "tenant-a-1",
+            "startedAt": "2026-03-20T17:24:51.420Z",
+            "tenantId": "91692144-93a5-4551-95a7-4e7e92c9e2fe",
+            "instanceId": "backend-a"
+          },
+          {
+            "label": "tenant-b-1",
+            "startedAt": "2026-03-20T17:24:51.655Z",
+            "tenantId": "85f81757-b348-4203-a667-f4af808a38db",
+            "instanceId": "backend-b"
+          },
+          {
+            "label": "tenant-a-3",
+            "startedAt": "2026-03-20T17:24:51.873Z",
+            "tenantId": "91692144-93a5-4551-95a7-4e7e92c9e2fe",
+            "instanceId": "backend-a"
+          },
+          {
+            "label": "tenant-b-2",
+            "startedAt": "2026-03-20T17:24:52.101Z",
+            "tenantId": "85f81757-b348-4203-a667-f4af808a38db",
+            "instanceId": "backend-a"
+          },
+          {
+            "label": "tenant-a-5",
+            "startedAt": "2026-03-20T17:24:52.310Z",
+            "tenantId": "91692144-93a5-4551-95a7-4e7e92c9e2fe",
+            "instanceId": "backend-a"
+          },
+          {
+            "label": "tenant-b-3",
+            "startedAt": "2026-03-20T17:24:52.441Z",
+            "tenantId": "85f81757-b348-4203-a667-f4af808a38db",
+            "instanceId": "backend-b"
+          },
+          {
+            "label": "tenant-a-2",
+            "startedAt": "2026-03-20T17:24:52.612Z",
+            "tenantId": "91692144-93a5-4551-95a7-4e7e92c9e2fe",
+            "instanceId": "backend-b"
+          }
+        ],
+        "tenantBStartedBeforeTenantAExhaustedQueue": true,
+        "midFlightQueue": {
+          "backendA": {
+            "routePolicyId": "ops-runtime-test-fair-queue",
+            "active": 1,
+            "queued": 5,
+            "maxConcurrentRequests": 1,
+            "maxConcurrentPerPartition": 1,
+            "maxQueueDepth": 6,
+            "maxQueueDepthPerPartition": 3,
+            "partitions": [
+              {
+                "partitionKey": "tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe",
+                "tenantId": "91692144-93a5-4551-95a7-4e7e92c9e2fe",
+                "userId": "d29930d3-e532-4b01-8675-fc6867b76efa",
+                "clientIp": "127.0.0.1",
+                "active": 0,
+                "queued": 3,
+                "grantedCount": 1,
+                "lastGrantedAt": "2026-03-20T17:24:51.412Z"
+              },
+              {
+                "partitionKey": "tenant:85f81757-b348-4203-a667-f4af808a38db",
+                "tenantId": "85f81757-b348-4203-a667-f4af808a38db",
+                "userId": "0274bda3-6a2f-414a-96da-5eb766a8881a",
+                "clientIp": "127.0.0.1",
+                "active": 1,
+                "queued": 2,
+                "grantedCount": 1,
+                "lastGrantedAt": "2026-03-20T17:24:51.650Z"
+              }
+            ]
+          },
+          "backendB": {
+            "routePolicyId": "ops-runtime-test-fair-queue",
+            "active": 1,
+            "queued": 5,
+            "maxConcurrentRequests": 1,
+            "maxConcurrentPerPartition": 1,
+            "maxQueueDepth": 6,
+            "maxQueueDepthPerPartition": 3,
+            "partitions": [
+              {
+                "partitionKey": "tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe",
+                "tenantId": "91692144-93a5-4551-95a7-4e7e92c9e2fe",
+                "userId": "d29930d3-e532-4b01-8675-fc6867b76efa",
+                "clientIp": "127.0.0.1",
+                "active": 0,
+                "queued": 3,
+                "grantedCount": 1,
+                "lastGrantedAt": "2026-03-20T17:24:51.412Z"
+              },
+              {
+                "partitionKey": "tenant:85f81757-b348-4203-a667-f4af808a38db",
+                "tenantId": "85f81757-b348-4203-a667-f4af808a38db",
+                "userId": "0274bda3-6a2f-414a-96da-5eb766a8881a",
+                "clientIp": "127.0.0.1",
+                "active": 1,
+                "queued": 2,
+                "grantedCount": 1,
+                "lastGrantedAt": "2026-03-20T17:24:51.650Z"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "redis-unavailable",
+      "title": "Redis indisponivel em trafego real",
+      "startedAt": "2026-03-20T17:24:52.737Z",
+      "finishedAt": "2026-03-20T17:25:02.310Z",
+      "durationMs": 9573,
+      "commands": [
+        {
+          "at": "2026-03-20T17:24:52.738Z",
+          "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+          "command": "docker compose -f D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\docker-compose.yml stop redis"
+        },
+        {
+          "at": "2026-03-20T17:24:57.108Z",
+          "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+          "command": "docker compose -f D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\docker-compose.yml start redis"
+        },
+        {
+          "at": "2026-03-20T17:24:57.992Z",
+          "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+          "command": "docker exec codex-distributed-redis redis-cli ping"
+        }
+      ],
+      "logs": {
+        "dependency-stub": "",
+        "backend-a": "\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:24:52 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=0.8 desired=1 overloadedInstances=0/2\",\"instanceId\":\"backend-a\",\"instanceCount\":2,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":0.8,\"desiredAdaptiveThrottleFactor\":1,\"pressureCause\":\"normal\",\"stateConsistency\":\"distributed\",\"clusterQueueDepth\":3,\"clusterRecentApiLatencyMs\":248.28,\"mitigation\":{\"degradeHeavyFeatures\":false,\"disableRemoteUpdateChecks\":false,\"rejectHeavyMutations\":false,\"featureFlags\":[],\"businessImpact\":[]},\"distributed\":true}\u001b[39m\n\u001b[31m[Nest] 23104  - \u001b[39m20/03/2026, 14:24:53 \u001b[31m  ERROR\u001b[39m \u001b[38;5;3m[RedisLockService] \u001b[39m\u001b[31mErro no RedisLockService (standalone(127.0.0.1:46379)): Stream isn't writeable and enableOfflineQueue options is false. Modo degradado ativo.\u001b[39m\n\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:24:53 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[RateLimitMetricsService] \u001b[39m\u001b[33mFalha no Redis de metricas de rate limit; fallback em memoria ativo. novas tentativas em 15s. detalhe=Stream isn't writeable and enableOfflineQueue options is false\u001b[39m\n\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:24:53 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=reconnecting detalhe=Stream isn't writeable and enableOfflineQueue options is false\u001b[39m\n\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:24:53 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[RedisThrottlerStorage] \u001b[39m\u001b[33mFalha no Redis de rate limit; fallback em memoria ativo. novas tentativas em 15s. detalhe=Stream isn't writeable and enableOfflineQueue options is false\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:24:53 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=0.8 desired=1 overloadedInstances=0/1\",\"instanceId\":\"backend-a\",\"instanceCount\":1,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":0.8,\"desiredAdaptiveThrottleFactor\":1,\"pressureCause\":\"normal\",\"stateConsistency\":\"local_fallback\",\"clusterQueueDepth\":0,\"clusterRecentApiLatencyMs\":348.8,\"mitigation\":{\"degradeHeavyFeatures\":true,\"disableRemoteUpdateChecks\":false,\"rejectHeavyMutations\":false,\"featureFlags\":[\"degrade-heavy-features\",\"redis-fallback-visible\"],\"businessImpact\":[\"Widgets pesados do dashboard e agregacoes caras podem operar em modo reduzido.\",\"Coordenacao distribuida esta em fallback local; consistencia global reduzida ate a recuperacao do Redis.\"]},\"distributed\":false}\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:24:54 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=0.85 desired=1 overloadedInstances=0/1\",\"instanceId\":\"backend-a\",\"instanceCount\":1,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":0.85,\"desiredAdaptiveThrottleFactor\":1,\"pressureCause\":\"normal\",\"stateConsistency\":\"local_fallback\",\"clusterQueueDepth\":0,\"clusterRecentApiLatencyMs\":348.8,\"mitigation\":{\"degradeHeavyFeatures\":true,\"disableRemoteUpdateChecks\":false,\"rejectHeavyMutations\":false,\"featureFlags\":[\"degrade-heavy-features\",\"redis-fallback-visible\"],\"businessImpact\":[\"Widgets pesados do dashboard e agregacoes caras podem operar em modo reduzido.\",\"Coordenacao distribuida esta em fallback local; consistencia global reduzida ate a recuperacao do Redis.\"]},\"distributed\":false}\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:24:55 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=0.9 desired=1 overloadedInstances=0/1\",\"instanceId\":\"backend-a\",\"instanceCount\":1,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":0.9,\"desiredAdaptiveThrottleFactor\":1,\"pressureCause\":\"normal\",\"stateConsistency\":\"local_fallback\",\"clusterQueueDepth\":0,\"clusterRecentApiLatencyMs\":348.8,\"mitigation\":{\"degradeHeavyFeatures\":true,\"disableRemoteUpdateChecks\":false,\"rejectHeavyMutations\":false,\"featureFlags\":[\"degrade-heavy-features\",\"redis-fallback-visible\"],\"businessImpact\":[\"Widgets pesados do dashboard e agregacoes caras podem operar em modo reduzido.\",\"Coordenacao distribuida esta em fallback local; consistencia global reduzida ate a recuperacao do Redis.\"]},\"distributed\":false}\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:24:56 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=0.95 desired=1 overloadedInstances=0/1\",\"instanceId\":\"backend-a\",\"instanceCount\":1,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":0.95,\"desiredAdaptiveThrottleFactor\":1,\"pressureCause\":\"normal\",\"stateConsistency\":\"local_fallback\",\"clusterQueueDepth\":0,\"clusterRecentApiLatencyMs\":348.8,\"mitigation\":{\"degradeHeavyFeatures\":true,\"disableRemoteUpdateChecks\":false,\"rejectHeavyMutations\":false,\"featureFlags\":[\"degrade-heavy-features\",\"redis-fallback-visible\"],\"businessImpact\":[\"Widgets pesados do dashboard e agregacoes caras podem operar em modo reduzido.\",\"Coordenacao distribuida esta em fallback local; consistencia global reduzida ate a recuperacao do Redis.\"]},\"distributed\":false}\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:24:57 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=1 desired=1 overloadedInstances=0/1\",\"instanceId\":\"backend-a\",\"instanceCount\":1,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":1,\"desiredAdaptiveThrottleFactor\":1,\"pressureCause\":\"normal\",\"stateConsistency\":\"local_fallback\",\"clusterQueueDepth\":0,\"clusterRecentApiLatencyMs\":278,\"mitigation\":{\"degradeHeavyFeatures\":true,\"disableRemoteUpdateChecks\":false,\"rejectHeavyMutations\":false,\"featureFlags\":[\"degrade-heavy-features\",\"redis-fallback-visible\"],\"businessImpact\":[\"Widgets pesados do dashboard e agregacoes caras podem operar em modo reduzido.\",\"Coordenacao distribuida esta em fallback local; consistencia global reduzida ate a recuperacao do Redis.\"]},\"distributed\":false}\u001b[39m\n\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:00 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[CronService] \u001b[39m\u001b[33m[DEGRADED_MODE_EXEC] Redis offline no ciclo 1774027500000 do job system.operational_alerts_evaluator.\u001b[39m\n\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:00 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[CronService] \u001b[39m\u001b[33m[DEGRADED_MODE_EXEC] Job system.operational_alerts_evaluator é idempotente. Prosseguindo com DB Guard.\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:00 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[CronService] \u001b[39m\u001b[32m[LOCK_ACQUIRED] Job system.operational_alerts_evaluator ciclo=1774027500000 instanceId=backend-a\u001b[39m\n\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:00 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[CronService] \u001b[39m\u001b[33m[DEGRADED_MODE_EXEC] Redis offline no ciclo 1774027500000 do job system.job_watchdog_evaluator.\u001b[39m\n\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:00 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[CronService] \u001b[39m\u001b[33m[DEGRADED_MODE_EXEC] Job system.job_watchdog_evaluator é idempotente. Prosseguindo com DB Guard.\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:00 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[CronService] \u001b[39m\u001b[32m[LOCK_ACQUIRED] Job system.job_watchdog_evaluator ciclo=1774027500000 instanceId=backend-a\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:00 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[CronService] \u001b[39m\u001b[32m[EXECUTION_STARTED] Executando callback do cron job: system.operational_alerts_evaluator\u001b[39m\n\u001b[31m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:00 \u001b[31m  ERROR\u001b[39m \u001b[38;5;3m[SystemOperationalAlertsService] \u001b[39m\u001b[31mOperational alerts evaluator skipped: Redis lock coordination is degraded.\u001b[39m\n\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:00 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[CronService] \u001b[39m\u001b[33m[DB_SYNC_FAILED_ABORT] Job system.job_watchdog_evaluator bloqueado pelo Exclusive Guard. cycleId=1774027500000\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:00 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[CronService] \u001b[39m\u001b[32m[EXECUTION_FINISHED] Job system.operational_alerts_evaluator concluído com sucesso.\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:01 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[32mStore operacional distribuido reconectado via standalone(127.0.0.1:46379).\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:01 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[RateLimitMetricsService] \u001b[39m\u001b[32mRedis de metricas de rate limit reconectado; persistencia distribuida reativada.\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:01 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[RedisLockService] \u001b[39m\u001b[32mRedisLockService reconectado.\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:01 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[RedisThrottlerStorage] \u001b[39m\u001b[32mRedis de rate limit reconectado; storage distribuido reativado.\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:01 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=1 desired=1 overloadedInstances=0/2\",\"instanceId\":\"backend-a\",\"instanceCount\":2,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":1,\"desiredAdaptiveThrottleFactor\":1,\"pressureCause\":\"normal\",\"stateConsistency\":\"distributed\",\"clusterQueueDepth\":0,\"clusterRecentApiLatencyMs\":329.75,\"mitigation\":{\"degradeHeavyFeatures\":false,\"disableRemoteUpdateChecks\":false,\"rejectHeavyMutations\":false,\"featureFlags\":[],\"businessImpact\":[]},\"distributed\":true}\u001b[39m\n",
+        "backend-b": "\u001b[33m[Nest] 17472  - \u001b[39m20/03/2026, 14:24:53 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=reconnecting detalhe=Stream isn't writeable and enableOfflineQueue options is false\u001b[39m\n\u001b[31m[Nest] 17472  - \u001b[39m20/03/2026, 14:24:53 \u001b[31m  ERROR\u001b[39m \u001b[38;5;3m[RedisLockService] \u001b[39m\u001b[31mErro no RedisLockService (standalone(127.0.0.1:46379)): Stream isn't writeable and enableOfflineQueue options is false. Modo degradado ativo.\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:24:55 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=0.94 desired=1 overloadedInstances=0/1\",\"instanceId\":\"backend-b\",\"instanceCount\":1,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":0.94,\"desiredAdaptiveThrottleFactor\":1,\"pressureCause\":\"normal\",\"stateConsistency\":\"local_fallback\",\"clusterQueueDepth\":0,\"clusterRecentApiLatencyMs\":489.67,\"mitigation\":{\"degradeHeavyFeatures\":true,\"disableRemoteUpdateChecks\":false,\"rejectHeavyMutations\":false,\"featureFlags\":[\"degrade-heavy-features\",\"redis-fallback-visible\"],\"businessImpact\":[\"Widgets pesados do dashboard e agregacoes caras podem operar em modo reduzido.\",\"Coordenacao distribuida esta em fallback local; consistencia global reduzida ate a recuperacao do Redis.\"]},\"distributed\":false}\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:24:56 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=0.99 desired=1 overloadedInstances=0/1\",\"instanceId\":\"backend-b\",\"instanceCount\":1,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":0.99,\"desiredAdaptiveThrottleFactor\":1,\"pressureCause\":\"normal\",\"stateConsistency\":\"local_fallback\",\"clusterQueueDepth\":0,\"clusterRecentApiLatencyMs\":489.67,\"mitigation\":{\"degradeHeavyFeatures\":true,\"disableRemoteUpdateChecks\":false,\"rejectHeavyMutations\":false,\"featureFlags\":[\"degrade-heavy-features\",\"redis-fallback-visible\"],\"businessImpact\":[\"Widgets pesados do dashboard e agregacoes caras podem operar em modo reduzido.\",\"Coordenacao distribuida esta em fallback local; consistencia global reduzida ate a recuperacao do Redis.\"]},\"distributed\":false}\u001b[39m\n\u001b[33m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:00 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[CronService] \u001b[39m\u001b[33m[DEGRADED_MODE_EXEC] Redis offline no ciclo 1774027500000 do job system.job_watchdog_evaluator.\u001b[39m\n\u001b[33m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:00 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[CronService] \u001b[39m\u001b[33m[DEGRADED_MODE_EXEC] Job system.job_watchdog_evaluator é idempotente. Prosseguindo com DB Guard.\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:00 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[CronService] \u001b[39m\u001b[32m[LOCK_ACQUIRED] Job system.job_watchdog_evaluator ciclo=1774027500000 instanceId=backend-b\u001b[39m\n\u001b[33m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:00 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[CronService] \u001b[39m\u001b[33m[DEGRADED_MODE_EXEC] Redis offline no ciclo 1774027500000 do job system.operational_alerts_evaluator.\u001b[39m\n\u001b[33m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:00 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[CronService] \u001b[39m\u001b[33m[DEGRADED_MODE_EXEC] Job system.operational_alerts_evaluator é idempotente. Prosseguindo com DB Guard.\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:00 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[CronService] \u001b[39m\u001b[32m[LOCK_ACQUIRED] Job system.operational_alerts_evaluator ciclo=1774027500000 instanceId=backend-b\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:00 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[CronService] \u001b[39m\u001b[32m[EXECUTION_STARTED] Executando callback do cron job: system.job_watchdog_evaluator\u001b[39m\n\u001b[33m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:00 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[CronService] \u001b[39m\u001b[33m[DB_SYNC_FAILED_ABORT] Job system.operational_alerts_evaluator bloqueado pelo Exclusive Guard. cycleId=1774027500000\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:00 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[CronService] \u001b[39m\u001b[32m[EXECUTION_FINISHED] Job system.job_watchdog_evaluator concluído com sucesso.\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:01 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[RedisLockService] \u001b[39m\u001b[32mRedisLockService reconectado.\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:01 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[32mStore operacional distribuido reconectado via standalone(127.0.0.1:46379).\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:01 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=0.99 desired=1 overloadedInstances=0/1\",\"instanceId\":\"backend-b\",\"instanceCount\":1,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":0.99,\"desiredAdaptiveThrottleFactor\":1,\"pressureCause\":\"normal\",\"stateConsistency\":\"distributed\",\"clusterQueueDepth\":0,\"clusterRecentApiLatencyMs\":381.5,\"mitigation\":{\"degradeHeavyFeatures\":false,\"disableRemoteUpdateChecks\":false,\"rejectHeavyMutations\":false,\"featureFlags\":[],\"businessImpact\":[]},\"distributed\":true}\u001b[39m\n"
+      },
+      "instanceCount": 2,
+      "loadApplied": {
+        "sameTenantConcurrentRequests": 2,
+        "holdMs": 1200
+      },
+      "expected": "Cluster deve entrar em modo degradado explicito, expor fallbackActive/detail e nao fingir coordenacao global.",
+      "observed": {
+        "backendA": {
+          "distributedState": {
+            "enabled": true,
+            "valid": true,
+            "configured": true,
+            "mode": "standalone",
+            "ready": false,
+            "fallbackActive": true,
+            "required": false,
+            "fallbackMode": "memory",
+            "status": "connect",
+            "detail": "Stream isn't writeable and enableOfflineQueue options is false"
+          },
+          "lock": {
+            "enabled": true,
+            "valid": true,
+            "configured": true,
+            "mode": "standalone",
+            "ready": false,
+            "fallbackActive": true,
+            "required": false,
+            "fallbackMode": "memory",
+            "status": "connect",
+            "detail": "Stream isn't writeable and enableOfflineQueue options is false"
+          }
+        },
+        "backendB": {
+          "distributedState": {
+            "enabled": true,
+            "valid": true,
+            "configured": true,
+            "mode": "standalone",
+            "ready": false,
+            "fallbackActive": true,
+            "required": false,
+            "fallbackMode": "memory",
+            "status": "connect",
+            "detail": "Stream isn't writeable and enableOfflineQueue options is false"
+          },
+          "lock": {
+            "enabled": true,
+            "valid": true,
+            "configured": true,
+            "mode": "standalone",
+            "ready": false,
+            "fallbackActive": true,
+            "required": false,
+            "fallbackMode": "memory",
+            "status": "connect",
+            "detail": "Stream isn't writeable and enableOfflineQueue options is false"
+          }
+        },
+        "dashboardRedis": {
+          "status": "degraded",
+          "error": "Dependencia Redis mitigada automaticamente sob pressao distribuida."
+        },
+        "alerts": {
+          "instanceId": "backend-a",
+          "emitted": [],
+          "skipped": [
+            "OPS_HIGH_5XX_ERROR_RATE",
+            "OPS_CRITICAL_SLOW_ROUTE",
+            "OPS_ACCESS_DENIED_SPIKE",
+            "OPS_JOB_FAILURE_STORM",
+            "OPS_VERSION_FALLBACK_SPIKE",
+            "OPS_REQUEST_RETRY_STORM",
+            "OPS_RUNTIME_PRESSURE_RECENT",
+            "OPS_QUEUE_SATURATION",
+            "OPS_CIRCUIT_BREAKER_INSTABILITY",
+            "OPS_CORRELATED_OPERATIONAL_DEGRADATION",
+            "OPS_DATABASE_DEGRADED",
+            "OPS_REDIS_DEGRADED",
+            "OPS_FEATURE_MITIGATION_ACTIVE"
+          ]
+        },
+        "sameTenantRequests": [
+          {
+            "label": "tenant-a-down-a",
+            "baseUrl": "http://127.0.0.1:4101",
+            "routePath": "/api/ops-runtime-test/fair-queue/hold?holdMs=1200",
+            "sentAt": "2026-03-20T17:24:56.965Z",
+            "completedAt": "2026-03-20T17:24:57.094Z",
+            "durationMs": 129,
+            "queueWaitMs": 26,
+            "status": 201,
+            "ok": true,
+            "headers": {
+              "access-control-allow-credentials": "true",
+              "access-control-expose-headers": "Content-Type,Content-Length,Content-Encoding,X-Request-Id,X-Trace-Id,Traceparent,Baggage,X-Total-Count,X-API-Version,X-API-Latest-Version,X-API-Supported-Versions,X-API-Deprecated,Deprecation,Sunset,Link,Warning",
+              "baggage": "v=2,tid=91692144-93a5-4551-95a7-4e7e92c9e2fe,uid=d29930d3-e532-4b01-8675-fc6867b76efa",
+              "connection": "keep-alive",
+              "content-length": "447",
+              "content-security-policy": "default-src 'self';style-src 'self' 'unsafe-inline';script-src 'self';img-src 'self' data: https: blob: http://localhost:4000 https://localhost:4000 http://localhost:5000 https://localhost:5000 http://localhost:3000 https://localhost:3000;connect-src 'self' http://localhost:4000 https://localhost:4000 http://localhost:5000 https://localhost:5000 http://localhost:3000 https://localhost:3000 ws://localhost:4000 wss://localhost:4000 ws://localhost:5000 wss://localhost:5000;font-src 'self' data: https://fonts.gstatic.com;object-src 'none';media-src 'self';frame-src 'none';base-uri 'self';form-action 'self';frame-ancestors 'none';script-src-attr 'none';upgrade-insecure-requests",
+              "content-type": "application/json; charset=utf-8",
+              "cross-origin-embedder-policy": "unsafe-none",
+              "cross-origin-opener-policy": "unsafe-none",
+              "cross-origin-resource-policy": "cross-origin",
+              "date": "Fri, 20 Mar 2026 17:24:57 GMT",
+              "etag": "W/\"1bf-UunKA+gfU4n6rw2Ule9suIVEVG0\"",
+              "keep-alive": "timeout=5",
+              "origin-agent-cluster": "?1",
+              "referrer-policy": "strict-origin-when-cross-origin",
+              "traceparent": "00-3dc8d29a083a45bfbaf7ca036e8ecef8-a68d906c48284f7d-01",
+              "vary": "x-api-version, Origin",
+              "x-api-deprecated": "false",
+              "x-api-latest-version": "2",
+              "x-api-supported-versions": "2",
+              "x-api-version": "2",
+              "x-content-type-options": "nosniff",
+              "x-dns-prefetch-control": "off",
+              "x-download-options": "noopen",
+              "x-frame-options": "DENY",
+              "x-permitted-cross-domain-policies": "none",
+              "x-request-id": "68dcf8d1-3bdd-4f90-9b37-20adca5cbf07",
+              "x-trace-id": "3dc8d29a083a45bfbaf7ca036e8ecef8",
+              "x-xss-protection": "0"
+            },
+            "body": {
+              "ok": true,
+              "operation": "fair-queue-hold",
+              "instanceId": "backend-a",
+              "tenantId": "91692144-93a5-4551-95a7-4e7e92c9e2fe",
+              "userId": "d29930d3-e532-4b01-8675-fc6867b76efa",
+              "configuredDelayMs": 100,
+              "startedAt": "2026-03-20T17:24:56.991Z",
+              "completedAt": "2026-03-20T17:24:57.092Z",
+              "durationMs": 101,
+              "trace": {
+                "requestId": "68dcf8d1-3bdd-4f90-9b37-20adca5cbf07",
+                "traceId": "3dc8d29a083a45bfbaf7ca036e8ecef8",
+                "apiVersion": "2",
+                "mitigationFlags": [],
+                "baggageBytes": 85
+              }
+            }
+          },
+          {
+            "label": "tenant-a-down-b",
+            "baseUrl": "http://127.0.0.1:4102",
+            "routePath": "/api/ops-runtime-test/fair-queue/hold?holdMs=1200",
+            "sentAt": "2026-03-20T17:24:56.966Z",
+            "completedAt": "2026-03-20T17:24:57.108Z",
+            "durationMs": 142,
+            "queueWaitMs": 27,
+            "status": 201,
+            "ok": true,
+            "headers": {
+              "access-control-allow-credentials": "true",
+              "access-control-expose-headers": "Content-Type,Content-Length,Content-Encoding,X-Request-Id,X-Trace-Id,Traceparent,Baggage,X-Total-Count,X-API-Version,X-API-Latest-Version,X-API-Supported-Versions,X-API-Deprecated,Deprecation,Sunset,Link,Warning",
+              "baggage": "v=2,tid=91692144-93a5-4551-95a7-4e7e92c9e2fe,uid=d29930d3-e532-4b01-8675-fc6867b76efa",
+              "connection": "keep-alive",
+              "content-length": "447",
+              "content-security-policy": "default-src 'self';style-src 'self' 'unsafe-inline';script-src 'self';img-src 'self' data: https: blob: http://localhost:4000 https://localhost:4000 http://localhost:5000 https://localhost:5000 http://localhost:3000 https://localhost:3000;connect-src 'self' http://localhost:4000 https://localhost:4000 http://localhost:5000 https://localhost:5000 http://localhost:3000 https://localhost:3000 ws://localhost:4000 wss://localhost:4000 ws://localhost:5000 wss://localhost:5000;font-src 'self' data: https://fonts.gstatic.com;object-src 'none';media-src 'self';frame-src 'none';base-uri 'self';form-action 'self';frame-ancestors 'none';script-src-attr 'none';upgrade-insecure-requests",
+              "content-type": "application/json; charset=utf-8",
+              "cross-origin-embedder-policy": "unsafe-none",
+              "cross-origin-opener-policy": "unsafe-none",
+              "cross-origin-resource-policy": "cross-origin",
+              "date": "Fri, 20 Mar 2026 17:24:57 GMT",
+              "etag": "W/\"1bf-sfGLD+bqsWWiRWK9OEdjs91IoaQ\"",
+              "keep-alive": "timeout=5",
+              "origin-agent-cluster": "?1",
+              "referrer-policy": "strict-origin-when-cross-origin",
+              "traceparent": "00-35fd74149edb408fbf95eb67c779573f-f69f18bac79f4d66-01",
+              "vary": "x-api-version, Origin",
+              "x-api-deprecated": "false",
+              "x-api-latest-version": "2",
+              "x-api-supported-versions": "2",
+              "x-api-version": "2",
+              "x-content-type-options": "nosniff",
+              "x-dns-prefetch-control": "off",
+              "x-download-options": "noopen",
+              "x-frame-options": "DENY",
+              "x-permitted-cross-domain-policies": "none",
+              "x-request-id": "53b98937-3d00-4433-8500-d12671c49a72",
+              "x-trace-id": "35fd74149edb408fbf95eb67c779573f",
+              "x-xss-protection": "0"
+            },
+            "body": {
+              "ok": true,
+              "operation": "fair-queue-hold",
+              "instanceId": "backend-b",
+              "tenantId": "91692144-93a5-4551-95a7-4e7e92c9e2fe",
+              "userId": "d29930d3-e532-4b01-8675-fc6867b76efa",
+              "configuredDelayMs": 100,
+              "startedAt": "2026-03-20T17:24:56.993Z",
+              "completedAt": "2026-03-20T17:24:57.104Z",
+              "durationMs": 111,
+              "trace": {
+                "requestId": "53b98937-3d00-4433-8500-d12671c49a72",
+                "traceId": "35fd74149edb408fbf95eb67c779573f",
+                "apiVersion": "2",
+                "mitigationFlags": [],
+                "baggageBytes": 85
+              }
+            }
+          }
+        ],
+        "simultaneousStartDeltaMs": 2
+      }
+    },
+    {
+      "id": "redis-intermittent",
+      "title": "Redis lento e intermitente via Toxiproxy",
+      "startedAt": "2026-03-20T17:25:02.310Z",
+      "finishedAt": "2026-03-20T17:25:08.724Z",
+      "durationMs": 6414,
+      "commands": [],
+      "logs": {
+        "dependency-stub": "",
+        "backend-a": "\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:03 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=connect detalhe=redis-operation-timeout:smembers:operational-request-queue:routes:750ms\u001b[39m\n\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:03 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=connect detalhe=redis-operation-timeout:set:operational-load-shedding:instance:backend-a:750ms\u001b[39m\n\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:03 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=connect detalhe=redis-operation-timeout:sadd:operational-load-shedding:instances:750ms\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:03 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=1 desired=1 overloadedInstances=0/1\",\"instanceId\":\"backend-a\",\"instanceCount\":1,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":1,\"desiredAdaptiveThrottleFactor\":1,\"pressureCause\":\"normal\",\"stateConsistency\":\"local_fallback\",\"clusterQueueDepth\":0,\"clusterRecentApiLatencyMs\":278,\"mitigation\":{\"degradeHeavyFeatures\":true,\"disableRemoteUpdateChecks\":false,\"rejectHeavyMutations\":false,\"featureFlags\":[\"degrade-heavy-features\",\"redis-fallback-visible\"],\"businessImpact\":[\"Widgets pesados do dashboard e agregacoes caras podem operar em modo reduzido.\",\"Coordenacao distribuida esta em fallback local; consistencia global reduzida ate a recuperacao do Redis.\"]},\"distributed\":false}\u001b[39m\n\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:04 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[RedisThrottlerStorage] \u001b[39m\u001b[33mFalha no Redis de rate limit; fallback em memoria ativo. novas tentativas em 15s. detalhe=Stream isn't writeable and enableOfflineQueue options is false\u001b[39m\n\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:04 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[RateLimitMetricsService] \u001b[39m\u001b[33mFalha no Redis de metricas de rate limit; fallback em memoria ativo. novas tentativas em 15s. detalhe=Stream isn't writeable and enableOfflineQueue options is false\u001b[39m\n\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:04 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=reconnecting detalhe=Stream isn't writeable and enableOfflineQueue options is false\u001b[39m\n\u001b[31m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:04 \u001b[31m  ERROR\u001b[39m \u001b[38;5;3m[RedisLockService] \u001b[39m\u001b[31mErro no RedisLockService (standalone(127.0.0.1:46379)): Stream isn't writeable and enableOfflineQueue options is false. Modo degradado ativo.\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:04 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"request_queued\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=700\",\"method\":\"POST\",\"statusCode\":null,\"requestId\":\"41b65cfa-cd8c-4cb7-a72e-f7726b5ad0e8\",\"traceId\":\"0578715ba7b947548e9a9385542504dc\",\"tenantId\":\"91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"userId\":\"d29930d3-e532-4b01-8675-fc6867b76efa\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queued route=ops-runtime-test-fair-queue partition=tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe routeDepth=1 partitionDepth=1\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"routeQueueDepth\":1,\"partitionQueueDepth\":1,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":false}\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:04 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[RedisLockService] \u001b[39m\u001b[32mRedisLockService reconectado.\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:04 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[32mStore operacional distribuido reconectado via standalone(127.0.0.1:46379).\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:04 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[RedisThrottlerStorage] \u001b[39m\u001b[32mRedis de rate limit reconectado; storage distribuido reativado.\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:04 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[RateLimitMetricsService] \u001b[39m\u001b[32mRedis de metricas de rate limit reconectado; persistencia distribuida reativada.\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:05 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=1 desired=1 overloadedInstances=0/2\",\"instanceId\":\"backend-a\",\"instanceCount\":2,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":1,\"desiredAdaptiveThrottleFactor\":1,\"pressureCause\":\"normal\",\"stateConsistency\":\"distributed\",\"clusterQueueDepth\":0,\"clusterRecentApiLatencyMs\":278.13,\"mitigation\":{\"degradeHeavyFeatures\":false,\"disableRemoteUpdateChecks\":false,\"rejectHeavyMutations\":false,\"featureFlags\":[],\"businessImpact\":[]},\"distributed\":true}\u001b[39m\n",
+        "backend-b": "\u001b[33m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:03 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=connect detalhe=redis-operation-timeout:smembers:operational-request-queue:routes:750ms\u001b[39m\n\u001b[33m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:03 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=connect detalhe=redis-operation-timeout:set:operational-load-shedding:instance:backend-b:750ms\u001b[39m\n\u001b[33m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:03 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=connect detalhe=redis-operation-timeout:sadd:operational-load-shedding:instances:750ms\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:03 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=0.99 desired=1 overloadedInstances=0/1\",\"instanceId\":\"backend-b\",\"instanceCount\":1,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":0.99,\"desiredAdaptiveThrottleFactor\":1,\"pressureCause\":\"normal\",\"stateConsistency\":\"local_fallback\",\"clusterQueueDepth\":0,\"clusterRecentApiLatencyMs\":381.5,\"mitigation\":{\"degradeHeavyFeatures\":true,\"disableRemoteUpdateChecks\":false,\"rejectHeavyMutations\":false,\"featureFlags\":[\"degrade-heavy-features\",\"redis-fallback-visible\"],\"businessImpact\":[\"Widgets pesados do dashboard e agregacoes caras podem operar em modo reduzido.\",\"Coordenacao distribuida esta em fallback local; consistencia global reduzida ate a recuperacao do Redis.\"]},\"distributed\":false}\u001b[39m\n\u001b[33m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:04 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=reconnecting detalhe=Stream isn't writeable and enableOfflineQueue options is false\u001b[39m\n\u001b[31m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:04 \u001b[31m  ERROR\u001b[39m \u001b[38;5;3m[RedisLockService] \u001b[39m\u001b[31mErro no RedisLockService (standalone(127.0.0.1:46379)): Stream isn't writeable and enableOfflineQueue options is false. Modo degradado ativo.\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:04 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"request_queued\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=700\",\"method\":\"POST\",\"statusCode\":null,\"requestId\":\"84c3967f-e2ad-403a-8068-ee2e3ba823a8\",\"traceId\":\"060dd90d0ee14fbb9b0ae9908ce63003\",\"tenantId\":\"91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"userId\":\"d29930d3-e532-4b01-8675-fc6867b76efa\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queued route=ops-runtime-test-fair-queue partition=tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe routeDepth=1 partitionDepth=1\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"routeQueueDepth\":1,\"partitionQueueDepth\":1,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":false}\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:04 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[32mStore operacional distribuido reconectado via standalone(127.0.0.1:46379).\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:04 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[RedisLockService] \u001b[39m\u001b[32mRedisLockService reconectado.\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:05 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=0.99 desired=1 overloadedInstances=0/2\",\"instanceId\":\"backend-b\",\"instanceCount\":2,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":0.99,\"desiredAdaptiveThrottleFactor\":1,\"pressureCause\":\"normal\",\"stateConsistency\":\"distributed\",\"clusterQueueDepth\":0,\"clusterRecentApiLatencyMs\":293.41,\"mitigation\":{\"degradeHeavyFeatures\":false,\"disableRemoteUpdateChecks\":false,\"rejectHeavyMutations\":false,\"featureFlags\":[],\"businessImpact\":[]},\"distributed\":true}\u001b[39m\n"
+      },
+      "instanceCount": 2,
+      "loadApplied": {
+        "redisLatencyMs": 1500,
+        "redisTimeoutMs": 900,
+        "trafficRequests": 4
+      },
+      "expected": "Health snapshot e payload operacional devem refletir latencia/falha Redis com degradacao explicita.",
+      "observed": {
+        "traffic": [
+          {
+            "label": "intermittent-1",
+            "baseUrl": "http://127.0.0.1:4101",
+            "routePath": "/api/ops-runtime-test/fair-queue/hold?holdMs=700",
+            "sentAt": "2026-03-20T17:25:04.336Z",
+            "completedAt": "2026-03-20T17:25:04.490Z",
+            "durationMs": 154,
+            "queueWaitMs": 39,
+            "status": 201,
+            "ok": true,
+            "headers": {
+              "access-control-allow-credentials": "true",
+              "access-control-expose-headers": "Content-Type,Content-Length,Content-Encoding,X-Request-Id,X-Trace-Id,Traceparent,Baggage,X-Total-Count,X-API-Version,X-API-Latest-Version,X-API-Supported-Versions,X-API-Deprecated,Deprecation,Sunset,Link,Warning",
+              "baggage": "v=2,tid=91692144-93a5-4551-95a7-4e7e92c9e2fe,uid=d29930d3-e532-4b01-8675-fc6867b76efa",
+              "connection": "keep-alive",
+              "content-length": "447",
+              "content-security-policy": "default-src 'self';style-src 'self' 'unsafe-inline';script-src 'self';img-src 'self' data: https: blob: http://localhost:4000 https://localhost:4000 http://localhost:5000 https://localhost:5000 http://localhost:3000 https://localhost:3000;connect-src 'self' http://localhost:4000 https://localhost:4000 http://localhost:5000 https://localhost:5000 http://localhost:3000 https://localhost:3000 ws://localhost:4000 wss://localhost:4000 ws://localhost:5000 wss://localhost:5000;font-src 'self' data: https://fonts.gstatic.com;object-src 'none';media-src 'self';frame-src 'none';base-uri 'self';form-action 'self';frame-ancestors 'none';script-src-attr 'none';upgrade-insecure-requests",
+              "content-type": "application/json; charset=utf-8",
+              "cross-origin-embedder-policy": "unsafe-none",
+              "cross-origin-opener-policy": "unsafe-none",
+              "cross-origin-resource-policy": "cross-origin",
+              "date": "Fri, 20 Mar 2026 17:25:04 GMT",
+              "etag": "W/\"1bf-/2M2VaYJO1+Dm7lpCgYUFuk7Wp8\"",
+              "keep-alive": "timeout=5",
+              "origin-agent-cluster": "?1",
+              "referrer-policy": "strict-origin-when-cross-origin",
+              "traceparent": "00-5faa898e7f8c4538ba9811a226eb0c4b-ddf3fe36957446f5-01",
+              "vary": "x-api-version, Origin",
+              "x-api-deprecated": "false",
+              "x-api-latest-version": "2",
+              "x-api-supported-versions": "2",
+              "x-api-version": "2",
+              "x-content-type-options": "nosniff",
+              "x-dns-prefetch-control": "off",
+              "x-download-options": "noopen",
+              "x-frame-options": "DENY",
+              "x-permitted-cross-domain-policies": "none",
+              "x-request-id": "0953a704-d129-4338-9038-fbb849708ea6",
+              "x-trace-id": "5faa898e7f8c4538ba9811a226eb0c4b",
+              "x-xss-protection": "0"
+            },
+            "body": {
+              "ok": true,
+              "operation": "fair-queue-hold",
+              "instanceId": "backend-a",
+              "tenantId": "91692144-93a5-4551-95a7-4e7e92c9e2fe",
+              "userId": "d29930d3-e532-4b01-8675-fc6867b76efa",
+              "configuredDelayMs": 100,
+              "startedAt": "2026-03-20T17:25:04.375Z",
+              "completedAt": "2026-03-20T17:25:04.486Z",
+              "durationMs": 111,
+              "trace": {
+                "requestId": "0953a704-d129-4338-9038-fbb849708ea6",
+                "traceId": "5faa898e7f8c4538ba9811a226eb0c4b",
+                "apiVersion": "2",
+                "mitigationFlags": [],
+                "baggageBytes": 85
+              }
+            }
+          },
+          {
+            "label": "intermittent-2",
+            "baseUrl": "http://127.0.0.1:4102",
+            "routePath": "/api/ops-runtime-test/fair-queue/hold?holdMs=700",
+            "sentAt": "2026-03-20T17:25:04.336Z",
+            "completedAt": "2026-03-20T17:25:04.488Z",
+            "durationMs": 152,
+            "queueWaitMs": 37,
+            "status": 201,
+            "ok": true,
+            "headers": {
+              "access-control-allow-credentials": "true",
+              "access-control-expose-headers": "Content-Type,Content-Length,Content-Encoding,X-Request-Id,X-Trace-Id,Traceparent,Baggage,X-Total-Count,X-API-Version,X-API-Latest-Version,X-API-Supported-Versions,X-API-Deprecated,Deprecation,Sunset,Link,Warning",
+              "baggage": "v=2,tid=91692144-93a5-4551-95a7-4e7e92c9e2fe,uid=d29930d3-e532-4b01-8675-fc6867b76efa",
+              "connection": "keep-alive",
+              "content-length": "447",
+              "content-security-policy": "default-src 'self';style-src 'self' 'unsafe-inline';script-src 'self';img-src 'self' data: https: blob: http://localhost:4000 https://localhost:4000 http://localhost:5000 https://localhost:5000 http://localhost:3000 https://localhost:3000;connect-src 'self' http://localhost:4000 https://localhost:4000 http://localhost:5000 https://localhost:5000 http://localhost:3000 https://localhost:3000 ws://localhost:4000 wss://localhost:4000 ws://localhost:5000 wss://localhost:5000;font-src 'self' data: https://fonts.gstatic.com;object-src 'none';media-src 'self';frame-src 'none';base-uri 'self';form-action 'self';frame-ancestors 'none';script-src-attr 'none';upgrade-insecure-requests",
+              "content-type": "application/json; charset=utf-8",
+              "cross-origin-embedder-policy": "unsafe-none",
+              "cross-origin-opener-policy": "unsafe-none",
+              "cross-origin-resource-policy": "cross-origin",
+              "date": "Fri, 20 Mar 2026 17:25:04 GMT",
+              "etag": "W/\"1bf-3K3N+QaJhLW0jWwltw3qZfe0Lnk\"",
+              "keep-alive": "timeout=5",
+              "origin-agent-cluster": "?1",
+              "referrer-policy": "strict-origin-when-cross-origin",
+              "traceparent": "00-1c2385d6ef744fd0a1e4b1987f361a71-ee0acc2256a84133-01",
+              "vary": "x-api-version, Origin",
+              "x-api-deprecated": "false",
+              "x-api-latest-version": "2",
+              "x-api-supported-versions": "2",
+              "x-api-version": "2",
+              "x-content-type-options": "nosniff",
+              "x-dns-prefetch-control": "off",
+              "x-download-options": "noopen",
+              "x-frame-options": "DENY",
+              "x-permitted-cross-domain-policies": "none",
+              "x-request-id": "2c79941b-64fe-444d-aff5-54d39a54f7d8",
+              "x-trace-id": "1c2385d6ef744fd0a1e4b1987f361a71",
+              "x-xss-protection": "0"
+            },
+            "body": {
+              "ok": true,
+              "operation": "fair-queue-hold",
+              "instanceId": "backend-b",
+              "tenantId": "91692144-93a5-4551-95a7-4e7e92c9e2fe",
+              "userId": "d29930d3-e532-4b01-8675-fc6867b76efa",
+              "configuredDelayMs": 100,
+              "startedAt": "2026-03-20T17:25:04.373Z",
+              "completedAt": "2026-03-20T17:25:04.486Z",
+              "durationMs": 113,
+              "trace": {
+                "requestId": "2c79941b-64fe-444d-aff5-54d39a54f7d8",
+                "traceId": "1c2385d6ef744fd0a1e4b1987f361a71",
+                "apiVersion": "2",
+                "mitigationFlags": [],
+                "baggageBytes": 85
+              }
+            }
+          },
+          {
+            "label": "intermittent-3",
+            "baseUrl": "http://127.0.0.1:4101",
+            "routePath": "/api/ops-runtime-test/fair-queue/hold?holdMs=700",
+            "sentAt": "2026-03-20T17:25:04.337Z",
+            "completedAt": "2026-03-20T17:25:04.608Z",
+            "durationMs": 271,
+            "queueWaitMs": 167,
+            "status": 201,
+            "ok": true,
+            "headers": {
+              "access-control-allow-credentials": "true",
+              "access-control-expose-headers": "Content-Type,Content-Length,Content-Encoding,X-Request-Id,X-Trace-Id,Traceparent,Baggage,X-Total-Count,X-API-Version,X-API-Latest-Version,X-API-Supported-Versions,X-API-Deprecated,Deprecation,Sunset,Link,Warning",
+              "baggage": "v=2,tid=91692144-93a5-4551-95a7-4e7e92c9e2fe,uid=d29930d3-e532-4b01-8675-fc6867b76efa",
+              "connection": "keep-alive",
+              "content-length": "447",
+              "content-security-policy": "default-src 'self';style-src 'self' 'unsafe-inline';script-src 'self';img-src 'self' data: https: blob: http://localhost:4000 https://localhost:4000 http://localhost:5000 https://localhost:5000 http://localhost:3000 https://localhost:3000;connect-src 'self' http://localhost:4000 https://localhost:4000 http://localhost:5000 https://localhost:5000 http://localhost:3000 https://localhost:3000 ws://localhost:4000 wss://localhost:4000 ws://localhost:5000 wss://localhost:5000;font-src 'self' data: https://fonts.gstatic.com;object-src 'none';media-src 'self';frame-src 'none';base-uri 'self';form-action 'self';frame-ancestors 'none';script-src-attr 'none';upgrade-insecure-requests",
+              "content-type": "application/json; charset=utf-8",
+              "cross-origin-embedder-policy": "unsafe-none",
+              "cross-origin-opener-policy": "unsafe-none",
+              "cross-origin-resource-policy": "cross-origin",
+              "date": "Fri, 20 Mar 2026 17:25:04 GMT",
+              "etag": "W/\"1bf-TAlT/tzcxjFWjm+tqSolePIrLQk\"",
+              "keep-alive": "timeout=5",
+              "origin-agent-cluster": "?1",
+              "referrer-policy": "strict-origin-when-cross-origin",
+              "traceparent": "00-0578715ba7b947548e9a9385542504dc-e3fb9661a8c74680-01",
+              "vary": "x-api-version, Origin",
+              "x-api-deprecated": "false",
+              "x-api-latest-version": "2",
+              "x-api-supported-versions": "2",
+              "x-api-version": "2",
+              "x-content-type-options": "nosniff",
+              "x-dns-prefetch-control": "off",
+              "x-download-options": "noopen",
+              "x-frame-options": "DENY",
+              "x-permitted-cross-domain-policies": "none",
+              "x-request-id": "41b65cfa-cd8c-4cb7-a72e-f7726b5ad0e8",
+              "x-trace-id": "0578715ba7b947548e9a9385542504dc",
+              "x-xss-protection": "0"
+            },
+            "body": {
+              "ok": true,
+              "operation": "fair-queue-hold",
+              "instanceId": "backend-a",
+              "tenantId": "91692144-93a5-4551-95a7-4e7e92c9e2fe",
+              "userId": "d29930d3-e532-4b01-8675-fc6867b76efa",
+              "configuredDelayMs": 100,
+              "startedAt": "2026-03-20T17:25:04.504Z",
+              "completedAt": "2026-03-20T17:25:04.605Z",
+              "durationMs": 101,
+              "trace": {
+                "requestId": "41b65cfa-cd8c-4cb7-a72e-f7726b5ad0e8",
+                "traceId": "0578715ba7b947548e9a9385542504dc",
+                "apiVersion": "2",
+                "mitigationFlags": [],
+                "baggageBytes": 85
+              }
+            }
+          },
+          {
+            "label": "intermittent-4",
+            "baseUrl": "http://127.0.0.1:4102",
+            "routePath": "/api/ops-runtime-test/fair-queue/hold?holdMs=700",
+            "sentAt": "2026-03-20T17:25:04.337Z",
+            "completedAt": "2026-03-20T17:25:04.609Z",
+            "durationMs": 272,
+            "queueWaitMs": 166,
+            "status": 201,
+            "ok": true,
+            "headers": {
+              "access-control-allow-credentials": "true",
+              "access-control-expose-headers": "Content-Type,Content-Length,Content-Encoding,X-Request-Id,X-Trace-Id,Traceparent,Baggage,X-Total-Count,X-API-Version,X-API-Latest-Version,X-API-Supported-Versions,X-API-Deprecated,Deprecation,Sunset,Link,Warning",
+              "baggage": "v=2,tid=91692144-93a5-4551-95a7-4e7e92c9e2fe,uid=d29930d3-e532-4b01-8675-fc6867b76efa",
+              "connection": "keep-alive",
+              "content-length": "447",
+              "content-security-policy": "default-src 'self';style-src 'self' 'unsafe-inline';script-src 'self';img-src 'self' data: https: blob: http://localhost:4000 https://localhost:4000 http://localhost:5000 https://localhost:5000 http://localhost:3000 https://localhost:3000;connect-src 'self' http://localhost:4000 https://localhost:4000 http://localhost:5000 https://localhost:5000 http://localhost:3000 https://localhost:3000 ws://localhost:4000 wss://localhost:4000 ws://localhost:5000 wss://localhost:5000;font-src 'self' data: https://fonts.gstatic.com;object-src 'none';media-src 'self';frame-src 'none';base-uri 'self';form-action 'self';frame-ancestors 'none';script-src-attr 'none';upgrade-insecure-requests",
+              "content-type": "application/json; charset=utf-8",
+              "cross-origin-embedder-policy": "unsafe-none",
+              "cross-origin-opener-policy": "unsafe-none",
+              "cross-origin-resource-policy": "cross-origin",
+              "date": "Fri, 20 Mar 2026 17:25:04 GMT",
+              "etag": "W/\"1bf-sG+SMimuKilgL6AU9JlwNd2W9Sk\"",
+              "keep-alive": "timeout=5",
+              "origin-agent-cluster": "?1",
+              "referrer-policy": "strict-origin-when-cross-origin",
+              "traceparent": "00-060dd90d0ee14fbb9b0ae9908ce63003-e6fd637ee7cd4893-01",
+              "vary": "x-api-version, Origin",
+              "x-api-deprecated": "false",
+              "x-api-latest-version": "2",
+              "x-api-supported-versions": "2",
+              "x-api-version": "2",
+              "x-content-type-options": "nosniff",
+              "x-dns-prefetch-control": "off",
+              "x-download-options": "noopen",
+              "x-frame-options": "DENY",
+              "x-permitted-cross-domain-policies": "none",
+              "x-request-id": "84c3967f-e2ad-403a-8068-ee2e3ba823a8",
+              "x-trace-id": "060dd90d0ee14fbb9b0ae9908ce63003",
+              "x-xss-protection": "0"
+            },
+            "body": {
+              "ok": true,
+              "operation": "fair-queue-hold",
+              "instanceId": "backend-b",
+              "tenantId": "91692144-93a5-4551-95a7-4e7e92c9e2fe",
+              "userId": "d29930d3-e532-4b01-8675-fc6867b76efa",
+              "configuredDelayMs": 100,
+              "startedAt": "2026-03-20T17:25:04.503Z",
+              "completedAt": "2026-03-20T17:25:04.605Z",
+              "durationMs": 102,
+              "trace": {
+                "requestId": "84c3967f-e2ad-403a-8068-ee2e3ba823a8",
+                "traceId": "060dd90d0ee14fbb9b0ae9908ce63003",
+                "apiVersion": "2",
+                "mitigationFlags": [],
+                "baggageBytes": 85
+              }
+            }
+          }
+        ],
+        "backendA": {
+          "distributedState": {
+            "enabled": true,
+            "valid": true,
+            "configured": true,
+            "mode": "standalone",
+            "ready": false,
+            "fallbackActive": true,
+            "required": false,
+            "fallbackMode": "memory",
+            "status": "connect",
+            "detail": "Stream isn't writeable and enableOfflineQueue options is false"
+          },
+          "lock": {
+            "enabled": true,
+            "valid": true,
+            "configured": true,
+            "mode": "standalone",
+            "ready": false,
+            "fallbackActive": true,
+            "required": false,
+            "fallbackMode": "memory",
+            "status": "connect",
+            "detail": "Stream isn't writeable and enableOfflineQueue options is false"
+          }
+        },
+        "backendB": {
+          "distributedState": {
+            "enabled": true,
+            "valid": true,
+            "configured": true,
+            "mode": "standalone",
+            "ready": false,
+            "fallbackActive": true,
+            "required": false,
+            "fallbackMode": "memory",
+            "status": "connect",
+            "detail": "Stream isn't writeable and enableOfflineQueue options is false"
+          },
+          "lock": {
+            "enabled": true,
+            "valid": true,
+            "configured": true,
+            "mode": "standalone",
+            "ready": false,
+            "fallbackActive": true,
+            "required": false,
+            "fallbackMode": "memory",
+            "status": "connect",
+            "detail": "Stream isn't writeable and enableOfflineQueue options is false"
+          }
+        },
+        "dashboardRedis": {
+          "status": "degraded",
+          "error": "Dependencia Redis mitigada automaticamente sob pressao distribuida."
+        },
+        "stateConsistency": {
+          "backendA": "local_fallback",
+          "backendB": "local_fallback"
+        }
+      }
+    },
+    {
+      "id": "breaker-quorum",
+      "title": "Breaker distribuido com quorum",
+      "startedAt": "2026-03-20T17:25:08.724Z",
+      "finishedAt": "2026-03-20T17:25:13.704Z",
+      "durationMs": 4980,
+      "commands": [],
+      "logs": {
+        "dependency-stub": "",
+        "backend-a": "\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:09 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[33m{\"event\":\"operational-observability\",\"type\":\"circuit_open\",\"route\":\"/ops-runtime-test/dependency/check\",\"method\":\"GET\",\"statusCode\":null,\"requestId\":\"2331ef04-54f4-47d6-b6e8-d920fa27eda1\",\"traceId\":\"99d09b63c3164df3bf954f8dfafd582a\",\"tenantId\":\"ef1fa0f9-7362-4cc9-a89d-61e19e9c4e51\",\"userId\":\"608575e0-5ffb-41a1-866a-51beac7d3886\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"circuit open key=dependency:ops-runtime-test retryAfterMs=3946\",\"key\":\"dependency:ops-runtime-test\",\"mode\":\"open\",\"retryAfterMs\":3946,\"openCount\":1,\"distributed\":true}\u001b[39m\n\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:13 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[33m{\"event\":\"operational-observability\",\"type\":\"circuit_half_open\",\"route\":\"/ops-runtime-test/dependency/check\",\"method\":\"GET\",\"statusCode\":null,\"requestId\":\"b4e638a6-eb79-4f9e-8cb2-d4b01896d7ed\",\"traceId\":\"3e3bef3e0c21424d908ed7d911385c8b\",\"tenantId\":\"ef1fa0f9-7362-4cc9-a89d-61e19e9c4e51\",\"userId\":\"608575e0-5ffb-41a1-866a-51beac7d3886\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"circuit half-open key=dependency:ops-runtime-test probes=2\",\"key\":\"dependency:ops-runtime-test\",\"halfOpenMaxProbes\":2,\"halfOpenSuccessThreshold\":2,\"failureQuorum\":2,\"recoveryQuorum\":2,\"openCount\":1,\"distributed\":true}\u001b[39m\n",
+        "backend-b": "\u001b[33m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:08 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[33m{\"event\":\"operational-observability\",\"type\":\"circuit_open\",\"route\":\"/ops-runtime-test/dependency/check\",\"method\":\"GET\",\"statusCode\":null,\"requestId\":\"c637800e-8563-4fbd-8eae-482e294ba5a5\",\"traceId\":\"001b52d567ea4a6c9c4ce5f540e11c58\",\"tenantId\":\"ef1fa0f9-7362-4cc9-a89d-61e19e9c4e51\",\"userId\":\"608575e0-5ffb-41a1-866a-51beac7d3886\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"circuit opened key=dependency:ops-runtime-test failures=2 openCount=1\",\"key\":\"dependency:ops-runtime-test\",\"failures\":2,\"openCount\":1,\"failureVoters\":2,\"failureQuorum\":2,\"openedUntil\":1774027512958,\"distributed\":true}\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:13 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"circuit_recovered\",\"route\":\"/ops-runtime-test/dependency/check\",\"method\":\"GET\",\"statusCode\":null,\"requestId\":\"2627b56a-d2cf-4643-8cfc-ddf5bb2c94c3\",\"traceId\":\"dec4f561ab764f9e99138a072b750d3f\",\"tenantId\":\"ef1fa0f9-7362-4cc9-a89d-61e19e9c4e51\",\"userId\":\"608575e0-5ffb-41a1-866a-51beac7d3886\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"circuit recovered key=dependency:ops-runtime-test\",\"key\":\"dependency:ops-runtime-test\",\"openCount\":0,\"failures\":0,\"recoveryVoters\":0,\"distributed\":true}\u001b[39m\n"
+      },
+      "instanceCount": 2,
+      "expected": "Uma falha isolada nao deve abrir circuito; duas instancias votando devem abrir, half-open deve permitir probes limitados e recuperar gradualmente.",
+      "observed": {
+        "firstFailure": {
+          "ok": false,
+          "statusCode": 502,
+          "mode": "failure",
+          "instanceId": "backend-a",
+          "durationMs": 75,
+          "tenantId": "ef1fa0f9-7362-4cc9-a89d-61e19e9c4e51",
+          "trace": {
+            "requestId": "bd33748a-8046-4c14-9783-996a95a8cdb4",
+            "traceId": "40148a0e0603495187209e7152f2af58",
+            "apiVersion": "2",
+            "mitigationFlags": [],
+            "baggageBytes": 85
+          },
+          "breaker": {
+            "key": "dependency:ops-runtime-test",
+            "mode": "closed",
+            "failures": 1,
+            "openCount": 0,
+            "openedUntil": null,
+            "halfOpenInFlight": 0,
+            "halfOpenProbeAttempts": 0,
+            "halfOpenSuccesses": 0,
+            "consecutiveSuccesses": 0,
+            "lastTransitionAt": 1774027508787,
+            "failureVoters": 1,
+            "recoveryVoters": 0
+          },
+          "error": {
+            "message": "Dependencia de teste respondeu 503"
+          }
+        },
+        "secondFailure": {
+          "ok": false,
+          "statusCode": 502,
+          "mode": "failure",
+          "instanceId": "backend-b",
+          "durationMs": 78,
+          "tenantId": "ef1fa0f9-7362-4cc9-a89d-61e19e9c4e51",
+          "trace": {
+            "requestId": "c637800e-8563-4fbd-8eae-482e294ba5a5",
+            "traceId": "001b52d567ea4a6c9c4ce5f540e11c58",
+            "apiVersion": "2",
+            "mitigationFlags": [],
+            "baggageBytes": 85
+          },
+          "breaker": {
+            "key": "dependency:ops-runtime-test",
+            "mode": "open",
+            "failures": 2,
+            "openCount": 1,
+            "openedUntil": 1774027512958,
+            "halfOpenInFlight": 0,
+            "halfOpenProbeAttempts": 0,
+            "halfOpenSuccesses": 0,
+            "consecutiveSuccesses": 0,
+            "lastTransitionAt": 1774027508974,
+            "failureVoters": 2,
+            "recoveryVoters": 0
+          },
+          "error": {
+            "message": "Dependencia de teste respondeu 503"
+          }
+        },
+        "circuitOpen": {
+          "ok": false,
+          "statusCode": 503,
+          "mode": "circuit-open",
+          "instanceId": "backend-a",
+          "durationMs": 8,
+          "tenantId": "ef1fa0f9-7362-4cc9-a89d-61e19e9c4e51",
+          "trace": {
+            "requestId": "2331ef04-54f4-47d6-b6e8-d920fa27eda1",
+            "traceId": "99d09b63c3164df3bf954f8dfafd582a",
+            "apiVersion": "2",
+            "mitigationFlags": [],
+            "baggageBytes": 85
+          },
+          "breaker": {
+            "key": "dependency:ops-runtime-test",
+            "mode": "open",
+            "failures": 2,
+            "openCount": 1,
+            "openedUntil": 1774027512958,
+            "halfOpenInFlight": 0,
+            "halfOpenProbeAttempts": 0,
+            "halfOpenSuccesses": 0,
+            "consecutiveSuccesses": 0,
+            "lastTransitionAt": 1774027508974,
+            "failureVoters": 2,
+            "recoveryVoters": 0
+          },
+          "error": {
+            "message": "Circuit breaker aberto para dependency:ops-runtime-test",
+            "retryAfterMs": 3946
+          }
+        },
+        "recoveryProbeA": {
+          "ok": true,
+          "statusCode": 200,
+          "mode": "ok",
+          "instanceId": "backend-a",
+          "durationMs": 29,
+          "tenantId": "ef1fa0f9-7362-4cc9-a89d-61e19e9c4e51",
+          "trace": {
+            "requestId": "b4e638a6-eb79-4f9e-8cb2-d4b01896d7ed",
+            "traceId": "3e3bef3e0c21424d908ed7d911385c8b",
+            "apiVersion": "2",
+            "mitigationFlags": [],
+            "baggageBytes": 85
+          },
+          "breaker": {
+            "key": "dependency:ops-runtime-test",
+            "mode": "half-open",
+            "failures": 2,
+            "openCount": 1,
+            "openedUntil": 1774027512958,
+            "halfOpenInFlight": 0,
+            "halfOpenProbeAttempts": 1,
+            "halfOpenSuccesses": 1,
+            "consecutiveSuccesses": 1,
+            "lastTransitionAt": 1774027513569,
+            "failureVoters": 1,
+            "recoveryVoters": 1
+          },
+          "dependency": {
+            "url": "http://127.0.0.1:46460/dependency",
+            "status": 200,
+            "body": {
+              "ok": true,
+              "mode": "ok",
+              "delayedMs": 0
+            },
+            "traceHeaders": {
+              "x-request-id": "b4e638a6-eb79-4f9e-8cb2-d4b01896d7ed",
+              "x-trace-id": "3e3bef3e0c21424d908ed7d911385c8b",
+              "traceparent": "00-3e3bef3e0c21424d908ed7d911385c8b-79b36b1a91d14225-01",
+              "baggage": "v=2,tid=ef1fa0f9-7362-4cc9-a89d-61e19e9c4e51,uid=608575e0-5ffb-41a1-866a-51beac7d3886"
+            }
+          }
+        },
+        "recoveryProbeB": {
+          "ok": true,
+          "statusCode": 200,
+          "mode": "ok",
+          "instanceId": "backend-b",
+          "durationMs": 33,
+          "tenantId": "ef1fa0f9-7362-4cc9-a89d-61e19e9c4e51",
+          "trace": {
+            "requestId": "2627b56a-d2cf-4643-8cfc-ddf5bb2c94c3",
+            "traceId": "dec4f561ab764f9e99138a072b750d3f",
+            "apiVersion": "2",
+            "mitigationFlags": [],
+            "baggageBytes": 85
+          },
+          "breaker": {
+            "key": "dependency:ops-runtime-test",
+            "mode": "closed",
+            "failures": 0,
+            "openCount": 0,
+            "openedUntil": null,
+            "halfOpenInFlight": 0,
+            "halfOpenProbeAttempts": 0,
+            "halfOpenSuccesses": 0,
+            "consecutiveSuccesses": 2,
+            "lastTransitionAt": 1774027513647,
+            "failureVoters": 0,
+            "recoveryVoters": 0
+          },
+          "dependency": {
+            "url": "http://127.0.0.1:46460/dependency",
+            "status": 200,
+            "body": {
+              "ok": true,
+              "mode": "ok",
+              "delayedMs": 0
+            },
+            "traceHeaders": {
+              "x-request-id": "2627b56a-d2cf-4643-8cfc-ddf5bb2c94c3",
+              "x-trace-id": "dec4f561ab764f9e99138a072b750d3f",
+              "traceparent": "00-dec4f561ab764f9e99138a072b750d3f-98f17bb8439249ef-01",
+              "baggage": "v=2,tid=ef1fa0f9-7362-4cc9-a89d-61e19e9c4e51,uid=608575e0-5ffb-41a1-866a-51beac7d3886"
+            }
+          }
+        },
+        "recovered": {
+          "ok": true,
+          "statusCode": 200,
+          "mode": "ok",
+          "instanceId": "backend-a",
+          "durationMs": 20,
+          "tenantId": "ef1fa0f9-7362-4cc9-a89d-61e19e9c4e51",
+          "trace": {
+            "requestId": "f8dab99d-55a2-471c-8ecf-8f550b3c96b7",
+            "traceId": "c04111e5db514c53a24755a067e66560",
+            "apiVersion": "2",
+            "mitigationFlags": [],
+            "baggageBytes": 85
+          },
+          "breaker": {
+            "key": "dependency:ops-runtime-test",
+            "mode": "closed",
+            "failures": 0,
+            "openCount": 0,
+            "openedUntil": null,
+            "halfOpenInFlight": 0,
+            "halfOpenProbeAttempts": 0,
+            "halfOpenSuccesses": 0,
+            "consecutiveSuccesses": 3,
+            "lastTransitionAt": 1774027513694,
+            "failureVoters": 0,
+            "recoveryVoters": 0
+          },
+          "dependency": {
+            "url": "http://127.0.0.1:46460/dependency",
+            "status": 200,
+            "body": {
+              "ok": true,
+              "mode": "ok",
+              "delayedMs": 0
+            },
+            "traceHeaders": {
+              "x-request-id": "f8dab99d-55a2-471c-8ecf-8f550b3c96b7",
+              "x-trace-id": "c04111e5db514c53a24755a067e66560",
+              "traceparent": "00-c04111e5db514c53a24755a067e66560-7fb26c7e6c2e46dc-01",
+              "baggage": "v=2,tid=ef1fa0f9-7362-4cc9-a89d-61e19e9c4e51,uid=608575e0-5ffb-41a1-866a-51beac7d3886"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "granular-shedding",
+      "title": "Shedding granular por tenant e rota",
+      "startedAt": "2026-03-20T17:25:13.704Z",
+      "finishedAt": "2026-03-20T17:25:15.494Z",
+      "durationMs": 1790,
+      "commands": [],
+      "logs": {
+        "dependency-stub": "",
+        "backend-a": "",
+        "backend-b": ""
+      },
+      "instanceCount": 2,
+      "loadApplied": {
+        "tenantAHammerRequests": 22,
+        "route": "/api/ops-runtime-test/rate-limit/ping"
+      },
+      "expected": "Tenant pesado deve receber factor reduzido e causa tenant-route, enquanto tenant leve permanece sem penalizacao injusta.",
+      "observed": {
+        "hammer": {
+          "total": 22,
+          "blocked": 0,
+          "adaptiveFactors": []
+        },
+        "tenantAContext": {
+          "instanceId": "backend-a",
+          "tenantId": "91692144-93a5-4551-95a7-4e7e92c9e2fe",
+          "path": "/api/ops-runtime-test/rate-limit/ping",
+          "trace": {
+            "requestId": "e4b2fcca-264d-4320-9f5e-d5d262f5a789",
+            "traceId": "e5eab9920b83482893d677ecd08de44b",
+            "apiVersion": "2",
+            "mitigationFlags": [],
+            "baggageBytes": 85
+          },
+          "factor": 1,
+          "cause": null,
+          "scope": "cluster",
+          "signalScore": 0,
+          "snapshot": {
+            "instanceId": "backend-a",
+            "instanceCount": 2,
+            "overloadedInstances": 0,
+            "adaptiveThrottleFactor": 1,
+            "desiredAdaptiveThrottleFactor": 1,
+            "pressureCause": "normal",
+            "stateConsistency": "distributed",
+            "local": {
+              "eventLoopLagP95Ms": 35.16,
+              "eventLoopLagP99Ms": 35.36,
+              "eventLoopLagMaxMs": 35.36,
+              "eventLoopUtilization": 0.0212,
+              "heapUsedRatio": 0.9061,
+              "recentApiLatencyMs": 132.32,
+              "gcPauseP95Ms": 14.14,
+              "gcPauseMaxMs": 15.26,
+              "gcEventsRecent": 21,
+              "queueDepth": 0,
+              "activeIsolatedRequests": 0,
+              "pressureScore": 0,
+              "consecutiveBreaches": 0,
+              "adaptiveThrottleFactor": 1,
+              "cause": "normal",
+              "overloaded": false
+            },
+            "clusterRecentApiLatencyMs": 139.47,
+            "clusterQueueDepth": 0,
+            "mitigation": {
+              "degradeHeavyFeatures": false,
+              "disableRemoteUpdateChecks": false,
+              "rejectHeavyMutations": false,
+              "featureFlags": [],
+              "businessImpact": []
+            }
+          }
+        },
+        "tenantBContext": {
+          "instanceId": "backend-a",
+          "tenantId": "85f81757-b348-4203-a667-f4af808a38db",
+          "path": "/api/ops-runtime-test/rate-limit/ping",
+          "trace": {
+            "requestId": "102e3b39-8ee3-484c-aeee-39b03b3dd93f",
+            "traceId": "9cf7965f364e4cfab43ec02956cc4033",
+            "apiVersion": "2",
+            "mitigationFlags": [],
+            "baggageBytes": 85
+          },
+          "factor": 1,
+          "cause": null,
+          "scope": "cluster",
+          "signalScore": 0,
+          "snapshot": {
+            "instanceId": "backend-a",
+            "instanceCount": 2,
+            "overloadedInstances": 0,
+            "adaptiveThrottleFactor": 1,
+            "desiredAdaptiveThrottleFactor": 1,
+            "pressureCause": "normal",
+            "stateConsistency": "distributed",
+            "local": {
+              "eventLoopLagP95Ms": 35.16,
+              "eventLoopLagP99Ms": 35.36,
+              "eventLoopLagMaxMs": 35.36,
+              "eventLoopUtilization": 0.0212,
+              "heapUsedRatio": 0.9061,
+              "recentApiLatencyMs": 132.32,
+              "gcPauseP95Ms": 14.14,
+              "gcPauseMaxMs": 15.26,
+              "gcEventsRecent": 21,
+              "queueDepth": 0,
+              "activeIsolatedRequests": 0,
+              "pressureScore": 0,
+              "consecutiveBreaches": 0,
+              "adaptiveThrottleFactor": 1,
+              "cause": "normal",
+              "overloaded": false
+            },
+            "clusterRecentApiLatencyMs": 139.47,
+            "clusterQueueDepth": 0,
+            "mitigation": {
+              "degradeHeavyFeatures": false,
+              "disableRemoteUpdateChecks": false,
+              "rejectHeavyMutations": false,
+              "featureFlags": [],
+              "businessImpact": []
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "adaptive-rate-limit",
+      "title": "Throttling adaptativo com smoothing e hysteresis",
+      "startedAt": "2026-03-20T17:25:15.494Z",
+      "finishedAt": "2026-03-20T17:25:27.066Z",
+      "durationMs": 11572,
+      "commands": [],
+      "logs": {
+        "dependency-stub": "",
+        "backend-a": "",
+        "backend-b": ""
+      },
+      "instanceCount": 2,
+      "loadApplied": {
+        "slowRequests": 8,
+        "delayMs": 1900
+      },
+      "expected": "Adaptive factor deve cair com suavizacao, nao oscilar agressivamente e recuperar de forma gradual apos estabilidade.",
+      "observed": {
+        "underLoadSamples": [
+          {
+            "at": "2026-03-20T17:25:15.545Z",
+            "adaptiveThrottleFactor": 1,
+            "desiredAdaptiveThrottleFactor": 1,
+            "pressureCause": "normal",
+            "clusterRecentApiLatencyMs": 139.47,
+            "clusterQueueDepth": 0,
+            "featureFlags": []
+          },
+          {
+            "at": "2026-03-20T17:25:16.606Z",
+            "adaptiveThrottleFactor": 1,
+            "desiredAdaptiveThrottleFactor": 1,
+            "pressureCause": "normal",
+            "clusterRecentApiLatencyMs": 133.8,
+            "clusterQueueDepth": 0,
+            "featureFlags": []
+          },
+          {
+            "at": "2026-03-20T17:25:17.638Z",
+            "adaptiveThrottleFactor": 1,
+            "desiredAdaptiveThrottleFactor": 1,
+            "pressureCause": "normal",
+            "clusterRecentApiLatencyMs": 132.13,
+            "clusterQueueDepth": 0,
+            "featureFlags": []
+          },
+          {
+            "at": "2026-03-20T17:25:18.690Z",
+            "adaptiveThrottleFactor": 1,
+            "desiredAdaptiveThrottleFactor": 1,
+            "pressureCause": "normal",
+            "clusterRecentApiLatencyMs": 346.14,
+            "clusterQueueDepth": 0,
+            "featureFlags": []
+          },
+          {
+            "at": "2026-03-20T17:25:19.741Z",
+            "adaptiveThrottleFactor": 1,
+            "desiredAdaptiveThrottleFactor": 1,
+            "pressureCause": "normal",
+            "clusterRecentApiLatencyMs": 342.6,
+            "clusterQueueDepth": 0,
+            "featureFlags": []
+          },
+          {
+            "at": "2026-03-20T17:25:20.791Z",
+            "adaptiveThrottleFactor": 1,
+            "desiredAdaptiveThrottleFactor": 1,
+            "pressureCause": "normal",
+            "clusterRecentApiLatencyMs": 339.23,
+            "clusterQueueDepth": 0,
+            "featureFlags": []
+          }
+        ],
+        "recoverySamples": [
+          {
+            "at": "2026-03-20T17:25:21.835Z",
+            "adaptiveThrottleFactor": 1,
+            "desiredAdaptiveThrottleFactor": 1,
+            "pressureCause": "normal",
+            "clusterRecentApiLatencyMs": 336.01,
+            "clusterQueueDepth": 0,
+            "featureFlags": []
+          },
+          {
+            "at": "2026-03-20T17:25:22.882Z",
+            "adaptiveThrottleFactor": 1,
+            "desiredAdaptiveThrottleFactor": 1,
+            "pressureCause": "normal",
+            "clusterRecentApiLatencyMs": 332.94,
+            "clusterQueueDepth": 0,
+            "featureFlags": []
+          },
+          {
+            "at": "2026-03-20T17:25:23.916Z",
+            "adaptiveThrottleFactor": 1,
+            "desiredAdaptiveThrottleFactor": 1,
+            "pressureCause": "normal",
+            "clusterRecentApiLatencyMs": 330.01,
+            "clusterQueueDepth": 0,
+            "featureFlags": []
+          },
+          {
+            "at": "2026-03-20T17:25:24.964Z",
+            "adaptiveThrottleFactor": 1,
+            "desiredAdaptiveThrottleFactor": 1,
+            "pressureCause": "normal",
+            "clusterRecentApiLatencyMs": 327.2,
+            "clusterQueueDepth": 0,
+            "featureFlags": []
+          },
+          {
+            "at": "2026-03-20T17:25:26.005Z",
+            "adaptiveThrottleFactor": 1,
+            "desiredAdaptiveThrottleFactor": 1,
+            "pressureCause": "normal",
+            "clusterRecentApiLatencyMs": 324.52,
+            "clusterQueueDepth": 0,
+            "featureFlags": []
+          }
+        ],
+        "rateLimitHeaders": [
+          {
+            "status": 200,
+            "adaptiveFactor": null,
+            "pressureCause": null
+          },
+          {
+            "status": 200,
+            "adaptiveFactor": null,
+            "pressureCause": null
+          },
+          {
+            "status": 200,
+            "adaptiveFactor": null,
+            "pressureCause": null
+          },
+          {
+            "status": 200,
+            "adaptiveFactor": null,
+            "pressureCause": null
+          },
+          {
+            "status": 200,
+            "adaptiveFactor": null,
+            "pressureCause": null
+          },
+          {
+            "status": 200,
+            "adaptiveFactor": null,
+            "pressureCause": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "trace-baggage",
+      "title": "Trace e baggage sob controle",
+      "startedAt": "2026-03-20T17:25:27.067Z",
+      "finishedAt": "2026-03-20T17:25:30.493Z",
+      "durationMs": 3426,
+      "commands": [],
+      "logs": {
+        "dependency-stub": "",
+        "backend-a": "",
+        "backend-b": ""
+      },
+      "instanceCount": 2,
+      "expected": "Traceparent e baggage devem ser propagados com tenantId, userId, apiVersion e flags sem ultrapassar o limite configurado.",
+      "observed": {
+        "dependencyResponse": {
+          "ok": true,
+          "statusCode": 200,
+          "mode": "ok",
+          "instanceId": "backend-a",
+          "durationMs": 33,
+          "tenantId": "91692144-93a5-4551-95a7-4e7e92c9e2fe",
+          "trace": {
+            "requestId": "aedca72e-218f-4309-8d46-3dfe0c925a49",
+            "traceId": "4e6dce50f1cb4506b783ae6d5bba26ac",
+            "apiVersion": "2",
+            "mitigationFlags": [],
+            "baggageBytes": 85
+          },
+          "breaker": {
+            "key": "dependency:ops-runtime-test",
+            "mode": "closed",
+            "failures": 0,
+            "openCount": 0,
+            "openedUntil": null,
+            "halfOpenInFlight": 0,
+            "halfOpenProbeAttempts": 0,
+            "halfOpenSuccesses": 0,
+            "consecutiveSuccesses": 4,
+            "lastTransitionAt": 1774027530480,
+            "failureVoters": 0,
+            "recoveryVoters": 0
+          },
+          "dependency": {
+            "url": "http://127.0.0.1:46460/dependency",
+            "status": 200,
+            "body": {
+              "ok": true,
+              "mode": "ok",
+              "delayedMs": 0
+            },
+            "traceHeaders": {
+              "x-request-id": "aedca72e-218f-4309-8d46-3dfe0c925a49",
+              "x-trace-id": "4e6dce50f1cb4506b783ae6d5bba26ac",
+              "traceparent": "00-4e6dce50f1cb4506b783ae6d5bba26ac-a66a1f3255f34ea3-01",
+              "baggage": "v=2,tid=91692144-93a5-4551-95a7-4e7e92c9e2fe,uid=d29930d3-e532-4b01-8675-fc6867b76efa"
+            }
+          }
+        },
+        "stubObserved": {
+          "at": "2026-03-20T17:25:30.472Z",
+          "method": "GET",
+          "path": "/dependency",
+          "traceparent": "00-4e6dce50f1cb4506b783ae6d5bba26ac-a66a1f3255f34ea3-01",
+          "baggage": "v=2,tid=91692144-93a5-4551-95a7-4e7e92c9e2fe,uid=d29930d3-e532-4b01-8675-fc6867b76efa",
+          "baggageBytes": 85,
+          "requestId": "aedca72e-218f-4309-8d46-3dfe0c925a49",
+          "traceId": "4e6dce50f1cb4506b783ae6d5bba26ac"
+        },
+        "baggageUnderControl": true
+      }
+    },
+    {
+      "id": "slow-success",
+      "title": "Sucesso lento com visibilidade operacional",
+      "startedAt": "2026-03-20T17:25:30.494Z",
+      "finishedAt": "2026-03-20T17:25:33.633Z",
+      "durationMs": 3139,
+      "commands": [],
+      "logs": {
+        "dependency-stub": "",
+        "backend-a": "\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:33 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[NotificationGateway] \u001b[39m\u001b[32mNova notificação emitida para sala: global\u001b[39m\n",
+        "backend-b": ""
+      },
+      "instanceCount": 2,
+      "loadApplied": {
+        "slowRequests": 5,
+        "delayMs": 2000
+      },
+      "expected": "Sucesso lento deve aparecer em telemetria operacional, aumentar latencia percebida e influenciar mitigacao/alerta.",
+      "observed": {
+        "responses": [
+          {
+            "status": 200,
+            "durationMs": 2000
+          },
+          {
+            "status": 200,
+            "durationMs": 2000
+          },
+          {
+            "status": 200,
+            "durationMs": 2000
+          },
+          {
+            "status": 200,
+            "durationMs": 2000
+          },
+          {
+            "status": 200,
+            "durationMs": 2000
+          }
+        ],
+        "operationalTelemetry": {
+          "status": "ok",
+          "windowStart": "2026-03-20T17:10:33.567Z",
+          "windowSeconds": 900,
+          "totalEventsRecent": 18,
+          "byType": [
+            {
+              "type": "auto_mitigation",
+              "count": 12
+            },
+            {
+              "type": "request_queued",
+              "count": 4
+            },
+            {
+              "type": "circuit_half_open",
+              "count": 1
+            },
+            {
+              "type": "circuit_open",
+              "count": 1
+            }
+          ],
+          "topRoutes": [
+            {
+              "route": "/system/runtime/load-shedding",
+              "count": 12
+            },
+            {
+              "route": "/api/ops-runtime-test/fair-queue/hold",
+              "count": 4
+            },
+            {
+              "route": "/ops-runtime-test/dependency/check",
+              "count": 2
+            }
+          ],
+          "recent": [
+            {
+              "type": "circuit_half_open",
+              "statusCode": null,
+              "method": "GET",
+              "route": "/ops-runtime-test/dependency/check",
+              "requestId": "b4e638a6-eb79-4f9e-8cb2-d4b01896d7ed",
+              "traceId": "3e3bef3e0c21424d908ed7d911385c8b",
+              "tenantId": "ef1fa0f9-7362-4cc9-a89d-61e19e9c4e51",
+              "userId": "608575e0-5ffb-41a1-866a-51beac7d3886",
+              "apiVersion": "2",
+              "mitigationFlags": [],
+              "detail": "circuit half-open key=dependency:ops-runtime-test probes=2",
+              "at": "2026-03-20T17:25:13.573Z"
+            },
+            {
+              "type": "circuit_open",
+              "statusCode": null,
+              "method": "GET",
+              "route": "/ops-runtime-test/dependency/check",
+              "requestId": "2331ef04-54f4-47d6-b6e8-d920fa27eda1",
+              "traceId": "99d09b63c3164df3bf954f8dfafd582a",
+              "tenantId": "ef1fa0f9-7362-4cc9-a89d-61e19e9c4e51",
+              "userId": "608575e0-5ffb-41a1-866a-51beac7d3886",
+              "apiVersion": "2",
+              "mitigationFlags": [],
+              "detail": "circuit open key=dependency:ops-runtime-test retryAfterMs=3946",
+              "at": "2026-03-20T17:25:09.016Z"
+            },
+            {
+              "type": "auto_mitigation",
+              "statusCode": null,
+              "method": "UNKNOWN",
+              "route": "/system/runtime/load-shedding",
+              "requestId": null,
+              "traceId": null,
+              "tenantId": null,
+              "userId": null,
+              "apiVersion": null,
+              "mitigationFlags": [],
+              "detail": "adaptive load shedding factor=1 desired=1 overloadedInstances=0/2",
+              "at": "2026-03-20T17:25:05.864Z"
+            },
+            {
+              "type": "request_queued",
+              "statusCode": null,
+              "method": "POST",
+              "route": "/api/ops-runtime-test/fair-queue/hold",
+              "requestId": "41b65cfa-cd8c-4cb7-a72e-f7726b5ad0e8",
+              "traceId": "0578715ba7b947548e9a9385542504dc",
+              "tenantId": "91692144-93a5-4551-95a7-4e7e92c9e2fe",
+              "userId": "d29930d3-e532-4b01-8675-fc6867b76efa",
+              "apiVersion": "2",
+              "mitigationFlags": [],
+              "detail": "queued route=ops-runtime-test-fair-queue partition=tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe routeDepth=1 partitionDepth=1",
+              "at": "2026-03-20T17:25:04.376Z"
+            },
+            {
+              "type": "auto_mitigation",
+              "statusCode": null,
+              "method": "UNKNOWN",
+              "route": "/system/runtime/load-shedding",
+              "requestId": null,
+              "traceId": null,
+              "tenantId": null,
+              "userId": null,
+              "apiVersion": null,
+              "mitigationFlags": [],
+              "detail": "adaptive load shedding factor=1 desired=1 overloadedInstances=0/1",
+              "at": "2026-03-20T17:25:03.580Z"
+            },
+            {
+              "type": "auto_mitigation",
+              "statusCode": null,
+              "method": "UNKNOWN",
+              "route": "/system/runtime/load-shedding",
+              "requestId": null,
+              "traceId": null,
+              "tenantId": null,
+              "userId": null,
+              "apiVersion": null,
+              "mitigationFlags": [],
+              "detail": "adaptive load shedding factor=1 desired=1 overloadedInstances=0/2",
+              "at": "2026-03-20T17:25:01.819Z"
+            },
+            {
+              "type": "auto_mitigation",
+              "statusCode": null,
+              "method": "UNKNOWN",
+              "route": "/system/runtime/load-shedding",
+              "requestId": null,
+              "traceId": null,
+              "tenantId": null,
+              "userId": null,
+              "apiVersion": null,
+              "mitigationFlags": [],
+              "detail": "adaptive load shedding factor=1 desired=1 overloadedInstances=0/1",
+              "at": "2026-03-20T17:24:57.804Z"
+            },
+            {
+              "type": "auto_mitigation",
+              "statusCode": null,
+              "method": "UNKNOWN",
+              "route": "/system/runtime/load-shedding",
+              "requestId": null,
+              "traceId": null,
+              "tenantId": null,
+              "userId": null,
+              "apiVersion": null,
+              "mitigationFlags": [],
+              "detail": "adaptive load shedding factor=0.95 desired=1 overloadedInstances=0/1",
+              "at": "2026-03-20T17:24:56.793Z"
+            },
+            {
+              "type": "auto_mitigation",
+              "statusCode": null,
+              "method": "UNKNOWN",
+              "route": "/system/runtime/load-shedding",
+              "requestId": null,
+              "traceId": null,
+              "tenantId": null,
+              "userId": null,
+              "apiVersion": null,
+              "mitigationFlags": [],
+              "detail": "adaptive load shedding factor=0.9 desired=1 overloadedInstances=0/1",
+              "at": "2026-03-20T17:24:55.790Z"
+            },
+            {
+              "type": "auto_mitigation",
+              "statusCode": null,
+              "method": "UNKNOWN",
+              "route": "/system/runtime/load-shedding",
+              "requestId": null,
+              "traceId": null,
+              "tenantId": null,
+              "userId": null,
+              "apiVersion": null,
+              "mitigationFlags": [],
+              "detail": "adaptive load shedding factor=0.85 desired=1 overloadedInstances=0/1",
+              "at": "2026-03-20T17:24:54.785Z"
+            },
+            {
+              "type": "auto_mitigation",
+              "statusCode": null,
+              "method": "UNKNOWN",
+              "route": "/system/runtime/load-shedding",
+              "requestId": null,
+              "traceId": null,
+              "tenantId": null,
+              "userId": null,
+              "apiVersion": null,
+              "mitigationFlags": [],
+              "detail": "adaptive load shedding factor=0.8 desired=1 overloadedInstances=0/1",
+              "at": "2026-03-20T17:24:53.773Z"
+            },
+            {
+              "type": "auto_mitigation",
+              "statusCode": null,
+              "method": "UNKNOWN",
+              "route": "/system/runtime/load-shedding",
+              "requestId": null,
+              "traceId": null,
+              "tenantId": null,
+              "userId": null,
+              "apiVersion": null,
+              "mitigationFlags": [],
+              "detail": "adaptive load shedding factor=0.8 desired=1 overloadedInstances=0/2",
+              "at": "2026-03-20T17:24:52.767Z"
+            },
+            {
+              "type": "auto_mitigation",
+              "statusCode": null,
+              "method": "UNKNOWN",
+              "route": "/system/runtime/load-shedding",
+              "requestId": null,
+              "traceId": null,
+              "tenantId": null,
+              "userId": null,
+              "apiVersion": null,
+              "mitigationFlags": [],
+              "detail": "adaptive load shedding factor=0.8 desired=0.55 overloadedInstances=0/2",
+              "at": "2026-03-20T17:24:51.762Z"
+            },
+            {
+              "type": "request_queued",
+              "statusCode": null,
+              "method": "POST",
+              "route": "/api/ops-runtime-test/fair-queue/hold",
+              "requestId": "d8d49b19-197f-48ff-93b3-be0c2aa954fe",
+              "traceId": "7a35d94eb53d402a9c918f68cbdb7d95",
+              "tenantId": "85f81757-b348-4203-a667-f4af808a38db",
+              "userId": "0274bda3-6a2f-414a-96da-5eb766a8881a",
+              "apiVersion": "2",
+              "mitigationFlags": [],
+              "detail": "queued route=ops-runtime-test-fair-queue partition=tenant:85f81757-b348-4203-a667-f4af808a38db routeDepth=5 partitionDepth=2",
+              "at": "2026-03-20T17:24:51.540Z"
+            },
+            {
+              "type": "request_queued",
+              "statusCode": null,
+              "method": "POST",
+              "route": "/api/ops-runtime-test/fair-queue/hold",
+              "requestId": "5589d737-d82f-4754-a069-c1b03ebc85ea",
+              "traceId": "74dae5831e0846dbaca10deded95e093",
+              "tenantId": "91692144-93a5-4551-95a7-4e7e92c9e2fe",
+              "userId": "d29930d3-e532-4b01-8675-fc6867b76efa",
+              "apiVersion": "2",
+              "mitigationFlags": [],
+              "detail": "queued route=ops-runtime-test-fair-queue partition=tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe routeDepth=2 partitionDepth=2",
+              "at": "2026-03-20T17:24:51.470Z"
+            },
+            {
+              "type": "request_queued",
+              "statusCode": null,
+              "method": "POST",
+              "route": "/api/ops-runtime-test/fair-queue/hold",
+              "requestId": "8ad2d346-a580-4c3a-b204-cf3e981e749f",
+              "traceId": "a160fec633d841fa907028f0f629ee35",
+              "tenantId": "91692144-93a5-4551-95a7-4e7e92c9e2fe",
+              "userId": "d29930d3-e532-4b01-8675-fc6867b76efa",
+              "apiVersion": "2",
+              "mitigationFlags": [],
+              "detail": "queued route=ops-runtime-test-fair-queue partition=tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe routeDepth=1 partitionDepth=1",
+              "at": "2026-03-20T17:24:51.442Z"
+            },
+            {
+              "type": "auto_mitigation",
+              "statusCode": null,
+              "method": "UNKNOWN",
+              "route": "/system/runtime/load-shedding",
+              "requestId": null,
+              "traceId": null,
+              "tenantId": null,
+              "userId": null,
+              "apiVersion": null,
+              "mitigationFlags": [],
+              "detail": "adaptive load shedding factor=1 desired=1 overloadedInstances=0/1",
+              "at": "2026-03-20T17:24:45.751Z"
+            },
+            {
+              "type": "auto_mitigation",
+              "statusCode": null,
+              "method": "UNKNOWN",
+              "route": "/system/runtime/load-shedding",
+              "requestId": null,
+              "traceId": null,
+              "tenantId": null,
+              "userId": null,
+              "apiVersion": null,
+              "mitigationFlags": [],
+              "detail": "adaptive load shedding factor=1 desired=1 overloadedInstances=0/1",
+              "at": "2026-03-20T17:24:44.744Z"
+            }
+          ]
+        },
+        "loadShedding": {
+          "instanceId": "backend-a",
+          "instanceCount": 2,
+          "overloadedInstances": 0,
+          "adaptiveThrottleFactor": 1,
+          "desiredAdaptiveThrottleFactor": 1,
+          "pressureCause": "normal",
+          "stateConsistency": "distributed",
+          "local": {
+            "eventLoopLagP95Ms": 33.52,
+            "eventLoopLagP99Ms": 35.49,
+            "eventLoopLagMaxMs": 35.49,
+            "eventLoopUtilization": 0.01,
+            "heapUsedRatio": 0.8825,
+            "recentApiLatencyMs": 376.72,
+            "gcPauseP95Ms": 14.14,
+            "gcPauseMaxMs": 15.26,
+            "gcEventsRecent": 38,
+            "queueDepth": 0,
+            "activeIsolatedRequests": 0,
+            "pressureScore": 0,
+            "consecutiveBreaches": 0,
+            "adaptiveThrottleFactor": 1,
+            "cause": "normal",
+            "overloaded": false
+          },
+          "clusterRecentApiLatencyMs": 456.81,
+          "clusterQueueDepth": 0,
+          "mitigation": {
+            "degradeHeavyFeatures": false,
+            "disableRemoteUpdateChecks": false,
+            "rejectHeavyMutations": false,
+            "featureFlags": [],
+            "businessImpact": []
+          }
+        },
+        "alerts": {
+          "instanceId": "backend-a",
+          "emitted": [
+            "OPS_CRITICAL_SLOW_ROUTE:GET /api/ops-runtime-test/runtime/slow"
+          ],
+          "skipped": [
+            "OPS_HIGH_5XX_ERROR_RATE",
+            "OPS_ACCESS_DENIED_SPIKE",
+            "OPS_JOB_FAILURE_STORM",
+            "OPS_VERSION_FALLBACK_SPIKE",
+            "OPS_REQUEST_RETRY_STORM",
+            "OPS_RUNTIME_PRESSURE_RECENT",
+            "OPS_QUEUE_SATURATION",
+            "OPS_CIRCUIT_BREAKER_INSTABILITY",
+            "OPS_CORRELATED_OPERATIONAL_DEGRADATION",
+            "OPS_DATABASE_DEGRADED",
+            "OPS_REDIS_DEGRADED",
+            "OPS_FEATURE_MITIGATION_ACTIVE"
+          ]
+        }
+      }
+    },
+    {
+      "id": "simultaneous-failure",
+      "title": "Falha simultanea sob carga alta",
+      "startedAt": "2026-03-20T17:25:33.634Z",
+      "finishedAt": "2026-03-20T17:25:40.283Z",
+      "durationMs": 6649,
+      "commands": [],
+      "logs": {
+        "dependency-stub": "",
+        "backend-a": "\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:34 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=ready detalhe=redis-operation-timeout:get:operational-load-shedding:granular:ops-runtime-test-fair-queue:anonymous:750ms\u001b[39m\n\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:34 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=ready detalhe=redis-operation-timeout:get:operational-load-shedding:granular:ops-runtime-test-rate-limit:anonymous:750ms\u001b[39m\n\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:34 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=ready detalhe=redis-operation-timeout:get:operational-load-shedding:granular:ops-runtime-test:anonymous:750ms\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:34 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"request_queued\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=1000\",\"method\":\"POST\",\"statusCode\":null,\"requestId\":\"cef12962-d0c7-4475-bda1-01648f62c0e3\",\"traceId\":\"dfadee48a93444658e109493c7f6feb3\",\"tenantId\":\"91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"userId\":\"d29930d3-e532-4b01-8675-fc6867b76efa\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queued route=ops-runtime-test-fair-queue partition=tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe routeDepth=1 partitionDepth=1\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"routeQueueDepth\":1,\"partitionQueueDepth\":1,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":false}\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:34 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"request_queued\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=1000\",\"method\":\"POST\",\"statusCode\":null,\"requestId\":\"d6c93617-1820-47c9-8823-e5a16e7aa4a1\",\"traceId\":\"f515a42d896347c7a8e3d9f100c39f4c\",\"tenantId\":\"91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"userId\":\"d29930d3-e532-4b01-8675-fc6867b76efa\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queued route=ops-runtime-test-fair-queue partition=tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe routeDepth=2 partitionDepth=2\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"routeQueueDepth\":2,\"partitionQueueDepth\":2,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":false}\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:34 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"request_queued\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=1000\",\"method\":\"POST\",\"statusCode\":null,\"requestId\":\"7c7c0a28-70a7-42a3-820f-dcc5eea58da4\",\"traceId\":\"619a4a0e7d5c4d00b6b6a12d5f8f8174\",\"tenantId\":\"91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"userId\":\"d29930d3-e532-4b01-8675-fc6867b76efa\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queued route=ops-runtime-test-fair-queue partition=tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe routeDepth=3 partitionDepth=3\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"routeQueueDepth\":3,\"partitionQueueDepth\":3,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":false}\u001b[39m\n\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:34 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=ready detalhe=redis-operation-timeout:smembers:operational-request-queue:routes:750ms\u001b[39m\n\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:34 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=ready detalhe=redis-operation-timeout:set:operational-load-shedding:instance:backend-a:750ms\u001b[39m\n\u001b[33m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:34 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=ready detalhe=redis-operation-timeout:sadd:operational-load-shedding:instances:750ms\u001b[39m\n\u001b[32m[Nest] 23104  - \u001b[39m20/03/2026, 14:25:34 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=1 desired=1 overloadedInstances=0/1\",\"instanceId\":\"backend-a\",\"instanceCount\":1,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":1,\"desiredAdaptiveThrottleFactor\":1,\"pressureCause\":\"normal\",\"stateConsistency\":\"local_fallback\",\"clusterQueueDepth\":0,\"clusterRecentApiLatencyMs\":364.66,\"mitigation\":{\"degradeHeavyFeatures\":true,\"disableRemoteUpdateChecks\":false,\"rejectHeavyMutations\":false,\"featureFlags\":[\"degrade-heavy-features\",\"redis-fallback-visible\"],\"businessImpact\":[\"Widgets pesados do dashboard e agregacoes caras podem operar em modo reduzido.\",\"Coordenacao distribuida esta em fallback local; consistencia global reduzida ate a recuperacao do Redis.\"]},\"distributed\":false}\u001b[39m\n",
+        "backend-b": "\u001b[33m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:34 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=ready detalhe=redis-operation-timeout:get:operational-load-shedding:granular:ops-runtime-test-fair-queue:anonymous:750ms\u001b[39m\n\u001b[33m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:34 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=ready detalhe=redis-operation-timeout:get:operational-load-shedding:granular:ops-runtime-test-rate-limit:anonymous:750ms\u001b[39m\n\u001b[33m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:34 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=ready detalhe=redis-operation-timeout:get:operational-load-shedding:granular:ops-runtime-test:anonymous:750ms\u001b[39m\n\u001b[33m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:34 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=ready detalhe=redis-operation-timeout:smembers:operational-request-queue:routes:750ms\u001b[39m\n\u001b[33m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:34 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=ready detalhe=redis-operation-timeout:set:operational-load-shedding:instance:backend-b:750ms\u001b[39m\n\u001b[33m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:34 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[DistributedOperationalStateService] \u001b[39m\u001b[33mStore operacional distribuido em fallback local explicito. topology=standalone(127.0.0.1:46379) status=ready detalhe=redis-operation-timeout:sadd:operational-load-shedding:instances:750ms\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:34 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=0.99 desired=1 overloadedInstances=0/1\",\"instanceId\":\"backend-b\",\"instanceCount\":1,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":0.99,\"desiredAdaptiveThrottleFactor\":1,\"pressureCause\":\"normal\",\"stateConsistency\":\"local_fallback\",\"clusterQueueDepth\":0,\"clusterRecentApiLatencyMs\":536.89,\"mitigation\":{\"degradeHeavyFeatures\":true,\"disableRemoteUpdateChecks\":false,\"rejectHeavyMutations\":false,\"featureFlags\":[\"degrade-heavy-features\",\"redis-fallback-visible\"],\"businessImpact\":[\"Widgets pesados do dashboard e agregacoes caras podem operar em modo reduzido.\",\"Coordenacao distribuida esta em fallback local; consistencia global reduzida ate a recuperacao do Redis.\"]},\"distributed\":false}\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:34 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"request_queued\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=1000\",\"method\":\"POST\",\"statusCode\":null,\"requestId\":\"0db6c811-a4bd-467c-94f2-75122cc184ed\",\"traceId\":\"001801e7ed75474aa11b9e553d886ab2\",\"tenantId\":\"91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"userId\":\"d29930d3-e532-4b01-8675-fc6867b76efa\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queued route=ops-runtime-test-fair-queue partition=tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe routeDepth=1 partitionDepth=1\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"routeQueueDepth\":1,\"partitionQueueDepth\":1,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":false}\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:34 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"request_queued\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=1000\",\"method\":\"POST\",\"statusCode\":null,\"requestId\":\"5182c9a0-3fec-442d-93af-f442e77e58a9\",\"traceId\":\"dc23afe8c9ef4612a6790883fd8cbf6b\",\"tenantId\":\"91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"userId\":\"d29930d3-e532-4b01-8675-fc6867b76efa\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queued route=ops-runtime-test-fair-queue partition=tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe routeDepth=2 partitionDepth=2\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"routeQueueDepth\":2,\"partitionQueueDepth\":2,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":false}\u001b[39m\n\u001b[32m[Nest] 17472  - \u001b[39m20/03/2026, 14:25:34 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"request_queued\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=1000\",\"method\":\"POST\",\"statusCode\":null,\"requestId\":\"9ecddb0e-aae3-4b8f-bc03-a15ec62afec1\",\"traceId\":\"6222e4003d5845e48d30c306fe6bb157\",\"tenantId\":\"91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"userId\":\"d29930d3-e532-4b01-8675-fc6867b76efa\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queued route=ops-runtime-test-fair-queue partition=tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe routeDepth=3 partitionDepth=3\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:91692144-93a5-4551-95a7-4e7e92c9e2fe\",\"routeQueueDepth\":3,\"partitionQueueDepth\":3,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":false}\u001b[39m\n"
+      },
+      "instanceCount": 2,
+      "loadApplied": {
+        "queueRequests": 8,
+        "rateRequests": 18,
+        "dependencyChecks": 4,
+        "redisLatencyMs": 1200,
+        "dependencyFailureStatus": 503
+      },
+      "expected": "Cluster deve degradar de forma controlada, expor mitigacao/alertas e evitar comportamento caotico sob falha combinada.",
+      "observed": {
+        "queue": {
+          "count": 8,
+          "avgDurationMs": 1151.63,
+          "avgQueueWaitMs": 1043.88,
+          "maxQueueWaitMs": 1294,
+          "rejected": 0
+        },
+        "rateLimited": 0,
+        "dependencyModes": [
+          "failure",
+          "failure",
+          "failure",
+          "failure"
+        ],
+        "loadShedding": {
+          "instanceId": "backend-a",
+          "instanceCount": 1,
+          "overloadedInstances": 0,
+          "adaptiveThrottleFactor": 1,
+          "desiredAdaptiveThrottleFactor": 1,
+          "pressureCause": "normal",
+          "stateConsistency": "local_fallback",
+          "local": {
+            "eventLoopLagP95Ms": 34.11,
+            "eventLoopLagP99Ms": 34.73,
+            "eventLoopLagMaxMs": 34.73,
+            "eventLoopUtilization": 0.1545,
+            "heapUsedRatio": 0.9105,
+            "recentApiLatencyMs": 311.05,
+            "gcPauseP95Ms": 4.23,
+            "gcPauseMaxMs": 15.26,
+            "gcEventsRecent": 46,
+            "queueDepth": 0,
+            "activeIsolatedRequests": 1,
+            "pressureScore": 0,
+            "consecutiveBreaches": 0,
+            "adaptiveThrottleFactor": 1,
+            "cause": "normal",
+            "overloaded": false
+          },
+          "clusterRecentApiLatencyMs": 311.05,
+          "clusterQueueDepth": 0,
+          "mitigation": {
+            "degradeHeavyFeatures": true,
+            "disableRemoteUpdateChecks": false,
+            "rejectHeavyMutations": false,
+            "featureFlags": [
+              "degrade-heavy-features",
+              "redis-fallback-visible"
+            ],
+            "businessImpact": [
+              "Widgets pesados do dashboard e agregacoes caras podem operar em modo reduzido.",
+              "Coordenacao distribuida esta em fallback local; consistencia global reduzida ate a recuperacao do Redis."
+            ]
+          }
+        },
+        "redis": {
+          "distributedState": {
+            "enabled": true,
+            "valid": true,
+            "configured": true,
+            "mode": "standalone",
+            "ready": true,
+            "fallbackActive": true,
+            "required": false,
+            "fallbackMode": "memory",
+            "status": "ready",
+            "detail": "redis-timeout"
+          },
+          "lock": {
+            "enabled": true,
+            "valid": true,
+            "configured": true,
+            "mode": "standalone",
+            "ready": true,
+            "fallbackActive": false,
+            "required": false,
+            "fallbackMode": "memory",
+            "status": "ready",
+            "detail": null
+          }
+        },
+        "dashboardRuntimeMitigation": {
+          "adaptiveThrottleFactor": 1,
+          "pressureCause": "normal",
+          "instanceCount": 1,
+          "overloadedInstances": 0,
+          "stateConsistency": "local_fallback",
+          "clusterRecentApiLatencyMs": 311.05,
+          "clusterQueueDepth": 0,
+          "degradeHeavyFeatures": true,
+          "disableRemoteUpdateChecks": false,
+          "rejectHeavyMutations": false,
+          "featureFlags": [
+            "degrade-heavy-features",
+            "redis-fallback-visible"
+          ],
+          "businessImpact": [
+            "Widgets pesados do dashboard e agregacoes caras podem operar em modo reduzido.",
+            "Coordenacao distribuida esta em fallback local; consistencia global reduzida ate a recuperacao do Redis."
+          ]
+        },
+        "dashboardRedis": {
+          "status": "degraded",
+          "error": "Dependencia Redis mitigada automaticamente sob pressao distribuida."
+        },
+        "alerts": {
+          "instanceId": "backend-a",
+          "emitted": [],
+          "skipped": [
+            "OPS_HIGH_5XX_ERROR_RATE",
+            "OPS_CRITICAL_SLOW_ROUTE:GET /api/ops-runtime-test/runtime/slow",
+            "OPS_ACCESS_DENIED_SPIKE",
+            "OPS_JOB_FAILURE_STORM",
+            "OPS_VERSION_FALLBACK_SPIKE",
+            "OPS_REQUEST_RETRY_STORM",
+            "OPS_RUNTIME_PRESSURE_RECENT",
+            "OPS_QUEUE_SATURATION",
+            "OPS_CIRCUIT_BREAKER_INSTABILITY",
+            "OPS_CORRELATED_OPERATIONAL_DEGRADATION",
+            "OPS_DATABASE_DEGRADED",
+            "OPS_REDIS_DEGRADED",
+            "OPS_FEATURE_MITIGATION_ACTIVE"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "generatedAt": "2026-03-20T16:58:00.787Z",
+  "artifactsDir": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\tmp\\distributed-runtime\\2026-03-20T16-56-47-182Z",
+  "commands": [
+    {
+      "at": "2026-03-20T16:56:47.185Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker compose -f D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\docker-compose.yml down -v --remove-orphans"
+    },
+    {
+      "at": "2026-03-20T16:56:47.680Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker compose -f D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\docker-compose.yml up -d"
+    },
+    {
+      "at": "2026-03-20T16:56:49.031Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-redis redis-cli ping"
+    },
+    {
+      "at": "2026-03-20T16:56:49.371Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-postgres pg_isready -U postgres -d runtimeproof"
+    },
+    {
+      "at": "2026-03-20T16:56:50.666Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-postgres pg_isready -U postgres -d runtimeproof"
+    },
+    {
+      "at": "2026-03-20T16:56:51.976Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-postgres pg_isready -U postgres -d runtimeproof"
+    },
+    {
+      "at": "2026-03-20T16:56:52.327Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "node D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\dependency-stub.cjs"
+    },
+    {
+      "at": "2026-03-20T16:56:52.707Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend",
+      "command": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend\\node_modules\\.bin\\nest.CMD build"
+    },
+    {
+      "at": "2026-03-20T16:57:14.930Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend",
+      "command": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend\\node_modules\\.bin\\prisma.CMD migrate deploy --schema prisma/schema.prisma"
+    },
+    {
+      "at": "2026-03-20T16:58:00.699Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend",
+      "command": "node dist/prisma/seed.js deploy --force"
+    }
+  ],
+  "setup": null,
+  "scenarios": [],
+  "error": {
+    "message": "Command failed (1): node dist/prisma/seed.js deploy --force\nnode:internal/modules/cjs/loader:1386\r\n  throw err;\r\n  ^\r\n\r\nError: Cannot find module 'D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend\\dist\\prisma\\seed.js'\r\n    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)\r\n    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)\r\n    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)\r\n    at Function._load (node:internal/modules/cjs/loader:1192:37)\r\n    at TracingChannel.traceSync (node:diagnostics_channel:328:14)\r\n    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)\r\n    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)\r\n    at node:internal/main/run_main_module:36:49 {\r\n  code: 'MODULE_NOT_FOUND',\r\n  requireStack: []\r\n}\r\n\r\nNode.js v22.22.0\r\n",
+    "stack": "Error: Command failed (1): node dist/prisma/seed.js deploy --force\nnode:internal/modules/cjs/loader:1386\r\n  throw err;\r\n  ^\r\n\r\nError: Cannot find module 'D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend\\dist\\prisma\\seed.js'\r\n    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)\r\n    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)\r\n    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)\r\n    at Function._load (node:internal/modules/cjs/loader:1192:37)\r\n    at TracingChannel.traceSync (node:diagnostics_channel:328:14)\r\n    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)\r\n    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)\r\n    at node:internal/main/run_main_module:36:49 {\r\n  code: 'MODULE_NOT_FOUND',\r\n  requireStack: []\r\n}\r\n\r\nNode.js v22.22.0\r\n\n    at ChildProcess.<anonymous> (D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\run-proof.cjs:101:21)\n    at ChildProcess.emit (node:events:519:28)\n    at ChildProcess._handle.onexit (node:internal/child_process:293:12)"
+  }
+}

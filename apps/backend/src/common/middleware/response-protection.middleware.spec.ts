@@ -5,6 +5,7 @@ function createMockResponse() {
   const headers = new Map<string, string>();
   let statusCode = 200;
   let sentBody: unknown = undefined;
+  let headersSent = false;
 
   const response = {
     locals: {},
@@ -13,6 +14,12 @@ function createMockResponse() {
     },
     get sentBody() {
       return sentBody;
+    },
+    get headersSent() {
+      return headersSent;
+    },
+    set headersSent(value: boolean) {
+      headersSent = value;
     },
     status(code: number) {
       statusCode = code;
@@ -103,5 +110,23 @@ describe('response protection middleware', () => {
         code: 'RESPONSE_TOO_LARGE',
       }),
     );
+  });
+
+  it('passes through untouched when headers were already sent', () => {
+    const middleware = new ResponseProtectionMiddleware();
+    const req = {
+      method: 'GET',
+      originalUrl: '/api/system/dashboard',
+      headers: {},
+    } as any;
+    const res = createMockResponse();
+
+    middleware.use(req, res, jest.fn());
+
+    res.headersSent = true;
+    res.json({ ok: true });
+
+    expect(res.sentBody).toEqual({ ok: true });
+    expect(res.getHeader('content-length')).toBeUndefined();
   });
 });

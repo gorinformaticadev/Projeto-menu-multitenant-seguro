@@ -61,6 +61,26 @@ export type OperationalRequestQueueSnapshot = {
   }>;
 };
 
+export type OperationalRequestQueueRouteDebugState = {
+  routePolicyId: string;
+  active: number;
+  queued: number;
+  maxConcurrentRequests: number;
+  maxConcurrentPerPartition: number;
+  maxQueueDepth: number;
+  maxQueueDepthPerPartition: number;
+  partitions: Array<{
+    partitionKey: string;
+    tenantId: string | null;
+    userId: string | null;
+    clientIp: string | null;
+    active: number;
+    queued: number;
+    grantedCount: number;
+    lastGrantedAt: string | null;
+  }>;
+};
+
 type AcquireQueueResult =
   | { status: 'granted'; partitionKey: string }
   | {
@@ -133,6 +153,50 @@ export class OperationalRequestQueueService implements OnModuleDestroy {
       totalActive: this.latestSnapshot.totalActive,
       totalQueued: this.latestSnapshot.totalQueued,
       routes: this.latestSnapshot.routes.map((entry) => ({ ...entry })),
+    };
+  }
+
+  async getRouteDebugState(
+    routePolicyId: string,
+  ): Promise<OperationalRequestQueueRouteDebugState | null> {
+    const state = await this.distributedOperationalStateService.readJson<SharedQueueState>(
+      this.getStateKey(routePolicyId),
+    );
+
+    if (!state) {
+      return null;
+    }
+
+    const partitions = Object.entries(state.partitions || {})
+      .map(([partitionKey, partition]) => ({
+        partitionKey,
+        tenantId: partition.tenantId,
+        userId: partition.userId,
+        clientIp: partition.clientIp,
+        active: Number(partition.active || 0),
+        queued: Array.isArray(partition.queue) ? partition.queue.length : 0,
+        grantedCount: Number(partition.grantedCount || 0),
+        lastGrantedAt: partition.lastGrantedAt
+          ? new Date(partition.lastGrantedAt).toISOString()
+          : null,
+      }))
+      .sort(
+        (left, right) =>
+          right.queued - left.queued ||
+          right.active - left.active ||
+          right.grantedCount - left.grantedCount ||
+          left.partitionKey.localeCompare(right.partitionKey),
+      );
+
+    return {
+      routePolicyId,
+      active: Number(state.active || 0),
+      queued: partitions.reduce((sum, partition) => sum + partition.queued, 0),
+      maxConcurrentRequests: Number(state.maxConcurrentRequests || 0),
+      maxConcurrentPerPartition: Number(state.maxConcurrentPerPartition || 0),
+      maxQueueDepth: Number(state.maxQueueDepth || 0),
+      maxQueueDepthPerPartition: Number(state.maxQueueDepthPerPartition || 0),
+      partitions,
     };
   }
 

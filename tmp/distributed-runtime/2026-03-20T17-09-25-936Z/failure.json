@@ -1,0 +1,264 @@
+{
+  "generatedAt": "2026-03-20T17:10:26.536Z",
+  "artifactsDir": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\tmp\\distributed-runtime\\2026-03-20T17-09-25-936Z",
+  "commands": [
+    {
+      "at": "2026-03-20T17:09:25.940Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker compose -f D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\docker-compose.yml down -v --remove-orphans"
+    },
+    {
+      "at": "2026-03-20T17:09:26.477Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker compose -f D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\docker-compose.yml up -d"
+    },
+    {
+      "at": "2026-03-20T17:09:27.928Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-redis redis-cli ping"
+    },
+    {
+      "at": "2026-03-20T17:09:28.243Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-postgres pg_isready -U postgres -d runtimeproof"
+    },
+    {
+      "at": "2026-03-20T17:09:29.558Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-postgres pg_isready -U postgres -d runtimeproof"
+    },
+    {
+      "at": "2026-03-20T17:09:30.887Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker exec codex-distributed-postgres pg_isready -U postgres -d runtimeproof"
+    },
+    {
+      "at": "2026-03-20T17:09:31.226Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "node D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\dependency-stub.cjs"
+    },
+    {
+      "at": "2026-03-20T17:09:31.592Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend",
+      "command": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend\\node_modules\\.bin\\nest.CMD build"
+    },
+    {
+      "at": "2026-03-20T17:09:54.264Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend",
+      "command": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend\\node_modules\\.bin\\prisma.CMD migrate deploy --schema prisma/schema.prisma"
+    },
+    {
+      "at": "2026-03-20T17:09:58.805Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend",
+      "command": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend\\node_modules\\.bin\\tsx.CMD prisma/seed.ts deploy --force"
+    },
+    {
+      "at": "2026-03-20T17:10:00.483Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend",
+      "command": "node D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend\\dist\\backend\\src\\main.js"
+    },
+    {
+      "at": "2026-03-20T17:10:05.120Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend",
+      "command": "node D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\apps\\backend\\dist\\backend\\src\\main.js"
+    },
+    {
+      "at": "2026-03-20T17:10:12.556Z",
+      "cwd": "D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro",
+      "command": "docker compose -f D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\docker-compose.yml stop redis"
+    }
+  ],
+  "setup": {
+    "superadminJar": {
+      "cookies": {}
+    },
+    "tenantA": {
+      "id": "f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf",
+      "email": "tenant-a@example.com",
+      "cnpjCpf": "11111111111180",
+      "nomeFantasia": "Tenant A Runtime Proof",
+      "nomeResponsavel": "Tenant A Responsavel",
+      "telefone": "(11) 90000-1001",
+      "logoUrl": null,
+      "ativo": true,
+      "createdAt": "2026-03-20T17:10:10.521Z",
+      "updatedAt": "2026-03-20T17:10:10.521Z",
+      "isMasterTenant": false
+    },
+    "tenantB": {
+      "id": "95101534-4f52-4038-88cf-825c74db29f2",
+      "email": "tenant-b@example.com",
+      "cnpjCpf": "22222222222259",
+      "nomeFantasia": "Tenant B Runtime Proof",
+      "nomeResponsavel": "Tenant B Responsavel",
+      "telefone": "(11) 90000-1002",
+      "logoUrl": null,
+      "ativo": true,
+      "createdAt": "2026-03-20T17:10:10.684Z",
+      "updatedAt": "2026-03-20T17:10:10.684Z",
+      "isMasterTenant": false
+    },
+    "tenantAJar": {
+      "cookies": {}
+    },
+    "tenantBJar": {
+      "cookies": {}
+    }
+  },
+  "scenarios": [
+    {
+      "id": "fairness-global",
+      "title": "Fairness global por tenant",
+      "startedAt": "2026-03-20T17:10:11.052Z",
+      "finishedAt": "2026-03-20T17:10:12.555Z",
+      "durationMs": 1503,
+      "commands": [],
+      "logs": {
+        "dependency-stub": "",
+        "backend-a": "\u001b[32m[Nest] 24192  - \u001b[39m20/03/2026, 14:10:11 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"request_queued\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=1200\",\"method\":\"POST\",\"statusCode\":null,\"requestId\":\"bf171d29-3212-43c8-b01f-30924e9f2395\",\"traceId\":\"ff595eb097dc4d71ad98d585b039fd9d\",\"tenantId\":\"f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf\",\"userId\":\"364170f8-86ca-4066-9a37-dd714589a956\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queued route=ops-runtime-test-fair-queue partition=tenant:f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf routeDepth=1 partitionDepth=1\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf\",\"routeQueueDepth\":1,\"partitionQueueDepth\":1,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":true}\u001b[39m\n\u001b[32m[Nest] 24192  - \u001b[39m20/03/2026, 14:10:11 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"request_queued\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=600\",\"method\":\"POST\",\"statusCode\":null,\"requestId\":\"6e7a6f91-e31a-4068-8ac2-74d2a6c5bbe9\",\"traceId\":\"6ee27af3274240ec93c288985781d197\",\"tenantId\":\"95101534-4f52-4038-88cf-825c74db29f2\",\"userId\":\"93dcd3f2-0b9e-4cbd-8b58-1f38ad2ace03\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queued route=ops-runtime-test-fair-queue partition=tenant:95101534-4f52-4038-88cf-825c74db29f2 routeDepth=2 partitionDepth=1\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:95101534-4f52-4038-88cf-825c74db29f2\",\"routeQueueDepth\":2,\"partitionQueueDepth\":1,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":true}\u001b[39m\n\u001b[32m[Nest] 24192  - \u001b[39m20/03/2026, 14:10:11 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"request_queued\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=1200\",\"method\":\"POST\",\"statusCode\":null,\"requestId\":\"c4b6f954-2f46-4ccd-8ae5-57d82de50924\",\"traceId\":\"f3aeeadba4524a18b579c5584ca9c6b7\",\"tenantId\":\"f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf\",\"userId\":\"364170f8-86ca-4066-9a37-dd714589a956\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queued route=ops-runtime-test-fair-queue partition=tenant:f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf routeDepth=3 partitionDepth=2\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf\",\"routeQueueDepth\":3,\"partitionQueueDepth\":2,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":true}\u001b[39m\n\u001b[32m[Nest] 24192  - \u001b[39m20/03/2026, 14:10:11 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=0.89 desired=0.75 overloadedInstances=0/2\",\"instanceId\":\"backend-a\",\"instanceCount\":2,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":0.89,\"desiredAdaptiveThrottleFactor\":0.75,\"pressureCause\":\"normal\",\"stateConsistency\":\"distributed\",\"clusterQueueDepth\":4,\"clusterRecentApiLatencyMs\":229.6,\"mitigation\":{\"degradeHeavyFeatures\":false,\"disableRemoteUpdateChecks\":false,\"rejectHeavyMutations\":false,\"featureFlags\":[],\"businessImpact\":[]},\"distributed\":true}\u001b[39m\n\u001b[32m[Nest] 24192  - \u001b[39m20/03/2026, 14:10:12 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=0.83 desired=0.75 overloadedInstances=0/2\",\"instanceId\":\"backend-a\",\"instanceCount\":2,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":0.83,\"desiredAdaptiveThrottleFactor\":0.75,\"pressureCause\":\"normal\",\"stateConsistency\":\"distributed\",\"clusterQueueDepth\":4,\"clusterRecentApiLatencyMs\":303.13,\"mitigation\":{\"degradeHeavyFeatures\":false,\"disableRemoteUpdateChecks\":false,\"rejectHeavyMutations\":false,\"featureFlags\":[],\"businessImpact\":[]},\"distributed\":true}\u001b[39m\n",
+        "backend-b": "\u001b[32m[Nest] 7684  - \u001b[39m20/03/2026, 14:10:11 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"request_queued\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=600\",\"method\":\"POST\",\"statusCode\":null,\"requestId\":\"d0639e2e-2ec4-4340-8dd7-d657cef68e85\",\"traceId\":\"ee008ef68a3944e2bf14ae1e30cceddd\",\"tenantId\":\"95101534-4f52-4038-88cf-825c74db29f2\",\"userId\":\"93dcd3f2-0b9e-4cbd-8b58-1f38ad2ace03\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queued route=ops-runtime-test-fair-queue partition=tenant:95101534-4f52-4038-88cf-825c74db29f2 routeDepth=4 partitionDepth=2\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:95101534-4f52-4038-88cf-825c74db29f2\",\"routeQueueDepth\":4,\"partitionQueueDepth\":2,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":true}\u001b[39m\n\u001b[32m[Nest] 7684  - \u001b[39m20/03/2026, 14:10:11 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"request_queued\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=1200\",\"method\":\"POST\",\"statusCode\":null,\"requestId\":\"16c58716-b859-4167-a50c-ca37ec1ef831\",\"traceId\":\"d93d81ada3a944e4bfd6f73165dc44b3\",\"tenantId\":\"f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf\",\"userId\":\"364170f8-86ca-4066-9a37-dd714589a956\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queued route=ops-runtime-test-fair-queue partition=tenant:f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf routeDepth=5 partitionDepth=3\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf\",\"routeQueueDepth\":5,\"partitionQueueDepth\":3,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":true}\u001b[39m\n\u001b[32m[Nest] 7684  - \u001b[39m20/03/2026, 14:10:11 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"request_queued\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=600\",\"method\":\"POST\",\"statusCode\":null,\"requestId\":\"15a8da19-374e-4a22-992a-efeb7461cca2\",\"traceId\":\"4981655863144362981666ab61418386\",\"tenantId\":\"95101534-4f52-4038-88cf-825c74db29f2\",\"userId\":\"93dcd3f2-0b9e-4cbd-8b58-1f38ad2ace03\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queued route=ops-runtime-test-fair-queue partition=tenant:95101534-4f52-4038-88cf-825c74db29f2 routeDepth=6 partitionDepth=3\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:95101534-4f52-4038-88cf-825c74db29f2\",\"routeQueueDepth\":6,\"partitionQueueDepth\":3,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":true}\u001b[39m\n\u001b[33m[Nest] 7684  - \u001b[39m20/03/2026, 14:10:11 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[33m{\"event\":\"operational-observability\",\"type\":\"request_queue_rejected\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=1200\",\"method\":\"POST\",\"statusCode\":429,\"requestId\":\"3d93004a-1cae-4706-bde1-a7e89ed28d99\",\"traceId\":\"664150bf8aa04f9499efb617bec50629\",\"tenantId\":\"f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf\",\"userId\":\"364170f8-86ca-4066-9a37-dd714589a956\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queue full route=ops-runtime-test-fair-queue partition=tenant:f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf routeDepth=5 partitionDepth=3\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf\",\"routeQueueDepth\":5,\"partitionQueueDepth\":3,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":true}\u001b[39m\n\u001b[33m[Nest] 7684  - \u001b[39m20/03/2026, 14:10:11 \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[33m{\"event\":\"operational-observability\",\"type\":\"request_queue_rejected\",\"route\":\"/api/ops-runtime-test/fair-queue/hold?holdMs=1200\",\"method\":\"POST\",\"statusCode\":429,\"requestId\":\"c8259ae2-0561-4274-b813-9741a4ff8206\",\"traceId\":\"944ad06551b7457ea190061a1b2fdc7e\",\"tenantId\":\"f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf\",\"userId\":\"364170f8-86ca-4066-9a37-dd714589a956\",\"apiVersion\":\"2\",\"mitigationFlags\":[],\"detail\":\"queue full route=ops-runtime-test-fair-queue partition=tenant:f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf routeDepth=5 partitionDepth=3\",\"routeId\":\"ops-runtime-test-fair-queue\",\"partitionKey\":\"tenant:f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf\",\"routeQueueDepth\":5,\"partitionQueueDepth\":3,\"maxQueueDepth\":6,\"maxQueueDepthPerPartition\":3,\"distributed\":true}\u001b[39m\n\u001b[32m[Nest] 7684  - \u001b[39m20/03/2026, 14:10:12 \u001b[32m    LOG\u001b[39m \u001b[38;5;3m[OperationalObservabilityService] \u001b[39m\u001b[32m{\"event\":\"operational-observability\",\"type\":\"auto_mitigation\",\"route\":\"/system/runtime/load-shedding\",\"method\":\"UNKNOWN\",\"statusCode\":null,\"requestId\":null,\"traceId\":null,\"tenantId\":null,\"userId\":null,\"apiVersion\":null,\"mitigationFlags\":[],\"detail\":\"adaptive load shedding factor=0.89 desired=0.75 overloadedInstances=0/2\",\"instanceId\":\"backend-b\",\"instanceCount\":2,\"overloadedInstances\":0,\"adaptiveThrottleFactor\":0.89,\"desiredAdaptiveThrottleFactor\":0.75,\"pressureCause\":\"normal\",\"stateConsistency\":\"distributed\",\"clusterQueueDepth\":7,\"clusterRecentApiLatencyMs\":256.18,\"mitigation\":{\"degradeHeavyFeatures\":true,\"disableRemoteUpdateChecks\":false,\"rejectHeavyMutations\":false,\"featureFlags\":[\"degrade-heavy-features\"],\"businessImpact\":[\"Widgets pesados do dashboard e agregacoes caras podem operar em modo reduzido.\"]},\"distributed\":true}\u001b[39m\n"
+      },
+      "instanceCount": 2,
+      "loadApplied": {
+        "tenantA": {
+          "concurrency": 6,
+          "holdMs": 1200
+        },
+        "tenantB": {
+          "concurrency": 3,
+          "holdMs": 600
+        }
+      },
+      "expected": "Tenant B deve receber grants antes de Tenant A consumir toda a fila.",
+      "observed": {
+        "tenantA": {
+          "count": 6,
+          "avgDurationMs": 697.17,
+          "avgQueueWaitMs": 736.75,
+          "maxQueueWaitMs": 1374,
+          "rejected": 2
+        },
+        "tenantB": {
+          "count": 3,
+          "avgDurationMs": 839.67,
+          "avgQueueWaitMs": 716,
+          "maxQueueWaitMs": 1129,
+          "rejected": 0
+        },
+        "orderedStarts": [
+          {
+            "label": "tenant-a-1",
+            "startedAt": "2026-03-20T17:10:11.140Z",
+            "tenantId": "f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf",
+            "instanceId": "backend-a"
+          },
+          {
+            "label": "tenant-b-2",
+            "startedAt": "2026-03-20T17:10:11.348Z",
+            "tenantId": "95101534-4f52-4038-88cf-825c74db29f2",
+            "instanceId": "backend-a"
+          },
+          {
+            "label": "tenant-a-3",
+            "startedAt": "2026-03-20T17:10:11.583Z",
+            "tenantId": "f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf",
+            "instanceId": "backend-a"
+          },
+          {
+            "label": "tenant-b-1",
+            "startedAt": "2026-03-20T17:10:11.790Z",
+            "tenantId": "95101534-4f52-4038-88cf-825c74db29f2",
+            "instanceId": "backend-b"
+          },
+          {
+            "label": "tenant-a-5",
+            "startedAt": "2026-03-20T17:10:12.017Z",
+            "tenantId": "f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf",
+            "instanceId": "backend-a"
+          },
+          {
+            "label": "tenant-b-3",
+            "startedAt": "2026-03-20T17:10:12.190Z",
+            "tenantId": "95101534-4f52-4038-88cf-825c74db29f2",
+            "instanceId": "backend-b"
+          },
+          {
+            "label": "tenant-a-4",
+            "startedAt": "2026-03-20T17:10:12.431Z",
+            "tenantId": "f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf",
+            "instanceId": "backend-b"
+          }
+        ],
+        "tenantBStartedBeforeTenantAExhaustedQueue": true,
+        "midFlightQueue": {
+          "backendA": {
+            "routePolicyId": "ops-runtime-test-fair-queue",
+            "active": 1,
+            "queued": 5,
+            "maxConcurrentRequests": 1,
+            "maxConcurrentPerPartition": 1,
+            "maxQueueDepth": 6,
+            "maxQueueDepthPerPartition": 3,
+            "partitions": [
+              {
+                "partitionKey": "tenant:f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf",
+                "tenantId": "f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf",
+                "userId": "364170f8-86ca-4066-9a37-dd714589a956",
+                "clientIp": "127.0.0.1",
+                "active": 0,
+                "queued": 3,
+                "grantedCount": 1,
+                "lastGrantedAt": "2026-03-20T17:10:11.131Z"
+              },
+              {
+                "partitionKey": "tenant:95101534-4f52-4038-88cf-825c74db29f2",
+                "tenantId": "95101534-4f52-4038-88cf-825c74db29f2",
+                "userId": "93dcd3f2-0b9e-4cbd-8b58-1f38ad2ace03",
+                "clientIp": "127.0.0.1",
+                "active": 1,
+                "queued": 2,
+                "grantedCount": 1,
+                "lastGrantedAt": "2026-03-20T17:10:11.343Z"
+              }
+            ]
+          },
+          "backendB": {
+            "routePolicyId": "ops-runtime-test-fair-queue",
+            "active": 0,
+            "queued": 5,
+            "maxConcurrentRequests": 1,
+            "maxConcurrentPerPartition": 1,
+            "maxQueueDepth": 6,
+            "maxQueueDepthPerPartition": 3,
+            "partitions": [
+              {
+                "partitionKey": "tenant:f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf",
+                "tenantId": "f6dbbfa7-7f44-4cc1-bf76-14d1f8f125bf",
+                "userId": "364170f8-86ca-4066-9a37-dd714589a956",
+                "clientIp": "127.0.0.1",
+                "active": 0,
+                "queued": 3,
+                "grantedCount": 1,
+                "lastGrantedAt": "2026-03-20T17:10:11.131Z"
+              },
+              {
+                "partitionKey": "tenant:95101534-4f52-4038-88cf-825c74db29f2",
+                "tenantId": "95101534-4f52-4038-88cf-825c74db29f2",
+                "userId": "93dcd3f2-0b9e-4cbd-8b58-1f38ad2ace03",
+                "clientIp": "127.0.0.1",
+                "active": 0,
+                "queued": 2,
+                "grantedCount": 1,
+                "lastGrantedAt": "2026-03-20T17:10:11.343Z"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "error": {
+    "message": "Dashboard failed at http://127.0.0.1:4101: 408 {\"statusCode\":408,\"timestamp\":\"2026-03-20T17:10:26.533Z\",\"path\":\"/api/system/dashboard?periodMinutes=60&severity=all\",\"requestId\":\"04649d82-107a-4eef-9322-f40a252fbc22\",\"traceId\":\"7a2be5f028a34788b5e096714b59aba0\",\"message\":\"Execucao da rota excedeu o tempo limite configurado para dashboard-aggregate.\"}",
+    "stack": "Error: Dashboard failed at http://127.0.0.1:4101: 408 {\"statusCode\":408,\"timestamp\":\"2026-03-20T17:10:26.533Z\",\"path\":\"/api/system/dashboard?periodMinutes=60&severity=all\",\"requestId\":\"04649d82-107a-4eef-9322-f40a252fbc22\",\"traceId\":\"7a2be5f028a34788b5e096714b59aba0\",\"message\":\"Execucao da rota excedeu o tempo limite configurado para dashboard-aggregate.\"}\n    at getDashboard (D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\run-proof.cjs:573:11)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async runRedisUnavailableScenario (D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\run-proof.cjs:718:21)\n    at async main (D:\\Usuarios\\Servidor\\GORInformatica\\Documents\\GitHub\\Projeto-menu-multitenant-seguro\\Scripts\\tests\\distributed-runtime\\run-proof.cjs:1291:5)"
+  }
+}

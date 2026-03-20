@@ -6,6 +6,7 @@ import { resolveApiVersion, buildApiVersionResponseHeaders } from '../http/api-v
 import {
   BAGGAGE_HEADER,
   annotateRequestTrace,
+  buildBaggageHeaderValue,
   getRequestTrace,
 } from '../http/request-trace.util';
 import { OperationalObservabilityService } from '../services/operational-observability.service';
@@ -72,20 +73,9 @@ export class ApiVersioningMiddleware implements NestMiddleware {
       res.setHeader(headerName, headerValue);
     }
     const baggageTrace = trace || getRequestTrace(req as unknown as Record<string, any>);
-    if (baggageTrace?.apiVersion) {
-      const baggageEntries = [
-        baggageTrace.tenantId ? `tenant_id=${baggageTrace.tenantId}` : null,
-        baggageTrace.userId ? `user_id=${baggageTrace.userId}` : null,
-        baggageTrace.apiVersion ? `api_version=${baggageTrace.apiVersion}` : null,
-        baggageTrace.mitigationFlags.length > 0
-          ? `mitigation_flags=${baggageTrace.mitigationFlags.join('.')}`
-          : null,
-      ]
-        .filter(Boolean)
-        .join(',');
-      if (baggageEntries) {
-        res.setHeader(BAGGAGE_HEADER, baggageEntries);
-      }
+    const baggage = buildBaggageHeaderValue(baggageTrace);
+    if (baggage) {
+      res.setHeader(BAGGAGE_HEADER, baggage);
     }
 
     next();

@@ -12,10 +12,13 @@ export type RedisNodeAddress = {
 export type RedisTopologyConfig = {
   mode: RedisTopologyMode;
   enabled: boolean;
+  valid: boolean;
+  configured: boolean;
   required: boolean;
   fallbackMode: RedisFallbackMode;
   connectTimeoutMs: number;
   retryCooldownMs: number;
+  invalidReason: string | null;
   standalone?: RedisNodeAddress & {
     username?: string;
     password?: string;
@@ -40,6 +43,8 @@ export type RedisTopologyConfig = {
 
 export type RedisHealthSnapshot = {
   enabled: boolean;
+  valid: boolean;
+  configured: boolean;
   mode: RedisTopologyMode;
   ready: boolean;
   fallbackActive: boolean;
@@ -147,10 +152,13 @@ export function resolveRedisTopologyConfig(
     return {
       mode: 'disabled',
       enabled: false,
+      valid: true,
+      configured: explicitMode !== null || host.length > 0 || clusterNodes.length > 0 || sentinels.length > 0,
       required,
       fallbackMode,
       connectTimeoutMs,
       retryCooldownMs,
+      invalidReason: null,
     };
   }
 
@@ -165,13 +173,17 @@ export function resolveRedisTopologyConfig(
           : 'disabled');
 
   if (inferredMode === 'cluster') {
+    const valid = clusterNodes.length > 0;
     return {
       mode: 'cluster',
-      enabled: clusterNodes.length > 0,
+      enabled: true,
+      valid,
+      configured: true,
       required,
       fallbackMode,
       connectTimeoutMs,
       retryCooldownMs,
+      invalidReason: valid ? null : 'redis-cluster-nodes-missing',
       cluster: {
         nodes: clusterNodes,
         username: normalizeText(env.REDIS_USERNAME) || undefined,
@@ -181,13 +193,17 @@ export function resolveRedisTopologyConfig(
   }
 
   if (inferredMode === 'sentinel') {
+    const valid = sentinels.length > 0;
     return {
       mode: 'sentinel',
-      enabled: sentinels.length > 0,
+      enabled: true,
+      valid,
+      configured: true,
       required,
       fallbackMode,
       connectTimeoutMs,
       retryCooldownMs,
+      invalidReason: valid ? null : 'redis-sentinels-missing',
       sentinel: {
         masterName: normalizeText(env.REDIS_MASTER_NAME) || 'mymaster',
         sentinels,
@@ -201,16 +217,20 @@ export function resolveRedisTopologyConfig(
     };
   }
 
-  if (inferredMode === 'standalone' && host) {
+  if (inferredMode === 'standalone') {
+    const valid = host.length > 0;
     return {
       mode: 'standalone',
       enabled: true,
+      valid,
+      configured: true,
       required,
       fallbackMode,
       connectTimeoutMs,
       retryCooldownMs,
+      invalidReason: valid ? null : 'redis-standalone-host-missing',
       standalone: {
-        host,
+        host: host || '127.0.0.1',
         port: parseInteger(env.REDIS_PORT, 6379, 1, 65535),
         username: normalizeText(env.REDIS_USERNAME) || undefined,
         password: normalizeText(env.REDIS_PASSWORD) || undefined,
@@ -222,10 +242,13 @@ export function resolveRedisTopologyConfig(
   return {
     mode: 'disabled',
     enabled: false,
+    valid: true,
+    configured: false,
     required,
     fallbackMode,
     connectTimeoutMs,
     retryCooldownMs,
+    invalidReason: null,
   };
 }
 
@@ -233,6 +256,10 @@ export function createRedisClientFromTopology(
   config: RedisTopologyConfig,
 ): RedisClientLike | undefined {
   if (!config.enabled || config.mode === 'disabled') {
+    return undefined;
+  }
+
+  if (!config.valid) {
     return undefined;
   }
 
@@ -336,6 +363,10 @@ export function describeRedisTopology(config: RedisTopologyConfig): string {
     return 'disabled';
   }
 
+  if (!config.valid) {
+    return `${config.mode}(invalid:${config.invalidReason || 'unknown'})`;
+  }
+
   if (config.mode === 'cluster') {
     return `cluster(${config.cluster?.nodes.length || 0} nodes)`;
   }
@@ -353,14 +384,69 @@ export function buildRedisHealthSnapshot(input: {
   fallbackActive: boolean;
   detail?: string | null;
 }): RedisHealthSnapshot {
+  const detail = classifyRedisHealthDetail(input.config, input.detail || null);
   return {
     enabled: input.config.enabled,
+    valid: input.config.valid,
+    configured: input.config.configured,
     mode: input.config.mode,
     ready: isRedisClientReady(input.client),
     fallbackActive: input.fallbackActive,
     required: input.config.required,
     fallbackMode: input.config.fallbackMode,
     status: getRedisClientStatus(input.client),
-    detail: input.detail || null,
+    detail,
   };
+}
+
+export function classifyRedisHealthDetail(
+  config: RedisTopologyConfig,
+  detail: string | null,
+): string | null {
+  if (!config.valid) {
+    return config.invalidReason;
+  }
+
+  const normalizedDetail = normalizeText(detail).toLowerCase();
+  if (!normalizedDetail) {
+    return null;
+  }
+
+  if (
+    normalizedDetail.includes('all sentinels are unreachable') ||
+    normalizedDetail.includes('sentinel')
+  ) {
+    return 'redis-sentinel-unreachable';
+  }
+
+  if (
+    normalizedDetail.includes('clusterallfailederror') ||
+    normalizedDetail.includes('failed to refresh slots cache') ||
+    normalizedDetail.includes('cluster')
+  ) {
+    return 'redis-cluster-partial-unavailable';
+  }
+
+  if (normalizedDetail.includes('etimedout') || normalizedDetail.includes('timeout')) {
+    return 'redis-timeout';
+  }
+
+  if (normalizedDetail.includes('econnrefused')) {
+    return 'redis-connection-refused';
+  }
+
+  if (normalizedDetail.includes('enotfound')) {
+    return 'redis-dns-resolution-failed';
+  }
+
+  return sanitizeOpaqueDetail(detail);
+}
+
+function sanitizeOpaqueDetail(value: string | null): string | null {
+  const normalized = normalizeText(value);
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized.slice(0, 160);
 }

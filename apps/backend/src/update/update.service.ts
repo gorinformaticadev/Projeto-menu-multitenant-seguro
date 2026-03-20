@@ -149,10 +149,11 @@ export class UpdateService implements OnModuleInit {
           key: 'dependency:github-remote-tags',
           route: '/update/check',
           failureThreshold: 2,
+          failureWindowMs: 15_000,
           resetTimeoutMs: 60_000,
           halfOpenMaxProbes: 1,
           halfOpenSuccessThreshold: 1,
-          jitterRatio: 0.2,
+          jitterRatio: 0.15,
         },
         () => this.getRemoteTagsOutput(repoUrl, settings.gitToken),
       );

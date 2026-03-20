@@ -181,4 +181,106 @@ describe('OperationalCircuitBreakerService', () => {
       openCount: 1,
     });
   });
+
+  it('does not open from stale failures that fall outside the calibrated failure window', async () => {
+    const service = createService();
+    const options = {
+      key: 'dependency:database',
+      route: '/api/system/dashboard',
+      failureThreshold: 2,
+      failureWindowMs: 2_000,
+      resetTimeoutMs: 10_000,
+      jitterRatio: 0,
+    };
+
+    await expect(service.execute(options, async () => Promise.reject(new Error('boom-1')))).rejects.toThrow(
+      'boom-1',
+    );
+    jest.advanceTimersByTime(2_500);
+    await expect(service.execute(options, async () => Promise.reject(new Error('boom-2')))).rejects.toThrow(
+      'boom-2',
+    );
+
+    expect(service.getSnapshot(options.key)).toMatchObject({
+      mode: 'closed',
+      failures: 1,
+      openCount: 0,
+    });
+  });
+
+  it('requires multiple recent instance votes when failure quorum is configured above one', async () => {
+    const originalNodeAppInstance = process.env.NODE_APP_INSTANCE;
+    process.env.NODE_APP_INSTANCE = 'instance-a';
+    const serviceA = createService();
+    process.env.NODE_APP_INSTANCE = 'instance-b';
+    const serviceB = createService();
+    process.env.NODE_APP_INSTANCE = originalNodeAppInstance;
+
+    const options = {
+      key: 'dependency:shared-db',
+      route: '/api/system/dashboard',
+      failureThreshold: 1,
+      failureQuorum: 2,
+      recoveryQuorum: 1,
+      voteWindowMs: 10_000,
+      resetTimeoutMs: 10_000,
+      jitterRatio: 0,
+    };
+
+    await expect(serviceA.execute(options, async () => Promise.reject(new Error('boom-a')))).rejects.toThrow(
+      'boom-a',
+    );
+    expect(serviceB.getSnapshot(options.key)).toMatchObject({
+      mode: 'closed',
+      failures: 0,
+      openCount: 0,
+    });
+
+    await expect(serviceB.execute(options, async () => Promise.reject(new Error('boom-b')))).rejects.toThrow(
+      'boom-b',
+    );
+    await expect(serviceA.execute(options, async () => 'ok')).rejects.toBeInstanceOf(
+      CircuitBreakerOpenError,
+    );
+  });
+
+  it('auto-expands half-open probes so recovery quorum can be satisfied by distinct instances', async () => {
+    const originalNodeAppInstance = process.env.NODE_APP_INSTANCE;
+    process.env.NODE_APP_INSTANCE = 'instance-a';
+    const serviceA = createService();
+    process.env.NODE_APP_INSTANCE = 'instance-b';
+    const serviceB = createService();
+    process.env.NODE_APP_INSTANCE = originalNodeAppInstance;
+    const options = {
+      key: 'dependency:quorum-recovery',
+      route: '/api/ops-runtime-test/dependency/check',
+      failureThreshold: 1,
+      failureQuorum: 1,
+      recoveryQuorum: 2,
+      resetTimeoutMs: 5_000,
+      halfOpenMaxProbes: 1,
+      halfOpenSuccessThreshold: 1,
+      jitterRatio: 0,
+    };
+
+    await expect(serviceA.execute(options, async () => Promise.reject(new Error('down')))).rejects.toThrow(
+      'down',
+    );
+
+    jest.advanceTimersByTime(5_001);
+
+    await expect(serviceA.execute(options, async () => 'probe-1')).resolves.toBe('probe-1');
+    expect(serviceA.getSnapshot(options.key)).toMatchObject({
+      mode: 'half-open',
+      halfOpenSuccesses: 1,
+      halfOpenProbeAttempts: 1,
+    });
+
+    await expect(serviceB.execute(options, async () => 'probe-2')).resolves.toBe('probe-2');
+    expect(serviceB.getSnapshot(options.key)).toMatchObject({
+      mode: 'closed',
+      failures: 0,
+      halfOpenSuccesses: 0,
+    });
+  });
 });

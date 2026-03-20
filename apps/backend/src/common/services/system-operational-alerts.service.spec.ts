@@ -488,6 +488,7 @@ describe('SystemOperationalAlertsService', () => {
     expect(result).toEqual({
       status: 'not_configured',
       latencyMs: null,
+      detail: null,
     });
   });
 

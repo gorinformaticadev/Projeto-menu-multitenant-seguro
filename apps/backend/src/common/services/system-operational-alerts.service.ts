@@ -55,6 +55,7 @@ type AlertDispatchInput = {
 type InfraHealthMetric = {
   status: 'healthy' | 'degraded' | 'error' | 'down' | 'not_configured';
   latencyMs: number | null;
+  detail?: string | null;
 };
 
 type CorrelatedOperationalRoute = {
@@ -130,9 +131,15 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     const instanceId = process.env.NODE_APP_INSTANCE || process.env.HOSTNAME || 'single-instance';
     const lockKey = 'alert:evaluator:lock';
 
-    // Substituido Advisory Lock por RedisLockService
-    const lockAcquired = await this.redisLock.acquireLock(lockKey, 50000, instanceId); // 50s
-    if (!lockAcquired) {
+    const lockState = await this.redisLock.acquireLockState(lockKey, 50000, instanceId);
+    if (lockState === 'degraded') {
+      this.logger.error(
+        'Operational alerts evaluator skipped: Redis lock coordination is degraded.',
+      );
+      return;
+    }
+
+    if (lockState === 'busy') {
       this.logger.log('Operational alerts evaluator skipped: lock is held by another instance.');
       return;
     }
@@ -778,6 +785,7 @@ export class SystemOperationalAlertsService implements OnModuleInit {
           service: serviceKey,
           status: metric.status,
           latencyMs: metric.latencyMs,
+          detail: metric.detail || null,
           consecutiveChecks: nextCount,
           threshold: config.infraDegradedMinConsecutive,
         },
@@ -897,6 +905,7 @@ export class SystemOperationalAlertsService implements OnModuleInit {
       return {
         status: 'not_configured',
         latencyMs: null,
+        detail: health.detail || null,
       };
     }
 
@@ -904,6 +913,7 @@ export class SystemOperationalAlertsService implements OnModuleInit {
       return {
         status: 'not_configured',
         latencyMs: null,
+        detail: health.detail || null,
       };
     }
 
@@ -911,12 +921,14 @@ export class SystemOperationalAlertsService implements OnModuleInit {
       return {
         status: 'healthy',
         latencyMs: null,
+        detail: health.detail || null,
       };
     }
 
     return {
       status: health.fallbackActive ? 'degraded' : 'down',
       latencyMs: null,
+      detail: health.detail || null,
     };
   }
 
