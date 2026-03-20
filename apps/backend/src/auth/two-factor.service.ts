@@ -14,6 +14,7 @@ import { getPlatformName } from '@core/common/constants/platform.constants';
 import { decryptSensitiveData, encryptSensitiveData } from '@core/common/utils/security.utils';
 import { TrustedDeviceService } from './trusted-device.service';
 import { AuditService } from '../audit/audit.service';
+import { AuthSchemaCompatibilityService } from './auth-schema-compatibility.service';
 
 type TwoFactorAuditContext = {
   actorUserId?: string;
@@ -32,6 +33,7 @@ export class TwoFactorService {
     private readonly trustedDeviceService: TrustedDeviceService,
     @Inject(forwardRef(() => AuditService))
     private readonly auditService: AuditService,
+    private readonly authSchemaCompatibilityService: AuthSchemaCompatibilityService,
   ) {}
 
   /**
@@ -40,9 +42,11 @@ export class TwoFactorService {
    */
   async generateSecret(userId: string, auditContext?: TwoFactorAuditContext) {
     await this.assertTwoFactorGloballyEnabled();
+    const supportsPendingSecret = await this.supportsPendingSecretColumn();
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      select: await this.buildTwoFactorUserSelect(),
     });
 
     if (!user) {
@@ -59,9 +63,14 @@ export class TwoFactorService {
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: {
-        twoFactorPendingSecret: encryptedSecret,
-      },
+      data: supportsPendingSecret
+        ? {
+            twoFactorPendingSecret: encryptedSecret,
+          }
+        : {
+            twoFactorSecret: encryptedSecret,
+          },
+      select: { id: true },
     });
 
     await this.auditService.log({
@@ -80,6 +89,7 @@ export class TwoFactorService {
       details: {
         hadActiveTwoFactor: user.twoFactorEnabled === true,
         rotatedSecret: user.twoFactorEnabled === true,
+        legacyPendingSecretFallback: !supportsPendingSecret,
       },
     });
 
@@ -97,16 +107,19 @@ export class TwoFactorService {
    */
   async enable(userId: string, token: string, auditContext?: TwoFactorAuditContext) {
     await this.assertTwoFactorGloballyEnabled();
+    const supportsPendingSecret = await this.supportsPendingSecretColumn();
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      select: await this.buildTwoFactorUserSelect(),
     });
 
     if (!user) {
       throw new NotFoundException('Usuario nao encontrado');
     }
 
-    const secretToActivate = user.twoFactorPendingSecret || user.twoFactorSecret;
+    const secretToActivate =
+      (supportsPendingSecret ? user.twoFactorPendingSecret : null) || user.twoFactorSecret;
     if (!secretToActivate) {
       throw new NotFoundException('Secret 2FA nao encontrado');
     }
@@ -116,16 +129,23 @@ export class TwoFactorService {
 
     const rotatedSecret =
       user.twoFactorEnabled === true &&
+      supportsPendingSecret &&
       !!user.twoFactorPendingSecret &&
       user.twoFactorPendingSecret !== user.twoFactorSecret;
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: {
-        twoFactorEnabled: true,
-        twoFactorSecret: secretToActivate,
-        twoFactorPendingSecret: null,
-      },
+      data: supportsPendingSecret
+        ? {
+            twoFactorEnabled: true,
+            twoFactorSecret: secretToActivate,
+            twoFactorPendingSecret: null,
+          }
+        : {
+            twoFactorEnabled: true,
+            twoFactorSecret: secretToActivate,
+          },
+      select: { id: true },
     });
 
     if (rotatedSecret) {
@@ -161,7 +181,7 @@ export class TwoFactorService {
         : undefined,
       details: {
         rotatedSecret,
-        usedPendingSecret: !!user.twoFactorPendingSecret,
+        usedPendingSecret: supportsPendingSecret && !!user.twoFactorPendingSecret,
       },
     });
 
@@ -172,8 +192,10 @@ export class TwoFactorService {
    * Desativar 2FA.
    */
   async disable(userId: string, token: string, auditContext?: TwoFactorAuditContext) {
+    const supportsPendingSecret = await this.supportsPendingSecretColumn();
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      select: await this.buildTwoFactorUserSelect(),
     });
 
     if (!user || !user.twoFactorSecret) {
@@ -185,11 +207,17 @@ export class TwoFactorService {
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: {
-        twoFactorEnabled: false,
-        twoFactorSecret: null,
-        twoFactorPendingSecret: null,
-      },
+      data: supportsPendingSecret
+        ? {
+            twoFactorEnabled: false,
+            twoFactorSecret: null,
+            twoFactorPendingSecret: null,
+          }
+        : {
+            twoFactorEnabled: false,
+            twoFactorSecret: null,
+          },
+      select: { id: true },
     });
 
     await this.trustedDeviceService.revokeAllForUser({
@@ -261,5 +289,22 @@ export class TwoFactorService {
     if (!isValid) {
       throw new BadRequestException('Codigo invalido');
     }
+  }
+
+  private async supportsPendingSecretColumn(): Promise<boolean> {
+    const capabilities = await this.authSchemaCompatibilityService.getCapabilities();
+    return capabilities.hasTwoFactorPendingSecretColumn;
+  }
+
+  private async buildTwoFactorUserSelect() {
+    const supportsPendingSecret = await this.supportsPendingSecretColumn();
+    return {
+      id: true,
+      email: true,
+      tenantId: true,
+      twoFactorEnabled: true,
+      twoFactorSecret: true,
+      ...(supportsPendingSecret ? { twoFactorPendingSecret: true } : {}),
+    };
   }
 }

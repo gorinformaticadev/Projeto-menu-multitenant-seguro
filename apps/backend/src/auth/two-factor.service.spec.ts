@@ -22,12 +22,17 @@ describe('TwoFactorService', () => {
     log: jest.fn(),
   };
 
+  const authSchemaCompatibilityServiceMock = {
+    getCapabilities: jest.fn(),
+  };
+
   const createService = () =>
     new TwoFactorService(
       prismaMock as any,
       securityConfigServiceMock as any,
       trustedDeviceServiceMock as any,
       auditServiceMock as any,
+      authSchemaCompatibilityServiceMock as any,
     );
 
   const originalEncryptionKey = process.env.ENCRYPTION_KEY;
@@ -51,6 +56,13 @@ describe('TwoFactorService', () => {
     trustedDeviceServiceMock.revokeAllForUser.mockResolvedValue(0);
     auditServiceMock.log.mockResolvedValue(undefined);
     prismaMock.user.update.mockResolvedValue(undefined);
+    authSchemaCompatibilityServiceMock.getCapabilities.mockResolvedValue({
+      hasTwoFactorPendingSecretColumn: true,
+      hasSessionVersionColumn: true,
+      hasTrustedDevicesTable: true,
+      hasUserPreferencesTable: true,
+      hasUserSessionsTable: true,
+    });
   });
 
   it('stores a newly generated secret as pending without overwriting the active secret immediately', async () => {
@@ -75,6 +87,7 @@ describe('TwoFactorService', () => {
       data: {
         twoFactorPendingSecret: expect.any(String),
       },
+      select: { id: true },
     });
     expect(prismaMock.user.update).not.toHaveBeenCalledWith(
       expect.objectContaining({
@@ -115,6 +128,7 @@ describe('TwoFactorService', () => {
         twoFactorSecret: pendingSecret,
         twoFactorPendingSecret: null,
       },
+      select: { id: true },
     });
     expect(trustedDeviceServiceMock.revokeAllForUser).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -122,5 +136,34 @@ describe('TwoFactorService', () => {
         reason: '2fa_secret_rotated',
       }),
     );
+  });
+
+  it('falls back to the active secret column when pending-secret support is absent in a legacy database', async () => {
+    authSchemaCompatibilityServiceMock.getCapabilities.mockResolvedValue({
+      hasTwoFactorPendingSecretColumn: false,
+      hasSessionVersionColumn: true,
+      hasTrustedDevicesTable: false,
+      hasUserPreferencesTable: true,
+      hasUserSessionsTable: true,
+    });
+    const service = createService();
+
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'admin@example.com',
+      tenantId: 'tenant-1',
+      twoFactorEnabled: false,
+      twoFactorSecret: null,
+    });
+
+    await service.generateSecret('user-1');
+
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: {
+        twoFactorSecret: expect.any(String),
+      },
+      select: { id: true },
+    });
   });
 });

@@ -19,11 +19,16 @@ describe('TrustedDeviceService', () => {
     log: jest.fn(),
   };
 
+  const authSchemaCompatibilityServiceMock = {
+    getCapabilities: jest.fn(),
+  };
+
   const createService = () =>
     new TrustedDeviceService(
       prismaMock as any,
       configServiceMock as any,
       auditServiceMock as any,
+      authSchemaCompatibilityServiceMock as any,
     );
 
   beforeEach(() => {
@@ -47,6 +52,13 @@ describe('TrustedDeviceService', () => {
     prismaMock.trustedDevice.update.mockResolvedValue(undefined);
     prismaMock.trustedDevice.updateMany.mockResolvedValue({ count: 0 });
     prismaMock.trustedDevice.deleteMany.mockResolvedValue({ count: 0 });
+    authSchemaCompatibilityServiceMock.getCapabilities.mockResolvedValue({
+      hasTwoFactorPendingSecretColumn: false,
+      hasSessionVersionColumn: true,
+      hasTrustedDevicesTable: true,
+      hasUserPreferencesTable: true,
+      hasUserSessionsTable: true,
+    });
   });
 
   it('issues a random token and stores only the token hash', async () => {
@@ -181,6 +193,41 @@ describe('TrustedDeviceService', () => {
         tenantId: 'tenant-1',
       }),
     ).rejects.toThrow('TRUSTED_DEVICE_TOKEN_SECRET nao configurado');
+  });
+
+  it('degrades safely when the trusted_devices table does not exist yet', async () => {
+    authSchemaCompatibilityServiceMock.getCapabilities.mockResolvedValue({
+      hasTwoFactorPendingSecretColumn: false,
+      hasSessionVersionColumn: true,
+      hasTrustedDevicesTable: false,
+      hasUserPreferencesTable: true,
+      hasUserSessionsTable: true,
+    });
+    const service = createService();
+
+    await expect(
+      service.validateTrustedDevice({
+        userId: 'user-1',
+        token: 'legacy-token',
+      }),
+    ).resolves.toEqual({
+      status: 'not_found',
+      shouldBypass2FA: false,
+      shouldClearCookie: true,
+    });
+
+    await expect(
+      service.issueTrustedDevice({
+        userId: 'user-1',
+        tenantId: 'tenant-1',
+      }),
+    ).resolves.toEqual({
+      token: '',
+      expiresAt: expect.any(Date),
+    });
+
+    expect(prismaMock.trustedDevice.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.trustedDevice.create).not.toHaveBeenCalled();
   });
 
   it('revokes all active trusted devices for a user and returns the revoked count', async () => {

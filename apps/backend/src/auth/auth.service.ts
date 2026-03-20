@@ -15,6 +15,7 @@ import { Login2FADto } from './dto/login-2fa.dto';
 import { UserSessionService } from './user-session.service';
 import { TrustedDeviceService } from './trusted-device.service';
 import { Complete2FAEnrollmentDto } from './dto/complete-2fa-enrollment.dto';
+import { AuthSchemaCompatibilityService } from './auth-schema-compatibility.service';
 
 type TokenGenerationInput = {
   userId: string;
@@ -122,6 +123,7 @@ export class AuthService {
     private securityConfigService: SecurityConfigService,
     private userSessionService: UserSessionService,
     private trustedDeviceService: TrustedDeviceService,
+    private readonly authSchemaCompatibilityService: AuthSchemaCompatibilityService,
   ) {}
 
   async login(
@@ -132,9 +134,9 @@ export class AuthService {
   ): Promise<LoginFlowResponse> {
     const { email, password } = loginDto;
 
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-      include: { tenant: true, preferences: true },
+    const user = await this.findUserByEmail(email, {
+      includePassword: true,
+      includeTwoFactorSecret: true,
     });
 
     if (!user) {
@@ -176,6 +178,7 @@ export class AuthService {
           lockedAt: null,
           lockedUntil: null,
         },
+        select: { id: true },
       });
     }
 
@@ -205,6 +208,7 @@ export class AuthService {
         await this.prisma.user.update({
           where: { id: user.id },
           data: updateData,
+          select: { id: true },
         });
 
         await this.auditService.log({
@@ -229,6 +233,7 @@ export class AuthService {
       await this.prisma.user.update({
         where: { id: user.id },
         data: updateData,
+        select: { id: true },
       });
 
       const attemptsRemaining = maxAttempts - newAttempts;
@@ -259,6 +264,7 @@ export class AuthService {
           loginAttempts: 0,
           lastFailedLoginAt: null,
         },
+        select: { id: true },
       });
     }
 
@@ -453,7 +459,18 @@ export class AuthService {
       const now = new Date();
       const storedToken = await tx.refreshToken.findUnique({
         where: { token: refreshToken },
-        include: { user: { include: { tenant: true, preferences: true } }, session: true },
+        select: {
+          id: true,
+          token: true,
+          sessionId: true,
+          expiresAt: true,
+          session: true,
+          user: {
+            select: await this.buildAuthUserSelect({
+              includeTwoFactorSecret: true,
+            }),
+          },
+        },
       });
 
       if (!storedToken) {
@@ -588,9 +605,9 @@ export class AuthService {
   ): Promise<AuthenticatedLoginResponse> {
     const { email, password, twoFactorToken } = login2FADto;
 
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-      include: { tenant: true, preferences: true },
+    const user = await this.findUserByEmail(email, {
+      includePassword: true,
+      includeTwoFactorSecret: true,
     });
 
     if (!user) {
@@ -658,6 +675,7 @@ export class AuthService {
           loginAttempts: 0,
           lastFailedLoginAt: null,
         },
+        select: { id: true },
       });
     }
 
@@ -726,9 +744,8 @@ export class AuthService {
       auditAction: 'TWO_FACTOR_ENROLLMENT_COMPLETED',
     });
 
-    const refreshedUser = await this.prisma.user.findUnique({
-      where: { id: user.id },
-      include: { tenant: true },
+    const refreshedUser = await this.findUserById(user.id, {
+      includeTwoFactorSecret: true,
     });
 
     if (!refreshedUser) {
@@ -784,10 +801,7 @@ export class AuthService {
   }
 
   async getProfile(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: { tenant: true, preferences: true },
-    });
+    const user = await this.findUserById(userId, {});
 
     if (!user) {
       throw this.buildUnauthorizedException('INVALID_CREDENTIALS', 'Usuario nao encontrado');
@@ -902,10 +916,7 @@ export class AuthService {
       );
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      include: { tenant: true },
-    });
+    const user = await this.findUserById(payload.sub, {});
 
     if (!user || user.email !== payload.email || user.role !== payload.role || user.tenantId !== payload.tenantId) {
       throw this.buildUnauthorizedException(
@@ -982,6 +993,83 @@ export class AuthService {
 
     const normalizedFallback = String(fallback ?? '').trim();
     return normalizedFallback.length > 0 ? normalizedFallback : '15m';
+  }
+
+  private async findUserByEmail(
+    email: string,
+    options: {
+      includePassword?: boolean;
+      includeTwoFactorSecret?: boolean;
+    } = {},
+  ) {
+    return this.prisma.user.findUnique({
+      where: { email },
+      select: await this.buildAuthUserSelect(options),
+    });
+  }
+
+  private async findUserById(
+    userId: string,
+    options: {
+      includePassword?: boolean;
+      includeTwoFactorSecret?: boolean;
+    } = {},
+  ) {
+    return this.prisma.user.findUnique({
+      where: { id: userId },
+      select: await this.buildAuthUserSelect(options),
+    });
+  }
+
+  private async buildAuthUserSelect(options: {
+    includePassword?: boolean;
+    includeTwoFactorSecret?: boolean;
+  }): Promise<Prisma.UserSelect> {
+    const capabilities = await this.authSchemaCompatibilityService.getCapabilities();
+    const select: Prisma.UserSelect = {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      tenantId: true,
+      avatarUrl: true,
+      twoFactorEnabled: true,
+      loginAttempts: true,
+      isLocked: true,
+      lockedUntil: true,
+      tenant: {
+        select: {
+          id: true,
+          nomeFantasia: true,
+          cnpjCpf: true,
+          telefone: true,
+          logoUrl: true,
+          email: true,
+        },
+      },
+    };
+
+    if (capabilities.hasSessionVersionColumn) {
+      select.sessionVersion = true;
+    }
+
+    if (options.includePassword) {
+      select.password = true;
+    }
+
+    if (options.includeTwoFactorSecret) {
+      select.twoFactorSecret = true;
+    }
+
+    if (capabilities.hasUserPreferencesTable) {
+      select.preferences = {
+        select: {
+          theme: true,
+        },
+      };
+    }
+
+    return select;
   }
 
   private toUserResponse(user: {

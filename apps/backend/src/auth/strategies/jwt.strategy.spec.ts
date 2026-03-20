@@ -20,17 +20,29 @@ describe('JwtStrategy session validation', () => {
     assertAccessSessionActive: jest.fn(),
   };
 
+  const authSchemaCompatibilityServiceMock = {
+    getCapabilities: jest.fn(),
+  };
+
   const createStrategy = () =>
     new JwtStrategy(
       configMock as any,
       prismaMock as any,
       tokenBlacklistServiceMock as any,
       userSessionServiceMock as any,
+      authSchemaCompatibilityServiceMock as any,
     );
 
   beforeEach(() => {
     jest.clearAllMocks();
     userSessionServiceMock.assertAccessSessionActive.mockResolvedValue(undefined);
+    authSchemaCompatibilityServiceMock.getCapabilities.mockResolvedValue({
+      hasTwoFactorPendingSecretColumn: false,
+      hasSessionVersionColumn: true,
+      hasTrustedDevicesTable: false,
+      hasUserPreferencesTable: true,
+      hasUserSessionsTable: true,
+    });
   });
 
   it('rejects a revoked bearer token', async () => {
@@ -158,5 +170,16 @@ describe('JwtStrategy session validation', () => {
         userAgent: 'jest-agent',
       },
     );
+    expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        tenantId: true,
+        name: true,
+        sessionVersion: true,
+      },
+    });
   });
 });

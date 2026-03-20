@@ -4,6 +4,7 @@ import { PrismaService } from '@core/prisma/prisma.service';
 import * as crypto from 'crypto';
 import { AuditService } from '../audit/audit.service';
 import { TRUSTED_DEVICE_TTL_MS } from './trusted-device.constants';
+import { AuthSchemaCompatibilityService } from './auth-schema-compatibility.service';
 
 type TrustedDeviceActor = {
   userId: string;
@@ -55,15 +56,27 @@ type RevokeTrustedDevicesInput = {
 @Injectable()
 export class TrustedDeviceService {
   private readonly logger = new Logger(TrustedDeviceService.name);
+  private legacyTableWarningLogged = false;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     @Inject(forwardRef(() => AuditService))
     private readonly auditService: AuditService,
+    private readonly authSchemaCompatibilityService: AuthSchemaCompatibilityService,
   ) {}
 
   async issueTrustedDevice(input: CreateTrustedDeviceInput): Promise<{ token: string; expiresAt: Date }> {
+    if (!(await this.supportsTrustedDevicesTable())) {
+      this.logMissingTrustedDeviceTableWarning(
+        'Skipping trusted-device issuance because trusted_devices is missing in the current database schema.',
+      );
+      return {
+        token: '',
+        expiresAt: new Date(),
+      };
+    }
+
     const token = this.generateToken();
     const tokenHash = this.hashToken(token);
     const now = new Date();
@@ -107,6 +120,17 @@ export class TrustedDeviceService {
         status: 'missing',
         shouldBypass2FA: false,
         shouldClearCookie: false,
+      };
+    }
+
+    if (!(await this.supportsTrustedDevicesTable())) {
+      this.logMissingTrustedDeviceTableWarning(
+        'Trusted-device validation is running in degraded mode because trusted_devices is missing in the current database schema.',
+      );
+      return {
+        status: 'not_found',
+        shouldBypass2FA: false,
+        shouldClearCookie: true,
       };
     }
 
@@ -191,6 +215,10 @@ export class TrustedDeviceService {
   }
 
   async revokeAllForUser(input: RevokeTrustedDevicesInput): Promise<number> {
+    if (!(await this.supportsTrustedDevicesTable())) {
+      return 0;
+    }
+
     const now = new Date();
     const revokedByUserId = this.toNullableString(input.revokedByUserId);
 
@@ -224,6 +252,10 @@ export class TrustedDeviceService {
   }
 
   async cleanupExpiredTrustedDevices(): Promise<number> {
+    if (!(await this.supportsTrustedDevicesTable())) {
+      return 0;
+    }
+
     const now = new Date();
     const revokedRetentionBoundary = new Date(now.getTime() - TRUSTED_DEVICE_TTL_MS);
 
@@ -314,5 +346,19 @@ export class TrustedDeviceService {
 
     const normalized = value.trim();
     return normalized.length > 0 ? normalized : null;
+  }
+
+  private async supportsTrustedDevicesTable(): Promise<boolean> {
+    const capabilities = await this.authSchemaCompatibilityService.getCapabilities();
+    return capabilities.hasTrustedDevicesTable;
+  }
+
+  private logMissingTrustedDeviceTableWarning(message: string) {
+    if (this.legacyTableWarningLogged) {
+      return;
+    }
+
+    this.legacyTableWarningLogged = true;
+    this.logger.warn(message);
   }
 }

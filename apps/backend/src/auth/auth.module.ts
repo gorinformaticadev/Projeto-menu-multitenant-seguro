@@ -15,6 +15,7 @@ import { EmailModule } from '../email/email.module';
 import { SecurityConfigModule } from '@core/security-config/security-config.module';
 import { UserSessionService } from './user-session.service';
 import { TrustedDeviceService } from './trusted-device.service';
+import { AuthSchemaCompatibilityService } from './auth-schema-compatibility.service';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { TrustedDeviceService } from './trusted-device.service';
     TokenBlacklistService,
     UserSessionService,
     TrustedDeviceService,
+    AuthSchemaCompatibilityService,
   ],
   exports: [
     AuthService,
@@ -56,6 +58,7 @@ import { TrustedDeviceService } from './trusted-device.service';
     TokenBlacklistService,
     UserSessionService,
     TrustedDeviceService,
+    AuthSchemaCompatibilityService,
   ],
 })
 export class AuthModule { }

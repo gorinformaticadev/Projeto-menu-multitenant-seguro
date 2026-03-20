@@ -56,6 +56,10 @@ describe('AuthService security runtime enforcement', () => {
     issueTrustedDevice: jest.fn(),
   };
 
+  const authSchemaCompatibilityServiceMock = {
+    getCapabilities: jest.fn(),
+  };
+
   const createService = () =>
     new AuthService(
       prismaMock as any,
@@ -67,6 +71,7 @@ describe('AuthService security runtime enforcement', () => {
       securityConfigServiceMock as any,
       userSessionServiceMock as any,
       trustedDeviceServiceMock as any,
+      authSchemaCompatibilityServiceMock as any,
     );
 
   beforeEach(() => {
@@ -114,6 +119,44 @@ describe('AuthService security runtime enforcement', () => {
     trustedDeviceServiceMock.issueTrustedDevice.mockResolvedValue({
       token: 'trusted-token',
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    });
+    authSchemaCompatibilityServiceMock.getCapabilities.mockResolvedValue({
+      hasTwoFactorPendingSecretColumn: false,
+      hasSessionVersionColumn: true,
+      hasTrustedDevicesTable: false,
+      hasUserPreferencesTable: true,
+      hasUserSessionsTable: true,
+    });
+  });
+
+  it('uses an explicit legacy-compatible user projection during login', async () => {
+    const service = createService();
+    prismaMock.user.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.login(
+        {
+          email: 'legacy@example.com',
+          password: 'SenhaValida!123',
+        },
+        '127.0.0.1',
+        'jest',
+      ),
+    ).rejects.toThrow(UnauthorizedException);
+
+    expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+      where: { email: 'legacy@example.com' },
+      select: expect.objectContaining({
+        id: true,
+        email: true,
+        password: true,
+        twoFactorSecret: true,
+        preferences: {
+          select: {
+            theme: true,
+          },
+        },
+      }),
     });
   });
 

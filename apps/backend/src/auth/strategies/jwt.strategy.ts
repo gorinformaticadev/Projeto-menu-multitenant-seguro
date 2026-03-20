@@ -7,6 +7,7 @@ import { Request } from 'express';
 import { TokenBlacklistService } from '../../common/services/token-blacklist.service';
 import { UserSessionService } from '../user-session.service';
 import { ACCESS_TOKEN_COOKIE_NAME } from '../auth-cookie.constants';
+import { AuthSchemaCompatibilityService } from '../auth-schema-compatibility.service';
 
 interface JwtPayload {
   sub: string;
@@ -32,6 +33,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private prisma: PrismaService,
     private tokenBlacklistService: TokenBlacklistService,
     private userSessionService: UserSessionService,
+    private authSchemaCompatibilityService: AuthSchemaCompatibilityService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
@@ -59,8 +61,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Sessao legada expirada; faca login novamente');
     }
 
+    const capabilities = await this.authSchemaCompatibilityService.getCapabilities();
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        tenantId: true,
+        name: true,
+        ...(capabilities.hasSessionVersionColumn ? { sessionVersion: true } : {}),
+      },
     });
 
     if (!user) {
