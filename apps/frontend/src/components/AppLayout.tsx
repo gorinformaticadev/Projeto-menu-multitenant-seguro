@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "./Sidebar";
@@ -11,8 +11,9 @@ import { ModuleRegistryTaskbar } from "./ModuleRegistryTaskbar";
 import { ModuleLoader } from "@/core/ModuleLoader";
 import { RouteGuard } from "./RouteGuard";
 import { useTheme } from "next-themes";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Button } from "./ui/button";
+import { DEFAULT_TENANT_LOGO_PATH, resolveTenantLogoSrc } from "@/lib/tenant-logo";
 
 function normalizeAppThemePreference(theme?: string | null): "light" | "dark" | "system" {
   if (theme === "dark" || theme === "system") {
@@ -22,19 +23,57 @@ function normalizeAppThemePreference(theme?: string | null): "light" | "dark" | 
   return "light";
 }
 
+function updateDocumentIcons(iconHref: string) {
+  const resolvedHref = iconHref || DEFAULT_TENANT_LOGO_PATH;
+  const iconSelectors = [
+    "link[rel='icon']",
+    "link[rel='shortcut icon']",
+    "link[rel='apple-touch-icon']",
+  ];
+
+  iconSelectors.forEach((selector) => {
+    const links = document.querySelectorAll(selector);
+    links.forEach((link) => {
+      (link as HTMLLinkElement).href = resolvedHref;
+    });
+  });
+
+  if (!document.querySelector("link[rel='icon']")) {
+    const link = document.createElement("link");
+    link.rel = "icon";
+    link.href = resolvedHref;
+    document.head.appendChild(link);
+  }
+}
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
   const { isInitialized, error } = useModuleRegistry();
   const { setTheme, theme } = useTheme();
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  const lastAppliedThemeRef = useRef<"light" | "dark" | "system" | null>(null);
 
-  // Sincroniza tema do backend com o next-themes no primeiro load
-  useEffect(() => {
-    const preferredTheme = normalizeAppThemePreference(user?.preferences?.theme);
-    if (preferredTheme !== theme) {
-      setTheme(preferredTheme);
+  // Sincroniza o tema do usuario antes da pintura para evitar flicker apos o login.
+  useLayoutEffect(() => {
+    if (!user) {
+      lastAppliedThemeRef.current = null;
+      return;
     }
+
+    const preferredTheme = normalizeAppThemePreference(user.preferences?.theme);
+
+    if (theme === preferredTheme) {
+      lastAppliedThemeRef.current = preferredTheme;
+      return;
+    }
+
+    if (lastAppliedThemeRef.current === preferredTheme) {
+      return;
+    }
+
+    lastAppliedThemeRef.current = preferredTheme;
+    setTheme(preferredTheme);
   }, [user, theme, setTheme]);
 
   // Páginas onde o sidebar e topbar NÃO devem aparecer
@@ -56,6 +95,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       body.style.overflow = previousBodyOverflow;
     };
   }, [isPublicPage, loading, user]);
+
+  useEffect(() => {
+    const faviconSrc =
+      resolveTenantLogoSrc(user?.tenant?.logoUrl, {
+        tenantId: user?.tenantId,
+        fallbackToDefault: true,
+      }) || DEFAULT_TENANT_LOGO_PATH;
+
+    updateDocumentIcons(faviconSrc);
+  }, [user?.tenant?.logoUrl, user?.tenantId]);
 
   // Se está carregando ou é página pública, não mostra sidebar nem topbar
   if (loading || isPublicPage || !user) {
@@ -95,23 +144,23 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Layout com Sidebar e Conteúdo */}
         <div className="flex h-full min-h-0 w-full overflow-hidden pt-16 pb-16 md:pb-0">
-          <aside className="hidden h-full min-h-0 flex-shrink-0 md:flex">
-            <Sidebar isExpanded={isSidebarExpanded} />
-          </aside>
-          <div className="hidden md:flex md:items-start md:pt-4">
+          <div className="relative hidden h-full min-h-0 flex-shrink-0 md:flex">
+            <aside className="h-full min-h-0">
+              <Sidebar isExpanded={isSidebarExpanded} />
+            </aside>
             <Button
               type="button"
               variant="ghost"
               size="icon"
               onClick={() => setIsSidebarExpanded((current) => !current)}
-              className="ml-2 h-8 w-8 rounded-full border border-skin-border bg-skin-surface text-skin-text-muted hover:bg-skin-menu-hover hover:text-skin-text"
+              className="absolute -right-3 top-1/2 z-10 h-8 w-8 -translate-y-1/2 rounded-full border border-skin-border/90 bg-skin-surface text-skin-text-muted shadow-sm transition-all duration-200 hover:bg-skin-surface-hover hover:text-skin-text"
               aria-label={isSidebarExpanded ? "Recolher barra lateral" : "Expandir barra lateral"}
               title={isSidebarExpanded ? "Recolher barra lateral" : "Expandir barra lateral"}
             >
               {isSidebarExpanded ? (
-                <PanelLeftClose className="h-4 w-4" />
+                <ChevronsLeft className="h-3.5 w-3.5" />
               ) : (
-                <PanelLeftOpen className="h-4 w-4" />
+                <ChevronsRight className="h-3.5 w-3.5" />
               )}
             </Button>
           </div>
