@@ -2,7 +2,7 @@
 
 [![CI/CD Pipeline](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/actions/workflows/ci-cd.yml)
 
-Plataforma SaaS multitenant orientada a isolamento de dados, seguranca operacional e implantacao simplificada via Docker. Projetado para operacao continua em producao com arquitetura modular pronta para evolucao funcional.
+Plataforma SaaS multitenant orientada a isolamento de dados, segurança operacional e implantação simplificada via Docker. Projetado para operação contínua em produção com arquitetura modular pronta para evolução funcional.
 
 ------------------------------------------------------------------------
 
@@ -16,14 +16,14 @@ Os merges devem passar obrigatoriamente pelos seguintes jobs de CI:
 - smoke-tests
 
 ------------------------------------------------------------------------
-## Visao Geral
+## Visão Geral
 
-Este repositorio entrega uma stack completa para aplicacoes SaaS multitenant:
+Este repositório entrega uma stack completa para aplicações SaaS multitenant:
 
-- API backend em **NestJS** com autenticacao, autorizacao e isolamento por tenant
+- API backend em **NestJS** com autenticação, autorização e isolamento por tenant
 - Frontend administrativo moderno em **Next.js**
-- Scripts oficiais para instalacao, atualizacao e remocao
-- Estrutura documental centralizada para operacao e manutencao
+- Scripts oficiais para instalação, atualização e remoção
+- Estrutura documental centralizada para operação e manutenção
 
 Objetivo principal:
 
@@ -31,23 +31,23 @@ Objetivo principal:
 
 ------------------------------------------------------------------------
 
-## Principais Caracteristicas Tecnicas
+## Principais Características Técnicas
 
 ### Arquitetura
 
-- Multitenancy com separacao logica por tenant
+- Multitenancy com separação lógica por tenant
 - Backend modular preparado para expansao
-- Frontend desacoplado e escalavel
-- Docker Compose pronto para producao
+- Frontend desacoplado e escalável
+- Docker Compose pronto para produção
 
-### Operacao
+### Operação
 
 - Scripts oficiais versionados
-- Documentacao tecnica consolidada
+- Documentação técnica consolidada
 - Fluxo controlado de update
 - Base pronta para CI/CD
 
-### Seguranca
+### Segurança
 
 - Controle de acesso centralizado
 - Isolamento entre tenants
@@ -55,7 +55,7 @@ Objetivo principal:
 
 ------------------------------------------------------------------------
 
-## Estrutura do Repositorio
+## Estrutura do Repositório
 
 ```text
 apps/
@@ -68,17 +68,17 @@ install/
   uninstall.sh
   scripts auxiliares
 
-DOCS/           -> Documentacao tecnica e operacional
+DOCS/           -> Documentação técnica e operacional
 Scripts/        -> Scripts auxiliares e testes manuais
 ```
 
 ------------------------------------------------------------------------
 
-## Instalacao Oficial
+## Instalação Oficial
 
 Sempre utilize os scripts da pasta `install/`.
 
-### Instalacao inicial
+### Instalação inicial
 
 ```bash
 sudo bash install/install.sh install -d crm.example.com.br -e seuemail@email.com -u gorinformatica
@@ -92,18 +92,18 @@ sudo bash install/install.sh install
 
 ------------------------------------------------------------------------
 
-## Manuais de InstalaÃ§Ã£o Detalhados
+## Manuais de Instalação Detalhados
 
-Para procedimentos passo a passo especÃ­ficos, consulte os manuais abaixo:
+Para procedimentos passo a passo específicos, consulte os manuais abaixo:
 
-- **[InstalaÃ§Ã£o Docker - Desenvolvimento](DOCS/manual-instalacao/INSTALL_DOCKER_DEV.md)**: Guia para rodar o ambiente de desenvolvimento localmente.
-- **[InstalaÃ§Ã£o Docker - Local (Prod)](DOCS/manual-instalacao/INSTALL_DOCKER_LOCAL.md)**: Guia para rodar/testar o build de produÃ§Ã£o localmente.
-- **[InstalaÃ§Ã£o VPS - ProduÃ§Ã£o](DOCS/manual-instalacao/INSTALL_VPS_PROD.md)**: Procedimento oficial para deploy em servidor VPS de ProduÃ§Ã£o.
-- **[InstalaÃ§Ã£o VPS - Dev/Staging](DOCS/manual-instalacao/INSTALL_VPS_DEV.md)**: Procedimento para deploy em servidor VPS de Desenvolvimento/HomologaÃ§Ã£o.
+- **[Instalação Docker - Desenvolvimento](DOCS/manual-instalacao/INSTALL_DOCKER_DEV.md)**: Guia para rodar o ambiente de desenvolvimento localmente.
+- **[Instalação Docker - Local (Prod)](DOCS/manual-instalacao/INSTALL_DOCKER_LOCAL.md)**: Guia para rodar/testar o build de produção localmente.
+- **[Instalação VPS - Produção](DOCS/manual-instalacao/INSTALL_VPS_PROD.md)**: Procedimento oficial para deploy em servidor VPS de Produção.
+- **[Instalação VPS - Dev/Staging](DOCS/manual-instalacao/INSTALL_VPS_DEV.md)**: Procedimento para deploy em servidor VPS de Desenvolvimento/Homologação.
 
 ------------------------------------------------------------------------
 
-## Atualizacao do Sistema
+## Atualização do Sistema
 
 ### Fluxo recomendado
 
@@ -111,7 +111,7 @@ Para procedimentos passo a passo especÃ­ficos, consulte os manuais abaixo:
 sudo bash install/install.sh update
 ```
 
-### Atualizacao pela branch desejada
+### Atualização pela branch desejada
 
 ```bash
 sudo bash install/install.sh update main
@@ -125,7 +125,7 @@ sudo bash install/update.sh
 
 ------------------------------------------------------------------------
 
-## Desinstalacao
+## Desinstalação
 
 ```bash
 sudo bash install/uninstall.sh
@@ -135,7 +135,7 @@ Scripts auxiliares:
 
 - `install/check.sh` -> valida ambiente
 - `install/restore-db.sh` -> wrapper de restore via API interna (Docker)
-- `install/restore-native.sh` -> wrapper de restore via API interna (instalacao native/PM2)
+- `install/restore-native.sh` -> wrapper de restore via API interna (instalação native/PM2)
 - `install/renew-cert.sh` -> renovar certificado
 
 ------------------------------------------------------------------------
@@ -145,16 +145,16 @@ Scripts auxiliares:
 Fluxo oficial de restore:
 
 1. Restore do dump em `staging database`
-2. Validacao de integridade/schema
+2. Validação de integridade/schema
 3. Maintenance mode + quiesce (cron pausado e Prisma desconectado)
-4. Promocao por swap/rename (`staging -> ativa`)
+4. Promoção por swap/rename (`staging -> ativa`)
 5. Smoke test + opcional `prisma migrate deploy`
 6. Maintenance OFF + cron retomado
 
-Wrappers manuais (`install/restore-db.sh` e `install/restore-native.sh`) **nao executam pg_restore direto no banco principal**.
+Wrappers manuais (`install/restore-db.sh` e `install/restore-native.sh`) **não executam pg_restore direto no banco principal**.
 Eles apenas chamam a API interna localhost e fazem polling do job.
 
-Variaveis minimas para wrappers:
+Variáveis mínimas para wrappers:
 
 ```bash
 export BACKUP_INTERNAL_API_TOKEN="<token interno>"
@@ -174,7 +174,7 @@ bash install/restore-db.sh
 
 -----------------------------------------------------------------------
 
-## Restore em Staging (Opcao A) - Runbook Minimo
+## Restore em Staging (Opção A) - Runbook Mínimo
 
 ### 1) Pre-check
 
@@ -188,7 +188,7 @@ echo "BACKUP_INTERNAL_ALLOWED_CIDRS=$BACKUP_INTERNAL_ALLOWED_CIDRS"
 echo "BACKUP_INTERNAL_TRUST_PROXY=$BACKUP_INTERNAL_TRUST_PROXY"
 ```
 
-### 2) Aplicar migracoes antes do deploy
+### 2) Aplicar migrações antes do deploy
 
 ```bash
 # Native
@@ -218,10 +218,10 @@ curl -sS "$BACKEND_INTERNAL_URL/backups/internal/jobs/$JOB_ID" \
   -H "x-backup-internal-token: $BACKUP_INTERNAL_API_TOKEN"
 ```
 
-### 4) Restore pequeno de prova (com promocao)
+### 4) Restore pequeno de prova (com promoção)
 
 1. Enfileire restore de um dump pequeno conhecido.
-2. FaÃ§a polling ate `status=SUCCESS`.
+2. Faça polling até `status=SUCCESS`.
 3. Evidencie timestamps (`createdAt`, `startedAt`, `finishedAt`) e `currentStep`.
 4. Valide health:
 
@@ -239,14 +239,14 @@ curl -sS -X POST "$BACKEND_INTERNAL_URL/backups/internal/restore-by-file" \
   -H "x-backup-internal-token: $BACKUP_INTERNAL_API_TOKEN" \
   --data "{\"backupFile\":\"backup_grande.dump\",\"runMigrations\":false,\"reason\":\"teste-A\"}"
 ```
-Evidencia: job `SUCCESS`, duracao (`finishedAt-startedAt`) e health `ok`.
+Evidência: job `SUCCESS`, duração (`finishedAt-startedAt`) e health `ok`.
 
-2. **Teste B - Promocao com sessao pendurada**
-Comando (manter sessao ativa):
+2. **Teste B - Promoção com sessão pendurada**
+Comando (manter sessão ativa):
 ```bash
 docker compose exec db psql -U "$DB_USER" -d "$DB_NAME" -c "SELECT pg_backend_pid(); SELECT pg_sleep(600);"
 ```
-Em paralelo, rode restore. Evidencia: promocao conclui (ou falha controlada) sem estado quebrado.
+Em paralelo, rode restore. Evidência: promoção conclui (ou falha controlada) sem estado quebrado.
 
 3. **Teste C - Crash entre renames**
 Simulacao:

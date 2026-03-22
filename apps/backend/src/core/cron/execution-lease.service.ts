@@ -3,11 +3,19 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type ExecutionLeaseStatus = 'active' | 'released';
+export type ExecutionLeaseFailureReason =
+  | 'not_found'
+  | 'ownership_mismatch'
+  | 'fencing_mismatch'
+  | 'inactive'
+  | 'stale_execution'
+  | 'database_error';
 
 export interface ExecutionLeaseRecord {
   jobKey: string;
   ownerId: string;
   cycleId: string;
+  leaseVersion: bigint;
   status: ExecutionLeaseStatus;
   startedAt: Date;
   heartbeatAt: Date;
@@ -37,6 +45,7 @@ export interface RenewExecutionLeaseInput {
   jobKey: string;
   ownerId: string;
   cycleId: string;
+  leaseVersion: bigint;
   heartbeatAt?: Date;
   ttlMs: number;
 }
@@ -45,15 +54,42 @@ export interface ReleaseExecutionLeaseInput {
   jobKey: string;
   ownerId: string;
   cycleId: string;
+  leaseVersion: bigint;
   releasedAt?: Date;
   reason: string;
   error?: unknown;
+}
+
+export interface AssertExecutionLeaseOwnershipInput {
+  jobKey: string;
+  ownerId: string;
+  cycleId: string;
+  leaseVersion: bigint;
+}
+
+export interface RenewExecutionLeaseResult {
+  renewed: boolean;
+  lease: ExecutionLeaseRecord | null;
+  reason: ExecutionLeaseFailureReason | null;
+}
+
+export interface ReleaseExecutionLeaseResult {
+  released: boolean;
+  lease: ExecutionLeaseRecord | null;
+  reason: ExecutionLeaseFailureReason | null;
+}
+
+export interface ExecutionLeaseOwnershipResult {
+  owned: boolean;
+  lease: ExecutionLeaseRecord | null;
+  reason: ExecutionLeaseFailureReason | null;
 }
 
 type ExecutionLeaseRow = {
   jobKey: string;
   ownerId: string;
   cycleId: string;
+  leaseVersion: bigint | number | string;
   status: string;
   startedAt: Date;
   heartbeatAt: Date;
@@ -79,6 +115,7 @@ export class ExecutionLeaseService {
           "jobKey",
           "ownerId",
           "cycleId",
+          "leaseVersion",
           "status",
           "startedAt",
           "heartbeatAt",
@@ -109,6 +146,7 @@ export class ExecutionLeaseService {
           "jobKey",
           "ownerId",
           "cycleId",
+          "leaseVersion",
           "status",
           "startedAt",
           "heartbeatAt",
@@ -123,6 +161,7 @@ export class ExecutionLeaseService {
           ${input.jobKey},
           ${input.ownerId},
           ${input.cycleId},
+          1,
           'active',
           ${startedAt},
           CURRENT_TIMESTAMP,
@@ -138,6 +177,7 @@ export class ExecutionLeaseService {
         SET
           "ownerId" = EXCLUDED."ownerId",
           "cycleId" = EXCLUDED."cycleId",
+          "leaseVersion" = "execution_leases"."leaseVersion" + 1,
           "status" = 'active',
           "startedAt" = EXCLUDED."startedAt",
           "heartbeatAt" = EXCLUDED."heartbeatAt",
@@ -153,6 +193,7 @@ export class ExecutionLeaseService {
           "jobKey",
           "ownerId",
           "cycleId",
+          "leaseVersion",
           "status",
           "startedAt",
           "heartbeatAt",
@@ -185,7 +226,7 @@ export class ExecutionLeaseService {
     }
   }
 
-  async renewLease(input: RenewExecutionLeaseInput): Promise<boolean> {
+  async renewLease(input: RenewExecutionLeaseInput): Promise<RenewExecutionLeaseResult> {
     const ttlMs = Math.max(1, Math.floor(input.ttlMs));
 
     try {
@@ -198,12 +239,14 @@ export class ExecutionLeaseService {
         WHERE "jobKey" = ${input.jobKey}
           AND "ownerId" = ${input.ownerId}
           AND "cycleId" = ${input.cycleId}
+          AND "leaseVersion" = ${input.leaseVersion}
           AND "status" = 'active'
           AND "lockedUntil" > CURRENT_TIMESTAMP
         RETURNING
           "jobKey",
           "ownerId",
           "cycleId",
+          "leaseVersion",
           "status",
           "startedAt",
           "heartbeatAt",
@@ -216,14 +259,31 @@ export class ExecutionLeaseService {
           "updatedAt"
       `);
 
-      return rows.length > 0;
+      if (rows.length > 0) {
+        return {
+          renewed: true,
+          lease: this.mapRow(rows[0]),
+          reason: null,
+        };
+      }
+
+      const lease = await this.get(input.jobKey);
+      return {
+        renewed: false,
+        lease,
+        reason: this.classifyFailureReason(input, lease),
+      };
     } catch (error) {
       this.logger.warn(`Falha ao renovar lease persistido de ${input.jobKey}: ${String(error)}`);
-      return false;
+      return {
+        renewed: false,
+        lease: await this.get(input.jobKey),
+        reason: 'database_error',
+      };
     }
   }
 
-  async releaseLease(input: ReleaseExecutionLeaseInput): Promise<boolean> {
+  async releaseLease(input: ReleaseExecutionLeaseInput): Promise<ReleaseExecutionLeaseResult> {
     const releasedAt = input.releasedAt || new Date();
     const lastError = this.normalizeError(input.error);
 
@@ -241,11 +301,13 @@ export class ExecutionLeaseService {
         WHERE "jobKey" = ${input.jobKey}
           AND "ownerId" = ${input.ownerId}
           AND "cycleId" = ${input.cycleId}
+          AND "leaseVersion" = ${input.leaseVersion}
           AND "status" = 'active'
         RETURNING
           "jobKey",
           "ownerId",
           "cycleId",
+          "leaseVersion",
           "status",
           "startedAt",
           "heartbeatAt",
@@ -258,10 +320,80 @@ export class ExecutionLeaseService {
           "updatedAt"
       `);
 
-      return rows.length > 0;
+      if (rows.length > 0) {
+        return {
+          released: true,
+          lease: this.mapRow(rows[0]),
+          reason: null,
+        };
+      }
+
+      const lease = await this.get(input.jobKey);
+      return {
+        released: false,
+        lease,
+        reason: this.classifyFailureReason(input, lease),
+      };
     } catch (error) {
       this.logger.warn(`Falha ao liberar lease persistido de ${input.jobKey}: ${String(error)}`);
-      return false;
+      return {
+        released: false,
+        lease: await this.get(input.jobKey),
+        reason: 'database_error',
+      };
+    }
+  }
+
+  async assertLeaseOwnership(
+    input: AssertExecutionLeaseOwnershipInput,
+  ): Promise<ExecutionLeaseOwnershipResult> {
+    try {
+      const rows = await this.prisma.$queryRaw<ExecutionLeaseRow[]>(Prisma.sql`
+        SELECT
+          "jobKey",
+          "ownerId",
+          "cycleId",
+          "leaseVersion",
+          "status",
+          "startedAt",
+          "heartbeatAt",
+          "lockedUntil",
+          "acquiredAt",
+          "releasedAt",
+          "releaseReason",
+          "lastError",
+          "createdAt",
+          "updatedAt"
+        FROM "execution_leases"
+        WHERE "jobKey" = ${input.jobKey}
+          AND "ownerId" = ${input.ownerId}
+          AND "cycleId" = ${input.cycleId}
+          AND "leaseVersion" = ${input.leaseVersion}
+          AND "status" = 'active'
+          AND "lockedUntil" > CURRENT_TIMESTAMP
+      `);
+
+      if (rows.length > 0) {
+        return {
+          owned: true,
+          lease: this.mapRow(rows[0]),
+          reason: null,
+        };
+      }
+
+      const lease = await this.get(input.jobKey);
+      return {
+        owned: false,
+        lease,
+        reason: this.classifyFailureReason(input, lease),
+      };
+    } catch (error) {
+      this.logger.warn(`Falha ao verificar ownership do lease persistido de ${input.jobKey}: ${String(error)}`);
+      return {
+        owned: false,
+        lease: await this.get(input.jobKey),
+        reason: 'database_error',
+      };
     }
   }
 
@@ -277,13 +409,14 @@ export class ExecutionLeaseService {
   }
 
   private mapRow(row: ExecutionLeaseRow): ExecutionLeaseRecord {
-    return {
-      jobKey: row.jobKey,
-      ownerId: row.ownerId,
-      cycleId: row.cycleId,
-      status: row.status === 'active' ? 'active' : 'released',
-      startedAt: row.startedAt,
-      heartbeatAt: row.heartbeatAt,
+      return {
+        jobKey: row.jobKey,
+        ownerId: row.ownerId,
+        cycleId: row.cycleId,
+        leaseVersion: this.normalizeLeaseVersion(row.leaseVersion),
+        status: row.status === 'active' ? 'active' : 'released',
+        startedAt: row.startedAt,
+        heartbeatAt: row.heartbeatAt,
       lockedUntil: row.lockedUntil,
       acquiredAt: row.acquiredAt,
       releasedAt: row.releasedAt,
@@ -291,6 +424,35 @@ export class ExecutionLeaseService {
       lastError: row.lastError,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
-    };
+      };
+  }
+
+  private classifyFailureReason(
+    input: AssertExecutionLeaseOwnershipInput,
+    lease: ExecutionLeaseRecord | null,
+  ): ExecutionLeaseFailureReason {
+    if (!lease) {
+      return 'not_found';
+    }
+    if (lease.leaseVersion !== input.leaseVersion) {
+      return 'fencing_mismatch';
+    }
+    if (lease.ownerId !== input.ownerId || lease.cycleId !== input.cycleId) {
+      return 'ownership_mismatch';
+    }
+    if (lease.status !== 'active') {
+      return 'inactive';
+    }
+    return 'stale_execution';
+  }
+
+  private normalizeLeaseVersion(value: bigint | number | string): bigint {
+    if (typeof value === 'bigint') {
+      return value;
+    }
+    if (typeof value === 'number') {
+      return BigInt(value);
+    }
+    return BigInt(String(value));
   }
 }

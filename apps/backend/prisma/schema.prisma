@@ -630,6 +630,7 @@ model ExecutionLease {
   jobKey        String   @id
   ownerId       String
   cycleId       String
+  leaseVersion  BigInt   @default(0)
   status        String   @default("released")
   startedAt     DateTime
   heartbeatAt   DateTime

@@ -97,6 +97,26 @@ describe('TokenCleanupService', () => {
     });
   });
 
+  it('aborts session cleanup when lease ownership is lost between batches', async () => {
+    prismaMock.userSession.findMany.mockResolvedValueOnce([{ id: 'session-1' }]);
+    prismaMock.userSession.deleteMany.mockResolvedValueOnce({ count: 1 });
+
+    const executionContext = {
+      throwIfAborted: jest.fn(),
+      assertLeaseOwnership: jest
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('LEASE_LOST')),
+    };
+
+    const service = createService();
+
+    await expect(service.cleanupExpiredSessions(executionContext as never)).rejects.toThrow('LEASE_LOST');
+    expect(prismaMock.userSession.deleteMany).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps token cleanup functional without advisory locks in the service layer', async () => {
     prismaMock.$transaction.mockResolvedValue([{ count: 4 }, { count: 2 }]);
 

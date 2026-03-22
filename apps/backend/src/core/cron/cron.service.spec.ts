@@ -55,6 +55,8 @@ describe('CronService', () => {
     acquireLease: jest.fn(),
     renewLease: jest.fn(),
     releaseLease: jest.fn(),
+    assertLeaseOwnership: jest.fn(),
+    get: jest.fn(),
   };
 
   let service: CronService;
@@ -69,6 +71,27 @@ describe('CronService', () => {
     editavel: true,
   };
 
+  const buildLease = (overrides: Record<string, unknown> = {}) => {
+    const baseTime = new Date('2026-03-07T10:00:00.000Z');
+    return {
+      jobKey: 'system.manual_test',
+      ownerId: 'instance-a',
+      cycleId: 'cycle-1',
+      leaseVersion: 1n,
+      status: 'active',
+      startedAt: baseTime,
+      heartbeatAt: baseTime,
+      lockedUntil: new Date('2026-03-07T10:02:00.000Z'),
+      acquiredAt: baseTime,
+      releasedAt: null,
+      releaseReason: null,
+      lastError: null,
+      createdAt: baseTime,
+      updatedAt: baseTime,
+      ...overrides,
+    };
+  };
+
   const createService = () =>
     new CronService(
       schedulerRegistryMock as unknown as SchedulerRegistry,
@@ -79,7 +102,7 @@ describe('CronService', () => {
     );
 
   const prepareRegisteredJob = async (
-    callback: () => Promise<void> | void = async () => undefined,
+    callback: (context?: unknown) => Promise<void> | void = async () => undefined,
     meta: Record<string, unknown> = {},
   ) => {
     prismaMock.cronSchedule.findUnique
@@ -88,17 +111,12 @@ describe('CronService', () => {
       .mockResolvedValue(persistedRecord);
     prismaMock.cronSchedule.create.mockResolvedValue(undefined);
 
-    await service.register(
-      'system.manual_test',
-      '*/5 * * * *',
-      callback,
-      {
-        name: 'Manual test',
-        description: 'Runs manually in tests',
-        origin: 'core',
-        ...meta,
-      },
-    );
+    await service.register('system.manual_test', '*/5 * * * *', callback, {
+      name: 'Manual test',
+      description: 'Runs manually in tests',
+      origin: 'core',
+      ...meta,
+    });
   };
 
   beforeEach(() => {
@@ -113,17 +131,37 @@ describe('CronService', () => {
     heartbeatServiceMock.get.mockResolvedValue(null);
     heartbeatServiceMock.markScheduled.mockResolvedValue(undefined);
     heartbeatServiceMock.markStarted.mockResolvedValue(true);
-    heartbeatServiceMock.markSuccess.mockResolvedValue(undefined);
-    heartbeatServiceMock.markFailure.mockResolvedValue(undefined);
-    heartbeatServiceMock.updateHeartbeat.mockResolvedValue(undefined);
+    heartbeatServiceMock.markSuccess.mockResolvedValue(true);
+    heartbeatServiceMock.markFailure.mockResolvedValue(true);
+    heartbeatServiceMock.updateHeartbeat.mockResolvedValue(true);
     heartbeatServiceMock.reconcileOrphans.mockResolvedValue(undefined);
 
     redisLockMock.isDegraded.mockReturnValue(false);
     redisLockMock.acquireLock.mockResolvedValue(true);
 
-    executionLeaseServiceMock.acquireLease.mockResolvedValue({ acquired: true, lease: null });
-    executionLeaseServiceMock.renewLease.mockResolvedValue(true);
-    executionLeaseServiceMock.releaseLease.mockResolvedValue(true);
+    executionLeaseServiceMock.acquireLease.mockResolvedValue({
+      acquired: true,
+      lease: buildLease(),
+    });
+    executionLeaseServiceMock.renewLease.mockResolvedValue({
+      renewed: true,
+      lease: buildLease(),
+      reason: null,
+    });
+    executionLeaseServiceMock.releaseLease.mockResolvedValue({
+      released: true,
+      lease: buildLease({
+        status: 'released',
+        releasedAt: new Date('2026-03-07T10:01:00.000Z'),
+      }),
+      reason: null,
+    });
+    executionLeaseServiceMock.assertLeaseOwnership.mockResolvedValue({
+      owned: true,
+      lease: buildLease(),
+      reason: null,
+    });
+    executionLeaseServiceMock.get.mockResolvedValue(buildLease());
 
     service = createService();
   });
@@ -205,9 +243,11 @@ describe('CronService', () => {
 
     expect(callback).toHaveBeenCalledTimes(1);
     expect(executionLeaseServiceMock.acquireLease).toHaveBeenCalledTimes(1);
+    expect(executionLeaseServiceMock.assertLeaseOwnership).toHaveBeenCalledTimes(1);
     expect(executionLeaseServiceMock.releaseLease).toHaveBeenCalledWith(
       expect.objectContaining({
         jobKey: 'system.manual_test',
+        leaseVersion: 1n,
         reason: 'completed',
       }),
     );
@@ -220,12 +260,12 @@ describe('CronService', () => {
     const callback = jest.fn().mockResolvedValue(undefined);
     executionLeaseServiceMock.acquireLease.mockResolvedValue({
       acquired: false,
-      lease: {
-        jobKey: 'system.manual_test',
+      lease: buildLease({
         ownerId: 'other-instance',
         cycleId: 'existing-cycle',
+        leaseVersion: 4n,
         lockedUntil: new Date('2026-03-07T10:05:00.000Z'),
-      },
+      }),
     });
 
     await prepareRegisteredJob(callback, {
@@ -256,13 +296,27 @@ describe('CronService', () => {
     expect(executionLeaseServiceMock.releaseLease).toHaveBeenCalledWith(
       expect.objectContaining({
         jobKey: 'system.manual_test',
+        leaseVersion: 1n,
         reason: 'heartbeat_guard_denied',
       }),
     );
   });
 
   it('marks the cycle as failed if the completed lease cannot be released safely', async () => {
-    executionLeaseServiceMock.releaseLease.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    executionLeaseServiceMock.releaseLease
+      .mockResolvedValueOnce({
+        released: false,
+        lease: buildLease(),
+        reason: 'database_error',
+      })
+      .mockResolvedValueOnce({
+        released: true,
+        lease: buildLease({
+          status: 'released',
+          releasedAt: new Date('2026-03-07T10:01:00.000Z'),
+        }),
+        reason: null,
+      });
 
     await prepareRegisteredJob(async () => undefined, {
       databaseLease: {
@@ -280,6 +334,7 @@ describe('CronService', () => {
       1,
       expect.objectContaining({
         jobKey: 'system.manual_test',
+        leaseVersion: 1n,
         reason: 'completed',
       }),
     );
@@ -287,8 +342,45 @@ describe('CronService', () => {
       2,
       expect.objectContaining({
         jobKey: 'system.manual_test',
+        leaseVersion: 1n,
         reason: 'failed',
       }),
     );
+  });
+
+  it('aborts stale execution when fencing token ownership is lost during callback processing', async () => {
+    const callback = jest.fn(async (context?: { assertLeaseOwnership?: (stage?: string) => Promise<void> }) => {
+      await context?.assertLeaseOwnership?.('mid_batch');
+    });
+
+    executionLeaseServiceMock.assertLeaseOwnership
+      .mockResolvedValueOnce({
+        owned: true,
+        lease: buildLease(),
+        reason: null,
+      })
+      .mockResolvedValueOnce({
+        owned: false,
+        lease: buildLease({
+          ownerId: 'other-instance',
+          cycleId: 'cycle-2',
+          leaseVersion: 2n,
+        }),
+        reason: 'fencing_mismatch',
+      });
+
+    await prepareRegisteredJob(callback, {
+      databaseLease: {
+        enabled: true,
+      },
+    });
+
+    await expect(service.trigger('system.manual_test')).rejects.toThrow(
+      'Lease persistido de system.manual_test foi perdido',
+    );
+
+    expect(heartbeatServiceMock.markSuccess).not.toHaveBeenCalled();
+    expect(heartbeatServiceMock.markFailure).toHaveBeenCalledTimes(1);
+    expect(executionLeaseServiceMock.releaseLease).not.toHaveBeenCalled();
   });
 });

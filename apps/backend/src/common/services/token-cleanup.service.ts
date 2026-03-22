@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { CronExpression } from '@nestjs/schedule';
 import { CronService } from '@core/cron/cron.service';
+import type { CronJobExecutionContext } from '@core/cron/cron.service';
 import { PrismaService } from '@core/prisma/prisma.service';
 
 @Injectable()
@@ -17,8 +18,8 @@ export class TokenCleanupService implements OnModuleInit {
     await this.cronService.register(
       'system.token_cleanup',
       CronExpression.EVERY_6_HOURS,
-      async () => {
-        await this.cleanupExpiredTokens();
+      async (context) => {
+        await this.cleanupExpiredTokens(context);
       },
       {
         name: 'Token cleanup',
@@ -35,8 +36,8 @@ export class TokenCleanupService implements OnModuleInit {
     await this.cronService.register(
       'system.session_cleanup',
       TokenCleanupService.EVERY_15_MINUTES,
-      async () => {
-        await this.cleanupExpiredSessions();
+      async (context) => {
+        await this.cleanupExpiredSessions(context);
       },
       {
         name: 'Session cleanup',
@@ -51,9 +52,12 @@ export class TokenCleanupService implements OnModuleInit {
     );
   }
 
-  async cleanupExpiredTokens(): Promise<void> {
+  async cleanupExpiredTokens(execution?: CronJobExecutionContext): Promise<void> {
     this.logger.log('Starting cleanup of expired refresh tokens...');
     try {
+      execution?.throwIfAborted();
+      await execution?.assertLeaseOwnership('before_token_cleanup');
+
       const now = new Date();
       const trustedDeviceRetentionBoundary = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
@@ -87,16 +91,20 @@ export class TokenCleanupService implements OnModuleInit {
       );
     } catch (error) {
       this.logger.error('Error during expired token cleanup.', error as Error);
+      throw error;
     }
   }
 
-  async cleanupExpiredSessions(): Promise<void> {
+  async cleanupExpiredSessions(execution?: CronJobExecutionContext): Promise<void> {
     this.logger.log('Starting cleanup of expired user sessions in batches...');
     try {
       let totalRemoved = 0;
       const batchSize = 1000;
 
       while (true) {
+        execution?.throwIfAborted();
+        await execution?.assertLeaseOwnership('before_session_batch_select');
+
         const expiredSessions = await this.prisma.userSession.findMany({
           where: {
             expiresAt: { lt: new Date() },
@@ -109,6 +117,9 @@ export class TokenCleanupService implements OnModuleInit {
           break;
         }
 
+        execution?.throwIfAborted();
+        await execution?.assertLeaseOwnership('before_session_batch_delete');
+
         const ids = expiredSessions.map((s) => s.id);
         const result = await this.prisma.userSession.deleteMany({
           where: {
@@ -117,12 +128,15 @@ export class TokenCleanupService implements OnModuleInit {
         });
 
         totalRemoved += result.count;
+        execution?.throwIfAborted();
+        await execution?.assertLeaseOwnership('after_session_batch_delete');
         if (result.count === 0) break; // Segurança contra loop infinito
       }
 
       this.logger.log(`Session cleanup completed: ${totalRemoved} rows removed.`);
     } catch (error) {
       this.logger.error('Error during expired session cleanup.', error as Error);
+      throw error;
     }
   }
 

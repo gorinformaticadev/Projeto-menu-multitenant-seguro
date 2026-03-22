@@ -146,15 +146,29 @@ export class CronJobHeartbeatService {
   /**
    * Atualiza o heartbeat (sinal de vida) para um job em execução.
    */
-  async updateHeartbeat(jobKey: string): Promise<void> {
+  async updateHeartbeat(jobKey: string, cycleId?: string, instanceId?: string): Promise<boolean> {
     try {
+      if (cycleId && instanceId) {
+        const result = await this.prisma.$executeRaw`
+          UPDATE "cron_job_heartbeats"
+          SET "lastHeartbeatAt" = NOW()
+          WHERE "jobKey" = ${jobKey}
+            AND "lastStatus" = 'running'
+            AND "cycleId" = ${cycleId}
+            AND "instanceId" = ${instanceId}
+        `;
+        return result > 0;
+      }
+
       await this.prisma.$executeRaw`
         UPDATE "cron_job_heartbeats"
         SET "lastHeartbeatAt" = NOW()
         WHERE "jobKey" = ${jobKey} AND "lastStatus" = 'running'
       `;
+      return true;
     } catch (error) {
       this.logger.warn(`Falha ao atualizar heartbeat para ${jobKey}: ${String(error)}`);
+      return false;
     }
   }
 
@@ -163,7 +177,35 @@ export class CronJobHeartbeatService {
     startedAt: Date,
     finishedAt: Date,
     nextExpectedRunAt: Date | null,
-  ): Promise<void> {
+    expectedCycleId?: string,
+    expectedInstanceId?: string,
+  ): Promise<boolean> {
+    if (expectedCycleId && expectedInstanceId) {
+      try {
+        const result = await this.prisma.$executeRaw`
+          UPDATE "cron_job_heartbeats"
+          SET
+            "lastStartedAt" = ${startedAt},
+            "lastHeartbeatAt" = ${finishedAt},
+            "lastSucceededAt" = ${finishedAt},
+            "lastDurationMs" = ${Math.max(0, finishedAt.getTime() - startedAt.getTime())},
+            "lastStatus" = 'success',
+            "lastError" = NULL,
+            "nextExpectedRunAt" = ${nextExpectedRunAt},
+            "consecutiveFailureCount" = 0,
+            "updatedAt" = ${finishedAt}
+          WHERE "jobKey" = ${jobKey}
+            AND "lastStatus" = 'running'
+            AND "cycleId" = ${expectedCycleId}
+            AND "instanceId" = ${expectedInstanceId}
+        `;
+        return result > 0;
+      } catch (error) {
+        this.logger.warn(`Falha ao marcar sucesso guardado para ${jobKey}: ${String(error)}`);
+        return false;
+      }
+    }
+
     const current = await this.get(jobKey);
     await this.persist({
       jobKey,
@@ -180,6 +222,7 @@ export class CronJobHeartbeatService {
       cycleId: current?.cycleId,
       instanceId: current?.instanceId,
     });
+    return true;
   }
 
   async markFailure(
@@ -188,7 +231,35 @@ export class CronJobHeartbeatService {
     finishedAt: Date,
     error: unknown,
     nextExpectedRunAt: Date | null,
-  ): Promise<void> {
+    expectedCycleId?: string,
+    expectedInstanceId?: string,
+  ): Promise<boolean> {
+    if (expectedCycleId && expectedInstanceId) {
+      try {
+        const result = await this.prisma.$executeRaw`
+          UPDATE "cron_job_heartbeats"
+          SET
+            "lastStartedAt" = ${startedAt},
+            "lastHeartbeatAt" = ${finishedAt},
+            "lastFailedAt" = ${finishedAt},
+            "lastDurationMs" = ${Math.max(0, finishedAt.getTime() - startedAt.getTime())},
+            "lastStatus" = 'failed',
+            "lastError" = ${this.normalizeError(error)},
+            "nextExpectedRunAt" = ${nextExpectedRunAt},
+            "consecutiveFailureCount" = COALESCE("consecutiveFailureCount", 0) + 1,
+            "updatedAt" = ${finishedAt}
+          WHERE "jobKey" = ${jobKey}
+            AND "lastStatus" = 'running'
+            AND "cycleId" = ${expectedCycleId}
+            AND "instanceId" = ${expectedInstanceId}
+        `;
+        return result > 0;
+      } catch (guardError) {
+        this.logger.warn(`Falha ao marcar falha guardada para ${jobKey}: ${String(guardError)}`);
+        return false;
+      }
+    }
+
     const current = await this.get(jobKey);
     await this.persist({
       jobKey,
@@ -205,6 +276,7 @@ export class CronJobHeartbeatService {
       cycleId: current?.cycleId,
       instanceId: current?.instanceId,
     });
+    return true;
   }
 
   /**
