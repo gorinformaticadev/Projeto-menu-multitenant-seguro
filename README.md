@@ -249,13 +249,13 @@ docker compose exec db psql -U "$DB_USER" -d "$DB_NAME" -c "SELECT pg_backend_pi
 Em paralelo, rode restore. Evidência: promoção conclui (ou falha controlada) sem estado quebrado.
 
 3. **Teste C - Crash entre renames**
-Simulacao:
+Simulação:
 ```bash
 # durante o cutover em staging
 docker compose kill -s SIGKILL backend
 docker compose up -d backend
 ```
-Evidencia: logs com reconciler (`caso C`) e recuperacao para estado consistente.
+Evidência: logs com reconciler (`caso C`) e recuperação para estado consistente.
 
 4. **Teste D - Reconnect Prisma falhando**
 Simulacao (janela do pos-promote):
@@ -264,7 +264,7 @@ docker pause multitenant-postgres
 sleep 70
 docker unpause multitenant-postgres
 ```
-Evidencia: retries ate timeout, job `FAILED` com mensagem curta e maintenance mantida.
+Evidência: retries até timeout, job `FAILED` com mensagem curta e maintenance mantida.
 
 5. **Teste E - 2 restores simultaneos**
 Comandos:
@@ -279,18 +279,18 @@ curl -sS -X POST "$BACKEND_INTERNAL_URL/backups/internal/restore-by-file" \
   -H "x-backup-internal-token: $BACKUP_INTERNAL_API_TOKEN" \
   --data '{"backupFile":"backup_smoke_2.dump","runMigrations":false,"reason":"teste-E2"}'
 ```
-Evidencia: segundo job em `WAITING_LOCK`, `lockAttempts` incrementando e `nextRunAt` futuro (consultar tabela `backup_jobs` no Postgres).
+Evidência: segundo job em `WAITING_LOCK`, `lockAttempts` incrementando e `nextRunAt` futuro (consultar tabela `backup_jobs` no Postgres).
 
-6. **Teste F - Dump invalido / objeto perigoso**
+6. **Teste F - Dump inválido / objeto perigoso**
 Comandos:
 ```bash
-# F1 - dump invalido (assinatura incorreta)
+# F1 - dump inválido (assinatura incorreta)
 printf 'NOT_A_PG_DUMP' > /tmp/invalid.dump
 curl -sS -X POST "http://127.0.0.1:4000/api/backups/upload" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -F "file=@/tmp/invalid.dump"
 
-# F2 - dump com objeto perigoso (FUNCTION) em ambiente de laboratorio
+# F2 - dump com objeto perigoso (FUNCTION) em ambiente de laboratório
 docker compose exec db psql -U "$DB_USER" -d "$DB_NAME" -c "CREATE OR REPLACE FUNCTION public.fn_danger() RETURNS int LANGUAGE sql AS $$ SELECT 1 $$;"
 docker compose exec db pg_dump -U "$DB_USER" -d "$DB_NAME" -Fc -f /tmp/danger.dump
 docker cp multitenant-postgres:/tmp/danger.dump /tmp/danger.dump
@@ -298,23 +298,22 @@ curl -sS -X POST "http://127.0.0.1:4000/api/backups/upload" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -F "file=@/tmp/danger.dump"
 ```
-Evidencia: bloqueio por padrao com erro operacional curto no restore (sem `allowUnsafeObjects`).
+Evidência: bloqueio por padrão com erro operacional curto no restore (sem `allowUnsafeObjects`).
 
 -----------------------------------------------------------------------
 
 ## Reset Completo do Ambiente
 
-Por seguranca, este README **nao** inclui sequencia destrutiva automatica de reset (ex.: `git reset --hard`, purge completo de Docker, remocao forcada de diretorios).
-
+Por segurança, este README **não** inclui sequência destrutiva automática de reset (ex.: `git reset --hard`, purge completo de Docker, remoção forçada de diretórios).
 Se precisar de reset completo, siga este fluxo:
 
 1. Execute `install/uninstall.sh`
-2. Reclone o repositorio
-3. Rode nova instalacao com `install/install.sh install`
+2. Reclone o repositório
+3. Rode nova instalação com `install/install.sh install`
 
 ------------------------------------------------------------------------
 
-## Documentacao Tecnica
+## Documentação Técnica
 
 - `DOCS/INICIO_RAPIDO.md`
 - `DOCS/install/README-INSTALADOR.md`
@@ -323,7 +322,7 @@ Se precisar de reset completo, siga este fluxo:
 
 ------------------------------------------------------------------------
 
-## Licenca
+## Licença
 
 **AGPL-3.0**
 
@@ -331,7 +330,7 @@ Consulte o arquivo `LICENSE`.
 
 ------------------------------------------------------------------------
 
-## Creditos
+## Créditos
 
 **GOR Informatica - Gilson Oliveira**
 
@@ -342,7 +341,7 @@ Consulte o arquivo `LICENSE`.
 
 ## Apoio ao Projeto
 
-Contribuicoes ajudam na evolucao continua da plataforma.
+Contribuições ajudam na evolução contínua da plataforma.
 
 ![QR Code Pix](DOCS/assets/qr-code-pix.png)
 
