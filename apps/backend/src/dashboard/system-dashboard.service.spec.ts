@@ -9,6 +9,7 @@ import { SystemTelemetryService } from '@common/services/system-telemetry.servic
 
 describe('SystemDashboardService', () => {
   const prismaMock = {
+    $queryRaw: jest.fn(),
     dashboardLayout: {
       findUnique: jest.fn(),
       upsert: jest.fn(),
@@ -243,6 +244,7 @@ describe('SystemDashboardService', () => {
     moduleSecurityServiceMock.getAvailableModules.mockResolvedValue([]);
     prismaMock.user.count.mockResolvedValue(0);
     prismaMock.tenant.count.mockResolvedValue(0);
+    prismaMock.$queryRaw.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -352,6 +354,56 @@ describe('SystemDashboardService', () => {
           expect.objectContaining({
             id: 'notif-1',
             action: 'OPS_HIGH_5XX_ERROR_RATE',
+          }),
+        ],
+      }),
+    );
+  });
+
+  it('marks session cleanup operational alerts as historical when a newer materialized success exists', async () => {
+    const service = createService();
+    const windowStart = new Date('2026-03-07T10:00:00.000Z');
+    prismaMock.notification.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(1);
+    prismaMock.notification.findMany.mockResolvedValue([
+      {
+        id: 'notif-session-cleanup',
+        title: 'Job atrasado',
+        body: 'O job Session cleanup nao executou no prazo esperado.',
+        severity: 'critical',
+        createdAt: new Date('2026-03-07T10:30:00.000Z'),
+        data: {
+          alertAction: 'JOB_NOT_RUNNING',
+          jobKey: 'system.session_cleanup',
+        },
+      },
+    ]);
+    prismaMock.$queryRaw.mockResolvedValue([
+      {
+        id: 'execution-1',
+        status: 'success',
+        scheduledFor: new Date('2026-03-07T10:35:00.000Z'),
+        finishedAt: new Date('2026-03-07T10:35:12.000Z'),
+        updatedAt: new Date('2026-03-07T10:35:12.000Z'),
+      },
+    ]);
+
+    const result = await (service as any).getNotificationsMetric(actor, windowStart);
+
+    expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(result).toEqual(
+      expect.objectContaining({
+        recentOperationalAlerts: [
+          expect.objectContaining({
+            id: 'notif-session-cleanup',
+            action: 'JOB_NOT_RUNNING',
+            jobKey: 'system.session_cleanup',
+            currentState: 'success',
+            isHistorical: true,
+            resolutionSummary:
+              'Historico: success posterior em 2026-03-07T10:35:12.000Z para o slot 2026-03-07T10:35:00.000Z.',
           }),
         ],
       }),
@@ -926,9 +978,6 @@ describe('SystemDashboardService', () => {
     );
   });
 });
-
-
-
 
 
 

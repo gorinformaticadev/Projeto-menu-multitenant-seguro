@@ -57,7 +57,7 @@ describe('SystemJobWatchdogService', () => {
     redisLockMock.acquireLock.mockResolvedValue(true);
     redisLockMock.releaseLock.mockResolvedValue(undefined);
     sessionCleanupExecutionServiceMock.inspectExpectedExecution.mockResolvedValue({
-      expectedScheduledFor: new Date('2026-03-07T14:45:00.000Z'),
+      expectedScheduledFor: new Date('2026-03-07T15:00:00.000Z'),
       execution: null,
       latestExecution: null,
       state: 'not_created',
@@ -145,7 +145,7 @@ describe('SystemJobWatchdogService', () => {
 
     expect(sessionCleanupExecutionServiceMock.inspectExpectedExecution).toHaveBeenCalledWith(
       expect.objectContaining({
-        expectedScheduledFor: new Date('2026-03-07T14:45:00.000Z'),
+        expectedScheduledFor: new Date('2026-03-07T15:00:00.000Z'),
       }),
     );
     expect(operationalAlertsServiceMock.dispatchOperationalAlert).toHaveBeenCalledWith(
@@ -155,7 +155,8 @@ describe('SystemJobWatchdogService', () => {
           jobKey: 'system.session_cleanup',
           executionMode: 'materialized',
           watchdogState: 'not_created',
-          reason: 'slot_not_materialized',
+          sourceOfTruth: 'materialized_execution',
+          watchdogReason: 'slot_not_materialized',
         }),
       }),
       expect.any(Number),
@@ -179,7 +180,7 @@ describe('SystemJobWatchdogService', () => {
       },
     ]);
     sessionCleanupExecutionServiceMock.inspectExpectedExecution.mockResolvedValue({
-      expectedScheduledFor: new Date('2026-03-07T14:45:00.000Z'),
+      expectedScheduledFor: new Date('2026-03-07T15:00:00.000Z'),
       execution: {
         id: 'execution-1',
         status: 'running',
@@ -227,14 +228,14 @@ describe('SystemJobWatchdogService', () => {
         runtimeActive: true,
         executionMode: 'materialized',
         lastStatus: 'running',
-        lastStartedAt: new Date('2026-03-07T13:45:00.000Z'),
-        lastHeartbeatAt: new Date('2026-03-07T13:45:10.000Z'),
-        nextExpectedRunAt: new Date('2026-03-07T15:00:00.000Z'),
+        lastStartedAt: new Date('2026-03-07T10:45:00.000Z'),
+        lastHeartbeatAt: new Date('2026-03-07T10:45:10.000Z'),
+        nextExpectedRunAt: new Date('2026-03-07T11:00:00.000Z'),
         consecutiveFailureCount: 0,
       },
     ]);
     sessionCleanupExecutionServiceMock.inspectExpectedExecution.mockResolvedValue({
-      expectedScheduledFor: new Date('2026-03-07T14:45:00.000Z'),
+      expectedScheduledFor: new Date('2026-03-07T15:00:00.000Z'),
       execution: {
         id: 'execution-1',
         status: 'success',
@@ -258,6 +259,11 @@ describe('SystemJobWatchdogService', () => {
 
     const result = await service.evaluateWatchdog(new Date('2026-03-07T15:10:00.000Z'));
 
+    expect(sessionCleanupExecutionServiceMock.inspectExpectedExecution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expectedScheduledFor: new Date('2026-03-07T15:00:00.000Z'),
+      }),
+    );
     expect(result).toEqual({
       emitted: [],
       skipped: ['healthy:system.session_cleanup'],

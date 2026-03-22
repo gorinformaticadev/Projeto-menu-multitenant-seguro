@@ -214,6 +214,10 @@ type OperationalAlertListItem = {
   severity: string;
   createdAt: string;
   action?: string | null;
+  jobKey?: string | null;
+  isHistorical?: boolean;
+  currentState?: string | null;
+  resolutionSummary?: string | null;
 };
 
 const POLL_INTERVAL_MS = 15000;
@@ -2740,8 +2744,20 @@ export function OperationalDashboard({
               recentOperationalAlerts.map((alert) => (
                 <div key={alert.id} className="flex items-start justify-between gap-2 text-[10px]">
                   <div className="min-w-0">
-                    <p className="truncate font-medium text-skin-text dark:text-skin-text">{alert.title}</p>
+                    <p className="truncate font-medium text-skin-text dark:text-skin-text">
+                      {alert.title}
+                      {alert.isHistorical ? (
+                        <span className="ml-1 rounded-full border border-skin-border/70 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-skin-text-muted dark:border-skin-border/30 dark:text-skin-text-muted/80">
+                          Historico
+                        </span>
+                      ) : null}
+                    </p>
                     <p className="truncate text-skin-text-muted dark:text-skin-text-muted/80">{alert.body}</p>
+                    {alert.resolutionSummary ? (
+                      <p className="truncate text-[9px] text-skin-text-muted dark:text-skin-text-muted/80">
+                        {alert.resolutionSummary}
+                      </p>
+                    ) : null}
                   </div>
                   <span className="shrink-0 text-skin-text-muted dark:text-skin-text-muted">{formatTimeOfDay(alert.createdAt)}</span>
                 </div>
@@ -3343,5 +3359,4 @@ export function OperationalDashboard({
     </TooltipProvider >
   );
 }
-
 

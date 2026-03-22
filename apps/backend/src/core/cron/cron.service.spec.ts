@@ -273,6 +273,36 @@ describe('CronService', () => {
     expect(redisLockMock.acquireLock).not.toHaveBeenCalled();
   });
 
+  it('does not let the aggregate heartbeat overwrite nextExpectedRunAt for a materialized job', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-07T15:00:00.000Z'));
+
+    await prepareRegisteredJob(async () => undefined, {
+      executionMode: 'materialized',
+    });
+
+    heartbeatServiceMock.list.mockResolvedValue(
+      new Map([
+        [
+          'system.manual_test',
+          buildHeartbeat({
+            lastStatus: 'success',
+            nextExpectedRunAt: new Date('2026-03-07T10:00:00.000Z'),
+          }),
+        ],
+      ]),
+    );
+
+    const jobs = await service.getRuntimeJobs();
+
+    expect(jobs[0]).toEqual(
+      expect.objectContaining({
+        key: 'system.manual_test',
+        executionMode: 'materialized',
+        nextExpectedRunAt: new Date('2026-03-07T15:05:00.000Z'),
+      }),
+    );
+  });
+
   it('acquires and releases the database lease on a successful cycle', async () => {
     const callback = jest.fn().mockResolvedValue(undefined);
 

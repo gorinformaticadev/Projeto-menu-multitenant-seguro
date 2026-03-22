@@ -583,7 +583,9 @@ export class CronService implements OnModuleInit {
     definition.lastDurationMs = heartbeat.lastDurationMs ?? undefined;
     definition.lastStatus = heartbeat.lastStatus;
     definition.lastError = heartbeat.lastError || undefined;
-    definition.nextExpectedRunAt = heartbeat.nextExpectedRunAt || definition.nextExpectedRunAt;
+    if (definition.executionMode !== 'materialized') {
+      definition.nextExpectedRunAt = heartbeat.nextExpectedRunAt || definition.nextExpectedRunAt;
+    }
     definition.consecutiveFailureCount = heartbeat.consecutiveFailureCount;
     definition.lastRun = definition.lastStartedAt;
   }

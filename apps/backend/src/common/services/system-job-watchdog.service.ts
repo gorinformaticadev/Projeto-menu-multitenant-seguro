@@ -335,8 +335,9 @@ export class SystemJobWatchdogService implements OnModuleInit {
     staleAfterMs: number,
     stuckAfterMs: number,
   ): Promise<{ emitted?: string; skipped: string }> {
+    const expectedScheduledFor = this.resolveExpectedScheduledFor(job.schedule, intervalMs);
     const snapshot = await this.sessionCleanupExecutionService.inspectExpectedExecution({
-      expectedScheduledFor: this.resolveExpectedScheduledFor(job, intervalMs),
+      expectedScheduledFor,
       now,
       staleAfterMs,
       stuckAfterMs,
@@ -400,14 +401,24 @@ export class SystemJobWatchdogService implements OnModuleInit {
   }
 
   private resolveExpectedScheduledFor(
-    job: CronJobDefinition,
+    schedule: string,
     intervalMs: number | null,
   ): Date | null {
-    if (!job.nextExpectedRunAt || !intervalMs || intervalMs <= 0) {
+    if (!intervalMs || intervalMs <= 0) {
       return null;
     }
 
-    return new Date(job.nextExpectedRunAt.getTime() - intervalMs);
+    try {
+      const probe = new CronJob(schedule, () => undefined);
+      const next = probe.nextDates(1) as { toJSDate: () => Date } | Array<{ toJSDate: () => Date }>;
+      const nextRun = Array.isArray(next) ? next[0]?.toJSDate() : next.toJSDate();
+      if (!nextRun) {
+        return null;
+      }
+      return new Date(nextRun.getTime() - intervalMs);
+    } catch {
+      return null;
+    }
   }
 
   private buildJobData(
@@ -435,7 +446,12 @@ export class SystemJobWatchdogService implements OnModuleInit {
     snapshot: SessionCleanupWatchdogSnapshot,
     extra: Record<string, unknown>,
   ): Record<string, unknown> {
-    return this.buildJobData(job, {
+    return {
+      jobKey: job.key,
+      jobName: job.name,
+      schedule: job.schedule,
+      executionMode: job.executionMode || 'direct',
+      sourceOfTruth: 'materialized_execution',
       watchdogState: snapshot.state,
       watchdogReason: snapshot.reason,
       expectedScheduledFor: snapshot.expectedScheduledFor?.toISOString() || null,
@@ -453,10 +469,12 @@ export class SystemJobWatchdogService implements OnModuleInit {
       materializedExecutionError: snapshot.execution?.error || null,
       materializedLatestExecutionId: snapshot.latestExecution?.id || null,
       materializedLatestExecutionStatus: snapshot.latestExecution?.status || null,
+      materializedLatestScheduledFor: snapshot.latestExecution?.scheduledFor?.toISOString() || null,
+      materializedLatestFinishedAt: snapshot.latestExecution?.finishedAt?.toISOString() || null,
       isOverdue: snapshot.isOverdue,
       isStuck: snapshot.isStuck,
       ...extra,
-    });
+    };
   }
 
   private async emitWatchdogAlert(input: WatchdogAlertInput, nowMs: number): Promise<boolean> {

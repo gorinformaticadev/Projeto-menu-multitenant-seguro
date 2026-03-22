@@ -42,6 +42,14 @@ interface DashboardMetricFallback {
   error: string;
 }
 
+interface LatestMaterializedSessionCleanupExecutionRow {
+  id: string;
+  status: string;
+  scheduledFor: Date;
+  finishedAt: Date | null;
+  updatedAt: Date;
+}
+
 type DashboardMetric<T extends Record<string, unknown>> = T | DashboardMetricFallback;
 type DashboardLayoutBreakpoint = 'lg' | 'md' | 'sm';
 interface DashboardHistoryPoint {
@@ -870,7 +878,7 @@ export class SystemDashboardService {
 
   private async getNotificationsMetric(actor: DashboardActor, windowStart: Date) {
     const scopeWhere = this.buildNotificationsScope(actor);
-    const [criticalUnread, criticalRecent, operationalRecentCount, recentOperationalAlertsRows] = await Promise.all([
+    const [criticalUnread, criticalRecent, operationalRecentCount, recentOperationalAlertsRows, latestSessionCleanupExecutionRows] = await Promise.all([
       this.prisma.notification.count({
         where: {
           ...scopeWhere,
@@ -917,7 +925,20 @@ export class SystemDashboardService {
         },
         take: 3,
       }),
+      this.prisma.$queryRaw<LatestMaterializedSessionCleanupExecutionRow[]>`
+        SELECT
+          id,
+          status,
+          "scheduledFor",
+          "finishedAt",
+          "updatedAt"
+        FROM "cron_materialized_executions"
+        WHERE "jobKey" = 'system.session_cleanup'
+        ORDER BY "scheduledFor" DESC, "updatedAt" DESC
+        LIMIT 1
+      `,
     ]);
+    const latestSessionCleanupExecution = latestSessionCleanupExecutionRows[0] || null;
 
     return {
       status: 'ok' as const,
@@ -931,8 +952,84 @@ export class SystemDashboardService {
         severity: row.severity,
         createdAt: row.createdAt.toISOString(),
         action: this.normalizeNullableString((row.data as Record<string, unknown> | null)?.alertAction) || null,
+        jobKey: this.normalizeNullableString((row.data as Record<string, unknown> | null)?.jobKey) || null,
+        isHistorical:
+          this.isResolvedMaterializedSessionCleanupAlert(
+            row.data as Record<string, unknown> | null,
+            row.createdAt,
+            latestSessionCleanupExecution,
+          ),
+        currentState:
+          this.normalizeNullableString(latestSessionCleanupExecution?.status) || null,
+        resolutionSummary: this.resolveOperationalAlertResolutionSummary(
+          row.data as Record<string, unknown> | null,
+          row.createdAt,
+          latestSessionCleanupExecution,
+        ),
       })),
     };
+  }
+
+  private isResolvedMaterializedSessionCleanupAlert(
+    data: Record<string, unknown> | null,
+    alertCreatedAt: Date,
+    latestExecution:
+      | {
+          id: string;
+          status: string;
+          scheduledFor: Date;
+          finishedAt: Date | null;
+          updatedAt: Date;
+        }
+      | null,
+  ): boolean {
+    const action = this.normalizeNullableString(data?.alertAction);
+    const jobKey = this.normalizeNullableString(data?.jobKey);
+
+    if (
+      jobKey !== 'system.session_cleanup' ||
+      (action !== 'JOB_NOT_RUNNING' && action !== 'JOB_STUCK_RUNNING')
+    ) {
+      return false;
+    }
+
+    if (!latestExecution || latestExecution.status !== 'success') {
+      return false;
+    }
+
+    const resolutionAt = latestExecution.finishedAt || latestExecution.updatedAt;
+    return resolutionAt.getTime() > alertCreatedAt.getTime();
+  }
+
+  private resolveOperationalAlertResolutionSummary(
+    data: Record<string, unknown> | null,
+    alertCreatedAt: Date,
+    latestExecution:
+      | {
+          id: string;
+          status: string;
+          scheduledFor: Date;
+          finishedAt: Date | null;
+          updatedAt: Date;
+        }
+      | null,
+  ): string | null {
+    if (
+      !this.isResolvedMaterializedSessionCleanupAlert(
+        data,
+        alertCreatedAt,
+        latestExecution,
+      )
+    ) {
+      return null;
+    }
+
+    const resolvedAt = latestExecution?.finishedAt || latestExecution?.updatedAt;
+    if (!resolvedAt || !latestExecution) {
+      return null;
+    }
+
+    return `Historico: success posterior em ${resolvedAt.toISOString()} para o slot ${latestExecution.scheduledFor.toISOString()}.`;
   }
 
   private buildNotificationsScope(actor: DashboardActor): any {
@@ -2027,8 +2124,6 @@ export class SystemDashboardService {
     return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3)}...` : normalized;
   }
 }
-
-
 
 
 
