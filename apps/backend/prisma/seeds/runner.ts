@@ -1,7 +1,7 @@
 import { PrismaClient, SeedRunStatus } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { seedRegistry } from './registry';
-import { SEED_ADVISORY_LOCK_ID, SEED_LOCK_RETRY_MS, SEED_LOCK_WAIT_SECONDS } from './defaults';
+import { SEED_LOCK_KEY, SEED_LOCK_RETRY_MS, SEED_LOCK_TTL_MS, SEED_LOCK_WAIT_SECONDS } from './defaults';
 import {
   SeedModuleDefinition,
   SeedModuleKey,
@@ -12,15 +12,25 @@ import {
 
 const prisma = new PrismaClient();
 
-type LockRow = { locked: boolean };
+type LeaseTouchRow = { jobKey: string };
+type SeedLeaseContext = {
+  jobKey: string;
+  ownerId: string;
+  cycleId: string;
+};
 
 export async function runSeedPipeline(options: SeedRunnerOptions = {}): Promise<SeedRunResult> {
   const executionId = randomUUID();
   const force = options.force === true;
   const mode = options.mode || 'deploy';
   const selectedModules = selectModules(options.modules);
+  const leaseContext: SeedLeaseContext = {
+    jobKey: SEED_LOCK_KEY,
+    ownerId: `${process.env.HOSTNAME || process.env.COMPUTERNAME || 'unknown'}:${process.pid}`,
+    cycleId: executionId,
+  };
 
-  const lockAcquired = await acquireSeedLock();
+  const lockAcquired = await acquireSeedLock(leaseContext);
   if (!lockAcquired) {
     await prisma.$disconnect();
     return {
@@ -32,9 +42,22 @@ export async function runSeedPipeline(options: SeedRunnerOptions = {}): Promise<
   }
 
   const results: SeedModuleResult[] = [];
+  let leaseLost = false;
+  const renewEveryMs = Math.max(1000, Math.min(30000, Math.floor(SEED_LOCK_TTL_MS / 2)));
+  const leaseHeartbeat = setInterval(async () => {
+    if (leaseLost) {
+      return;
+    }
+
+    leaseLost = !(await renewSeedLock(leaseContext));
+  }, renewEveryMs);
 
   try {
     for (const moduleDef of selectedModules) {
+      if (leaseLost) {
+        throw new Error('Seed execution lease lost before pipeline completion');
+      }
+
       const seedKey = `${moduleDef.key}@${moduleDef.version}`;
 
       const alreadyApplied = await prisma.seedHistory.findFirst({
@@ -150,7 +173,8 @@ export async function runSeedPipeline(options: SeedRunnerOptions = {}): Promise<
       results,
     };
   } finally {
-    await releaseSeedLock();
+    clearInterval(leaseHeartbeat);
+    await releaseSeedLock(leaseContext);
     await prisma.$disconnect();
   }
 }
@@ -197,14 +221,54 @@ function selectModules(modules?: SeedModuleKey[]): SeedModuleDefinition[] {
   return selected;
 }
 
-async function acquireSeedLock(): Promise<boolean> {
+async function acquireSeedLock(context: SeedLeaseContext): Promise<boolean> {
   const timeoutMs = Math.max(1, SEED_LOCK_WAIT_SECONDS) * 1000;
   const retryMs = Math.max(200, SEED_LOCK_RETRY_MS);
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
-    const rows = await prisma.$queryRaw<LockRow[]>`SELECT pg_try_advisory_lock(${SEED_ADVISORY_LOCK_ID}) AS locked`;
-    if (rows[0]?.locked === true) {
+    const rows = await prisma.$queryRaw<LeaseTouchRow[]>`
+      INSERT INTO "execution_leases" (
+        "jobKey",
+        "ownerId",
+        "cycleId",
+        "status",
+        "startedAt",
+        "heartbeatAt",
+        "lockedUntil",
+        "acquiredAt",
+        "createdAt",
+        "updatedAt"
+      ) VALUES (
+        ${context.jobKey},
+        ${context.ownerId},
+        ${context.cycleId},
+        'active',
+        CURRENT_TIMESTAMP,
+        CURRENT_TIMESTAMP,
+        CURRENT_TIMESTAMP + (${Math.max(1, SEED_LOCK_TTL_MS)} * INTERVAL '1 millisecond'),
+        CURRENT_TIMESTAMP,
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT ("jobKey") DO UPDATE
+      SET
+        "ownerId" = EXCLUDED."ownerId",
+        "cycleId" = EXCLUDED."cycleId",
+        "status" = 'active',
+        "startedAt" = EXCLUDED."startedAt",
+        "heartbeatAt" = EXCLUDED."heartbeatAt",
+        "lockedUntil" = EXCLUDED."lockedUntil",
+        "acquiredAt" = EXCLUDED."acquiredAt",
+        "releasedAt" = NULL,
+        "releaseReason" = NULL,
+        "lastError" = NULL,
+        "updatedAt" = NOW()
+      WHERE "execution_leases"."lockedUntil" <= CURRENT_TIMESTAMP
+        OR "execution_leases"."status" <> 'active'
+      RETURNING "jobKey"
+    `;
+    if (rows.length > 0) {
       return true;
     }
     await sleep(retryMs);
@@ -213,8 +277,40 @@ async function acquireSeedLock(): Promise<boolean> {
   return false;
 }
 
-async function releaseSeedLock(): Promise<void> {
-  await prisma.$executeRaw`SELECT pg_advisory_unlock(${SEED_ADVISORY_LOCK_ID})`;
+async function renewSeedLock(context: SeedLeaseContext): Promise<boolean> {
+  const rows = await prisma.$queryRaw<LeaseTouchRow[]>`
+    UPDATE "execution_leases"
+    SET
+      "heartbeatAt" = CURRENT_TIMESTAMP,
+      "lockedUntil" = CURRENT_TIMESTAMP + (${Math.max(1, SEED_LOCK_TTL_MS)} * INTERVAL '1 millisecond'),
+      "updatedAt" = NOW()
+    WHERE "jobKey" = ${context.jobKey}
+      AND "ownerId" = ${context.ownerId}
+      AND "cycleId" = ${context.cycleId}
+      AND "status" = 'active'
+      AND "lockedUntil" > CURRENT_TIMESTAMP
+    RETURNING "jobKey"
+  `;
+  return rows.length > 0;
+}
+
+async function releaseSeedLock(context: SeedLeaseContext): Promise<void> {
+  const releasedAt = new Date();
+  await prisma.$queryRaw<LeaseTouchRow[]>`
+    UPDATE "execution_leases"
+    SET
+      "status" = 'released',
+      "heartbeatAt" = ${releasedAt},
+      "lockedUntil" = ${releasedAt},
+      "releasedAt" = ${releasedAt},
+      "releaseReason" = 'seed_pipeline_completed',
+      "updatedAt" = NOW()
+    WHERE "jobKey" = ${context.jobKey}
+      AND "ownerId" = ${context.ownerId}
+      AND "cycleId" = ${context.cycleId}
+      AND "status" = 'active'
+    RETURNING "jobKey"
+  `;
 }
 
 async function sleep(ms: number): Promise<void> {

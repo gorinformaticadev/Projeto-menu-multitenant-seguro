@@ -626,6 +626,26 @@ model CronJobHeartbeat {
   @@map("cron_job_heartbeats")
 }
 
+model ExecutionLease {
+  jobKey        String   @id
+  ownerId       String
+  cycleId       String
+  status        String   @default("released")
+  startedAt     DateTime
+  heartbeatAt   DateTime
+  lockedUntil   DateTime
+  acquiredAt    DateTime @default(now())
+  releasedAt    DateTime?
+  releaseReason String?
+  lastError     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status, lockedUntil])
+  @@index([ownerId])
+  @@map("execution_leases")
+}
+
 enum Role {
   SUPER_ADMIN
   ADMIN

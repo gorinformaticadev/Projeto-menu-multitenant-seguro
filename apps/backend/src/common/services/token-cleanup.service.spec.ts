@@ -8,11 +8,14 @@ describe('TokenCleanupService', () => {
       deleteMany: jest.fn(),
       count: jest.fn(),
     },
-    userSession: {
+    trustedDevice: {
       deleteMany: jest.fn(),
     },
-    $queryRaw: jest.fn(),
-    $executeRaw: jest.fn(),
+    userSession: {
+      findMany: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    $transaction: jest.fn(),
   };
 
   const cronServiceMock = {
@@ -29,10 +32,13 @@ describe('TokenCleanupService', () => {
     jest.clearAllMocks();
     cronServiceMock.register.mockResolvedValue(undefined);
     prismaMock.refreshToken.deleteMany.mockResolvedValue({ count: 0 });
+    prismaMock.trustedDevice.deleteMany.mockResolvedValue({ count: 0 });
+    prismaMock.userSession.findMany.mockResolvedValue([]);
     prismaMock.userSession.deleteMany.mockResolvedValue({ count: 0 });
+    prismaMock.$transaction.mockImplementation(async (ops: Array<Promise<unknown>>) => Promise.all(ops));
   });
 
-  it('registers token and session cleanup jobs in the dynamic cron runtime', async () => {
+  it('registers token and session cleanup jobs with database lease enabled', async () => {
     const service = createService();
 
     await service.onModuleInit();
@@ -45,6 +51,9 @@ describe('TokenCleanupService', () => {
         name: 'Token cleanup',
         origin: 'core',
         settingsUrl: '/configuracoes/sistema/cron',
+        databaseLease: expect.objectContaining({
+          enabled: true,
+        }),
       }),
     );
     expect(cronServiceMock.register).toHaveBeenCalledWith(
@@ -55,7 +64,48 @@ describe('TokenCleanupService', () => {
         name: 'Session cleanup',
         origin: 'core',
         settingsUrl: '/configuracoes/sistema/cron',
+        databaseLease: expect.objectContaining({
+          enabled: true,
+        }),
       }),
     );
+  });
+
+  it('removes expired sessions in batches until no more rows remain', async () => {
+    prismaMock.userSession.findMany
+      .mockResolvedValueOnce([{ id: 'session-1' }, { id: 'session-2' }])
+      .mockResolvedValueOnce([{ id: 'session-3' }])
+      .mockResolvedValueOnce([]);
+    prismaMock.userSession.deleteMany
+      .mockResolvedValueOnce({ count: 2 })
+      .mockResolvedValueOnce({ count: 1 });
+
+    const service = createService();
+
+    await service.cleanupExpiredSessions();
+
+    expect(prismaMock.userSession.findMany).toHaveBeenCalledTimes(3);
+    expect(prismaMock.userSession.deleteMany).toHaveBeenNthCalledWith(1, {
+      where: {
+        id: { in: ['session-1', 'session-2'] },
+      },
+    });
+    expect(prismaMock.userSession.deleteMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        id: { in: ['session-3'] },
+      },
+    });
+  });
+
+  it('keeps token cleanup functional without advisory locks in the service layer', async () => {
+    prismaMock.$transaction.mockResolvedValue([{ count: 4 }, { count: 2 }]);
+
+    const service = createService();
+
+    await service.cleanupExpiredTokens();
+
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(prismaMock.refreshToken.deleteMany).toHaveBeenCalledTimes(1);
+    expect(prismaMock.trustedDevice.deleteMany).toHaveBeenCalledTimes(1);
   });
 });

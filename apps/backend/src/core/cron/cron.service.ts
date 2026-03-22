@@ -7,6 +7,13 @@ import {
   CronJobHeartbeatService,
   CronJobHeartbeatStatus,
 } from './cron-job-heartbeat.service';
+import { ExecutionLeaseService } from './execution-lease.service';
+
+export interface CronJobDatabaseLeaseOptions {
+  enabled?: boolean;
+  ttlMs?: number;
+  renewIntervalMs?: number;
+}
 
 export interface CronJobDefinition {
   key: string;
@@ -36,6 +43,7 @@ export interface CronJobDefinition {
   watchdogEnabled?: boolean;
   watchdogStaleAfterMs?: number;
   watchdogStuckAfterMs?: number;
+  databaseLease?: CronJobDatabaseLeaseOptions;
 }
 
 type RegisterCronMeta = {
@@ -48,6 +56,7 @@ type RegisterCronMeta = {
   watchdogEnabled?: boolean;
   watchdogStaleAfterMs?: number;
   watchdogStuckAfterMs?: number;
+  databaseLease?: CronJobDatabaseLeaseOptions;
 };
 
 type JobWrapper = {
@@ -58,6 +67,9 @@ type JobWrapper = {
 };
 
 import { RedisLockService } from '../../common/services/redis-lock.service';
+
+const DEFAULT_DATABASE_LEASE_TTL_MS = 2 * 60 * 1000;
+const DEFAULT_DATABASE_LEASE_RENEW_MS = 30 * 1000;
 
 @Injectable()
 export class CronService implements OnModuleInit {
@@ -71,6 +83,7 @@ export class CronService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly heartbeatService: CronJobHeartbeatService,
     private readonly redisLock: RedisLockService,
+    private readonly executionLeaseService: ExecutionLeaseService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -159,6 +172,7 @@ export class CronService implements OnModuleInit {
         watchdogEnabled: meta.watchdogEnabled,
         watchdogStaleAfterMs: meta.watchdogStaleAfterMs,
         watchdogStuckAfterMs: meta.watchdogStuckAfterMs,
+        databaseLease: meta.databaseLease,
       },
       true,
     );
@@ -492,6 +506,7 @@ export class CronService implements OnModuleInit {
       watchdogStaleAfterMs?: number;
       watchdogStuckAfterMs?: number;
       idempotent?: boolean;
+      databaseLease?: CronJobDatabaseLeaseOptions;
     },
     runtimeRegistered: boolean,
   ): CronJobDefinition {
@@ -514,6 +529,7 @@ export class CronService implements OnModuleInit {
       watchdogEnabled: input.watchdogEnabled !== false,
       watchdogStaleAfterMs: input.watchdogStaleAfterMs,
       watchdogStuckAfterMs: input.watchdogStuckAfterMs,
+      databaseLease: input.databaseLease,
     };
   }
 
@@ -536,6 +552,46 @@ export class CronService implements OnModuleInit {
     definition.nextExpectedRunAt = heartbeat.nextExpectedRunAt || definition.nextExpectedRunAt;
     definition.consecutiveFailureCount = heartbeat.consecutiveFailureCount;
     definition.lastRun = definition.lastStartedAt;
+  }
+
+  private resolveDatabaseLeaseOptions(
+    definition: CronJobDefinition,
+  ): Required<CronJobDatabaseLeaseOptions> | null {
+    if (definition.databaseLease?.enabled !== true) {
+      return null;
+    }
+
+    return {
+      enabled: true,
+      ttlMs: Math.max(
+        1,
+        Math.floor(definition.databaseLease.ttlMs || DEFAULT_DATABASE_LEASE_TTL_MS),
+      ),
+      renewIntervalMs: Math.max(
+        1,
+        Math.floor(definition.databaseLease.renewIntervalMs || DEFAULT_DATABASE_LEASE_RENEW_MS),
+      ),
+    };
+  }
+
+  private mergeExecutionErrors(primary: unknown, secondary: unknown): Error {
+    const primaryMessage = primary instanceof Error ? primary.message : String(primary);
+    const secondaryMessage = secondary instanceof Error ? secondary.message : String(secondary);
+    return new Error(`${primaryMessage}; lease=${secondaryMessage}`);
+  }
+
+  private resolveInstanceId(): string {
+    const runtimeParts = [
+      String(process.env.NODE_APP_INSTANCE || '').trim(),
+      String(process.env.HOSTNAME || process.env.COMPUTERNAME || '').trim(),
+      `pid-${process.pid}`,
+    ].filter((part) => part.length > 0);
+
+    if (runtimeParts.length === 0) {
+      return 'single-instance';
+    }
+
+    return runtimeParts.join(':');
   }
 
   private async executeRegisteredJob(
@@ -575,7 +631,7 @@ export class CronService implements OnModuleInit {
     }
     
     // instanceId (PM2_INSTANCE ou Hostname)
-    const instanceId = process.env.NODE_APP_INSTANCE || process.env.HOSTNAME || 'single-instance';
+    const instanceId = this.resolveInstanceId();
 
     // 1. Cooldown Redundante Removido
 
@@ -625,6 +681,60 @@ export class CronService implements OnModuleInit {
 
     const startedAt = new Date();
     const nextExpectedRunAt = this.resolveNextExpectedRun(job);
+    const leaseOptions = this.resolveDatabaseLeaseOptions(definition);
+    const leaseContext = leaseOptions
+      ? {
+          jobKey: key,
+          ownerId: instanceId,
+          cycleId,
+        }
+      : null;
+    let leaseReleased = leaseContext === null;
+    let leaseLostError: Error | null = null;
+
+    const releaseLease = async (reason: string, releasedAt: Date, error?: unknown): Promise<void> => {
+      if (!leaseContext || leaseReleased) {
+        return;
+      }
+
+      const released = await this.executionLeaseService.releaseLease({
+        ...leaseContext,
+        releasedAt,
+        reason,
+        error,
+      });
+
+      if (!released) {
+        throw new Error(
+          `Lease persistido de ${key} nao foi liberado por ownerId=${instanceId} cycleId=${cycleId}.`,
+        );
+      }
+
+      leaseReleased = true;
+      this.logger.log(
+        `[DB_LEASE_RELEASED] Job ${key} cycleId=${cycleId} instanceId=${instanceId} reason=${reason}`,
+      );
+    };
+
+    if (leaseContext && leaseOptions) {
+      const acquisition = await this.executionLeaseService.acquireLease({
+        ...leaseContext,
+        startedAt,
+        ttlMs: leaseOptions.ttlMs,
+      });
+
+      if (!acquisition.acquired) {
+        const activeLease = acquisition.lease;
+        this.logger.log(
+          `[DB_LEASE_DENIED] Job ${key} bloqueado por lease ativo. ownerId=${activeLease?.ownerId || 'unknown'} cycleId=${activeLease?.cycleId || 'unknown'} lockedUntil=${activeLease?.lockedUntil?.toISOString() || 'unknown'}`,
+        );
+        return;
+      }
+
+      this.logger.log(
+        `[DB_LEASE_ACQUIRED] Job ${key} cycleId=${cycleId} instanceId=${instanceId} lockedUntil=${acquisition.lease?.lockedUntil?.toISOString() || 'unknown'}`,
+      );
+    }
 
     definition.lastStartedAt = startedAt;
     definition.lastRun = startedAt;
@@ -642,24 +752,58 @@ export class CronService implements OnModuleInit {
     );
 
     if (!startedStatus) {
+      if (leaseContext && !leaseReleased) {
+        try {
+          await releaseLease('heartbeat_guard_denied', new Date(), 'HEARTBEAT_EXCLUSIVE_GUARD_DENIED');
+        } catch (leaseError) {
+          this.logger.error(
+            `[DB_LEASE_RELEASE_FAILED] Job ${key} nao conseguiu liberar lease apos rejeicao do Exclusive Guard: ${String(leaseError)}`,
+          );
+        }
+      }
       this.logger.warn(`[DB_SYNC_FAILED_ABORT] Job ${key} bloqueado pelo Exclusive Guard. cycleId=${cycleId}`);
       return;
     }
 
+    const heartbeatTickMs = leaseOptions
+      ? Math.min(DEFAULT_DATABASE_LEASE_RENEW_MS, leaseOptions.renewIntervalMs)
+      : DEFAULT_DATABASE_LEASE_RENEW_MS;
+
     const heartbeatInterval = setInterval(async () => {
       try {
         await this.heartbeatService.updateHeartbeat(key);
-      } catch (err) {
+      } catch {
         this.logger.warn(`[HEARTBEAT_FAILED] Falha ao atualizar heartbeat para ${key}`);
       }
-    }, 30000);
+
+      if (leaseContext && leaseOptions && !leaseReleased) {
+        const renewed = await this.executionLeaseService.renewLease({
+          ...leaseContext,
+          ttlMs: leaseOptions.ttlMs,
+        });
+
+        if (!renewed && !leaseLostError) {
+          leaseLostError = new Error(
+            `Lease persistido de ${key} foi perdido antes da finalizacao do ciclo ${cycleId}.`,
+          );
+          this.logger.error(
+            `[DB_LEASE_RENEW_FAILED] Job ${key} perdeu o lease persistido. cycleId=${cycleId} instanceId=${instanceId}`,
+          );
+        }
+      }
+    }, heartbeatTickMs);
 
     try {
       this.logger.log(`[EXECUTION_STARTED] Executando callback do cron job: ${key}`);
       await callback();
+      if (leaseLostError) {
+        throw leaseLostError;
+      }
 
       const finishedAt = new Date();
       const nextRun = this.resolveNextExpectedRun(job);
+
+      await releaseLease('completed', finishedAt);
 
       definition.lastStatus = 'success';
       definition.lastSucceededAt = finishedAt;
@@ -671,16 +815,28 @@ export class CronService implements OnModuleInit {
     } catch (error) {
       const finishedAt = new Date();
       const nextRun = this.resolveNextExpectedRun(job);
+      let finalError = error;
+
+      if (leaseContext && !leaseReleased) {
+        try {
+          await releaseLease('failed', finishedAt, error);
+        } catch (leaseError) {
+          finalError = this.mergeExecutionErrors(error, leaseError);
+          this.logger.error(
+            `[DB_LEASE_RELEASE_FAILED] Job ${key} falhou ao liberar lease persistido: ${String(leaseError)}`,
+          );
+        }
+      }
 
       definition.lastStatus = 'failed';
       definition.lastFailedAt = finishedAt;
       definition.lastDurationMs = Math.max(0, finishedAt.getTime() - startedAt.getTime());
       definition.consecutiveFailureCount = (definition.consecutiveFailureCount || 0) + 1;
 
-      await this.heartbeatService.markFailure(key, startedAt, finishedAt, error, nextRun || null);
-      this.logger.error(`Erro ao executar cron job ${key}:`, error);
+      await this.heartbeatService.markFailure(key, startedAt, finishedAt, finalError, nextRun || null);
+      this.logger.error(`Erro ao executar cron job ${key}:`, finalError);
       if (options.rethrowOnFailure) {
-        throw error;
+        throw finalError;
       }
     } finally {
       clearInterval(heartbeatInterval);

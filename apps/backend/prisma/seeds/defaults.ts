@@ -75,6 +75,7 @@ export const DEFAULT_SECURITY_CONFIG = {
   platformEmail: 'admin@sistema.com',
 } as const;
 
-export const SEED_ADVISORY_LOCK_ID = Number(process.env.SEED_LOCK_ID || 87456321);
+export const SEED_LOCK_KEY = `seed.pipeline.${process.env.SEED_LOCK_ID || 87456321}`;
 export const SEED_LOCK_WAIT_SECONDS = Number(process.env.SEED_LOCK_WAIT_SECONDS || 90);
 export const SEED_LOCK_RETRY_MS = Number(process.env.SEED_LOCK_RETRY_MS || 2000);
+export const SEED_LOCK_TTL_MS = Number(process.env.SEED_LOCK_TTL_MS || 120000);
