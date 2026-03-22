@@ -1,59 +1,57 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: false, // Desabilitado temporariamente para evitar rate limiting
-  poweredByHeader: false, // Remove X-Powered-By header
-  compress: true, // Enable gzip compression
+  reactStrictMode: false,
+  poweredByHeader: false,
+  compress: true,
   images: {
-    unoptimized: process.env.NEXT_PUBLIC_IS_GH_PAGES === 'true',
+    unoptimized: process.env.NEXT_PUBLIC_IS_GH_PAGES === "true",
     remotePatterns: [
       {
-        protocol: 'http',
-        hostname: 'localhost',
+        protocol: "http",
+        hostname: "localhost",
       },
       {
-        protocol: 'https',
-        hostname: '**',
-      }
+        protocol: "https",
+        hostname: "**",
+      },
     ],
-    formats: ['image/webp', 'image/avif'], // Optimize image formats
+    formats: ["image/webp", "image/avif"],
   },
   async headers() {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api';
-
     return [
       {
-        source: '/(.*)',
+        source: "/(.*)",
         headers: [
           {
-            key: 'X-Frame-Options',
-            value: 'DENY', // Prevent clickjacking
+            key: "X-Frame-Options",
+            value: "DENY",
           },
           {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff', // Prevent MIME sniffing
+            key: "X-Content-Type-Options",
+            value: "nosniff",
           },
           {
-            key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin',
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
           },
           {
-            key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()', // Restrict permissions
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
           },
           {
-            key: 'Content-Security-Policy',
-          value: (() => {
-              const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || '/api';
-              const apiUrl = rawApiUrl.replace(/\/+$/, '');
+            key: "Content-Security-Policy",
+            value: (() => {
+              const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "/api";
+              const apiUrl = rawApiUrl.replace(/\/+$/, "");
               const isAbsolute = /^https?:\/\//i.test(apiUrl);
 
               const apiCsp = isAbsolute
-                ? `${apiUrl} ${apiUrl.replace(/^http:/, 'https:')}`
-                : '';
+                ? `${apiUrl} ${apiUrl.replace(/^http:/, "https:")}`
+                : "";
 
               const wsCsp = isAbsolute
-                ? `${apiUrl.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:')}`
-                : '';
+                ? `${apiUrl.replace(/^http:/, "ws:").replace(/^https:/, "wss:")}`
+                : "";
 
               return `default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: ${apiCsp}; connect-src 'self' ${apiCsp} ${wsCsp} http://localhost:5000 ws://localhost:5000 https://localhost:5000 wss://localhost:5000; font-src 'self' data: https:;`;
             })(),
@@ -63,48 +61,44 @@ const nextConfig = {
     ];
   },
   async rewrites() {
-    const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || '/api';
-    const apiUrl = rawApiUrl.replace(/\/+$/, '');
+    const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "/api";
+    const apiUrl = rawApiUrl.replace(/\/+$/, "");
     const isAbsoluteApiUrl = /^https?:\/\//i.test(apiUrl);
     const rewrites = [];
 
-    // Evita loop quando NEXT_PUBLIC_API_URL = "/api".
-    // Nesse cenário, o proxy da borda (nginx) já resolve /api para o backend.
     if (isAbsoluteApiUrl) {
-      const apiBase = apiUrl.endsWith('/api') ? apiUrl : `${apiUrl}/api`;
+      const apiBase = apiUrl.endsWith("/api") ? apiUrl : `${apiUrl}/api`;
+
       rewrites.push({
-        source: '/api/:path*',
+        source: "/api/:path*",
         destination: `${apiBase}/:path*`,
       });
 
       rewrites.push({
-        source: '/uploads/:path*',
+        source: "/uploads/:path*",
         destination: `${apiUrl}/uploads/:path*`,
       });
-    } else if (apiUrl && apiUrl !== '/api') {
+    } else if (apiUrl && apiUrl !== "/api") {
       rewrites.push({
-        source: '/api/:path*',
+        source: "/api/:path*",
         destination: `${apiUrl}/:path*`,
       });
 
       rewrites.push({
-        source: '/uploads/:path*',
+        source: "/uploads/:path*",
         destination: `${apiUrl}/uploads/:path*`,
       });
     }
 
     return rewrites;
   },
-  // Enable experimental features for better security
   experimental: {
-    optimizeCss: true, // Optimize CSS
-    workerThreads: true,
+    optimizeCss: true,
+    // Mantido desabilitado para evitar falha estrutural do build no ambiente atual.
+    workerThreads: false,
     webpackBuildWorker: false,
   },
-  // Configure build output
-  output: 'standalone', // Always use standalone for SSR support
-  // Transpile local module packages
-  // transpilePackages: ['@modules/sistema'],
-}
+  output: "standalone",
+};
 
-export default nextConfig
+export default nextConfig;

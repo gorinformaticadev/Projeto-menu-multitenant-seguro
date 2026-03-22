@@ -12,8 +12,7 @@ import { ThemeProvider } from "@/providers/ThemeProvider";
 import { MaintenanceProvider } from "@/contexts/MaintenanceContext";
 import { MaintenanceBanner } from "@/components/MaintenanceBanner";
 import { SystemNotificationsProvider } from "@/contexts/SystemNotificationsContext";
-
-const AVAILABLE_APP_THEMES = ["light", "dark", "system"] as const;
+import { APP_THEME_STORAGE_KEY, APP_THEME_VALUES } from "@/lib/app-theme";
 
 export const metadata: Metadata = {
   title: "Sistema Multitenant", // Será atualizado dinamicamente pelo DynamicTitle
@@ -60,8 +59,10 @@ export default function RootLayout({
                       defaultTheme="light"
                       enableSystem
                       disableTransitionOnChange
-                      themes={[...AVAILABLE_APP_THEMES]}
+                      storageKey={APP_THEME_STORAGE_KEY}
+                      themes={[...APP_THEME_VALUES]}
                     >
+                      {/* O shell autenticado usa a preferencia canonica do AuthContext via ThemeProvider client-side. */}
                       <MaintenanceBanner />
                       <InactivityLogout />
                       <AppLayout>

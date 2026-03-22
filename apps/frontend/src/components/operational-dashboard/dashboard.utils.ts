@@ -490,11 +490,10 @@ function clampValue(value: number, min: number, max: number): number {
   return Math.min(Math.max(Math.floor(value), min), max);
 }
 
-function clampOptional(value: number, min: number, max: number): number | undefined {
+function clampOptional(value: number | undefined, min: number, max: number): number | undefined {
   if (!Number.isFinite(value)) {
     return undefined;
   }
 
-  return clampValue(value, min, max);
+  return clampValue(value ?? min, min, max);
 }
-

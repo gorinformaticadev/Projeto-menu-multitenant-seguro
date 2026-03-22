@@ -334,7 +334,7 @@ function ModuleCardBody({ card }: { card: MainDashboardCard }) {
           {stats.map((stat) => (
             <div
               key={`operational-overview-stat-${stat.label}`}
-              className="rounded-[18px] border border-white/10 bg-white/5 px-3 py-2"
+              className="rounded-[18px] border border-skin-border/80 bg-skin-background-elevated/70 px-3 py-2"
             >
               <p className="text-[10px] uppercase tracking-[0.14em] text-skin-text-muted">
                 {stat.label}
@@ -447,7 +447,7 @@ function ModuleCardBody({ card }: { card: MainDashboardCard }) {
             {columns.map(([column, columnItems]) => (
               <div
                 key={`${card.id}-${column}`}
-                className="flex min-h-[9rem] flex-col rounded-[18px] border border-skin-border/80 bg-skin-background-elevated/70 p-3 /80 /40"
+                className="flex min-h-[9rem] flex-col rounded-[18px] border border-skin-border/80 bg-skin-background-elevated/70 p-3"
               >
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-skin-text">
@@ -666,7 +666,9 @@ export function DashboardHome() {
         : card.kind === "list"
           ? ListTodo
           : resolveDashboardIcon(card.icon);
-      const onSelect = card.href ? () => router.push(card.href) : undefined;
+      const cardHref =
+        typeof card.href === "string" && card.href.trim().length > 0 ? card.href : null;
+      const onSelect = cardHref ? () => router.push(cardHref) : undefined;
 
       map.set(
         card.id,
@@ -1177,7 +1179,7 @@ export function DashboardHome() {
               }
               className={`h-8 w-8 rounded-xl border transition-colors ${operationalPinned
                   ? "border-skin-info/30 bg-skin-info/15 text-skin-info hover:bg-skin-info/20 hover:text-skin-info"
-                  : "border-white/10 bg-white/5 text-skin-text-muted hover:bg-white/10 hover:text-white"
+                  : "border-skin-border/80 bg-skin-background-elevated/70 text-skin-text-muted hover:bg-skin-surface hover:text-skin-text"
                 }`}
               onClick={(event) => {
                 event.stopPropagation();
@@ -1193,7 +1195,7 @@ export function DashboardHome() {
       ) : null}
 
       {isSuperAdmin && operationalExpanded ? (
-              <div className="rounded-[32px] border border-skin-border/80 bg-skin-surface/60 p-3 shadow-lg backdrop-blur-sm /80  md:p-4">
+              <div className="rounded-[32px] border border-skin-border/80 bg-skin-surface/60 p-3 shadow-lg backdrop-blur-sm md:p-4">
           <OperationalDashboard
             embedded
             storedFilters={operationalFilters}
@@ -1266,6 +1268,3 @@ export function DashboardHome() {
     </div>
   );
 }
-
-
-

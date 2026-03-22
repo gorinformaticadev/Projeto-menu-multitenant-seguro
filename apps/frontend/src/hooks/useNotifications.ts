@@ -31,7 +31,7 @@ interface BrowserPushSubscriptionPayload {
 // Flag para controlar se o Socket.IO está habilitado
 const SOCKET_ENABLED = true;
 
-const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
+const urlBase64ToArrayBuffer = (base64String: string): ArrayBuffer => {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = window.atob(base64);
@@ -41,7 +41,10 @@ const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
     outputArray[i] = rawData.charCodeAt(i);
   }
 
-  return outputArray;
+  return outputArray.buffer.slice(
+    outputArray.byteOffset,
+    outputArray.byteOffset + outputArray.byteLength,
+  );
 };
 
 export function useNotifications(): UseNotificationsReturn {
@@ -93,7 +96,6 @@ export function useNotifications(): UseNotificationsReturn {
         icon: '/android-chrome-192x192.png',
         badge: '/favicon-32x32.png',
         tag: `notification-${notification.id}`,
-        renotify: true,
         silent: false,
       });
 
@@ -162,7 +164,7 @@ export function useNotifications(): UseNotificationsReturn {
 
         subscription = await readyWorker.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(publicKey),
+          applicationServerKey: urlBase64ToArrayBuffer(publicKey),
         });
       }
 

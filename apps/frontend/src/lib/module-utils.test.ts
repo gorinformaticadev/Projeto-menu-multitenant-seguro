@@ -15,6 +15,14 @@ const createModule = (overrides: Partial<InstalledModule> = {}): InstalledModule
     current: "files_installed",
     blockers: [],
     dependencies: [],
+    npmDependencies: {
+      backend: [],
+      frontend: [],
+      total: 0,
+      pending: 0,
+      installed: 0,
+      conflicts: 0,
+    },
     frontendInspectMode: "filesystem",
     frontendValidationLevel: "structural",
     steps: {

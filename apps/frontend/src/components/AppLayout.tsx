@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePlatformConfigContext } from "@/contexts/PlatformConfigContext";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { BottomNav } from "./BottomNav";
@@ -10,21 +11,14 @@ import { useModuleRegistry } from "@/hooks/useModuleRegistry";
 import { ModuleRegistryTaskbar } from "./ModuleRegistryTaskbar";
 import { ModuleLoader } from "@/core/ModuleLoader";
 import { RouteGuard } from "./RouteGuard";
-import { useTheme } from "next-themes";
 import { ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Button } from "./ui/button";
-import { DEFAULT_TENANT_LOGO_PATH, resolveTenantLogoSrc } from "@/lib/tenant-logo";
+import { resolveTenantLogoSrc } from "@/lib/tenant-logo";
 
-function normalizeAppThemePreference(theme?: string | null): "light" | "dark" | "system" {
-  if (theme === "dark" || theme === "system") {
-    return theme;
-  }
-
-  return "light";
-}
+const DEFAULT_APP_ICON_PATH = "/favicon.ico";
 
 function updateDocumentIcons(iconHref: string) {
-  const resolvedHref = iconHref || DEFAULT_TENANT_LOGO_PATH;
+  const resolvedHref = iconHref || DEFAULT_APP_ICON_PATH;
   const iconSelectors = [
     "link[rel='icon']",
     "link[rel='shortcut icon']",
@@ -49,32 +43,9 @@ function updateDocumentIcons(iconHref: string) {
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
+  const { config: platformConfig } = usePlatformConfigContext();
   const { isInitialized, error } = useModuleRegistry();
-  const { setTheme, theme } = useTheme();
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
-  const lastAppliedThemeRef = useRef<"light" | "dark" | "system" | null>(null);
-
-  // Sincroniza o tema do usuario antes da pintura para evitar flicker apos o login.
-  useLayoutEffect(() => {
-    if (!user) {
-      lastAppliedThemeRef.current = null;
-      return;
-    }
-
-    const preferredTheme = normalizeAppThemePreference(user.preferences?.theme);
-
-    if (theme === preferredTheme) {
-      lastAppliedThemeRef.current = preferredTheme;
-      return;
-    }
-
-    if (lastAppliedThemeRef.current === preferredTheme) {
-      return;
-    }
-
-    lastAppliedThemeRef.current = preferredTheme;
-    setTheme(preferredTheme);
-  }, [user, theme, setTheme]);
 
   // Páginas onde o sidebar e topbar NÃO devem aparecer
   const publicPages = ["/", "/login", "/esqueci-senha", "/redefinir-senha"];
@@ -98,13 +69,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const faviconSrc =
-      resolveTenantLogoSrc(user?.tenant?.logoUrl, {
-        tenantId: user?.tenantId,
-        fallbackToDefault: true,
-      }) || DEFAULT_TENANT_LOGO_PATH;
+      resolveTenantLogoSrc(platformConfig.platformBrandLogoUrl, {
+        fallbackToDefault: false,
+      }) || DEFAULT_APP_ICON_PATH;
 
     updateDocumentIcons(faviconSrc);
-  }, [user?.tenant?.logoUrl, user?.tenantId]);
+  }, [platformConfig.platformBrandLogoUrl]);
 
   // Se está carregando ou é página pública, não mostra sidebar nem topbar
   if (loading || isPublicPage || !user) {

@@ -68,35 +68,6 @@
     --color-sidebar-text: 71 85 105;
     --color-sidebar-active: 37 99 235;
     --color-menu-hover: 241 245 249;
-    --auth-page-start: oklch(0.12 0.02 240);
-    --auth-page-mid: oklch(0.14 0.02 240);
-    --auth-page-end: oklch(0.09 0.01 240);
-    --auth-surface: oklch(0.18 0.02 240 / 0.75);
-    --auth-surface-hover: oklch(0.22 0.02 240 / 0.85);
-    --auth-border: oklch(1 0 0 / 0.15);
-    --auth-border-soft: oklch(1 0 0 / 0.08);
-    --auth-text: oklch(0.98 0.01 240);
-    --auth-text-muted: oklch(0.75 0.02 240);
-    --auth-text-soft: oklch(0.55 0.02 240);
-    --auth-primary: oklch(0.60 0.20 280);
-    --auth-primary-hover: oklch(0.65 0.18 280);
-    --auth-primary-soft: oklch(0.68 0.22 210 / 0.45);
-    --auth-primary-selection: oklch(0.60 0.20 280 / 0.3);
-    --auth-secondary-soft: oklch(0.64 0.25 295 / 0.45);
-    --auth-success-soft: oklch(0.73 0.16 155 / 0.1);
-    --auth-success-border: oklch(0.73 0.16 155 / 0.2);
-    --auth-success-text: oklch(0.84 0.12 155);
-    --auth-warning-text: oklch(0.79 0.15 85);
-    --auth-input-background: oklch(0 0 0 / 0.25);
-    --auth-input-background-focus: oklch(0 0 0 / 0.35);
-    --auth-input-shadow: inset 1px 1px 3px oklch(0 0 0 / 0.4), inset -1px -1px 2px oklch(1 0 0 / 0.03);
-    --auth-card-shadow: 0 20px 50px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(1 0 0 / 0.05);
-    --auth-card-shadow-hover: 0 20px 60px oklch(0 0 0 / 0.7);
-    --auth-shell-shadow: 0 4px 12px oklch(0 0 0 / 0.5);
-    --auth-footer-shadow: 0 10px 30px oklch(0 0 0 / 0.4);
-    --auth-button-shadow: 0 4px 18px 0 oklch(0.60 0.20 280 / 0.45);
-    --auth-button-shadow-hover: 0 6px 24px oklch(0.60 0.20 280 / 0.35);
-    --auth-support-glow: 0 0 20px oklch(0.73 0.16 155 / 0.25);
     --dashboard-placeholder-background: linear-gradient(120deg, oklch(0.62 0.16 275 / 0.18), oklch(0.72 0.12 230 / 0.2));
     --dashboard-placeholder-editing-background: linear-gradient(120deg, oklch(0.56 0.16 255 / 0.18), oklch(0.62 0.14 245 / 0.26));
     --dashboard-placeholder-border: oklch(0.62 0.14 245 / 0.45);
@@ -230,51 +201,37 @@
     font-weight: 500;
   }
 
-  p,
-  div,
-  span {
-    font-size: 0.8125rem;
-    /* 13px */
-  }
-
-  /* Ajustes para componentes específicos */
-  .text-3xl {
-    font-size: 1.5rem !important;
-  }
-
-  .text-2xl {
-    font-size: 1.25rem !important;
-  }
-
-  .text-xl {
-    font-size: 1.125rem !important;
-  }
-
-  .text-lg {
-    font-size: 1rem !important;
-  }
-
-  .text-base {
-    font-size: 0.8125rem !important;
-  }
-
-  .text-sm {
-    font-size: 0.75rem !important;
-  }
-
-  .text-xs {
-    font-size: 0.7rem !important;
-  }
-
   /* Auth theme is fixed and isolated from app theme switching */
   .auth-theme {
-    --color-auth-background: 15 23 42;
-    --color-auth-surface: 30 41 59;
-    --color-auth-border: 51 65 85;
-    --color-auth-text: 248 250 252;
-    --color-auth-text-muted: 148 163 184;
-    --color-auth-primary: 79 70 229;
-    --color-auth-primary-hover: 67 56 202;
+    --auth-page-start: oklch(0.12 0.02 240);
+    --auth-page-mid: oklch(0.14 0.02 240);
+    --auth-page-end: oklch(0.09 0.01 240);
+    --auth-surface: oklch(0.18 0.02 240 / 0.75);
+    --auth-surface-hover: oklch(0.22 0.02 240 / 0.85);
+    --auth-border: oklch(1 0 0 / 0.15);
+    --auth-border-soft: oklch(1 0 0 / 0.08);
+    --auth-text: oklch(0.98 0.01 240);
+    --auth-text-muted: oklch(0.75 0.02 240);
+    --auth-text-soft: oklch(0.55 0.02 240);
+    --auth-primary: oklch(0.60 0.20 280);
+    --auth-primary-hover: oklch(0.65 0.18 280);
+    --auth-primary-soft: oklch(0.68 0.22 210 / 0.45);
+    --auth-primary-selection: oklch(0.60 0.20 280 / 0.3);
+    --auth-secondary-soft: oklch(0.64 0.25 295 / 0.45);
+    --auth-success-soft: oklch(0.73 0.16 155 / 0.1);
+    --auth-success-border: oklch(0.73 0.16 155 / 0.2);
+    --auth-success-text: oklch(0.84 0.12 155);
+    --auth-warning-text: oklch(0.79 0.15 85);
+    --auth-input-background: oklch(0 0 0 / 0.25);
+    --auth-input-background-focus: oklch(0 0 0 / 0.35);
+    --auth-input-shadow: inset 1px 1px 3px oklch(0 0 0 / 0.4), inset -1px -1px 2px oklch(1 0 0 / 0.03);
+    --auth-card-shadow: 0 20px 50px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(1 0 0 / 0.05);
+    --auth-card-shadow-hover: 0 20px 60px oklch(0 0 0 / 0.7);
+    --auth-shell-shadow: 0 4px 12px oklch(0 0 0 / 0.5);
+    --auth-footer-shadow: 0 10px 30px oklch(0 0 0 / 0.4);
+    --auth-button-shadow: 0 4px 18px 0 oklch(0.60 0.20 280 / 0.45);
+    --auth-button-shadow-hover: 0 6px 24px oklch(0.60 0.20 280 / 0.35);
+    --auth-support-glow: 0 0 20px oklch(0.73 0.16 155 / 0.25);
   }
 
   .auth-page {
@@ -467,3 +424,5 @@
 .operational-dashboard-grid.is-editing .react-grid-item:hover .react-resizable-handle {
   transform: scale(1.08);
 }
+
+

@@ -31,6 +31,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import type {
+  NameType,
+  Payload,
+  ValueType,
+} from "recharts/types/component/DefaultTooltipContent";
 import {
   Responsive,
   useContainerWidth,
@@ -283,6 +288,12 @@ function formatTimeOfDay(value: unknown): string {
   }).format(date);
 }
 
+function toTooltipNumericValue(value: ValueType | undefined): number | null {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  const numeric = Number(candidate);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
 function normalizeTrendSeries(value: unknown): TrendPoint[] {
   if (!Array.isArray(value)) {
     return [];
@@ -503,9 +514,9 @@ function MiniTrendSparkline({
           <RechartsTooltip
             cursor={false}
             labelFormatter={(_label, payload) => String(payload?.[0]?.payload?.label || "")}
-            formatter={(value: number) => {
-              const numeric = Number(value);
-              return Number.isFinite(numeric)
+            formatter={(value: ValueType | undefined) => {
+              const numeric = toTooltipNumericValue(value);
+              return numeric !== null
                 ? `${numeric.toFixed(0)}${config.valueSuffix || ""}`
                 : "--";
             }}
@@ -527,7 +538,7 @@ function DashboardCollectionState({
   minHeight?: string;
 }) {
   return (
-    <div className={`flex ${minHeight} items-center justify-center rounded-[28px] border border-dashed border-skin-border bg-skin-background-elevated/50/85 p-4 dark:border-skin-border dark:bg-skin-surface/30`}>
+    <div className={`flex ${minHeight} items-center justify-center rounded-[28px] border border-dashed border-skin-border bg-skin-background-elevated/85 p-4 dark:border-skin-border dark:bg-skin-surface/30`}>
       <DashboardSurfaceState
         title={title}
         description={description}
@@ -554,7 +565,7 @@ function DashboardChartState({
       centered
       className={dark
         ? "h-full border-skin-border/20 bg-skin-surface/5 text-skin-text"
-        : "h-full border-dashed border-skin-border/80 bg-skin-background-elevated/50/70 dark:border-skin-border/80 dark:bg-skin-surface/35"}
+        : "h-full border-dashed border-skin-border/80 bg-skin-background-elevated/70 dark:border-skin-border/80 dark:bg-skin-surface/35"}
     />
   );
 }
@@ -637,7 +648,7 @@ function DashboardOverviewSkeleton() {
                 <div className="h-4 w-10 animate-pulse rounded-full bg-skin-border/80" />
               </div>
               <div className="mt-3 h-2 animate-pulse rounded-full bg-skin-border" />
-              <div className="mt-3 h-10 animate-pulse rounded-[16px] bg-skin-background-elevated/80 /60" />
+              <div className="mt-3 h-10 animate-pulse rounded-[16px] bg-skin-background-elevated/80" />
             </div>
           ))}
         </div>
@@ -935,7 +946,7 @@ function PanoramaSignal({
         side="bottom"
         align="start"
         sideOffset={10}
-        className="w-80 rounded-[20px] border border-skin-border bg-skin-surface/95 p-3 text-skin-text shadow-xl /70 dark:bg-skin-surface/95 dark:text-skin-text dark:shadow-2xl"
+        className="w-80 rounded-[20px] border border-skin-border bg-skin-surface/95 p-3 text-skin-text shadow-xl dark:bg-skin-surface/95 dark:text-skin-text dark:shadow-2xl"
       >
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-skin-text-muted">
@@ -949,7 +960,7 @@ function PanoramaSignal({
           {detailsItems.map((item, index) => (
             <div
               key={`${item.label}-${index}`}
-              className="rounded-2xl border border-skin-border bg-skin-background-elevated/50/80 px-3 py-2 dark:border-skin-border/20 dark:bg-skin-surface/5"
+              className="rounded-2xl border border-skin-border bg-skin-background-elevated/80 px-3 py-2 dark:border-skin-border/20 dark:bg-skin-surface/5"
             >
               <p className="text-sm font-medium text-skin-text dark:text-skin-text">{item.label}</p>
               {item.hint ? (
@@ -1116,7 +1127,7 @@ function HealthBucketLegendRow({
         side="left"
         align="start"
         sideOffset={10}
-        className="w-72 rounded-[20px] border border-skin-border bg-skin-surface/95 p-3 text-skin-text shadow-xl /70 dark:bg-skin-surface/95 dark:text-skin-text dark:shadow-2xl"
+        className="w-72 rounded-[20px] border border-skin-border bg-skin-surface/95 p-3 text-skin-text shadow-xl dark:bg-skin-surface/95 dark:text-skin-text dark:shadow-2xl"
         onMouseEnter={clearCloseTimeout}
         onMouseLeave={scheduleClose}
       >
@@ -1135,7 +1146,7 @@ function HealthBucketLegendRow({
           {items.map((item) => (
             <div
               key={item.id}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-skin-border bg-skin-background-elevated/50/80 px-3 py-2 dark:border-skin-border/20 dark:bg-skin-surface/5"
+              className="flex items-center justify-between gap-3 rounded-2xl border border-skin-border bg-skin-background-elevated/80 px-3 py-2 dark:border-skin-border/20 dark:bg-skin-surface/5"
             >
               <span className="min-w-0 truncate text-sm text-skin-text dark:text-skin-text">
                 {item.label}
@@ -2185,7 +2196,7 @@ export function OperationalDashboard({
                   ? `${databaseMetric.latencyMs}ms`
                   : "--"}
               </p>
-              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-skin-text-muted dark:text-skin-text-muted/80/80">
+              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-skin-text-muted dark:text-skin-text-muted/80">
                 banco
               </p>
             </div>
@@ -2220,7 +2231,7 @@ export function OperationalDashboard({
                   ? `${redisMetric.latencyMs}ms`
                   : "--"}
               </p>
-              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-skin-text-muted dark:text-skin-text-muted/80/80">
+              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-skin-text-muted dark:text-skin-text-muted/80">
                 cache
               </p>
             </div>
@@ -2253,10 +2264,10 @@ export function OperationalDashboard({
               {String(workersMetric?.activeWorkers ?? workersMetric?.runningJobs ?? "--")}
             </p>
             <div className="text-right">
-              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80/80">
+              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80">
                 Executando: <span className="font-medium text-skin-text">{String(workersMetric?.runningJobs ?? "--")}</span>
               </p>
-              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80/80">
+              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80">
                 Pendentes: <span className="font-medium text-skin-warning/80">{String(workersMetric?.pendingJobs ?? "--")}</span>
               </p>
             </div>
@@ -2286,8 +2297,8 @@ export function OperationalDashboard({
               {String(jobsMetric?.running ?? "--")}
             </p>
             <div className="text-right">
-              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80/80">Pendentes: <span className="text-skin-warning/80">{String(jobsMetric?.pending ?? "--")}</span></p>
-              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80/80">Falhas 24h: <span className="text-skin-danger">{String(jobsMetric?.failedLast24h ?? "--")}</span></p>
+              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80">Pendentes: <span className="text-skin-warning/80">{String(jobsMetric?.pending ?? "--")}</span></p>
+              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80">Falhas 24h: <span className="text-skin-danger">{String(jobsMetric?.failedLast24h ?? "--")}</span></p>
             </div>
           </div>
         )}
@@ -2683,7 +2694,7 @@ export function OperationalDashboard({
       >
         <div className="mt-auto flex items-end justify-between gap-2">
           <p className="text-[1.7rem] font-bold leading-none tracking-tight text-skin-info/90">{String(tenantsMetric?.active ?? "--")}</p>
-          <div className="text-right text-[10px] text-skin-text-muted dark:text-skin-text-muted/80/80">
+          <div className="text-right text-[10px] text-skin-text-muted dark:text-skin-text-muted/80">
             <p>ativas</p>
             <p>{String(tenantsMetric?.total ?? "--")} total</p>
           </div>
@@ -2715,11 +2726,11 @@ export function OperationalDashboard({
               {String(notificationsMetric?.criticalUnread ?? "--")}
             </p>
             <div className="text-right">
-              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80/80">Nao lidas</p>
-              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80/80">
+              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80">Nao lidas</p>
+              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80">
                 Criticas no periodo: <span className="font-medium text-skin-text">{String(notificationsMetric?.criticalRecent ?? "--")}</span>
               </p>
-              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80/80">
+              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80">
                 Alertas operacionais: <span className="font-medium text-skin-text">{String(notificationsMetric?.operationalRecentCount ?? "--")}</span>
               </p>
             </div>
@@ -2730,13 +2741,13 @@ export function OperationalDashboard({
                 <div key={alert.id} className="flex items-start justify-between gap-2 text-[10px]">
                   <div className="min-w-0">
                     <p className="truncate font-medium text-skin-text dark:text-skin-text">{alert.title}</p>
-                    <p className="truncate text-skin-text-muted dark:text-skin-text-muted/80/80">{alert.body}</p>
+                    <p className="truncate text-skin-text-muted dark:text-skin-text-muted/80">{alert.body}</p>
                   </div>
                   <span className="shrink-0 text-skin-text-muted dark:text-skin-text-muted">{formatTimeOfDay(alert.createdAt)}</span>
                 </div>
               ))
             ) : (
-              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80/80">Sem alertas operacionais recentes.</p>
+              <p className="text-[10px] text-skin-text-muted dark:text-skin-text-muted/80">Sem alertas operacionais recentes.</p>
             )}
           </div>
         </div>
@@ -2903,7 +2914,7 @@ export function OperationalDashboard({
                     </button>
                   ))}
                 </div>
-                <div className="mt-4 rounded-[22px] border border-skin-border/80 bg-skin-background-elevated/50/80 p-3 dark:border-skin-border/80 /40">
+                <div className="mt-4 rounded-[22px] border border-skin-border/80 bg-skin-background-elevated/80 p-3 dark:border-skin-border/40">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-sm font-semibold text-skin-text dark:text-skin-text">
@@ -3156,9 +3167,13 @@ export function OperationalDashboard({
                         </Pie>
                         <RechartsTooltip
                           cursor={false}
-                          formatter={(value: number, _name, payload) => [
-                            `${value} widgets`,
-                            String(payload?.payload?.name || "Status"),
+                          formatter={(
+                            value: ValueType | undefined,
+                            _name: NameType | undefined,
+                            payload: Payload<ValueType, NameType> | undefined,
+                          ) => [
+                            `${toTooltipNumericValue(value) ?? 0} widgets`,
+                            String(payload?.payload?.name || payload?.name || "Status"),
                           ]}
                           contentStyle={DASHBOARD_TOOLTIP_STYLE_LG}
                         />
@@ -3328,12 +3343,5 @@ export function OperationalDashboard({
     </TooltipProvider >
   );
 }
-
-
-
-
-
-
-
 
 

@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { PasswordInput } from "@/components/ui/password-input";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { DEFAULT_TENANT_LOGO_PATH, resolveTenantLogoSrc } from "@/lib/tenant-logo";
+import { resolveTenantLogoSrc } from "@/lib/tenant-logo";
 
 export default function PerfilPage() {
   const { user, updateUser } = useAuth();
@@ -57,15 +57,11 @@ export default function PerfilPage() {
   const [avatarSubmitting, setAvatarSubmitting] = useState(false);
   const [avatarCacheBuster, setAvatarCacheBuster] = useState<number>(() => Date.now());
 
-  const tenantLogoFallbackSrc =
-    resolveTenantLogoSrc(user?.tenant?.logoUrl, {
-      tenantId: user?.tenantId,
-      fallbackToDefault: true,
-    }) || DEFAULT_TENANT_LOGO_PATH;
   const userAvatarSrc = resolveTenantLogoSrc(user?.avatarUrl, {
     cacheBuster: avatarCacheBuster,
   });
-  const currentAvatarSrc = avatarPreview || userAvatarSrc || tenantLogoFallbackSrc;
+  const currentAvatarSrc = avatarPreview || userAvatarSrc;
+  const userInitial = user?.name?.trim().charAt(0).toUpperCase() || "U";
 
   const getProfileCacheKey = useCallback(() => {
     if (!user?.id) return null;
@@ -362,7 +358,7 @@ export default function PerfilPage() {
 
       toast({
         title: "Imagem removida",
-        description: "Voltamos para a imagem padrao do tenant",
+        description: "A conta voltou a exibir apenas suas iniciais no menu do usuario",
       });
     } catch (error: unknown) {
       toast({
@@ -386,16 +382,19 @@ export default function PerfilPage() {
             <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                 <div className="relative h-24 w-24 overflow-hidden rounded-3xl border border-skin-border bg-skin-background-elevated shadow-sm">
-                  <Image
-                    src={currentAvatarSrc}
-                    alt="Avatar do usuario"
-                    fill
-                    className="object-cover"
-                    unoptimized
-                    onError={(e) => {
-                      e.currentTarget.src = tenantLogoFallbackSrc;
-                    }}
-                  />
+                  {currentAvatarSrc ? (
+                    <Image
+                      src={currentAvatarSrc}
+                      alt="Avatar do usuario"
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-skin-primary text-3xl font-semibold text-skin-text-inverse">
+                      {userInitial}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-3">
@@ -457,23 +456,26 @@ export default function PerfilPage() {
                 description={
                   user?.avatarUrl
                     ? "Imagem personalizada ativa no TopBar."
-                    : "Sem imagem personalizada. O sistema usa o fallback do tenant."
+                    : "Sem imagem personalizada. O sistema exibe apenas suas iniciais."
                 }
                 aside="Formatos aceitos: JPG, PNG, GIF e WEBP (maximo 5MB)."
               >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex items-center gap-4">
                     <div className="relative h-20 w-20 overflow-hidden rounded-2xl border border-skin-border bg-skin-surface">
-                      <Image
-                        src={currentAvatarSrc}
-                        alt="Avatar do usuario"
-                        fill
-                        className="object-cover"
-                        unoptimized
-                        onError={(e) => {
-                          e.currentTarget.src = tenantLogoFallbackSrc;
-                        }}
-                      />
+                      {currentAvatarSrc ? (
+                        <Image
+                          src={currentAvatarSrc}
+                          alt="Avatar do usuario"
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-skin-primary text-2xl font-semibold text-skin-text-inverse">
+                          {userInitial}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 text-sm text-skin-text">
                       <Camera className="h-4 w-4 text-skin-text-muted" />

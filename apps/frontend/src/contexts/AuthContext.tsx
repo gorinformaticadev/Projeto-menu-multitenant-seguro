@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
+import { type AppThemePreference, normalizeAppThemePreference } from "@/lib/app-theme";
 import { moduleRegistry } from "@/lib/module-registry";
 import { isProtectedRoute, isAuthRoute, isSafeCallbackUrl, ROUTE_CONFIG } from "@/lib/routes";
 
@@ -25,7 +26,7 @@ export interface User {
   } | null;
   twoFactorEnabled?: boolean;
   preferences?: {
-    theme?: string;
+    theme?: AppThemePreference;
   } | null;
 }
 
@@ -115,6 +116,16 @@ const loadModulesSafely = async (): Promise<void> => {
   }
 };
 
+const normalizeUserThemePreference = (nextUser: User): User => ({
+  ...nextUser,
+  preferences: nextUser.preferences
+    ? {
+        ...nextUser.preferences,
+        theme: normalizeAppThemePreference(nextUser.preferences.theme),
+      }
+    : nextUser.preferences,
+});
+
 interface AuthContextData {
   user: User | null;
   token: string | null;
@@ -132,10 +143,19 @@ interface AuthContextData {
     trustDevice: boolean,
   ) => Promise<LoginResult>;
   logout: () => Promise<void>;
+  saveThemePreference: (theme: AppThemePreference) => Promise<AppThemePreference>;
   updateUser: (userData: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
+
+const withThemePreference = (nextUser: User, theme: AppThemePreference): User => ({
+  ...nextUser,
+  preferences: {
+    ...(nextUser.preferences ?? {}),
+    theme: normalizeAppThemePreference(theme),
+  },
+});
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -165,7 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 
   const handleAuthenticatedResponse = async (payload: AuthenticatedResponsePayload) => {
-    setUser(payload.user);
+    setUser(normalizeUserThemePreference(payload.user));
     setToken(SESSION_MARKER);
 
     void loadModulesSafely();
@@ -196,7 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           timeout: AUTH_REQUEST_TIMEOUT_MS,
         });
 
-        setUser(response.data);
+        setUser(normalizeUserThemePreference(response.data));
         setToken(SESSION_MARKER);
         void loadModulesSafely();
       } catch (error: unknown) {
@@ -386,10 +406,77 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  function updateUser(userData: Partial<User>) {
-    if (user) {
-      setUser({ ...user, ...userData });
+  async function saveThemePreference(theme: AppThemePreference): Promise<AppThemePreference> {
+    const normalizedTheme = normalizeAppThemePreference(theme);
+    const previousTheme = normalizeAppThemePreference(user?.preferences?.theme);
+
+    if (!user) {
+      throw new Error("Usuario nao autenticado para alterar o tema");
     }
+
+    if (normalizedTheme === previousTheme) {
+      return previousTheme;
+    }
+
+    setUser((currentUser) => {
+      if (!currentUser) {
+        return currentUser;
+      }
+
+      return withThemePreference(currentUser, normalizedTheme);
+    });
+
+    try {
+      await api.patch(
+        "/users/preferences",
+        { theme: normalizedTheme },
+        { timeout: AUTH_REQUEST_TIMEOUT_MS },
+      );
+      return normalizedTheme;
+    } catch (error) {
+      setUser((currentUser) => {
+        if (!currentUser) {
+          return currentUser;
+        }
+
+        return withThemePreference(currentUser, previousTheme);
+      });
+
+      throw error;
+    }
+  }
+
+  function updateUser(userData: Partial<User>) {
+    setUser((currentUser) => {
+      if (!currentUser) {
+        return currentUser;
+      }
+
+      const nextPreferences = userData.preferences
+        ? {
+            ...(currentUser.preferences ?? {}),
+            ...userData.preferences,
+          }
+        : currentUser.preferences;
+
+      if (nextPreferences?.theme) {
+        nextPreferences.theme = normalizeAppThemePreference(nextPreferences.theme);
+      }
+
+      const nextTenant = userData.tenant
+        ? {
+            ...(currentUser.tenant ?? {}),
+            ...userData.tenant,
+          }
+        : currentUser.tenant;
+
+      return {
+        ...currentUser,
+        ...userData,
+        tenant: nextTenant,
+        preferences: nextPreferences,
+      };
+    });
   }
 
   return (
@@ -403,6 +490,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loginWith2FA,
         completeTwoFactorEnrollment,
         logout,
+        saveThemePreference,
         updateUser,
       }}
     >

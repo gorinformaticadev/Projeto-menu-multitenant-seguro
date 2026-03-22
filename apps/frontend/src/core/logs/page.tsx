@@ -289,7 +289,7 @@ export default function LogsPage() {
                           {log.userAgent && (
                             <div className="truncate">User-Agent: {log.userAgent}</div>
                           )}
-                          {log.details && (
+                          {Boolean(log.details) && (
                             <details className="mt-2">
                               <summary className="cursor-pointer text-skin-primary hover:underline">
                                 Ver detalhes

@@ -1,107 +1,197 @@
-import { useState, useEffect } from 'react';
-import api from '@/lib/api';
+import { useEffect, useState } from "react";
+import api from "@/lib/api";
+
+const PLATFORM_CONFIG_CACHE_KEY = "platform-config-cache";
+const PLATFORM_CONFIG_CACHE_TTL_MS = 60 * 1000;
 
 export interface PlatformConfig {
   platformName: string;
   platformLogoUrl: string | null;
+  masterLogoUrl: string | null;
+  platformBrandLogoUrl: string | null;
   platformEmail: string;
   platformPhone: string;
 }
 
-// Default values as constants
 export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
-  platformName: 'Sistema Multitenant',
+  platformName: "Sistema Multitenant",
   platformLogoUrl: null,
-  platformEmail: 'contato@sistema.com',
-  platformPhone: '(11) 99999-9999',
+  masterLogoUrl: null,
+  platformBrandLogoUrl: null,
+  platformEmail: "contato@sistema.com",
+  platformPhone: "(11) 99999-9999",
 };
 
-// Global cache for platform config
 let globalPlatformConfig: PlatformConfig | null = null;
 let configPromise: Promise<PlatformConfig> | null = null;
 
-/**
- * Fetch platform configuration from API
- */
-async function fetchPlatformConfig(): Promise<PlatformConfig> {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmedValue = value.trim();
+  return trimmedValue ? trimmedValue : null;
+}
+
+function normalizePlatformConfig(
+  responseData: unknown,
+  masterLogoUrl: string | null,
+): PlatformConfig {
+  const data = isRecord(responseData) ? responseData : {};
+  const platformLogoUrl = normalizeOptionalString(data.platformLogoUrl);
+  const normalizedMasterLogoUrl = normalizeOptionalString(masterLogoUrl);
+
+  return {
+    platformName:
+      typeof data.platformName === "string" && data.platformName.trim()
+        ? data.platformName
+        : DEFAULT_PLATFORM_CONFIG.platformName,
+    platformLogoUrl,
+    masterLogoUrl: normalizedMasterLogoUrl,
+    platformBrandLogoUrl: platformLogoUrl ?? normalizedMasterLogoUrl,
+    platformEmail:
+      typeof data.platformEmail === "string" && data.platformEmail.trim()
+        ? data.platformEmail
+        : DEFAULT_PLATFORM_CONFIG.platformEmail,
+    platformPhone:
+      typeof data.platformPhone === "string" && data.platformPhone.trim()
+        ? data.platformPhone
+        : DEFAULT_PLATFORM_CONFIG.platformPhone,
+  };
+}
+
+function readPlatformConfigCache(): PlatformConfig | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const cachedValue = window.localStorage.getItem(PLATFORM_CONFIG_CACHE_KEY);
+  if (!cachedValue) {
+    return null;
+  }
+
   try {
-    const response = await api.get('/api/platform-config');
-    const responseData = response.data || {};
-    const normalizedConfig: PlatformConfig = {
-      platformName: String(responseData.platformName || DEFAULT_PLATFORM_CONFIG.platformName),
-      platformLogoUrl:
-        typeof responseData.platformLogoUrl === 'string' && responseData.platformLogoUrl.trim()
-          ? responseData.platformLogoUrl
-          : null,
-      platformEmail: String(responseData.platformEmail || DEFAULT_PLATFORM_CONFIG.platformEmail),
-      platformPhone: String(responseData.platformPhone || DEFAULT_PLATFORM_CONFIG.platformPhone),
+    const parsedCache = JSON.parse(cachedValue) as {
+      data?: unknown;
+      timestamp?: unknown;
     };
-    globalPlatformConfig = normalizedConfig;
-    return normalizedConfig;
-  } catch (error) {
-    console.warn('Failed to fetch platform config, using defaults:', error);
-    globalPlatformConfig = DEFAULT_PLATFORM_CONFIG;
-    return DEFAULT_PLATFORM_CONFIG;
+
+    if (
+      typeof parsedCache.timestamp !== "number" ||
+      Date.now() - parsedCache.timestamp >= PLATFORM_CONFIG_CACHE_TTL_MS
+    ) {
+      window.localStorage.removeItem(PLATFORM_CONFIG_CACHE_KEY);
+      return null;
+    }
+
+    return normalizePlatformConfig(
+      parsedCache.data,
+      isRecord(parsedCache.data) ? normalizeOptionalString(parsedCache.data.masterLogoUrl) : null,
+    );
+  } catch {
+    window.localStorage.removeItem(PLATFORM_CONFIG_CACHE_KEY);
+    return null;
   }
 }
 
-/**
- * Get platform configuration (cached)
- */
+function writePlatformConfigCache(config: PlatformConfig) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(
+    PLATFORM_CONFIG_CACHE_KEY,
+    JSON.stringify({
+      data: config,
+      timestamp: Date.now(),
+    }),
+  );
+}
+
+async function fetchMasterLogo(): Promise<string | null> {
+  try {
+    const response = await api.get("/api/tenants/public/master-logo");
+    return normalizeOptionalString(response.data?.logoUrl);
+  } catch {
+    return null;
+  }
+}
+
+async function fetchPlatformConfig(): Promise<PlatformConfig> {
+  const cachedConfig = readPlatformConfigCache();
+  if (cachedConfig) {
+    globalPlatformConfig = cachedConfig;
+    return cachedConfig;
+  }
+
+  try {
+    const [platformConfigResult, masterLogoUrl] = await Promise.all([
+      api.get("/api/platform-config"),
+      fetchMasterLogo(),
+    ]);
+
+    const normalizedConfig = normalizePlatformConfig(platformConfigResult.data, masterLogoUrl);
+    globalPlatformConfig = normalizedConfig;
+    writePlatformConfigCache(normalizedConfig);
+    return normalizedConfig;
+  } catch (error) {
+    console.warn("Failed to fetch platform config, using defaults:", error);
+    const fallbackConfig = normalizePlatformConfig({}, null);
+    globalPlatformConfig = fallbackConfig;
+    return fallbackConfig;
+  }
+}
+
 export async function getPlatformConfig(): Promise<PlatformConfig> {
   if (globalPlatformConfig) {
     return globalPlatformConfig;
   }
 
   if (!configPromise) {
-    configPromise = fetchPlatformConfig();
+    configPromise = fetchPlatformConfig().finally(() => {
+      configPromise = null;
+    });
   }
 
   return configPromise;
 }
 
-/**
- * Get platform name only
- */
 export async function getPlatformName(): Promise<string> {
   const config = await getPlatformConfig();
   return config.platformName;
 }
 
-/**
- * Get platform email only
- */
 export async function getPlatformEmail(): Promise<string> {
   const config = await getPlatformConfig();
   return config.platformEmail;
 }
 
-/**
- * Get platform phone only
- */
 export async function getPlatformPhone(): Promise<string> {
   const config = await getPlatformConfig();
   return config.platformPhone;
 }
 
-/**
- * Clear platform config cache
- */
 export function clearPlatformConfigCache(): void {
   globalPlatformConfig = null;
   configPromise = null;
+
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem(PLATFORM_CONFIG_CACHE_KEY);
+  }
 }
 
-/**
- * React hook for platform configuration
- */
 export function usePlatformConfig() {
   const [config, setConfig] = useState<PlatformConfig>(DEFAULT_PLATFORM_CONFIG);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let mounted = true;
+    let isMounted = true;
 
     const loadConfig = async () => {
       try {
@@ -109,27 +199,27 @@ export function usePlatformConfig() {
         setError(null);
 
         const platformConfig = await getPlatformConfig();
-
-        if (mounted) {
+        if (isMounted) {
           setConfig(platformConfig);
         }
       } catch (err: unknown) {
-        if (mounted) {
-          const errorMsg = err instanceof Error ? err.message : 'Failed to load platform configuration';
-          setError(errorMsg);
+        if (isMounted) {
           setConfig(DEFAULT_PLATFORM_CONFIG);
+          setError(
+            err instanceof Error ? err.message : "Failed to load platform configuration",
+          );
         }
       } finally {
-        if (mounted) {
+        if (isMounted) {
           setLoading(false);
         }
       }
     };
 
-    loadConfig();
+    void loadConfig();
 
     return () => {
-      mounted = false;
+      isMounted = false;
     };
   }, []);
 
@@ -142,9 +232,8 @@ export function usePlatformConfig() {
       setConfig(platformConfig);
       setError(null);
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to refresh platform configuration';
-      setError(errorMsg);
       setConfig(DEFAULT_PLATFORM_CONFIG);
+      setError(err instanceof Error ? err.message : "Failed to refresh platform configuration");
     } finally {
       setLoading(false);
     }
@@ -155,32 +244,24 @@ export function usePlatformConfig() {
     loading,
     error,
     refreshConfig,
-    // Individual getters for convenience
     platformName: config.platformName,
     platformEmail: config.platformEmail,
     platformPhone: config.platformPhone,
+    platformLogoUrl: config.platformLogoUrl,
+    platformBrandLogoUrl: config.platformBrandLogoUrl,
   };
 }
 
-/**
- * React hook for platform name only
- */
 export function usePlatformName() {
   const { platformName, loading, error } = usePlatformConfig();
   return { platformName, loading, error };
 }
 
-/**
- * React hook for platform email only
- */
 export function usePlatformEmail() {
   const { platformEmail, loading, error } = usePlatformConfig();
   return { platformEmail, loading, error };
 }
 
-/**
- * React hook for platform phone only
- */
 export function usePlatformPhone() {
   const { platformPhone, loading, error } = usePlatformConfig();
   return { platformPhone, loading, error };

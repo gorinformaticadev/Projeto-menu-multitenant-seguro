@@ -1,20 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
+import { AlertTriangle, Building2, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-// import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
 import { TwoFactorLogin } from "@/components/TwoFactorLogin";
 import { TwoFactorSetup } from "@/components/TwoFactorSetup";
+import { useToast } from "@/hooks/use-toast";
 import { use2FALogin } from "@/hooks/use2FALogin";
 import { usePlatformConfigContext } from "@/contexts/PlatformConfigContext";
-import { Building2, Eye, EyeOff, AlertTriangle } from "lucide-react";
-import { resolveTenantLogoSrc } from "@/lib/tenant-logo";
 import { ROUTE_CONFIG, isSafeCallbackUrl } from "@/lib/routes";
+import { resolveTenantLogoSrc } from "@/lib/tenant-logo";
 
 const REMEMBERED_LOGIN_KEY = "rememberedLoginEmail";
 
@@ -48,17 +47,19 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    if (error) {
-      toast({
-        title: "Erro no login",
-        description: error,
-        variant: "destructive",
-      });
+    if (!error) {
+      return;
     }
+
+    toast({
+      title: "Erro no login",
+      description: error,
+      variant: "destructive",
+    });
   }, [error, toast]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
 
     if (!email || !password) {
       toast({
@@ -91,19 +92,13 @@ export default function LoginPage() {
     setRememberMe(false);
   }
 
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.getModifierState('CapsLock')) {
-      setCapsLockActive(true);
-    } else {
-      setCapsLockActive(false);
-    }
+  function handleKeyDown(event: React.KeyboardEvent) {
+    setCapsLockActive(event.getModifierState("CapsLock"));
   }
 
-  // Wrapper with Glassmorphism Context
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
     <div className="auth-theme auth-page min-h-screen flex flex-col items-center justify-center gap-4 p-4 font-sans text-[var(--auth-text)] selection:bg-[color:var(--auth-primary-selection)]">
-      {/* Background Blobs for Glass Effect Enhancement */}
-      <div className="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+      <div className="fixed left-0 top-0 -z-10 h-full w-full overflow-hidden pointer-events-none">
         <div className="auth-blob-primary absolute left-1/4 top-1/4 h-96 w-96 rounded-full opacity-50 blur-[100px] animate-pulse" />
         <div className="auth-blob-secondary absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full opacity-50 blur-[100px] animate-pulse delay-1000" />
       </div>
@@ -156,19 +151,11 @@ export default function LoginPage() {
 
   return (
     <div className="auth-theme auth-page relative flex min-h-screen flex-col items-center justify-center gap-3 overflow-hidden p-4 font-sans text-[var(--auth-text)] selection:bg-[color:var(--auth-primary-selection)]">
+      <div className="auth-blob-primary absolute -left-10 top-1/4 h-72 w-72 rounded-full opacity-40 blur-[100px] animate-pulse" />
+      <div className="auth-blob-secondary absolute -right-10 bottom-1/4 h-72 w-72 rounded-full opacity-40 blur-[100px] animate-pulse delay-700" />
 
-      {/* Background Glows to enhance Glass Effect */}
-      <div className="auth-blob-primary absolute top-1/4 -left-10 h-72 w-72 rounded-full opacity-40 blur-[100px] animate-pulse" />
-      <div className="auth-blob-secondary absolute bottom-1/4 -right-10 h-72 w-72 rounded-full opacity-40 blur-[100px] animate-pulse delay-700" />
-
-      {/* 
-        Main Login Card - GLASS NEUMORPHISM HYBRID
-        Combines backdrop-blur (Glass) with strong box-shadows (Neumorphism volume).
-      */}
       <div className="auth-card relative z-10 w-full max-w-[380px] rounded-3xl p-6 backdrop-blur-xl transition-all duration-500">
-
-        <div className="flex flex-col items-center justify-center mb-2 space-y-4">
-          {/* Logo Container - Glass Pop-out */}
+        <div className="mb-2 flex flex-col items-center justify-center space-y-4">
           {platformLogoSrc ? (
             <div className="auth-shell relative inline-flex items-center justify-center rounded-2xl backdrop-blur-md">
               <Image
@@ -176,12 +163,13 @@ export default function LoginPage() {
                 alt="Logo da Plataforma"
                 width={80}
                 height={80}
-                className="h-20 w-auto object-contain relative z-10 drop-shadow-xl"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                  const fallback = e.currentTarget.parentElement?.querySelector('.fallback-tenant-icon');
+                className="relative z-10 h-20 w-auto object-contain drop-shadow-xl"
+                onError={(event) => {
+                  event.currentTarget.style.display = "none";
+                  const fallback =
+                    event.currentTarget.parentElement?.querySelector(".fallback-tenant-icon");
                   if (fallback) {
-                    fallback.classList.remove('hidden');
+                    fallback.classList.remove("hidden");
                   }
                 }}
                 unoptimized
@@ -197,7 +185,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          <div className="text-center space-y-1">
+          <div className="space-y-1 text-center">
             <div className="text-xl font-bold tracking-tight text-[var(--auth-text)] drop-shadow-md">
               {platformConfig.platformName}
             </div>
@@ -207,16 +195,20 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="email" className="auth-text-muted ml-2 text-xs font-bold uppercase tracking-wider">Email</Label>
+            <Label
+              htmlFor="email"
+              className="auth-text-muted ml-2 text-xs font-bold uppercase tracking-wider"
+            >
+              Email
+            </Label>
             <div className="relative group">
-              {/* Glassy Inset Input */}
               <Input
                 id="email"
                 name="username"
                 type="email"
                 placeholder="seu@email.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(event) => setEmail(event.target.value)}
                 autoComplete="username"
                 className="auth-field h-10 rounded-xl px-4 text-[var(--auth-text)] transition-all focus-visible:ring-1 focus-visible:ring-[color:var(--auth-primary-soft)]"
               />
@@ -224,18 +216,22 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between ml-2 mr-1">
-              <Label htmlFor="password" className="auth-text-muted text-xs font-bold uppercase tracking-wider">Senha</Label>
+            <div className="ml-2 mr-1 flex items-center justify-between">
+              <Label
+                htmlFor="password"
+                className="auth-text-muted text-xs font-bold uppercase tracking-wider"
+              >
+                Senha
+              </Label>
             </div>
             <div className="relative group">
-              {/* Glassy Inset Input */}
               <Input
                 id="password"
                 name="password"
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(event) => setPassword(event.target.value)}
                 autoComplete="current-password"
                 onKeyDown={handleKeyDown}
                 onKeyUp={handleKeyDown}
@@ -243,9 +239,9 @@ export default function LoginPage() {
               />
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
+                onClick={() => setShowPassword((current) => !current)}
                 className="auth-text-soft absolute right-3 top-1/2 -translate-y-1/2 transition-colors hover:text-[var(--auth-text-muted)]"
-                tabIndex={-1}
+                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
               >
                 {showPassword ? (
                   <EyeOff className="h-4 w-4" />
@@ -254,21 +250,23 @@ export default function LoginPage() {
                 )}
               </button>
             </div>
-            {capsLockActive && (
+            {capsLockActive ? (
               <div className="auth-warning ml-2 mt-1 flex animate-pulse items-center gap-1.5">
                 <AlertTriangle className="h-3 w-3" />
-                <span className="text-[10px] font-bold uppercase tracking-wider">CAPSLOOCK ATIVADO</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider">
+                  CAPS LOCK ATIVADO
+                </span>
               </div>
-            )}
+            ) : null}
           </div>
 
-          <div className="flex items-center justify-between pt-2 px-2">
+          <div className="flex items-center justify-between px-2 pt-2">
             <div className="flex items-center space-x-2">
               <div className="relative flex items-center">
                 <Checkbox
                   id="rememberMe"
                   checked={rememberMe}
-                  onCheckedChange={(checked: boolean) => setRememberMe(checked as boolean)}
+                  onCheckedChange={(checked: boolean) => setRememberMe(Boolean(checked))}
                   disabled={loading}
                   className="auth-checkbox checkbox-shadow h-5 w-5 rounded"
                 />
@@ -298,10 +296,10 @@ export default function LoginPage() {
         </form>
       </div>
 
-      {/* Footer Info Card - GLASS */}
       <div className="auth-footer-shell relative z-10 flex w-full max-w-[380px] flex-col items-center justify-center gap-3 rounded-2xl p-3 backdrop-blur-xl transition-all hover:bg-[var(--auth-surface-hover)]">
         <p className="auth-text-soft text-[10px] font-semibold tracking-wide">
-          POWERED BY <span className="auth-text-muted font-bold">GOR INFORMÁTICA</span> © {currentYear}
+          POWERED BY <span className="auth-text-muted font-bold">GOR INFORMÁTICA</span> ©{" "}
+          {currentYear}
         </p>
 
         <a
@@ -310,12 +308,18 @@ export default function LoginPage() {
           rel="noopener noreferrer"
           className="auth-support-link flex items-center gap-2 rounded-full px-6 py-2 text-[11px] font-bold tracking-wide backdrop-blur-sm transition-all duration-300"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentcolor" viewBox="0 0 16 16">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            fill="currentColor"
+            viewBox="0 0 16 16"
+          >
             <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.729.729 0 0 0-.529.247c-.182.198-.691.677-.691 1.654 0 .977.71 1.916.81 2.049.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232z" />
           </svg>
           SUPORTE WHATSAPP
         </a>
       </div>
-    </div >
+    </div>
   );
 }

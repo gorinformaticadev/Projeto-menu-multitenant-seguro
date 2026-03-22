@@ -10,18 +10,13 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Save, Building2, Info, Upload, Trash2 } from "lucide-react";
 import { usePlatformConfigContext } from "@/contexts/PlatformConfigContext";
-import { PlatformConfig } from "@/hooks/usePlatformConfig";
+import { DEFAULT_PLATFORM_CONFIG, PlatformConfig } from "@/hooks/usePlatformConfig";
 import { resolveTenantLogoSrc } from "@/lib/tenant-logo";
 
 export default function PlatformConfigSection() {
   const { toast } = useToast();
   const { config: contextConfig, loading, refreshConfig } = usePlatformConfigContext();
-  const [config, setConfig] = useState<PlatformConfig>({
-    platformName: "",
-    platformLogoUrl: null,
-    platformEmail: "",
-    platformPhone: "",
-  });
+  const [config, setConfig] = useState<PlatformConfig>(DEFAULT_PLATFORM_CONFIG);
   const [saving, setSaving] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
