@@ -72,6 +72,32 @@ export interface NavigationModel {
   launcherItems: Array<{ id: string; name: string; icon: string; href: string; order: number }>;
 }
 
+export const EMPTY_NAVIGATION_MODEL: NavigationModel = {
+  primaryItems: [],
+  groups: [],
+  mobileItems: [],
+  launcherItems: [],
+};
+
+export const NAVIGATION_MODEL_ERROR_CODE = "NAVIGATION_MODEL_UNAVAILABLE";
+export const NAVIGATION_MODEL_ERROR_MESSAGE =
+  "Nao foi possivel carregar a navegacao do sistema. Atualize a pagina para tentar novamente.";
+
+export type NavigationModelResolution =
+  | {
+      status: "ready";
+      model: NavigationModel;
+      error: null;
+    }
+  | {
+      status: "error";
+      model: NavigationModel;
+      error: {
+        code: typeof NAVIGATION_MODEL_ERROR_CODE;
+        message: string;
+      };
+    };
+
 export type { DashboardWidgetDefinition };
 export type ModuleDashboardWidget = DashboardWidgetDefinition & { module?: string };
 
@@ -396,6 +422,30 @@ class ModuleRegistry {
       mobileItems: this.buildMobileItems(primaryItems, groups),
       launcherItems: this.buildLauncherItems(userRole),
     };
+  }
+
+  resolveNavigationModel(userRole?: string): NavigationModelResolution {
+    try {
+      return {
+        status: "ready",
+        model: this.getNavigationModel(userRole),
+        error: null,
+      };
+    } catch (error) {
+      console.error("[ModuleRegistry] Falha ao resolver o modelo de navegacao:", {
+        userRole,
+        error,
+      });
+
+      return {
+        status: "error",
+        model: EMPTY_NAVIGATION_MODEL,
+        error: {
+          code: NAVIGATION_MODEL_ERROR_CODE,
+          message: NAVIGATION_MODEL_ERROR_MESSAGE,
+        },
+      };
+    }
   }
 
   getSidebarItems(userRole?: string): ModuleMenu[] {

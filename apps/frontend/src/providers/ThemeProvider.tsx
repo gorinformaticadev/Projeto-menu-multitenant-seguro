@@ -3,20 +3,29 @@
 import * as React from "react"
 import { ThemeProvider as NextThemesProvider, type ThemeProviderProps } from "next-themes";
 import { useAuth } from "@/contexts/AuthContext";
-import { normalizeAppThemePreference } from "@/lib/app-theme";
+import { resolveAuthenticatedShellTheme } from "@/lib/app-theme";
 
 export function ThemeProvider({ children, ...props }: ThemeProviderProps & { children: React.ReactNode }) {
     const { user } = useAuth();
-    const authenticatedShellTheme = user
-      ? normalizeAppThemePreference(user.preferences?.theme)
-      : undefined;
+    const hasAuthenticatedUser = Boolean(user);
 
-    return (
-      <NextThemesProvider
-        {...props}
-        forcedTheme={authenticatedShellTheme ?? props.forcedTheme}
-      >
-        {children}
-      </NextThemesProvider>
-    );
+    if (hasAuthenticatedUser) {
+      const authenticatedShellTheme = resolveAuthenticatedShellTheme(user?.preferences?.theme);
+      const {
+        forcedTheme: _ignoredForcedTheme,
+        storageKey: _ignoredStorageKey,
+        ...sharedProviderProps
+      } = props;
+
+      return (
+        <NextThemesProvider
+          {...sharedProviderProps}
+          forcedTheme={authenticatedShellTheme}
+        >
+          {children}
+        </NextThemesProvider>
+      );
+    }
+
+    return <NextThemesProvider {...props}>{children}</NextThemesProvider>;
 }

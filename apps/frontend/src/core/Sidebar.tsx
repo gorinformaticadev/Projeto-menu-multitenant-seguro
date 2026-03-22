@@ -6,9 +6,10 @@ import { usePathname } from "next/navigation";
 import { ChevronDown, ChevronRight, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
+  EMPTY_NAVIGATION_MODEL,
   type ModuleMenu,
   type NavigationGroupDefinition,
-  type NavigationModel,
+  type NavigationModelResolution,
   moduleRegistry,
 } from "@/lib/module-registry";
 import { resolveNavigationIcon } from "@/lib/navigation-icons";
@@ -20,13 +21,6 @@ type SidebarEntry =
   | { type: "item"; item: ModuleMenu; order: number }
   | { type: "group"; group: NavigationGroupDefinition; order: number };
 
-const EMPTY_NAVIGATION_MODEL: NavigationModel = {
-  primaryItems: [],
-  groups: [],
-  mobileItems: [],
-  launcherItems: [],
-};
-
 function sortItems(items: ModuleMenu[]) {
   return [...items].sort((left, right) => (left.order ?? 999) - (right.order ?? 999));
 }
@@ -34,7 +28,11 @@ function sortItems(items: ModuleMenu[]) {
 export function Sidebar({ isExpanded }: { isExpanded: boolean }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const [navigationModel, setNavigationModel] = useState<NavigationModel>(EMPTY_NAVIGATION_MODEL);
+  const [navigationState, setNavigationState] = useState<NavigationModelResolution>({
+    status: "ready",
+    model: EMPTY_NAVIGATION_MODEL,
+    error: null,
+  });
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [openNestedSections, setOpenNestedSections] = useState<Record<string, boolean>>({});
   const [openPopoverKey, setOpenPopoverKey] = useState<string | null>(null);
@@ -52,12 +50,7 @@ export function Sidebar({ isExpanded }: { isExpanded: boolean }) {
   );
 
   const loadNavigation = useCallback(() => {
-    try {
-      setNavigationModel(moduleRegistry.getNavigationModel(user?.role));
-    } catch (error) {
-      console.error("Erro ao carregar navegacao do sidebar:", error);
-      setNavigationModel(EMPTY_NAVIGATION_MODEL);
-    }
+    setNavigationState(moduleRegistry.resolveNavigationModel(user?.role));
   }, [user?.role]);
 
   useEffect(() => {
@@ -74,6 +67,8 @@ export function Sidebar({ isExpanded }: { isExpanded: boolean }) {
       window.removeEventListener("moduleStatusChanged", handleModuleStatusChanged);
     };
   }, [loadNavigation]);
+
+  const navigationModel = navigationState.model;
 
   const entries = useMemo<SidebarEntry[]>(
     () =>
@@ -433,6 +428,15 @@ export function Sidebar({ isExpanded }: { isExpanded: boolean }) {
       )}
     >
       <div className="flex-1 overflow-y-auto p-3">
+        {navigationState.status === "error" && navigationState.error && (
+          <div
+            role="alert"
+            className="mb-3 rounded-xl border border-skin-danger/20 bg-skin-danger/10 px-3 py-3 text-xs text-skin-danger"
+          >
+            <p className="font-semibold">Navegacao indisponivel</p>
+            <p className="mt-1 leading-relaxed">{navigationState.error.message}</p>
+          </div>
+        )}
         <nav className="space-y-1">{mainEntries.map((entry) => renderEntry(entry))}</nav>
       </div>
 

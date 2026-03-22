@@ -179,3 +179,5 @@ uploads/tenants/76072661-7548-4490-a095-b636e2f92788/users/3c6adb53-2ba6-4e79-9a
 !apps/backend/src/modules/ordem_servico/shared/constants/
 !apps/backend/src/modules/ordem_servico/shared/constants/available-permissions.ts
 Scripts/tests/start-backend-instance.ps1
+/uploads/platform/logos
+/uploads/tenants

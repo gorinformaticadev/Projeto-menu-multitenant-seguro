@@ -10,7 +10,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch --exec \"ts-node -r tsconfig-paths/register src/main.ts\"",
     "start:prod": "node dist/main.js",
-    "build": "pnpm run prisma:generate && nest build",
+    "build": "prisma generate && nest build",
     "test": "pnpm run prisma:generate:test && node .\\scripts\\run-jest-cleanly.js",
     "test:security-regression": "jest src/security-regression/security-architecture.regression.spec.ts src/security-regression/critical-endpoints.regression.spec.ts src/core/security-config/security-runtime-config.service.spec.ts src/common/guards/security-throttler.guard.spec.ts src/common/services/redis-throttler.storage.spec.ts src/auth/auth.service.spec.ts src/auth/user-session.service.spec.ts src/prisma-seed/default-users.seed.spec.ts --runInBand",
     "test:smoke": "jest --config ./test/jest-smoke.json --runInBand --passWithNoTests",

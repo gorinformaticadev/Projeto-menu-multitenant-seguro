@@ -5,13 +5,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { type AppThemePreference, normalizeAppThemePreference } from "@/lib/app-theme";
+import { type AppThemePreference, resolveAuthenticatedShellTheme } from "@/lib/app-theme";
 
 export function ThemeToggle({ className }: { className?: string }) {
   const { user, saveThemePreference } = useAuth();
   const { toast } = useToast();
-  const currentTheme = normalizeAppThemePreference(user?.preferences?.theme);
+  const currentTheme = resolveAuthenticatedShellTheme(user?.preferences?.theme);
 
+  // Este componente apenas solicita a troca da preferencia canonica.
+  // Aplicacao no DOM, persistencia e rollback pertencem ao AuthContext + ThemeProvider.
   const updateTheme = async (newTheme: AppThemePreference) => {
     if (newTheme === currentTheme) {
       return;

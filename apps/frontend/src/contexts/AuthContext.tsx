@@ -3,7 +3,11 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
-import { type AppThemePreference, normalizeAppThemePreference } from "@/lib/app-theme";
+import {
+  type AppThemePreference,
+  normalizeAppThemePreference,
+  resolveAuthenticatedShellTheme,
+} from "@/lib/app-theme";
 import { moduleRegistry } from "@/lib/module-registry";
 import { isProtectedRoute, isAuthRoute, isSafeCallbackUrl, ROUTE_CONFIG } from "@/lib/routes";
 
@@ -121,7 +125,7 @@ const normalizeUserThemePreference = (nextUser: User): User => ({
   preferences: nextUser.preferences
     ? {
         ...nextUser.preferences,
-        theme: normalizeAppThemePreference(nextUser.preferences.theme),
+        theme: resolveAuthenticatedShellTheme(nextUser.preferences.theme),
       }
     : nextUser.preferences,
 });
@@ -153,7 +157,7 @@ const withThemePreference = (nextUser: User, theme: AppThemePreference): User =>
   ...nextUser,
   preferences: {
     ...(nextUser.preferences ?? {}),
-    theme: normalizeAppThemePreference(theme),
+    theme: resolveAuthenticatedShellTheme(theme),
   },
 });
 
@@ -407,8 +411,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function saveThemePreference(theme: AppThemePreference): Promise<AppThemePreference> {
-    const normalizedTheme = normalizeAppThemePreference(theme);
-    const previousTheme = normalizeAppThemePreference(user?.preferences?.theme);
+    // Cadeia canonica do shell autenticado:
+    // 1. normaliza a preferencia
+    // 2. atualiza o contexto otimisticamente
+    // 3. persiste no backend
+    // 4. faz rollback se a persistencia falhar
+    const normalizedTheme = resolveAuthenticatedShellTheme(theme);
+    const previousTheme = resolveAuthenticatedShellTheme(user?.preferences?.theme);
 
     if (!user) {
       throw new Error("Usuario nao autenticado para alterar o tema");

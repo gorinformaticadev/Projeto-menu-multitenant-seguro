@@ -92,6 +92,11 @@ const nextConfig = {
 
     return rewrites;
   },
+  typescript: {
+    // O Next usa este arquivo proprio para seus ajustes automaticos de tipos gerados.
+    // O typecheck canonico do projeto continua em tsconfig.json.
+    tsconfigPath: "./tsconfig.next.json",
+  },
   experimental: {
     optimizeCss: true,
     // Mantido desabilitado para evitar falha estrutural do build no ambiente atual.

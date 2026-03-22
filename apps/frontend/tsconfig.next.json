@@ -1,0 +1,21 @@
+{
+  // Configuracao consumida pelo Next 16 em build/dev.
+  // Mantemos aqui os includes gerados pelo framework, inclusive .next/dev/types,
+  // para que o Next possa ajustar este arquivo sem contaminar o typecheck canonico.
+  "extends": "./tsconfig.json",
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "eslint.config.js",
+    "next.config.js",
+    "postcss.config.js",
+    "generate-favicon.js",
+    "scripts/generate-module-index.js"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

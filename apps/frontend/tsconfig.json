@@ -1,4 +1,7 @@
 {
+  // Configuracao canonica do projeto para editor e typecheck manual/CI.
+  // O Next 16 usa tsconfig.next.json via next.config.js para evitar reescrever este arquivo
+  // com artefatos volateis de .next/dev durante o build.
   "compilerOptions": {
     "target": "ES2017",
     "lib": [
@@ -40,8 +43,7 @@
     "next.config.js",
     "postcss.config.js",
     "generate-favicon.js",
-    "scripts/generate-module-index.js",
-    ".next/dev/types/**/*.ts"
+    "scripts/generate-module-index.js"
   ],
   "exclude": [
     "node_modules"

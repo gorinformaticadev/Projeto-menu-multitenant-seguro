@@ -76,6 +76,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     updateDocumentIcons(faviconSrc);
   }, [platformConfig.platformBrandLogoUrl]);
 
+  // O tema do shell autenticado e aplicado exclusivamente pelo ThemeProvider.
+  // Este layout nao deve sincronizar classes de tema nem disputar essa responsabilidade.
+
   // Se está carregando ou é página pública, não mostra sidebar nem topbar
   if (loading || isPublicPage || !user) {
     return (
