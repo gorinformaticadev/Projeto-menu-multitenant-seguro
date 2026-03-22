@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.42](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.43...v0.1.42) (2026-03-22)
+
+
+### Features
+
+* **cron:** implement materialized job execution mode ([dba883b](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/dba883b7ed4556ab4a95984632f129f48cf278f8))
+
 ### [0.1.41](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.42...v0.1.41) (2026-03-22)
 
 ### [0.1.40](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.39...v0.1.40) (2026-03-22)
