@@ -6,6 +6,7 @@ import {
   CronJobHeartbeatRecord,
   CronJobHeartbeatService,
   CronJobHeartbeatStatus,
+  CronJobHeartbeatWriteFailureReason,
 } from './cron-job-heartbeat.service';
 import {
   ExecutionLeaseFailureReason,
@@ -18,6 +19,8 @@ export interface CronJobDatabaseLeaseOptions {
   ttlMs?: number;
   renewIntervalMs?: number;
 }
+
+export type CronJobExecutionMode = 'direct' | 'materialized';
 
 export interface CronJobDefinition {
   key: string;
@@ -48,6 +51,7 @@ export interface CronJobDefinition {
   watchdogStaleAfterMs?: number;
   watchdogStuckAfterMs?: number;
   databaseLease?: CronJobDatabaseLeaseOptions;
+  executionMode?: CronJobExecutionMode;
 }
 
 export interface CronJobExecutionContext {
@@ -80,6 +84,7 @@ type RegisterCronMeta = {
   watchdogStaleAfterMs?: number;
   watchdogStuckAfterMs?: number;
   databaseLease?: CronJobDatabaseLeaseOptions;
+  executionMode?: CronJobExecutionMode;
 };
 
 type JobWrapper = {
@@ -88,6 +93,9 @@ type JobWrapper = {
   job?: CronJob;
   runtimeRegistered: boolean;
 };
+
+type CronJobCycleTerminalStatus = 'success' | 'failed' | 'skipped' | 'superseded';
+type PersistedHeartbeatTerminalStatus = Extract<CronJobHeartbeatStatus, 'success' | 'failed' | 'skipped'>;
 
 import { RedisLockService } from '../../common/services/redis-lock.service';
 
@@ -196,6 +204,7 @@ export class CronService implements OnModuleInit {
         watchdogStaleAfterMs: meta.watchdogStaleAfterMs,
         watchdogStuckAfterMs: meta.watchdogStuckAfterMs,
         databaseLease: meta.databaseLease,
+        executionMode: meta.executionMode,
       },
       true,
     );
@@ -530,6 +539,7 @@ export class CronService implements OnModuleInit {
       watchdogStuckAfterMs?: number;
       idempotent?: boolean;
       databaseLease?: CronJobDatabaseLeaseOptions;
+      executionMode?: CronJobExecutionMode;
     },
     runtimeRegistered: boolean,
   ): CronJobDefinition {
@@ -553,6 +563,7 @@ export class CronService implements OnModuleInit {
       watchdogStaleAfterMs: input.watchdogStaleAfterMs,
       watchdogStuckAfterMs: input.watchdogStuckAfterMs,
       databaseLease: input.databaseLease,
+      executionMode: input.executionMode || 'direct',
     };
   }
 
@@ -615,6 +626,282 @@ export class CronService implements OnModuleInit {
     return 'Ciclo encerrado sem motivo informado.';
   }
 
+  private isPersistedHeartbeatTerminalStatus(
+    status: CronJobHeartbeatStatus | null | undefined,
+  ): status is PersistedHeartbeatTerminalStatus {
+    return status === 'success' || status === 'failed' || status === 'skipped';
+  }
+
+  private resolveObservedCycleTerminalStatus(
+    heartbeat: CronJobHeartbeatRecord | null,
+    cycleId: string,
+    instanceId: string,
+  ): PersistedHeartbeatTerminalStatus | null {
+    if (!heartbeat) {
+      return null;
+    }
+
+    if (heartbeat.cycleId !== cycleId || heartbeat.instanceId !== instanceId) {
+      return null;
+    }
+
+    if (!this.isPersistedHeartbeatTerminalStatus(heartbeat.lastStatus)) {
+      return null;
+    }
+
+    return heartbeat.lastStatus;
+  }
+
+  private describeHeartbeatRecord(heartbeat: CronJobHeartbeatRecord | null): string {
+    if (!heartbeat) {
+      return 'heartbeat=absent';
+    }
+
+    return [
+      `heartbeatStatus=${heartbeat.lastStatus}`,
+      `heartbeatCycleId=${heartbeat.cycleId || 'unknown'}`,
+      `heartbeatInstanceId=${heartbeat.instanceId || 'unknown'}`,
+      `heartbeatLastStartedAt=${heartbeat.lastStartedAt?.toISOString() || 'null'}`,
+      `heartbeatLastHeartbeatAt=${heartbeat.lastHeartbeatAt?.toISOString() || 'null'}`,
+      `heartbeatNextExpectedRunAt=${heartbeat.nextExpectedRunAt?.toISOString() || 'null'}`,
+    ].join(' ');
+  }
+
+  private buildTerminalPersistenceError(
+    key: string,
+    cycleId: string,
+    instanceId: string,
+    stage: string,
+    intendedStatus: Exclude<CronJobCycleTerminalStatus, 'superseded'>,
+    reason: CronJobHeartbeatWriteFailureReason | null,
+    cause?: unknown,
+  ): Error {
+    const error = new Error(
+      `Falha ao persistir estado terminal ${intendedStatus} de ${key}. cycleId=${cycleId} instanceId=${instanceId} stage=${stage} reason=${reason || 'unknown'} cause=${this.normalizeErrorMessage(cause)}`,
+    );
+    error.name = 'CronTerminalizationError';
+    return error;
+  }
+
+  private resolveFallbackTerminalStatus(
+    failureReason: CronJobHeartbeatWriteFailureReason | null,
+    heartbeat: CronJobHeartbeatRecord | null,
+    cycleId: string,
+    instanceId: string,
+    error?: unknown,
+  ): CronJobCycleTerminalStatus {
+    if (this.isLeaseOwnershipLostError(error) || failureReason === 'stale_execution') {
+      return 'superseded';
+    }
+
+    if (heartbeat && (heartbeat.cycleId !== cycleId || heartbeat.instanceId !== instanceId)) {
+      return 'superseded';
+    }
+
+    return 'failed';
+  }
+
+  private async persistCycleTerminalFallback(params: {
+    key: string;
+    cycleId: string;
+    instanceId: string;
+    stage: string;
+    intendedStatus: Exclude<CronJobCycleTerminalStatus, 'superseded'>;
+    terminalStatus: CronJobCycleTerminalStatus;
+    failureReason: CronJobHeartbeatWriteFailureReason | null;
+    startedAt: Date;
+    finishedAt: Date;
+    nextExpectedRunAt: Date | null;
+    error?: unknown;
+    observedHeartbeat?: CronJobHeartbeatRecord | null;
+  }): Promise<void> {
+    const normalizedError = this.normalizeErrorMessage(params.error);
+    const observedHeartbeat = params.observedHeartbeat || null;
+
+    if (params.failureReason === 'stale_execution' || params.terminalStatus === 'superseded') {
+      this.logger.warn(
+        `[TERMINAL_REJECTED_BY_OWNERSHIP] Job ${params.key} cycleId=${params.cycleId} instanceId=${params.instanceId} intended=${params.intendedStatus} stage=${params.stage} reason=${params.failureReason || 'unknown'} ${this.describeHeartbeatRecord(observedHeartbeat)}`,
+      );
+    }
+
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          action: 'CRON_CYCLE_TERMINAL_FALLBACK',
+          severity: params.terminalStatus === 'failed' ? 'error' : 'warning',
+          message: `Job ${params.key} encerrou o ciclo ${params.cycleId} com terminal fallback ${params.terminalStatus}.`,
+          details: normalizedError,
+          metadata: {
+            jobKey: params.key,
+            cycleId: params.cycleId,
+            instanceId: params.instanceId,
+            stage: params.stage,
+            intendedTerminalStatus: params.intendedStatus,
+            persistedTerminalStatus: params.terminalStatus,
+            heartbeatWriteFailureReason: params.failureReason,
+            startedAt: params.startedAt.toISOString(),
+            finishedAt: params.finishedAt.toISOString(),
+            nextExpectedRunAt: params.nextExpectedRunAt?.toISOString() || null,
+            observedHeartbeat: observedHeartbeat
+              ? {
+                  lastStatus: observedHeartbeat.lastStatus,
+                  cycleId: observedHeartbeat.cycleId || null,
+                  instanceId: observedHeartbeat.instanceId || null,
+                  lastStartedAt: observedHeartbeat.lastStartedAt?.toISOString() || null,
+                  lastHeartbeatAt: observedHeartbeat.lastHeartbeatAt?.toISOString() || null,
+                  nextExpectedRunAt: observedHeartbeat.nextExpectedRunAt?.toISOString() || null,
+                }
+              : null,
+            error: normalizedError,
+          },
+        },
+      });
+
+      this.logger.warn(
+        `[TERMINAL_FALLBACK_PERSISTED] Job ${params.key} cycleId=${params.cycleId} instanceId=${params.instanceId} intended=${params.intendedStatus} terminal=${params.terminalStatus} stage=${params.stage}`,
+      );
+    } catch (fallbackError) {
+      this.logger.error(
+        `[TERMINAL_FALLBACK_FAILED] Job ${params.key} cycleId=${params.cycleId} instanceId=${params.instanceId} intended=${params.intendedStatus} terminal=${params.terminalStatus} stage=${params.stage} error=${String(fallbackError)}`,
+      );
+    }
+  }
+
+  private applyTerminalStateToDefinition(
+    definition: CronJobDefinition,
+    status: PersistedHeartbeatTerminalStatus,
+    startedAt: Date,
+    finishedAt: Date,
+    error?: unknown,
+  ): void {
+    definition.lastStartedAt = startedAt;
+    definition.lastRun = startedAt;
+    definition.lastDurationMs = Math.max(0, finishedAt.getTime() - startedAt.getTime());
+
+    if (status === 'success') {
+      definition.lastStatus = 'success';
+      definition.lastSucceededAt = finishedAt;
+      definition.lastError = undefined;
+      definition.consecutiveFailureCount = 0;
+      return;
+    }
+
+    if (status === 'skipped') {
+      definition.lastStatus = 'skipped';
+      definition.lastError = this.normalizeLifecycleReason(error || 'SKIPPED');
+      return;
+    }
+
+    definition.lastStatus = 'failed';
+    definition.lastFailedAt = finishedAt;
+    definition.lastError = this.normalizeErrorMessage(error);
+    definition.consecutiveFailureCount = (definition.consecutiveFailureCount || 0) + 1;
+  }
+
+  private async ensureStartedCycleTerminalState(params: {
+    key: string;
+    cycleId: string;
+    instanceId: string;
+    startedAt: Date;
+    finishedAt: Date;
+    nextExpectedRunAt: Date | null;
+    intendedStatus: Exclude<CronJobCycleTerminalStatus, 'superseded'>;
+    writeFailureReason: CronJobHeartbeatWriteFailureReason | null;
+    error?: unknown;
+    stage: string;
+  }): Promise<CronJobCycleTerminalStatus> {
+    const observedBeforeFallback = await this.heartbeatService.get(params.key);
+    const observedTerminal = this.resolveObservedCycleTerminalStatus(
+      observedBeforeFallback,
+      params.cycleId,
+      params.instanceId,
+    );
+
+    if (observedTerminal) {
+      this.logger.warn(
+        `[TERMINAL_ALREADY_PERSISTED] Job ${params.key} cycleId=${params.cycleId} instanceId=${params.instanceId} stage=${params.stage} status=${observedTerminal}`,
+      );
+      return observedTerminal;
+    }
+
+    const fallbackStatusBeforeRetry = this.resolveFallbackTerminalStatus(
+      params.writeFailureReason,
+      observedBeforeFallback,
+      params.cycleId,
+      params.instanceId,
+      params.error,
+    );
+
+    if (fallbackStatusBeforeRetry === 'superseded') {
+      await this.persistCycleTerminalFallback({
+        ...params,
+        terminalStatus: 'superseded',
+        failureReason: params.writeFailureReason,
+        observedHeartbeat: observedBeforeFallback,
+      });
+      return 'superseded';
+    }
+
+    const fallbackError = this.buildTerminalPersistenceError(
+      params.key,
+      params.cycleId,
+      params.instanceId,
+      params.stage,
+      params.intendedStatus,
+      params.writeFailureReason,
+      params.error,
+    );
+
+    const failedFallback = await this.heartbeatService.markFailure(
+      params.key,
+      params.startedAt,
+      params.finishedAt,
+      fallbackError,
+      params.nextExpectedRunAt,
+      params.cycleId,
+      params.instanceId,
+    );
+
+    if (failedFallback.persisted) {
+      this.logger.error(
+        `[TERMINAL_FALLBACK_TO_FAILED] Job ${params.key} cycleId=${params.cycleId} instanceId=${params.instanceId} intended=${params.intendedStatus} stage=${params.stage}`,
+      );
+      return 'failed';
+    }
+
+    const observedAfterFallback = await this.heartbeatService.get(params.key);
+    const observedTerminalAfterFallback = this.resolveObservedCycleTerminalStatus(
+      observedAfterFallback,
+      params.cycleId,
+      params.instanceId,
+    );
+
+    if (observedTerminalAfterFallback) {
+      this.logger.warn(
+        `[TERMINAL_ALREADY_PERSISTED] Job ${params.key} cycleId=${params.cycleId} instanceId=${params.instanceId} stage=${params.stage}:fallback status=${observedTerminalAfterFallback}`,
+      );
+      return observedTerminalAfterFallback;
+    }
+
+    const fallbackStatus = this.resolveFallbackTerminalStatus(
+      failedFallback.reason || params.writeFailureReason,
+      observedAfterFallback,
+      params.cycleId,
+      params.instanceId,
+      fallbackError,
+    );
+
+    await this.persistCycleTerminalFallback({
+      ...params,
+      terminalStatus: fallbackStatus,
+      failureReason: failedFallback.reason || params.writeFailureReason,
+      error: fallbackError,
+      observedHeartbeat: observedAfterFallback,
+    });
+
+    return fallbackStatus;
+  }
+
   private isLeaseOwnershipFailure(reason: ExecutionLeaseFailureReason | null | undefined): boolean {
     return Boolean(reason && reason !== 'database_error');
   }
@@ -665,6 +952,91 @@ export class CronService implements OnModuleInit {
     return runtimeParts.join(':');
   }
 
+  private resolveMaterializedCycleId(
+    definition: CronJobDefinition,
+    job: CronJob | undefined,
+    reason: 'scheduled' | 'manual',
+  ): string {
+    if (reason === 'manual') {
+      return `manual-${Date.now()}`;
+    }
+
+    const intervalMs = this.estimateIntervalMs(definition.schedule);
+    const nextRun = this.safeNextRun(job);
+
+    if (nextRun && intervalMs) {
+      return (nextRun.getTime() - intervalMs).toString();
+    }
+
+    return `fallback-${Math.floor(Date.now() / 60000) * 60000}`;
+  }
+
+  private async executeMaterializedDispatchJob(
+    key: string,
+    modulo: string,
+    identificador: string,
+    callback: CronJobCallback,
+    definition: CronJobDefinition,
+    job: CronJob | undefined,
+    options: {
+      reason: 'scheduled' | 'manual';
+      respectEnabledCheck: boolean;
+      rethrowOnFailure: boolean;
+    },
+  ): Promise<void> {
+    const cycleId = this.resolveMaterializedCycleId(definition, job, options.reason);
+    const instanceId = this.resolveInstanceId();
+
+    if (this.maintenancePaused && options.reason === 'scheduled') {
+      this.logger.log(
+        `[MATERIALIZED_DISPATCH_SKIPPED] Job ${key} ignorado por maintenance mode. cycleId=${cycleId}`,
+      );
+      return;
+    }
+
+    if (options.respectEnabledCheck) {
+      const current = await this.prisma.cronSchedule.findUnique({
+        where: { modulo_identificador: { modulo, identificador } },
+      });
+
+      if (!current || !current.ativo) {
+        this.logger.log(
+          `[MATERIALIZED_DISPATCH_SKIPPED] Job ${key} ignorado porque o agendamento esta desativado. cycleId=${cycleId}`,
+        );
+        return;
+      }
+    }
+
+    const executionContext: CronJobExecutionContext = {
+      reason: options.reason,
+      cycleId,
+      instanceId,
+      signal: new AbortController().signal,
+      lease: undefined,
+      assertLeaseOwnership: async () => undefined,
+      throwIfAborted: () => undefined,
+    };
+
+    try {
+      this.logger.log(
+        `[MATERIALIZED_DISPATCH_TRIGGERED] Job ${key} cycleId=${cycleId} instanceId=${instanceId}`,
+      );
+      await callback(executionContext);
+    } catch (error) {
+      this.logger.error(
+        `[MATERIALIZED_DISPATCH_FAILED] Job ${key} cycleId=${cycleId} instanceId=${instanceId}`,
+        error as Error,
+      );
+
+      if (options.rethrowOnFailure) {
+        throw error;
+      }
+    } finally {
+      definition.nextRun = this.resolveNextExpectedRun(job);
+      definition.nextExpectedRunAt = definition.nextRun;
+    }
+  }
+
   private async executeRegisteredJob(
     key: string,
     modulo: string,
@@ -679,6 +1051,19 @@ export class CronService implements OnModuleInit {
     },
   ): Promise<void> {
     // 0. Obter dados determinísticos para cycleId
+    if (definition.executionMode === 'materialized') {
+      await this.executeMaterializedDispatchJob(
+        key,
+        modulo,
+        identificador,
+        callback,
+        definition,
+        job,
+        options,
+      );
+      return;
+    }
+
     const heartbeat = await this.heartbeatService.get(key);
     
     let cycleId = `manual-${Date.now()}`;
@@ -700,11 +1085,13 @@ export class CronService implements OnModuleInit {
     const instanceId = this.resolveInstanceId();
     const startedAt = new Date();
     const nextExpectedRunAt = this.resolveNextExpectedRun(job);
+    let cycleEnteredRunning = false;
 
     const persistSkippedCycle = async (reason: string, error?: unknown): Promise<boolean> => {
       const finishedAt = new Date();
       const normalizedReason = this.normalizeLifecycleReason(error || reason);
-      const persisted = await this.heartbeatService.markSkipped(
+      let terminalStatus: CronJobCycleTerminalStatus = 'skipped';
+      const skipped = await this.heartbeatService.markSkipped(
         key,
         startedAt,
         finishedAt,
@@ -714,22 +1101,40 @@ export class CronService implements OnModuleInit {
         instanceId,
       );
 
-      if (persisted) {
-        definition.lastStartedAt = startedAt;
-        definition.lastRun = startedAt;
-        definition.lastStatus = 'skipped';
-        definition.lastError = normalizedReason;
-        definition.lastDurationMs = Math.max(0, finishedAt.getTime() - startedAt.getTime());
+      if (skipped.persisted) {
+        this.applyTerminalStateToDefinition(definition, 'skipped', startedAt, finishedAt, normalizedReason);
       } else {
         this.logger.warn(
-          `[EXECUTION_SKIP_NOT_PERSISTED] Job ${key} nao conseguiu registrar skipped. cycleId=${cycleId} instanceId=${instanceId} reason=${normalizedReason}`,
+          `[EXECUTION_SKIP_NOT_PERSISTED] Job ${key} nao conseguiu registrar skipped. cycleId=${cycleId} instanceId=${instanceId} reason=${normalizedReason} failureReason=${skipped.reason || 'unknown'}`,
         );
+
+        if (cycleEnteredRunning) {
+          terminalStatus = await this.ensureStartedCycleTerminalState({
+            key,
+            cycleId,
+            instanceId,
+            startedAt,
+            finishedAt,
+            nextExpectedRunAt: nextExpectedRunAt || null,
+            intendedStatus: 'skipped',
+            writeFailureReason: skipped.reason,
+            error: normalizedReason,
+            stage: 'markSkipped',
+          });
+          this.applyHeartbeat(definition, await this.heartbeatService.get(key));
+        }
       }
 
-      this.logger.log(
-        `[EXECUTION_SKIPPED] Job ${key} cycleId=${cycleId} instanceId=${instanceId} reason=${normalizedReason}`,
-      );
-      return persisted;
+      if (terminalStatus === 'skipped') {
+        this.logger.log(
+          `[EXECUTION_SKIPPED] Job ${key} cycleId=${cycleId} instanceId=${instanceId} reason=${normalizedReason}`,
+        );
+      } else {
+        this.logger.warn(
+          `[EXECUTION_TERMINALIZED_WITH_FALLBACK] Job ${key} cycleId=${cycleId} instanceId=${instanceId} terminal=${terminalStatus} reason=${normalizedReason}`,
+        );
+      }
+      return skipped.persisted;
     };
 
     // 1. Cooldown Redundante Removido
@@ -912,6 +1317,7 @@ export class CronService implements OnModuleInit {
     definition.lastRun = startedAt;
     definition.lastStatus = 'running';
     definition.lastError = undefined;
+    cycleEnteredRunning = true;
 
     if (leaseContext && leaseOptions) {
       const acquisition = await this.executionLeaseService.acquireLease({
@@ -992,11 +1398,6 @@ export class CronService implements OnModuleInit {
 
       await releaseLease('completed', finishedAt);
 
-      definition.lastStatus = 'success';
-      definition.lastSucceededAt = finishedAt;
-      definition.lastDurationMs = Math.max(0, finishedAt.getTime() - startedAt.getTime());
-      definition.consecutiveFailureCount = 0;
-
       const successPersisted = await this.heartbeatService.markSuccess(
         key,
         startedAt,
@@ -1005,13 +1406,32 @@ export class CronService implements OnModuleInit {
         cycleId,
         instanceId,
       );
-      if (!successPersisted) {
-        this.logger.warn(
-          `[STALE_EXECUTION_DETECTED] Job ${key} concluiu, mas o heartbeat final nao pertencia mais ao cycleId=${cycleId} instanceId=${instanceId}.`,
-        );
+      if (successPersisted.persisted) {
+        this.applyTerminalStateToDefinition(definition, 'success', startedAt, finishedAt);
+        this.logger.log(`[EXECUTION_FINISHED] Job ${key} concluido com sucesso.`);
         return;
       }
-      this.logger.log(`[EXECUTION_FINISHED] Job ${key} concluído com sucesso.`);
+      const resolvedTerminal = await this.ensureStartedCycleTerminalState({
+        key,
+        cycleId,
+        instanceId,
+        startedAt,
+        finishedAt,
+        nextExpectedRunAt: nextRun || null,
+        intendedStatus: 'success',
+        writeFailureReason: successPersisted.reason,
+        stage: 'markSuccess',
+      });
+
+      if (resolvedTerminal !== 'superseded') {
+        this.applyTerminalStateToDefinition(definition, resolvedTerminal, startedAt, finishedAt);
+      } else {
+        this.applyHeartbeat(definition, await this.heartbeatService.get(key));
+      }
+
+      this.logger.warn(
+        `[EXECUTION_FINISHED_WITH_FALLBACK] Job ${key} cycleId=${cycleId} instanceId=${instanceId} terminal=${resolvedTerminal}`,
+      );
     } catch (error) {
       const finishedAt = new Date();
       const nextRun = this.resolveNextExpectedRun(job);
@@ -1038,11 +1458,6 @@ export class CronService implements OnModuleInit {
         }
       }
 
-      definition.lastStatus = 'failed';
-      definition.lastFailedAt = finishedAt;
-      definition.lastDurationMs = Math.max(0, finishedAt.getTime() - startedAt.getTime());
-      definition.consecutiveFailureCount = (definition.consecutiveFailureCount || 0) + 1;
-
       const failurePersisted = await this.heartbeatService.markFailure(
         key,
         startedAt,
@@ -1052,9 +1467,31 @@ export class CronService implements OnModuleInit {
         cycleId,
         instanceId,
       );
-      if (!failurePersisted) {
+
+      if (failurePersisted.persisted) {
+        this.applyTerminalStateToDefinition(definition, 'failed', startedAt, finishedAt, finalError);
+      } else {
+        const resolvedTerminal = await this.ensureStartedCycleTerminalState({
+          key,
+          cycleId,
+          instanceId,
+          startedAt,
+          finishedAt,
+          nextExpectedRunAt: nextRun || null,
+          intendedStatus: 'failed',
+          writeFailureReason: failurePersisted.reason,
+          error: finalError,
+          stage: 'markFailure',
+        });
+
+        if (resolvedTerminal !== 'superseded') {
+          this.applyTerminalStateToDefinition(definition, resolvedTerminal, startedAt, finishedAt, finalError);
+        } else {
+          this.applyHeartbeat(definition, await this.heartbeatService.get(key));
+        }
+
         this.logger.warn(
-          `[STALE_EXECUTION_DETECTED] Job ${key} falhou, mas o heartbeat final nao pertencia mais ao cycleId=${cycleId} instanceId=${instanceId}.`,
+          `[EXECUTION_FAILED_WITH_FALLBACK] Job ${key} cycleId=${cycleId} instanceId=${instanceId} terminal=${resolvedTerminal}`,
         );
       }
       this.logger.error(`Erro ao executar cron job ${key}:`, finalError);

@@ -17,6 +17,8 @@ import { SystemVersionService } from './services/system-version.service';
 import { PathsModule } from '@core/common/paths/paths.module';
 import { SystemOperationalAlertsService } from './services/system-operational-alerts.service';
 import { SystemJobWatchdogService } from './services/system-job-watchdog.service';
+import { SessionCleanupExecutionService } from './services/session-cleanup-execution.service';
+import { SessionCleanupProcessorService } from './services/session-cleanup-processor.service';
 import { CronModule } from '../core/cron/cron.module';
 import { SystemSettingsModule } from '../system-settings/system-settings.module';
 
@@ -38,6 +40,8 @@ import { SystemSettingsModule } from '../system-settings/system-settings.module'
     ModuleInstallerService,
     ModuleDatabaseExecutorService,
     SystemOperationalAlertsService,
+    SessionCleanupProcessorService,
+    SessionCleanupExecutionService,
     SystemJobWatchdogService,
     {
       provide: 'EventBus',
@@ -51,6 +55,8 @@ import { SystemSettingsModule } from '../system-settings/system-settings.module'
     ModuleInstallerService,
     ModuleDatabaseExecutorService,
     SystemOperationalAlertsService,
+    SessionCleanupProcessorService,
+    SessionCleanupExecutionService,
     SystemJobWatchdogService,
     PrismaModule  // Export PrismaModule for module dependencies
   ],

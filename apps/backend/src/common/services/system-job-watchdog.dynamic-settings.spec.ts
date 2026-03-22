@@ -1,8 +1,11 @@
 import { CronService } from '../../core/cron/cron.service';
+import { CronJobHeartbeatService } from '../../core/cron/cron-job-heartbeat.service';
 import { ConfigResolverService } from '../../system-settings/config-resolver.service';
 import { SettingsRegistry } from '../../system-settings/settings-registry.service';
 import { SystemSettingsAuditService } from '../../system-settings/system-settings-audit.service';
 import { SystemSettingsWriteService } from '../../system-settings/system-settings-write.service';
+import { RedisLockService } from './redis-lock.service';
+import { SessionCleanupExecutionService } from './session-cleanup-execution.service';
 import { SystemJobWatchdogService } from './system-job-watchdog.service';
 import { SystemOperationalAlertsService } from './system-operational-alerts.service';
 
@@ -181,13 +184,26 @@ describe('SystemJobWatchdogService dynamic watchdog toggle', () => {
       getRuntimeJobs: jest.fn().mockResolvedValue([staleJob]),
       isMaintenancePaused: jest.fn().mockReturnValue(false),
     };
+    const heartbeatService = {
+      reconcileOrphans: jest.fn().mockResolvedValue(undefined),
+    };
     const operationalAlertsService = {
       dispatchOperationalAlert: jest.fn().mockResolvedValue(true),
     };
+    const redisLock = {
+      acquireLock: jest.fn().mockResolvedValue(true),
+      releaseLock: jest.fn().mockResolvedValue(undefined),
+    };
+    const sessionCleanupExecutionService = {
+      inspectExpectedExecution: jest.fn(),
+    };
     const service = new SystemJobWatchdogService(
       cronService as unknown as CronService,
+      heartbeatService as unknown as CronJobHeartbeatService,
       operationalAlertsService as unknown as SystemOperationalAlertsService,
       resolver,
+      redisLock as unknown as RedisLockService,
+      sessionCleanupExecutionService as unknown as SessionCleanupExecutionService,
     );
 
     return {
@@ -195,7 +211,10 @@ describe('SystemJobWatchdogService dynamic watchdog toggle', () => {
       resolver,
       writeService,
       cronService,
+      heartbeatService,
       operationalAlertsService,
+      redisLock,
+      sessionCleanupExecutionService,
       service,
     };
   };

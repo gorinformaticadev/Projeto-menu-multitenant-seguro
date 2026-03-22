@@ -1,5 +1,8 @@
 import { CronService } from '@core/cron/cron.service';
+import type { CronJobExecutionContext } from '@core/cron/cron.service';
 import { PrismaService } from '@core/prisma/prisma.service';
+import { SessionCleanupExecutionService } from './session-cleanup-execution.service';
+import { SessionCleanupProcessorService } from './session-cleanup-processor.service';
 import { TokenCleanupService } from './token-cleanup.service';
 
 describe('TokenCleanupService', () => {
@@ -11,10 +14,6 @@ describe('TokenCleanupService', () => {
     trustedDevice: {
       deleteMany: jest.fn(),
     },
-    userSession: {
-      findMany: jest.fn(),
-      deleteMany: jest.fn(),
-    },
     $transaction: jest.fn(),
   };
 
@@ -22,10 +21,20 @@ describe('TokenCleanupService', () => {
     register: jest.fn(),
   };
 
+  const sessionCleanupExecutionServiceMock = {
+    materializeScheduledExecution: jest.fn(),
+  };
+
+  const sessionCleanupProcessorMock = {
+    cleanupExpiredSessions: jest.fn(),
+  };
+
   const createService = () =>
     new TokenCleanupService(
       prismaMock as unknown as PrismaService,
       cronServiceMock as unknown as CronService,
+      sessionCleanupExecutionServiceMock as unknown as SessionCleanupExecutionService,
+      sessionCleanupProcessorMock as unknown as SessionCleanupProcessorService,
     );
 
   beforeEach(() => {
@@ -33,12 +42,14 @@ describe('TokenCleanupService', () => {
     cronServiceMock.register.mockResolvedValue(undefined);
     prismaMock.refreshToken.deleteMany.mockResolvedValue({ count: 0 });
     prismaMock.trustedDevice.deleteMany.mockResolvedValue({ count: 0 });
-    prismaMock.userSession.findMany.mockResolvedValue([]);
-    prismaMock.userSession.deleteMany.mockResolvedValue({ count: 0 });
     prismaMock.$transaction.mockImplementation(async (ops: Array<Promise<unknown>>) => Promise.all(ops));
+    sessionCleanupExecutionServiceMock.materializeScheduledExecution.mockResolvedValue({
+      id: 'execution-1',
+    });
+    sessionCleanupProcessorMock.cleanupExpiredSessions.mockResolvedValue(undefined);
   });
 
-  it('registers token and session cleanup jobs with database lease enabled', async () => {
+  it('registers token cleanup directly and session cleanup in materialized mode', async () => {
     const service = createService();
 
     await service.onModuleInit();
@@ -64,60 +75,42 @@ describe('TokenCleanupService', () => {
         name: 'Session cleanup',
         origin: 'core',
         settingsUrl: '/configuracoes/sistema/cron',
-        databaseLease: expect.objectContaining({
-          enabled: true,
-        }),
+        executionMode: 'materialized',
       }),
     );
   });
 
-  it('removes expired sessions in batches until no more rows remain', async () => {
-    prismaMock.userSession.findMany
-      .mockResolvedValueOnce([{ id: 'session-1' }, { id: 'session-2' }])
-      .mockResolvedValueOnce([{ id: 'session-3' }])
-      .mockResolvedValueOnce([]);
-    prismaMock.userSession.deleteMany
-      .mockResolvedValueOnce({ count: 2 })
-      .mockResolvedValueOnce({ count: 1 });
-
+  it('materializes the scheduled session cleanup slot instead of running the cleanup inline', async () => {
     const service = createService();
 
-    await service.cleanupExpiredSessions();
+    await service.onModuleInit();
 
-    expect(prismaMock.userSession.findMany).toHaveBeenCalledTimes(3);
-    expect(prismaMock.userSession.deleteMany).toHaveBeenNthCalledWith(1, {
-      where: {
-        id: { in: ['session-1', 'session-2'] },
-      },
-    });
-    expect(prismaMock.userSession.deleteMany).toHaveBeenNthCalledWith(2, {
-      where: {
-        id: { in: ['session-3'] },
-      },
-    });
+    const sessionRegistration = cronServiceMock.register.mock.calls.find(
+      ([key]: [string]) => key === 'system.session_cleanup',
+    );
+    const callback = sessionRegistration?.[2] as ((context?: CronJobExecutionContext) => Promise<void>) | undefined;
+    const context = {
+      reason: 'scheduled',
+      cycleId: '1774152000000',
+      instanceId: 'instance-a',
+    } as unknown as CronJobExecutionContext;
+
+    await callback?.(context);
+
+    expect(sessionCleanupExecutionServiceMock.materializeScheduledExecution).toHaveBeenCalledWith(context);
+    expect(sessionCleanupProcessorMock.cleanupExpiredSessions).not.toHaveBeenCalled();
   });
 
-  it('aborts session cleanup when lease ownership is lost between batches', async () => {
-    prismaMock.userSession.findMany.mockResolvedValueOnce([{ id: 'session-1' }]);
-    prismaMock.userSession.deleteMany.mockResolvedValueOnce({ count: 1 });
-
-    const executionContext = {
-      throwIfAborted: jest.fn(),
-      assertLeaseOwnership: jest
-        .fn()
-        .mockResolvedValueOnce(undefined)
-        .mockResolvedValueOnce(undefined)
-        .mockResolvedValueOnce(undefined)
-        .mockRejectedValueOnce(new Error('LEASE_LOST')),
-    };
-
+  it('delegates the session cleanup business logic to the processor', async () => {
     const service = createService();
+    const context = { cycleId: 'cycle-1' } as unknown as CronJobExecutionContext;
 
-    await expect(service.cleanupExpiredSessions(executionContext as never)).rejects.toThrow('LEASE_LOST');
-    expect(prismaMock.userSession.deleteMany).toHaveBeenCalledTimes(1);
+    await service.cleanupExpiredSessions(context);
+
+    expect(sessionCleanupProcessorMock.cleanupExpiredSessions).toHaveBeenCalledWith(context);
   });
 
-  it('keeps token cleanup functional without advisory locks in the service layer', async () => {
+  it('keeps token cleanup functional with the direct cron path', async () => {
     prismaMock.$transaction.mockResolvedValue([{ count: 4 }, { count: 2 }]);
 
     const service = createService();

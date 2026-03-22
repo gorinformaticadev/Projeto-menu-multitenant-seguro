@@ -647,6 +647,33 @@ model ExecutionLease {
   @@map("execution_leases")
 }
 
+model MaterializedCronExecution {
+  id           String   @id @default(uuid())
+  jobKey       String
+  scheduledFor DateTime
+  triggeredAt  DateTime @default(now())
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  status       String   @default("pending")
+  ownerId      String?
+  attempt      Int      @default(0)
+  leaseVersion BigInt   @default(0)
+  lockedUntil  DateTime?
+  heartbeatAt  DateTime?
+  reason       String?
+  error        String?
+  metadata     Json     @default("{}")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([jobKey, scheduledFor])
+  @@index([jobKey, scheduledFor])
+  @@index([jobKey, status, scheduledFor])
+  @@index([status, lockedUntil])
+  @@index([jobKey, updatedAt])
+  @@map("cron_materialized_executions")
+}
+
 enum Role {
   SUPER_ADMIN
   ADMIN

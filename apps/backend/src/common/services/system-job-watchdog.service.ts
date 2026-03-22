@@ -4,6 +4,10 @@ import { CronJob } from 'cron';
 import { CronJobDefinition, CronService } from '../../core/cron/cron.service';
 import { CronJobHeartbeatService } from '../../core/cron/cron-job-heartbeat.service';
 import { ConfigResolverService } from '../../system-settings/config-resolver.service';
+import {
+  SessionCleanupExecutionService,
+  SessionCleanupWatchdogSnapshot,
+} from './session-cleanup-execution.service';
 import { SystemOperationalAlertsService } from './system-operational-alerts.service';
 
 type WatchdogAlertInput = {
@@ -33,6 +37,7 @@ export class SystemJobWatchdogService implements OnModuleInit {
     private readonly systemOperationalAlertsService: SystemOperationalAlertsService,
     private readonly configResolver: ConfigResolverService,
     private readonly redisLock: RedisLockService,
+    private readonly sessionCleanupExecutionService: SessionCleanupExecutionService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -129,6 +134,24 @@ export class SystemJobWatchdogService implements OnModuleInit {
       const intervalMs = this.estimateIntervalMs(job.schedule);
       const staleAfterMs = job.watchdogStaleAfterMs || this.resolveStaleThreshold(intervalMs);
       const stuckAfterMs = job.watchdogStuckAfterMs || this.resolveStuckThreshold(intervalMs);
+
+      if (this.isMaterializedSessionCleanup(job)) {
+        const materializedEvaluation = await this.evaluateMaterializedSessionCleanup(
+          job,
+          now,
+          nowMs,
+          intervalMs,
+          staleAfterMs,
+          stuckAfterMs,
+        );
+
+        if (materializedEvaluation.emitted) {
+          emitted.push(materializedEvaluation.emitted);
+        } else {
+          skipped.push(materializedEvaluation.skipped);
+        }
+        continue;
+      }
 
       if (this.isJobStuck(job, nowMs, stuckAfterMs)) {
         if (
@@ -297,6 +320,96 @@ export class SystemJobWatchdogService implements OnModuleInit {
     );
   }
 
+  private isMaterializedSessionCleanup(job: CronJobDefinition): boolean {
+    return (
+      job.key === SessionCleanupExecutionService.JOB_KEY &&
+      job.executionMode === 'materialized'
+    );
+  }
+
+  private async evaluateMaterializedSessionCleanup(
+    job: CronJobDefinition,
+    now: Date,
+    nowMs: number,
+    intervalMs: number | null,
+    staleAfterMs: number,
+    stuckAfterMs: number,
+  ): Promise<{ emitted?: string; skipped: string }> {
+    const snapshot = await this.sessionCleanupExecutionService.inspectExpectedExecution({
+      expectedScheduledFor: this.resolveExpectedScheduledFor(job, intervalMs),
+      now,
+      staleAfterMs,
+      stuckAfterMs,
+    });
+
+    if (snapshot.state === 'stuck') {
+      const emitted = await this.emitWatchdogAlert(
+        {
+          action: 'JOB_STUCK_RUNNING',
+          cooldownKey: `JOB_STUCK_RUNNING:${job.key}`,
+          severity: 'critical',
+          title: 'Job travado em execucao',
+          body: `O job ${job.name} ficou em execucao por mais tempo do que o esperado.`,
+          pushEligible: true,
+          audit: true,
+          data: this.buildMaterializedJobData(job, snapshot, {
+            stuckAfterMs,
+            intervalMs,
+          }),
+        },
+        nowMs,
+      );
+
+      return {
+        emitted: emitted ? `JOB_STUCK_RUNNING:${job.key}` : undefined,
+        skipped: emitted ? `healthy:${job.key}` : `JOB_STUCK_RUNNING:${job.key}`,
+      };
+    }
+
+    if (
+      (snapshot.state === 'not_created' || snapshot.state === 'pending') &&
+      snapshot.isOverdue
+    ) {
+      const emitted = await this.emitWatchdogAlert(
+        {
+          action: 'JOB_NOT_RUNNING',
+          cooldownKey: `JOB_NOT_RUNNING:${job.key}`,
+          severity: 'critical',
+          title: 'Job atrasado',
+          body: `O job ${job.name} nao executou no prazo esperado.`,
+          pushEligible: true,
+          audit: true,
+          data: this.buildMaterializedJobData(job, snapshot, {
+            staleAfterMs,
+            intervalMs,
+            reason: snapshot.reason,
+          }),
+        },
+        nowMs,
+      );
+
+      return {
+        emitted: emitted ? `JOB_NOT_RUNNING:${job.key}` : undefined,
+        skipped: emitted ? `healthy:${job.key}` : `JOB_NOT_RUNNING:${job.key}`,
+      };
+    }
+
+    return {
+      skipped: `healthy:${job.key}`,
+    };
+  }
+
+  private resolveExpectedScheduledFor(
+    job: CronJobDefinition,
+    intervalMs: number | null,
+  ): Date | null {
+    if (!job.nextExpectedRunAt || !intervalMs || intervalMs <= 0) {
+      return null;
+    }
+
+    return new Date(job.nextExpectedRunAt.getTime() - intervalMs);
+  }
+
   private buildJobData(
     job: CronJobDefinition,
     extra: Record<string, unknown>,
@@ -305,6 +418,7 @@ export class SystemJobWatchdogService implements OnModuleInit {
       jobKey: job.key,
       jobName: job.name,
       schedule: job.schedule,
+      executionMode: job.executionMode || 'direct',
       lastStatus: job.lastStatus || 'idle',
       lastStartedAt: job.lastStartedAt?.toISOString() || null,
       lastSucceededAt: job.lastSucceededAt?.toISOString() || null,
@@ -314,6 +428,35 @@ export class SystemJobWatchdogService implements OnModuleInit {
       issue: job.issue || null,
       ...extra,
     };
+  }
+
+  private buildMaterializedJobData(
+    job: CronJobDefinition,
+    snapshot: SessionCleanupWatchdogSnapshot,
+    extra: Record<string, unknown>,
+  ): Record<string, unknown> {
+    return this.buildJobData(job, {
+      watchdogState: snapshot.state,
+      watchdogReason: snapshot.reason,
+      expectedScheduledFor: snapshot.expectedScheduledFor?.toISOString() || null,
+      materializedExecutionId: snapshot.execution?.id || null,
+      materializedExecutionStatus: snapshot.execution?.status || null,
+      materializedExecutionOwnerId: snapshot.execution?.ownerId || null,
+      materializedExecutionAttempt: snapshot.execution?.attempt || null,
+      materializedExecutionLeaseVersion: snapshot.execution?.leaseVersion?.toString() || null,
+      materializedExecutionTriggeredAt: snapshot.execution?.triggeredAt?.toISOString() || null,
+      materializedExecutionStartedAt: snapshot.execution?.startedAt?.toISOString() || null,
+      materializedExecutionFinishedAt: snapshot.execution?.finishedAt?.toISOString() || null,
+      materializedExecutionHeartbeatAt: snapshot.execution?.heartbeatAt?.toISOString() || null,
+      materializedExecutionLockedUntil: snapshot.execution?.lockedUntil?.toISOString() || null,
+      materializedExecutionReason: snapshot.execution?.reason || null,
+      materializedExecutionError: snapshot.execution?.error || null,
+      materializedLatestExecutionId: snapshot.latestExecution?.id || null,
+      materializedLatestExecutionStatus: snapshot.latestExecution?.status || null,
+      isOverdue: snapshot.isOverdue,
+      isStuck: snapshot.isStuck,
+      ...extra,
+    });
   }
 
   private async emitWatchdogAlert(input: WatchdogAlertInput, nowMs: number): Promise<boolean> {

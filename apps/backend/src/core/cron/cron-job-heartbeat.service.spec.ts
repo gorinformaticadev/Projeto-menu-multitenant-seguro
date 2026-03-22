@@ -27,7 +27,10 @@ describe('CronJobHeartbeatService', () => {
         '1774192080000',
         'instance-a',
       ),
-    ).resolves.toBe(true);
+    ).resolves.toEqual({
+      persisted: true,
+      reason: null,
+    });
   });
 
   it('does not overwrite a running heartbeat owned by another cycle when skip recording loses the race', async () => {
@@ -43,6 +46,9 @@ describe('CronJobHeartbeatService', () => {
         '1774192080000',
         'instance-b',
       ),
-    ).resolves.toBe(false);
+    ).resolves.toEqual({
+      persisted: false,
+      reason: 'stale_execution',
+    });
   });
 });

@@ -3,6 +3,12 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type CronJobHeartbeatStatus = 'idle' | 'running' | 'success' | 'failed' | 'skipped';
+export type CronJobHeartbeatWriteFailureReason = 'stale_execution' | 'database_error';
+
+export interface CronJobHeartbeatWriteResult {
+  persisted: boolean;
+  reason: CronJobHeartbeatWriteFailureReason | null;
+}
 
 export interface CronJobHeartbeatRecord {
   jobKey: string;
@@ -179,7 +185,7 @@ export class CronJobHeartbeatService {
     nextExpectedRunAt: Date | null,
     expectedCycleId?: string,
     expectedInstanceId?: string,
-  ): Promise<boolean> {
+  ): Promise<CronJobHeartbeatWriteResult> {
     if (expectedCycleId && expectedInstanceId) {
       try {
         const result = await this.prisma.$executeRaw`
@@ -199,10 +205,16 @@ export class CronJobHeartbeatService {
             AND "cycleId" = ${expectedCycleId}
             AND "instanceId" = ${expectedInstanceId}
         `;
-        return result > 0;
+        return {
+          persisted: result > 0,
+          reason: result > 0 ? null : 'stale_execution',
+        };
       } catch (error) {
         this.logger.warn(`Falha ao marcar sucesso guardado para ${jobKey}: ${String(error)}`);
-        return false;
+        return {
+          persisted: false,
+          reason: 'database_error',
+        };
       }
     }
 
@@ -222,7 +234,10 @@ export class CronJobHeartbeatService {
       cycleId: current?.cycleId,
       instanceId: current?.instanceId,
     });
-    return true;
+    return {
+      persisted: true,
+      reason: null,
+    };
   }
 
   async markFailure(
@@ -233,7 +248,7 @@ export class CronJobHeartbeatService {
     nextExpectedRunAt: Date | null,
     expectedCycleId?: string,
     expectedInstanceId?: string,
-  ): Promise<boolean> {
+  ): Promise<CronJobHeartbeatWriteResult> {
     if (expectedCycleId && expectedInstanceId) {
       try {
         const result = await this.prisma.$executeRaw`
@@ -253,10 +268,16 @@ export class CronJobHeartbeatService {
             AND "cycleId" = ${expectedCycleId}
             AND "instanceId" = ${expectedInstanceId}
         `;
-        return result > 0;
+        return {
+          persisted: result > 0,
+          reason: result > 0 ? null : 'stale_execution',
+        };
       } catch (guardError) {
         this.logger.warn(`Falha ao marcar falha guardada para ${jobKey}: ${String(guardError)}`);
-        return false;
+        return {
+          persisted: false,
+          reason: 'database_error',
+        };
       }
     }
 
@@ -276,7 +297,10 @@ export class CronJobHeartbeatService {
       cycleId: current?.cycleId,
       instanceId: current?.instanceId,
     });
-    return true;
+    return {
+      persisted: true,
+      reason: null,
+    };
   }
 
   async markSkipped(
@@ -287,7 +311,7 @@ export class CronJobHeartbeatService {
     nextExpectedRunAt: Date | null,
     expectedCycleId?: string,
     expectedInstanceId?: string,
-  ): Promise<boolean> {
+  ): Promise<CronJobHeartbeatWriteResult> {
     try {
       const result = await this.prisma.$executeRaw`
         INSERT INTO "cron_job_heartbeats" (
@@ -329,10 +353,16 @@ export class CronJobHeartbeatService {
             AND "cron_job_heartbeats"."instanceId" = EXCLUDED."instanceId"
           )
       `;
-      return result > 0;
+      return {
+        persisted: result > 0,
+        reason: result > 0 ? null : 'stale_execution',
+      };
     } catch (error) {
       this.logger.warn(`Falha ao marcar ciclo skipped para ${jobKey}: ${String(error)}`);
-      return false;
+      return {
+        persisted: false,
+        reason: 'database_error',
+      };
     }
   }
 

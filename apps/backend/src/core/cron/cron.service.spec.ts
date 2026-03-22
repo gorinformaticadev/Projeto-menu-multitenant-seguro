@@ -33,6 +33,9 @@ describe('CronService', () => {
       create: jest.fn(),
       update: jest.fn(),
     },
+    auditLog: {
+      create: jest.fn(),
+    },
   };
 
   const heartbeatServiceMock = {
@@ -93,6 +96,26 @@ describe('CronService', () => {
     };
   };
 
+  const buildHeartbeat = (overrides: Record<string, unknown> = {}) => {
+    const baseTime = new Date('2026-03-07T10:00:00.000Z');
+    return {
+      jobKey: 'system.manual_test',
+      lastStartedAt: baseTime,
+      lastHeartbeatAt: baseTime,
+      lastSucceededAt: null,
+      lastFailedAt: null,
+      lastDurationMs: 10,
+      lastStatus: 'running',
+      lastError: null,
+      nextExpectedRunAt: new Date('2026-03-07T10:05:00.000Z'),
+      consecutiveFailureCount: 0,
+      updatedAt: baseTime,
+      cycleId: 'cycle-1',
+      instanceId: 'instance-a',
+      ...overrides,
+    };
+  };
+
   const createService = () =>
     new CronService(
       schedulerRegistryMock as unknown as SchedulerRegistry,
@@ -128,13 +151,14 @@ describe('CronService', () => {
     cronJobs.clear();
 
     prismaMock.cronSchedule.findMany.mockResolvedValue([]);
+    prismaMock.auditLog.create.mockResolvedValue({ id: 'audit-1' });
     heartbeatServiceMock.list.mockResolvedValue(new Map());
     heartbeatServiceMock.get.mockResolvedValue(null);
     heartbeatServiceMock.markScheduled.mockResolvedValue(undefined);
     heartbeatServiceMock.markStarted.mockResolvedValue(true);
-    heartbeatServiceMock.markSkipped.mockResolvedValue(true);
-    heartbeatServiceMock.markSuccess.mockResolvedValue(true);
-    heartbeatServiceMock.markFailure.mockResolvedValue(true);
+    heartbeatServiceMock.markSkipped.mockResolvedValue({ persisted: true, reason: null });
+    heartbeatServiceMock.markSuccess.mockResolvedValue({ persisted: true, reason: null });
+    heartbeatServiceMock.markFailure.mockResolvedValue({ persisted: true, reason: null });
     heartbeatServiceMock.updateHeartbeat.mockResolvedValue(true);
     heartbeatServiceMock.reconcileOrphans.mockResolvedValue(undefined);
 
@@ -232,6 +256,23 @@ describe('CronService', () => {
     expect(heartbeatServiceMock.markFailure).not.toHaveBeenCalled();
   });
 
+  it('dispatches materialized jobs without entering the generic heartbeat or lease lifecycle', async () => {
+    const callback = jest.fn().mockResolvedValue(undefined);
+
+    await prepareRegisteredJob(callback, {
+      executionMode: 'materialized',
+    });
+
+    await service.trigger('system.manual_test');
+
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(heartbeatServiceMock.markStarted).not.toHaveBeenCalled();
+    expect(heartbeatServiceMock.markSuccess).not.toHaveBeenCalled();
+    expect(heartbeatServiceMock.markFailure).not.toHaveBeenCalled();
+    expect(executionLeaseServiceMock.acquireLease).not.toHaveBeenCalled();
+    expect(redisLockMock.acquireLock).not.toHaveBeenCalled();
+  });
+
   it('acquires and releases the database lease on a successful cycle', async () => {
     const callback = jest.fn().mockResolvedValue(undefined);
 
@@ -260,6 +301,7 @@ describe('CronService', () => {
     expect(heartbeatServiceMock.markSkipped).not.toHaveBeenCalled();
     expect(heartbeatServiceMock.markSuccess).toHaveBeenCalledTimes(1);
     expect(heartbeatServiceMock.markFailure).not.toHaveBeenCalled();
+    expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
   });
 
   it('records the cycle as skipped when a valid database lease already exists', async () => {
@@ -393,6 +435,112 @@ describe('CronService', () => {
     );
   });
 
+  it('persists a superseded terminal fallback when markSuccess loses ownership', async () => {
+    heartbeatServiceMock.markSuccess.mockResolvedValue({
+      persisted: false,
+      reason: 'stale_execution',
+    });
+
+    await prepareRegisteredJob(async () => undefined, {
+      databaseLease: {
+        enabled: true,
+      },
+    });
+
+    heartbeatServiceMock.get
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(
+        buildHeartbeat({
+          cycleId: 'other-cycle',
+          instanceId: 'other-instance',
+        }),
+      )
+      .mockResolvedValueOnce(
+        buildHeartbeat({
+          cycleId: 'other-cycle',
+          instanceId: 'other-instance',
+        }),
+      );
+
+    await expect(service.trigger('system.manual_test')).resolves.toBeUndefined();
+
+    expect(heartbeatServiceMock.markFailure).not.toHaveBeenCalled();
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'CRON_CYCLE_TERMINAL_FALLBACK',
+          metadata: expect.objectContaining({
+            intendedTerminalStatus: 'success',
+            persistedTerminalStatus: 'superseded',
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('falls back to failed heartbeat persistence when markSuccess hits database_error', async () => {
+    heartbeatServiceMock.markSuccess.mockResolvedValue({
+      persisted: false,
+      reason: 'database_error',
+    });
+
+    await prepareRegisteredJob(async () => undefined, {
+      databaseLease: {
+        enabled: true,
+      },
+    });
+
+    heartbeatServiceMock.get.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+
+    await expect(service.trigger('system.manual_test')).resolves.toBeUndefined();
+
+    expect(heartbeatServiceMock.markFailure).toHaveBeenCalledTimes(1);
+    expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it('persists a superseded terminal fallback when markFailure loses ownership', async () => {
+    const callback = jest.fn().mockRejectedValue(new Error('boom'));
+    heartbeatServiceMock.markFailure.mockResolvedValue({
+      persisted: false,
+      reason: 'stale_execution',
+    });
+
+    await prepareRegisteredJob(callback, {
+      databaseLease: {
+        enabled: true,
+      },
+    });
+
+    heartbeatServiceMock.get
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(
+        buildHeartbeat({
+          cycleId: 'other-cycle',
+          instanceId: 'other-instance',
+        }),
+      )
+      .mockResolvedValueOnce(
+        buildHeartbeat({
+          cycleId: 'other-cycle',
+          instanceId: 'other-instance',
+        }),
+      );
+
+    await expect(service.trigger('system.manual_test')).rejects.toThrow('boom');
+
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'CRON_CYCLE_TERMINAL_FALLBACK',
+          metadata: expect.objectContaining({
+            intendedTerminalStatus: 'failed',
+            persistedTerminalStatus: 'superseded',
+          }),
+        }),
+      }),
+    );
+  });
+
   it('aborts stale execution when fencing token ownership is lost during callback processing', async () => {
     const callback = jest.fn(async (context?: { assertLeaseOwnership?: (stage?: string) => Promise<void> }) => {
       await context?.assertLeaseOwnership?.('mid_batch');
@@ -414,11 +562,31 @@ describe('CronService', () => {
         reason: 'fencing_mismatch',
       });
 
+    heartbeatServiceMock.markFailure.mockResolvedValue({
+      persisted: false,
+      reason: 'stale_execution',
+    });
+
     await prepareRegisteredJob(callback, {
       databaseLease: {
         enabled: true,
       },
     });
+
+    heartbeatServiceMock.get
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(
+        buildHeartbeat({
+          cycleId: 'cycle-2',
+          instanceId: 'other-instance',
+        }),
+      )
+      .mockResolvedValueOnce(
+        buildHeartbeat({
+          cycleId: 'cycle-2',
+          instanceId: 'other-instance',
+        }),
+      );
 
     await expect(service.trigger('system.manual_test')).rejects.toThrow(
       'Lease persistido de system.manual_test foi perdido',
@@ -427,5 +595,16 @@ describe('CronService', () => {
     expect(heartbeatServiceMock.markSuccess).not.toHaveBeenCalled();
     expect(heartbeatServiceMock.markFailure).toHaveBeenCalledTimes(1);
     expect(executionLeaseServiceMock.releaseLease).not.toHaveBeenCalled();
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'CRON_CYCLE_TERMINAL_FALLBACK',
+          metadata: expect.objectContaining({
+            intendedTerminalStatus: 'failed',
+            persistedTerminalStatus: 'superseded',
+          }),
+        }),
+      }),
+    );
   });
 });
