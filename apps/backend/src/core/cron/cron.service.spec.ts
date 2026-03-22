@@ -40,6 +40,7 @@ describe('CronService', () => {
     get: jest.fn(),
     markScheduled: jest.fn(),
     markStarted: jest.fn(),
+    markSkipped: jest.fn(),
     markSuccess: jest.fn(),
     markFailure: jest.fn(),
     updateHeartbeat: jest.fn(),
@@ -131,6 +132,7 @@ describe('CronService', () => {
     heartbeatServiceMock.get.mockResolvedValue(null);
     heartbeatServiceMock.markScheduled.mockResolvedValue(undefined);
     heartbeatServiceMock.markStarted.mockResolvedValue(true);
+    heartbeatServiceMock.markSkipped.mockResolvedValue(true);
     heartbeatServiceMock.markSuccess.mockResolvedValue(true);
     heartbeatServiceMock.markFailure.mockResolvedValue(true);
     heartbeatServiceMock.updateHeartbeat.mockResolvedValue(true);
@@ -242,6 +244,9 @@ describe('CronService', () => {
     await service.trigger('system.manual_test');
 
     expect(callback).toHaveBeenCalledTimes(1);
+    expect(heartbeatServiceMock.markStarted.mock.invocationCallOrder[0]).toBeLessThan(
+      executionLeaseServiceMock.acquireLease.mock.invocationCallOrder[0],
+    );
     expect(executionLeaseServiceMock.acquireLease).toHaveBeenCalledTimes(1);
     expect(executionLeaseServiceMock.assertLeaseOwnership).toHaveBeenCalledTimes(1);
     expect(executionLeaseServiceMock.releaseLease).toHaveBeenCalledWith(
@@ -252,11 +257,12 @@ describe('CronService', () => {
       }),
     );
     expect(heartbeatServiceMock.markStarted).toHaveBeenCalledTimes(1);
+    expect(heartbeatServiceMock.markSkipped).not.toHaveBeenCalled();
     expect(heartbeatServiceMock.markSuccess).toHaveBeenCalledTimes(1);
     expect(heartbeatServiceMock.markFailure).not.toHaveBeenCalled();
   });
 
-  it('does not execute the callback when a valid database lease already exists', async () => {
+  it('records the cycle as skipped when a valid database lease already exists', async () => {
     const callback = jest.fn().mockResolvedValue(undefined);
     executionLeaseServiceMock.acquireLease.mockResolvedValue({
       acquired: false,
@@ -277,11 +283,48 @@ describe('CronService', () => {
     await service.trigger('system.manual_test');
 
     expect(callback).not.toHaveBeenCalled();
-    expect(heartbeatServiceMock.markStarted).not.toHaveBeenCalled();
+    expect(heartbeatServiceMock.markStarted).toHaveBeenCalledTimes(1);
+    expect(heartbeatServiceMock.markSkipped).toHaveBeenCalledWith(
+      'system.manual_test',
+      expect.any(Date),
+      expect.any(Date),
+      expect.stringContaining('DB_LEASE_DENIED ownerId=other-instance'),
+      expect.any(Date),
+      expect.any(String),
+      expect.any(String),
+    );
     expect(executionLeaseServiceMock.releaseLease).not.toHaveBeenCalled();
+    expect(heartbeatServiceMock.markSuccess).not.toHaveBeenCalled();
+    expect(heartbeatServiceMock.markFailure).not.toHaveBeenCalled();
   });
 
-  it('releases the database lease when the heartbeat exclusive guard rejects the cycle', async () => {
+  it('records the cycle as skipped when the cycle lock is denied before execution', async () => {
+    const callback = jest.fn().mockResolvedValue(undefined);
+    redisLockMock.acquireLock.mockResolvedValue(false);
+
+    await prepareRegisteredJob(callback, {
+      databaseLease: {
+        enabled: true,
+      },
+    });
+
+    await service.trigger('system.manual_test');
+
+    expect(callback).not.toHaveBeenCalled();
+    expect(heartbeatServiceMock.markStarted).not.toHaveBeenCalled();
+    expect(heartbeatServiceMock.markSkipped).toHaveBeenCalledWith(
+      'system.manual_test',
+      expect.any(Date),
+      expect.any(Date),
+      'LOCK_DENIED',
+      expect.any(Date),
+      expect.any(String),
+      expect.any(String),
+    );
+    expect(executionLeaseServiceMock.acquireLease).not.toHaveBeenCalled();
+  });
+
+  it('records the cycle as skipped when the heartbeat exclusive guard rejects the cycle', async () => {
     heartbeatServiceMock.markStarted.mockResolvedValue(false);
 
     await prepareRegisteredJob(async () => undefined, {
@@ -292,13 +335,15 @@ describe('CronService', () => {
 
     await service.trigger('system.manual_test');
 
-    expect(executionLeaseServiceMock.acquireLease).toHaveBeenCalledTimes(1);
-    expect(executionLeaseServiceMock.releaseLease).toHaveBeenCalledWith(
-      expect.objectContaining({
-        jobKey: 'system.manual_test',
-        leaseVersion: 1n,
-        reason: 'heartbeat_guard_denied',
-      }),
+    expect(executionLeaseServiceMock.acquireLease).not.toHaveBeenCalled();
+    expect(heartbeatServiceMock.markSkipped).toHaveBeenCalledWith(
+      'system.manual_test',
+      expect.any(Date),
+      expect.any(Date),
+      'HEARTBEAT_GUARD_DENIED',
+      expect.any(Date),
+      expect.any(String),
+      expect.any(String),
     );
   });
 

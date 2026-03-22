@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
-export type CronJobHeartbeatStatus = 'idle' | 'running' | 'success' | 'failed';
+export type CronJobHeartbeatStatus = 'idle' | 'running' | 'success' | 'failed' | 'skipped';
 
 export interface CronJobHeartbeatRecord {
   jobKey: string;
@@ -279,6 +279,63 @@ export class CronJobHeartbeatService {
     return true;
   }
 
+  async markSkipped(
+    jobKey: string,
+    startedAt: Date,
+    finishedAt: Date,
+    reason: unknown,
+    nextExpectedRunAt: Date | null,
+    expectedCycleId?: string,
+    expectedInstanceId?: string,
+  ): Promise<boolean> {
+    try {
+      const result = await this.prisma.$executeRaw`
+        INSERT INTO "cron_job_heartbeats" (
+          "jobKey",
+          "lastStartedAt",
+          "lastHeartbeatAt",
+          "lastDurationMs",
+          "lastStatus",
+          "lastError",
+          "nextExpectedRunAt",
+          "updatedAt",
+          "cycleId",
+          "instanceId"
+        ) VALUES (
+          ${jobKey},
+          ${startedAt},
+          ${finishedAt},
+          ${Math.max(0, finishedAt.getTime() - startedAt.getTime())},
+          'skipped',
+          ${this.normalizeError(reason)},
+          ${nextExpectedRunAt},
+          ${finishedAt},
+          ${expectedCycleId || null},
+          ${expectedInstanceId || null}
+        )
+        ON CONFLICT ("jobKey") DO UPDATE SET
+          "lastStartedAt" = EXCLUDED."lastStartedAt",
+          "lastHeartbeatAt" = EXCLUDED."lastHeartbeatAt",
+          "lastDurationMs" = EXCLUDED."lastDurationMs",
+          "lastStatus" = EXCLUDED."lastStatus",
+          "lastError" = EXCLUDED."lastError",
+          "nextExpectedRunAt" = EXCLUDED."nextExpectedRunAt",
+          "updatedAt" = EXCLUDED."updatedAt",
+          "cycleId" = EXCLUDED."cycleId",
+          "instanceId" = EXCLUDED."instanceId"
+        WHERE "cron_job_heartbeats"."lastStatus" <> 'running'
+          OR (
+            "cron_job_heartbeats"."cycleId" = EXCLUDED."cycleId"
+            AND "cron_job_heartbeats"."instanceId" = EXCLUDED."instanceId"
+          )
+      `;
+      return result > 0;
+    } catch (error) {
+      this.logger.warn(`Falha ao marcar ciclo skipped para ${jobKey}: ${String(error)}`);
+      return false;
+    }
+  }
+
   /**
    * Encontra jobs que estao 'running' há muito tempo sem progresso (stuck orphan)
    * e os recupera para 'failed' para permitir novos ciclos.
@@ -416,7 +473,7 @@ export class CronJobHeartbeatService {
   }
 
   private normalizeStatus(value: string | null | undefined): CronJobHeartbeatStatus {
-    if (value === 'running' || value === 'success' || value === 'failed') {
+    if (value === 'running' || value === 'success' || value === 'failed' || value === 'skipped') {
       return value;
     }
     return 'idle';

@@ -603,6 +603,18 @@ export class CronService implements OnModuleInit {
     return new Error(`${primaryMessage}; lease=${secondaryMessage}`);
   }
 
+  private normalizeLifecycleReason(reason: unknown): string {
+    if (reason instanceof Error && reason.message.trim()) {
+      return reason.message.trim().slice(0, 500);
+    }
+
+    if (typeof reason === 'string' && reason.trim()) {
+      return reason.trim().slice(0, 500);
+    }
+
+    return 'Ciclo encerrado sem motivo informado.';
+  }
+
   private isLeaseOwnershipFailure(reason: ExecutionLeaseFailureReason | null | undefined): boolean {
     return Boolean(reason && reason !== 'database_error');
   }
@@ -666,11 +678,6 @@ export class CronService implements OnModuleInit {
       rethrowOnFailure: boolean;
     },
   ): Promise<void> {
-    if (this.maintenancePaused && options.reason === 'scheduled') {
-      this.logger.log(`[EXECUTION_SKIPPED] Job ${key} pausado por maintenance mode de restore`);
-      return;
-    }
-
     // 0. Obter dados determinísticos para cycleId
     const heartbeat = await this.heartbeatService.get(key);
     
@@ -691,8 +698,47 @@ export class CronService implements OnModuleInit {
     
     // instanceId (PM2_INSTANCE ou Hostname)
     const instanceId = this.resolveInstanceId();
+    const startedAt = new Date();
+    const nextExpectedRunAt = this.resolveNextExpectedRun(job);
+
+    const persistSkippedCycle = async (reason: string, error?: unknown): Promise<boolean> => {
+      const finishedAt = new Date();
+      const normalizedReason = this.normalizeLifecycleReason(error || reason);
+      const persisted = await this.heartbeatService.markSkipped(
+        key,
+        startedAt,
+        finishedAt,
+        normalizedReason,
+        nextExpectedRunAt || null,
+        cycleId,
+        instanceId,
+      );
+
+      if (persisted) {
+        definition.lastStartedAt = startedAt;
+        definition.lastRun = startedAt;
+        definition.lastStatus = 'skipped';
+        definition.lastError = normalizedReason;
+        definition.lastDurationMs = Math.max(0, finishedAt.getTime() - startedAt.getTime());
+      } else {
+        this.logger.warn(
+          `[EXECUTION_SKIP_NOT_PERSISTED] Job ${key} nao conseguiu registrar skipped. cycleId=${cycleId} instanceId=${instanceId} reason=${normalizedReason}`,
+        );
+      }
+
+      this.logger.log(
+        `[EXECUTION_SKIPPED] Job ${key} cycleId=${cycleId} instanceId=${instanceId} reason=${normalizedReason}`,
+      );
+      return persisted;
+    };
 
     // 1. Cooldown Redundante Removido
+
+    if (this.maintenancePaused && options.reason === 'scheduled') {
+      await persistSkippedCycle('MAINTENANCE_PAUSED');
+      this.logger.log(`[EXECUTION_SKIPPED] Job ${key} pausado por maintenance mode de restore`);
+      return;
+    }
 
     // 2. Verificação de status ativo (Banco)
     if (options.respectEnabledCheck) {
@@ -701,6 +747,7 @@ export class CronService implements OnModuleInit {
       });
 
       if (!current || !current.ativo) {
+        await persistSkippedCycle('JOB_DISABLED');
         this.logger.log(`[EXECUTION_SKIPPED] Job ${key} ignorado (desativado no banco).`);
         return;
       }
@@ -726,20 +773,20 @@ export class CronService implements OnModuleInit {
         this.logger.warn(`[DEGRADED_MODE_EXEC] Job ${key} é idempotente. Prosseguindo com DB Guard.`);
         lockAcquired = true;
       } else {
+        await persistSkippedCycle('DEGRADED_MODE_ABORT');
         this.logger.error(`[DEGRADED_MODE_ABORT] Job ${key} crítico com riscos de concorrência. Abortando.`);
         return;
       }
     }
 
     if (!lockAcquired) {
+      await persistSkippedCycle('LOCK_DENIED');
       this.logger.log(`[LOCK_DENIED] Job ${key} concorrente rejeitado. cycleId=${cycleId} instanceId=${instanceId}`);
       return;
     }
 
     this.logger.log(`[LOCK_ACQUIRED] Job ${key} ciclo=${cycleId} instanceId=${instanceId}`);
 
-    const startedAt = new Date();
-    const nextExpectedRunAt = this.resolveNextExpectedRun(job);
     const leaseOptions = this.resolveDatabaseLeaseOptions(definition);
     const leaseContext = leaseOptions
       ? {
@@ -844,6 +891,28 @@ export class CronService implements OnModuleInit {
       );
     };
 
+    // 5. Atualização de Status no Banco (Exclusive Guard)
+    const stuckAfterMs = definition.watchdogStuckAfterMs || 15 * 60 * 1000; 
+    const startedStatus = await this.heartbeatService.markStarted(
+      key, 
+      startedAt, 
+      nextExpectedRunAt || null, 
+      cycleId, 
+      instanceId,
+      stuckAfterMs
+    );
+
+    if (!startedStatus) {
+      await persistSkippedCycle('HEARTBEAT_GUARD_DENIED');
+      this.logger.warn(`[DB_SYNC_FAILED_ABORT] Job ${key} bloqueado pelo Exclusive Guard. cycleId=${cycleId}`);
+      return;
+    }
+
+    definition.lastStartedAt = startedAt;
+    definition.lastRun = startedAt;
+    definition.lastStatus = 'running';
+    definition.lastError = undefined;
+
     if (leaseContext && leaseOptions) {
       const acquisition = await this.executionLeaseService.acquireLease({
         ...leaseContext,
@@ -853,6 +922,9 @@ export class CronService implements OnModuleInit {
 
       if (!acquisition.acquired) {
         const activeLease = acquisition.lease;
+        await persistSkippedCycle(
+          `DB_LEASE_DENIED ownerId=${activeLease?.ownerId || 'unknown'} cycleId=${activeLease?.cycleId || 'unknown'} leaseVersion=${activeLease?.leaseVersion?.toString() || 'unknown'}`,
+        );
         this.logger.log(
           `[DB_LEASE_DENIED] Job ${key} bloqueado por lease ativo. ownerId=${activeLease?.ownerId || 'unknown'} cycleId=${activeLease?.cycleId || 'unknown'} leaseVersion=${activeLease?.leaseVersion?.toString() || 'unknown'} lockedUntil=${activeLease?.lockedUntil?.toISOString() || 'unknown'}`,
         );
@@ -874,35 +946,6 @@ export class CronService implements OnModuleInit {
       this.logger.log(
         `[DB_LEASE_ACQUIRED] Job ${key} cycleId=${cycleId} instanceId=${instanceId} leaseVersion=${leaseVersion.toString()} mode=${leaseVersion > 1n ? 'takeover' : 'initial'} lockedUntil=${acquisition.lease?.lockedUntil?.toISOString() || 'unknown'}`,
       );
-    }
-
-    definition.lastStartedAt = startedAt;
-    definition.lastRun = startedAt;
-    definition.lastStatus = 'running';
-
-    // 5. Atualização de Status no Banco (Exclusive Guard)
-    const stuckAfterMs = definition.watchdogStuckAfterMs || 15 * 60 * 1000; 
-    const startedStatus = await this.heartbeatService.markStarted(
-      key, 
-      startedAt, 
-      nextExpectedRunAt || null, 
-      cycleId, 
-      instanceId,
-      stuckAfterMs
-    );
-
-    if (!startedStatus) {
-      if (leaseContext && !leaseReleased) {
-        try {
-          await releaseLease('heartbeat_guard_denied', new Date(), 'HEARTBEAT_EXCLUSIVE_GUARD_DENIED');
-        } catch (leaseError) {
-          this.logger.error(
-            `[DB_LEASE_RELEASE_FAILED] Job ${key} nao conseguiu liberar lease apos rejeicao do Exclusive Guard: ${String(leaseError)}`,
-          );
-        }
-      }
-      this.logger.warn(`[DB_SYNC_FAILED_ABORT] Job ${key} bloqueado pelo Exclusive Guard. cycleId=${cycleId}`);
-      return;
     }
 
     const heartbeatTickMs = leaseOptions
