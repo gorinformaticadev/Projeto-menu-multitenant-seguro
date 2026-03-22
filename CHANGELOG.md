@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.40](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.39...v0.1.40) (2026-03-22)
+
+
+### Features
+
+* **users:** implement profile avatar upload and display ([e81f420](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/e81f42007af1c4a2ec05e8de0b480eea9ccb1ba9))
+
 ### [0.1.38](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.39...v0.1.38) (2026-03-22)
 
 
