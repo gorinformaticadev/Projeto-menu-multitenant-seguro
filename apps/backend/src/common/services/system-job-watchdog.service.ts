@@ -335,9 +335,8 @@ export class SystemJobWatchdogService implements OnModuleInit {
     staleAfterMs: number,
     stuckAfterMs: number,
   ): Promise<{ emitted?: string; skipped: string }> {
-    const expectedScheduledFor = this.resolveExpectedScheduledFor(job.schedule, intervalMs);
     const snapshot = await this.sessionCleanupExecutionService.inspectExpectedExecution({
-      expectedScheduledFor,
+      schedule: job.schedule,
       now,
       staleAfterMs,
       stuckAfterMs,
@@ -400,27 +399,6 @@ export class SystemJobWatchdogService implements OnModuleInit {
     };
   }
 
-  private resolveExpectedScheduledFor(
-    schedule: string,
-    intervalMs: number | null,
-  ): Date | null {
-    if (!intervalMs || intervalMs <= 0) {
-      return null;
-    }
-
-    try {
-      const probe = new CronJob(schedule, () => undefined);
-      const next = probe.nextDates(1) as { toJSDate: () => Date } | Array<{ toJSDate: () => Date }>;
-      const nextRun = Array.isArray(next) ? next[0]?.toJSDate() : next.toJSDate();
-      if (!nextRun) {
-        return null;
-      }
-      return new Date(nextRun.getTime() - intervalMs);
-    } catch {
-      return null;
-    }
-  }
-
   private buildJobData(
     job: CronJobDefinition,
     extra: Record<string, unknown>,
@@ -452,6 +430,13 @@ export class SystemJobWatchdogService implements OnModuleInit {
       schedule: job.schedule,
       executionMode: job.executionMode || 'direct',
       sourceOfTruth: 'materialized_execution',
+      scheduleTimeZone: snapshot.scheduleTimeZone,
+      slotResolutionErrorCode: snapshot.slotResolutionErrorCode,
+      slotResolutionError: snapshot.slotResolutionError,
+      slotResolutionWindowMs: snapshot.slotResolutionWindowMs,
+      slotResolutionMaxOccurrences: snapshot.slotResolutionMaxOccurrences,
+      slotResolutionEstimatedIntervalMs: snapshot.slotResolutionEstimatedIntervalMs,
+      slotResolutionCadence: snapshot.slotResolutionCadence,
       watchdogState: snapshot.state,
       watchdogReason: snapshot.reason,
       expectedScheduledFor: snapshot.expectedScheduledFor?.toISOString() || null,

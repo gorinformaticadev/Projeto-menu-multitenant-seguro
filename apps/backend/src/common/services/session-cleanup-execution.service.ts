@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { CronTime } from 'cron';
 import type { CronJobExecutionContext } from '@core/cron/cron.service';
 import { MaterializedCronExecutionFailureReason, MaterializedCronExecutionRecord, MaterializedCronExecutionService, MaterializedCronExecutionStatus } from '@core/cron/materialized-cron-execution.service';
 import { PrismaService } from '@core/prisma/prisma.service';
@@ -24,7 +25,49 @@ export interface SessionCleanupWatchdogSnapshot {
   isOverdue: boolean;
   isStuck: boolean;
   reason: string;
+  scheduleTimeZone: string;
+  slotResolutionErrorCode: string | null;
+  slotResolutionError: string | null;
+  slotResolutionWindowMs: number | null;
+  slotResolutionMaxOccurrences: number | null;
+  slotResolutionEstimatedIntervalMs: number | null;
+  slotResolutionCadence: string | null;
 }
+
+type ExpectedSlotSearchCadence = 'subdaily' | 'daily' | 'weekly' | 'monthly';
+
+type ExpectedSlotResolutionErrorCode =
+  | 'invalid_schedule'
+  | 'interval_estimation_failed'
+  | 'unsupported_schedule_interval'
+  | 'slot_outside_resolution_window'
+  | 'occurrence_limit_exceeded';
+
+type ExpectedSlotSearchPlan = {
+  cadence: ExpectedSlotSearchCadence;
+  maxOccurrences: number;
+  maxWindowMs: number;
+};
+
+type ExpectedSlotResolution =
+  | {
+      scheduledFor: Date;
+      errorCode: null;
+      error: null;
+      windowMs: number;
+      maxOccurrences: number;
+      estimatedIntervalMs: number;
+      cadence: ExpectedSlotSearchCadence;
+    }
+  | {
+      scheduledFor: null;
+      errorCode: ExpectedSlotResolutionErrorCode;
+      error: string;
+      windowMs: number | null;
+      maxOccurrences: number | null;
+      estimatedIntervalMs: number | null;
+      cadence: ExpectedSlotSearchCadence | null;
+    };
 
 @Injectable()
 export class SessionCleanupExecutionService implements OnModuleInit, OnModuleDestroy {
@@ -32,6 +75,9 @@ export class SessionCleanupExecutionService implements OnModuleInit, OnModuleDes
   private static readonly LEASE_TTL_MS = 2 * 60 * 1000;
   private static readonly LEASE_RENEW_MS = 20 * 1000;
   private static readonly WORKER_POLL_MS = 5 * 1000;
+  private static readonly MINUTE_MS = 60 * 1000;
+  private static readonly HOUR_MS = 60 * SessionCleanupExecutionService.MINUTE_MS;
+  private static readonly DAY_MS = 24 * SessionCleanupExecutionService.HOUR_MS;
 
   private readonly logger = new Logger(SessionCleanupExecutionService.name);
   private workerTimer: NodeJS.Timeout | null = null;
@@ -109,16 +155,24 @@ export class SessionCleanupExecutionService implements OnModuleInit, OnModuleDes
   }
 
   async inspectExpectedExecution(params: {
-    expectedScheduledFor: Date | null;
+    schedule: string;
     now: Date;
     staleAfterMs: number;
     stuckAfterMs: number;
+    timeZone?: string | null;
   }): Promise<SessionCleanupWatchdogSnapshot> {
     const latestExecution = await this.materializedExecutionService.getLatestForJob(
       SessionCleanupExecutionService.JOB_KEY,
     );
+    const scheduleTimeZone = this.resolveScheduleTimeZone(params.timeZone);
+    const expectedSlotResolution = this.resolveExpectedScheduledFor(
+      params.schedule,
+      params.now,
+      scheduleTimeZone,
+    );
+    const expectedScheduledFor = expectedSlotResolution.scheduledFor;
 
-    if (!params.expectedScheduledFor) {
+    if (!expectedScheduledFor) {
       return {
         expectedScheduledFor: null,
         execution: latestExecution,
@@ -126,38 +180,51 @@ export class SessionCleanupExecutionService implements OnModuleInit, OnModuleDes
         state: 'not_created',
         isOverdue: false,
         isStuck: false,
-        reason: 'expected_slot_unavailable',
+        reason: 'expected_slot_resolution_failed',
+        scheduleTimeZone,
+        slotResolutionErrorCode: expectedSlotResolution.errorCode,
+        slotResolutionError: expectedSlotResolution.error,
+        slotResolutionWindowMs: expectedSlotResolution.windowMs,
+        slotResolutionMaxOccurrences: expectedSlotResolution.maxOccurrences,
+        slotResolutionEstimatedIntervalMs: expectedSlotResolution.estimatedIntervalMs,
+        slotResolutionCadence: expectedSlotResolution.cadence,
       };
     }
 
     const slotExecution = await this.materializedExecutionService.getBySlot(
       SessionCleanupExecutionService.JOB_KEY,
-      params.expectedScheduledFor,
+      expectedScheduledFor,
     );
 
     if (slotExecution) {
-      return this.classifyExecution(slotExecution, latestExecution, params.now, params.staleAfterMs, params.stuckAfterMs);
-    }
-
-    if (
-      latestExecution &&
-      latestExecution.status === 'running' &&
-      latestExecution.scheduledFor.getTime() < params.expectedScheduledFor.getTime()
-    ) {
-      return this.classifyExecution(latestExecution, latestExecution, params.now, params.staleAfterMs, params.stuckAfterMs);
+      return this.classifyExecution(
+        slotExecution,
+        latestExecution,
+        params.now,
+        params.staleAfterMs,
+        params.stuckAfterMs,
+        scheduleTimeZone,
+      );
     }
 
     const isOverdue =
-      params.now.getTime() > params.expectedScheduledFor.getTime() + params.staleAfterMs;
+      params.now.getTime() > expectedScheduledFor.getTime() + params.staleAfterMs;
 
     return {
-      expectedScheduledFor: params.expectedScheduledFor,
+      expectedScheduledFor,
       execution: null,
       latestExecution,
       state: 'not_created',
       isOverdue,
       isStuck: false,
-      reason: isOverdue ? 'slot_not_materialized' : 'slot_not_due',
+      reason: isOverdue ? 'slot_not_materialized' : 'slot_within_materialization_grace',
+      scheduleTimeZone,
+      slotResolutionErrorCode: null,
+      slotResolutionError: null,
+      slotResolutionWindowMs: expectedSlotResolution.windowMs,
+      slotResolutionMaxOccurrences: expectedSlotResolution.maxOccurrences,
+      slotResolutionEstimatedIntervalMs: expectedSlotResolution.estimatedIntervalMs,
+      slotResolutionCadence: expectedSlotResolution.cadence,
     };
   }
 
@@ -167,10 +234,15 @@ export class SessionCleanupExecutionService implements OnModuleInit, OnModuleDes
     now: Date,
     staleAfterMs: number,
     stuckAfterMs: number,
+    scheduleTimeZone: string,
   ): SessionCleanupWatchdogSnapshot {
     if (execution.status === 'running') {
       const reference = execution.heartbeatAt || execution.startedAt || execution.triggeredAt;
-      const isStuck = now.getTime() > reference.getTime() + stuckAfterMs;
+      const lockExpired = execution.lockedUntil
+        ? now.getTime() > execution.lockedUntil.getTime()
+        : true;
+      const isStuck =
+        now.getTime() > reference.getTime() + stuckAfterMs && lockExpired;
 
       return {
         expectedScheduledFor: execution.scheduledFor,
@@ -180,6 +252,13 @@ export class SessionCleanupExecutionService implements OnModuleInit, OnModuleDes
         isOverdue: false,
         isStuck,
         reason: isStuck ? 'running_without_recent_heartbeat' : 'running',
+        scheduleTimeZone,
+        slotResolutionErrorCode: null,
+        slotResolutionError: null,
+        slotResolutionWindowMs: null,
+        slotResolutionMaxOccurrences: null,
+        slotResolutionEstimatedIntervalMs: null,
+        slotResolutionCadence: null,
       };
     }
 
@@ -193,6 +272,13 @@ export class SessionCleanupExecutionService implements OnModuleInit, OnModuleDes
         isOverdue,
         isStuck: false,
         reason: isOverdue ? 'pending_past_expected_window' : 'pending',
+        scheduleTimeZone,
+        slotResolutionErrorCode: null,
+        slotResolutionError: null,
+        slotResolutionWindowMs: null,
+        slotResolutionMaxOccurrences: null,
+        slotResolutionEstimatedIntervalMs: null,
+        slotResolutionCadence: null,
       };
     }
 
@@ -204,7 +290,213 @@ export class SessionCleanupExecutionService implements OnModuleInit, OnModuleDes
       isOverdue: false,
       isStuck: false,
       reason: execution.status,
+      scheduleTimeZone,
+      slotResolutionErrorCode: null,
+      slotResolutionError: null,
+      slotResolutionWindowMs: null,
+      slotResolutionMaxOccurrences: null,
+      slotResolutionEstimatedIntervalMs: null,
+      slotResolutionCadence: null,
     };
+  }
+
+  private resolveExpectedScheduledFor(
+    schedule: string,
+    now: Date,
+    timeZone: string,
+  ): ExpectedSlotResolution {
+    let cronTime: CronTime;
+
+    try {
+      cronTime = new CronTime(schedule, timeZone);
+    } catch (error) {
+      return this.buildExpectedSlotResolutionError(
+        'invalid_schedule',
+        `Falha ao interpretar schedule ${schedule}: ${this.normalizeErrorMessage(error)}`,
+      );
+    }
+
+    const intervalMs = this.estimateScheduleIntervalMs(cronTime, now, timeZone);
+    if (!intervalMs || intervalMs <= 0) {
+      return this.buildExpectedSlotResolutionError(
+        'interval_estimation_failed',
+        `Nao foi possivel estimar a periodicidade de ${schedule} para resolver o slot esperado.`,
+      );
+    }
+
+    const searchPlan = this.resolveExpectedSlotSearchPlan(intervalMs);
+    if (!searchPlan) {
+      return this.buildExpectedSlotResolutionError(
+        'unsupported_schedule_interval',
+        `A periodicidade estimada de ${Math.round(intervalMs / SessionCleanupExecutionService.DAY_MS)} dia(s) excede a politica suportada pelo watchdog materialized.`,
+        {
+          estimatedIntervalMs: intervalMs,
+        },
+      );
+    }
+
+    const windowMs = Math.min(
+      searchPlan.maxWindowMs,
+      Math.max(intervalMs, intervalMs * searchPlan.maxOccurrences),
+    );
+    const anchor = new Date(now.getTime() - windowMs);
+
+    try {
+      let candidate = cronTime.getNextDateFrom(anchor, timeZone).toJSDate();
+
+      if (candidate.getTime() > now.getTime()) {
+        return this.buildExpectedSlotResolutionError(
+          'slot_outside_resolution_window',
+          `Nenhum slot de ${schedule} foi encontrado na janela proporcional de ${windowMs}ms.`,
+          {
+            estimatedIntervalMs: intervalMs,
+            maxOccurrences: searchPlan.maxOccurrences,
+            windowMs,
+            cadence: searchPlan.cadence,
+          },
+        );
+      }
+
+      for (let occurrence = 1; occurrence <= searchPlan.maxOccurrences; occurrence += 1) {
+        const nextCandidate = cronTime.getNextDateFrom(candidate, timeZone).toJSDate();
+        if (nextCandidate.getTime() > now.getTime()) {
+          return {
+            scheduledFor: candidate,
+            errorCode: null,
+            error: null,
+            windowMs,
+            maxOccurrences: searchPlan.maxOccurrences,
+            estimatedIntervalMs: intervalMs,
+            cadence: searchPlan.cadence,
+          };
+        }
+
+        candidate = nextCandidate;
+      }
+
+      return this.buildExpectedSlotResolutionError(
+        'occurrence_limit_exceeded',
+        `A resolucao do slot esperado de ${schedule} excedeu o limite de ${searchPlan.maxOccurrences} ocorrencias.`,
+        {
+          estimatedIntervalMs: intervalMs,
+          maxOccurrences: searchPlan.maxOccurrences,
+          windowMs,
+          cadence: searchPlan.cadence,
+        },
+      );
+    } catch (error) {
+      return this.buildExpectedSlotResolutionError(
+        'invalid_schedule',
+        `Falha ao calcular o slot esperado de ${schedule}: ${this.normalizeErrorMessage(error)}`,
+        {
+          estimatedIntervalMs: intervalMs,
+          maxOccurrences: searchPlan.maxOccurrences,
+          windowMs,
+          cadence: searchPlan.cadence,
+        },
+      );
+    }
+  }
+
+  private estimateScheduleIntervalMs(
+    cronTime: CronTime,
+    referenceTime: Date,
+    timeZone: string,
+  ): number | null {
+    try {
+      const first = cronTime.getNextDateFrom(referenceTime, timeZone).toJSDate();
+      const second = cronTime.getNextDateFrom(first, timeZone).toJSDate();
+      const intervalMs = second.getTime() - first.getTime();
+
+      if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
+        return null;
+      }
+
+      return intervalMs;
+    } catch {
+      return null;
+    }
+  }
+
+  private resolveExpectedSlotSearchPlan(intervalMs: number): ExpectedSlotSearchPlan | null {
+    if (intervalMs <= SessionCleanupExecutionService.HOUR_MS) {
+      return {
+        cadence: 'subdaily',
+        maxOccurrences: 24,
+        maxWindowMs: 3 * SessionCleanupExecutionService.DAY_MS,
+      };
+    }
+
+    if (intervalMs <= SessionCleanupExecutionService.DAY_MS) {
+      return {
+        cadence: 'daily',
+        maxOccurrences: 14,
+        maxWindowMs: 21 * SessionCleanupExecutionService.DAY_MS,
+      };
+    }
+
+    if (intervalMs <= 7 * SessionCleanupExecutionService.DAY_MS) {
+      return {
+        cadence: 'weekly',
+        maxOccurrences: 12,
+        maxWindowMs: 120 * SessionCleanupExecutionService.DAY_MS,
+      };
+    }
+
+    if (intervalMs <= 62 * SessionCleanupExecutionService.DAY_MS) {
+      return {
+        cadence: 'monthly',
+        maxOccurrences: 18,
+        maxWindowMs: 550 * SessionCleanupExecutionService.DAY_MS,
+      };
+    }
+
+    return null;
+  }
+
+  private buildExpectedSlotResolutionError(
+    errorCode: ExpectedSlotResolutionErrorCode,
+    error: string,
+    metadata?: {
+      estimatedIntervalMs?: number | null;
+      maxOccurrences?: number | null;
+      windowMs?: number | null;
+      cadence?: ExpectedSlotSearchCadence | null;
+    },
+  ): ExpectedSlotResolution {
+    return {
+      scheduledFor: null,
+      errorCode,
+      error,
+      windowMs: metadata?.windowMs ?? null,
+      maxOccurrences: metadata?.maxOccurrences ?? null,
+      estimatedIntervalMs: metadata?.estimatedIntervalMs ?? null,
+      cadence: metadata?.cadence ?? null,
+    };
+  }
+
+  private resolveScheduleTimeZone(timeZone?: string | null): string {
+    const candidates = [
+      typeof timeZone === 'string' ? timeZone.trim() : '',
+      String(process.env.TZ || '').trim(),
+      String(Intl.DateTimeFormat().resolvedOptions().timeZone || '').trim(),
+      'UTC',
+    ];
+
+    for (const candidate of candidates) {
+      if (!candidate) {
+        continue;
+      }
+
+      try {
+        new CronTime('* * * * *', candidate);
+        return candidate;
+      } catch {
+        continue;
+      }
+    }
+
+    return 'UTC';
   }
 
   private async requestDrain(): Promise<number> {

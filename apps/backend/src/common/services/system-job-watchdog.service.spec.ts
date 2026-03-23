@@ -64,6 +64,7 @@ describe('SystemJobWatchdogService', () => {
       isOverdue: true,
       isStuck: false,
       reason: 'slot_not_materialized',
+      scheduleTimeZone: 'UTC',
     });
 
     service = createService();
@@ -145,8 +146,12 @@ describe('SystemJobWatchdogService', () => {
 
     expect(sessionCleanupExecutionServiceMock.inspectExpectedExecution).toHaveBeenCalledWith(
       expect.objectContaining({
-        expectedScheduledFor: new Date('2026-03-07T15:00:00.000Z'),
+        schedule: '*/15 * * * *',
+        now: new Date('2026-03-07T15:10:00.000Z'),
       }),
+    );
+    expect(sessionCleanupExecutionServiceMock.inspectExpectedExecution.mock.calls[0][0]).not.toHaveProperty(
+      'expectedScheduledFor',
     );
     expect(operationalAlertsServiceMock.dispatchOperationalAlert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -154,6 +159,7 @@ describe('SystemJobWatchdogService', () => {
         data: expect.objectContaining({
           jobKey: 'system.session_cleanup',
           executionMode: 'materialized',
+          scheduleTimeZone: 'UTC',
           watchdogState: 'not_created',
           sourceOfTruth: 'materialized_execution',
           watchdogReason: 'slot_not_materialized',
@@ -200,6 +206,7 @@ describe('SystemJobWatchdogService', () => {
       isOverdue: false,
       isStuck: true,
       reason: 'running_without_recent_heartbeat',
+      scheduleTimeZone: 'UTC',
     });
 
     await service.evaluateWatchdog(new Date('2026-03-07T15:10:00.000Z'));
@@ -255,13 +262,15 @@ describe('SystemJobWatchdogService', () => {
       isOverdue: false,
       isStuck: false,
       reason: 'success',
+      scheduleTimeZone: 'UTC',
     });
 
     const result = await service.evaluateWatchdog(new Date('2026-03-07T15:10:00.000Z'));
 
     expect(sessionCleanupExecutionServiceMock.inspectExpectedExecution).toHaveBeenCalledWith(
       expect.objectContaining({
-        expectedScheduledFor: new Date('2026-03-07T15:00:00.000Z'),
+        schedule: '*/15 * * * *',
+        now: new Date('2026-03-07T15:10:00.000Z'),
       }),
     );
     expect(result).toEqual({

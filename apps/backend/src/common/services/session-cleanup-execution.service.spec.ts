@@ -4,6 +4,9 @@ import { SessionCleanupExecutionService } from './session-cleanup-execution.serv
 import { SessionCleanupProcessorService } from './session-cleanup-processor.service';
 
 describe('SessionCleanupExecutionService', () => {
+  const saoPauloTimeZone = 'America/Sao_Paulo';
+  const utcTimeZone = 'UTC';
+
   const prismaMock = {
     auditLog: {
       create: jest.fn(),
@@ -166,45 +169,307 @@ describe('SessionCleanupExecutionService', () => {
     );
   });
 
-  it('classifies an overdue slot as not created when the cron dispatched nothing for that slot', async () => {
-    const expectedScheduledFor = new Date('2026-03-22T15:00:00.000Z');
+  it('keeps a daily materialized job healthy when the expected slot exists with success', async () => {
+    const successExecution = createExecution({
+      status: 'success',
+      scheduledFor: new Date('2026-03-23T11:00:00.000Z'),
+      triggeredAt: new Date('2026-03-23T11:00:01.000Z'),
+      startedAt: new Date('2026-03-23T11:00:02.000Z'),
+      finishedAt: new Date('2026-03-23T11:00:20.000Z'),
+      heartbeatAt: new Date('2026-03-23T11:00:20.000Z'),
+      lockedUntil: new Date('2026-03-23T11:00:20.000Z'),
+      reason: 'completed',
+    });
+    materializedExecutionServiceMock.getLatestForJob.mockResolvedValue(successExecution);
+    materializedExecutionServiceMock.getBySlot.mockResolvedValue(successExecution);
 
     await expect(
       service.inspectExpectedExecution({
-        expectedScheduledFor,
-        now: new Date('2026-03-22T15:12:00.000Z'),
-        staleAfterMs: 5 * 60 * 1000,
+        schedule: '0 8 * * *',
+        timeZone: saoPauloTimeZone,
+        now: new Date('2026-03-23T11:20:00.000Z'),
+        staleAfterMs: 30 * 60 * 1000,
         stuckAfterMs: 10 * 60 * 1000,
       }),
     ).resolves.toEqual(
       expect.objectContaining({
-        state: 'not_created',
-        isOverdue: true,
-        reason: 'slot_not_materialized',
+        expectedScheduledFor: new Date('2026-03-23T11:00:00.000Z'),
+        state: 'success',
+        isOverdue: false,
+        isStuck: false,
+        reason: 'success',
+        scheduleTimeZone: saoPauloTimeZone,
       }),
     );
   });
 
-  it('classifies a running slot as stuck when the execution heartbeat is stale', async () => {
+  it('resolves the expected slot for an hourly schedule using the bounded subdaily policy', async () => {
+    await expect(
+      service.inspectExpectedExecution({
+        schedule: '0 0 * * * *',
+        timeZone: utcTimeZone,
+        now: new Date('2026-03-23T11:15:00.000Z'),
+        staleAfterMs: 60 * 60 * 1000,
+        stuckAfterMs: 10 * 60 * 1000,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        expectedScheduledFor: new Date('2026-03-23T11:00:00.000Z'),
+        state: 'not_created',
+        isOverdue: false,
+        reason: 'slot_within_materialization_grace',
+        scheduleTimeZone: utcTimeZone,
+        slotResolutionCadence: 'subdaily',
+        slotResolutionMaxOccurrences: 24,
+      }),
+    );
+  });
+
+  it('classifies an overdue daily slot as not created when the correct materialized slot is absent', async () => {
+    const previousSuccess = createExecution({
+      status: 'success',
+      scheduledFor: new Date('2026-03-22T11:00:00.000Z'),
+      startedAt: new Date('2026-03-22T11:00:02.000Z'),
+      finishedAt: new Date('2026-03-22T11:00:30.000Z'),
+      heartbeatAt: new Date('2026-03-22T11:00:30.000Z'),
+      lockedUntil: new Date('2026-03-22T11:00:30.000Z'),
+      reason: 'completed',
+    });
+    materializedExecutionServiceMock.getLatestForJob.mockResolvedValue(previousSuccess);
+
+    await expect(
+      service.inspectExpectedExecution({
+        schedule: '0 8 * * *',
+        timeZone: saoPauloTimeZone,
+        now: new Date('2026-03-23T12:00:00.000Z'),
+        staleAfterMs: 30 * 60 * 1000,
+        stuckAfterMs: 10 * 60 * 1000,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        expectedScheduledFor: new Date('2026-03-23T11:00:00.000Z'),
+        state: 'not_created',
+        isOverdue: true,
+        reason: 'slot_not_materialized',
+        scheduleTimeZone: saoPauloTimeZone,
+      }),
+    );
+  });
+
+  it('resolves the expected slot for a weekly schedule using the bounded weekly policy', async () => {
+    await expect(
+      service.inspectExpectedExecution({
+        schedule: '0 8 * * 1',
+        timeZone: utcTimeZone,
+        now: new Date('2026-03-26T12:00:00.000Z'),
+        staleAfterMs: 7 * 24 * 60 * 60 * 1000,
+        stuckAfterMs: 10 * 60 * 1000,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        expectedScheduledFor: new Date('2026-03-23T08:00:00.000Z'),
+        state: 'not_created',
+        isOverdue: false,
+        reason: 'slot_within_materialization_grace',
+        scheduleTimeZone: utcTimeZone,
+        slotResolutionCadence: 'weekly',
+        slotResolutionMaxOccurrences: 12,
+      }),
+    );
+  });
+
+  it('resolves the expected slot for a monthly schedule using the bounded monthly policy', async () => {
+    await expect(
+      service.inspectExpectedExecution({
+        schedule: '0 8 1 * *',
+        timeZone: utcTimeZone,
+        now: new Date('2026-03-23T12:00:00.000Z'),
+        staleAfterMs: 40 * 24 * 60 * 60 * 1000,
+        stuckAfterMs: 10 * 60 * 1000,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        expectedScheduledFor: new Date('2026-03-01T08:00:00.000Z'),
+        state: 'not_created',
+        isOverdue: false,
+        reason: 'slot_within_materialization_grace',
+        scheduleTimeZone: utcTimeZone,
+        slotResolutionCadence: 'monthly',
+        slotResolutionMaxOccurrences: 18,
+      }),
+    );
+  });
+
+  it('keeps a pending slot healthy while it is still within the materialization grace window', async () => {
+    const pendingExecution = createExecution({
+      status: 'pending',
+      scheduledFor: new Date('2026-03-23T11:10:00.000Z'),
+      startedAt: null,
+      finishedAt: null,
+      heartbeatAt: null,
+      lockedUntil: null,
+      ownerId: null,
+      attempt: 0,
+      leaseVersion: 0n,
+    });
+    materializedExecutionServiceMock.getLatestForJob.mockResolvedValue(pendingExecution);
+    materializedExecutionServiceMock.getBySlot.mockResolvedValue(pendingExecution);
+
+    await expect(
+      service.inspectExpectedExecution({
+        schedule: '0 * * * * *',
+        timeZone: saoPauloTimeZone,
+        now: new Date('2026-03-23T11:10:30.000Z'),
+        staleAfterMs: 60 * 1000,
+        stuckAfterMs: 10 * 60 * 1000,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        expectedScheduledFor: new Date('2026-03-23T11:10:00.000Z'),
+        state: 'pending',
+        isOverdue: false,
+        reason: 'pending',
+        scheduleTimeZone: saoPauloTimeZone,
+      }),
+    );
+  });
+
+  it('returns an explicit resolution error for an invalid cron expression', async () => {
+    await expect(
+      service.inspectExpectedExecution({
+        schedule: 'invalid cron',
+        timeZone: utcTimeZone,
+        now: new Date('2026-03-23T12:00:00.000Z'),
+        staleAfterMs: 60 * 1000,
+        stuckAfterMs: 10 * 60 * 1000,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        expectedScheduledFor: null,
+        state: 'not_created',
+        isOverdue: false,
+        reason: 'expected_slot_resolution_failed',
+        scheduleTimeZone: utcTimeZone,
+        slotResolutionErrorCode: 'invalid_schedule',
+        slotResolutionError: expect.stringContaining('Falha ao interpretar schedule'),
+      }),
+    );
+  });
+
+  it('returns an explicit resolution error for yearly schedules outside the supported policy window', async () => {
+    await expect(
+      service.inspectExpectedExecution({
+        schedule: '0 8 1 1 *',
+        timeZone: utcTimeZone,
+        now: new Date('2026-03-23T12:00:00.000Z'),
+        staleAfterMs: 60 * 1000,
+        stuckAfterMs: 10 * 60 * 1000,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        expectedScheduledFor: null,
+        state: 'not_created',
+        isOverdue: false,
+        reason: 'expected_slot_resolution_failed',
+        scheduleTimeZone: utcTimeZone,
+        slotResolutionErrorCode: 'unsupported_schedule_interval',
+        slotResolutionError: expect.stringContaining('politica suportada'),
+      }),
+    );
+  });
+
+  it('flags a pending slot when it remains pending past the grace window', async () => {
+    const pendingExecution = createExecution({
+      status: 'pending',
+      scheduledFor: new Date('2026-03-23T11:10:00.000Z'),
+      startedAt: null,
+      finishedAt: null,
+      heartbeatAt: null,
+      lockedUntil: null,
+      ownerId: null,
+      attempt: 0,
+      leaseVersion: 0n,
+    });
+    materializedExecutionServiceMock.getLatestForJob.mockResolvedValue(pendingExecution);
+    materializedExecutionServiceMock.getBySlot.mockResolvedValue(pendingExecution);
+
+    await expect(
+      service.inspectExpectedExecution({
+        schedule: '0 * * * * *',
+        timeZone: saoPauloTimeZone,
+        now: new Date('2026-03-23T11:12:00.000Z'),
+        staleAfterMs: 60 * 1000,
+        stuckAfterMs: 10 * 60 * 1000,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        expectedScheduledFor: new Date('2026-03-23T11:10:00.000Z'),
+        state: 'pending',
+        isOverdue: true,
+        reason: 'pending_past_expected_window',
+        scheduleTimeZone: saoPauloTimeZone,
+      }),
+    );
+  });
+
+  it('keeps a running slot healthy while heartbeat and lock are still current', async () => {
     const runningExecution = createExecution({
       status: 'running',
-      heartbeatAt: new Date('2026-03-22T15:00:30.000Z'),
+      scheduledFor: new Date('2026-03-23T11:10:00.000Z'),
+      triggeredAt: new Date('2026-03-23T11:10:01.000Z'),
+      startedAt: new Date('2026-03-23T11:10:02.000Z'),
+      heartbeatAt: new Date('2026-03-23T11:10:40.000Z'),
+      lockedUntil: new Date('2026-03-23T11:12:10.000Z'),
     });
     materializedExecutionServiceMock.getLatestForJob.mockResolvedValue(runningExecution);
     materializedExecutionServiceMock.getBySlot.mockResolvedValue(runningExecution);
 
     await expect(
       service.inspectExpectedExecution({
-        expectedScheduledFor: runningExecution.scheduledFor,
-        now: new Date('2026-03-22T15:15:00.000Z'),
-        staleAfterMs: 5 * 60 * 1000,
-        stuckAfterMs: 10 * 60 * 1000,
+        schedule: '0 * * * * *',
+        timeZone: saoPauloTimeZone,
+        now: new Date('2026-03-23T11:11:30.000Z'),
+        staleAfterMs: 60 * 1000,
+        stuckAfterMs: 90 * 1000,
       }),
     ).resolves.toEqual(
       expect.objectContaining({
+        expectedScheduledFor: new Date('2026-03-23T11:10:00.000Z'),
+        state: 'running',
+        isStuck: false,
+        reason: 'running',
+        scheduleTimeZone: saoPauloTimeZone,
+      }),
+    );
+  });
+
+  it('classifies a running slot as stuck when the execution heartbeat is stale and the lease is expired', async () => {
+    const runningExecution = createExecution({
+      status: 'running',
+      scheduledFor: new Date('2026-03-23T11:10:00.000Z'),
+      triggeredAt: new Date('2026-03-23T11:10:01.000Z'),
+      startedAt: new Date('2026-03-23T11:10:02.000Z'),
+      heartbeatAt: new Date('2026-03-23T11:10:30.000Z'),
+      lockedUntil: new Date('2026-03-23T11:11:00.000Z'),
+    });
+    materializedExecutionServiceMock.getLatestForJob.mockResolvedValue(runningExecution);
+    materializedExecutionServiceMock.getBySlot.mockResolvedValue(runningExecution);
+
+    await expect(
+      service.inspectExpectedExecution({
+        schedule: '0 * * * * *',
+        timeZone: saoPauloTimeZone,
+        now: new Date('2026-03-23T11:13:00.000Z'),
+        staleAfterMs: 60 * 1000,
+        stuckAfterMs: 90 * 1000,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        expectedScheduledFor: new Date('2026-03-23T11:10:00.000Z'),
         state: 'stuck',
         isStuck: true,
         reason: 'running_without_recent_heartbeat',
+        scheduleTimeZone: saoPauloTimeZone,
       }),
     );
   });
