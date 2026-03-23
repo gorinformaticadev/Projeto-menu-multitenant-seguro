@@ -36,6 +36,7 @@ describe('CronService', () => {
     auditLog: {
       create: jest.fn(),
     },
+    $queryRaw: jest.fn(),
   };
 
   const heartbeatServiceMock = {
@@ -116,6 +117,26 @@ describe('CronService', () => {
     };
   };
 
+  const buildMaterializedExecution = (overrides: Record<string, unknown> = {}) => {
+    const scheduledFor = new Date('2026-03-07T10:00:00.000Z');
+    const startedAt = new Date('2026-03-07T10:00:03.000Z');
+    const finishedAt = new Date('2026-03-07T10:00:13.000Z');
+
+    return {
+      jobKey: 'system.manual_test',
+      scheduledFor,
+      triggeredAt: new Date('2026-03-07T10:00:02.000Z'),
+      startedAt,
+      finishedAt,
+      status: 'success',
+      heartbeatAt: new Date('2026-03-07T10:00:10.000Z'),
+      reason: 'completed',
+      error: null,
+      updatedAt: finishedAt,
+      ...overrides,
+    };
+  };
+
   const createService = () =>
     new CronService(
       schedulerRegistryMock as unknown as SchedulerRegistry,
@@ -152,6 +173,7 @@ describe('CronService', () => {
 
     prismaMock.cronSchedule.findMany.mockResolvedValue([]);
     prismaMock.auditLog.create.mockResolvedValue({ id: 'audit-1' });
+    prismaMock.$queryRaw.mockResolvedValue([]);
     heartbeatServiceMock.list.mockResolvedValue(new Map());
     heartbeatServiceMock.get.mockResolvedValue(null);
     heartbeatServiceMock.markScheduled.mockResolvedValue(undefined);
@@ -273,12 +295,89 @@ describe('CronService', () => {
     expect(redisLockMock.acquireLock).not.toHaveBeenCalled();
   });
 
-  it('does not let the aggregate heartbeat overwrite nextExpectedRunAt for a materialized job', async () => {
+  it('uses materialized executions as the operational source for runtime snapshots', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-03-07T15:00:00.000Z'));
 
     await prepareRegisteredJob(async () => undefined, {
       executionMode: 'materialized',
     });
+
+    const latestSuccess = buildMaterializedExecution({
+      scheduledFor: new Date('2026-03-07T14:45:00.000Z'),
+      triggeredAt: new Date('2026-03-07T14:45:02.000Z'),
+      startedAt: new Date('2026-03-07T14:45:05.000Z'),
+      heartbeatAt: new Date('2026-03-07T14:45:15.000Z'),
+      finishedAt: new Date('2026-03-07T14:45:20.000Z'),
+      updatedAt: new Date('2026-03-07T14:45:20.000Z'),
+      status: 'success',
+    });
+
+    prismaMock.$queryRaw
+      .mockResolvedValueOnce([latestSuccess])
+      .mockResolvedValueOnce([latestSuccess])
+      .mockResolvedValueOnce([]);
+
+    const jobs = await service.getRuntimeJobs();
+
+    expect(heartbeatServiceMock.list).not.toHaveBeenCalled();
+    expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(4);
+    expect(jobs[0]).toEqual(
+      expect.objectContaining({
+        key: 'system.manual_test',
+        executionMode: 'materialized',
+        lastStatus: 'success',
+        lastStartedAt: new Date('2026-03-07T14:45:05.000Z'),
+        lastSucceededAt: new Date('2026-03-07T14:45:20.000Z'),
+        lastDurationMs: 15000,
+        nextExpectedRunAt: new Date('2026-03-07T15:05:00.000Z'),
+      }),
+    );
+  });
+
+  it('derives lastSucceededAt for materialized jobs from materialized execution history', async () => {
+    await prepareRegisteredJob(async () => undefined, {
+      executionMode: 'materialized',
+    });
+
+    const latestRunning = buildMaterializedExecution({
+      scheduledFor: new Date('2026-03-07T15:00:00.000Z'),
+      triggeredAt: new Date('2026-03-07T15:00:02.000Z'),
+      startedAt: new Date('2026-03-07T15:00:04.000Z'),
+      finishedAt: null,
+      heartbeatAt: new Date('2026-03-07T15:00:19.000Z'),
+      updatedAt: new Date('2026-03-07T15:00:19.000Z'),
+      status: 'running',
+    });
+    const previousSuccess = buildMaterializedExecution({
+      scheduledFor: new Date('2026-03-07T14:45:00.000Z'),
+      triggeredAt: new Date('2026-03-07T14:45:02.000Z'),
+      startedAt: new Date('2026-03-07T14:45:05.000Z'),
+      heartbeatAt: new Date('2026-03-07T14:45:11.000Z'),
+      finishedAt: new Date('2026-03-07T14:45:12.000Z'),
+      updatedAt: new Date('2026-03-07T14:45:12.000Z'),
+      status: 'success',
+    });
+
+    prismaMock.$queryRaw
+      .mockResolvedValueOnce([latestRunning])
+      .mockResolvedValueOnce([previousSuccess])
+      .mockResolvedValueOnce([]);
+
+    const [job] = await service.getRuntimeJobs();
+
+    expect(job).toEqual(
+      expect.objectContaining({
+        executionMode: 'materialized',
+        lastStatus: 'running',
+        lastStartedAt: new Date('2026-03-07T15:00:04.000Z'),
+        lastSucceededAt: new Date('2026-03-07T14:45:12.000Z'),
+        lastDurationMs: 15000,
+      }),
+    );
+  });
+
+  it('keeps heartbeat as the operational source for non-materialized runtime snapshots', async () => {
+    await prepareRegisteredJob();
 
     heartbeatServiceMock.list.mockResolvedValue(
       new Map([
@@ -286,19 +385,24 @@ describe('CronService', () => {
           'system.manual_test',
           buildHeartbeat({
             lastStatus: 'success',
-            nextExpectedRunAt: new Date('2026-03-07T10:00:00.000Z'),
+            lastStartedAt: new Date('2026-03-07T11:00:00.000Z'),
+            lastSucceededAt: new Date('2026-03-07T11:00:08.000Z'),
+            nextExpectedRunAt: new Date('2026-03-07T11:05:00.000Z'),
           }),
         ],
       ]),
     );
 
-    const jobs = await service.getRuntimeJobs();
+    const [job] = await service.getRuntimeJobs();
 
-    expect(jobs[0]).toEqual(
+    expect(prismaMock.$queryRaw).not.toHaveBeenCalled();
+    expect(job).toEqual(
       expect.objectContaining({
-        key: 'system.manual_test',
-        executionMode: 'materialized',
-        nextExpectedRunAt: new Date('2026-03-07T15:05:00.000Z'),
+        executionMode: 'direct',
+        lastStatus: 'success',
+        lastStartedAt: new Date('2026-03-07T11:00:00.000Z'),
+        lastSucceededAt: new Date('2026-03-07T11:00:08.000Z'),
+        nextExpectedRunAt: new Date('2026-03-07T11:05:00.000Z'),
       }),
     );
   });

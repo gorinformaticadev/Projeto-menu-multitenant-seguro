@@ -1,6 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
+import { Prisma } from '@prisma/client';
+import { RedisLockService } from '../../common/services/redis-lock.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CronJobHeartbeatRecord,
@@ -13,6 +15,7 @@ import {
   ExecutionLeaseRecord,
   ExecutionLeaseService,
 } from './execution-lease.service';
+import type { MaterializedCronExecutionStatus } from './materialized-cron-execution.service';
 
 export interface CronJobDatabaseLeaseOptions {
   enabled?: boolean;
@@ -97,7 +100,30 @@ type JobWrapper = {
 type CronJobCycleTerminalStatus = 'success' | 'failed' | 'skipped' | 'superseded';
 type PersistedHeartbeatTerminalStatus = Extract<CronJobHeartbeatStatus, 'success' | 'failed' | 'skipped'>;
 
-import { RedisLockService } from '../../common/services/redis-lock.service';
+type MaterializedRuntimeSnapshotRow = {
+  jobKey: string;
+  scheduledFor: Date;
+  triggeredAt: Date;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+  status: MaterializedCronExecutionStatus;
+  heartbeatAt: Date | null;
+  reason: string | null;
+  error: string | null;
+  updatedAt: Date;
+};
+
+type MaterializedRuntimeSnapshot = {
+  latest: MaterializedRuntimeSnapshotRow | null;
+  latestSuccess: MaterializedRuntimeSnapshotRow | null;
+  latestFailure: MaterializedRuntimeSnapshotRow | null;
+  consecutiveFailureCount: number;
+};
+
+type MaterializedFailureCountRow = {
+  jobKey: string;
+  consecutiveFailureCount: number | bigint | null;
+};
 
 const DEFAULT_DATABASE_LEASE_TTL_MS = 2 * 60 * 1000;
 const DEFAULT_DATABASE_LEASE_RENEW_MS = 30 * 1000;
@@ -514,10 +540,30 @@ export class CronService implements OnModuleInit {
       return definition;
     });
 
-    const heartbeatMap = await this.heartbeatService.list(definitions.map((definition) => definition.key));
+    const directJobKeys = definitions
+      .filter((definition) => definition.executionMode !== 'materialized')
+      .map((definition) => definition.key);
+    const materializedJobKeys = definitions
+      .filter((definition) => definition.executionMode === 'materialized')
+      .map((definition) => definition.key);
+
+    const [heartbeatMap, materializedSnapshots] = await Promise.all([
+      directJobKeys.length > 0
+        ? this.heartbeatService.list(directJobKeys)
+        : Promise.resolve(new Map<string, CronJobHeartbeatRecord>()),
+      this.loadMaterializedExecutionSnapshots(materializedJobKeys),
+    ]);
 
     return definitions
       .map((definition) => {
+        if (definition.executionMode === 'materialized') {
+          this.applyMaterializedExecutionSnapshot(
+            definition,
+            materializedSnapshots.get(definition.key) || null,
+          );
+          return definition;
+        }
+
         this.applyHeartbeat(definition, heartbeatMap.get(definition.key));
         return definition;
       })
@@ -588,6 +634,216 @@ export class CronService implements OnModuleInit {
     }
     definition.consecutiveFailureCount = heartbeat.consecutiveFailureCount;
     definition.lastRun = definition.lastStartedAt;
+  }
+
+  private async loadMaterializedExecutionSnapshots(
+    jobKeys: string[],
+  ): Promise<Map<string, MaterializedRuntimeSnapshot>> {
+    if (jobKeys.length === 0) {
+      return new Map();
+    }
+
+    const snapshots = new Map<string, MaterializedRuntimeSnapshot>(
+      jobKeys.map((jobKey) => [
+        jobKey,
+        {
+          latest: null,
+          latestSuccess: null,
+          latestFailure: null,
+          consecutiveFailureCount: 0,
+        },
+      ]),
+    );
+
+    try {
+      const [latestRows, latestSuccessRows, latestFailureRows, failureCountRows] = await Promise.all([
+        this.prisma.$queryRaw<MaterializedRuntimeSnapshotRow[]>(Prisma.sql`
+          SELECT DISTINCT ON ("jobKey")
+            "jobKey",
+            "scheduledFor",
+            "triggeredAt",
+            "startedAt",
+            "finishedAt",
+            "status",
+            "heartbeatAt",
+            "reason",
+            "error",
+            "updatedAt"
+          FROM "cron_materialized_executions"
+          WHERE "jobKey" IN (${Prisma.join(jobKeys)})
+          ORDER BY "jobKey", "scheduledFor" DESC, "updatedAt" DESC
+        `),
+        this.prisma.$queryRaw<MaterializedRuntimeSnapshotRow[]>(Prisma.sql`
+          SELECT DISTINCT ON ("jobKey")
+            "jobKey",
+            "scheduledFor",
+            "triggeredAt",
+            "startedAt",
+            "finishedAt",
+            "status",
+            "heartbeatAt",
+            "reason",
+            "error",
+            "updatedAt"
+          FROM "cron_materialized_executions"
+          WHERE "jobKey" IN (${Prisma.join(jobKeys)})
+            AND "status" = 'success'
+          ORDER BY "jobKey", "scheduledFor" DESC, "updatedAt" DESC
+        `),
+        this.prisma.$queryRaw<MaterializedRuntimeSnapshotRow[]>(Prisma.sql`
+          SELECT DISTINCT ON ("jobKey")
+            "jobKey",
+            "scheduledFor",
+            "triggeredAt",
+            "startedAt",
+            "finishedAt",
+            "status",
+            "heartbeatAt",
+            "reason",
+            "error",
+            "updatedAt"
+          FROM "cron_materialized_executions"
+          WHERE "jobKey" IN (${Prisma.join(jobKeys)})
+            AND "status" IN ('failed', 'aborted')
+          ORDER BY "jobKey", "scheduledFor" DESC, "updatedAt" DESC
+        `),
+        this.prisma.$queryRaw<MaterializedFailureCountRow[]>(Prisma.sql`
+          WITH ranked_executions AS (
+            SELECT
+              "jobKey",
+              "status",
+              SUM(CASE WHEN "status" = 'success' THEN 1 ELSE 0 END) OVER (
+                PARTITION BY "jobKey"
+                ORDER BY "scheduledFor" DESC, "updatedAt" DESC
+                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+              ) AS "successSeen"
+            FROM "cron_materialized_executions"
+            WHERE "jobKey" IN (${Prisma.join(jobKeys)})
+          )
+          SELECT
+            "jobKey",
+            COUNT(*) FILTER (WHERE "status" IN ('failed', 'aborted'))::int AS "consecutiveFailureCount"
+          FROM ranked_executions
+          WHERE "successSeen" = 0
+          GROUP BY "jobKey"
+        `),
+      ]);
+
+      for (const row of latestRows) {
+        const current = snapshots.get(row.jobKey);
+        if (current) {
+          current.latest = row;
+        }
+      }
+
+      for (const row of latestSuccessRows) {
+        const current = snapshots.get(row.jobKey);
+        if (current) {
+          current.latestSuccess = row;
+        }
+      }
+
+      for (const row of latestFailureRows) {
+        const current = snapshots.get(row.jobKey);
+        if (current) {
+          current.latestFailure = row;
+        }
+      }
+
+      for (const row of failureCountRows) {
+        const current = snapshots.get(row.jobKey);
+        if (current) {
+          current.consecutiveFailureCount = Number(row.consecutiveFailureCount || 0);
+        }
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao montar snapshot materializado dos cron jobs: ${String(error)}`,
+      );
+    }
+
+    return snapshots;
+  }
+
+  private applyMaterializedExecutionSnapshot(
+    definition: CronJobDefinition,
+    snapshot?: MaterializedRuntimeSnapshot | null,
+  ): void {
+    definition.lastRun = undefined;
+    definition.lastStartedAt = undefined;
+    definition.lastHeartbeatAt = undefined;
+    definition.lastSucceededAt = undefined;
+    definition.lastFailedAt = undefined;
+    definition.lastDurationMs = undefined;
+    definition.lastStatus = 'idle';
+    definition.lastError = undefined;
+    definition.consecutiveFailureCount = 0;
+
+    const latest = snapshot?.latest;
+    if (!latest) {
+      return;
+    }
+
+    definition.lastStartedAt = latest.startedAt || undefined;
+    definition.lastHeartbeatAt = latest.heartbeatAt || undefined;
+    definition.lastSucceededAt =
+      this.resolveMaterializedTerminalAt(snapshot?.latestSuccess) || undefined;
+    definition.lastFailedAt =
+      this.resolveMaterializedTerminalAt(snapshot?.latestFailure) || undefined;
+    definition.lastDurationMs = this.resolveMaterializedDurationMs(latest);
+    definition.lastStatus = this.mapMaterializedStatus(latest.status);
+    definition.lastError = this.resolveMaterializedError(latest);
+    definition.consecutiveFailureCount = snapshot?.consecutiveFailureCount || 0;
+    definition.lastRun = definition.lastStartedAt;
+  }
+
+  private mapMaterializedStatus(status: MaterializedCronExecutionStatus): CronJobHeartbeatStatus {
+    switch (status) {
+      case 'running':
+        return 'running';
+      case 'success':
+        return 'success';
+      case 'failed':
+      case 'aborted':
+        return 'failed';
+      case 'skipped':
+      case 'superseded':
+        return 'skipped';
+      case 'pending':
+      default:
+        return 'idle';
+    }
+  }
+
+  private resolveMaterializedTerminalAt(
+    execution?: MaterializedRuntimeSnapshotRow | null,
+  ): Date | null {
+    if (!execution) {
+      return null;
+    }
+
+    return execution.finishedAt || execution.updatedAt;
+  }
+
+  private resolveMaterializedDurationMs(
+    execution: MaterializedRuntimeSnapshotRow,
+  ): number | undefined {
+    const reference = execution.finishedAt || execution.heartbeatAt;
+    if (!execution.startedAt || !reference) {
+      return undefined;
+    }
+
+    return Math.max(0, reference.getTime() - execution.startedAt.getTime());
+  }
+
+  private resolveMaterializedError(
+    execution: MaterializedRuntimeSnapshotRow,
+  ): string | undefined {
+    if (execution.status === 'success' || execution.status === 'running' || execution.status === 'pending') {
+      return undefined;
+    }
+
+    return execution.error || execution.reason || undefined;
   }
 
   private resolveDatabaseLeaseOptions(

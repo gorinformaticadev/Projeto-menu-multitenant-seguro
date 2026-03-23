@@ -65,12 +65,13 @@ interface CronJob {
   runtimeRegistered?: boolean;
   runtimeActive?: boolean;
   sourceOfTruth?: "database";
+  executionMode?: "direct" | "materialized";
   lastRun?: string;
   lastStartedAt?: string;
   lastSucceededAt?: string;
   lastFailedAt?: string;
   lastDurationMs?: number;
-  lastStatus?: "idle" | "running" | "success" | "failed";
+  lastStatus?: "idle" | "running" | "success" | "failed" | "skipped";
   lastError?: string;
   nextRun?: string;
   nextExpectedRunAt?: string;
@@ -931,6 +932,7 @@ function renderStatusBadge(job: CronJob) {
     running: "Executando",
     success: "Sucesso",
     failed: "Falhou",
+    skipped: "Ignorado",
   };
   const variant =
     status === "failed" ? "destructive" : status === "running" ? "secondary" : "outline";
@@ -1057,5 +1059,4 @@ function formatDurationMs(value?: number): string {
 
   return `${value} ms`;
 }
-
 
