@@ -1,0 +1,98 @@
+✅ Secret Manager inicializado (Local)
+[31m[Nest] 16584  - [39m23/03/2026, 16:34:57 [31m  ERROR[39m [38;5;3m[RedisLockService] [39m[31mErro no RedisLockService: connect ECONNREFUSED 127.0.0.1:6379. Modo degradado ativo.[39m
+[31m[Nest] 16584  - [39m23/03/2026, 16:34:57 [31m  ERROR[39m [38;5;3m[RedisLockService] [39m[31mFalha ao conectar ao Redis no bootstrap: Error: Connection is closed.[39m
+Cabecalhos HTTP extras de seguranca habilitados (origem: database)
+[31m[Nest] 16584  - [39m23/03/2026, 16:45:00 [31m  ERROR[39m [38;5;3m[MaterializedCronExecutionService] [39m[31mFalha ao materializar execucao de system.session_cleanup para 2026-03-23T19:45:00.000Z: PrismaClientKnownRequestError: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Raw query failed. Code: `42P01`. Message: `relação "cron_materialized_executions" não existe`[39m
+[31m[Nest] 16584  - [39m23/03/2026, 16:45:00 [31m  ERROR[39m [38;5;3m[CronService] [39m[31m[MATERIALIZED_DISPATCH_FAILED] Job system.session_cleanup cycleId=1774295100000 instanceId=GILSON:pid-16584[39m
+[31m[Nest] 16584  - [39m23/03/2026, 16:45:00 [31m  ERROR[39m [38;5;3m[CronService] [39mPrismaClientKnownRequestError: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Raw query failed. Code: `42P01`. Message: `relação "cron_materialized_executions" não existe`
+    at ei.handleRequestError (D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\node_modules\[4m.pnpm[24m\@prisma+client@6.19.2_prism_6b2b1af085fe6797f5a5ea830937a8e3\node_modules\[4m@prisma\client[24m\src\runtime\RequestHandler.ts:228:13)
+    at ei.handleAndLogRequestError (D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\node_modules\[4m.pnpm[24m\@prisma+client@6.19.2_prism_6b2b1af085fe6797f5a5ea830937a8e3\node_modules\[4m@prisma\client[24m\src\runtime\RequestHandler.ts:174:12)
+    at ei.request (D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\node_modules\[4m.pnpm[24m\@prisma+client@6.19.2_prism_6b2b1af085fe6797f5a5ea830937a8e3\node_modules\[4m@prisma\client[24m\src\runtime\RequestHandler.ts:143:12)
+    at async a (D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\node_modules\[4m.pnpm[24m\@prisma+client@6.19.2_prism_6b2b1af085fe6797f5a5ea830937a8e3\node_modules\[4m@prisma\client[24m\src\runtime\getPrismaClient.ts:833:24)
+    at async MaterializedCronExecutionService.materializeExecution [90m(D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\apps\backend\[39msrc\core\cron\materialized-cron-execution.service.ts:232:24[90m)[39m
+    at async SessionCleanupExecutionService.materializeScheduledExecution [90m(D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\apps\backend\[39msrc\common\services\session-cleanup-execution.service.ts:115:26[90m)[39m
+    at async cronService.register.name [90m(D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\apps\backend\[39msrc\common\services\token-cleanup.service.ts:44:9[90m)[39m
+    at async CronService.executeMaterializedDispatchJob [90m(D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\apps\backend\[39msrc\core\cron\cron.service.ts:1282:7[90m)[39m
+    at async CronService.executeRegisteredJob [90m(D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\apps\backend\[39msrc\core\cron\cron.service.ts:1313:7[90m)[39m
+    at async CronJob.<anonymous> [90m(D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\apps\backend\[39msrc\core\cron\cron.service.ts:471:7[90m)[39m {
+  code: [32m'P2010'[39m,
+  meta: {
+    code: [32m'42P01'[39m,
+    message: [32m'relação "cron_materialized_executions" não existe'[39m
+  },
+  clientVersion: [32m'6.19.2'[39m
+}
+✅ Secret Manager inicializado (Local)
+[31m[Nest] 12016  - [39m23/03/2026, 17:05:59 [31m  ERROR[39m [38;5;3m[RedisLockService] [39m[31mErro no RedisLockService: connect ECONNREFUSED 127.0.0.1:6379. Modo degradado ativo.[39m
+[31m[Nest] 12016  - [39m23/03/2026, 17:05:59 [31m  ERROR[39m [38;5;3m[RedisLockService] [39m[31mFalha ao conectar ao Redis no bootstrap: Error: Connection is closed.[39m
+Cabecalhos HTTP extras de seguranca habilitados (origem: database)
+node:child_process:991
+    throw err;
+    ^
+
+<ref *1> Error: spawnSync C:\WINDOWS\system32\cmd.exe EPERM
+    at Object.spawnSync (node:internal/child_process:1120:20)
+    at spawnSync (node:child_process:902:24)
+    at execSync (node:child_process:983:15)
+    at treeKillSync (D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\node_modules\.pnpm\@nestjs+cli@11.0.16_@types+node@20.19.33\node_modules\@nestjs\cli\lib\utils\tree-kill.js:7:38)
+    at D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\node_modules\.pnpm\@nestjs+cli@11.0.16_@types+node@20.19.33\node_modules\@nestjs\cli\actions\start.action.js:68:46
+    at Object.onWatchStatusChange (D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\node_modules\.pnpm\@nestjs+cli@11.0.16_@types+node@20.19.33\node_modules\@nestjs\cli\lib\compiler\watch-compiler.js:83:17)
+    at D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\node_modules\.pnpm\typescript@5.9.3\node_modules\typescript\lib\typescript.js:133916:30
+    at emitFilesAndReportErrors (D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\node_modules\.pnpm\typescript@5.9.3\node_modules\typescript\lib\typescript.js:133737:5)
+    at result.afterProgramCreate (D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\node_modules\.pnpm\typescript@5.9.3\node_modules\typescript\lib\typescript.js:133912:5)
+    at synchronizeProgram (D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\node_modules\.pnpm\typescript@5.9.3\node_modules\typescript\lib\typescript.js:134235:12) {
+  errno: -4048,
+  code: 'EPERM',
+  syscall: 'spawnSync C:\\WINDOWS\\system32\\cmd.exe',
+  path: 'C:\\WINDOWS\\system32\\cmd.exe',
+  spawnargs: [ '/d', '/s', '/c', '"taskkill /pid 9952 /T /F"' ],
+  error: [Circular *1],
+  status: null,
+  signal: null,
+  output: null,
+  pid: 0,
+  stdout: undefined,
+  stderr: undefined
+}
+
+Node.js v22.22.0
+✅ Secret Manager inicializado (Local)
+[31m[Nest] 8372  - [39m23/03/2026, 17:12:54 [31m  ERROR[39m [38;5;3m[RedisLockService] [39m[31mErro no RedisLockService: connect ECONNREFUSED 127.0.0.1:6379. Modo degradado ativo.[39m
+[31m[Nest] 8372  - [39m23/03/2026, 17:12:54 [31m  ERROR[39m [38;5;3m[RedisLockService] [39m[31mFalha ao conectar ao Redis no bootstrap: Error: Connection is closed.[39m
+Cabecalhos HTTP extras de seguranca habilitados (origem: database)
+[31m[Nest] 8372  - [39m23/03/2026, 17:15:00 [31m  ERROR[39m [38;5;3m[MaterializedCronExecutionService] [39m[31mFalha ao materializar execucao de system.session_cleanup para 2026-03-23T20:15:00.000Z: PrismaClientKnownRequestError: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Raw query failed. Code: `42P01`. Message: `relação "cron_materialized_executions" não existe`[39m
+[31m[Nest] 8372  - [39m23/03/2026, 17:15:00 [31m  ERROR[39m [38;5;3m[CronService] [39m[31m[MATERIALIZED_DISPATCH_FAILED] Job system.session_cleanup cycleId=1774296900000 instanceId=GILSON:pid-8372[39m
+[31m[Nest] 8372  - [39m23/03/2026, 17:15:00 [31m  ERROR[39m [38;5;3m[CronService] [39mPrismaClientKnownRequestError: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Raw query failed. Code: `42P01`. Message: `relação "cron_materialized_executions" não existe`
+    at ei.handleRequestError (D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\node_modules\[4m.pnpm[24m\@prisma+client@6.19.2_prism_6b2b1af085fe6797f5a5ea830937a8e3\node_modules\[4m@prisma\client[24m\src\runtime\RequestHandler.ts:228:13)
+    at ei.handleAndLogRequestError (D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\node_modules\[4m.pnpm[24m\@prisma+client@6.19.2_prism_6b2b1af085fe6797f5a5ea830937a8e3\node_modules\[4m@prisma\client[24m\src\runtime\RequestHandler.ts:174:12)
+    at ei.request (D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\node_modules\[4m.pnpm[24m\@prisma+client@6.19.2_prism_6b2b1af085fe6797f5a5ea830937a8e3\node_modules\[4m@prisma\client[24m\src\runtime\RequestHandler.ts:143:12)
+    at async a (D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\node_modules\[4m.pnpm[24m\@prisma+client@6.19.2_prism_6b2b1af085fe6797f5a5ea830937a8e3\node_modules\[4m@prisma\client[24m\src\runtime\getPrismaClient.ts:833:24)
+    at async MaterializedCronExecutionService.materializeExecution [90m(D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\apps\backend\[39msrc\core\cron\materialized-cron-execution.service.ts:232:24[90m)[39m
+    at async SessionCleanupExecutionService.materializeScheduledExecution [90m(D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\apps\backend\[39msrc\common\services\session-cleanup-execution.service.ts:115:26[90m)[39m
+    at async cronService.register.name [90m(D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\apps\backend\[39msrc\common\services\token-cleanup.service.ts:44:9[90m)[39m
+    at async CronService.executeMaterializedDispatchJob [90m(D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\apps\backend\[39msrc\core\cron\cron.service.ts:1282:7[90m)[39m
+    at async CronService.executeRegisteredJob [90m(D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\apps\backend\[39msrc\core\cron\cron.service.ts:1313:7[90m)[39m
+    at async CronJob.<anonymous> [90m(D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\apps\backend\[39msrc\core\cron\cron.service.ts:471:7[90m)[39m {
+  code: [32m'P2010'[39m,
+  meta: {
+    code: [32m'42P01'[39m,
+    message: [32m'relação "cron_materialized_executions" não existe'[39m
+  },
+  clientVersion: [32m'6.19.2'[39m
+}

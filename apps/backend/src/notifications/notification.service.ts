@@ -13,6 +13,7 @@ import {
   NotificationResponse,
 } from './notification.entity';
 import { BroadcastNotificationDto, NotificationConfigurationStatusDto } from './notification.dto';
+import { AuthorizationService } from '@common/services/authorization.service';
 
 export type SystemNotificationSeverity = 'info' | 'warning' | 'critical';
 
@@ -130,6 +131,7 @@ export class NotificationService {
   constructor(
     private prisma: PrismaService,
     private readonly configResolver: ConfigResolverService,
+    private readonly authorizationService: AuthorizationService,
   ) {
     // Empty implementation
   }
@@ -159,7 +161,7 @@ export class NotificationService {
     const title = this.normalizeText(input.title || actionRule.title || this.buildSystemAlertTitle(action), 140);
     const body = this.normalizeText(input.body || input.message || title, 500);
     const targetRole = this.normalizeText(input.targetRole || 'SUPER_ADMIN', 40);
-    const targetUserId = this.normalizeText(input.targetUserId || undefined, 80);
+    const targetUserId = this.normalizeOptionalText(input.targetUserId || undefined, 80);
     const moduleName = this.normalizeText(input.module || 'system', 80);
     const payloadData = this.sanitizeData({
       action,
@@ -209,12 +211,12 @@ export class NotificationService {
     const title = this.normalizeText(input.title, 140);
     const body = this.normalizeText(input.body, 500);
     const targetRole = this.normalizeText(input.targetRole || 'SUPER_ADMIN', 40);
-    const targetUserId = this.normalizeText(input.targetUserId || undefined, 80);
+    const targetUserId = this.normalizeOptionalText(input.targetUserId || undefined, 80);
     const type = this.normalizeText(input.type || 'SYSTEM_ALERT', 40);
     const source = this.normalizeText(input.source || 'system', 40) || 'system';
     const moduleName = this.normalizeText(input.module || 'system', 80) || 'system';
-    const tenantId = this.normalizeText(input.tenantId || undefined, 80);
-    const userId = this.normalizeText(input.userId || targetUserId || undefined, 80);
+    const tenantId = this.normalizeOptionalText(input.tenantId || undefined, 80);
+    const userId = this.normalizeOptionalText(input.userId || targetUserId || undefined, 80);
     const data = this.sanitizeData(input.data || {});
 
     if (!title || !body) {
@@ -457,6 +459,7 @@ export class NotificationService {
    */
   async findForDropdown(user: unknown): Promise<NotificationResponse> {
     const where = this.buildWhereClause(user);
+    const unreadWhere = this.buildUnreadWhere(where);
 
     const [notifications, total, unreadCount] = await Promise.all([
       this.prisma.notification.findMany({
@@ -465,9 +468,7 @@ export class NotificationService {
         take: 10,
       }),
       this.prisma.notification.count({ where }),
-      this.prisma.notification.count({
-        where: { ...where, OR: [{ read: false }, { isRead: false }] },
-      }),
+      this.prisma.notification.count({ where: unreadWhere }),
     ]);
 
     return {
@@ -483,6 +484,7 @@ export class NotificationService {
    */
   async findMany(user: any, filters: NotificationFilters = {}): Promise<NotificationResponse> {
     const where = this.buildWhereClause(user, filters);
+    const unreadWhere = this.buildUnreadWhere(where);
     const page = filters.page || 1;
     const limit = filters.limit || 20;
     const skip = (page - 1) * limit;
@@ -495,9 +497,7 @@ export class NotificationService {
         take: limit,
       }),
       this.prisma.notification.count({ where }),
-      this.prisma.notification.count({
-        where: { ...where, OR: [{ read: false }, { isRead: false }] },
-      }),
+      this.prisma.notification.count({ where: unreadWhere }),
     ]);
 
     return {
@@ -512,14 +512,16 @@ export class NotificationService {
    * Marca notificacao como lida
    */
   async markUserNotificationAsRead(id: string, user: unknown): Promise<Notification | null> {
-    const where = {
-      id,
-      ...this.buildWhereClause(user),
-    };
+    const actor = this.normalizeNotificationActor(user);
+    const existing = await this.findAccessibleNotificationRow(id, actor, 'read');
+    if (!existing) {
+      this.logger.warn(`Notificacao nao encontrada ou sem permissao: ${id}`);
+      return null;
+    }
 
     try {
       const notification = await this.prisma.notification.update({
-        where,
+        where: { id: existing.id },
         data: {
           read: true,
           isRead: true,
@@ -539,14 +541,16 @@ export class NotificationService {
    * Marca notificacao como nao lida
    */
   async markAsUnread(id: string, user: unknown): Promise<Notification | null> {
-    const where = {
-      id,
-      ...this.buildWhereClause(user),
-    };
+    const actor = this.normalizeNotificationActor(user);
+    const existing = await this.findAccessibleNotificationRow(id, actor, 'read');
+    if (!existing) {
+      this.logger.warn(`Notificacao nao encontrada ou sem permissao: ${id}`);
+      return null;
+    }
 
     try {
       const notification = await this.prisma.notification.update({
-        where,
+        where: { id: existing.id },
         data: {
           read: false,
           isRead: false,
@@ -569,10 +573,7 @@ export class NotificationService {
     const where = this.buildWhereClause(user, filters);
 
     const result = await this.prisma.notification.updateMany({
-      where: {
-        ...where,
-        OR: [{ read: false }, { isRead: false }],
-      },
+      where: this.buildUnreadWhere(where),
       data: {
         read: true,
         isRead: true,
@@ -588,14 +589,16 @@ export class NotificationService {
    * Deleta uma notificacao
    */
   async delete(id: string, user: unknown): Promise<Notification | null> {
-    const where = {
-      id,
-      ...this.buildWhereClause(user),
-    };
+    const actor = this.normalizeNotificationActor(user);
+    const existing = await this.findAccessibleNotificationRow(id, actor, 'delete');
+    if (!existing) {
+      this.logger.warn(`Notificacao nao encontrada ou sem permissao: ${id}`);
+      return null;
+    }
 
     try {
       const notification = await this.prisma.notification.delete({
-        where,
+        where: { id: existing.id },
       });
 
       this.logger.log(`Notificacao deletada: ${id}`);
@@ -610,13 +613,31 @@ export class NotificationService {
    * Deleta multiplas notificacoes
    */
   async deleteMany(ids: string[], user: unknown): Promise<number> {
+    const normalizedIds = ids.filter((id) => typeof id === 'string' && id.trim().length > 0);
+    if (normalizedIds.length === 0) {
+      return 0;
+    }
+
     const where = {
-      id: { in: ids },
-      ...this.buildWhereClause(user),
+      AND: [
+        { id: { in: normalizedIds } },
+        this.buildWhereClause(user),
+      ],
     };
 
-    const result = await this.prisma.notification.deleteMany({
+    const accessibleNotifications = await this.prisma.notification.findMany({
       where,
+      select: { id: true },
+    });
+
+    if (accessibleNotifications.length === 0) {
+      return 0;
+    }
+
+    const result = await this.prisma.notification.deleteMany({
+      where: {
+        id: { in: accessibleNotifications.map((notification) => notification.id) },
+      },
     });
 
     this.logger.log(`${result.count} notificacoes deletadas`);
@@ -627,10 +648,7 @@ export class NotificationService {
    * Conta notificacoes nao lidas
    */
   async countUnread(user: unknown): Promise<number> {
-    const where = {
-      ...this.buildWhereClause(user),
-      OR: [{ read: false }, { isRead: false }],
-    };
+    const where = this.buildUnreadWhere(this.buildWhereClause(user));
 
     return this.prisma.notification.count({ where });
   }
@@ -712,20 +730,9 @@ export class NotificationService {
    * Busca uma notificacao por ID
    */
   async findById(id: string, user: unknown): Promise<Notification | null> {
-    const where = {
-      id,
-      ...this.buildWhereClause(user),
-    };
-
-    try {
-      const notification = await this.prisma.notification.findUnique({
-        where,
-      });
-
-      return notification ? this.mapToEntity(notification) : null;
-    } catch {
-      return null;
-    }
+    const actor = this.normalizeNotificationActor(user);
+    const notification = await this.findAccessibleNotificationRow(id, actor, 'read');
+    return notification ? this.mapToEntity(notification) : null;
   }
 
   // ============================================================================
@@ -733,40 +740,8 @@ export class NotificationService {
   // ============================================================================
 
   private buildWhereClause(user: any, filters?: NotificationFilters) {
-    const where: any = {};
-
-    if (user.role === 'USER') {
-      where.userId = user.id;
-    } else if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
-      if (user.tenantId) {
-        where.OR = [{ tenantId: user.tenantId }, { userId: user.id }];
-      } else {
-        where.OR = [{ userId: user.id }, { userId: null, tenantId: null }];
-      }
-    }
-
-    if (filters) {
-      if (filters.type) {
-        where.severity = this.mapTypeToSeverity(filters.type);
-      }
-      if (filters.read !== undefined) {
-        where.read = filters.read;
-      }
-      if (filters.tenantId && user.role === 'SUPER_ADMIN') {
-        where.tenantId = filters.tenantId;
-      }
-      if (filters.userId && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN')) {
-        where.userId = filters.userId;
-      }
-      if (filters.dateFrom) {
-        where.createdAt = { ...where.createdAt, gte: filters.dateFrom };
-      }
-      if (filters.dateTo) {
-        where.createdAt = { ...where.createdAt, lte: filters.dateTo };
-      }
-    }
-
-    return where;
+    const actor = this.normalizeNotificationActor(user);
+    return this.authorizationService.buildNotificationWhere(actor, filters);
   }
 
   private normalizeNotificationActor(authorInfo: any): { id: string | null; role: string; tenantId: string | null } {
@@ -775,6 +750,38 @@ export class NotificationService {
       role: String(authorInfo?.role || '').trim().toUpperCase(),
       tenantId: typeof authorInfo?.tenantId === 'string' ? authorInfo.tenantId : null,
     };
+  }
+
+  private buildUnreadWhere(baseWhere: Record<string, unknown>) {
+    return {
+      AND: [
+        baseWhere,
+        {
+          OR: [{ read: false }, { isRead: false }],
+        },
+      ],
+    };
+  }
+
+  private async findAccessibleNotificationRow(
+    id: string,
+    actor: { id: string | null; role: string; tenantId: string | null },
+    action: 'read' | 'delete',
+  ) {
+    try {
+      const notification = await this.prisma.notification.findFirst({
+        where: { id },
+      });
+
+      if (!notification) {
+        return null;
+      }
+
+      this.authorizationService.assertCanAccessNotification(actor, notification, action);
+      return notification;
+    } catch {
+      return null;
+    }
   }
 
   private async applyNotificationAuthorScope(data: NotificationCreateData, authorInfo?: any) {
@@ -1212,6 +1219,11 @@ export class NotificationService {
     }
 
     return normalized.length > maxLength ? normalized.slice(0, maxLength) : normalized;
+  }
+
+  private normalizeOptionalText(value: string | undefined, maxLength: number): string | null {
+    const normalized = this.normalizeText(value, maxLength);
+    return normalized || null;
   }
 
   private clampNumber(value: number | undefined, min: number, max: number, fallback: number): number {

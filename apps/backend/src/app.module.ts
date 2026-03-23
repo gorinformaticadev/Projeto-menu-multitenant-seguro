@@ -39,12 +39,15 @@ import { SystemTelemetryInterceptor } from './common/interceptors/system-telemet
 import { SystemDashboardModule } from './dashboard/system-dashboard.module';
 import { SystemDiagnosticsModule } from './diagnostics/system-diagnostics.module';
 import { SystemSettingsModule } from './system-settings/system-settings.module';
+import { SecurityRuntimeModule } from './common/security-runtime.module';
+import { RequestSecurityContextMiddleware } from './common/middleware/request-security-context.middleware';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    SecurityRuntimeModule,
     SystemSettingsModule,
     // Modulo de agendamento para tarefas cron
     ScheduleModule.forRoot(),
@@ -161,7 +164,9 @@ export class AppModule implements NestModule {
 
   configure(consumer: MiddlewareConsumer) {
     // HTTPS Redirect - Apenas em produÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½o
-    consumer.apply(HttpsRedirectMiddleware).forRoutes('*');
+    consumer
+      .apply(RequestSecurityContextMiddleware, HttpsRedirectMiddleware)
+      .forRoutes('*');
   }
 }
 

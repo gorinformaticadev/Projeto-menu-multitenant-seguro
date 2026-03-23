@@ -144,7 +144,7 @@ describe('Advanced CSP dynamic setting', () => {
 
     expect(result.source).toBe('env');
     expect(result.value).toBe(true);
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('Falling back to ENV/default'));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('fallback de ENV/default'));
   });
 
   it('aplica a CSP avancada quando a flag estiver habilitada', async () => {

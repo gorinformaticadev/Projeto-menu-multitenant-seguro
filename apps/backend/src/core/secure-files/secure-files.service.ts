@@ -18,6 +18,7 @@ import {
 } from './interfaces/secure-file.interface';
 import { sanitizeFileName, validateFileSignature } from './config/secure-multer.config';
 import { ConfigResolverService } from '../../system-settings/config-resolver.service';
+import { AuthorizationService } from '@common/services/authorization.service';
 
 @Injectable()
 export class SecureFilesService {
@@ -30,6 +31,7 @@ export class SecureFilesService {
     private readonly prisma: PrismaService,
     private readonly pathsService: PathsService,
     private readonly configResolver: ConfigResolverService,
+    private readonly authorizationService: AuthorizationService,
   ) {
     this.uploadsRoot = this.pathsService.ensureDir(this.pathsService.getUploadsDir());
     this.tempDir = this.pathsService.ensureDir(this.pathsService.getTempDir());
@@ -119,25 +121,9 @@ export class SecureFilesService {
     }
   }
 
-  async getFileStream(fileId: string, userId: string, tenantId: string): Promise<SecureFileStream> {
-    const file = await this.prisma.secureFile.findUnique({
-      where: { id: fileId },
-    });
-
-    if (!file) {
-      throw new NotFoundException('File not found');
-    }
-
-    if (file.tenantId !== tenantId) {
-      this.logger.warn(`Cross-tenant secure file access denied: user=${userId}, file=${fileId}`);
-      throw new NotFoundException('File not found');
-    }
-
-    if (file.deletedAt) {
-      throw new NotFoundException('File has been deleted');
-    }
-
-    await this.assertTenantModuleAccess(file.tenantId, file.moduleName, 'read');
+  async getFileStream(fileId: string, actorInput: any): Promise<SecureFileStream> {
+    const actor = this.normalizeActor(actorInput);
+    const file = await this.getAccessibleFileOrThrow(fileId, actor, 'read');
 
     const filePath = this.getFilePath(
       file.tenantId,
@@ -161,7 +147,7 @@ export class SecureFilesService {
       },
     });
 
-    await this.logAuditEvent('SECURE_FILE_ACCESSED', userId, tenantId, {
+    await this.logAuditEvent('SECURE_FILE_ACCESSED', actor.id, file.tenantId, {
       fileId,
       moduleName: file.moduleName,
       documentType: file.documentType,
@@ -181,24 +167,9 @@ export class SecureFilesService {
     };
   }
 
-  async getFileMetadata(fileId: string, tenantId: string): Promise<SecureFileMetadata> {
-    const file = await this.prisma.secureFile.findUnique({
-      where: { id: fileId },
-    });
-
-    if (!file) {
-      throw new NotFoundException('File not found');
-    }
-
-    if (file.tenantId !== tenantId) {
-      throw new NotFoundException('File not found');
-    }
-
-    if (file.deletedAt) {
-      throw new NotFoundException('File has been deleted');
-    }
-
-    await this.assertTenantModuleAccess(file.tenantId, file.moduleName, 'read');
+  async getFileMetadata(fileId: string, actorInput: any): Promise<SecureFileMetadata> {
+    const actor = this.normalizeActor(actorInput);
+    const file = await this.getAccessibleFileOrThrow(fileId, actor, 'read');
 
     return {
       fileId: file.id,
@@ -211,38 +182,25 @@ export class SecureFilesService {
     };
   }
 
-  async deleteFile(fileId: string, userId: string, tenantId: string): Promise<void> {
-    const file = await this.prisma.secureFile.findUnique({
-      where: { id: fileId },
-    });
-
-    if (!file) {
-      throw new NotFoundException('File not found');
-    }
-
-    if (file.tenantId !== tenantId) {
-      throw new NotFoundException('File not found');
-    }
-
-    if (file.deletedAt) {
-      throw new BadRequestException('File has already been deleted');
-    }
-
-    await this.assertTenantModuleAccess(file.tenantId, file.moduleName, 'read');
+  async deleteFile(fileId: string, actorInput: any): Promise<void> {
+    const actor = this.normalizeActor(actorInput);
+    const file = await this.getAccessibleFileOrThrow(fileId, actor, 'delete');
+    await this.assertTenantModuleAccess(file.tenantId, file.moduleName, 'write');
 
     await this.prisma.secureFile.update({
       where: { id: fileId },
       data: { deletedAt: new Date() },
     });
 
-    await this.logAuditEvent('SECURE_FILE_DELETED', userId, tenantId, {
+    await this.logAuditEvent('SECURE_FILE_DELETED', actor.id, file.tenantId, {
       fileId,
       moduleName: file.moduleName,
       documentType: file.documentType,
     });
   }
 
-  async listFiles(tenantId: string, moduleName?: string, documentType?: string) {
+  async listFiles(actorInput: any, tenantId: string, moduleName?: string, documentType?: string) {
+    const actor = this.normalizeActor(actorInput);
     const safeTenantId = this.validatePathSegment(tenantId, 'tenantId');
     const safeModuleName = moduleName
       ? this.validatePathSegment(moduleName, 'moduleName')
@@ -255,10 +213,10 @@ export class SecureFilesService {
       await this.assertTenantModuleAccess(safeTenantId, safeModuleName, 'read');
     }
 
-    const where: any = {
-      tenantId: safeTenantId,
+    const where = this.authorizationService.buildSecureFileListWhere(actor, {
       deletedAt: null,
-    };
+      tenantId: safeTenantId,
+    }) as any;
 
     if (safeModuleName) {
       where.moduleName = safeModuleName;
@@ -417,6 +375,49 @@ export class SecureFilesService {
       await fsPromises.unlink(file.path);
       throw new BadRequestException('File is too small or corrupted');
     }
+  }
+
+  private normalizeActor(actorInput: any): { id: string; tenantId: string | null; role: string | null } {
+    const id = typeof actorInput?.id === 'string' ? actorInput.id.trim() : '';
+    if (!id) {
+      throw new ForbiddenException('Usuario nao autenticado');
+    }
+
+    return {
+      id,
+      tenantId: typeof actorInput?.tenantId === 'string' ? actorInput.tenantId : null,
+      role: typeof actorInput?.role === 'string' ? actorInput.role : null,
+    };
+  }
+
+  private async getAccessibleFileOrThrow(
+    fileId: string,
+    actor: { id: string; tenantId: string | null; role: string | null },
+    action: 'read' | 'delete',
+  ) {
+    const file = await this.prisma.secureFile.findFirst({
+      where: { id: fileId },
+    });
+
+    if (!file) {
+      throw new NotFoundException('File not found');
+    }
+
+    if (file.deletedAt) {
+      if (action === 'delete') {
+        throw new BadRequestException('File has already been deleted');
+      }
+      throw new NotFoundException('File has been deleted');
+    }
+
+    if (action === 'delete') {
+      this.authorizationService.assertCanDeleteSecureFile(actor, file);
+    } else {
+      this.authorizationService.assertCanReadSecureFile(actor, file);
+    }
+
+    await this.assertTenantModuleAccess(file.tenantId, file.moduleName, 'read');
+    return file;
   }
 
   private async logAuditEvent(

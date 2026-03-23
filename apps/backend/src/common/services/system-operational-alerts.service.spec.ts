@@ -9,6 +9,7 @@ import { CronService } from '../../core/cron/cron.service';
 import { SystemTelemetryService } from './system-telemetry.service';
 import { SystemOperationalAlertsService } from './system-operational-alerts.service';
 import { ConfigResolverService } from '../../system-settings/config-resolver.service';
+import { RedisLockService } from './redis-lock.service';
 
 describe('SystemOperationalAlertsService', () => {
   const prismaMock = {
@@ -35,6 +36,13 @@ describe('SystemOperationalAlertsService', () => {
   };
   const configResolverMock = {
     getBoolean: jest.fn(),
+  };
+  const cooldowns = new Map<string, number>();
+  const redisLockMock = {
+    acquireLock: jest.fn(),
+    releaseLock: jest.fn(),
+    hasCooldown: jest.fn(),
+    setCooldown: jest.fn(),
   };
 
   const baseNotification: Notification = {
@@ -69,6 +77,7 @@ describe('SystemOperationalAlertsService', () => {
       auditServiceMock as unknown as AuditService,
       cronServiceMock as unknown as CronService,
       configResolverMock as unknown as ConfigResolverService,
+      redisLockMock as unknown as RedisLockService,
     );
 
   beforeEach(() => {
@@ -112,6 +121,16 @@ describe('SystemOperationalAlertsService', () => {
     prismaMock.backupJob.findMany.mockResolvedValue([]);
     cronServiceMock.register.mockResolvedValue(undefined);
     configResolverMock.getBoolean.mockResolvedValue(true);
+    redisLockMock.acquireLock.mockResolvedValue(true);
+    redisLockMock.releaseLock.mockResolvedValue(undefined);
+    cooldowns.clear();
+    redisLockMock.hasCooldown.mockImplementation(async (key: string) => {
+      const expiresAt = cooldowns.get(key);
+      return typeof expiresAt === 'number' && expiresAt > Date.now();
+    });
+    redisLockMock.setCooldown.mockImplementation(async (key: string, ttlMs: number) => {
+      cooldowns.set(key, Date.now() + ttlMs);
+    });
     jest
       .spyOn(serviceInternals, 'checkDatabaseHealth')
       .mockResolvedValue({ status: 'healthy', latencyMs: 12 });

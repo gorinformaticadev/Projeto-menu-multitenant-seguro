@@ -196,7 +196,7 @@ export const SETTINGS_REGISTRY_DEFINITIONS = {
   }),
   'security.csrf.enabled': booleanSetting({
     key: 'security.csrf.enabled',
-    defaultValue: false,
+    defaultValue: true,
     label: 'Protecao CSRF',
     description: 'Ativa a validacao CSRF global do backend para requests mutaveis.',
     operationalNotes: [

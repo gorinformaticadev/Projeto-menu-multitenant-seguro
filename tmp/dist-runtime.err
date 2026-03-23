@@ -1,0 +1,4 @@
+✅ Secret Manager inicializado (Local)
+[31m[Nest] 16732  - [39m23/03/2026, 16:28:54 [31m  ERROR[39m [38;5;3m[RedisLockService] [39m[31mErro no RedisLockService: connect ECONNREFUSED 127.0.0.1:6379. Modo degradado ativo.[39m
+[31m[Nest] 16732  - [39m23/03/2026, 16:28:54 [31m  ERROR[39m [38;5;3m[RedisLockService] [39m[31mFalha ao conectar ao Redis no bootstrap: Error: Connection is closed.[39m
+Cabecalhos HTTP extras de seguranca habilitados (origem: database)

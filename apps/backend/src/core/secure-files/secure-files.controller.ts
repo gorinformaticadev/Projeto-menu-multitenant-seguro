@@ -120,8 +120,7 @@ export class SecureFilesController {
     const user = req.user;
     const { stream, headers } = await this.secureFilesService.getFileStream(
       fileId,
-      user.id,
-      user.tenantId,
+      user,
     );
 
     // Definir headers de resposta
@@ -139,7 +138,7 @@ export class SecureFilesController {
   @UseGuards(SecureFileAccessGuard)
   async getFileMetadata(@Param('fileId') fileId: string, @Req() req: any) {
     const user = req.user;
-    return await this.secureFilesService.getFileMetadata(fileId, user.tenantId);
+    return await this.secureFilesService.getFileMetadata(fileId, user);
   }
 
   /**
@@ -150,7 +149,7 @@ export class SecureFilesController {
   @UseGuards(SecureFileAccessGuard)
   async deleteFile(@Param('fileId') fileId: string, @Req() req: any) {
     const user = req.user;
-    await this.secureFilesService.deleteFile(fileId, user.id, user.tenantId);
+    await this.secureFilesService.deleteFile(fileId, user);
     return { message: 'Arquivo deletado com sucesso' };
   }
 
@@ -162,6 +161,7 @@ export class SecureFilesController {
   async listFiles(@Query() query: FileQueryDto, @Req() req: any) {
     const user = req.user;
     return await this.secureFilesService.listFiles(
+      user,
       user.tenantId,
       query.moduleName,
       query.documentType,

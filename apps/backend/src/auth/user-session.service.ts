@@ -2,6 +2,7 @@ import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { SecurityRuntimeConfigService } from '@core/security-config/security-runtime-config.service';
 import { TrustedDeviceService } from './trusted-device.service';
+import { WebsocketConnectionRegistryService } from '@common/services/websocket-connection-registry.service';
 
 type SessionContext = {
   ipAddress?: string;
@@ -20,6 +21,7 @@ export class UserSessionService {
     private readonly prisma: PrismaService,
     private readonly securityRuntimeConfigService: SecurityRuntimeConfigService,
     private readonly trustedDeviceService: TrustedDeviceService,
+    private readonly websocketConnectionRegistry: WebsocketConnectionRegistryService,
   ) {}
 
   async createSession(
@@ -109,6 +111,11 @@ export class UserSessionService {
         },
       }),
     ]);
+
+    this.websocketConnectionRegistry.disconnectSession(
+      sessionId,
+      this.mapDisconnectReason(reason),
+    );
   }
 
   async revokeAllUserSessions(userId: string, reason: string) {
@@ -157,6 +164,11 @@ export class UserSessionService {
         },
       }),
     ]);
+
+    this.websocketConnectionRegistry.disconnectUser(
+      userId,
+      this.mapDisconnectReason(reason),
+    );
 
     await this.trustedDeviceService.revokeAllForUser({
       userId,
@@ -211,5 +223,16 @@ export class UserSessionService {
 
   private calculateSessionExpiresAt(reference: Date, timeoutMinutes: number): Date {
     return new Date(reference.getTime() + timeoutMinutes * 60_000);
+  }
+
+  private mapDisconnectReason(reason: string): string {
+    const normalized = String(reason || '').trim().toUpperCase();
+    if (normalized === 'LOGOUT') {
+      return 'SESSION_LOGOUT';
+    }
+    if (normalized === 'INACTIVE_TIMEOUT') {
+      return 'SESSION_TIMEOUT';
+    }
+    return 'SESSION_REVOKED';
   }
 }

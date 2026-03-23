@@ -10,11 +10,13 @@ import { NotificationsController } from './notifications.controller';
 import { SystemNotificationsController } from './system-notifications.controller';
 import { PrismaModule } from '@core/prisma/prisma.module';
 import { WebsocketRuntimeToggleService } from '@common/services/websocket-runtime-toggle.service';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
     PrismaModule,
     ConfigModule,
+    AuthModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {

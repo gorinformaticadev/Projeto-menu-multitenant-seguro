@@ -7,6 +7,7 @@ import { ConfigResolverService } from '../../system-settings/config-resolver.ser
 import { SettingsRegistry } from '../../system-settings/settings-registry.service';
 import { SystemSettingsAuditService } from '../../system-settings/system-settings-audit.service';
 import { SystemSettingsWriteService } from '../../system-settings/system-settings-write.service';
+import { AuthorizationService } from '@common/services/authorization.service';
 
 type StoredSettingRecord = {
   key: string;
@@ -232,6 +233,7 @@ describe('SecureFilesService dynamic file signature validation', () => {
       prisma as any,
       pathsServiceMock as any,
       resolver,
+      new AuthorizationService(),
     );
 
     return {

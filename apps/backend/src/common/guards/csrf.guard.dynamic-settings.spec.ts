@@ -151,14 +151,14 @@ describe('CsrfGuard dynamic setting', () => {
     }
   });
 
-  it('uses the default setting to keep CSRF protection disabled', async () => {
+  it('uses the default setting to keep CSRF protection enabled', async () => {
     const { guard } = createGuard();
     const http = createExecutionContext({
       method: 'POST',
       origin: 'https://evil.example.com',
     });
 
-    await expect(guard.canActivate(http.context)).resolves.toBe(true);
+    await expect(guard.canActivate(http.context)).rejects.toBeInstanceOf(ForbiddenException);
     expect(http.response.cookie).not.toHaveBeenCalled();
   });
 
@@ -220,14 +220,16 @@ describe('CsrfGuard dynamic setting', () => {
     expect(restoredHttp.response.cookie).not.toHaveBeenCalled();
   });
 
-  it('keeps fail-open behavior when the dynamic settings store is unavailable', async () => {
+  it('keeps fail-open behavior when the dynamic settings store is unavailable by falling back to default or ENV', async () => {
     const defaultContext = createGuard(createInMemoryPrisma(false));
     const defaultHttp = createExecutionContext({
       method: 'POST',
       origin: 'https://evil.example.com',
     });
 
-    await expect(defaultContext.guard.canActivate(defaultHttp.context)).resolves.toBe(true);
+    await expect(defaultContext.guard.canActivate(defaultHttp.context)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
 
     process.env.CSRF_PROTECTION_ENABLED = 'true';
     const envContext = createGuard(createInMemoryPrisma(false));

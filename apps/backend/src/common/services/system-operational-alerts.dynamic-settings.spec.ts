@@ -10,6 +10,7 @@ import { SystemSettingsAuditService } from '../../system-settings/system-setting
 import { SystemSettingsWriteService } from '../../system-settings/system-settings-write.service';
 import { SystemTelemetryService } from './system-telemetry.service';
 import { SystemOperationalAlertsService } from './system-operational-alerts.service';
+import { RedisLockService } from './redis-lock.service';
 
 type StoredSettingRecord = {
   key: string;
@@ -194,6 +195,12 @@ describe('SystemOperationalAlertsService dynamic operations alerts toggle', () =
     const cronService = {
       register: jest.fn().mockResolvedValue(undefined),
     };
+    const redisLock = {
+      acquireLock: jest.fn().mockResolvedValue(true),
+      releaseLock: jest.fn().mockResolvedValue(undefined),
+      hasCooldown: jest.fn().mockResolvedValue(false),
+      setCooldown: jest.fn().mockResolvedValue(undefined),
+    };
     const service = new SystemOperationalAlertsService(
       prisma as unknown as PrismaService,
       new SystemTelemetryService(),
@@ -203,6 +210,7 @@ describe('SystemOperationalAlertsService dynamic operations alerts toggle', () =
       auditService as unknown as AuditService,
       cronService as unknown as CronService,
       resolver,
+      redisLock as unknown as RedisLockService,
     );
 
     return {
@@ -214,6 +222,7 @@ describe('SystemOperationalAlertsService dynamic operations alerts toggle', () =
       pushNotificationService,
       auditService,
       cronService,
+      redisLock,
       service,
     };
   };

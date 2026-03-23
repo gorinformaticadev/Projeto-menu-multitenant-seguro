@@ -4,6 +4,7 @@ import { ConfigResolverService } from '../system-settings/config-resolver.servic
 import { SettingsRegistry } from '../system-settings/settings-registry.service';
 import { SystemSettingsAuditService } from '../system-settings/system-settings-audit.service';
 import { SystemSettingsWriteService } from '../system-settings/system-settings-write.service';
+import { AuthorizationService } from '@common/services/authorization.service';
 
 type StoredSettingRecord = {
   key: string;
@@ -334,7 +335,11 @@ describe('NotificationService dynamic notifications toggle', () => {
       prisma as any,
       new SystemSettingsAuditService(),
     );
-    const notificationService = new NotificationService(prisma as any, resolver);
+    const notificationService = new NotificationService(
+      prisma as any,
+      resolver,
+      new AuthorizationService(),
+    );
     const notificationGateway = {
       emitNewNotification: jest.fn().mockResolvedValue(undefined),
       emitNotificationRead: jest.fn().mockResolvedValue(undefined),

@@ -1,12 +1,10 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
-import { PrismaService } from '@core/prisma/prisma.service';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
-import { TokenBlacklistService } from '../../common/services/token-blacklist.service';
-import { UserSessionService } from '../user-session.service';
 import { ACCESS_TOKEN_COOKIE_NAME } from '../auth-cookie.constants';
+import { AuthValidationService } from '../auth-validation.service';
 
 interface JwtPayload {
   sub: string;
@@ -29,9 +27,7 @@ const extractAccessTokenFromCookie = (req: Request): string | null => {
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private config: ConfigService,
-    private prisma: PrismaService,
-    private tokenBlacklistService: TokenBlacklistService,
-    private userSessionService: UserSessionService,
+    private authValidationService: AuthValidationService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
@@ -51,50 +47,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         ? authorization.slice(7).trim()
         : extractAccessTokenFromCookie(req) || undefined;
 
-    if (rawToken && (await this.tokenBlacklistService.isTokenBlacklisted(rawToken))) {
-      throw new UnauthorizedException('Token revogado');
-    }
-
-    if (!payload.sid) {
-      throw new UnauthorizedException('Sessao legada expirada; faca login novamente');
-    }
-
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-    });
-
-    if (!user) {
-      throw new UnauthorizedException('Usuario nao encontrado');
-    }
-
-    const currentSessionVersion =
-      typeof (user as { sessionVersion?: number | null }).sessionVersion === 'number'
-        ? (user as { sessionVersion?: number | null }).sessionVersion
-        : 0;
-
-    if ((payload.sessionVersion ?? -1) !== currentSessionVersion) {
-      throw new UnauthorizedException('Sessao expirada ou revogada');
-    }
-
-    if (payload.role !== user.role || payload.tenantId !== user.tenantId || payload.email !== user.email) {
-      throw new UnauthorizedException('Token desatualizado');
-    }
-
-    await this.userSessionService.assertAccessSessionActive(payload.sid, user.id, {
+    return this.authValidationService.validatePayload(payload, {
+      rawToken,
       ipAddress: this.resolveClientIp(req),
       userAgent: this.resolveUserAgent(req),
+      source: 'http',
     });
-
-    return {
-      id: user.id,
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-      tenantId: user.tenantId,
-      name: user.name,
-      sessionVersion: currentSessionVersion,
-      sid: payload.sid,
-    };
   }
 
   private resolveClientIp(req: Request): string | undefined {

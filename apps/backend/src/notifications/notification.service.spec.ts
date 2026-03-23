@@ -1,4 +1,5 @@
 import { NotificationService } from './notification.service';
+import { AuthorizationService } from '@common/services/authorization.service';
 
 describe('NotificationService system notifications', () => {
   const configResolverMock = {
@@ -18,7 +19,12 @@ describe('NotificationService system notifications', () => {
     },
   };
 
-  const createService = () => new NotificationService(prismaMock as any, configResolverMock as any);
+  const createService = () =>
+    new NotificationService(
+      prismaMock as any,
+      configResolverMock as any,
+      new AuthorizationService(),
+    );
 
   beforeEach(() => {
     jest.clearAllMocks();

@@ -1,9 +1,29 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
+import { RequestSecurityContextService } from '@common/services/request-security-context.service';
 
 const DEFAULT_PRISMA_RECONNECT_TIMEOUT_MS = 60000;
 const DEFAULT_PRISMA_RECONNECT_BACKOFF_MS = 1000;
 const MAX_BACKOFF_MS = 10000;
+const TENANT_SCOPED_MODELS = new Set([
+  'AuditLog',
+  'BackupArtifact',
+  'BackupJob',
+  'BackupLog',
+  'BackupRestoreLog',
+  'DashboardLayout',
+  'ModuleTenant',
+  'Notification',
+  'PushSubscription',
+  'SecureFile',
+  'SystemSetting',
+  'User',
+  'UserSession',
+]);
+const FIND_UNIQUE_ACTION_REWRITES: Record<string, Prisma.PrismaAction> = {
+  findUnique: 'findFirst',
+  findUniqueOrThrow: 'findFirstOrThrow',
+};
 
 export class PrismaReconnectFailed extends Error {
   constructor(
@@ -23,8 +43,17 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   private cutoverBlocked = false;
   private connected = false;
 
-  constructor() {
+  constructor(
+    private readonly requestSecurityContext: RequestSecurityContextService = new RequestSecurityContextService(),
+  ) {
     super();
+    (
+      this as unknown as {
+        $use?: (
+          middleware: (params: any, next: (params: any) => Promise<unknown>) => Promise<unknown>,
+        ) => void;
+      }
+    ).$use?.((params, next) => this.applyTenantEnforcement(params, next));
   }
 
   async onModuleInit(): Promise<void> {
@@ -140,5 +169,189 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   private async wait(ms: number): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private async applyTenantEnforcement(
+    params: any,
+    next: (params: any) => Promise<unknown>,
+  ): Promise<unknown> {
+    if (!params.model || !TENANT_SCOPED_MODELS.has(params.model)) {
+      return next(params);
+    }
+
+    if (!this.requestSecurityContext.shouldEnforceTenantScope()) {
+      return next(params);
+    }
+
+    const tenantId = this.requestSecurityContext.getTenantId();
+    if (!tenantId) {
+      throw new Error(`Tenant scope missing for ${params.model}.${params.action}`);
+    }
+
+    switch (params.action) {
+      case 'findUnique':
+      case 'findUniqueOrThrow':
+        params.action = FIND_UNIQUE_ACTION_REWRITES[params.action];
+        params.args = {
+          ...(params.args || {}),
+          where: this.combineWhereWithTenant(params.args?.where, tenantId),
+        };
+        return next(params);
+      case 'findFirst':
+      case 'findFirstOrThrow':
+      case 'findMany':
+      case 'count':
+      case 'aggregate':
+      case 'updateMany':
+      case 'deleteMany':
+        params.args = {
+          ...(params.args || {}),
+          where: this.combineWhereWithTenant(params.args?.where, tenantId),
+        };
+        return next(params);
+      case 'create':
+        params.args = {
+          ...(params.args || {}),
+          data: this.injectTenantIntoData(params.args?.data, tenantId, params.model),
+        };
+        return next(params);
+      case 'createMany':
+        params.args = {
+          ...(params.args || {}),
+          data: this.injectTenantIntoCreateMany(params.args?.data, tenantId, params.model),
+        };
+        return next(params);
+      case 'update':
+      case 'delete':
+        await this.assertTenantScopedRecordExists(params.model, params.args?.where, tenantId, params.action);
+        this.assertTenantMutationData(params.args?.data, tenantId, params.model, params.action);
+        return next(params);
+      case 'upsert':
+        await this.assertTenantScopedRecordExists(params.model, params.args?.where, tenantId, params.action, true);
+        params.args = {
+          ...(params.args || {}),
+          create: this.injectTenantIntoData(params.args?.create, tenantId, params.model),
+          update: this.assertTenantMutationData(
+            params.args?.update,
+            tenantId,
+            params.model,
+            params.action,
+          ),
+        };
+        return next(params);
+      default:
+        return next(params);
+    }
+  }
+
+  private combineWhereWithTenant(where: unknown, tenantId: string): Record<string, unknown> {
+    if (!where || typeof where !== 'object') {
+      return { tenantId };
+    }
+
+    return {
+      AND: [where as Record<string, unknown>, { tenantId }],
+    };
+  }
+
+  private injectTenantIntoData(
+    data: unknown,
+    tenantId: string,
+    model: string,
+  ): Record<string, unknown> {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new Error(`Tenant scope missing for ${model}.create`);
+    }
+
+    const payload = { ...(data as Record<string, unknown>) };
+    const explicitTenantId =
+      typeof payload.tenantId === 'string' && payload.tenantId.trim().length > 0
+        ? payload.tenantId.trim()
+        : null;
+
+    if (explicitTenantId && explicitTenantId !== tenantId) {
+      throw new Error(`Tenant scope mismatch for ${model}.create`);
+    }
+
+    payload.tenantId = tenantId;
+    return payload;
+  }
+
+  private injectTenantIntoCreateMany(
+    data: unknown,
+    tenantId: string,
+    model: string,
+  ): Array<Record<string, unknown>> | Record<string, unknown> {
+    if (Array.isArray(data)) {
+      return data.map((entry) => this.injectTenantIntoData(entry, tenantId, model));
+    }
+
+    return this.injectTenantIntoData(data, tenantId, model);
+  }
+
+  private assertTenantMutationData(
+    data: unknown,
+    tenantId: string,
+    model: string,
+    action: string,
+  ): Record<string, unknown> | undefined {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return data as Record<string, unknown> | undefined;
+    }
+
+    const payload = { ...(data as Record<string, unknown>) };
+    const explicitTenantId =
+      typeof payload.tenantId === 'string' && payload.tenantId.trim().length > 0
+        ? payload.tenantId.trim()
+        : null;
+
+    if (explicitTenantId && explicitTenantId !== tenantId) {
+      throw new Error(`Tenant scope mismatch for ${model}.${action}`);
+    }
+
+    if (explicitTenantId) {
+      payload.tenantId = tenantId;
+    }
+
+    return payload;
+  }
+
+  private async assertTenantScopedRecordExists(
+    model: string,
+    where: unknown,
+    tenantId: string,
+    action: string,
+    allowMissing = false,
+  ): Promise<void> {
+    if (!where || typeof where !== 'object') {
+      throw new Error(`Tenant scope missing for ${model}.${action}`);
+    }
+
+    const delegate = this.resolveModelDelegate(model);
+    const scopedWhere = this.combineWhereWithTenant(where, tenantId);
+    const record = await this.requestSecurityContext.runWithoutTenantEnforcement(
+      `prisma-tenant-preflight:${model}.${action}`,
+      () =>
+        delegate.findFirst({
+          where: scopedWhere,
+          select: { id: true, tenantId: true },
+        }),
+    );
+
+    if (!record && !allowMissing) {
+      throw new Error(`Tenant scope missing for ${model}.${action}`);
+    }
+  }
+
+  private resolveModelDelegate(model: string): {
+    findFirst: (args: Record<string, unknown>) => Promise<unknown>;
+  } {
+    const delegateName = model.charAt(0).toLowerCase() + model.slice(1);
+    const delegate = (this as Record<string, any>)[delegateName];
+    if (!delegate?.findFirst) {
+      throw new Error(`Prisma delegate not found for model ${model}`);
+    }
+
+    return delegate;
   }
 }

@@ -1,60 +1,59 @@
 import {
-  Injectable,
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
+import { AuthorizationService } from '@common/services/authorization.service';
 
 /**
- * Guard para validar acesso a arquivo sensível
- * Valida:
- * 1. Arquivo pertence ao tenant do usuário
- * 2. Arquivo não está deletado
+ * Guard para validar acesso a arquivo sensivel
  */
 @Injectable()
 export class SecureFileAccessGuard implements CanActivate {
-  constructor(private readonly prisma: PrismaService) {
-      // Empty implementation
-    }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authorizationService: AuthorizationService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
     const fileId = request.params.fileId;
 
-    if (!user || !user.tenantId) {
-      throw new ForbiddenException('Usuário não autenticado');
+    if (!user?.id) {
+      throw new ForbiddenException('Usuario nao autenticado');
     }
 
     if (!fileId) {
-      throw new ForbiddenException('ID de arquivo não fornecido');
+      throw new ForbiddenException('ID de arquivo nao fornecido');
     }
 
-    // Buscar arquivo
-    const file = await this.prisma.secureFile.findUnique({
+    const file = await this.prisma.secureFile.findFirst({
       where: { id: fileId },
       select: {
         id: true,
         tenantId: true,
         moduleName: true,
         deletedAt: true,
+        uploadedBy: true,
       },
     });
 
     if (!file) {
-      throw new NotFoundException('Arquivo não encontrado');
+      throw new NotFoundException('Arquivo nao encontrado');
     }
 
-    // Validar que arquivo pertence ao tenant do usuário
-    if (file.tenantId !== user.tenantId) {
-      throw new ForbiddenException('Acesso negado');
-    }
-
-    // Validar que arquivo não está deletado
     if (file.deletedAt) {
       throw new NotFoundException('Arquivo foi deletado');
+    }
+
+    if (request.method?.toUpperCase() === 'DELETE') {
+      this.authorizationService.assertCanDeleteSecureFile(user, file);
+    } else {
+      this.authorizationService.assertCanReadSecureFile(user, file);
     }
 
     const moduleRecord = await this.prisma.module.findUnique({
@@ -70,7 +69,7 @@ export class SecureFileAccessGuard implements CanActivate {
       where: {
         moduleId_tenantId: {
           moduleId: moduleRecord.id,
-          tenantId: user.tenantId,
+          tenantId: file.tenantId,
         },
       },
       select: { enabled: true },

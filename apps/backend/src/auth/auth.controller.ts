@@ -43,6 +43,11 @@ import {
   buildTwoFactorEnrollmentCookieOptions,
 } from './auth-cookie.constants';
 import { Complete2FAEnrollmentDto } from './dto/complete-2fa-enrollment.dto';
+import {
+  clearCsrfCookie,
+  CSRF_COOKIE_NAME,
+  ensureCsrfCookie,
+} from '@common/utils/csrf-token.util';
 
 type AuthenticatedRequest = Request & {
   user: { id: string; email?: string; role?: string };
@@ -111,6 +116,7 @@ export class AuthController {
       result.accessTokenExpiresAt,
       result.refreshTokenExpiresAt,
     );
+    this.setCsrfCookie(req, res);
     return this.buildAuthenticatedResponse(result);
   }
 
@@ -147,6 +153,7 @@ export class AuthController {
       this.clearAuthCookies(res);
       this.clearTrustedDeviceCookie(res);
       this.clearTwoFactorEnrollmentCookie(res);
+      this.clearCsrfCookie(res);
     }
 
     return { message: 'Logout realizado com sucesso' };
@@ -184,6 +191,7 @@ export class AuthController {
       }
 
       this.clearTwoFactorEnrollmentCookie(res);
+      this.setCsrfCookie(req, res);
       return this.buildAuthenticatedResponse(result);
     } catch (error) {
       this.rethrowAuthContractError(error);
@@ -235,6 +243,7 @@ export class AuthController {
     }
 
     this.clearTwoFactorEnrollmentCookie(res);
+    this.setCsrfCookie(req, res);
     return this.buildAuthenticatedResponse(result);
   }
 
@@ -394,6 +403,7 @@ export class AuthController {
         result.accessTokenExpiresAt,
         result.refreshTokenExpiresAt,
       );
+      ensureCsrfCookie(res);
       this.clearTwoFactorEnrollmentCookie(res);
       return this.buildAuthenticatedResponse(result);
     }
@@ -579,6 +589,14 @@ export class AuthController {
 
   private clearTwoFactorEnrollmentCookie(res: Response): void {
     res.cookie(TWO_FACTOR_ENROLLMENT_COOKIE_NAME, '', buildAuthCookieClearOptions());
+  }
+
+  private setCsrfCookie(req: Request, res: Response): void {
+    ensureCsrfCookie(res, req.cookies?.[CSRF_COOKIE_NAME]);
+  }
+
+  private clearCsrfCookie(res: Response): void {
+    clearCsrfCookie(res);
   }
 
   private parseExpiresAt(expiresAt: string | null | undefined, fallbackMinutes: number): Date {

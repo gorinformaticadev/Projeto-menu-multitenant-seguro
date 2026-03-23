@@ -22,7 +22,8 @@ describe('Security architecture regression guards', () => {
     expect(source).toContain('this.prisma.$transaction(async (tx)');
     expect(source).toContain('assertRefreshSessionActive');
     expect(source).toContain('consumed.count !== 1');
-    expect(source).toContain("throw new UnauthorizedException('Refresh token invalido ou ja utilizado')");
+    expect(source).toContain('buildUnauthorizedException(');
+    expect(source).toContain("'Refresh token invalido ou ja utilizado'");
   });
 
   it('keeps throttler principal extraction dependent on JWT signature verification', () => {

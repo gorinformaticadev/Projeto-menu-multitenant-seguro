@@ -1,26 +1,31 @@
 /**
- * NOTIFICATION GATEWAY - Socket.IO Gateway para notificações em tempo real
+ * NOTIFICATION GATEWAY - Socket.IO Gateway para notificacoes em tempo real
  */
 
 import {
-  WebSocketGateway,
-  WebSocketServer,
-  SubscribeMessage,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
   ConnectedSocket,
   MessageBody,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { NotificationService } from './notification.service';
 import { Notification } from './notification.entity';
 import { PushNotificationService } from './push-notification.service';
 import { WebsocketRuntimeToggleService } from '@common/services/websocket-runtime-toggle.service';
 import { ACCESS_TOKEN_COOKIE_NAME } from '../auth/auth-cookie.constants';
+import {
+  AuthenticatedSessionActor,
+  AuthValidationService,
+} from '../auth/auth-validation.service';
+import { RequestSecurityContextService } from '@common/services/request-security-context.service';
+import { WebsocketConnectionRegistryService } from '@common/services/websocket-connection-registry.service';
+import { sanitizeSensitiveData } from '@common/utils/sanitize-sensitive-data.util';
 
 interface ConnectionMetrics {
   totalConnections: number;
@@ -37,24 +42,19 @@ interface EmitNotificationOptions {
 }
 
 interface AuthenticatedSocket extends Socket {
-  user?: {
-    id: string;
-    tenantId: string;
-    role: string;
-  };
+  user?: AuthenticatedSessionActor;
+  accessToken?: string;
 }
 
 @WebSocketGateway({
   namespace: '/notifications',
   cors: {
     origin: (origin, callback) => {
-      // Domínios de produção
       const allowedOrigins = [
         process.env.FRONTEND_URL,
-        process.env.FRONTEND_URL?.replace('https://', 'wss://'), // Protocolo WebSocket
+        process.env.FRONTEND_URL?.replace('https://', 'wss://'),
       ].filter(Boolean);
-      
-      // Domínios de desenvolvimento
+
       if (process.env.NODE_ENV !== 'production') {
         allowedOrigins.push(
           'http://localhost:5000',
@@ -62,15 +62,14 @@ interface AuthenticatedSocket extends Socket {
           'ws://localhost:5000',
           'ws://localhost:3000',
           'http://127.0.0.1:5000',
-          'http://127.0.0.1:3000'
+          'http://127.0.0.1:3000',
         );
       }
-      
-      // Permitir se não houver origem (apps móveis, conexões diretas) ou estiver na lista permitida
+
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        callback(new Error(`Origem não permitida: ${origin}`));
+        callback(new Error(`Origem nao permitida: ${origin}`));
       }
     },
     credentials: true,
@@ -83,26 +82,27 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
   server: Server;
 
   private readonly logger = new Logger(NotificationGateway.name);
-  private connectedClients = new Map<string, AuthenticatedSocket>();
-  private connectionMetrics: ConnectionMetrics = {
+  private readonly connectedClients = new Map<string, AuthenticatedSocket>();
+  private readonly connectionMetrics: ConnectionMetrics = {
     totalConnections: 0,
     activeConnections: 0,
     peakConnections: 0,
     connectionAttempts: 0,
     failedConnections: 0,
     avgConnectionDuration: 0,
-    connectionFailureRate: 0
+    connectionFailureRate: 0,
   };
-  private connectionStartTimes = new Map<string, number>();
+  private readonly connectionStartTimes = new Map<string, number>();
   private monitoringInterval: NodeJS.Timeout;
 
   constructor(
-    private notificationService: NotificationService,
-    private pushNotificationService: PushNotificationService,
-    private jwtService: JwtService,
-    private configService: ConfigService,
-    private prismaService: PrismaService,
-    private websocketRuntimeToggleService: WebsocketRuntimeToggleService,
+    private readonly notificationService: NotificationService,
+    private readonly pushNotificationService: PushNotificationService,
+    private readonly authValidationService: AuthValidationService,
+    private readonly prismaService: PrismaService,
+    private readonly websocketRuntimeToggleService: WebsocketRuntimeToggleService,
+    private readonly requestSecurityContext: RequestSecurityContextService,
+    private readonly websocketConnectionRegistry: WebsocketConnectionRegistryService,
   ) {
     this.startMonitoring();
   }
@@ -114,10 +114,9 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
         this.checkThresholds();
         this.logMetrics();
       } catch (error) {
-        // CRÍTICO: Nunca permitir que erros de monitoramento quebrem outras operações
-        this.logger.error('Erro no monitoramento do gateway (não crítico):', error);
+        this.logger.error('Erro no monitoramento do gateway (nao critico):', error);
       }
-    }, 60000); // A cada minuto
+    }, 60000);
     this.monitoringInterval.unref?.();
   }
 
@@ -127,47 +126,43 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
       this.connectionMetrics.activeConnections = currentActive;
       this.connectionMetrics.peakConnections = Math.max(
         this.connectionMetrics.peakConnections,
-        currentActive
+        currentActive,
       );
 
-      // Calcular taxa de falha
       if (this.connectionMetrics.connectionAttempts > 0) {
-        this.connectionMetrics.connectionFailureRate = 
-          (this.connectionMetrics.failedConnections / this.connectionMetrics.connectionAttempts) * 100;
+        this.connectionMetrics.connectionFailureRate =
+          (this.connectionMetrics.failedConnections / this.connectionMetrics.connectionAttempts) *
+          100;
       }
     } catch (error) {
-      this.logger.error('Erro ao atualizar métricas:', error);
+      this.logger.error('Erro ao atualizar metricas:', error);
     }
   }
 
   private checkThresholds() {
     try {
-      const maxConnections = parseInt(process.env.MAX_WEBSOCKET_CONNECTIONS) || 1000;
-      
-      // Alertar sobre uso alto de conexões
+      const maxConnections = parseInt(process.env.MAX_WEBSOCKET_CONNECTIONS || '', 10) || 1000;
+
       if (this.connectionMetrics.activeConnections > maxConnections * 0.8) {
         this.logger.warn('ALTO_USO_CONEXOES', {
           active: this.connectionMetrics.activeConnections,
           threshold: maxConnections * 0.8,
-          percentage: (this.connectionMetrics.activeConnections / maxConnections * 100).toFixed(2)
+          percentage: (
+            (this.connectionMetrics.activeConnections / maxConnections) *
+            100
+          ).toFixed(2),
         });
       }
 
-      // Alertar sobre alta taxa de falhas - APENAS LOG, NUNCA THROW
       if (this.connectionMetrics.connectionFailureRate > 5) {
         this.logger.warn('ALTA_TAXA_FALHAS_CONEXAO', {
           connectionFailureRate: this.connectionMetrics.connectionFailureRate,
           failedConnections: this.connectionMetrics.failedConnections,
-          connectionAttempts: this.connectionMetrics.connectionAttempts
+          connectionAttempts: this.connectionMetrics.connectionAttempts,
         });
-        
-        // CRÍTICO: NUNCA fazer throw aqui - apenas log
-        // Isso estava causando o HTTP 500 anteriormente
       }
     } catch (error) {
-      // CRÍTICO: Capturar QUALQUER erro e apenas logar
-      this.logger.error('Erro ao verificar thresholds (não crítico):', error);
-      // NUNCA re-throw o erro
+      this.logger.error('Erro ao verificar thresholds (nao critico):', error);
     }
   }
 
@@ -177,14 +172,13 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
         ...this.connectionMetrics,
         timestamp: new Date().toISOString(),
         memoryUsage: process.memoryUsage(),
-        uptime: process.uptime()
+        uptime: process.uptime(),
       });
     } catch (error) {
-      this.logger.error('Erro ao logar métricas:', error);
+      this.logger.error('Erro ao logar metricas:', error);
     }
   }
 
-  // Lifecycle hook para limpeza
   onModuleDestroy() {
     if (this.monitoringInterval) {
       clearInterval(this.monitoringInterval);
@@ -193,112 +187,129 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
 
   async handleConnection(client: AuthenticatedSocket) {
     try {
-      // Rastrear início da conexão para métricas
       this.connectionMetrics.totalConnections++;
       this.connectionMetrics.connectionAttempts++;
+
       if (!(await this.websocketRuntimeToggleService.isEnabledCached())) {
-        this.logger.warn(`Canal de notificacoes websocket desabilitado; conexao rejeitada: ${client.id}`);
+        this.logger.warn(
+          `Canal de notificacoes websocket desabilitado; conexao rejeitada: ${client.id}`,
+        );
         this.connectionMetrics.failedConnections++;
-        client.disconnect(true);
+        this.disconnectClient(
+          client,
+          'WEBSOCKET_DISABLED',
+          'Canal websocket desabilitado pela configuracao.',
+        );
         return;
       }
 
       this.connectionStartTimes.set(client.id, Date.now());
+      this.logger.log(
+        `Cliente websocket conectando: ${client.id} ${JSON.stringify(
+          sanitizeSensitiveData({
+            hasAuthPayload: Boolean(client.handshake?.auth),
+            hasAuthorizationHeader: Boolean(client.handshake?.headers?.authorization),
+            hasCookieHeader: Boolean(client.handshake?.headers?.cookie),
+            address: client.handshake?.address,
+          }),
+        )}`,
+      );
 
-      // DEBUG: Verificar se o token está sendo enviado
-      this.logger.log(`🔍 Cliente conectando: ${client.id}`);
-      this.logger.log(`🔍 Handshake auth:`, client.handshake?.auth);
-      this.logger.log(`🔍 Handshake headers:`, client.handshake?.headers?.authorization);
-
-      // AUTENTICAÇÃO DIRETA: Extrair e validar token
       const token = this.extractTokenFromHandshake(client);
       if (!token) {
-        this.logger.warn(`❌ Cliente rejeitado - nenhum token fornecido: ${client.id}`);
+        this.logger.warn(`Cliente rejeitado - nenhum token fornecido: ${client.id}`);
         this.connectionMetrics.failedConnections++;
-        client.disconnect(true);
+        this.disconnectClient(client, 'AUTH_TOKEN_MISSING', 'Token de autenticacao ausente.');
         return;
       }
 
-      // Validar token JWT
-      const user = await this.validateTokenForConnection(token);
+      const user = await this.validateAndBindClient(client, token);
       if (!user) {
-        this.logger.warn(`❌ Cliente rejeitado - token inválido: ${client.id}`);
         this.connectionMetrics.failedConnections++;
-        client.disconnect(true);
         return;
       }
-
-      // Anexar usuário ao cliente
-      (client as any).user = user;
-      this.logger.log(`✅ Cliente autenticado: ${client.id} (user: ${user.id}, tenant: ${user.tenantId})`);
 
       this.connectedClients.set(client.id, client);
+      this.websocketConnectionRegistry.register({
+        clientId: client.id,
+        userId: user.id,
+        tenantId: user.tenantId,
+        sessionId: user.sessionId,
+        disconnect: (close?: boolean) => client.disconnect(close),
+        emit: (event: string, payload: unknown) => client.emit(event, payload),
+      });
 
-      // Entrar nas salas apropriadas
       await this.joinRooms(client);
 
-      this.logger.log(`Cliente conectado: ${client.id} (user: ${user.id}, tenant: ${user.tenantId})`);
-      
-      // Enviar contagem de não lidas
-      const unreadCount = await this.notificationService.countUnread(user);
-      client.emit('notification:unread-count', { count: unreadCount });
+      this.logger.log(
+        `Cliente conectado: ${client.id} (user: ${user.id}, tenant: ${user.tenantId ?? 'global'})`,
+      );
 
+      const unreadCount = await this.requestSecurityContext.runWithActor(user, () =>
+        this.notificationService.countUnread(user),
+      );
+      client.emit('notification:unread-count', { count: unreadCount });
     } catch (error) {
-      this.logger.error(`Erro na conexão do cliente ${client.id}:`, error);
+      this.logger.error(`Erro na conexao do cliente ${client.id}:`, error);
       this.connectionMetrics.failedConnections++;
-      client.disconnect(true);
+      this.disconnectClient(client, 'WEBSOCKET_CONNECTION_FAILED');
     }
   }
 
   handleDisconnect(client: AuthenticatedSocket) {
-    // Calcular duração da conexão
     const startTime = this.connectionStartTimes.get(client.id);
     if (startTime) {
       const duration = Date.now() - startTime;
-      this.connectionMetrics.avgConnectionDuration = 
-        ((this.connectionMetrics.avgConnectionDuration * (this.connectionMetrics.totalConnections - 1)) + duration) 
-        / this.connectionMetrics.totalConnections;
-      
+      this.connectionMetrics.avgConnectionDuration =
+        ((this.connectionMetrics.avgConnectionDuration *
+          (this.connectionMetrics.totalConnections - 1)) +
+          duration) /
+        this.connectionMetrics.totalConnections;
+
       this.connectionStartTimes.delete(client.id);
     }
-    
+
     this.connectedClients.delete(client.id);
+    this.websocketConnectionRegistry.unregister(client.id);
     this.logger.log(`Cliente desconectado: ${client.id}`);
   }
 
   @SubscribeMessage('notification:mark-read')
   async handleMarkAsRead(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { id: string }
+    @MessageBody() data: { id: string },
   ) {
     try {
-      if (!(await this.ensureRealtimeChannelEnabled(client))) {
+      const user = await this.requireValidatedSocket(client);
+      if (!user) {
         return;
       }
 
-      const notification = await this.notificationService.markUserNotificationAsRead(data.id, client.user);
-      
+      const notification = await this.requestSecurityContext.runWithActor(user, () =>
+        this.notificationService.markUserNotificationAsRead(data.id, user),
+      );
+
       if (notification) {
-        // Emitir para o usuário que a notificação foi lida
         client.emit('notification:read', notification);
-        
-        // Emitir nova contagem de não lidas
-        const unreadCount = await this.notificationService.countUnread(client.user);
+
+        const unreadCount = await this.requestSecurityContext.runWithActor(user, () =>
+          this.notificationService.countUnread(user),
+        );
         client.emit('notification:unread-count', { count: unreadCount });
-        
-        this.logger.log(`Notificação marcada como lida via Socket.IO: ${data.id}`);
+
+        this.logger.log(`Notificacao marcada como lida via Socket.IO: ${data.id}`);
       }
-    } catch (error) {
-      this.logger.error(`Erro ao marcar notificação como lida: ${data.id}`, {
-        error: error.message,
-        stack: error.stack,
+    } catch (error: any) {
+      this.logger.error(`Erro ao marcar notificacao como lida: ${data.id}`, {
+        error: error?.message,
+        stack: error?.stack,
         clientId: client.id,
         userId: client.user?.id,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
-      client.emit('notification:error', { 
-        message: 'Não foi possível processar a solicitação',
-        code: 'MARK_READ_FAILED'
+      client.emit('notification:error', {
+        message: 'Nao foi possivel processar a solicitacao',
+        code: 'MARK_READ_FAILED',
       });
     }
   }
@@ -306,30 +317,30 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
   @SubscribeMessage('notification:mark-all-read')
   async handleMarkAllAsRead(@ConnectedSocket() client: AuthenticatedSocket) {
     try {
-      if (!(await this.ensureRealtimeChannelEnabled(client))) {
+      const user = await this.requireValidatedSocket(client);
+      if (!user) {
         return;
       }
 
-      const count = await this.notificationService.markAllAsRead(client.user);
-      
-      // Emitir confirmação
+      const count = await this.requestSecurityContext.runWithActor(user, () =>
+        this.notificationService.markAllAsRead(user),
+      );
+
       client.emit('notification:all-read', { count });
-      
-      // Emitir nova contagem (deve ser 0)
       client.emit('notification:unread-count', { count: 0 });
-      
-      this.logger.log(`${count} notificações marcadas como lidas via Socket.IO`);
-    } catch (error) {
+
+      this.logger.log(`${count} notificacoes marcadas como lidas via Socket.IO`);
+    } catch (error: any) {
       this.logger.error('Erro ao marcar todas como lidas:', {
-        error: error.message,
-        stack: error.stack,
+        error: error?.message,
+        stack: error?.stack,
         clientId: client.id,
         userId: client.user?.id,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
-      client.emit('notification:error', { 
-        message: 'Não foi possível processar a solicitação',
-        code: 'MARK_ALL_READ_FAILED'
+      client.emit('notification:error', {
+        message: 'Nao foi possivel processar a solicitacao',
+        code: 'MARK_ALL_READ_FAILED',
       });
     }
   }
@@ -337,47 +348,49 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
   @SubscribeMessage('notification:delete')
   async handleDelete(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { id: string }
+    @MessageBody() data: { id: string },
   ) {
     try {
-      if (!(await this.ensureRealtimeChannelEnabled(client))) {
+      const user = await this.requireValidatedSocket(client);
+      if (!user) {
         return;
       }
 
-      const notification = await this.notificationService.delete(data.id, client.user);
-      
+      const notification = await this.requestSecurityContext.runWithActor(user, () =>
+        this.notificationService.delete(data.id, user),
+      );
+
       if (notification) {
-        // Emitir confirmação de exclusão
         client.emit('notification:deleted', { id: data.id });
-        
-        // Atualizar contagem se era não lida
+
         if (!notification.read) {
-          const unreadCount = await this.notificationService.countUnread(client.user);
+          const unreadCount = await this.requestSecurityContext.runWithActor(user, () =>
+            this.notificationService.countUnread(user),
+          );
           client.emit('notification:unread-count', { count: unreadCount });
         }
-        
-        this.logger.log(`Notificação deletada via Socket.IO: ${data.id}`);
+
+        this.logger.log(`Notificacao deletada via Socket.IO: ${data.id}`);
       }
-    } catch (error) {
-      this.logger.error(`Erro ao deletar notificação: ${data.id}`, {
-        error: error.message,
-        stack: error.stack,
+    } catch (error: any) {
+      this.logger.error(`Erro ao deletar notificacao: ${data.id}`, {
+        error: error?.message,
+        stack: error?.stack,
         clientId: client.id,
         userId: client.user?.id,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
-      client.emit('notification:error', { 
-        message: 'Não foi possível processar a solicitação',
-        code: 'DELETE_NOTIFICATION_FAILED'
+      client.emit('notification:error', {
+        message: 'Nao foi possivel processar a solicitacao',
+        code: 'DELETE_NOTIFICATION_FAILED',
       });
     }
   }
 
-  /**
-   * Emite nova notificação para usuários apropriados
-   * CRÍTICO: Nunca deve falhar ou quebrar requisições HTTP
-   */
-  async emitNewNotification(notification: Notification, options: EmitNotificationOptions = {}) {
+  async emitNewNotification(
+    notification: Notification,
+    options: EmitNotificationOptions = {},
+  ) {
     try {
       if (!(await this.ensureRealtimeChannelEnabled())) {
         await this.sendPushIfEnabled(notification, options);
@@ -385,130 +398,103 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
       }
 
       const rooms = this.determineTargetRooms(notification);
-      
       for (const room of rooms) {
         try {
           this.server.to(room).emit('notification:new', notification);
-          this.logger.log(`Nova notificação emitida para sala: ${room}`);
+          this.logger.log(`Nova notificacao emitida para sala: ${room}`);
         } catch (roomError) {
-          // CRÍTICO: Erro em uma sala não deve afetar outras
           this.logger.error(`Erro ao emitir para sala ${room}:`, roomError);
         }
       }
 
-      // Atualizar contagem de não lidas para usuários afetados
       try {
         await this.updateUnreadCounts(notification);
       } catch (countError) {
-        // CRÍTICO: Erro na contagem não deve quebrar a emissão
-        this.logger.error('Erro ao atualizar contagens (não crítico):', countError);
+        this.logger.error('Erro ao atualizar contagens (nao critico):', countError);
       }
 
-      // Enviar push para PWA/background sem afetar fluxo principal
       await this.sendPushIfEnabled(notification, options);
-      
     } catch (error) {
-      // CRÍTICO: NUNCA permitir que este método falhe
-      this.logger.error('Erro ao emitir nova notificação (não crítico):', error);
-      // NUNCA re-throw - isso quebraria requisições HTTP
+      this.logger.error('Erro ao emitir nova notificacao (nao critico):', error);
     }
   }
 
-  /**
-   * Emite evento de notificação lida
-   */
   async emitNotificationRead(notification: Notification) {
     try {
       if (!(await this.ensureRealtimeChannelEnabled())) {
         return;
       }
 
-      const rooms = this.determineTargetRooms(notification);
-      
-      for (const room of rooms) {
+      for (const room of this.determineTargetRooms(notification)) {
         this.server.to(room).emit('notification:read', notification);
       }
-      
     } catch (error) {
-      this.logger.error('Erro ao emitir notificação lida:', error);
+      this.logger.error('Erro ao emitir notificacao lida:', error);
     }
   }
 
-  /**
-   * Emite evento de notificação deletada
-   */
   async emitNotificationDeleted(notificationId: string, notification: Notification) {
     try {
       if (!(await this.ensureRealtimeChannelEnabled())) {
         return;
       }
 
-      const rooms = this.determineTargetRooms(notification);
-      
-      for (const room of rooms) {
+      for (const room of this.determineTargetRooms(notification)) {
         this.server.to(room).emit('notification:deleted', { id: notificationId });
       }
-      
     } catch (error) {
-      this.logger.error('Erro ao emitir notificação deletada:', error);
+      this.logger.error('Erro ao emitir notificacao deletada:', error);
     }
   }
 
-  // ============================================================================
-  // MÉTODOS PRIVADOS
-  // ============================================================================
-
   private async joinRooms(client: AuthenticatedSocket) {
     const user = client.user;
-    
-    // Sala do usuário específico
-    await client.join(`user:${user.id}`);
-    
-    // Sala do tenant apenas para perfis administrativos
+    if (!user) {
+      return;
+    }
+
+    await client.join(this.buildUserRoom(user));
+
     if (user.tenantId && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN')) {
-      await client.join(`tenant:${user.tenantId}`);
+      await client.join(this.buildTenantAdminRoom(user.tenantId));
     }
-    
-    // Sala global (para super admins)
+
     if (user.role === 'SUPER_ADMIN') {
-      await client.join('global');
+      await client.join(this.buildGlobalAdminRoom());
     }
-    
+
     this.logger.debug(`Cliente ${client.id} entrou nas salas apropriadas`);
   }
 
   private determineTargetRooms(notification: Notification): string[] {
-    const rooms: string[] = [];
-    
-    // Notificação para usuário específico
     if (notification.userId) {
-      rooms.push(`user:${notification.userId}`);
+      return [
+        this.buildUserRoom({
+          id: notification.userId,
+          tenantId: notification.tenantId ?? null,
+        }),
+      ];
     }
-    // Notificação para tenant
-    else if (notification.tenantId) {
-      rooms.push(`tenant:${notification.tenantId}`);
+
+    if (notification.tenantId) {
+      return [this.buildTenantAdminRoom(notification.tenantId)];
     }
-    // Notificação global
-    else {
-      rooms.push('global');
-    }
-    
-    return rooms;
+
+    return [this.buildGlobalAdminRoom()];
   }
 
   private async updateUnreadCounts(notification: Notification) {
     try {
-      // Determinar quais usuários devem receber atualização de contagem
-      const targetUsers = await this.getTargetUsers(notification);
-      
-      for (const userId of targetUsers) {
-        const client = Array.from(this.connectedClients.values())
-          .find(c => c.user?.id === userId);
-        
-        if (client) {
-          const unreadCount = await this.notificationService.countUnread(client.user);
-          client.emit('notification:unread-count', { count: unreadCount });
+      const targetUsers = new Set(await this.getTargetUsers(notification));
+      for (const client of this.connectedClients.values()) {
+        if (!client.user || !targetUsers.has(client.user.id)) {
+          continue;
         }
+
+        const unreadCount = await this.requestSecurityContext.runWithActor(client.user, () =>
+          this.notificationService.countUnread(client.user!),
+        );
+        client.emit('notification:unread-count', { count: unreadCount });
       }
     } catch (error) {
       this.logger.error('Erro ao atualizar contagens:', error);
@@ -516,23 +502,60 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
   }
 
   private async getTargetUsers(notification: Notification): Promise<string[]> {
-    // Implementar lógica para determinar usuários que devem receber a notificação
-    // Por simplicidade, retornando apenas o usuário específico se houver
     if (notification.userId) {
       return [notification.userId];
     }
-    
-    // Para notificações de tenant, você precisaria buscar todos os usuários do tenant
-    // Para notificações globais, todos os super admins
-    
-    return [];
+
+    if (notification.tenantId) {
+      const users = await this.requestSecurityContext.runWithoutTenantEnforcement(
+        'notification-gateway:get-tenant-target-users',
+        () =>
+          this.prismaService.user.findMany({
+            where: {
+              tenantId: notification.tenantId,
+              role: { in: ['ADMIN', 'SUPER_ADMIN'] },
+            },
+            select: { id: true },
+          }),
+      );
+
+      return users.map((user) => user.id);
+    }
+
+    const superAdmins = await this.requestSecurityContext.runWithoutTenantEnforcement(
+      'notification-gateway:get-global-target-users',
+      () =>
+        this.prismaService.user.findMany({
+          where: { role: 'SUPER_ADMIN' },
+          select: { id: true },
+        }),
+    );
+
+    return superAdmins.map((user) => user.id);
   }
 
   private extractTokenFromHandshake(client: AuthenticatedSocket): string | null {
-    return client.handshake?.auth?.token ||
-           client.handshake?.headers?.authorization?.replace('Bearer ', '') ||
-           this.extractAccessTokenFromCookieHeader(client.handshake?.headers?.cookie) ||
-           null;
+    return (
+      client.handshake?.auth?.token ||
+      this.extractAccessTokenFromAuthorizationHeader(client.handshake?.headers?.authorization) ||
+      this.extractAccessTokenFromCookieHeader(client.handshake?.headers?.cookie) ||
+      null
+    );
+  }
+
+  private extractAccessTokenFromAuthorizationHeader(
+    authorizationHeader?: string | string[],
+  ): string | null {
+    const rawHeader = Array.isArray(authorizationHeader)
+      ? authorizationHeader[0]
+      : authorizationHeader;
+
+    if (typeof rawHeader !== 'string' || !rawHeader.toLowerCase().startsWith('bearer ')) {
+      return null;
+    }
+
+    const token = rawHeader.slice(7).trim();
+    return token.length > 0 ? token : null;
   }
 
   private extractAccessTokenFromCookieHeader(cookieHeader?: string | string[]): string | null {
@@ -553,45 +576,46 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     return null;
   }
 
-  private async validateTokenForConnection(token: string): Promise<any> {
+  private async validateAndBindClient(
+    client: AuthenticatedSocket,
+    token: string,
+    expectedUserId?: string,
+  ): Promise<AuthenticatedSessionActor | null> {
     try {
-      // Validar JWT token usando o JwtService
-      const payload = this.jwtService.verify(token, {
-        secret: this.configService.get('JWT_SECRET'),
+      const user = await this.authValidationService.validateAccessToken(token, {
+        expectedUserId,
+        expectedTenantId: client.user?.tenantId,
+        ipAddress: client.handshake?.address,
+        userAgent: this.resolveClientUserAgent(client),
+        source: 'websocket',
       });
 
-      if (!payload.sub) {
-        return null;
-      }
-
-      // Buscar usuário no banco de dados
-      const user = await this.prismaService.user.findUnique({
-        where: { id: payload.sub },
-        include: {
-          tenant: true
-        }
-      });
-
-      if (!user) {
-        return null;
-      }
-
-      return {
-        id: user.id,
-        tenantId: user.tenantId,
-        role: user.role,
-        email: user.email,
-        name: user.name
-      };
+      client.user = user;
+      client.accessToken = token;
+      return user;
     } catch (error) {
-      this.logger.error('Erro ao validar token JWT para conexão:', error.message);
+      this.logger.warn(
+        `Falha na autenticacao websocket client=${client.id} detalhe=${error instanceof Error ? error.message : String(error)}`,
+      );
+      this.disconnectClient(client, 'SESSION_REVOKED', 'Sessao invalida ou revogada.');
       return null;
     }
   }
 
-  private async validateToken(token: string): Promise<unknown> {
-    // Método legado - manter para compatibilidade
-    return this.validateTokenForConnection(token);
+  private async requireValidatedSocket(
+    client: AuthenticatedSocket,
+  ): Promise<AuthenticatedSessionActor | null> {
+    if (!(await this.ensureRealtimeChannelEnabled(client))) {
+      return null;
+    }
+
+    const token = client.accessToken || this.extractTokenFromHandshake(client);
+    if (!token) {
+      this.disconnectClient(client, 'AUTH_TOKEN_MISSING', 'Token de autenticacao ausente.');
+      return null;
+    }
+
+    return this.validateAndBindClient(client, token, client.user?.id);
   }
 
   private async ensureRealtimeChannelEnabled(client?: AuthenticatedSocket): Promise<boolean> {
@@ -601,16 +625,11 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     }
 
     if (client) {
-      try {
-        client.emit('notification:error', {
-          message: 'Canal websocket desabilitado pela configuracao.',
-          code: 'WEBSOCKET_DISABLED',
-        });
-      } catch {
-        // Melhor esforco: a desconexao nao deve depender do emit.
-      }
-
-      client.disconnect(true);
+      this.disconnectClient(
+        client,
+        'WEBSOCKET_DISABLED',
+        'Canal websocket desabilitado pela configuracao.',
+      );
       return false;
     }
 
@@ -620,22 +639,11 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
 
   private disconnectAllClientsBecauseChannelIsDisabled(): void {
     for (const client of this.connectedClients.values()) {
-      try {
-        client.emit('notification:error', {
-          message: 'Canal websocket desabilitado pela configuracao.',
-          code: 'WEBSOCKET_DISABLED',
-        });
-      } catch {
-        // Melhor esforco: manter a limpeza do namespace mesmo se o emit falhar.
-      }
-
-      try {
-        client.disconnect(true);
-      } catch (error) {
-        this.logger.warn(
-          `Falha ao desconectar cliente websocket ${client.id} apos desabilitacao dinamica. detalhe=${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
+      this.disconnectClient(
+        client,
+        'WEBSOCKET_DISABLED',
+        'Canal websocket desabilitado pela configuracao.',
+      );
     }
 
     this.connectedClients.clear();
@@ -655,5 +663,54 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     } catch (pushError) {
       this.logger.error('Erro ao enviar push (nao critico):', pushError);
     }
+  }
+
+  private buildUserRoom(user: { id: string; tenantId?: string | null }): string {
+    return user.tenantId
+      ? `tenant:${user.tenantId}:user:${user.id}`
+      : `global:user:${user.id}`;
+  }
+
+  private buildTenantAdminRoom(tenantId: string): string {
+    return `tenant:${tenantId}:admins`;
+  }
+
+  private buildGlobalAdminRoom(): string {
+    return 'global:super-admins';
+  }
+
+  private disconnectClient(
+    client: AuthenticatedSocket,
+    code: string,
+    message = 'Conexao websocket encerrada por politica de seguranca.',
+  ): void {
+    try {
+      client.emit?.('notification:error', {
+        message,
+        code,
+      });
+    } catch {
+      // Melhor esforco: nao impedir a desconexao.
+    }
+
+    this.connectedClients.delete(client.id);
+    this.connectionStartTimes.delete(client.id);
+    this.websocketConnectionRegistry.unregister(client.id);
+
+    try {
+      client.disconnect(true);
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao desconectar cliente websocket ${client.id}. detalhe=${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private resolveClientUserAgent(client: AuthenticatedSocket): string | undefined {
+    const header = client.handshake?.headers?.['user-agent'];
+    const userAgent = Array.isArray(header) ? header[0] : header;
+    return typeof userAgent === 'string' && userAgent.trim().length > 0
+      ? userAgent.trim()
+      : undefined;
   }
 }

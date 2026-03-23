@@ -25,11 +25,17 @@ describe('UserSessionService inactivity enforcement', () => {
     revokeAllForUser: jest.fn(),
   };
 
+  const websocketConnectionRegistryMock = {
+    disconnectSession: jest.fn(),
+    disconnectUser: jest.fn(),
+  };
+
   const createService = () =>
     new UserSessionService(
       prismaMock as any,
       securityRuntimeConfigServiceMock as any,
       trustedDeviceServiceMock as any,
+      websocketConnectionRegistryMock as any,
     );
 
   beforeEach(() => {
@@ -45,6 +51,8 @@ describe('UserSessionService inactivity enforcement', () => {
     prismaMock.userSession.deleteMany.mockResolvedValue({ count: 0 });
     prismaMock.userSession.update.mockResolvedValue(undefined);
     trustedDeviceServiceMock.revokeAllForUser.mockResolvedValue(1);
+    websocketConnectionRegistryMock.disconnectSession.mockReset();
+    websocketConnectionRegistryMock.disconnectUser.mockReset();
   });
 
   it('updates last activity on authenticated requests', async () => {
@@ -102,6 +110,10 @@ describe('UserSessionService inactivity enforcement', () => {
         sessionId: 'session-2',
       },
     });
+    expect(websocketConnectionRegistryMock.disconnectSession).toHaveBeenCalledWith(
+      'session-2',
+      'SESSION_TIMEOUT',
+    );
   });
 
   it('applies the same inactivity rule during refresh without relying on the frontend timer', async () => {

@@ -1,0 +1,10 @@
+
+> @0.1.43 dev:backend D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro
+> corepack pnpm --filter backend start:dev
+
+
+> backend@0.1.31 start:dev D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\apps\backend
+> nest start --watch --exec "ts-node -r tsconfig-paths/register src/main.ts"
+
+[2J[3J[H[[90m18:34:18[0m] Starting compilation in watch mode...
+
