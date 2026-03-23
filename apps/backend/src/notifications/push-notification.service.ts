@@ -5,6 +5,7 @@ import { decryptSensitiveData } from '@core/common/utils/security.utils';
 import { ConfigResolverService } from '../system-settings/config-resolver.service';
 import { Notification } from './notification.entity';
 import { SavePushSubscriptionDto } from './notification.dto';
+import { AuthorizationService } from '@common/services/authorization.service';
 
 interface AuthenticatedUser {
   id: string;
@@ -46,6 +47,7 @@ export class PushNotificationService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly configResolver: ConfigResolverService,
+    private readonly authorizationService: AuthorizationService,
   ) {}
 
   async getPublicKey(): Promise<string | null> {
@@ -258,28 +260,42 @@ export class PushNotificationService {
   }
 
   private async resolveTargetUserIds(notification: Notification): Promise<string[]> {
+    const candidates = await this.fetchCandidateUsers(notification);
+    const authorizedIds: string[] = [];
+
+    for (const user of candidates) {
+      const canReceive = this.authorizationService.canReceiveNotification(user, notification);
+      if (canReceive) {
+        authorizedIds.push(user.id);
+      }
+    }
+
+    return authorizedIds;
+  }
+
+  private async fetchCandidateUsers(notification: Notification): Promise<any[]> {
     if (notification.userId) {
-      return [notification.userId];
+      const user = await this.prisma.user.findUnique({
+        where: { id: notification.userId },
+        select: { id: true, role: true, tenantId: true },
+      });
+      return user ? [user] : [];
     }
 
     if (notification.tenantId) {
-      const users = await this.prisma.user.findMany({
+      return this.prisma.user.findMany({
         where: {
           tenantId: notification.tenantId,
           role: { in: ['ADMIN', 'SUPER_ADMIN'] },
         },
-        select: { id: true },
+        select: { id: true, role: true, tenantId: true },
       });
-
-      return users.map((u) => u.id);
     }
 
-    const superAdmins = await this.prisma.user.findMany({
+    return this.prisma.user.findMany({
       where: { role: 'SUPER_ADMIN' },
-      select: { id: true },
+      select: { id: true, role: true, tenantId: true },
     });
-
-    return superAdmins.map((u) => u.id);
   }
 
   private async getResolvedVapidConfig(): Promise<ResolvedVapidConfig | null> {

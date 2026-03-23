@@ -159,12 +159,27 @@ export class AuthorizationService {
     }
   }
 
+  canReceiveNotification(
+    actor: SecurityActor,
+    notification: NotificationRecord,
+  ): boolean {
+    return this.canAccessNotification(actor, notification, 'read');
+  }
+
   canAccessNotification(
     actor: SecurityActor,
     notification: NotificationRecord,
     _action: 'read' | 'delete',
   ): boolean {
     if (this.isSuperAdmin(actor)) {
+      // SUPER_ADMIN global (sem tenantId) pode ler tudo
+      if (actor.tenantId == null) {
+        return true;
+      }
+
+      // SUPER_ADMIN com tenantId (caso do seed antigo) segue a mesma regra de visibilidade:
+      // Pode ler o que for dele, ou o que for global (tenantId null && userId null).
+      // NAO pode ler notificacoes administrativas de um tenant so porque tem o mesmo tenantId.
       return (
         notification.userId === actor.id ||
         (notification.tenantId == null && notification.userId == null)

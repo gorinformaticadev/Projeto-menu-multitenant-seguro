@@ -26,6 +26,7 @@ import {
 import { RequestSecurityContextService } from '@common/services/request-security-context.service';
 import { WebsocketConnectionRegistryService } from '@common/services/websocket-connection-registry.service';
 import { sanitizeSensitiveData } from '@common/utils/sanitize-sensitive-data.util';
+import { AuthorizationService } from '@common/services/authorization.service';
 
 interface ConnectionMetrics {
   totalConnections: number;
@@ -103,6 +104,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     private readonly websocketRuntimeToggleService: WebsocketRuntimeToggleService,
     private readonly requestSecurityContext: RequestSecurityContextService,
     private readonly websocketConnectionRegistry: WebsocketConnectionRegistryService,
+    private readonly authorizationService: AuthorizationService,
   ) {
     this.startMonitoring();
   }
@@ -455,11 +457,13 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
 
     await client.join(this.buildUserRoom(user));
 
-    if (user.tenantId && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN')) {
+    // Apenas ADMINs de fato ou SUPER_ADMINs globais podem entrar na sala administrativa do tenant.
+    // SUPER_ADMIN com tenantId (seed antigo) nao deve entrar para evitar vazamento.
+    if (user.tenantId && user.role === 'ADMIN') {
       await client.join(this.buildTenantAdminRoom(user.tenantId));
     }
 
-    if (user.role === 'SUPER_ADMIN') {
+    if (user.role === 'SUPER_ADMIN' && !user.tenantId) {
       await client.join(this.buildGlobalAdminRoom());
     }
 
@@ -502,36 +506,50 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
   }
 
   private async getTargetUsers(notification: Notification): Promise<string[]> {
+    const candidates = await this.fetchCandidateUsers(notification);
+    const authorizedIds: string[] = [];
+
+    for (const user of candidates) {
+      const canReceive = this.authorizationService.canReceiveNotification(user, notification);
+      if (canReceive) {
+        authorizedIds.push(user.id);
+      }
+    }
+
+    return authorizedIds;
+  }
+
+  private async fetchCandidateUsers(notification: Notification): Promise<any[]> {
     if (notification.userId) {
-      return [notification.userId];
+      const user = await this.prismaService.user.findUnique({
+        where: { id: notification.userId },
+        select: { id: true, role: true, tenantId: true },
+      });
+      return user ? [user] : [];
     }
 
     if (notification.tenantId) {
-      const users = await this.requestSecurityContext.runWithoutTenantEnforcement(
+      return this.requestSecurityContext.runWithoutTenantEnforcement(
         'notification-gateway:get-tenant-target-users',
         () =>
           this.prismaService.user.findMany({
             where: {
-              tenantId: notification.tenantId,
+              tenantId: notification.tenantId!,
               role: { in: ['ADMIN', 'SUPER_ADMIN'] },
             },
-            select: { id: true },
+            select: { id: true, role: true, tenantId: true },
           }),
       );
-
-      return users.map((user) => user.id);
     }
 
-    const superAdmins = await this.requestSecurityContext.runWithoutTenantEnforcement(
+    return this.requestSecurityContext.runWithoutTenantEnforcement(
       'notification-gateway:get-global-target-users',
       () =>
         this.prismaService.user.findMany({
           where: { role: 'SUPER_ADMIN' },
-          select: { id: true },
+          select: { id: true, role: true, tenantId: true },
         }),
     );
-
-    return superAdmins.map((user) => user.id);
   }
 
   private extractTokenFromHandshake(client: AuthenticatedSocket): string | null {

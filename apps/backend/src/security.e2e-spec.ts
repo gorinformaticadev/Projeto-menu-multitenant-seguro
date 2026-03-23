@@ -321,8 +321,83 @@ describe('Security red team regression attacks', () => {
     ).rejects.toThrow('Tenant scope missing');
   });
 
+  it('blocks SUPER_ADMIN with tenantId from joining tenant admin rooms', async () => {
+    const gateway = createNotificationGateway({
+      authValidationService: {
+        validateAccessToken: jest.fn().mockResolvedValue({
+          ...baseActor,
+          role: 'SUPER_ADMIN',
+          tenantId: 'tenant-1',
+        }),
+      },
+    });
+    const client = createSocketClient('socket-super-admin-tenant');
+
+    await gateway.handleConnection(client as any);
+
+    expect(client.join).not.toHaveBeenCalledWith('tenant-1:admins');
+    expect(client.join).not.toHaveBeenCalledWith('global:super-admins');
+    expect(client.join).toHaveBeenCalledWith('tenant:tenant-1:user:user-1');
+  });
+
+  it('filters out SUPER_ADMIN with tenantId from tenant notification delivery', async () => {
+    const prisma = {
+      user: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'admin-1', role: 'ADMIN', tenantId: 'tenant-1' },
+          { id: 'super-admin-legacy', role: 'SUPER_ADMIN', tenantId: 'tenant-1' },
+        ]),
+      },
+    };
+    const gateway = createNotificationGateway({ prismaService: prisma });
+
+    // @ts-ignore - accessing private method for test
+    const targetUsers = await gateway.getTargetUsers({
+      id: 'notif-1',
+      tenantId: 'tenant-1',
+      targetRole: 'ADMIN',
+    } as any);
+
+    expect(targetUsers).toContain('admin-1');
+    expect(targetUsers).not.toContain('super-admin-legacy');
+  });
+
+  it('blocks POST /auth/login without CSRF token in production', async () => {
+    process.env.NODE_ENV = 'production';
+    const guard = new CsrfGuard(
+      new Reflector(),
+      {
+        getBoolean: jest.fn().mockResolvedValue(true),
+      } as any,
+    );
+    const context = {
+      getHandler: () => function loginHandler() { return undefined; },
+      getClass: () => class AuthController {},
+      switchToHttp: () => ({
+        getRequest: () => ({
+          method: 'POST',
+          url: '/auth/login',
+          headers: {
+            origin: 'https://app.example.com',
+            'user-agent': 'jest',
+          },
+          cookies: {},
+        }),
+        getResponse: () => ({
+          cookie: jest.fn(),
+        }),
+      }),
+    };
+
+    const frontendUrl = process.env.FRONTEND_URL;
+    process.env.FRONTEND_URL = 'https://app.example.com';
+    await expect(guard.canActivate(context as any)).rejects.toThrow(ForbiddenException);
+    process.env.FRONTEND_URL = frontendUrl;
+  });
+
   function createNotificationGateway(overrides?: {
     authValidationService?: { validateAccessToken: jest.Mock };
+    prismaService?: any;
   }) {
     const requestSecurityContext = new RequestSecurityContextService();
     const websocketConnectionRegistry = new WebsocketConnectionRegistryService();
@@ -341,16 +416,19 @@ describe('Security red team regression attacks', () => {
         ({
           validateAccessToken: jest.fn().mockResolvedValue(baseActor),
         } as any),
-      {
-        user: {
-          findMany: jest.fn().mockResolvedValue([]),
-        },
-      } as any,
+      overrides?.prismaService ||
+        ({
+          user: {
+            findMany: jest.fn().mockResolvedValue([]),
+            findUnique: jest.fn(),
+          },
+        } as any),
       {
         isEnabledCached: jest.fn().mockResolvedValue(true),
       } as any,
       requestSecurityContext,
       websocketConnectionRegistry,
+      new AuthorizationService(),
     );
   }
 

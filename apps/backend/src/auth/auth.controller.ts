@@ -66,11 +66,22 @@ export class AuthController {
   ) {}
 
   /**
-   * POST /auth/login
-   * Rate Limiting: 5 tentativas por minuto
-   * CSRF: Desabilitado - endpoint publico de autenticacao
+   * GET /auth/csrf
+   * Endpoint publico para bootstrap do cookie CSRF.
+   * Deve ser chamado pelo frontend antes do primeiro POST de login/refresh.
    */
   @SkipCsrf()
+  @Get('csrf')
+  async bootstrapCsrf(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    this.setCsrfCookie(req, res);
+    return { message: 'CSRF cookie set' };
+  }
+
+  /**
+   * POST /auth/login
+   * Rate Limiting: 5 tentativas por minuto
+   * CSRF: Habilitado para evitar session swapping
+   */
   @Post('login')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async login(
@@ -93,9 +104,8 @@ export class AuthController {
   /**
    * POST /auth/refresh
    * Renovar access token usando refresh token
-   * CSRF: Desabilitado - usa refresh token como autenticacao
+   * CSRF: Habilitado para evitar session swapping em modo browser
    */
-  @SkipCsrf()
   @Post('refresh')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async refresh(
@@ -163,9 +173,8 @@ export class AuthController {
   /**
    * POST /auth/login-2fa
    * Login com 2FA
-   * CSRF: Desabilitado - endpoint publico de autenticacao
+   * CSRF: Habilitado para evitar session swapping
    */
-  @SkipCsrf()
   @Post('login-2fa')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async login2FA(

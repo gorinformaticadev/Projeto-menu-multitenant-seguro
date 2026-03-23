@@ -89,7 +89,7 @@ export const defaultUsersSeed: SeedModuleDefinition = {
         email: DEFAULT_USERS.superAdminEmail,
         name: DEFAULT_USERS.superAdminName,
         role: Role.SUPER_ADMIN,
-        tenantId: tenant.id,
+        tenantId: null,
         passwordHash: adminPasswordHash,
       },
       force,
@@ -149,7 +149,7 @@ type EnsureUserInput = {
   email: string;
   name: string;
   role: Role;
-  tenantId: string;
+  tenantId: string | null;
   passwordHash: string;
 };
 
