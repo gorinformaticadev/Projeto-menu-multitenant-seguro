@@ -210,7 +210,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 autoComplete="username"
-                className="auth-field h-10 rounded-xl px-4 text-[var(--auth-text)] transition-all focus-visible:ring-1 focus-visible:ring-[color:var(--auth-primary-soft)]"
+                className="auth-field h-10 rounded-xl px-4 !text-[var(--auth-input-text)] placeholder:!text-[var(--auth-input-placeholder)] transition-all focus-visible:ring-1 focus-visible:ring-[color:var(--auth-primary-soft)]"
               />
             </div>
           </div>
@@ -235,7 +235,7 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 onKeyDown={handleKeyDown}
                 onKeyUp={handleKeyDown}
-                className="auth-field h-10 rounded-xl px-4 pr-10 text-[var(--auth-text)] transition-all focus-visible:ring-1 focus-visible:ring-[color:var(--auth-primary-soft)]"
+                className="auth-field h-10 rounded-xl px-4 pr-10 !text-[var(--auth-input-text)] placeholder:!text-[var(--auth-input-placeholder)] transition-all focus-visible:ring-1 focus-visible:ring-[color:var(--auth-primary-soft)]"
               />
               <button
                 type="button"

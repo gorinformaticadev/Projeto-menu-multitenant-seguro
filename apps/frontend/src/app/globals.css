@@ -222,8 +222,10 @@
     --auth-success-border: oklch(0.73 0.16 155 / 0.2);
     --auth-success-text: oklch(0.84 0.12 155);
     --auth-warning-text: oklch(0.79 0.15 85);
-    --auth-input-background: oklch(0 0 0 / 0.25);
-    --auth-input-background-focus: oklch(0 0 0 / 0.35);
+    --auth-input-background: oklch(0.97 0.01 240 / 0.94);
+    --auth-input-background-focus: oklch(0.99 0.01 240 / 0.98);
+    --auth-input-text: oklch(0.26 0.02 240);
+    --auth-input-placeholder: oklch(0.5 0.02 240);
     --auth-input-shadow: inset 1px 1px 3px oklch(0 0 0 / 0.4), inset -1px -1px 2px oklch(1 0 0 / 0.03);
     --auth-card-shadow: 0 20px 50px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(1 0 0 / 0.05);
     --auth-card-shadow-hover: 0 20px 60px oklch(0 0 0 / 0.7);
@@ -273,16 +275,29 @@
     background: var(--auth-input-background);
     border: 1px solid var(--auth-border-soft);
     box-shadow: var(--auth-input-shadow);
-    color: var(--auth-text);
+    color: var(--auth-input-text);
+    caret-color: var(--auth-input-text);
+    -webkit-text-fill-color: var(--auth-input-text);
   }
 
   .auth-field::placeholder {
-    color: var(--auth-text-soft);
+    color: var(--auth-input-placeholder);
   }
 
   .auth-field:focus-visible {
     background: var(--auth-input-background-focus);
     box-shadow: var(--auth-input-shadow);
+  }
+
+  .auth-field:-webkit-autofill,
+  .auth-field:-webkit-autofill:hover,
+  .auth-field:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--auth-input-text);
+    caret-color: var(--auth-input-text);
+    -webkit-box-shadow:
+      0 0 0 1000px var(--auth-input-background-focus) inset,
+      var(--auth-input-shadow);
+    transition: background-color 5000s ease-in-out 0s;
   }
 
   .auth-button {

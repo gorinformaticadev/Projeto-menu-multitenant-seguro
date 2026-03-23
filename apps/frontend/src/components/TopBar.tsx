@@ -8,7 +8,7 @@ import { usePlatformConfigContext } from "@/contexts/PlatformConfigContext";
 import { useSystemVersion } from "@/hooks/useSystemVersion";
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { Button } from "./ui/button";
-import { Search, User, LogOut, Info, Palette } from "lucide-react";
+import { Search, User, LogOut, Info, Settings } from "lucide-react";
 import { ModuleRegistryUserMenu } from "./ModuleRegistryUserMenu";
 import { GlobalSearch } from "./GlobalSearch";
 import { SystemNotificationsBell } from "@/components/system-notifications/SystemNotificationsBell";
@@ -202,14 +202,16 @@ export function TopBar() {
                   Meu Perfil
                 </Link>
 
-                <Link
-                  href="/perfil#aparencia"
-                  onClick={() => setShowUserMenu(false)}
-                  className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-skin-text transition-colors hover:bg-skin-menu-hover"
-                >
-                  <Palette className="h-4 w-4 text-skin-text-muted" />
-                  Aparencia e tema
-                </Link>
+                {(user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") && (
+                  <Link
+                    href="/configuracoes"
+                    onClick={() => setShowUserMenu(false)}
+                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-skin-text transition-colors hover:bg-skin-menu-hover"
+                  >
+                    <Settings className="h-4 w-4 text-skin-text-muted" />
+                    Configuracoes
+                  </Link>
+                )}
 
                 <ModuleRegistryUserMenu onItemClick={() => setShowUserMenu(false)} />
 

@@ -305,6 +305,13 @@ class ModuleRegistry {
           order: 12,
           children: configurationChildren,
         },
+        {
+          id: "logs",
+          label: "Logs",
+          route: "/logs",
+          icon: "FileText",
+          order: 13,
+        },
       ],
     };
   }
