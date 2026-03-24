@@ -53,6 +53,8 @@ describe('update-flow.utils', () => {
   it('normaliza labels de status e etapa', () => {
     expect(formatUpdateLifecycleStatus('pending_confirmation')).toBe('Aguardando confirmacao');
     expect(formatUpdateLifecycleStatus('completed')).toBe('Concluido');
+    expect(formatUpdateStage('build_frontend')).toBe('compilando frontend');
+    expect(formatUpdateStage('build_prisma_client')).toBe('gerando cliente do banco');
     expect(formatUpdateStage('health_check-step')).toBe('health check step');
     expect(formatUpdateStage(null)).toBe('desconhecida');
   });

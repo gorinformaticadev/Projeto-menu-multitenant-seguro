@@ -94,7 +94,30 @@ export function formatUpdateStage(stage: string | null | undefined): string {
   if (!normalized) {
     return 'desconhecida';
   }
-  return normalized.replace(/[_-]+/g, ' ');
+
+  const compact = normalized.toLowerCase().replace(/[_-]+/g, ' ');
+  const labels: Record<string, string> = {
+    starting: 'inicializando atualizacao',
+    precheck: 'validando configuracoes',
+    prepare: 'preparando release',
+    download: 'baixando release',
+    build: 'compilando sistema',
+    build dependencies: 'instalando dependencias',
+    build prisma client: 'gerando cliente do banco',
+    build backend: 'compilando backend',
+    build frontend: 'compilando frontend',
+    build frontend assets: 'organizando arquivos do frontend',
+    migrate: 'executando migrations',
+    seed: 'aplicando dados versionados',
+    switch: 'trocando release ativa',
+    restart: 'reiniciando servicos',
+    validate: 'validando integracoes',
+    healthcheck: 'validando saude do sistema',
+    rollback: 'executando rollback',
+    completed: 'concluindo atualizacao',
+  };
+
+  return labels[compact] || compact;
 }
 
 function normalizeNullableString(value: unknown): string | null {

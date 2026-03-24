@@ -877,14 +877,26 @@ set_step "download" 20
 ensure_release_code "$TARGET_TAG" "$NEW_RELEASE_DIR"
 link_shared_into_release "$NEW_RELEASE_DIR"
 
-set_step "build" 40
-log "Instalando dependencias e compilando..."
+set_step "build_dependencies" 40
+log "Instalando dependencias..."
 cd "$NEW_RELEASE_DIR"
 ensure_command pnpm "$EXIT_BUILD_FAILED"
 pnpm install --frozen-lockfile || fail_and_exit "$EXIT_BUILD_FAILED" "Falha ao instalar dependencias"
+
+set_step "build_prisma_client" 44
+log "Gerando cliente Prisma do backend..."
 pnpm --filter backend exec prisma generate || fail_and_exit "$EXIT_BUILD_FAILED" "Falha ao gerar cliente Prisma do backend"
+
+set_step "build_backend" 48
+log "Compilando backend..."
 pnpm --filter backend build || fail_and_exit "$EXIT_BUILD_FAILED" "Falha ao compilar backend"
+
+set_step "build_frontend" 54
+log "Compilando frontend..."
 pnpm --filter frontend build || fail_and_exit "$EXIT_BUILD_FAILED" "Falha ao compilar frontend"
+
+set_step "build_frontend_assets" 58
+log "Organizando arquivos do frontend para execucao standalone..."
 if [[ -d "$NEW_RELEASE_DIR/apps/frontend/public" ]]; then
   cp -r "$NEW_RELEASE_DIR/apps/frontend/public" "$NEW_RELEASE_DIR/apps/frontend/.next/standalone/apps/frontend/" || true
 fi

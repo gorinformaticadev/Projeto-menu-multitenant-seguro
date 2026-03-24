@@ -141,6 +141,24 @@ function formatBuildDate(value?: string): string {
   return date.toLocaleString('pt-BR');
 }
 
+function formatElapsedTime(startedAt: string | null | undefined): string | null {
+  if (!startedAt) return null;
+
+  const started = new Date(startedAt).getTime();
+  if (Number.isNaN(started)) return null;
+
+  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - started) / 1000));
+  if (elapsedSeconds < 60) return `${elapsedSeconds}s`;
+
+  const minutes = Math.floor(elapsedSeconds / 60);
+  const seconds = elapsedSeconds % 60;
+  if (minutes < 60) return `${minutes}min ${seconds}s`;
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${hours}h ${remainingMinutes}min`;
+}
+
 export default function UpdatesPage() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -470,7 +488,10 @@ export default function UpdatesPage() {
             {lifecycle && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Fluxo de Atualizacao</CardTitle>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    Fluxo de Atualizacao
+                    {isUpdateLifecycleRunning(lifecycle.status) && <RefreshCw className="h-4 w-4 animate-spin text-skin-primary" />}
+                  </CardTitle>
                   <CardDescription>Estado atual: {formatUpdateLifecycleStatus(lifecycle.status)}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -478,6 +499,11 @@ export default function UpdatesPage() {
                     <span className="text-skin-text-muted">Etapa: {formatUpdateStage(lifecycle.step)}</span>
                     <span className="font-medium">{Math.max(0, Math.min(100, lifecycle.progress || 0))}%</span>
                   </div>
+                  {isUpdateLifecycleRunning(lifecycle.status) && lifecycle.startedAt && (
+                    <div className="text-xs text-skin-text-muted">
+                      Em execucao ha {formatElapsedTime(lifecycle.startedAt) || 'alguns instantes'}
+                    </div>
+                  )}
                   <div className="h-2 w-full rounded bg-skin-border overflow-hidden">
                     <div className="h-2 rounded bg-skin-primary transition-all duration-300" style={{ width: `${Math.max(0, Math.min(100, lifecycle.progress || 0))}%` }} />
                   </div>
