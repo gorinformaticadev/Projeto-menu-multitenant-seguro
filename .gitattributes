@@ -7,3 +7,4 @@ Dockerfile text eol=lf
 *.prisma text eol=lf
 *.json text eol=lf
 *.bat text eol=crlf
+*.md text eol=lf

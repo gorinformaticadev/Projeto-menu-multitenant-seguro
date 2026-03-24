@@ -793,6 +793,7 @@ log "Instalando dependencias e compilando..."
 cd "$NEW_RELEASE_DIR"
 ensure_command pnpm "$EXIT_BUILD_FAILED"
 pnpm install --frozen-lockfile || fail_and_exit "$EXIT_BUILD_FAILED" "Falha ao instalar dependencias"
+pnpm --filter backend exec prisma generate || fail_and_exit "$EXIT_BUILD_FAILED" "Falha ao gerar cliente Prisma do backend"
 pnpm --filter backend build || fail_and_exit "$EXIT_BUILD_FAILED" "Falha ao compilar backend"
 pnpm --filter frontend build || fail_and_exit "$EXIT_BUILD_FAILED" "Falha ao compilar frontend"
 if [[ -d "$NEW_RELEASE_DIR/apps/frontend/public" ]]; then
