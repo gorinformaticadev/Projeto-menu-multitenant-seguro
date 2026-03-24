@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.53](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.52...v0.1.53) (2026-03-24)
+
+
+### Bug Fixes
+
+* **update:** tornar o sistema de configurações resiliente a colunas ausentes no banco ([b4c9cbc](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/b4c9cbc818218ce46f48f9666ffa5e9937062873))
+
 ### [0.1.42](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.43...v0.1.42) (2026-03-22)
 
 
