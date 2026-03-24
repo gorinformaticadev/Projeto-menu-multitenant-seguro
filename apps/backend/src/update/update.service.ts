@@ -130,7 +130,7 @@ export class UpdateService implements OnModuleInit {
 
       const repoUrl = this.buildPublicGitRepoUrl(settings);
       decryptedTokenForSanitizer = this.tryDecryptToken(settings.gitToken);
-      const stdout = await this.getRemoteTagsOutput(repoUrl, settings.gitToken);
+      const stdout = await this.getRemoteTagsOutput(repoUrl, settings.gitToken, settings.gitReleaseBranch);
 
       const cleanTags = stdout
         .split('\n')
@@ -919,10 +919,17 @@ export class UpdateService implements OnModuleInit {
     return `https://github.com/${settings.gitUsername}/${repository}.git`;
   }
 
-  private async getRemoteTagsOutput(repoUrl: string, encryptedGitToken?: string): Promise<string> {
+  private async getRemoteTagsOutput(repoUrl: string, encryptedGitToken?: string, branch?: string): Promise<string> {
     const options = { timeout: 60_000, cwd: process.cwd(), maxBuffer: 10 * 1024 * 1024 };
+    const gitArgs = ['ls-remote', '--tags', repoUrl];
+    if (branch) {
+      // Se uma branch for especificada, poderíamos tentar filtrar, 
+      // mas ls-remote --tags geralmente retorna todas as tags do repositório.
+      // No entanto, manter o parâmetro permite futuras expansões de lógica.
+    }
+
     if (!encryptedGitToken) {
-      const { stdout } = await this.execFileAsync('git', ['ls-remote', '--tags', repoUrl], options);
+      const { stdout } = await this.execFileAsync('git', gitArgs, options);
       return stdout;
     }
 
@@ -930,16 +937,15 @@ export class UpdateService implements OnModuleInit {
     try {
       decryptedToken = this.tryDecryptToken(encryptedGitToken);
       if (!decryptedToken) {
-        const { stdout } = await this.execFileAsync('git', ['ls-remote', '--tags', repoUrl], options);
+        const { stdout } = await this.execFileAsync('git', gitArgs, options);
         return stdout;
       }
 
-      // GitHub PATs usam 'token' ou 'Bearer' como prefixo
       const authHeaderValue = `Bearer ${decryptedToken}`;
       const headerArg = `http.extraHeader=AUTHORIZATION: ${authHeaderValue}`;
       const { stdout } = await this.execFileAsync(
         'git',
-        ['-c', headerArg, 'ls-remote', '--tags', repoUrl],
+        ['-c', headerArg, ...gitArgs],
         options,
       );
       return stdout;
@@ -950,7 +956,7 @@ export class UpdateService implements OnModuleInit {
         decryptedToken,
       );
       this.logger.warn(`Falha ao usar gitToken; tentando repositório sem autenticação. detalhe=${sanitizedStderr}`);
-      const { stdout } = await this.execFileAsync('git', ['ls-remote', '--tags', repoUrl], options);
+      const { stdout } = await this.execFileAsync('git', gitArgs, options);
       return stdout;
     }
   }
