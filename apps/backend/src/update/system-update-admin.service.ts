@@ -437,18 +437,18 @@ export class SystemUpdateAdminService {
     const updateScriptCandidates =
       mode === 'docker'
         ? [
-            path.join(baseDir, 'current', 'install', 'update-images.sh'),
             path.join(this.pathsService.getProjectRoot(), 'install', 'update-images.sh'),
+            path.join(baseDir, 'current', 'install', 'update-images.sh'),
             path.join(baseDir, 'install', 'update-images.sh'),
           ]
         : [
-            path.join(baseDir, 'current', 'install', 'update-native.sh'),
             path.join(this.pathsService.getProjectRoot(), 'install', 'update-native.sh'),
+            path.join(baseDir, 'current', 'install', 'update-native.sh'),
             path.join(baseDir, 'install', 'update-native.sh'),
           ];
     const rollbackScriptCandidates = [
-      path.join(baseDir, 'current', 'install', 'rollback-native.sh'),
       path.join(this.pathsService.getProjectRoot(), 'install', 'rollback-native.sh'),
+      path.join(baseDir, 'current', 'install', 'rollback-native.sh'),
       path.join(baseDir, 'install', 'rollback-native.sh'),
     ];
 
