@@ -202,6 +202,27 @@ describe('UpdateService', () => {
     expect(service.formatVersion('v1.2.3')).toBe('v1.2.3');
   });
 
+  it('prioriza tags da mesma linha major.minor da versao atual', async () => {
+    const { service } = createService();
+
+    jest.spyOn(service as unknown as { getRuntimeVersionInfo: () => { version: string } }, 'getRuntimeVersionInfo')
+      .mockReturnValue({ version: 'v0.1.67' });
+
+    service.execFileAsync = jest.fn(async () => ({
+      stdout: [
+        'hash\trefs/tags/v3.3.0',
+        'hash\trefs/tags/v0.1.68',
+        'hash\trefs/tags/v0.1.67',
+      ].join('\n'),
+      stderr: '',
+    }));
+
+    const result = await service.checkForUpdates();
+
+    expect(result.availableVersion).toBe('v0.1.68');
+    expect(result.updateAvailable).toBe(true);
+  });
+
   it('runSafeNativeDeploy injeta repo e auth header quando git esta configurado', async () => {
     const { service } = createService();
     const existsSyncSpy = jest.spyOn(fs, 'existsSync').mockImplementation((target: fs.PathLike) => {

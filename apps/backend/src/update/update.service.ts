@@ -136,7 +136,8 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
         .map(tag => semver.clean(tag))
         .filter((tag): tag is string => !!tag && !!semver.valid(tag));
 
-      const uniqueCleanTags = Array.from(new Set(cleanTags)).sort((a, b) => semver.rcompare(a, b));
+      const currentClean = this.getComparableVersion(this.getRuntimeVersionInfo().version);
+      const uniqueCleanTags = this.selectCandidateReleaseTags(cleanTags, currentClean);
 
       if (uniqueCleanTags.length === 0) {
         this.logger.warn('Nenhuma tag válida encontrada no repositório');
@@ -145,7 +146,6 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
 
       const latestClean = uniqueCleanTags[0];
       const latestVersion = this.formatVersion(latestClean);
-      const currentClean = this.getComparableVersion(this.getRuntimeVersionInfo().version);
       const updateAvailable = semver.gt(latestClean, currentClean);
 
       await this.updateSystemSettings({
@@ -195,14 +195,14 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
         .map(tag => semver.clean(tag))
         .filter((tag): tag is string => !!tag && !!semver.valid(tag));
 
-      const uniqueCleanTags = Array.from(new Set(cleanTags)).sort((a, b) => semver.rcompare(a, b));
+      const currentClean = this.getComparableVersion(this.getRuntimeVersionInfo().version);
+      const uniqueCleanTags = this.selectCandidateReleaseTags(cleanTags, currentClean);
       if (uniqueCleanTags.length === 0) {
         return { connected: true, updateAvailable: false };
       }
 
       const latestClean = uniqueCleanTags[0];
       const latestVersion = this.formatVersion(latestClean);
-      const currentClean = this.getComparableVersion(this.getRuntimeVersionInfo().version);
 
       return {
         connected: true,
@@ -1205,6 +1205,25 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
 
     const coerced = semver.coerce(value);
     return coerced?.version || '0.0.0';
+  }
+
+  private selectCandidateReleaseTags(tags: string[], currentVersion: string): string[] {
+    const uniqueSorted = Array.from(new Set(tags)).sort((a, b) => semver.rcompare(a, b));
+    if (uniqueSorted.length === 0) {
+      return [];
+    }
+
+    const current = semver.parse(currentVersion);
+    if (!current) {
+      return uniqueSorted;
+    }
+
+    const sameLine = uniqueSorted.filter((tag) => {
+      const parsed = semver.parse(tag);
+      return !!parsed && parsed.major === current.major && parsed.minor === current.minor;
+    });
+
+    return sameLine.length > 0 ? sameLine : uniqueSorted;
   }
 
   private buildPublicGitRepoUrl(settings: UpdateSystemSettings): string {
