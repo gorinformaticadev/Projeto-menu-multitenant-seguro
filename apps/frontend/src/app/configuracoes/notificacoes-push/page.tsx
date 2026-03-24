@@ -184,7 +184,8 @@ export default function PushNotificationsConfigPage() {
               Configuração VAPID
             </CardTitle>
             <CardDescription>
-              Gere as chaves com <code>npx web-push generate-vapid-keys</code> e salve abaixo.
+              Gere as chaves com <code>npx web-push generate-vapid-keys o pnpm exec web-push generate-vapid-keys
+              </code> e salve abaixo.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
