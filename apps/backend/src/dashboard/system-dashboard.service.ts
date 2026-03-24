@@ -11,9 +11,9 @@ import { PrismaService } from '../core/prisma/prisma.service';
 import { ResponseTimeMetricsService } from './system-response-time-metrics.service';
 import { SystemTelemetryService } from '@common/services/system-telemetry.service';
 import { ModuleSecurityService } from '../core/module-security.service';
-import { registerCoreModule } from '../core/shared/modules/core-module';
-import { moduleRegistry } from '../core/shared/registry/module-registry';
-import { ModuleDashboardWidget } from '../core/shared/types/module.types';
+import { registerCoreModule } from '@core/shared/modules/core-module';
+import { moduleRegistry } from '@core/shared/registry/module-registry';
+import { ModuleDashboardWidget } from '@core/shared/types/module.types';
 
 type DashboardSeverity = 'all' | 'info' | 'warning' | 'critical';
 
@@ -2124,7 +2124,6 @@ export class SystemDashboardService {
     return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3)}...` : normalized;
   }
 }
-
 
 
 
