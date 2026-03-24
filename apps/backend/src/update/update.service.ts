@@ -387,7 +387,7 @@ export class UpdateService implements OnModuleInit {
     const lifecycle = this.buildLifecycleState(settings, systemState);
     const runtimeVersion = this.getRuntimeVersionInfo().version;
 
-    const mode = systemState?.mode || this.getInstallationMode();
+    const mode = systemState?.mode || this.getInstallationMode(settings);
     return {
       currentVersion: this.formatVersion(runtimeVersion),
       availableVersion: settings.availableVersion ? this.formatVersion(settings.availableVersion) : undefined,
@@ -638,7 +638,7 @@ export class UpdateService implements OnModuleInit {
       progress: progress < 0 ? 0 : progress > 100 ? 100 : Math.floor(progress),
       startedAt: systemState?.startedAt || null,
       finishedAt: systemState?.finishedAt || null,
-      mode: systemState?.mode || this.getInstallationMode(),
+      mode: systemState?.mode || this.getInstallationMode(settings),
       lock: Boolean(systemState?.lock),
       stale: Boolean(systemState?.stale),
       operation: {
