@@ -191,7 +191,8 @@ export class UpdateService implements OnModuleInit {
       );
     }
     const normalizedVersion = this.formatVersion(normalizedCleanVersion);
-    const mode = this.getInstallationMode();
+    const settings = await this.getSystemSettings();
+    const mode = this.getInstallationMode(settings);
     const startedAtIso = new Date().toISOString();
 
     try {
@@ -917,7 +918,7 @@ export class UpdateService implements OnModuleInit {
     });
   }
 
-  private getInstallationMode(): 'docker' | 'native' {
+  private getInstallationMode(settings: UpdateSystemSettings): 'docker' | 'native' {
     try {
       if (process.env.IS_DOCKER === 'true') {
         return 'docker';
@@ -938,7 +939,13 @@ export class UpdateService implements OnModuleInit {
       this.logger.warn(`Falha ao detectar modo de instalação automaticamente: ${String(error)}`);
     }
 
-    return 'native';
+      if (settings.packageManager) {
+        if (settings.packageManager === 'docker' || settings.packageManager === 'native') {
+          this.logger.log(`Modo de instalação resolvido via configuração do banco de dados: ${settings.packageManager}`);
+          return settings.packageManager;
+        }
+      }
+      return 'native';
   }
 
   private getProjectRoot(): string {
@@ -1072,8 +1079,9 @@ export class UpdateService implements OnModuleInit {
         return stdout;
       }
 
-      const basicAuth = Buffer.from(`x-access-token:${decryptedToken}`, 'utf8').toString('base64');
-      const headerArg = `http.extraHeader=AUTHORIZATION: basic ${basicAuth}`;
+      // GitHub PATs usam 'token' ou 'Bearer' como prefixo, não 'x-access-token'
+      const authHeaderValue = `Bearer ${decryptedToken}`;
+      const headerArg = `http.extraHeader=AUTHORIZATION: ${authHeaderValue}`;
       const { stdout } = await this.execFileAsync(
         'git',
         ['-c', headerArg, 'ls-remote', '--tags', repoUrl],

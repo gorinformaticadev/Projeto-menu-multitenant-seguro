@@ -601,7 +601,9 @@ download_release_tarball() {
 
   log "Baixando release tarball: ${tarball_url}"
   if [[ -n "$GIT_AUTH_HEADER" ]]; then
-    curl -fsSL -H "$GIT_AUTH_HEADER" "$tarball_url" -o "$archive_file"
+    # Extrair apenas o valor do header (removendo 'http.extraHeader=')
+    local curl_header="${GIT_AUTH_HEADER#http.extraHeader=}"
+    curl -fsSL -H "$curl_header" "$tarball_url" -o "$archive_file"
   else
     curl -fsSL "$tarball_url" -o "$archive_file"
   fi
@@ -639,7 +641,9 @@ download_release_git_clone() {
 
   log "Tarball indisponivel. Fazendo git clone da tag ${target_tag}..."
   if [[ -n "$GIT_AUTH_HEADER" ]]; then
-    git -c "http.extraHeader=${GIT_AUTH_HEADER}" clone --depth 1 --branch "$target_tag" "$GIT_REPO_URL" "$release_dir"
+    # O GIT_AUTH_HEADER já deve estar no formato 'AUTHORIZATION: Bearer <TOKEN>' ou 'AUTHORIZATION: token <TOKEN>'
+    # Para git clone, o formato esperado é 'http.extraHeader=AUTHORIZATION: Bearer <TOKEN>'
+    git -c "${GIT_AUTH_HEADER}" clone --depth 1 --branch "$target_tag" "$GIT_REPO_URL" "$release_dir"
   else
     git clone --depth 1 --branch "$target_tag" "$GIT_REPO_URL" "$release_dir"
   fi
