@@ -124,7 +124,7 @@ export class UpdateController {
   @Roles(Role.SUPER_ADMIN)
   async getLogDetails(@Param('id') logId: string) {
     try {
-      const log = await this.updateService.getUpdateLogDetails(logId);
+      const log = await this.updateService.getUpdateLogDetail(logId);
       return {
         success: true,
         data: log,
