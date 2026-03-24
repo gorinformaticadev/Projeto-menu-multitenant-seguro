@@ -28,11 +28,11 @@ export const lightTheme: ThemeTokens = {
 
 export const darkTheme: ThemeTokens = {
   background: "10 10 10",
-  backgroundElevated: "15 15 15",
-  surface: "10 10 10",
-  surfaceHover: "38 38 38",
-  border: "38 38 38",
-  borderStrong: "70 70 70",
+  backgroundElevated: "20 20 24",
+  surface: "24 24 27",
+  surfaceHover: "38 38 42",
+  border: "50 50 56",
+  borderStrong: "82 82 91",
   text: "250 250 250",
   textMuted: "163 163 163",
   textInverse: "10 10 10",
@@ -41,15 +41,15 @@ export const darkTheme: ThemeTokens = {
   secondary: "24 24 27",
   success: "34 197 94",
   warning: "245 158 11",
-  danger: "127 29 29",
+  danger: "248 113 113",
   info: "14 165 233",
-  inputBackground: "10 10 10",
-  inputBorder: "38 38 38",
+  inputBackground: "20 20 24",
+  inputBorder: "50 50 56",
   focusRing: "60 130 246",
-  sidebarBackground: "10 10 10",
+  sidebarBackground: "18 18 20",
   sidebarText: "226 232 240",
   sidebarActive: "250 250 250",
-  menuHover: "38 38 38",
+  menuHover: "44 44 48",
 };
 
 export const themes = {
