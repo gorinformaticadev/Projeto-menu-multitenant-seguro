@@ -250,7 +250,7 @@ native_system_permissions_and_project() {
     log_info "Etapa 2/23: ajustando permissoes e preparando projeto..."
     as_root "mkdir -p '${app_dir}'"
     if command -v rsync &>/dev/null; then
-        as_root "rsync -a --delete --exclude '.git' --exclude 'node_modules' --exclude 'apps/backend/node_modules' --exclude 'apps/frontend/node_modules' --exclude 'apps/backend/backups' --exclude 'backups' --exclude 'uploads' '${PROJECT_ROOT}/' '${app_dir}/'"
+        as_root "rsync -a --delete --exclude '.git' --exclude 'node_modules' --exclude 'apps/backend/node_modules' --exclude 'apps/frontend/node_modules' --exclude 'apps/backend/backups' --exclude 'backups' --exclude 'uploads' --exclude 'releases' --exclude 'shared' --exclude 'current' --exclude 'apps/frontend/.next' --exclude 'apps/backend/dist' '${PROJECT_ROOT}/' '${app_dir}/'"
     else
         as_root "cp -a '${PROJECT_ROOT}/.' '${app_dir}/'"
     fi
@@ -407,6 +407,8 @@ native_install_certbot() {
 native_build_apps() {
     local app_dir="$1"
     log_info "Etapa 13/23: build backend/frontend e seed..."
+    run_as_native_user "cd '${app_dir}' && rm -rf apps/backend/dist apps/frontend/.next"
+    run_as_native_user "cd '${app_dir}' && pnpm --filter backend exec prisma generate"
     run_as_native_user "cd '${app_dir}' && pnpm --filter backend build"
     run_as_native_user "cd '${app_dir}/apps/backend' && pnpm exec tsc prisma/seed.ts --outDir dist --skipLibCheck --module commonjs --target ES2021 --esModuleInterop --resolveJsonModule"
     run_as_native_user "cd '${app_dir}' && pnpm --filter frontend build"

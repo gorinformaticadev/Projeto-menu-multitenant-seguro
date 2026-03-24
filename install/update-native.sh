@@ -787,6 +787,7 @@ NEW_RELEASE_DIR="${RELEASES_DIR}/$(sanitize_release_name "$TARGET_TAG")"
 
 set_step "download" 20
 ensure_release_code "$TARGET_TAG" "$NEW_RELEASE_DIR"
+link_shared_into_release "$NEW_RELEASE_DIR"
 
 set_step "build" 40
 log "Instalando dependencias e compilando..."
@@ -810,8 +811,8 @@ fi
 
 set_step "migrate" 60
 log "Executando migrations..."
-cd "$NEW_RELEASE_DIR/apps/backend"
-pnpm exec prisma migrate deploy || fail_and_exit "$EXIT_BUILD_FAILED" "Falha nas migrations"
+cd "$NEW_RELEASE_DIR"
+pnpm --filter backend exec prisma migrate deploy --schema apps/backend/prisma/schema.prisma || fail_and_exit "$EXIT_BUILD_FAILED" "Falha nas migrations"
 
 set_step "switch" 80
 enable_maintenance_mode "Atualizando sistema para versao ${TARGET_TAG}"
@@ -821,7 +822,6 @@ if [[ -n "$CURRENT_TARGET" ]] && [[ "$CURRENT_TARGET" != "$NEW_RELEASE_DIR" ]]; 
   ln -sfn "$CURRENT_TARGET" "$PREVIOUS_LINK"
 fi
 
-link_shared_into_release "$NEW_RELEASE_DIR"
 resolve_build_metadata "$NEW_RELEASE_DIR"
 write_build_metadata_files "$NEW_RELEASE_DIR"
 ln -sfn "$NEW_RELEASE_DIR" "$CURRENT_LINK"
