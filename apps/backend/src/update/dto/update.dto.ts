@@ -40,11 +40,11 @@ export class UpdateConfigDto {
   gitReleaseBranch?: string = 'main';
 
   @IsOptional()
-  @IsEnum(['docker', 'native'])
+  @IsString()
   packageManager?: string = 'docker';
 
   @IsOptional()
-  @IsEnum(['release', 'tag'])
+  @IsString()
   updateChannel?: 'release' | 'tag' = 'release';
 
   @IsOptional()
@@ -52,23 +52,14 @@ export class UpdateConfigDto {
 
   @IsOptional()
   @IsString()
-  @Matches(/^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.-]+)?$/, {
-    message: 'releaseTag deve seguir o formato semver (ex: v1.2.3 ou 1.2.3)',
-  })
   releaseTag?: string;
 
   @IsOptional()
   @IsString()
-  @Matches(/^(docker-compose\.prod\.yml|docker-compose\.prod\.external\.yml)$/, {
-    message: 'composeFile invalido. Use docker-compose.prod.yml ou docker-compose.prod.external.yml',
-  })
   composeFile?: string;
 
   @IsOptional()
   @IsString()
-  @Matches(/^(install\/\.env\.production|\.env\.production|\.env)$/, {
-    message: 'envFile invalido. Use install/.env.production, .env.production ou .env',
-  })
   envFile?: string;
 }
 

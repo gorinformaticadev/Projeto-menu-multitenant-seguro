@@ -409,7 +409,18 @@ export class UpdateService implements OnModuleInit {
       updateData.gitToken = this.encryptToken(data.gitToken);
     }
 
-    await this.updateSystemSettings(updateData);
+    try {
+      await this.updateSystemSettings(updateData);
+    } catch (error) {
+      this.logger.error(`Falha ao salvar configuracoes de update: ${String(error)}`);
+      throw new HttpException(
+        {
+          message: 'Erro ao persistir configuracoes no banco de dados',
+          technical: String(error),
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
 
     await this.auditService.log({
       action: 'UPDATE_CONFIG_CHANGED',
