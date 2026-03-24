@@ -75,11 +75,6 @@ type StructuredUpdateErrorPayload = {
   exitCode: number | null;
 };
 
-// Interface estendida para incluir campos novos que ainda não estão no Prisma
-interface ExtendedUpdateSystemSettings extends UpdateSystemSettings {
-  updateChannel?: 'release' | 'tag';
-}
-
 @Injectable()
 export class UpdateService implements OnModuleInit {
   private readonly logger = new Logger(UpdateService.name);
@@ -281,7 +276,7 @@ export class UpdateService implements OnModuleInit {
       const decryptedToken = this.tryDecryptToken(settings.gitToken);
       const env: Record<string, string> = {
         GIT_REPO_URL: this.buildPublicGitRepoUrl(settings),
-        UPDATE_CHANNEL: (settings as any).updateChannel || 'release',
+        UPDATE_CHANNEL: settings.updateChannel,
       };
 
       if (decryptedToken) {
@@ -371,7 +366,7 @@ export class UpdateService implements OnModuleInit {
       isConfigured: !!(settings.gitUsername && settings.gitRepository),
       checkEnabled: settings.updateCheckEnabled,
       mode: this.getInstallationMode(settings),
-      updateChannel: (settings.updateChannel as any) || 'release',
+      updateChannel: settings.updateChannel as any,
       updateLifecycle: this.buildLifecycleState(settings, systemState),
     };
   }
@@ -384,7 +379,7 @@ export class UpdateService implements OnModuleInit {
       gitToken: settings.gitToken ? '********' : undefined,
       gitReleaseBranch: settings.gitReleaseBranch || 'main',
       packageManager: settings.packageManager || 'docker',
-      updateChannel: (settings.updateChannel as any) || 'release',
+      updateChannel: settings.updateChannel as any,
       updateCheckEnabled: settings.updateCheckEnabled,
       releaseTag: settings.releaseTag || undefined,
       composeFile: settings.composeFile || 'docker-compose.prod.yml',
