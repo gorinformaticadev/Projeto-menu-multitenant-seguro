@@ -12,8 +12,12 @@ export interface RequestContextPayload {
 }
 
 export const extractRequestContext = (request: any): RequestContextPayload => {
+  const realIp = request?.headers?.['x-real-ip'];
   const forwardedFor = request?.headers?.['x-forwarded-for'];
+  
+  const realIpValue = Array.isArray(realIp) ? realIp[0] : realIp;
   const forwardedValue = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
+
   const firstForwardedIp =
     typeof forwardedValue === 'string'
       ? forwardedValue
@@ -31,7 +35,7 @@ export const extractRequestContext = (request: any): RequestContextPayload => {
   const userAgent = typeof userAgentValue === 'string' ? userAgentValue.trim() : '';
 
   return {
-    ip: firstForwardedIp || requestIp || socketIp || null,
+    ip: realIpValue || firstForwardedIp || requestIp || socketIp || null,
     userAgent: userAgent || null,
   };
 };

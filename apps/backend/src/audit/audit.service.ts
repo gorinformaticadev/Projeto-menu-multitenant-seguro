@@ -1,5 +1,6 @@
 ﻿import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
+import { RequestSecurityContextService } from '../common/services/request-security-context.service';
 import { RateLimitMetricsService, RateLimitStatsParams } from '../common/services/rate-limit-metrics.service';
 import { humanizeAuditAction, resolveAuditDisplayMessage } from './audit-log-presentation.util';
 
@@ -52,6 +53,7 @@ export class AuditService {
   constructor(
     private prisma: PrismaService,
     private readonly rateLimitMetricsService: RateLimitMetricsService,
+    private readonly requestSecurityContext: RequestSecurityContextService,
   ) {}
 
   /**
@@ -63,7 +65,10 @@ export class AuditService {
     const actorEmail = this.normalizeString(data.actor?.email);
     const actorRole = this.normalizeString(data.actor?.role);
     const tenantId = this.normalizeString(data.tenantId);
-    const ip = this.normalizeString(data.requestCtx?.ip || data.ipAddress);
+    const request = this.requestSecurityContext.getRequest();
+    const realIp = request?.headers?.['x-real-ip'];
+    const realIpValue = Array.isArray(realIp) ? realIp[0] : realIp;
+    const ip = this.normalizeString(realIpValue || data.requestCtx?.ip || data.ipAddress);
     const userAgent = this.normalizeString(data.requestCtx?.userAgent || data.userAgent);
     const severity = this.normalizeSeverity(data.severity);
     const metadata = this.sanitizeMetadata(data.metadata || data.details || {});

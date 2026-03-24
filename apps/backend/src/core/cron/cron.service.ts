@@ -1343,6 +1343,15 @@ export class CronService implements OnModuleInit {
     const instanceId = this.resolveInstanceId();
     const startedAt = new Date();
     const nextExpectedRunAt = this.resolveNextExpectedRun(job);
+
+    // Lock preventivo para evitar que duas instâncias iniciem o mesmo ciclo simultaneamente
+    const preLockKey = `cron:prelock:${key}:${cycleId}`;
+    const hasPreLock = await this.redisLock.acquireLock(preLockKey, 30000, instanceId);
+    if (!hasPreLock && options.reason !== 'manual') {
+      this.logger.warn(`[PRE_LOCK_DENIED] Job ${key} já está sendo processado por outra instância. cycleId=${cycleId}`);
+      return;
+    }
+
     let cycleEnteredRunning = false;
 
     const persistSkippedCycle = async (reason: string, error?: unknown): Promise<boolean> => {
