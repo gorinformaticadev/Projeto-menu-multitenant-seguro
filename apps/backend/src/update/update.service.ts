@@ -371,7 +371,7 @@ export class UpdateService implements OnModuleInit {
       isConfigured: !!(settings.gitUsername && settings.gitRepository),
       checkEnabled: settings.updateCheckEnabled,
       mode: this.getInstallationMode(settings),
-      updateChannel: (settings as any).updateChannel || 'release',
+      updateChannel: (settings.updateChannel as any) || 'release',
       updateLifecycle: this.buildLifecycleState(settings, systemState),
     };
   }
@@ -384,7 +384,7 @@ export class UpdateService implements OnModuleInit {
       gitToken: settings.gitToken ? '********' : undefined,
       gitReleaseBranch: settings.gitReleaseBranch || 'main',
       packageManager: settings.packageManager || 'docker',
-      updateChannel: (settings as any).updateChannel || 'release',
+      updateChannel: (settings.updateChannel as any) || 'release',
       updateCheckEnabled: settings.updateCheckEnabled,
       releaseTag: settings.releaseTag || undefined,
       composeFile: settings.composeFile || 'docker-compose.prod.yml',
@@ -406,9 +406,8 @@ export class UpdateService implements OnModuleInit {
       updatedBy: userId,
     };
 
-    // Lidar com o campo updateChannel (mesmo que não esteja no Prisma ainda, salvamos se possível ou ignoramos se causar erro)
     if (data.updateChannel) {
-      (updateData as any).updateChannel = data.updateChannel;
+      updateData.updateChannel = data.updateChannel;
     }
 
     if (data.gitToken && data.gitToken !== '********') {
@@ -426,7 +425,7 @@ export class UpdateService implements OnModuleInit {
           gitUsername: current.gitUsername,
           gitRepository: current.gitRepository,
           packageManager: current.packageManager,
-          updateChannel: (current as any).updateChannel,
+          updateChannel: current.updateChannel,
         },
         to: {
           gitUsername: data.gitUsername,

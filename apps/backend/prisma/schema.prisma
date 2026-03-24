@@ -344,6 +344,7 @@ model UpdateSystemSettings {
   gitReleaseBranch   String    @default("main")
   packageManager     String    @default("npm")
   updateCheckEnabled Boolean   @default(true)
+  updateChannel      String    @default("release")
   lastUpdateCheck    DateTime?
   availableVersion   String?
   updateAvailable    Boolean   @default(false)
