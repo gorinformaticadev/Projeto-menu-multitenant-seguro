@@ -547,9 +547,16 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
     }
 
     const normalizedFinalStatus = this.mapSystemStateToUpdateLogStatus(systemState.status);
-    if (!normalizedFinalStatus) {
+    const staleRecovery = !normalizedFinalStatus && this.shouldRecoverStaleRunningLogs(systemState);
+    if (!normalizedFinalStatus && !staleRecovery) {
       return;
     }
+
+    const finalStatus = normalizedFinalStatus || 'FAILED';
+    const recoveredErrorMessage =
+      staleRecovery
+        ? 'Update anterior ficou sem processo ativo e foi destravado automaticamente.'
+        : systemState.userMessage || systemState.lastError || undefined;
 
     const completedAt = systemState.finishedAt ? new Date(systemState.finishedAt) : new Date();
     const completedAtSafe = Number.isFinite(completedAt.getTime()) ? completedAt : new Date();
@@ -565,6 +572,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
       const mergedExecutionLog = {
         ...executionLog,
         reconciled: true,
+        staleRecovered: staleRecovery,
         reconciledAt: new Date().toISOString(),
         finalState: {
           status: systemState.status,
@@ -587,12 +595,12 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
       await this.prisma.updateLog.update({
         where: { id: log.id },
         data: {
-          status: normalizedFinalStatus,
+          status: finalStatus,
           completedAt: completedAtSafe,
           duration: duration ?? undefined,
-          errorMessage: systemState.userMessage || systemState.lastError || undefined,
+          errorMessage: recoveredErrorMessage,
           rollbackReason:
-            normalizedFinalStatus === 'ROLLED_BACK'
+            finalStatus === 'ROLLED_BACK'
               ? systemState.rollback?.reason || 'automatic rollback executed'
               : undefined,
           executionLogs: JSON.stringify(mergedExecutionLog),
@@ -600,13 +608,21 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
       });
     }
 
-    if (normalizedFinalStatus === 'SUCCESS' && systemState.toVersion && systemState.toVersion !== 'unknown') {
+    if (finalStatus === 'SUCCESS' && systemState.toVersion && systemState.toVersion !== 'unknown') {
       await this.updateSystemSettings({
         appVersion: this.formatVersion(systemState.toVersion),
         releaseTag: this.formatVersion(systemState.toVersion),
         updateAvailable: false,
       });
     }
+  }
+
+  private shouldRecoverStaleRunningLogs(systemState: SystemUpdateStateSnapshot): boolean {
+    return (
+      systemState.status === 'idle' &&
+      systemState.lock !== true &&
+      systemState.operation?.active !== true
+    );
   }
 
   private mapSystemStateToUpdateLogStatus(status: SystemUpdateStateSnapshot['status']): string | null {
