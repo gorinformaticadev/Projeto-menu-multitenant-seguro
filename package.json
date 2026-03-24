@@ -1,6 +1,6 @@
 {
   "private": true,
-  "version": "0.1.67",
+  "version": "0.1.68",
   "workspaces": {
     "packages": [
       "apps/*"
@@ -38,6 +38,19 @@
   },
   "dependencies": {
     "googleapis": "^171.3.0"
+  },
+  "standard-version": {
+    "tagPrefix": "v",
+    "packageFiles": [
+      "package.json",
+      "apps/backend/package.json",
+      "apps/frontend/package.json"
+    ],
+    "bumpFiles": [
+      "package.json",
+      "apps/backend/package.json",
+      "apps/frontend/package.json"
+    ]
   },
   "pnpm": {
     "overrides": {
