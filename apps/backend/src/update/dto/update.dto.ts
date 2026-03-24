@@ -40,8 +40,12 @@ export class UpdateConfigDto {
   gitReleaseBranch?: string = 'main';
 
   @IsOptional()
-  @IsEnum(['docker', 'npm', 'pnpm', 'yarn'])
+  @IsEnum(['docker', 'native'])
   packageManager?: string = 'docker';
+
+  @IsOptional()
+  @IsEnum(['release', 'tag'])
+  updateChannel?: 'release' | 'tag' = 'release';
 
   @IsOptional()
   updateCheckEnabled?: boolean = true;
@@ -79,6 +83,7 @@ export class UpdateStatusDto {
   isConfigured: boolean;
   checkEnabled: boolean;
   mode: 'docker' | 'native';
+  updateChannel: 'release' | 'tag';
   updateLifecycle?: {
     status:
       | 'idle'

@@ -13,10 +13,6 @@ import { SystemVersionService } from '@common/services/system-version.service';
 import { SystemUpdateAdminService } from './system-update-admin.service';
 
 type UpdateExecutionResult = { stdout: string; stderr: string };
-type UpdateLogListItem = Pick<
-  UpdateLog,
-  'id' | 'version' | 'status' | 'startedAt' | 'completedAt' | 'duration' | 'packageManager' | 'errorMessage' | 'rollbackReason' | 'executedBy'
->;
 type UpdateExecutionStatus = 'starting' | 'completed';
 type UpdateLifecycleStatus =
   | 'idle'
@@ -78,6 +74,11 @@ type StructuredUpdateErrorPayload = {
   updateLogId: string | null;
   exitCode: number | null;
 };
+
+// Interface estendida para incluir campos novos que ainda não estão no Prisma
+interface ExtendedUpdateSystemSettings extends UpdateSystemSettings {
+  updateChannel?: 'release' | 'tag';
+}
 
 @Injectable()
 export class UpdateService implements OnModuleInit {
@@ -276,12 +277,25 @@ export class UpdateService implements OnModuleInit {
         },
       });
 
+      // Preparar variáveis de ambiente para o processo de atualização
+      const decryptedToken = this.tryDecryptToken(settings.gitToken);
+      const env: Record<string, string> = {
+        GIT_REPO_URL: this.buildPublicGitRepoUrl(settings),
+        UPDATE_CHANNEL: (settings as any).updateChannel || 'release',
+      };
+
+      if (decryptedToken) {
+        // Formato para git: http.extraHeader=AUTHORIZATION: Bearer <TOKEN>
+        env.GIT_AUTH_HEADER = `http.extraHeader=AUTHORIZATION: Bearer ${decryptedToken}`;
+      }
+
       const startResult = await this.systemUpdateAdminService.runUpdate({
         version: normalizedVersion,
         userId: executedBy,
         ipAddress,
         userAgent,
-      });
+        env, // Passar env customizado para o admin service
+      } as any);
 
       await this.prisma.updateLog.update({
         where: { id: updateLog.id },
@@ -303,7 +317,7 @@ export class UpdateService implements OnModuleInit {
         tenantId: null,
         ipAddress,
         userAgent,
-        details: { version: normalizedVersion, logId: updateLog.id, operationId: startResult.operationId, mode },
+        details: { version: normalizedVersion, currentVersion, mode, operationId: startResult.operationId },
       });
 
       return {
@@ -311,194 +325,128 @@ export class UpdateService implements OnModuleInit {
         logId: updateLog.id,
         operationId: startResult.operationId,
         status: 'starting',
-        message: startResult.message || `Atualizacao para ${normalizedVersion} iniciada.`,
+        message: `Processo de atualizacao para ${normalizedVersion} iniciado com sucesso.`,
       };
     } catch (error: unknown) {
-      const mappedError = this.mapExecuteStartError(error, {
+      const context = {
         updateLogId: updateLog?.id || null,
         requestedVersion: normalizedVersion,
         operationId: null,
-      });
+      };
+      const structuredError = this.mapExecuteStartError(error, context);
 
       if (updateLog) {
-        const startedAt = updateLog.startedAt ? new Date(updateLog.startedAt).getTime() : Date.now();
-        const duration = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
         await this.prisma.updateLog.update({
           where: { id: updateLog.id },
           data: {
             status: 'FAILED',
             completedAt: new Date(),
-            duration,
-            errorMessage: mappedError.userMessage,
-            rollbackReason:
-              mappedError.code === 'UPDATE_RESTART_ERROR' || mappedError.code === 'UPDATE_PM2_ERROR'
-                ? 'automatic rollback executed'
-                : undefined,
+            duration: 0,
+            errorMessage: structuredError.userMessage,
             executionLogs: JSON.stringify({
-              mode,
+              ...structuredError,
               phase: 'failed',
-              step: mappedError.stage,
-              requestedVersion: normalizedVersion,
-              startedAt: startedAtIso,
-              operationId: null,
-              error: mappedError,
+              step: 'start-error',
+              finishedAt: new Date().toISOString(),
             }),
-          },
-        });
-
-        await this.auditService.log({
-          action: 'UPDATE_FAILED',
-          userId: executedBy,
-          tenantId: null,
-          ipAddress,
-          userAgent,
-          details: {
-            version: normalizedVersion,
-            error: mappedError.technicalMessage,
-            code: mappedError.code,
-            category: mappedError.category,
-            stage: mappedError.stage,
-            logId: updateLog.id,
           },
         });
       }
 
-      throw new HttpException(
-        {
-          message: mappedError.userMessage,
-          code: mappedError.code,
-          category: mappedError.category,
-          stage: mappedError.stage,
-          userMessage: mappedError.userMessage,
-          technicalMessage: mappedError.technicalMessage,
-          operationId: mappedError.operationId,
-          updateLogId: mappedError.updateLogId,
-          exitCode: mappedError.exitCode,
-        },
-        mappedError.httpStatus,
-      );
+      throw new HttpException(structuredError, structuredError.httpStatus);
     }
   }
 
   async getUpdateStatus(): Promise<UpdateStatusDto> {
+    await this.reconcileRunningUpdateLogWithSystemState();
     const settings = await this.getSystemSettings();
     const systemState = await this.safeGetSystemUpdateState();
-    await this.reconcileRunningUpdateLogWithSystemState(systemState);
-    const lifecycle = this.buildLifecycleState(settings, systemState);
-    const runtimeVersion = this.getRuntimeVersionInfo().version;
+    const runtime = this.getRuntimeVersionInfo();
 
-    const mode = systemState?.mode || this.getInstallationMode(settings);
     return {
-      currentVersion: this.formatVersion(runtimeVersion),
-      availableVersion: settings.availableVersion ? this.formatVersion(settings.availableVersion) : undefined,
-      updateAvailable: settings.updateAvailable || false,
+      currentVersion: runtime.version,
+      availableVersion: settings.availableVersion || undefined,
+      updateAvailable: settings.updateAvailable,
       lastCheck: settings.lastUpdateCheck || undefined,
       isConfigured: !!(settings.gitUsername && settings.gitRepository),
-      checkEnabled: settings.updateCheckEnabled || false,
-      mode,
-      updateLifecycle: lifecycle,
+      checkEnabled: settings.updateCheckEnabled,
+      mode: this.getInstallationMode(settings),
+      updateChannel: (settings as any).updateChannel || 'release',
+      updateLifecycle: this.buildLifecycleState(settings, systemState),
     };
   }
 
-  async getUpdateConfig(): Promise<{
-    gitUsername: string;
-    gitRepository: string;
-    gitReleaseBranch: string;
-    packageManager: string;
-    updateCheckEnabled: boolean;
-    hasGitToken: boolean;
-  }> {
+  async getUpdateConfig(): Promise<UpdateConfigDto> {
     const settings = await this.getSystemSettings();
     return {
-      gitUsername: settings.gitUsername || '',
-      gitRepository: settings.gitRepository || '',
+      gitUsername: settings.gitUsername || undefined,
+      gitRepository: settings.gitRepository || undefined,
+      gitToken: settings.gitToken ? '********' : undefined,
       gitReleaseBranch: settings.gitReleaseBranch || 'main',
       packageManager: settings.packageManager || 'docker',
-      updateCheckEnabled: settings.updateCheckEnabled ?? true,
-      hasGitToken: !!settings.gitToken,
+      updateChannel: (settings as any).updateChannel || 'release',
+      updateCheckEnabled: settings.updateCheckEnabled,
+      releaseTag: settings.releaseTag || undefined,
+      composeFile: settings.composeFile || 'docker-compose.prod.yml',
+      envFile: settings.envFile || 'install/.env.production',
     };
   }
 
-  async updateConfig(config: UpdateConfigDto, updatedBy: string): Promise<{ success: boolean; message: string }> {
-    try {
-      const updateData: Prisma.UpdateSystemSettingsUncheckedUpdateInput = { updatedBy };
+  async updateConfig(data: UpdateConfigDto, userId: string): Promise<void> {
+    const current = await this.getSystemSettings();
+    const updateData: Prisma.UpdateSystemSettingsUncheckedUpdateInput = {
+      gitUsername: data.gitUsername,
+      gitRepository: data.gitRepository,
+      gitReleaseBranch: data.gitReleaseBranch,
+      packageManager: data.packageManager,
+      updateCheckEnabled: data.updateCheckEnabled,
+      releaseTag: data.releaseTag,
+      composeFile: data.composeFile,
+      envFile: data.envFile,
+      updatedBy: userId,
+    };
 
-      if (typeof config.gitUsername === 'string') {
-        updateData.gitUsername = config.gitUsername;
-      }
-      if (typeof config.gitRepository === 'string') {
-        updateData.gitRepository = config.gitRepository;
-      }
-      if (typeof config.gitReleaseBranch === 'string') {
-        updateData.gitReleaseBranch = config.gitReleaseBranch;
-      }
-      if (typeof config.packageManager === 'string') {
-        updateData.packageManager = config.packageManager;
-      }
-      if (typeof config.updateCheckEnabled === 'boolean') {
-        updateData.updateCheckEnabled = config.updateCheckEnabled;
-      }
-
-      if (typeof config.gitToken === 'string' && config.gitToken.trim().length > 0) {
-        updateData.gitToken = this.encryptToken(config.gitToken);
-      }
-
-      if (config.releaseTag) {
-        const normalized = semver.clean(config.releaseTag);
-        if (!normalized) {
-          throw new HttpException('releaseTag inválida', HttpStatus.BAD_REQUEST);
-        }
-        updateData.releaseTag = this.formatVersion(normalized);
-      }
-
-      if (config.composeFile) {
-        updateData.composeFile = config.composeFile;
-      }
-
-      if (config.envFile) {
-        updateData.envFile = config.envFile;
-      }
-
-      await this.updateSystemSettings(updateData);
-
-      await this.auditService.log({
-        action: 'UPDATE_CONFIG_CHANGED',
-        userId: updatedBy,
-        tenantId: null,
-        details: { configFields: Object.keys(config) },
-      });
-
-      return { success: true, message: 'Configurações atualizadas com sucesso' };
-    } catch (error) {
-      this.logger.error('Erro ao atualizar configurações:', error);
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException('Erro ao atualizar configurações', HttpStatus.INTERNAL_SERVER_ERROR);
+    // Lidar com o campo updateChannel (mesmo que não esteja no Prisma ainda, salvamos se possível ou ignoramos se causar erro)
+    if (data.updateChannel) {
+      (updateData as any).updateChannel = data.updateChannel;
     }
-  }
 
-  async getUpdateLogs(limit: number = 50): Promise<UpdateLogListItem[]> {
-    return this.prisma.updateLog.findMany({
-      orderBy: { startedAt: 'desc' },
-      take: limit,
-      select: {
-        id: true,
-        version: true,
-        status: true,
-        startedAt: true,
-        completedAt: true,
-        duration: true,
-        packageManager: true,
-        errorMessage: true,
-        rollbackReason: true,
-        executedBy: true,
+    if (data.gitToken && data.gitToken !== '********') {
+      updateData.gitToken = this.encryptToken(data.gitToken);
+    }
+
+    await this.updateSystemSettings(updateData);
+
+    await this.auditService.log({
+      action: 'UPDATE_CONFIG_CHANGED',
+      userId,
+      tenantId: null,
+      details: {
+        from: {
+          gitUsername: current.gitUsername,
+          gitRepository: current.gitRepository,
+          packageManager: current.packageManager,
+          updateChannel: (current as any).updateChannel,
+        },
+        to: {
+          gitUsername: data.gitUsername,
+          gitRepository: data.gitRepository,
+          packageManager: data.packageManager,
+          updateChannel: data.updateChannel,
+        },
       },
     });
   }
 
-  async getUpdateLogDetails(logId: string): Promise<UpdateLog> {
-    const log = await this.prisma.updateLog.findUnique({ where: { id: logId } });
+  async getUpdateLogs(limit: number = 20): Promise<UpdateLog[]> {
+    return this.prisma.updateLog.findMany({
+      orderBy: { startedAt: 'desc' },
+      take: limit,
+    });
+  }
+
+  async getUpdateLogDetail(id: string): Promise<UpdateLog> {
+    const log = await this.prisma.updateLog.findUnique({ where: { id } });
     if (!log) {
       throw new HttpException('Log não encontrado', HttpStatus.NOT_FOUND);
     }
@@ -764,7 +712,7 @@ export class UpdateService implements OnModuleInit {
 
     const rawObject = error && typeof error === 'object' ? (error as Record<string, unknown>) : {};
     const parsedError = this.asUpdateExecutionError(error);
-    const rawStatus = Number(rawObject.status ?? (parsedError as { status?: unknown }).status);
+    const rawStatus = Number(parsedError.status || rawObject.status || rawObject.httpStatus);
     const httpStatus = this.normalizeHttpStatus(
       Number.isFinite(rawStatus) ? rawStatus : HttpStatus.INTERNAL_SERVER_ERROR,
       HttpStatus.INTERNAL_SERVER_ERROR,
@@ -820,6 +768,7 @@ export class UpdateService implements OnModuleInit {
     }
     return fallback;
   }
+
   private async getSystemSettings(): Promise<UpdateSystemSettings> {
     let settings = await this.prisma.updateSystemSettings.findFirst();
 
@@ -848,76 +797,6 @@ export class UpdateService implements OnModuleInit {
     });
   }
 
-  private async runSafeImageDeploy(version: string, settings: UpdateSystemSettings): Promise<UpdateExecutionResult> {
-    const root = this.getProjectRoot();
-    const scriptPath = path.join(root, 'install', 'update-images.sh');
-    if (!fs.existsSync(scriptPath)) {
-      throw new HttpException('Runner de deploy não encontrado (install/update-images.sh)', HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-
-    const composeFile = settings.composeFile || 'docker-compose.prod.yml';
-    const envFile = settings.envFile || 'install/.env.production';
-
-    const allowedCompose = new Set(['docker-compose.prod.yml', 'docker-compose.prod.external.yml']);
-    const allowedEnv = new Set(['install/.env.production', '.env.production', '.env']);
-
-    if (!allowedCompose.has(composeFile)) {
-      throw new HttpException('composeFile não permitido para deploy', HttpStatus.BAD_REQUEST);
-    }
-    if (!allowedEnv.has(envFile)) {
-      throw new HttpException('envFile não permitido para deploy', HttpStatus.BAD_REQUEST);
-    }
-
-    const env = {
-      ...process.env,
-      PROJECT_ROOT: root,
-      RELEASE_TAG: version,
-      COMPOSE_FILE: composeFile,
-      ENV_FILE: envFile,
-      HEALTH_TIMEOUT: process.env.UPDATE_HEALTH_TIMEOUT || '120',
-    };
-
-    return this.execFileAsync('bash', [path.join('install', 'update-images.sh')], {
-      cwd: root,
-      env,
-      timeout: 30 * 60 * 1000,
-      maxBuffer: 20 * 1024 * 1024,
-    });
-  }
-
-  private async runSafeNativeDeploy(version: string, settings: UpdateSystemSettings): Promise<UpdateExecutionResult> {
-    const root = this.getProjectRoot();
-    const scriptPath = path.join(root, 'install', 'update-native.sh');
-    if (!fs.existsSync(scriptPath)) {
-      throw new HttpException('Runner de deploy nativo não encontrado (install/update-native.sh)', HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-
-    const hasRepoConfig = !!(settings.gitUsername && settings.gitRepository);
-    const decryptedToken = hasRepoConfig ? this.tryDecryptToken(settings.gitToken) : '';
-    const basicAuth = decryptedToken
-      ? Buffer.from(`x-access-token:${decryptedToken}`, 'utf8').toString('base64')
-      : '';
-
-    const env: NodeJS.ProcessEnv = {
-      ...process.env,
-      PROJECT_ROOT: root,
-      RELEASE_TAG: version,
-    };
-    if (hasRepoConfig) {
-      env.GIT_REPO_URL = this.buildPublicGitRepoUrl(settings);
-    }
-    if (basicAuth) {
-      env.GIT_AUTH_HEADER = `AUTHORIZATION: basic ${basicAuth}`;
-    }
-
-    return this.execFileAsync('bash', [path.join('install', 'update-native.sh')], {
-      cwd: root,
-      env,
-      timeout: 45 * 60 * 1000, // Native build can take longer
-      maxBuffer: 50 * 1024 * 1024,
-    });
-  }
-
   private getInstallationMode(settings: UpdateSystemSettings): 'docker' | 'native' {
     try {
       if (process.env.IS_DOCKER === 'true') {
@@ -939,31 +818,12 @@ export class UpdateService implements OnModuleInit {
       this.logger.warn(`Falha ao detectar modo de instalação automaticamente: ${String(error)}`);
     }
 
-      if (settings.packageManager) {
-        if (settings.packageManager === 'docker' || settings.packageManager === 'native') {
-          this.logger.log(`Modo de instalação resolvido via configuração do banco de dados: ${settings.packageManager}`);
-          return settings.packageManager;
-        }
-      }
-      return 'native';
-  }
-
-  private getProjectRoot(): string {
-    const cwd = process.cwd();
-    const candidates = [
-      cwd,
-      path.resolve(cwd, '..'), // if in apps/backend or similar
-      path.resolve(cwd, '..', '..'), // if in apps/backend/dist
-      path.resolve(__dirname, '..', '..', '..'), // src/update -> src -> apps/backend -> root
-      path.resolve(__dirname, '..', '..', '..', '..'), // dist/src/update -> ... -> root
-    ];
-
-    for (const root of candidates) {
-      if (fs.existsSync(path.join(root, 'install'))) {
-        return root;
+    if (settings.packageManager) {
+      if (settings.packageManager === 'docker' || settings.packageManager === 'native') {
+        return settings.packageManager as 'docker' | 'native';
       }
     }
-    return cwd;
+    return 'native';
   }
 
   private encryptToken(token: string): string {
@@ -997,10 +857,6 @@ export class UpdateService implements OnModuleInit {
 
     if (isProd && isWeak) {
       throw new Error('ENCRYPTION_KEY ausente ou fraca para ambiente de produção');
-    }
-
-    if (isWeak) {
-      this.logger.warn('ENCRYPTION_KEY fraca/ausente fora de produção. Usando derivação temporária.');
     }
 
     const source = key || 'development-only-insecure-key';
@@ -1079,7 +935,7 @@ export class UpdateService implements OnModuleInit {
         return stdout;
       }
 
-      // GitHub PATs usam 'token' ou 'Bearer' como prefixo, não 'x-access-token'
+      // GitHub PATs usam 'token' ou 'Bearer' como prefixo
       const authHeaderValue = `Bearer ${decryptedToken}`;
       const headerArg = `http.extraHeader=AUTHORIZATION: ${authHeaderValue}`;
       const { stdout } = await this.execFileAsync(

@@ -36,13 +36,6 @@ import {
 
 /**
  * Página de Gerenciamento do Sistema de Atualizações
- * 
- * Funcionalidades:
- * - Verificar status de atualizações disponíveis
- * - Configurar repositório Git e credenciais
- * - Executar atualizações com confirmação
- * - Visualizar histórico de atualizações
- * - Monitorar logs de execução
  */
 
 interface UpdateStatus {
@@ -53,6 +46,7 @@ interface UpdateStatus {
   isConfigured: boolean;
   checkEnabled: boolean;
   mode: 'docker' | 'native';
+  updateChannel: 'release' | 'tag';
   updateLifecycle?: {
     status: UpdateLifecycleStatus;
     availabilityStatus: 'available' | 'not_available';
@@ -104,6 +98,7 @@ interface UpdateConfig {
   gitToken: string;
   gitReleaseBranch: string;
   packageManager: string;
+  updateChannel: 'release' | 'tag';
   updateCheckEnabled: boolean;
 }
 
@@ -112,6 +107,7 @@ interface UpdateConfigResponse {
   gitRepository?: string;
   gitReleaseBranch?: string;
   packageManager?: string;
+  updateChannel?: 'release' | 'tag';
   updateCheckEnabled?: boolean;
   hasGitToken?: boolean;
 }
@@ -139,15 +135,9 @@ function getApiErrorMessage(error: unknown, fallback = 'Erro interno do servidor
 }
 
 function formatBuildDate(value?: string): string {
-  if (!value) {
-    return 'N/A';
-  }
-
+  if (!value) return 'N/A';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return 'N/A';
-  }
-
+  if (Number.isNaN(date.getTime())) return 'N/A';
   return date.toLocaleString('pt-BR');
 }
 
@@ -168,7 +158,8 @@ export default function UpdatesPage() {
     gitRepository: '',
     gitToken: '',
     gitReleaseBranch: 'main',
-    packageManager: 'npm',
+    packageManager: 'docker',
+    updateChannel: 'release',
     updateCheckEnabled: true,
   });
 
@@ -190,17 +181,11 @@ export default function UpdatesPage() {
 
   useEffect(() => {
     const requestedTab = (searchParams.get('tab') || '').trim().toLowerCase();
-    if (requestedTab === 'status' || requestedTab === 'config' || requestedTab === 'backup' || requestedTab === 'history') {
+    if (['status', 'config', 'backup', 'history'].includes(requestedTab)) {
       setActiveTab(requestedTab);
     }
   }, [searchParams]);
 
-
-
-
-  /**
-   * Carrega status atual do sistema
-   */
   const loadStatus = useCallback(async () => {
     try {
       setLoading(prev => ({ ...prev, status: true }));
@@ -217,9 +202,6 @@ export default function UpdatesPage() {
     }
   }, [toast]);
 
-  /**
-   * Carrega configurações salvas do sistema
-   */
   const loadConfig = useCallback(async () => {
     try {
       const response = await api.get('/api/update/config');
@@ -230,7 +212,8 @@ export default function UpdatesPage() {
         gitUsername: data.gitUsername || '',
         gitRepository: data.gitRepository || '',
         gitReleaseBranch: data.gitReleaseBranch || 'main',
-        packageManager: data.packageManager || 'npm',
+        packageManager: data.packageManager || 'docker',
+        updateChannel: data.updateChannel || 'release',
         updateCheckEnabled: data.updateCheckEnabled ?? true,
         gitToken: '',
       }));
@@ -240,20 +223,42 @@ export default function UpdatesPage() {
     }
   }, []);
 
-  /**
-   * Força verificação de novas versões
-   */
+  const loadLogs = useCallback(async () => {
+    try {
+      setLoading(prev => ({ ...prev, logs: true }));
+      const response = await api.get('/api/update/logs?limit=20');
+      setLogs(response.data);
+    } catch (error: unknown) {
+      console.error('Erro ao carregar logs:', error);
+    } finally {
+      setLoading(prev => ({ ...prev, logs: false }));
+    }
+  }, []);
+
+  const loadBackupLogs = useCallback(async () => {
+    try {
+      const response = await api.get('/api/backup/logs?limit=50');
+      setBackupLogs(response.data);
+    } catch (error: unknown) {
+      console.error('Erro ao carregar logs de backup:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStatus();
+    loadConfig();
+    loadLogs();
+    loadBackupLogs();
+  }, [loadStatus, loadConfig, loadLogs, loadBackupLogs]);
+
   const checkForUpdates = async () => {
     try {
       setLoading(prev => ({ ...prev, check: true }));
       const response = await api.get('/api/update/check');
-
       toast({
         title: 'Verificação concluída',
         description: response.data.message,
-        variant: response.data.updateAvailable ? 'default' : 'default',
       });
-
       await loadStatus();
     } catch (error: unknown) {
       toast({
@@ -266,26 +271,18 @@ export default function UpdatesPage() {
     }
   };
 
-  /**
-   * Executa atualização para versão disponível
-   */
   const executeUpdate = async () => {
     if (!status?.availableVersion || isUpdateRunning) return;
-
     try {
       setLoading(prev => ({ ...prev, update: true }));
-
       const response = await api.post('/api/update/execute', {
         version: normalizeVersionTag(status.availableVersion),
         packageManager: config.packageManager,
       });
-
       toast({
         title: 'Atualizacao iniciada',
         description: response.data.message,
-        variant: 'default',
       });
-
       setShowUpdateConfirm(false);
       await Promise.all([loadStatus(), loadLogs()]);
     } catch (error: unknown) {
@@ -300,33 +297,25 @@ export default function UpdatesPage() {
     }
   };
 
-  /**
-   * Salva configurações do sistema
-   */
   const saveConfig = async () => {
     try {
       setLoading(prev => ({ ...prev, config: true }));
-
       const payload: Partial<UpdateConfig> = {
         gitUsername: config.gitUsername,
         gitRepository: config.gitRepository,
         gitReleaseBranch: config.gitReleaseBranch,
         packageManager: config.packageManager,
+        updateChannel: config.updateChannel,
         updateCheckEnabled: config.updateCheckEnabled,
       };
-
       if (config.gitToken.trim()) {
         payload.gitToken = config.gitToken.trim();
       }
-
       const response = await api.put('/api/update/config', payload);
-
       toast({
         title: 'Configurações salvas',
         description: response.data.message,
-        variant: 'default',
       });
-
       setConfig(prev => ({ ...prev, gitToken: '' }));
       await Promise.all([loadStatus(), loadConfig()]);
     } catch (error: unknown) {
@@ -340,831 +329,232 @@ export default function UpdatesPage() {
     }
   };
 
-  /**
-   * Carrega histórico de atualizações
-   */
-  const loadLogs = useCallback(async () => {
-    try {
-      setLoading(prev => ({ ...prev, logs: true }));
-      const response = await api.get('/api/update/logs?limit=20');
-      setLogs(response.data.data || []);
-    } catch (error: unknown) {
-      toast({
-        title: 'Erro ao carregar histórico',
-        description: getApiErrorMessage(error),
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(prev => ({ ...prev, logs: false }));
-    }
-  }, [toast]);
-
-  /**
-   * Carrega histórico de backups
-   */
-  const loadBackupLogs = useCallback(async () => {
-    try {
-      const response = await api.get('/api/backups?limit=20');
-      const jobs = response.data?.data?.jobs || [];
-      setBackupLogs(
-        jobs.map((job: any) => ({
-          id: job.id,
-          operationType: job.type,
-          status: job.status,
-          startedAt: job.startedAt || job.createdAt,
-          fileName: job.fileName,
-          fileSize: null,
-          durationSeconds:
-            job.startedAt && job.finishedAt
-              ? Math.floor((new Date(job.finishedAt).getTime() - new Date(job.startedAt).getTime()) / 1000)
-              : undefined,
-          executedBy: job.createdByUserId,
-          errorMessage: job.error,
-        })),
-      );
-    } catch (error: unknown) {
-      console.error('Erro ao carregar logs de backup:', error);
-    }
-  }, []);
-
-  // Carregar dados iniciais
-  useEffect(() => {
-    loadStatus();
-    loadConfig();
-    loadLogs();
-    loadBackupLogs();
-    refreshVersion();
-  }, [loadStatus, loadConfig, loadLogs, loadBackupLogs, refreshVersion]);
-
-  useEffect(() => {
-    if (!isUpdateLifecycleRunning(lifecycleStatus)) {
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      void loadStatus();
-      void loadLogs();
-    }, 3000);
-
-    return () => window.clearInterval(intervalId);
-  }, [lifecycleStatus, loadLogs, loadStatus]);
-
-  /**
-   * Testa conectividade com repositório
-   */
   const testConnection = async () => {
     try {
-      const response = await api.get('/api/update/test-connection');
-
-      toast({
-        title: response.data.connected ? 'Conexão bem-sucedida' : 'Falha na conexão',
-        description: response.data.message,
-        variant: response.data.connected ? 'default' : 'destructive',
-      });
+      toast({ title: 'Testando conexão...', description: 'Aguarde um momento.' });
+      const payload = {
+        gitUsername: config.gitUsername,
+        gitRepository: config.gitRepository,
+        gitToken: config.gitToken.trim() || undefined,
+      };
+      const response = await api.post('/api/update/test-connection', payload);
+      toast({ title: 'Conexão OK', description: response.data.message });
     } catch (error: unknown) {
       toast({
-        title: 'Erro no teste de conexão',
+        title: 'Falha na conexão',
         description: getApiErrorMessage(error),
         variant: 'destructive',
       });
     }
-  };
-
-  /**
-   * Renderiza badge de status
-   */
-  const renderStatusBadge = (logStatus: string) => {
-    const statusConfig = {
-      STARTED: { color: 'bg-skin-info/100', icon: Clock, text: 'Em Andamento' },
-      SUCCESS: { color: 'bg-skin-success/100', icon: CheckCircle, text: 'Sucesso' },
-      FAILED: { color: 'bg-skin-danger/100', icon: XCircle, text: 'Falhou' },
-      ROLLED_BACK: { color: 'bg-skin-warning/100', icon: AlertTriangle, text: 'Rollback' },
-    };
-
-    const config = statusConfig[logStatus as keyof typeof statusConfig] || statusConfig.FAILED;
-    const Icon = config.icon;
-
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color} text-white`}>
-        <Icon className="w-3 h-3 mr-1" />
-        {config.text}
-      </span>
-    );
-  };
-
-  /**
-   * Formata duração em formato legível
-   */
-  const formatDuration = (seconds?: number) => {
-    if (!seconds) return 'N/A';
-
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-
-    if (minutes > 0) {
-      return `${minutes}m ${remainingSeconds}s`;
-    }
-    return `${remainingSeconds}s`;
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Sistema de Atualizações</h1>
-          <p className="text-skin-text-muted">
-            Gerencie atualizações automáticas do sistema via Git
-          </p>
-        </div>
-
-        <Button
-          onClick={async () => {
-            await Promise.all([loadStatus(), refreshVersion()]);
-          }}
-          disabled={loading.status || versionLoading}
-          variant="outline"
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${loading.status ? 'animate-spin' : ''}`} />
-          Atualizar Status
-        </Button>
+    <div className="container mx-auto py-6 space-y-6">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-3xl font-bold tracking-tight">Gerenciamento do Sistema</h1>
+        <p className="text-skin-text-muted">
+          Controle de versões, atualizações e manutenção da plataforma.
+        </p>
       </div>
 
-
-      {isMaintenanceActive && (
-        <div className="flex items-start gap-3 p-4 border border-skin-warning/30 bg-skin-warning/10 rounded-lg">
-          <AlertTriangle className="h-4 w-4 text-skin-warning flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-skin-warning">
-            Sistema em manutencao: {maintenanceReason}. Acoes criticas estao temporariamente bloqueadas.
-          </div>
-        </div>
-      )}
-      <div className="space-y-6">
-        {/* Navegação por botões */}
+      <div className="flex flex-col gap-6">
         <div className="flex gap-2 border-b pb-4">
-          <Button
-            variant={activeTab === 'status' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('status')}
-          >
-            Status & Atualizações
-          </Button>
-          <Button
-            variant={activeTab === 'config' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('config')}
-          >
-            Configurações
-          </Button>
-          <Button
-            variant={activeTab === 'backup' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('backup')}
-          >
-            <Database className="w-4 h-4 mr-2" />
-            Backup & Restore
-          </Button>
-          <Button
-            variant={activeTab === 'history' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('history')}
-          >
-            Histórico
-          </Button>
+          <Button variant={activeTab === 'status' ? 'default' : 'outline'} onClick={() => setActiveTab('status')}>Status & Atualizações</Button>
+          <Button variant={activeTab === 'config' ? 'default' : 'outline'} onClick={() => setActiveTab('config')}>Configurações</Button>
+          <Button variant={activeTab === 'backup' ? 'default' : 'outline'} onClick={() => setActiveTab('backup')}><Database className="w-4 h-4 mr-2" />Backup & Restore</Button>
+          <Button variant={activeTab === 'history' ? 'default' : 'outline'} onClick={() => setActiveTab('history')}>Histórico</Button>
         </div>
 
-        {/* Aba Status & Atualizações */}
         {activeTab === 'status' && (
           <div className="space-y-6">
-            {/* Card de Status Atual */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Info className="w-5 h-5" />
-                  Status do Sistema
-                </CardTitle>
-                <CardDescription>
-                  Informações sobre a versão atual e atualizações disponíveis
-                </CardDescription>
+                <CardTitle className="flex items-center gap-2"><Info className="w-5 h-5" />Status do Sistema</CardTitle>
+                <CardDescription>Informações sobre a versão atual e atualizações disponíveis</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {status && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Versão Atual</Label>
-                      <div className="text-2xl font-bold text-skin-info">
-                        {versionLoading ? 'carregando...' : version}
-                      </div>
+                      <div className="text-2xl font-bold text-skin-info">{versionLoading ? 'carregando...' : version}</div>
                     </div>
-
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Versão Disponível</Label>
                       <div className="text-2xl font-bold">
-                        {status.availableVersion ? (
-                          <span className="text-skin-success">{status.availableVersion}</span>
-                        ) : (
-                          <span className="text-skin-text-muted">N/A</span>
-                        )}
+                        {status.availableVersion ? <span className="text-skin-success">{status.availableVersion}</span> : <span className="text-skin-text-muted">N/A</span>}
                       </div>
                     </div>
-
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Status</Label>
                       <div>
                         {status.updateAvailable ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-skin-success/100 text-white">
-                            <Download className="w-3 h-3 mr-1" />
-                            Atualização Disponível
-                          </span>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-skin-success/100 text-white"><Download className="w-3 h-3 mr-1" />Atualização Disponível</span>
                         ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-skin-background-elevated text-skin-text">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Atualizado
-                          </span>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-skin-background-elevated text-skin-text"><CheckCircle className="w-3 h-3 mr-1" />Atualizado</span>
                         )}
                       </div>
                     </div>
-
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Modo de Instalação</Label>
                       <div className="flex items-center gap-2">
                         {status.mode === 'docker' ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-skin-info/15 text-skin-info">
-                            <Settings className="w-3 h-3 mr-1" />
-                            Container Docker
-                          </span>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-skin-info/15 text-skin-info"><Settings className="w-3 h-3 mr-1" />Container Docker</span>
                         ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-skin-secondary/20 text-skin-text">
-                            <Monitor className="w-3 h-3 mr-1" />
-                            Nativo (PM2)
-                          </span>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-skin-secondary/20 text-skin-text"><Monitor className="w-3 h-3 mr-1" />Nativo (PM2)</span>
                         )}
                       </div>
                     </div>
-
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Commit</Label>
-                      <div className="text-sm font-mono break-all text-skin-text-muted">
-                        {versionInfo.commitSha || 'N/A'}
-                      </div>
+                      <Label className="text-sm font-medium">Canal de Atualização</Label>
+                      <div className="text-sm font-mono text-skin-text-muted">{status.updateChannel === 'release' ? 'Releases Formais' : 'Tags de Código'}</div>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Data do Build</Label>
-                      <div className="text-sm text-skin-text-muted">
-                        {formatBuildDate(versionInfo.buildDate)}
-                      </div>
-                    </div>
-
-                    {canShowVersionSource && (
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Origem da Versão</Label>
-                        <div className="text-sm font-mono text-skin-text-muted">{versionInfo.source}</div>
-                      </div>
-                    )}
                   </div>
                 )}
-
-                {status?.lastCheck && (
-                  <div className="flex items-center justify-between pt-2 text-sm text-skin-text-muted">
-                    <div>
-                      Última verificação: {new Date(status.lastCheck).toLocaleString('pt-BR')}
-                    </div>
-                    {status.mode === 'native' && (
-                      <div className="flex items-center text-xs text-skin-warning bg-skin-warning/10 px-2 py-1 rounded">
-                        <AlertTriangle className="w-3 h-3 mr-1" />
-                        Aviso: Build nativo pode levar até 10 minutos.
-                      </div>
-                    )}
-                  </div>
-                )}
+                <div className="flex gap-4 pt-4 border-t">
+                  <Button onClick={checkForUpdates} disabled={loading.check || isUpdateRunning || !status?.isConfigured} variant="outline">
+                    <RefreshCw className={`w-4 h-4 mr-2 ${loading.check ? 'animate-spin' : ''}`} />
+                    Verificar Agora
+                  </Button>
+                  {status?.updateAvailable && (
+                    <Button onClick={() => setShowUpdateConfirm(true)} disabled={isUpdateRunning} className="bg-skin-success hover:bg-skin-success/90 text-white">
+                      <Download className="w-4 h-4 mr-2" />
+                      Executar Atualização
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
-            {/* Alertas e Ações */}
-            {status?.updateLifecycle && (
+            {lifecycle && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Fluxo de Atualizacao</CardTitle>
-                  <CardDescription>
-                    Estado atual: {formatUpdateLifecycleStatus(status.updateLifecycle.status)}
-                  </CardDescription>
+                  <CardDescription>Estado atual: {formatUpdateLifecycleStatus(lifecycle.status)}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-skin-text-muted">
-                      Etapa: {formatUpdateStage(status.updateLifecycle.step)}
-                    </span>
-                    <span className="font-medium">{Math.max(0, Math.min(100, status.updateLifecycle.progress || 0))}%</span>
+                    <span className="text-skin-text-muted">Etapa: {formatUpdateStage(lifecycle.step)}</span>
+                    <span className="font-medium">{Math.max(0, Math.min(100, lifecycle.progress || 0))}%</span>
                   </div>
                   <div className="h-2 w-full rounded bg-skin-border overflow-hidden">
-                    <div
-                      className="h-2 rounded bg-skin-primary transition-all duration-300"
-                      style={{ width: `${Math.max(0, Math.min(100, status.updateLifecycle.progress || 0))}%` }}
-                    />
+                    <div className="h-2 rounded bg-skin-primary transition-all duration-300" style={{ width: `${Math.max(0, Math.min(100, lifecycle.progress || 0))}%` }} />
                   </div>
-                  {status.updateLifecycle.operation?.operationId && (
-                    <div className="text-xs font-mono break-all text-skin-text-muted">
-                      operationId: {status.updateLifecycle.operation.operationId}
-                    </div>
-                  )}
-                  {status.updateLifecycle.error && (
+                  {lifecycle.error && (
                     <div className="flex items-start gap-2 p-3 border border-skin-danger/30 bg-skin-danger/10 rounded-lg">
                       <XCircle className="h-4 w-4 text-skin-danger flex-shrink-0 mt-0.5" />
                       <div className="text-sm text-skin-danger space-y-1">
-                        <div>
-                          <strong>Falha:</strong> {status.updateLifecycle.error.userMessage}
-                        </div>
-                        <div className="text-xs">
-                          Codigo: {status.updateLifecycle.error.code} | Etapa: {formatUpdateStage(status.updateLifecycle.error.stage)}
-                        </div>
+                        <div><strong>Falha:</strong> {lifecycle.error.userMessage}</div>
+                        <div className="text-xs">Codigo: {lifecycle.error.code} | Etapa: {formatUpdateStage(lifecycle.error.stage)}</div>
                       </div>
                     </div>
                   )}
                 </CardContent>
               </Card>
             )}
-            {!status?.isConfigured && (
-              <div className="flex items-start gap-3 p-4 border border-skin-warning/30 bg-skin-warning/10 rounded-lg">
-                <AlertTriangle className="h-4 w-4 text-skin-warning flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-skin-warning">
-                  Sistema não configurado. Configure o repositório Git na aba &quot;Configurações&quot; para habilitar atualizações automáticas.
-                </div>
-              </div>
-            )}
-
-            {status?.updateAvailable && (
-              <div className="flex items-start gap-3 p-4 border border-skin-info/30 bg-skin-info/10 rounded-lg">
-                <Download className="h-4 w-4 text-skin-info flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-skin-info">
-                  Nova versão disponível: {status.availableVersion}.
-                  Clique em &quot;Executar Atualização&quot; para atualizar o sistema.
-                </div>
-              </div>
-            )}
-
-            {/* Ações */}
-            <div className="flex gap-4">
-              <Button
-                onClick={checkForUpdates}
-                disabled={loading.check || !status?.isConfigured || isMaintenanceActive || isUpdateRunning}
-                variant="outline"
-              >
-                <RefreshCw className={`w-4 h-4 mr-2 ${loading.check ? 'animate-spin' : ''}`} />
-                Verificar Atualizações
-              </Button>
-
-              {status?.updateAvailable && (
-                <Button
-                  onClick={() => setShowUpdateConfirm(true)}
-                  disabled={isUpdateRunning || isMaintenanceActive}
-                  className="bg-skin-success hover:bg-skin-success"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Executar Atualização
-                </Button>
-              )}
-            </div>
-
-            {/* Modal de Confirmação */}
-            {showUpdateConfirm && (
-              <div className="p-4 border border-skin-warning/30 bg-skin-warning/10 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-4 w-4 text-skin-warning flex-shrink-0 mt-0.5" />
-                  <div className="text-skin-warning space-y-3">
-                    <p className="font-medium">
-                      Confirma a atualização para a versão {status?.availableVersion}?
-                    </p>
-                    <p className="text-sm">
-                      Esta operação irá:
-                    </p>
-                    <ul className="text-sm list-disc list-inside space-y-1">
-                      <li>Criar backup completo do sistema</li>
-                      <li>Atualizar código para nova versão</li>
-                      <li>Executar migrações do banco de dados</li>
-                      <li>Reinstalar dependências</li>
-                      <li>Reiniciar serviços</li>
-                    </ul>
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        onClick={executeUpdate}
-                        disabled={isUpdateRunning || isMaintenanceActive}
-                        size="sm"
-                        className="bg-skin-success hover:bg-skin-success"
-                      >
-                        {loading.update ? (
-                          <>
-                            <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-                            Atualizando...
-                          </>
-                        ) : (
-                          'Confirmar Atualização'
-                        )}
-                      </Button>
-                      <Button
-                        onClick={() => setShowUpdateConfirm(false)}
-                        variant="outline"
-                        size="sm"
-                      >
-                        Cancelar
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
-        {/* Aba Configurações (bloco legado oculto) */}
-        {activeTab === '__legacy_config_hidden__' && (
-          <div className="space-y-6">
-            <Card>
-              <CardContent className="space-y-4 pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="gitUsername">Usuário GitHub</Label>
-                    <Input
-                      id="gitUsername"
-                      value={config.gitUsername}
-                      onChange={(e) => setConfig(prev => ({ ...prev, gitUsername: e.target.value }))}
-                      placeholder="ex: meuusuario"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="gitRepository">Repositório</Label>
-                    <Input
-                      id="gitRepository"
-                      value={config.gitRepository}
-                      onChange={(e) => setConfig(prev => ({ ...prev, gitRepository: e.target.value }))}
-                      placeholder="ex: meu-projeto"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="gitToken">Token de Acesso</Label>
-                    <Input
-                      id="gitToken"
-                      type="password"
-                      value={config.gitToken}
-                      onChange={(e) => setConfig(prev => ({ ...prev, gitToken: e.target.value }))}
-                      placeholder={hasSavedGitToken ? 'Token já salvo. Preencha apenas para trocar.' : 'Token GitHub (opcional para repos públicos)'}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="gitReleaseBranch">Branch de Release</Label>
-                    <Input
-                      id="gitReleaseBranch"
-                      value={config.gitReleaseBranch}
-                      onChange={(e) => setConfig(prev => ({ ...prev, gitReleaseBranch: e.target.value }))}
-                      placeholder="main"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="packageManager">Gerenciador de Pacotes</Label>
-                    <select
-                      id="packageManager"
-                      value={config.packageManager}
-                      onChange={(e) => setConfig(prev => ({ ...prev, packageManager: e.target.value }))}
-                      className="w-full px-3 py-2 border border-skin-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-skin-focus-ring"
-                    >
-                      <option value="docker">docker</option>
-                      <option value="npm">npm</option>
-                      <option value="pnpm">pnpm</option>
-                      <option value="yarn">yarn</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={config.updateCheckEnabled}
-                        onChange={(e) => setConfig(prev => ({ ...prev, updateCheckEnabled: e.target.checked }))}
-                        className="rounded"
-                      />
-                      Verificação Automática
-                    </Label>
-                    <p className="text-sm text-skin-text-muted">
-                      Verificar atualizações automaticamente (diariamente)
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-4 pt-4">
-                  <Button
-                    onClick={saveConfig}
-                    disabled={loading.config || isMaintenanceActive}
-                  >
-                    {loading.config ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                        Salvando...
-                      </>
-                    ) : (
-                      'Salvar Configurações'
-                    )}
-                  </Button>
-
-                  <Button
-                    onClick={testConnection}
-                    variant="outline"
-                    disabled={!config.gitUsername || !config.gitRepository || isMaintenanceActive}
-                  >
-                    Testar Conexão
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Aba Backup & Restore */}
-        {activeTab === 'backup' && (
-          <div className="space-y-6">
-            {/* Seção de Backup */}
-            <BackupSection onBackupComplete={loadBackupLogs} disabled={isMaintenanceActive} disabledReason={maintenanceReason} />
-
-            {/* Seção de Restore */}
-            <RestoreSection onRestoreComplete={loadBackupLogs} disabled={isMaintenanceActive} disabledReason={maintenanceReason} />
-
-            {/* Histórico de Backups */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <History className="w-5 h-5" />
-                  Histórico de Backups e Restores
-                </CardTitle>
-                <CardDescription>
-                  Registro de operações de backup e restore executadas
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {backupLogs.length === 0 ? (
-                  <div className="py-8 text-center text-skin-text-muted">
-                    Nenhuma operação registrada
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {/* Área de rolagem com altura máxima para 5 itens */}
-                    <div className="max-h-[640px] overflow-y-auto pr-2 space-y-4">
-                      {backupLogs.map((log) => (
-                        <div key={log.id} className="border rounded-lg p-4 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <span className="font-medium">
-                                {log.operationType === 'BACKUP' ? '💾 Backup' : '⬆️ Restore'}
-                              </span>
-                              <span className={`px-2 py-1 text-xs rounded-full ${log.status === 'SUCCESS' ? 'bg-skin-success/15 text-skin-success' :
-                                log.status === 'FAILED' ? 'bg-skin-danger/15 text-skin-danger' :
-                                  'bg-skin-background-elevated text-skin-text'
-                                }`}>
-                                {log.status}
-                              </span>
-                            </div>
-                            <div className="text-sm text-skin-text-muted">
-                              {new Date(log.startedAt).toLocaleString('pt-BR')}
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                            <div>
-                              <span className="font-medium">Arquivo:</span> {log.fileName}
-                            </div>
-                            <div>
-                              <span className="font-medium">Tamanho:</span>{' '}
-                              {log.fileSize ? (log.fileSize / 1024 / 1024).toFixed(2) + ' MB' : 'N/A'}
-                            </div>
-                            <div>
-                              <span className="font-medium">Duração:</span>{' '}
-                              {log.durationSeconds ? `${log.durationSeconds}s` : 'N/A'}
-                            </div>
-                            <div>
-                              <span className="font-medium">Executado por:</span> {log.executedBy}
-                            </div>
-                          </div>
-
-                          {log.errorMessage && (
-                            <div className="flex items-start gap-2 mt-2 p-3 border border-skin-danger/30 bg-skin-danger/10 rounded-lg">
-                              <XCircle className="h-4 w-4 text-skin-danger flex-shrink-0 mt-0.5" />
-                              <div className="text-sm text-skin-danger">
-                                <strong>Erro:</strong> {log.errorMessage}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Indicador de total de registros */}
-                    {backupLogs.length > 5 && (
-                      <div className="border-t pt-2 text-center text-sm text-skin-text-muted">
-                        Total de {backupLogs.length} registros (role para ver todos)
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Aba Configurações */}
         {activeTab === 'config' && (
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="w-5 h-5" />
-                  Configurações do Sistema
-                </CardTitle>
-                <CardDescription>
-                  Configure o repositório Git e parâmetros de atualização
-                </CardDescription>
+                <CardTitle className="flex items-center gap-2"><Settings className="w-5 h-5" />Configurações do Sistema</CardTitle>
+                <CardDescription>Configure o repositório Git e parâmetros de atualização</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="gitUsername">Usuário GitHub</Label>
-                    <Input
-                      id="gitUsername"
-                      value={config.gitUsername}
-                      onChange={(e) => setConfig(prev => ({ ...prev, gitUsername: e.target.value }))}
-                      placeholder="ex: meuusuario"
-                    />
+                    <Input id="gitUsername" value={config.gitUsername} onChange={(e) => setConfig(prev => ({ ...prev, gitUsername: e.target.value }))} placeholder="ex: meuusuario" />
                   </div>
-
                   <div className="space-y-2">
                     <Label htmlFor="gitRepository">Repositório</Label>
-                    <Input
-                      id="gitRepository"
-                      value={config.gitRepository}
-                      onChange={(e) => setConfig(prev => ({ ...prev, gitRepository: e.target.value }))}
-                      placeholder="ex: meu-projeto"
-                    />
+                    <Input id="gitRepository" value={config.gitRepository} onChange={(e) => setConfig(prev => ({ ...prev, gitRepository: e.target.value }))} placeholder="ex: meu-projeto" />
                   </div>
-
                   <div className="space-y-2">
                     <Label htmlFor="gitToken">Token de Acesso</Label>
-                    <Input
-                      id="gitToken"
-                      type="password"
-                      value={config.gitToken}
-                      onChange={(e) => setConfig(prev => ({ ...prev, gitToken: e.target.value }))}
-                      placeholder={hasSavedGitToken ? 'Token já salvo. Preencha apenas para trocar.' : 'Token GitHub (opcional para repos públicos)'}
-                    />
+                    <Input id="gitToken" type="password" value={config.gitToken} onChange={(e) => setConfig(prev => ({ ...prev, gitToken: e.target.value }))} placeholder={hasSavedGitToken ? 'Token já salvo. Preencha apenas para trocar.' : 'Token GitHub'} />
                   </div>
-
                   <div className="space-y-2">
-                    <Label htmlFor="gitReleaseBranch">Branch de Release</Label>
-                    <Input
-                      id="gitReleaseBranch"
-                      value={config.gitReleaseBranch}
-                      onChange={(e) => setConfig(prev => ({ ...prev, gitReleaseBranch: e.target.value }))}
-                      placeholder="main"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="packageManager">Gerenciador de Pacotes</Label>
-                    <select
-                      id="packageManager"
-                      value={config.packageManager}
-                      onChange={(e) => setConfig(prev => ({ ...prev, packageManager: e.target.value }))}
-                      className="w-full px-3 py-2 border border-skin-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-skin-focus-ring"
-                    >
-                      <option value="docker">docker</option>
-                      <option value="npm">npm</option>
-                      <option value="pnpm">pnpm</option>
-                      <option value="yarn">yarn</option>
+                    <Label htmlFor="updateChannel">Canal de Atualização</Label>
+                    <select id="updateChannel" value={config.updateChannel} onChange={(e) => setConfig(prev => ({ ...prev, updateChannel: e.target.value as 'release' | 'tag' }))} className="w-full px-3 py-2 border border-skin-border-strong rounded-md">
+                      <option value="release">Release (Apenas versões formais)</option>
+                      <option value="tag">Tag (Qualquer tag do repositório)</option>
                     </select>
                   </div>
-
                   <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={config.updateCheckEnabled}
-                        onChange={(e) => setConfig(prev => ({ ...prev, updateCheckEnabled: e.target.checked }))}
-                        className="rounded"
-                      />
-                      Verificação Automática
-                    </Label>
-                    <p className="text-sm text-skin-text-muted">
-                      Verificar atualizações automaticamente (diariamente)
-                    </p>
+                    <Label htmlFor="packageManager">Modo de Instalação</Label>
+                    <select id="packageManager" value={config.packageManager} onChange={(e) => setConfig(prev => ({ ...prev, packageManager: e.target.value }))} className="w-full px-3 py-2 border border-skin-border-strong rounded-md">
+                      <option value="docker">Docker</option>
+                      <option value="native">Native (PM2)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2 flex items-center gap-2 pt-8">
+                    <input type="checkbox" checked={config.updateCheckEnabled} onChange={(e) => setConfig(prev => ({ ...prev, updateCheckEnabled: e.target.checked }))} className="rounded" />
+                    <Label>Verificação Automática</Label>
                   </div>
                 </div>
-
                 <div className="flex gap-4 pt-4">
-                  <Button
-                    onClick={saveConfig}
-                    disabled={loading.config || isMaintenanceActive}
-                  >
-                    {loading.config ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                        Salvando...
-                      </>
-                    ) : (
-                      'Salvar Configurações'
-                    )}
-                  </Button>
-
-                  <Button
-                    onClick={testConnection}
-                    variant="outline"
-                    disabled={!config.gitUsername || !config.gitRepository || isMaintenanceActive}
-                  >
-                    Testar Conexão
-                  </Button>
+                  <Button onClick={saveConfig} disabled={loading.config || isMaintenanceActive}>{loading.config ? 'Salvando...' : 'Salvar Configurações'}</Button>
+                  <Button onClick={testConnection} variant="outline" disabled={!config.gitUsername || !config.gitRepository || isMaintenanceActive}>Testar Conexão</Button>
                 </div>
               </CardContent>
             </Card>
           </div>
         )}
 
-        {/* Aba Histórico */}
-        {activeTab === 'history' && (
+        {activeTab === 'backup' && (
           <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <History className="w-5 h-5" />
-                  Histórico de Atualizações
-                </CardTitle>
-                <CardDescription>
-                  Registro de todas as atualizações executadas no sistema
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loading.logs ? (
-                  <div className="flex items-center justify-center py-8">
-                    <RefreshCw className="w-6 h-6 animate-spin mr-2" />
-                    Carregando histórico...
-                  </div>
-                ) : logs.length === 0 ? (
-                  <div className="py-8 text-center text-skin-text-muted">
-                    Nenhuma atualização registrada
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {logs.map((log) => (
-                      <div key={log.id} className="border rounded-lg p-4 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <span className="font-medium">Versão {log.version}</span>
-                            {renderStatusBadge(log.status)}
-                          </div>
-                          <div className="text-sm text-skin-text-muted">
-                            {new Date(log.startedAt).toLocaleString('pt-BR')}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                          <div>
-                            <span className="font-medium">Duração:</span> {formatDuration(log.duration)}
-                          </div>
-                          <div>
-                            <span className="font-medium">Package Manager:</span> {log.packageManager}
-                          </div>
-                          <div>
-                            <span className="font-medium">Executado por:</span> {log.executedBy || 'Sistema'}
-                          </div>
-                          <div>
-                            <span className="font-medium">Status:</span> {log.status}
-                          </div>
-                        </div>
-
-                        {log.errorMessage && (
-                          <div className="flex items-start gap-2 mt-2 p-3 border border-skin-danger/30 bg-skin-danger/10 rounded-lg">
-                            <XCircle className="h-4 w-4 text-skin-danger flex-shrink-0 mt-0.5" />
-                            <div className="text-sm text-skin-danger">
-                              <strong>Erro:</strong> {log.errorMessage}
-                            </div>
-                          </div>
-                        )}
-
-                        {log.rollbackReason && (
-                          <div className="flex items-start gap-2 mt-2 p-3 border border-skin-warning/30 bg-skin-warning/10 rounded-lg">
-                            <AlertTriangle className="h-4 w-4 text-skin-warning flex-shrink-0 mt-0.5" />
-                            <div className="text-sm text-skin-warning">
-                              <strong>Rollback:</strong> {log.rollbackReason}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <BackupSection onBackupComplete={loadBackupLogs} disabled={isMaintenanceActive} disabledReason={maintenanceReason} />
+            <RestoreSection onRestoreComplete={loadBackupLogs} disabled={isMaintenanceActive} disabledReason={maintenanceReason} />
           </div>
+        )}
+
+        {activeTab === 'history' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><History className="w-5 h-5" />Histórico de Atualizações</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {logs.length === 0 ? <div className="py-8 text-center text-skin-text-muted">Nenhuma atualização registrada</div> : (
+                <div className="space-y-4">
+                  {logs.map((log) => (
+                    <div key={log.id} className="border rounded-lg p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{log.version}</span>
+                        <span className={`px-2 py-1 text-xs rounded-full ${log.status === 'SUCCESS' ? 'bg-skin-success/15 text-skin-success' : 'bg-skin-danger/15 text-skin-danger'}`}>{log.status}</span>
+                      </div>
+                      <div className="text-sm text-skin-text-muted">{new Date(log.startedAt).toLocaleString('pt-BR')}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
       </div>
+
+      {showUpdateConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Confirmar Atualização</CardTitle>
+              <CardDescription>Você está prestes a atualizar o sistema para a versão {status?.availableVersion}.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-3 bg-skin-warning/10 border border-skin-warning/30 rounded text-sm text-skin-warning flex gap-2">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                O sistema ficará indisponível durante o processo. Recomenda-se realizar um backup antes de prosseguir.
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={() => setShowUpdateConfirm(false)} disabled={loading.update}>Cancelar</Button>
+                <Button onClick={executeUpdate} disabled={loading.update} className="bg-skin-success hover:bg-skin-success/90 text-white">Confirmar e Atualizar</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
-
-
-
-
-

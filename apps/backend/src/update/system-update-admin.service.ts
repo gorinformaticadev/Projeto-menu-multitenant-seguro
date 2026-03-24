@@ -152,6 +152,7 @@ export class SystemUpdateAdminService {
       TARGET_TAG: version,
       RELEASE_TAG: version,
       PROJECT_ROOT: runtime.baseDir,
+      ...(request as any).env,
     });
 
     await this.auditService.log({

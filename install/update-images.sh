@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
+# =============================================================================
+# Atualizador Docker (Images)
+# =============================================================================
+
 set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 ENV_FILE="${ENV_FILE:-install/.env.production}"
 RELEASE_TAG="${RELEASE_TAG:-latest}"
+UPDATE_CHANNEL="${UPDATE_CHANNEL:-release}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-120}"
 ROLLBACK_HEALTH_TIMEOUT="${ROLLBACK_HEALTH_TIMEOUT:-120}"
 
@@ -22,11 +27,11 @@ ROLLBACK_COMPLETED_FLAG=0
 MIGRATE_RAN=0
 
 log() {
-  echo "[deploy] $*"
+  echo "[deploy] [$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"
 }
 
 log_err() {
-  echo "[deploy] ERROR: $*" >&2
+  echo "[deploy] [$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2
 }
 
 json_escape() {
@@ -298,14 +303,19 @@ if [[ -d "$PROJECT_ROOT/.git" ]]; then
 fi
 write_build_metadata_files "$APP_VERSION" "$GIT_SHA" "$BUILD_TIME" "$BUILD_BRANCH"
 
+log "Iniciando atualização Docker (Canal: $UPDATE_CHANNEL)"
 log "versao alvo (RELEASE_TAG): $RELEASE_TAG"
 log "metadata runtime: APP_VERSION=$APP_VERSION GIT_SHA=$GIT_SHA BUILD_TIME=$BUILD_TIME"
 log "frontend anterior: cid=$PREV_FRONTEND_CONTAINER_ID image_id=$PREV_FRONTEND_IMAGE_ID image_name=$PREV_FRONTEND_IMAGE_NAME"
 log "backend anterior:  cid=$PREV_BACKEND_CONTAINER_ID image_id=$PREV_BACKEND_IMAGE_ID image_name=$PREV_BACKEND_IMAGE_NAME"
 log "frontend alvo compose image: $TARGET_FRONTEND_IMAGE"
 log "backend alvo compose image:  $TARGET_BACKEND_IMAGE"
-log "pull de imagens"
-compose pull frontend backend
+
+log "Efetuando pull das imagens..."
+if ! compose pull frontend backend; then
+  log_err "Falha ao baixar imagens do registro Docker."
+  exit 1
+fi
 
 ROLLBACK_ENABLED=1
 
