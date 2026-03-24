@@ -756,6 +756,94 @@ healthcheck_http() {
   done
 }
 
+run_seed_deploy() {
+  local backend_dir="$1/apps/backend"
+  log "Executando seed versionado (apenas pendentes)..."
+  (
+    cd "$backend_dir"
+    # shellcheck disable=SC1091
+    source ./.env
+    node dist/prisma/seed.js deploy
+  )
+}
+
+validate_backend_shared_storage() {
+  local backend_dir="$1/apps/backend"
+  local probe_file="$backend_dir/.update-shared-storage-probe.cjs"
+
+  cat > "$probe_file" <<'EOF'
+let Redis;
+try {
+  Redis = require(require.resolve('ioredis', { paths: [process.cwd()] }));
+} catch (error) {
+  console.error('Dependencia ioredis nao encontrada no backend. Execute a instalacao de dependencias antes da validacao.');
+  process.exit(1);
+}
+
+const host = process.env.REDIS_HOST || '127.0.0.1';
+const port = Number(process.env.REDIS_PORT || 6379);
+const username = process.env.REDIS_USERNAME || undefined;
+const password = process.env.REDIS_PASSWORD || undefined;
+const db = Number(process.env.REDIS_DB || 0);
+
+const options = {
+  host,
+  port,
+  db,
+  connectTimeout: Number(process.env.RATE_LIMIT_REDIS_CONNECT_TIMEOUT || 1000),
+  maxRetriesPerRequest: 1,
+  enableOfflineQueue: false,
+  lazyConnect: true,
+};
+
+if (username) options.username = username;
+if (password) options.password = password;
+
+const client = new Redis(options);
+
+async function run() {
+  if (client.status === 'wait') {
+    await client.connect();
+  }
+  const pong = await client.ping();
+  if (pong !== 'PONG') {
+    throw new Error(`Redis ping inesperado: ${pong}`);
+  }
+
+  const key = `update:shared-storage:${Date.now()}`;
+  await client.set(key, 'ok', 'EX', 20);
+  const value = await client.get(key);
+  if (value !== 'ok') {
+    throw new Error('Falha no teste SET/GET do storage compartilhado');
+  }
+  await client.del(key);
+  await client.quit();
+}
+
+run()
+  .then(() => process.exit(0))
+  .catch(async (error) => {
+    try {
+      await client.quit();
+    } catch {}
+    console.error(error?.message || error);
+    process.exit(1);
+  });
+EOF
+
+  if ! (
+    cd "$backend_dir"
+    # shellcheck disable=SC1091
+    source ./.env
+    node "$probe_file"
+  ); then
+    rm -f "$probe_file"
+    return 1
+  fi
+
+  rm -f "$probe_file"
+}
+
 cleanup_old_releases() {
   log "Limpando releases antigas (mantendo ${RELEASES_TO_KEEP})..."
   ls -1dt "${RELEASES_DIR}"/* | tail -n +$((RELEASES_TO_KEEP + 1)) | xargs rm -rf || true
@@ -811,8 +899,11 @@ fi
 
 set_step "migrate" 60
 log "Executando migrations..."
-cd "$NEW_RELEASE_DIR"
-pnpm --filter backend exec prisma migrate deploy --schema apps/backend/prisma/schema.prisma || fail_and_exit "$EXIT_BUILD_FAILED" "Falha nas migrations"
+cd "$NEW_RELEASE_DIR/apps/backend"
+pnpm prisma migrate deploy --schema prisma/schema.prisma || fail_and_exit "$EXIT_BUILD_FAILED" "Falha nas migrations"
+
+set_step "seed" 70
+run_seed_deploy "$NEW_RELEASE_DIR" || fail_and_exit "$EXIT_BUILD_FAILED" "Falha no seed versionado"
 
 set_step "switch" 80
 enable_maintenance_mode "Atualizando sistema para versao ${TARGET_TAG}"
@@ -828,6 +919,10 @@ ln -sfn "$NEW_RELEASE_DIR" "$CURRENT_LINK"
 
 set_step "restart" 90
 restart_pm2_processes "$NEW_RELEASE_DIR"
+
+set_step "validate" 93
+log "Validando storage compartilhado do backend..."
+validate_backend_shared_storage "$NEW_RELEASE_DIR" || fail_and_exit "$EXIT_BUILD_FAILED" "Falha na validacao do storage compartilhado do backend"
 
 set_step "healthcheck" 95
 log "Validando integridade do sistema..."
