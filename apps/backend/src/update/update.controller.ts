@@ -134,16 +134,15 @@ export class UpdateController {
     }
   }
 
-  @Get('test-connection')
+@Get('test-connection')
   @Roles(Role.SUPER_ADMIN)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async testConnection() {
     try {
-      const result = await this.updateService.checkForUpdates();
+      const result = await this.updateService.testConnection();
       return {
         success: true,
         message: 'Conexão com repositório estabelecida com sucesso',
-        connected: true,
         ...result,
       };
     } catch {
@@ -153,5 +152,25 @@ export class UpdateController {
         connected: false,
       };
     }
+  }
+
+  @Post('test-connection')
+  @Roles(Role.SUPER_ADMIN)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async testConnectionWithPayload(@Body() config: UpdateConfigDto) {
+    const result = await this.updateService.testConnection(config);
+    if (result.connected) {
+      return {
+        success: true,
+        message: 'Conexão com repositório estabelecida com sucesso',
+        ...result,
+      };
+    }
+
+    return {
+      success: false,
+      message: 'Falha na conexão com o repositório',
+      ...result,
+    };
   }
 }

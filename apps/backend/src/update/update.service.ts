@@ -113,7 +113,7 @@ export class UpdateService implements OnModuleInit {
     }
   }
 
-  async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: string }> {
+async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: string }> {
     let decryptedTokenForSanitizer = '';
     try {
       this.logger.log('Iniciando verificação de atualizações...');
@@ -163,6 +163,60 @@ export class UpdateService implements OnModuleInit {
       );
       this.logger.error(`Erro ao verificar atualizações. detalhe=${detail}`);
       throw new HttpException('Erro ao verificar atualizações', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  async testConnection(config?: UpdateConfigDto): Promise<{ connected: boolean; updateAvailable: boolean; availableVersion?: string }> {
+    let decryptedTokenForSanitizer = '';
+    try {
+      const settings = await this.getSystemSettings();
+      const providedToken = config?.gitToken?.trim();
+      const mergedSettings = {
+        ...settings,
+        gitUsername: config?.gitUsername || settings.gitUsername,
+        gitRepository: config?.gitRepository || settings.gitRepository,
+        gitReleaseBranch: config?.gitReleaseBranch || settings.gitReleaseBranch,
+        gitToken: providedToken ? this.encryptToken(providedToken) : settings.gitToken,
+      } as UpdateSystemSettings;
+
+      if (!mergedSettings.gitUsername || !mergedSettings.gitRepository) {
+        return { connected: false, updateAvailable: false };
+      }
+
+      const repoUrl = this.buildPublicGitRepoUrl(mergedSettings);
+      decryptedTokenForSanitizer = providedToken || this.tryDecryptToken(mergedSettings.gitToken);
+      const stdout = await this.getRemoteTagsOutput(repoUrl, mergedSettings.gitToken, mergedSettings.gitReleaseBranch);
+
+      const cleanTags = stdout
+        .split('\n')
+        .map(line => line.split('\t')[1])
+        .filter(ref => ref && ref.includes('refs/tags/'))
+        .map(ref => ref.replace('refs/tags/', '').replace('^{}', ''))
+        .map(tag => semver.clean(tag))
+        .filter((tag): tag is string => !!tag && !!semver.valid(tag));
+
+      const uniqueCleanTags = Array.from(new Set(cleanTags)).sort((a, b) => semver.rcompare(a, b));
+      if (uniqueCleanTags.length === 0) {
+        return { connected: true, updateAvailable: false };
+      }
+
+      const latestClean = uniqueCleanTags[0];
+      const latestVersion = this.formatVersion(latestClean);
+      const currentClean = this.getComparableVersion(this.getRuntimeVersionInfo().version);
+
+      return {
+        connected: true,
+        updateAvailable: semver.gt(latestClean, currentClean),
+        availableVersion: latestVersion,
+      };
+    } catch (error: unknown) {
+      const parsedError = this.asUpdateExecutionError(error);
+      const detail = this.sanitizeGitError(
+        String(parsedError.stderr || parsedError.message || ''),
+        decryptedTokenForSanitizer,
+      );
+      this.logger.warn(`Falha no teste de conexão do repositório. detalhe=${detail}`);
+      return { connected: false, updateAvailable: false };
     }
   }
 
