@@ -11,11 +11,36 @@ import { PrismaService } from '../core/prisma/prisma.service';
 import { ResponseTimeMetricsService } from './system-response-time-metrics.service';
 import { SystemTelemetryService } from '@common/services/system-telemetry.service';
 import { ModuleSecurityService } from '../core/module-security.service';
-import { registerCoreModule } from '@core/shared/modules/core-module';
-import { moduleRegistry } from '@core/shared/registry/module-registry';
-import { ModuleDashboardWidget } from '@core/shared/types/module.types';
 
 type DashboardSeverity = 'all' | 'info' | 'warning' | 'critical';
+
+interface ModuleDashboardWidget {
+  id: string;
+  name: string;
+  component: string;
+  order?: number;
+  permissions?: string[];
+  roles?: string[];
+  visibilityRole?: 'SUPER_ADMIN' | 'ADMIN' | 'USER' | 'CLIENT';
+  size?: 'small' | 'medium' | 'large';
+  module?: string;
+  icon?: string;
+  description?: string;
+  route?: string;
+  actionLabel?: string;
+  kind?: 'summary' | 'list' | 'kanban';
+  stats?: Array<{
+    label: string;
+    value: string;
+  }>;
+  items?: Array<{
+    id: string;
+    label: string;
+    value?: string;
+    column?: string;
+    tone?: 'neutral' | 'good' | 'warn' | 'danger';
+  }>;
+}
 
 export interface DashboardActor {
   userId: string;
@@ -1096,8 +1121,14 @@ export class SystemDashboardService {
   }
 
   private ensureModuleDashboardRegistry() {
-    if (!moduleRegistry.isRegistered('core')) {
-      registerCoreModule();
+    const registry = this.loadModuleRegistry();
+    const registerCore = this.loadRegisterCoreModule();
+    if (!registry || !registerCore) {
+      return;
+    }
+
+    if (!registry.isRegistered('core')) {
+      registerCore();
     }
   }
 
@@ -1129,8 +1160,7 @@ export class SystemDashboardService {
       Array.from(modulesBySlug.values()),
     );
     const coveredModules = new Set<string>();
-    const registryWidgets = moduleRegistry
-      .getDashboardWidgets(role, [])
+    const registryWidgets = this.getRegisteredDashboardWidgets(role)
       .filter(
         (widget) =>
           !(
@@ -1532,6 +1562,41 @@ export class SystemDashboardService {
     }
 
     return 'summary';
+  }
+
+  private getRegisteredDashboardWidgets(role: string): ModuleDashboardWidget[] {
+    const registry = this.loadModuleRegistry();
+    if (!registry) {
+      return [];
+    }
+
+    try {
+      const widgets = registry.getDashboardWidgets(role, []);
+      return Array.isArray(widgets) ? widgets : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private loadModuleRegistry(): {
+    isRegistered: (moduleId: string) => boolean;
+    getDashboardWidgets: (userRole?: string, permissions?: string[]) => ModuleDashboardWidget[];
+  } | null {
+    try {
+      const loaded = require('../core/shared/registry/module-registry');
+      return loaded?.moduleRegistry ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  private loadRegisterCoreModule(): (() => void) | null {
+    try {
+      const loaded = require('../core/shared/modules/core-module');
+      return typeof loaded?.registerCoreModule === 'function' ? loaded.registerCoreModule : null;
+    } catch {
+      return null;
+    }
   }
 
   private resolveWidgetVisibilityRole(
@@ -2124,8 +2189,6 @@ export class SystemDashboardService {
     return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3)}...` : normalized;
   }
 }
-
-
 
 
 
