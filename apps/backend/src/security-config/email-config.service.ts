@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { CreateEmailConfigDto, UpdateEmailConfigDto } from './dto/email-config.dto';
 import { EmailConfiguration } from '@prisma/client';
+import { SecurityConfigService } from './security-config.service';
 
 @Injectable()
 export class EmailConfigService {
@@ -9,6 +10,7 @@ export class EmailConfigService {
 
   constructor(
     private prisma: PrismaService,
+    private securityConfigService: SecurityConfigService,
   ) { }
 
   /**
@@ -152,14 +154,14 @@ export class EmailConfigService {
   }
 
   /**
-   * Get SMTP credentials from SecurityConfig
+   * Get SMTP credentials from SecurityConfig (decrypted)
    */
   async getSmtpCredentials(): Promise<{ smtpUsername?: string; smtpPassword?: string }> {
     try {
-      const securityConfig = await this.prisma.securityConfig.findFirst();
+      const credentials = await this.securityConfigService.getSmtpCredentials();
       return {
-        smtpUsername: securityConfig?.smtpUsername || undefined,
-        smtpPassword: securityConfig?.smtpPassword || undefined,
+        smtpUsername: credentials.smtpUsername || undefined,
+        smtpPassword: credentials.smtpPassword || undefined,
       };
     } catch (error) {
       this.logger.error('Error fetching SMTP credentials:', error);
@@ -169,9 +171,9 @@ export class EmailConfigService {
 
   /**
    * Test email configuration by sending a test email
-   * Note: This method now requires the emailService to be passed in
+   * Credentials are fetched from the database (SecurityConfig)
    */
-  async testConfig(email: string, smtpUser: string, smtpPass: string, user: any, emailService: any): Promise<{ success: boolean; message: string }> {
+  async testConfig(email: string, user: any, emailService: any): Promise<{ success: boolean; message: string }> {
     try {
       this.logger.log(`Testing email configuration for user ${user.id} to ${email}`);
 
@@ -183,6 +185,18 @@ export class EmailConfigService {
         return {
           success: false,
           message: 'Nenhuma configuração de email ativa encontrada. Configure um provedor de email primeiro.'
+        };
+      }
+
+      // Fetch credentials from database
+      const credentials = await this.getSmtpCredentials();
+      const smtpUser = credentials.smtpUsername || '';
+      const smtpPass = credentials.smtpPassword || '';
+
+      if (!smtpUser || !smtpPass) {
+        return {
+          success: false,
+          message: 'Credenciais SMTP não configuradas. Informe usuário e senha SMTP e salve antes de testar.'
         };
       }
 
@@ -212,8 +226,6 @@ export class EmailConfigService {
       }
     } catch (error) {
       this.logger.error(`❌ Error testing email configuration for ${email}:`, error);
-
-      // Return the specific error message from the email service
       return {
         success: false,
         message: error.message || 'Erro desconhecido ao testar configuração de email'

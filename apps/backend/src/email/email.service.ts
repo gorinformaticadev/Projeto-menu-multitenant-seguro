@@ -50,7 +50,7 @@ export class EmailService implements OnModuleInit {
           host: this.dbConfig.smtpHost,
           port: this.dbConfig.smtpPort,
           secure: this.dbConfig.encryption === 'SSL', // true for port 465, false for other ports
-          tls: this.dbConfig.encryption === 'STARTTLS' || this.dbConfig.encryption === 'TLS' ? {
+          tls: this.dbConfig.encryption === 'STARTTLS' ? {
             rejectUnauthorized: false
           } : undefined,
         };
@@ -386,10 +386,9 @@ export class EmailService implements OnModuleInit {
       };
 
       // Configure TLS based on encryption type
-      if (config.encryption === 'STARTTLS' || config.encryption === 'TLS') {
+      if (config.encryption === 'STARTTLS') {
         transporterConfig.tls = {
-          rejectUnauthorized: false, // Allow self-signed certificates in development
-          ciphers: 'SSLv3'
+          rejectUnauthorized: false,
         };
       }
 
@@ -486,8 +485,8 @@ export class EmailService implements OnModuleInit {
       const tempTransporter = nodemailer.createTransport({
         host: this.dbConfig.smtpHost,
         port: this.dbConfig.smtpPort,
-        secure: this.dbConfig.encryption === 'SSL', // true for port 465, false for other ports
-        tls: this.dbConfig.encryption === 'STARTTLS' || this.dbConfig.encryption === 'TLS' ? {
+        secure: this.dbConfig.encryption === 'SSL',
+        tls: this.dbConfig.encryption === 'STARTTLS' ? {
           rejectUnauthorized: false
         } : undefined,
         auth: {

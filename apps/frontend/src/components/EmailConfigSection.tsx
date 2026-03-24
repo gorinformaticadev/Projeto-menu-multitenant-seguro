@@ -49,7 +49,7 @@ interface EmailConfig {
 
 interface SecurityConfig {
   smtpUsername?: string;
-  smtpPassword?: string;
+  hasPassword?: boolean;
 }
 
 export default function EmailConfigSection() {
@@ -68,7 +68,6 @@ export default function EmailConfigSection() {
     smtpHost: "",
     smtpPort: 587,
     encryption: "STARTTLS",
-    authMethod: "PLAIN",
     smtpUser: "",
     smtpPass: "",
   });
@@ -101,7 +100,6 @@ export default function EmailConfigSection() {
             smtpHost: activeRes.data.smtpHost,
             smtpPort: activeRes.data.smtpPort,
             encryption: activeRes.data.encryption,
-            authMethod: activeRes.data.authMethod,
             smtpUser: credentialsRes.data.smtpUsername || "",
             smtpPass: "", // Don't load password for security
           });
@@ -145,7 +143,6 @@ export default function EmailConfigSection() {
         smtpHost: provider.smtpHost,
         smtpPort: provider.smtpPort,
         encryption: provider.encryption,
-        authMethod: provider.authMethod,
       });
     }
   };
@@ -177,7 +174,7 @@ export default function EmailConfigSection() {
         smtpHost: formData.smtpHost,
         smtpPort: formData.smtpPort,
         encryption: formData.encryption,
-        authMethod: formData.authMethod,
+        authMethod: "LOGIN",
       };
 
       // Create new configuration
@@ -224,11 +221,9 @@ export default function EmailConfigSection() {
     try {
       setTesting(true);
 
-      // Send test email with credentials
+      // Send test email - credentials are fetched from the database on the backend
       await api.post("/email-config/test", {
         email: testEmail,
-        smtpUser: formData.smtpUser,
-        smtpPass: formData.smtpPass
       });
 
       toast({
@@ -361,38 +356,23 @@ export default function EmailConfigSection() {
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <Label htmlFor="encryption">
-                Tipo de Criptografia
-              </Label>
-              <Select
-                value={formData.encryption}
-                onValueChange={(value: string) => handleInputChange("encryption", value)}
-              >
-                <SelectTrigger id="encryption">
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="STARTTLS">STARTTLS</SelectItem>
-                  <SelectItem value="SSL">SSL</SelectItem>
-                  <SelectItem value="TLS">TLS</SelectItem>
-                  <SelectItem value="NONE">Nenhuma</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="auth-method">
-                Método de Autenticação
-              </Label>
-              <Input
-                id="auth-method"
-                value={formData.authMethod}
-                onChange={(e) => handleInputChange("authMethod", e.target.value)}
-                placeholder="Método de autenticação"
-              />
-            </div>
+          <div>
+            <Label htmlFor="encryption">
+              Tipo de Criptografia
+            </Label>
+            <Select
+              value={formData.encryption}
+              onValueChange={(value: string) => handleInputChange("encryption", value)}
+            >
+              <SelectTrigger id="encryption">
+                <SelectValue placeholder="Selecione..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="SSL">SSL/TLS (porta 465)</SelectItem>
+                <SelectItem value="STARTTLS">STARTTLS (porta 587)</SelectItem>
+                <SelectItem value="NONE">Nenhuma</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -471,6 +451,9 @@ export default function EmailConfigSection() {
                 <p><strong>Criptografia:</strong> {activeConfig.encryption}</p>
                 {securityConfig.smtpUsername && (
                   <p><strong>Usuário:</strong> {securityConfig.smtpUsername}</p>
+                )}
+                {securityConfig.hasPassword && (
+                  <p><strong>Senha:</strong> ••••••••</p>
                 )}
               </div>
             </div>

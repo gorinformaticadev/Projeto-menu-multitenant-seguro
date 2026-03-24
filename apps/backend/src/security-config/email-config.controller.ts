@@ -59,13 +59,17 @@ export class EmailConfigController {
   /**
    * GET /email-config/smtp-credentials
    * Obter credenciais SMTP do SecurityConfig
-   * Apenas SUPER_ADMIN
+   * Apenas SUPER_ADMIN - retorna apenas o username (nunca a senha)
    */
   @Get('smtp-credentials')
   @Roles(Role.SUPER_ADMIN)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async getSmtpCredentials() {
-    return this.emailConfigService.getSmtpCredentials();
+    const credentials = await this.emailConfigService.getSmtpCredentials();
+    return {
+      smtpUsername: credentials.smtpUsername || null,
+      hasPassword: !!credentials.smtpPassword,
+    };
   }
 
   /**
@@ -136,10 +140,8 @@ export class EmailConfigController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async testConfig(
     @Body('email') email: string,
-    @Body('smtpUser') smtpUser: string,
-    @Body('smtpPass') smtpPass: string,
     @Req() req: AuthenticatedRequest,
   ) {
-    return this.emailConfigService.testConfig(email, smtpUser, smtpPass, req.user, this.emailService);
+    return this.emailConfigService.testConfig(email, req.user, this.emailService);
   }
 }
