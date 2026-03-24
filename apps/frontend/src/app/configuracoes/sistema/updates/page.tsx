@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -178,6 +178,7 @@ export default function UpdatesPage() {
   const lifecycle = status?.updateLifecycle;
   const lifecycleStatus = lifecycle?.status || 'idle';
   const isUpdateRunning = isUpdateLifecycleRunning(lifecycleStatus) || loading.update;
+  const lastTerminalLifecycleRef = useRef<UpdateLifecycleStatus | null>(null);
 
   useEffect(() => {
     const requestedTab = (searchParams.get('tab') || '').trim().toLowerCase();
@@ -186,17 +187,19 @@ export default function UpdatesPage() {
     }
   }, [searchParams]);
 
-  const loadStatus = useCallback(async () => {
+  const loadStatus = useCallback(async (options?: { silent?: boolean }) => {
     try {
       setLoading(prev => ({ ...prev, status: true }));
       const response = await api.get('/api/update/status');
       setStatus(response.data);
     } catch (error: unknown) {
-      toast({
-        title: 'Erro ao carregar status',
-        description: getApiErrorMessage(error),
-        variant: 'destructive',
-      });
+      if (!options?.silent) {
+        toast({
+          title: 'Erro ao carregar status',
+          description: getApiErrorMessage(error),
+          variant: 'destructive',
+        });
+      }
     } finally {
       setLoading(prev => ({ ...prev, status: false }));
     }
@@ -223,13 +226,15 @@ export default function UpdatesPage() {
     }
   }, []);
 
-  const loadLogs = useCallback(async () => {
+  const loadLogs = useCallback(async (options?: { silent?: boolean }) => {
     try {
       setLoading(prev => ({ ...prev, logs: true }));
       const response = await api.get('/api/update/logs?limit=20');
-      setLogs(response.data);
+      setLogs(Array.isArray(response.data?.data) ? response.data.data : Array.isArray(response.data) ? response.data : []);
     } catch (error: unknown) {
-      console.error('Erro ao carregar logs:', error);
+      if (!options?.silent) {
+        console.error('Erro ao carregar logs:', error);
+      }
     } finally {
       setLoading(prev => ({ ...prev, logs: false }));
     }
@@ -245,11 +250,47 @@ export default function UpdatesPage() {
   }, []);
 
   useEffect(() => {
-    loadStatus();
-    loadConfig();
-    loadLogs();
-    loadBackupLogs();
+    void loadStatus();
+    void loadConfig();
+    void loadLogs();
+    void loadBackupLogs();
   }, [loadStatus, loadConfig, loadLogs, loadBackupLogs]);
+
+  useEffect(() => {
+    if (!isUpdateRunning && !isMaintenanceActive) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      void loadStatus({ silent: true });
+      void loadLogs({ silent: true });
+    }, 3000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [isUpdateRunning, isMaintenanceActive, loadLogs, loadStatus]);
+
+  useEffect(() => {
+    if (lifecycleStatus === 'completed' || lifecycleStatus === 'failed') {
+      if (lastTerminalLifecycleRef.current !== lifecycleStatus) {
+        lastTerminalLifecycleRef.current = lifecycleStatus;
+        toast({
+          title: lifecycleStatus === 'completed' ? 'Atualização concluída' : 'Atualização falhou',
+          description:
+            lifecycleStatus === 'completed'
+              ? 'O status do sistema foi atualizado.'
+              : lifecycle?.error?.userMessage || 'O processo de atualização terminou com falha.',
+          variant: lifecycleStatus === 'completed' ? 'default' : 'destructive',
+        });
+      }
+      return;
+    }
+
+    if (isUpdateRunning) {
+      lastTerminalLifecycleRef.current = null;
+    }
+  }, [isUpdateRunning, lifecycle?.error?.userMessage, lifecycleStatus, toast]);
 
   const checkForUpdates = async () => {
     try {

@@ -791,13 +791,26 @@ ensure_release_code "$TARGET_TAG" "$NEW_RELEASE_DIR"
 set_step "build" 40
 log "Instalando dependencias e compilando..."
 cd "$NEW_RELEASE_DIR"
-# Aqui você pode adicionar os comandos de build específicos (npm install, npm run build, etc)
-# Para fins deste script, assumimos que o código já vem pronto ou o build é simples.
+ensure_command pnpm "$EXIT_BUILD_FAILED"
+pnpm install --frozen-lockfile || fail_and_exit "$EXIT_BUILD_FAILED" "Falha ao instalar dependencias"
+pnpm --filter backend build || fail_and_exit "$EXIT_BUILD_FAILED" "Falha ao compilar backend"
+pnpm --filter frontend build || fail_and_exit "$EXIT_BUILD_FAILED" "Falha ao compilar frontend"
+if [[ -d "$NEW_RELEASE_DIR/apps/frontend/public" ]]; then
+  cp -r "$NEW_RELEASE_DIR/apps/frontend/public" "$NEW_RELEASE_DIR/apps/frontend/.next/standalone/apps/frontend/" || true
+fi
+mkdir -p "$NEW_RELEASE_DIR/apps/frontend/.next/standalone/apps/frontend/.next/static"
+if [[ -d "$NEW_RELEASE_DIR/apps/frontend/.next/static" ]]; then
+  cp -r "$NEW_RELEASE_DIR/apps/frontend/.next/static/." "$NEW_RELEASE_DIR/apps/frontend/.next/standalone/apps/frontend/.next/static/" || true
+fi
+mkdir -p "$NEW_RELEASE_DIR/apps/frontend/.next/standalone/apps/frontend/.next/server"
+if [[ -d "$NEW_RELEASE_DIR/apps/frontend/.next/server" ]]; then
+  cp -r "$NEW_RELEASE_DIR/apps/frontend/.next/server/." "$NEW_RELEASE_DIR/apps/frontend/.next/standalone/apps/frontend/.next/server/" || true
+fi
 
 set_step "migrate" 60
 log "Executando migrations..."
 cd "$NEW_RELEASE_DIR/apps/backend"
-# npx prisma migrate deploy || fail_and_exit "$EXIT_BUILD_FAILED" "Falha nas migrations"
+pnpm exec prisma migrate deploy || fail_and_exit "$EXIT_BUILD_FAILED" "Falha nas migrations"
 
 set_step "switch" 80
 enable_maintenance_mode "Atualizando sistema para versao ${TARGET_TAG}"
