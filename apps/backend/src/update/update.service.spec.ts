@@ -1,5 +1,6 @@
 import { HttpException } from '@nestjs/common';
 import * as fs from 'fs';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { SystemVersionService } from '@common/services/system-version.service';
 import { AuditService } from '../audit/audit.service';
@@ -31,6 +32,7 @@ function createService() {
         gitReleaseBranch: 'main',
         packageManager: 'docker',
         updateCheckEnabled: true,
+        updateChannel: 'release',
         lastUpdateCheck: null,
         availableVersion: null,
         updateAvailable: false,
@@ -43,6 +45,22 @@ function createService() {
       create: jest.fn(async ({ data }) => ({ id: 'settings-1', ...data })),
       update: jest.fn(async ({ data }) => ({ id: 'settings-1', ...data })),
     },
+    $queryRaw: jest.fn(async () => [
+      { column_name: 'id' },
+      { column_name: 'gitUsername' },
+      { column_name: 'gitRepository' },
+      { column_name: 'gitReleaseBranch' },
+      { column_name: 'packageManager' },
+      { column_name: 'updateCheckEnabled' },
+      { column_name: 'updateChannel' },
+      { column_name: 'releaseTag' },
+      { column_name: 'composeFile' },
+      { column_name: 'envFile' },
+      { column_name: 'updatedAt' },
+      { column_name: 'updatedBy' },
+    ]),
+    $queryRawUnsafe: jest.fn(async () => []),
+    $executeRaw: jest.fn(async () => 1),
     updateLog: {
       findFirst: jest.fn(async () => null),
       findMany: jest.fn(async () => []),
@@ -325,5 +343,84 @@ describe('UpdateService', () => {
         operationId: 'update-123',
       },
     });
+  });
+
+  it('updateConfig persiste todos os campos expostos pela tela de updates', async () => {
+    const { service, prismaMock } = createService();
+
+    await service.updateConfig(
+      {
+        gitUsername: 'novo-org',
+        gitRepository: 'novo-repo',
+        gitReleaseBranch: 'stable',
+        gitToken: '********',
+        packageManager: 'docker',
+        updateCheckEnabled: false,
+        updateChannel: 'tag',
+        releaseTag: 'v2.0.0',
+        composeFile: 'docker-compose.custom.yml',
+        envFile: 'install/.env.custom',
+      },
+      'user-1',
+    );
+
+    expect(prismaMock.updateSystemSettings.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'settings-1' },
+        data: expect.objectContaining({
+          gitUsername: 'novo-org',
+          gitRepository: 'novo-repo',
+          gitReleaseBranch: 'stable',
+          packageManager: 'docker',
+          updateCheckEnabled: false,
+          updateChannel: 'tag',
+          releaseTag: 'v2.0.0',
+          composeFile: 'docker-compose.custom.yml',
+          envFile: 'install/.env.custom',
+          updatedBy: 'user-1',
+        }),
+      }),
+    );
+  });
+
+  it('updateConfig faz fallback para SQL bruto quando o Prisma encontra coluna ausente', async () => {
+    const { service, prismaMock } = createService();
+    const missingColumnError = new Prisma.PrismaClientKnownRequestError(
+      'The column `update_system_settings.updateChannel` does not exist in the current database.',
+      {
+        code: 'P2022',
+        clientVersion: '6.19.2',
+      },
+    );
+
+    prismaMock.updateSystemSettings.update.mockRejectedValueOnce(missingColumnError);
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      { column_name: 'id' },
+      { column_name: 'gitUsername' },
+      { column_name: 'gitRepository' },
+      { column_name: 'gitReleaseBranch' },
+      { column_name: 'packageManager' },
+      { column_name: 'updateCheckEnabled' },
+      { column_name: 'updatedAt' },
+      { column_name: 'updatedBy' },
+    ]);
+
+    await service.updateConfig(
+      {
+        gitUsername: 'legacy-org',
+        gitRepository: 'legacy-repo',
+        gitReleaseBranch: 'main',
+        gitToken: '********',
+        packageManager: 'docker',
+        updateCheckEnabled: true,
+        updateChannel: 'release',
+        releaseTag: 'latest',
+        composeFile: 'docker-compose.prod.yml',
+        envFile: 'install/.env.production',
+      },
+      'user-legacy',
+    );
+
+    expect(prismaMock.$executeRaw).toHaveBeenCalled();
   });
 });

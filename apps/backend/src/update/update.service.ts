@@ -81,6 +81,7 @@ export class UpdateService implements OnModuleInit {
   private readonly encryptionKeyRaw = process.env.ENCRYPTION_KEY || '';
   private readonly encryptionKey: Buffer;
   private readonly execFileAsync = promisify(execFile);
+  private updateSystemSettingsColumnsCache: Set<string> | null = null;
 
   constructor(
     private prisma: PrismaService,
@@ -395,15 +396,12 @@ export class UpdateService implements OnModuleInit {
       gitReleaseBranch: data.gitReleaseBranch,
       packageManager: data.packageManager,
       updateCheckEnabled: data.updateCheckEnabled,
+      updateChannel: data.updateChannel,
       releaseTag: data.releaseTag,
       composeFile: data.composeFile,
       envFile: data.envFile,
       updatedBy: userId,
     };
-
-    if (data.updateChannel) {
-      updateData.updateChannel = data.updateChannel;
-    }
 
     if (data.gitToken && data.gitToken !== '********') {
       updateData.gitToken = this.encryptToken(data.gitToken);
@@ -775,31 +773,250 @@ export class UpdateService implements OnModuleInit {
   }
 
   private async getSystemSettings(): Promise<UpdateSystemSettings> {
-    let settings = await this.prisma.updateSystemSettings.findFirst();
+    try {
+      let settings = await this.prisma.updateSystemSettings.findFirst();
 
-    if (!settings) {
-      settings = await this.prisma.updateSystemSettings.create({
-        data: {
-          appVersion: this.getRuntimeVersionInfo().version,
-          packageManager: 'docker',
-          updateCheckEnabled: true,
-          gitReleaseBranch: 'main',
-          releaseTag: 'latest',
-          composeFile: 'docker-compose.prod.yml',
-          envFile: 'install/.env.production',
-        },
-      });
+      if (!settings) {
+        settings = await this.prisma.updateSystemSettings.create({
+          data: {
+            appVersion: this.getRuntimeVersionInfo().version,
+            packageManager: 'docker',
+            updateCheckEnabled: true,
+            gitReleaseBranch: 'main',
+            releaseTag: 'latest',
+            composeFile: 'docker-compose.prod.yml',
+            envFile: 'install/.env.production',
+          },
+        });
+      }
+
+      return settings;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2022') {
+        this.logger.warn('Detectada inconsistência no schema do banco (colunas ausentes). Tentando fallback seguro.');
+        const rawSettings = await this.fetchRawUpdateSystemSettings();
+        if (rawSettings) {
+          return this.normalizeRawUpdateSystemSettings(rawSettings);
+        }
+
+        return this.createLegacyDefaultSystemSettings();
+      }
+      throw error;
     }
-
-    return settings;
   }
 
   private async updateSystemSettings(data: Prisma.UpdateSystemSettingsUncheckedUpdateInput): Promise<void> {
     const settings = await this.getSystemSettings();
-    await this.prisma.updateSystemSettings.update({
-      where: { id: settings.id },
-      data: { ...data, updatedAt: new Date() },
-    });
+    try {
+      await this.prisma.updateSystemSettings.update({
+        where: { id: settings.id },
+        data: { ...data, updatedAt: new Date() },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2022') {
+        this.logger.warn('Falha ao salvar devido a colunas ausentes no banco. Aplicando fallback SQL compatível com schema legado.');
+        await this.updateSystemSettingsWithRawSql(settings.id, data);
+        return;
+      }
+      throw error;
+    }
+  }
+
+  private async fetchRawUpdateSystemSettings(): Promise<Record<string, unknown> | null> {
+    const rawSettings = await this.prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+      'SELECT * FROM "update_system_settings" LIMIT 1',
+    );
+
+    if (rawSettings && rawSettings.length > 0) {
+      return rawSettings[0];
+    }
+
+    return null;
+  }
+
+  private normalizeRawUpdateSystemSettings(raw: Record<string, unknown>): UpdateSystemSettings {
+    return {
+      id: this.pickRawValue<string>(raw, ['id']) || 'default',
+      appVersion: this.pickRawValue<string>(raw, ['appVersion', 'app_version']) || '1.0.0',
+      gitToken: this.pickRawValue<string | null>(raw, ['gitToken', 'git_token']) || null,
+      gitUsername: this.pickRawValue<string | null>(raw, ['gitUsername', 'git_username']) || null,
+      gitRepository: this.pickRawValue<string | null>(raw, ['gitRepository', 'git_repository']) || null,
+      gitReleaseBranch: this.pickRawValue<string>(raw, ['gitReleaseBranch', 'git_release_branch']) || 'main',
+      packageManager: this.pickRawValue<string>(raw, ['packageManager', 'package_manager']) || 'docker',
+      updateCheckEnabled: this.pickRawValue<boolean>(raw, ['updateCheckEnabled', 'update_check_enabled']) ?? true,
+      updateChannel: this.pickRawValue<string>(raw, ['updateChannel', 'update_channel']) || 'release',
+      lastUpdateCheck: this.asDateOrNull(this.pickRawValue(raw, ['lastUpdateCheck', 'last_update_check'])),
+      availableVersion: this.pickRawValue<string | null>(raw, ['availableVersion', 'available_version']) || null,
+      updateAvailable: this.pickRawValue<boolean>(raw, ['updateAvailable', 'update_available']) ?? false,
+      releaseTag: this.pickRawValue<string | null>(raw, ['releaseTag', 'release_tag']) || 'latest',
+      composeFile: this.pickRawValue<string | null>(raw, ['composeFile', 'compose_file']) || 'docker-compose.prod.yml',
+      envFile: this.pickRawValue<string | null>(raw, ['envFile', 'env_file']) || 'install/.env.production',
+      updatedAt: this.asDateOrNull(this.pickRawValue(raw, ['updatedAt', 'updated_at'])) || new Date(),
+      updatedBy: this.pickRawValue<string | null>(raw, ['updatedBy', 'updated_by']) || null,
+    } as UpdateSystemSettings;
+  }
+
+  private pickRawValue<T>(raw: Record<string, unknown>, candidates: string[]): T | undefined {
+    for (const candidate of candidates) {
+      if (candidate in raw) {
+        return raw[candidate] as T;
+      }
+    }
+
+    return undefined;
+  }
+
+  private asDateOrNull(value: unknown): Date | null {
+    if (!value) {
+      return null;
+    }
+
+    if (value instanceof Date) {
+      return value;
+    }
+
+    const parsed = new Date(String(value));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  private async createLegacyDefaultSystemSettings(): Promise<UpdateSystemSettings> {
+    const now = new Date();
+    const id = crypto.randomUUID();
+    const columns = await this.getUpdateSystemSettingsColumns();
+    const initialValues = new Map<string, unknown>([
+      ['id', id],
+      ['appVersion', this.getRuntimeVersionInfo().version],
+      ['gitReleaseBranch', 'main'],
+      ['packageManager', 'docker'],
+      ['updateCheckEnabled', true],
+      ['updateAvailable', false],
+      ['updatedAt', now],
+    ]);
+
+    const inserts = Array.from(initialValues.entries())
+      .filter(([column]) => columns.has(column.toLowerCase()))
+      .map(([column, value]) => ({
+        identifier: Prisma.raw(`"${column}"`),
+        value,
+      }));
+
+    if (inserts.length > 0) {
+      await this.prisma.$executeRaw(
+        Prisma.sql`
+          INSERT INTO "update_system_settings" (${Prisma.join(inserts.map((entry) => entry.identifier), ', ')})
+          VALUES (${Prisma.join(inserts.map((entry) => entry.value), ', ')})
+        `,
+      );
+    }
+
+    return {
+      id,
+      appVersion: this.getRuntimeVersionInfo().version,
+      gitToken: null,
+      gitUsername: null,
+      gitRepository: null,
+      gitReleaseBranch: 'main',
+      packageManager: 'docker',
+      updateCheckEnabled: true,
+      updateChannel: 'release',
+      lastUpdateCheck: null,
+      availableVersion: null,
+      updateAvailable: false,
+      releaseTag: 'latest',
+      composeFile: 'docker-compose.prod.yml',
+      envFile: 'install/.env.production',
+      updatedAt: now,
+      updatedBy: null,
+    } as UpdateSystemSettings;
+  }
+
+  private async getUpdateSystemSettingsColumns(): Promise<Set<string>> {
+    if (this.updateSystemSettingsColumnsCache) {
+      return this.updateSystemSettingsColumnsCache;
+    }
+
+    const result = await this.prisma.$queryRaw<Array<{ column_name: string }>>(
+      Prisma.sql`
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'update_system_settings'
+      `,
+    );
+
+    this.updateSystemSettingsColumnsCache = new Set(result.map((row) => String(row.column_name).toLowerCase()));
+    return this.updateSystemSettingsColumnsCache;
+  }
+
+  private unwrapUpdateSystemSettingValue(value: unknown): string | boolean | Date | null | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (value === null || typeof value === 'string' || typeof value === 'boolean' || value instanceof Date) {
+      return value as string | boolean | Date | null;
+    }
+
+    if (typeof value === 'object' && value !== null && 'set' in (value as Record<string, unknown>)) {
+      return this.unwrapUpdateSystemSettingValue((value as Record<string, unknown>).set);
+    }
+
+    return undefined;
+  }
+
+  private async updateSystemSettingsWithRawSql(
+    settingsId: string,
+    data: Prisma.UpdateSystemSettingsUncheckedUpdateInput,
+  ): Promise<void> {
+    const columns = await this.getUpdateSystemSettingsColumns();
+    const assignments: Prisma.Sql[] = [];
+    const fieldMap: Array<[keyof Prisma.UpdateSystemSettingsUncheckedUpdateInput, string]> = [
+      ['appVersion', 'appVersion'],
+      ['gitToken', 'gitToken'],
+      ['gitUsername', 'gitUsername'],
+      ['gitRepository', 'gitRepository'],
+      ['gitReleaseBranch', 'gitReleaseBranch'],
+      ['packageManager', 'packageManager'],
+      ['updateCheckEnabled', 'updateCheckEnabled'],
+      ['updateChannel', 'updateChannel'],
+      ['lastUpdateCheck', 'lastUpdateCheck'],
+      ['availableVersion', 'availableVersion'],
+      ['updateAvailable', 'updateAvailable'],
+      ['releaseTag', 'releaseTag'],
+      ['composeFile', 'composeFile'],
+      ['envFile', 'envFile'],
+      ['updatedBy', 'updatedBy'],
+    ];
+
+    for (const [field, column] of fieldMap) {
+      if (!columns.has(column.toLowerCase())) {
+        continue;
+      }
+
+      const value = this.unwrapUpdateSystemSettingValue(data[field]);
+      if (value === undefined) {
+        continue;
+      }
+
+      assignments.push(Prisma.sql`${Prisma.raw(`"${column}"`)} = ${value}`);
+    }
+
+    if (columns.has('updatedat')) {
+      assignments.push(Prisma.sql`"updatedAt" = ${new Date()}`);
+    }
+
+    if (assignments.length === 0) {
+      this.logger.warn('Fallback SQL do update_system_settings não encontrou colunas compatíveis para atualização.');
+      return;
+    }
+
+    await this.prisma.$executeRaw(
+      Prisma.sql`
+        UPDATE "update_system_settings"
+        SET ${Prisma.join(assignments, ', ')}
+        WHERE "id" = ${settingsId}
+      `,
+    );
   }
 
   private getInstallationMode(settings: UpdateSystemSettings): 'docker' | 'native' {

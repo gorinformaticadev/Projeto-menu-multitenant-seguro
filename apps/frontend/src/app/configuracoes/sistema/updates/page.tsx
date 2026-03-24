@@ -477,6 +477,10 @@ export default function UpdatesPage() {
                     <Input id="gitToken" type="password" value={config.gitToken} onChange={(e) => setConfig(prev => ({ ...prev, gitToken: e.target.value }))} placeholder={hasSavedGitToken ? 'Token já salvo. Preencha apenas para trocar.' : 'Token GitHub'} />
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="gitReleaseBranch">Branch de Release</Label>
+                    <Input id="gitReleaseBranch" value={config.gitReleaseBranch} onChange={(e) => setConfig(prev => ({ ...prev, gitReleaseBranch: e.target.value }))} placeholder="ex: main ou master" />
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="updateChannel">Canal de Atualização</Label>
                     <select id="updateChannel" value={config.updateChannel} onChange={(e) => setConfig(prev => ({ ...prev, updateChannel: e.target.value as 'release' | 'tag' }))} className="w-full px-3 py-2 border border-skin-border-strong rounded-md">
                       <option value="release">Release (Apenas versões formais)</option>
