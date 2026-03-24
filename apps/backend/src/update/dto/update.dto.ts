@@ -23,10 +23,12 @@ export class ExecuteUpdateDto {
 export class UpdateConfigDto {
   @IsOptional()
   @IsString()
+  @Matches(/^[a-zA-Z0-9_-]+$/, { message: 'gitUsername deve conter apenas caracteres alfanuméricos, hífens ou underscores.' })
   gitUsername?: string;
 
   @IsOptional()
   @IsString()
+  @Matches(/^[a-zA-Z0-9_.-]+$/, { message: 'gitRepository deve conter apenas caracteres alfanuméricos, hífens, underscores ou pontos.' })
   gitRepository?: string;
 
   @IsOptional()

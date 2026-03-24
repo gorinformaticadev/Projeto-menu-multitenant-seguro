@@ -1,4 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import { URL } from 'url';
+import * as dns from 'dns/promises';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { decryptSensitiveData } from '@core/common/utils/security.utils';
@@ -6,6 +8,23 @@ import { ConfigResolverService } from '../system-settings/config-resolver.servic
 import { Notification } from './notification.entity';
 import { SavePushSubscriptionDto } from './notification.dto';
 import { AuthorizationService } from '@common/services/authorization.service';
+
+const PUSH_SERVICE_ALLOWLIST = [
+  'fcm.googleapis.com',
+  'updates.push.services.mozilla.com',
+  'updates.push.services.mozilla.com',
+  'push.services.mozilla.com',
+  'updates.push.services.wmp.microsoft.com',
+  'push.apple.com',
+];
+
+const PRIVATE_IP_RANGES = [
+  /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,
+  /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/,
+  /^192\.168\.\d{1,3}\.\d{1,3}$/,
+  /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,
+  /^169\.254\.\d{1,3}\.\d{1,3}$/,
+];
 
 interface AuthenticatedUser {
   id: string;
@@ -172,15 +191,16 @@ export class PushNotificationService {
 
       await Promise.all(
         uniqueSubscriptions.map(async (sub) => {
-          try {
-            await this.webPush!.sendNotification(
-              {
-                endpoint: sub.endpoint,
-                keys: { p256dh: sub.p256dh, auth: sub.auth },
-              },
-              payload,
-            );
-            successIds.push(sub.id);
+            try {
+              await this.validatePushEndpoint(sub.endpoint);
+              await this.webPush!.sendNotification(
+                {
+                  endpoint: sub.endpoint,
+                  keys: { p256dh: sub.p256dh, auth: sub.auth },
+                },
+                payload,
+              );
+              successIds.push(sub.id);
           } catch (error: unknown) {
             const statusCode =
               ((error as { statusCode?: number; status?: number })?.statusCode ??
@@ -400,5 +420,30 @@ export class PushNotificationService {
 
     const normalized = String(value).trim();
     return normalized.length > 0 ? normalized : null;
+  }
+
+  private async validatePushEndpoint(endpoint: string): Promise<void> {
+    const url = new URL(endpoint);
+    const hostname = url.hostname;
+
+    // 1. Validar contra allowlist de domínios conhecidos
+    if (!PUSH_SERVICE_ALLOWLIST.some(allowedDomain => hostname.endsWith(allowedDomain))) {
+      this.logger.warn(`Tentativa de enviar push para domínio não permitido: ${hostname}`);
+      throw new InternalServerErrorException("Endpoint de push inválido ou não permitido.");
+    }
+
+    // 2. Resolver IPs e verificar se são IPs privados
+    try {
+      const addresses = await dns.resolve4(hostname);
+      for (const address of addresses) {
+        if (PRIVATE_IP_RANGES.some(range => range.test(address))) {
+          this.logger.warn(`Tentativa de enviar push para IP privado: ${address} (${hostname})`);
+          throw new InternalServerErrorException("Endpoint de push resolve para IP privado.");
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Falha ao resolver DNS para ${hostname}: ${error.message}`);
+      throw new InternalServerErrorException("Falha ao validar endpoint de push.");
+    }
   }
 }

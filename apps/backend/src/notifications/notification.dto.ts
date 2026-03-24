@@ -3,7 +3,7 @@
  */
 
 import { Type } from 'class-transformer';
-import { IsString, IsOptional, IsEnum, IsObject, IsUUID, IsBoolean, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsObject, IsUUID, IsBoolean, ValidateNested, IsUrl } from 'class-validator';
 import { Notification } from './notification.entity';
 
 export class CreateNotificationDto {
@@ -101,6 +101,7 @@ export class PushSubscriptionKeysDto {
 
 export class SavePushSubscriptionDto {
   @IsString()
+  @IsUrl({ require_tld: true, protocols: ['https'] }, { message: 'Endpoint deve ser uma URL HTTPS válida com TLD.' })
   endpoint: string;
 
   @ValidateNested()
@@ -110,6 +111,7 @@ export class SavePushSubscriptionDto {
 
 export class RemovePushSubscriptionDto {
   @IsString()
+  @IsUrl({ require_tld: true, protocols: ['https'] }, { message: 'Endpoint deve ser uma URL HTTPS válida com TLD.' })
   endpoint: string;
 }
 

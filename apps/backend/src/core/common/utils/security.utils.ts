@@ -6,6 +6,11 @@ import * as bcrypt from 'bcrypt';
  */
 
 /**
+ * Configurações globais de segurança
+ */
+export const BCRYPT_SALT_ROUNDS = 12;
+
+/**
  * Gera uma senha segura aleatória
  */
 export function generateSecurePassword(length: number = 16): string {
@@ -170,8 +175,7 @@ export function decryptSensitiveData(encryptedData: string, key?: string): strin
  * Hash seguro de senha com salt aleatório
  */
 export async function hashPassword(password: string): Promise<string> {
-  const saltRounds = 12; // Aumentado para maior segurança
-  return bcrypt.hash(password, saltRounds);
+  return bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
 }
 
 /**

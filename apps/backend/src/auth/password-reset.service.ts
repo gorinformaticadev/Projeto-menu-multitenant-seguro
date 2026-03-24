@@ -4,6 +4,7 @@ import { SecurityConfigService } from '@core/security-config/security-config.ser
 import { EmailService } from '../email/email.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { BCRYPT_SALT_ROUNDS } from '@core/common/utils/security.utils';
 import * as bcrypt from 'bcrypt';
 import { validatePasswordAgainstPolicy } from '../common/utils/password-policy.util';
 import { UserSessionService } from './user-session.service';
@@ -154,8 +155,7 @@ export class PasswordResetService {
       }
 
       // Hash da nova senha
-      const saltRounds = 12;
-      const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+      const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
 
       // Atualizar a senha do usuário e marcar o token como usado
       await this.prisma.$transaction([

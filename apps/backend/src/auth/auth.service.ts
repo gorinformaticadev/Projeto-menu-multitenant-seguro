@@ -7,6 +7,7 @@ import { AuditService } from '../audit/audit.service';
 import { TwoFactorService } from './two-factor.service';
 import { TokenBlacklistService } from '../common/services/token-blacklist.service';
 import { SecurityConfigService } from '@core/security-config/security-config.service';
+import { BCRYPT_SALT_ROUNDS } from '@core/common/utils/security.utils';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import type { StringValue } from 'ms';
@@ -109,6 +110,7 @@ type UserLookupResult = UserRecord & {
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly twoFactorEnrollmentExpiresIn = '10m';
+  private readonly DUMMY_HASH = '$2b$12$LByR86.8.t7y.L.L.L.L.L.L.L.L.L.L.L.L.L.L.L.L.L.L.L.L.L';
 
   constructor(
     private prisma: PrismaService,
@@ -138,6 +140,7 @@ export class AuthService {
     });
 
     if (!user) {
+      await this.performDummyHash(password);
       await this.auditService.log({
         action: 'LOGIN_FAILED',
         ipAddress,
@@ -780,7 +783,7 @@ export class AuthService {
   }
 
   async hashPassword(password: string): Promise<string> {
-    return bcrypt.hash(password, 10);
+    return bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
   }
 
   async getProfile(userId: string) {
@@ -1014,6 +1017,12 @@ export class AuthService {
   private readSessionVersion(user: { sessionVersion?: number | null } | Record<string, unknown>) {
     const rawValue = (user as { sessionVersion?: number | null }).sessionVersion;
     return typeof rawValue === 'number' && Number.isFinite(rawValue) ? rawValue : 0;
+  }
+
+  private async performDummyHash(password: string): Promise<void> {
+    // Executa o compare com um hash dummy para mitigar timing attacks
+    // quando o usuário não é encontrado.
+    await bcrypt.compare(password, this.DUMMY_HASH);
   }
 
   private buildUnauthorizedException(code: AuthCode, message: string): UnauthorizedException {
