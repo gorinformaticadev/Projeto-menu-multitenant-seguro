@@ -235,6 +235,9 @@ export class EmailService implements OnModuleInit {
           <div class="footer">
             <p>Este é um email automático. Por favor, não responda.</p>
           </div>
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;">
+            ${this.getEmailFooter()}
+          </table>
         </div>
       </body>
       </html>
@@ -311,7 +314,7 @@ export class EmailService implements OnModuleInit {
             </td>
           </tr>
 
-          <!-- Rodapé -->
+          <!-- Rodapé automático -->
           <tr>
             <td style="padding:24px 40px;text-align:center;">
               <p style="margin:0 0 6px 0;font-size:12px;color:#9ca3af;">
@@ -322,6 +325,8 @@ export class EmailService implements OnModuleInit {
               </p>
             </td>
           </tr>
+
+          ${this.getEmailFooter()}
 
         </table>
       </td>
@@ -373,6 +378,9 @@ export class EmailService implements OnModuleInit {
           <div class="footer">
             <p>Este é um email automático. Por favor, não responda.</p>
           </div>
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;">
+            ${this.getEmailFooter()}
+          </table>
         </div>
       </body>
       </html>
@@ -596,10 +604,102 @@ export class EmailService implements OnModuleInit {
           <div class="footer">
             <p>Este é um email automático. Por favor, não responda.</p>
           </div>
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;">
+            ${this.getEmailFooter()}
+          </table>
         </div>
       </body>
       </html>
     `;
+  }
+
+  /**
+   * Rodapé padrão de identidade visual — inserido em todos os templates de email.
+   * A logo é carregada via URL pública do frontend (FRONTEND_URL/android-chrome-512x512.png).
+   */
+  private getEmailFooter(): string {
+    const frontendUrl = (this.config.get<string>('FRONTEND_URL') ?? '').replace(/\/+$/, '');
+    const logoUrl = `${frontendUrl}/android-chrome-512x512.png`;
+
+    return `
+          <!-- Rodapé de identidade visual -->
+          <tr>
+            <td style="padding:0 0 0 0;">
+              <table width="100%" cellpadding="0" cellspacing="0"
+                     style="background-color:#eef0f3;border-top:1px solid #d1d5db;">
+                <tr>
+                  <!-- Coluna esquerda: logo + nome -->
+                  <td width="220" style="padding:24px 20px 24px 28px;vertical-align:middle;">
+                    <table cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="vertical-align:middle;">
+                          <img src="${logoUrl}"
+                               alt="Pluggor"
+                               width="72" height="72"
+                               style="display:block;border-radius:8px;object-fit:contain;" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding-top:6px;text-align:center;">
+                          <span style="font-size:13px;font-weight:700;color:#1e4d6b;letter-spacing:0.5px;">Pluggor</span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+
+                  <!-- Separador vertical duplo -->
+                  <td width="18" style="vertical-align:middle;padding:16px 0;">
+                    <div style="display:inline-block;width:2px;height:80px;background-color:#1e4d6b;margin-right:4px;"></div>
+                    <div style="display:inline-block;width:2px;height:80px;background-color:#1e4d6b;"></div>
+                  </td>
+
+                  <!-- Coluna direita: nome, subtítulo e contatos -->
+                  <td style="padding:20px 28px 20px 16px;vertical-align:middle;">
+                    <p style="margin:0 0 2px 0;font-size:22px;font-weight:700;color:#1e4d6b;letter-spacing:-0.5px;">Pluggor</p>
+                    <p style="margin:0 0 12px 0;font-size:13px;color:#4b7a96;">by GOR Informática</p>
+
+                    <table cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding:3px 0;">
+                          <span style="display:inline-block;width:20px;height:20px;border:1.5px solid #1e4d6b;border-radius:50%;text-align:center;line-height:18px;font-size:11px;color:#1e4d6b;margin-right:8px;vertical-align:middle;">&#9990;</span>
+                          <span style="font-size:13px;color:#374151;vertical-align:middle;">+55 (61) 3359-7358</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:3px 0;">
+                          <span style="display:inline-block;width:20px;height:20px;border:1.5px solid #1e4d6b;border-radius:50%;text-align:center;line-height:18px;font-size:11px;color:#1e4d6b;margin-right:8px;vertical-align:middle;">&#9993;</span>
+                          <span style="font-size:13px;color:#374151;vertical-align:middle;">atendimento@gorinformatica.com.br</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:3px 0;">
+                          <span style="display:inline-block;width:20px;height:20px;border:1.5px solid #1e4d6b;border-radius:50%;text-align:center;line-height:18px;font-size:11px;color:#1e4d6b;margin-right:8px;vertical-align:middle;">&#127760;</span>
+                          <a href="https://www.pluggor.com.br" style="font-size:13px;color:#1e4d6b;text-decoration:none;vertical-align:middle;">www.pluggor.com.br</a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+
+                  <!-- Logo marca d'água direita -->
+                  <td width="72" style="padding:24px 20px 24px 0;vertical-align:bottom;text-align:right;">
+                    <img src="${logoUrl}"
+                         alt=""
+                         width="56" height="56"
+                         style="display:block;opacity:0.18;filter:grayscale(100%);margin-left:auto;" />
+                  </td>
+                </tr>
+
+                <!-- Linha inferior: desenvolvido por -->
+                <tr>
+                  <td colspan="4" style="padding:10px 28px 14px 28px;border-top:1px solid #d1d5db;text-align:center;">
+                    <p style="margin:0;font-size:12px;color:#6b7280;">
+                      Sistema desenvolvido por: <strong style="color:#1e4d6b;">GOR Informática</strong>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>`;
   }
 
   /**
