@@ -34,6 +34,14 @@ export interface SessionCleanupWatchdogSnapshot {
   slotResolutionCadence: string | null;
 }
 
+type RuntimeExecutionClassification = {
+  state: SessionCleanupWatchdogState;
+  isStuck: boolean;
+  reason: string;
+  heartbeatStale: boolean;
+  lockExpired: boolean;
+};
+
 type ExpectedSlotSearchCadence = 'subdaily' | 'daily' | 'weekly' | 'monthly';
 
 type ExpectedSlotResolutionErrorCode =
@@ -228,6 +236,84 @@ export class SessionCleanupExecutionService implements OnModuleInit, OnModuleDes
     };
   }
 
+  async inspectLatestExecution(params: {
+    now: Date;
+    stuckAfterMs: number;
+    timeZone?: string | null;
+  }): Promise<SessionCleanupWatchdogSnapshot> {
+    const latestExecution = await this.materializedExecutionService.getLatestForJob(
+      SessionCleanupExecutionService.JOB_KEY,
+    );
+    const scheduleTimeZone = this.resolveScheduleTimeZone(params.timeZone);
+
+    if (!latestExecution) {
+      return {
+        expectedScheduledFor: null,
+        execution: null,
+        latestExecution: null,
+        state: 'not_created',
+        isOverdue: false,
+        isStuck: false,
+        reason: 'latest_execution_missing',
+        scheduleTimeZone,
+        slotResolutionErrorCode: null,
+        slotResolutionError: null,
+        slotResolutionWindowMs: null,
+        slotResolutionMaxOccurrences: null,
+        slotResolutionEstimatedIntervalMs: null,
+        slotResolutionCadence: null,
+      };
+    }
+
+    return this.classifyRuntimeExecution(
+      latestExecution,
+      latestExecution,
+      params.now,
+      params.stuckAfterMs,
+      scheduleTimeZone,
+    );
+  }
+
+  async inspectExecutionById(params: {
+    executionId: string;
+    now: Date;
+    stuckAfterMs: number;
+    timeZone?: string | null;
+  }): Promise<SessionCleanupWatchdogSnapshot> {
+    const [execution, latestExecution] = await Promise.all([
+      this.materializedExecutionService.getById(params.executionId),
+      this.materializedExecutionService.getLatestForJob(SessionCleanupExecutionService.JOB_KEY),
+    ]);
+    const scheduleTimeZone = this.resolveScheduleTimeZone(params.timeZone);
+
+    if (!execution) {
+      return {
+        expectedScheduledFor: null,
+        execution: null,
+        latestExecution,
+        state: 'not_created',
+        isOverdue: false,
+        isStuck: false,
+        reason: 'execution_not_found',
+        scheduleTimeZone,
+        slotResolutionErrorCode: null,
+        slotResolutionError: null,
+        slotResolutionWindowMs: null,
+        slotResolutionMaxOccurrences: null,
+        slotResolutionEstimatedIntervalMs: null,
+        slotResolutionCadence: null,
+      };
+    }
+
+    return this.classifyRuntimeExecution(
+      execution,
+      latestExecution,
+      params.now,
+      params.stuckAfterMs,
+      scheduleTimeZone,
+    );
+  }
+
   private classifyExecution(
     execution: MaterializedCronExecutionRecord,
     latestExecution: MaterializedCronExecutionRecord | null,
@@ -237,21 +323,20 @@ export class SessionCleanupExecutionService implements OnModuleInit, OnModuleDes
     scheduleTimeZone: string,
   ): SessionCleanupWatchdogSnapshot {
     if (execution.status === 'running') {
-      const reference = execution.heartbeatAt || execution.startedAt || execution.triggeredAt;
-      const lockExpired = execution.lockedUntil
-        ? now.getTime() > execution.lockedUntil.getTime()
-        : true;
-      const isStuck =
-        now.getTime() > reference.getTime() + stuckAfterMs && lockExpired;
+      const runtimeClassification = this.classifyRunningExecution(
+        execution,
+        now,
+        stuckAfterMs,
+      );
 
       return {
         expectedScheduledFor: execution.scheduledFor,
         execution,
         latestExecution,
-        state: isStuck ? 'stuck' : 'running',
+        state: runtimeClassification.state,
         isOverdue: false,
-        isStuck,
-        reason: isStuck ? 'running_without_recent_heartbeat' : 'running',
+        isStuck: runtimeClassification.isStuck,
+        reason: runtimeClassification.reason,
         scheduleTimeZone,
         slotResolutionErrorCode: null,
         slotResolutionError: null,
@@ -297,6 +382,97 @@ export class SessionCleanupExecutionService implements OnModuleInit, OnModuleDes
       slotResolutionMaxOccurrences: null,
       slotResolutionEstimatedIntervalMs: null,
       slotResolutionCadence: null,
+    };
+  }
+
+  private classifyRuntimeExecution(
+    execution: MaterializedCronExecutionRecord,
+    latestExecution: MaterializedCronExecutionRecord | null,
+    now: Date,
+    stuckAfterMs: number,
+    scheduleTimeZone: string,
+  ): SessionCleanupWatchdogSnapshot {
+    if (execution.status === 'running') {
+      const runtimeClassification = this.classifyRunningExecution(
+        execution,
+        now,
+        stuckAfterMs,
+      );
+
+      return {
+        expectedScheduledFor: execution.scheduledFor,
+        execution,
+        latestExecution,
+        state: runtimeClassification.state,
+        isOverdue: false,
+        isStuck: runtimeClassification.isStuck,
+        reason: runtimeClassification.reason,
+        scheduleTimeZone,
+        slotResolutionErrorCode: null,
+        slotResolutionError: null,
+        slotResolutionWindowMs: null,
+        slotResolutionMaxOccurrences: null,
+        slotResolutionEstimatedIntervalMs: null,
+        slotResolutionCadence: null,
+      };
+    }
+
+    if (execution.status === 'pending') {
+      return {
+        expectedScheduledFor: execution.scheduledFor,
+        execution,
+        latestExecution,
+        state: 'pending',
+        isOverdue: false,
+        isStuck: false,
+        reason: 'pending',
+        scheduleTimeZone,
+        slotResolutionErrorCode: null,
+        slotResolutionError: null,
+        slotResolutionWindowMs: null,
+        slotResolutionMaxOccurrences: null,
+        slotResolutionEstimatedIntervalMs: null,
+        slotResolutionCadence: null,
+      };
+    }
+
+    return {
+      expectedScheduledFor: execution.scheduledFor,
+      execution,
+      latestExecution,
+      state: execution.status,
+      isOverdue: false,
+      isStuck: false,
+      reason: execution.status,
+      scheduleTimeZone,
+      slotResolutionErrorCode: null,
+      slotResolutionError: null,
+      slotResolutionWindowMs: null,
+      slotResolutionMaxOccurrences: null,
+      slotResolutionEstimatedIntervalMs: null,
+      slotResolutionCadence: null,
+    };
+  }
+
+  private classifyRunningExecution(
+    execution: MaterializedCronExecutionRecord,
+    now: Date,
+    stuckAfterMs: number,
+  ): RuntimeExecutionClassification {
+    const reference = execution.heartbeatAt || execution.startedAt || execution.triggeredAt;
+    const heartbeatStale = now.getTime() > reference.getTime() + stuckAfterMs;
+    const lockExpired = execution.lockedUntil
+      ? now.getTime() > execution.lockedUntil.getTime()
+      : true;
+    const isStuck =
+      execution.finishedAt === null && heartbeatStale && lockExpired;
+
+    return {
+      state: isStuck ? 'stuck' : 'running',
+      isStuck,
+      reason: isStuck ? 'running_without_recent_heartbeat' : 'running',
+      heartbeatStale,
+      lockExpired,
     };
   }
 

@@ -16,14 +16,21 @@ describe('SystemOperationalAlertsService', () => {
     backupJob: {
       findMany: jest.fn(),
     },
+    notification: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+    },
     $queryRaw: jest.fn(),
     $executeRaw: jest.fn(),
   };
   const notificationServiceMock = {
     createSystemNotificationEntity: jest.fn(),
+    findSystemNotificationEntityById: jest.fn(),
   };
   const notificationGatewayMock = {
     emitNewNotification: jest.fn(),
+    emitNotificationRead: jest.fn(),
   };
   const pushNotificationServiceMock = {
     getPublicKey: jest.fn(),
@@ -117,8 +124,12 @@ describe('SystemOperationalAlertsService', () => {
     process.env.OPS_ALERT_REDIS_REQUIRED = 'false';
 
     notificationServiceMock.createSystemNotificationEntity.mockResolvedValue(baseNotification);
+    notificationServiceMock.findSystemNotificationEntityById.mockResolvedValue(baseNotification);
     pushNotificationServiceMock.getPublicKey.mockResolvedValue('public-key');
     prismaMock.backupJob.findMany.mockResolvedValue([]);
+    prismaMock.notification.findMany.mockResolvedValue([]);
+    prismaMock.notification.findUnique.mockResolvedValue(null);
+    prismaMock.notification.update.mockResolvedValue(undefined);
     cronServiceMock.register.mockResolvedValue(undefined);
     configResolverMock.getBoolean.mockResolvedValue(true);
     redisLockMock.acquireLock.mockResolvedValue(true);
@@ -452,5 +463,100 @@ describe('SystemOperationalAlertsService', () => {
     expect(notificationGatewayMock.emitNewNotification).not.toHaveBeenCalled();
     expect(pushNotificationServiceMock.getPublicKey).not.toHaveBeenCalled();
     expect(auditServiceMock.log).not.toHaveBeenCalled();
+  });
+
+  it('lista alertas operacionais recentes com payload normalizado', async () => {
+    prismaMock.notification.findMany.mockResolvedValue([
+      {
+        id: 'notif-1',
+        createdAt: new Date('2026-03-07T14:00:00.000Z'),
+        data: {
+          alertAction: 'JOB_STUCK_RUNNING',
+          jobKey: 'system.session_cleanup',
+        },
+        isRead: false,
+        readAt: null,
+      },
+    ]);
+
+    const result = await service.findRecentOperationalAlerts({
+      source: 'job-watchdog',
+      since: new Date('2026-03-07T13:00:00.000Z'),
+      limit: 10,
+    });
+
+    expect(prismaMock.notification.findMany).toHaveBeenCalledWith({
+      where: {
+        module: 'operational-alerts',
+        source: 'job-watchdog',
+        createdAt: {
+          gte: new Date('2026-03-07T13:00:00.000Z'),
+        },
+      },
+      select: {
+        id: true,
+        createdAt: true,
+        data: true,
+        isRead: true,
+        readAt: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 10,
+    });
+    expect(result).toEqual([
+      {
+        id: 'notif-1',
+        createdAt: new Date('2026-03-07T14:00:00.000Z'),
+        data: {
+          alertAction: 'JOB_STUCK_RUNNING',
+          jobKey: 'system.session_cleanup',
+        },
+        isRead: false,
+        readAt: null,
+      },
+    ]);
+  });
+
+  it('resolve alertas operacionais existentes, marca como lidos e emite evento de leitura', async () => {
+    prismaMock.notification.findUnique.mockResolvedValue({
+      id: 'notif-1',
+      data: {
+        alertAction: 'JOB_STUCK_RUNNING',
+        jobKey: 'system.session_cleanup',
+      },
+    });
+    prismaMock.notification.update.mockResolvedValue({
+      id: 'notif-1',
+    });
+
+    const resolved = await service.resolveOperationalAlerts({
+      ids: ['notif-1'],
+      resolution: {
+        alertLifecycle: 'resolved',
+        alertResolvedReason: 'terminal_state_observed',
+      },
+      markAsRead: true,
+    });
+
+    expect(resolved).toBe(1);
+    expect(prismaMock.notification.update).toHaveBeenCalledWith({
+      where: { id: 'notif-1' },
+      data: {
+        data: expect.objectContaining({
+          alertAction: 'JOB_STUCK_RUNNING',
+          jobKey: 'system.session_cleanup',
+          alertLifecycle: 'resolved',
+          alertResolvedReason: 'terminal_state_observed',
+          alertResolvedAt: expect.any(String),
+        }),
+        read: true,
+        isRead: true,
+        readAt: expect.any(Date),
+      },
+    });
+    expect(notificationServiceMock.findSystemNotificationEntityById).toHaveBeenCalledWith('notif-1');
+    expect(notificationGatewayMock.emitNotificationRead).toHaveBeenCalledWith(baseNotification);
   });
 });

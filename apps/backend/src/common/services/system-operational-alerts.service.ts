@@ -44,6 +44,14 @@ type AlertDispatchInput = {
   source?: string;
 };
 
+export interface OperationalAlertRecord {
+  id: string;
+  createdAt: Date;
+  data: Record<string, unknown>;
+  isRead: boolean;
+  readAt: Date | null;
+}
+
 type InfraHealthMetric = {
   status: 'healthy' | 'degraded' | 'error' | 'down' | 'not_configured';
   latencyMs: number | null;
@@ -232,6 +240,112 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     // For now, I'll assume the new emitAlertIfNeeded is for specific cases and the old one remains for dispatchOperationalAlert.
     // If the intent was to replace all calls to emitAlertIfNeeded with the new signature, that would be a larger refactor.
     return this.emitAlertIfNeeded(input, nowMs, cooldownMinutes);
+  }
+
+  async findRecentOperationalAlerts(params: {
+    source?: string;
+    since?: Date;
+    limit?: number;
+  } = {}): Promise<OperationalAlertRecord[]> {
+    const take = Math.max(1, Math.min(Number(params.limit || 100), 500));
+
+    const rows = await this.prisma.notification.findMany({
+      where: {
+        module: 'operational-alerts',
+        ...(params.source ? { source: params.source } : {}),
+        ...(params.since
+          ? {
+              createdAt: {
+                gte: params.since,
+              },
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+        createdAt: true,
+        data: true,
+        isRead: true,
+        readAt: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take,
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      createdAt: row.createdAt,
+      data: this.normalizeAlertData(row.data),
+      isRead: Boolean(row.isRead),
+      readAt: row.readAt || null,
+    }));
+  }
+
+  async resolveOperationalAlerts(params: {
+    ids: string[];
+    resolution: Record<string, unknown>;
+    markAsRead?: boolean;
+  }): Promise<number> {
+    const ids = Array.from(
+      new Set(
+        params.ids
+          .map((id) => String(id || '').trim())
+          .filter((id) => id.length > 0),
+      ),
+    );
+
+    if (ids.length === 0) {
+      return 0;
+    }
+
+    let resolvedCount = 0;
+    const resolvedAt = new Date();
+    const markAsRead = params.markAsRead !== false;
+
+    for (const id of ids) {
+      const row = await this.prisma.notification.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          data: true,
+        },
+      });
+
+      if (!row) {
+        continue;
+      }
+
+      await this.prisma.notification.update({
+        where: { id },
+        data: {
+          data: {
+            ...this.normalizeAlertData(row.data),
+            ...params.resolution,
+            alertResolvedAt: resolvedAt.toISOString(),
+          } as any,
+          ...(markAsRead
+            ? {
+                read: true,
+                isRead: true,
+                readAt: resolvedAt,
+              }
+            : {}),
+        },
+      });
+
+      if (markAsRead) {
+        const entity = await this.notificationService.findSystemNotificationEntityById(id);
+        if (entity) {
+          await this.notificationGateway.emitNotificationRead(entity);
+        }
+      }
+
+      resolvedCount += 1;
+    }
+
+    return resolvedCount;
   }
 
   private async evaluateHigh5xxErrorRateAlert(
@@ -512,6 +626,14 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     // Set cooldown using RedisLockService
     await this.redisLock.setCooldown(cooldownKey, cooldownMinutes * 60 * 1000);
     return true;
+  }
+
+  private normalizeAlertData(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return {};
+    }
+
+    return value as Record<string, unknown>;
   }
 
 

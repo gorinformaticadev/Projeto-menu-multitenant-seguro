@@ -17,6 +17,8 @@ describe('SystemJobWatchdogService', () => {
   };
   const operationalAlertsServiceMock = {
     dispatchOperationalAlert: jest.fn(),
+    findRecentOperationalAlerts: jest.fn(),
+    resolveOperationalAlerts: jest.fn(),
   };
   const configResolverMock = {
     getBoolean: jest.fn(),
@@ -27,6 +29,8 @@ describe('SystemJobWatchdogService', () => {
   };
   const sessionCleanupExecutionServiceMock = {
     inspectExpectedExecution: jest.fn(),
+    inspectLatestExecution: jest.fn(),
+    inspectExecutionById: jest.fn(),
   };
 
   let service: SystemJobWatchdogService;
@@ -53,6 +57,8 @@ describe('SystemJobWatchdogService', () => {
     cronServiceMock.isMaintenancePaused.mockReturnValue(false);
     heartbeatServiceMock.reconcileOrphans.mockResolvedValue(undefined);
     operationalAlertsServiceMock.dispatchOperationalAlert.mockResolvedValue(true);
+    operationalAlertsServiceMock.findRecentOperationalAlerts.mockResolvedValue([]);
+    operationalAlertsServiceMock.resolveOperationalAlerts.mockResolvedValue(0);
     configResolverMock.getBoolean.mockResolvedValue(true);
     redisLockMock.acquireLock.mockResolvedValue(true);
     redisLockMock.releaseLock.mockResolvedValue(undefined);
@@ -64,6 +70,26 @@ describe('SystemJobWatchdogService', () => {
       isOverdue: true,
       isStuck: false,
       reason: 'slot_not_materialized',
+      scheduleTimeZone: 'UTC',
+    });
+    sessionCleanupExecutionServiceMock.inspectLatestExecution.mockResolvedValue({
+      expectedScheduledFor: null,
+      execution: null,
+      latestExecution: null,
+      state: 'not_created',
+      isOverdue: false,
+      isStuck: false,
+      reason: 'latest_execution_missing',
+      scheduleTimeZone: 'UTC',
+    });
+    sessionCleanupExecutionServiceMock.inspectExecutionById.mockResolvedValue({
+      expectedScheduledFor: null,
+      execution: null,
+      latestExecution: null,
+      state: 'not_created',
+      isOverdue: false,
+      isStuck: false,
+      reason: 'execution_not_found',
       scheduleTimeZone: 'UTC',
     });
 
@@ -185,6 +211,251 @@ describe('SystemJobWatchdogService', () => {
         consecutiveFailureCount: 0,
       },
     ]);
+    const stuckSnapshot = {
+      expectedScheduledFor: new Date('2026-03-07T15:00:00.000Z'),
+      execution: {
+        id: 'execution-1',
+        status: 'running',
+        ownerId: 'instance-a',
+        attempt: 1,
+        leaseVersion: 1n,
+        triggeredAt: new Date('2026-03-07T14:45:01.000Z'),
+        startedAt: new Date('2026-03-07T14:45:02.000Z'),
+        finishedAt: null,
+        heartbeatAt: new Date('2026-03-07T14:45:03.000Z'),
+        lockedUntil: new Date('2026-03-07T14:47:03.000Z'),
+        reason: null,
+        error: null,
+      },
+      latestExecution: null,
+      state: 'stuck',
+      isOverdue: false,
+      isStuck: true,
+      reason: 'running_without_recent_heartbeat',
+      scheduleTimeZone: 'UTC',
+    };
+    sessionCleanupExecutionServiceMock.inspectExpectedExecution.mockResolvedValue(stuckSnapshot);
+    sessionCleanupExecutionServiceMock.inspectLatestExecution.mockResolvedValue(stuckSnapshot);
+    sessionCleanupExecutionServiceMock.inspectExecutionById.mockResolvedValue(stuckSnapshot);
+
+    await service.evaluateWatchdog(new Date('2026-03-07T15:10:00.000Z'));
+
+    expect(operationalAlertsServiceMock.dispatchOperationalAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'JOB_STUCK_RUNNING',
+        cooldownKey: expect.stringContaining('execution-1'),
+        data: expect.objectContaining({
+          watchdogState: 'stuck',
+          materializedExecutionStatus: 'running',
+          alertFingerprint: expect.stringContaining('execution-1'),
+        }),
+      }),
+      expect.any(Number),
+    );
+  });
+
+  it('uses the materialized execution mais recente como fonte de verdade e descarta stuck de snapshot antigo', async () => {
+    cronServiceMock.getRuntimeJobs.mockResolvedValue([
+      {
+        key: 'system.session_cleanup',
+        name: 'Session cleanup',
+        description: 'Removes expired sessions',
+        schedule: '*/15 * * * *',
+        enabled: true,
+        runtimeRegistered: true,
+        runtimeActive: true,
+        executionMode: 'materialized',
+        lastStatus: 'running',
+        lastStartedAt: new Date('2026-03-07T10:45:00.000Z'),
+        lastHeartbeatAt: new Date('2026-03-07T10:45:10.000Z'),
+        nextExpectedRunAt: new Date('2026-03-07T11:00:00.000Z'),
+        consecutiveFailureCount: 0,
+      },
+    ]);
+    sessionCleanupExecutionServiceMock.inspectExpectedExecution.mockResolvedValue({
+      expectedScheduledFor: new Date('2026-03-07T14:45:00.000Z'),
+      execution: {
+        id: 'execution-stale',
+        status: 'running',
+        ownerId: 'instance-a',
+        attempt: 1,
+        leaseVersion: 1n,
+        triggeredAt: new Date('2026-03-07T14:45:01.000Z'),
+        startedAt: new Date('2026-03-07T14:45:02.000Z'),
+        finishedAt: null,
+        heartbeatAt: new Date('2026-03-07T14:45:03.000Z'),
+        lockedUntil: new Date('2026-03-07T14:47:03.000Z'),
+        reason: null,
+        error: null,
+      },
+      latestExecution: {
+        id: 'execution-1',
+        scheduledFor: new Date('2026-03-07T15:00:00.000Z'),
+        status: 'success',
+        ownerId: 'instance-a',
+        attempt: 1,
+        leaseVersion: 1n,
+        triggeredAt: new Date('2026-03-07T15:00:01.000Z'),
+        startedAt: new Date('2026-03-07T15:00:02.000Z'),
+        finishedAt: new Date('2026-03-07T15:00:30.000Z'),
+        heartbeatAt: new Date('2026-03-07T15:00:30.000Z'),
+        lockedUntil: new Date('2026-03-07T15:00:30.000Z'),
+        reason: 'completed',
+        error: null,
+      },
+      state: 'stuck',
+      isOverdue: false,
+      isStuck: true,
+      reason: 'running_without_recent_heartbeat',
+      scheduleTimeZone: 'UTC',
+    });
+    sessionCleanupExecutionServiceMock.inspectLatestExecution.mockResolvedValue({
+      expectedScheduledFor: new Date('2026-03-07T15:00:00.000Z'),
+      execution: {
+        id: 'execution-1',
+        scheduledFor: new Date('2026-03-07T15:00:00.000Z'),
+        status: 'success',
+        ownerId: 'instance-a',
+        attempt: 1,
+        leaseVersion: 1n,
+        triggeredAt: new Date('2026-03-07T14:45:01.000Z'),
+        startedAt: new Date('2026-03-07T14:45:02.000Z'),
+        finishedAt: new Date('2026-03-07T14:45:30.000Z'),
+        heartbeatAt: new Date('2026-03-07T14:45:30.000Z'),
+        lockedUntil: new Date('2026-03-07T14:45:30.000Z'),
+        reason: 'completed',
+        error: null,
+      },
+      latestExecution: null,
+      state: 'success',
+      isOverdue: false,
+      isStuck: false,
+      reason: 'success',
+      scheduleTimeZone: 'UTC',
+    });
+    operationalAlertsServiceMock.findRecentOperationalAlerts.mockResolvedValue([
+      {
+        id: 'notif-stuck-1',
+        createdAt: new Date('2026-03-07T14:58:00.000Z'),
+        isRead: false,
+        readAt: null,
+        data: {
+          alertAction: 'JOB_STUCK_RUNNING',
+          jobKey: 'system.session_cleanup',
+          materializedExecutionId: 'execution-stale',
+          expectedScheduledFor: '2026-03-07T14:45:00.000Z',
+        },
+      },
+    ]);
+
+    const result = await service.evaluateWatchdog(new Date('2026-03-07T15:10:00.000Z'));
+
+    expect(sessionCleanupExecutionServiceMock.inspectExpectedExecution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        schedule: '*/15 * * * *',
+        now: new Date('2026-03-07T15:10:00.000Z'),
+      }),
+    );
+    expect(result).toEqual({
+      emitted: [],
+      skipped: ['healthy:system.session_cleanup'],
+    });
+    expect(operationalAlertsServiceMock.resolveOperationalAlerts).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ids: ['notif-stuck-1'],
+        resolution: expect.objectContaining({
+          resolvedByExecutionId: 'execution-1',
+          resolvedByStatus: 'success',
+        }),
+      }),
+    );
+    expect(operationalAlertsServiceMock.dispatchOperationalAlert).not.toHaveBeenCalled();
+  });
+
+  it('deduplica o mesmo alerta de stuck por fingerprint da execucao', async () => {
+    cronServiceMock.getRuntimeJobs.mockResolvedValue([
+      {
+        key: 'system.session_cleanup',
+        name: 'Session cleanup',
+        description: 'Removes expired sessions',
+        schedule: '*/15 * * * *',
+        enabled: true,
+        runtimeRegistered: true,
+        runtimeActive: true,
+        executionMode: 'materialized',
+        lastStatus: 'success',
+        nextExpectedRunAt: new Date('2026-03-07T15:00:00.000Z'),
+        consecutiveFailureCount: 0,
+      },
+    ]);
+    const stuckSnapshot = {
+      expectedScheduledFor: new Date('2026-03-07T15:00:00.000Z'),
+      execution: {
+        id: 'execution-1',
+        scheduledFor: new Date('2026-03-07T15:00:00.000Z'),
+        status: 'running',
+        ownerId: 'instance-a',
+        attempt: 1,
+        leaseVersion: 1n,
+        triggeredAt: new Date('2026-03-07T14:45:01.000Z'),
+        startedAt: new Date('2026-03-07T14:45:02.000Z'),
+        finishedAt: null,
+        heartbeatAt: new Date('2026-03-07T14:45:03.000Z'),
+        lockedUntil: new Date('2026-03-07T14:47:03.000Z'),
+        reason: null,
+        error: null,
+      },
+      latestExecution: null,
+      state: 'stuck',
+      isOverdue: false,
+      isStuck: true,
+      reason: 'running_without_recent_heartbeat',
+      scheduleTimeZone: 'UTC',
+    };
+    sessionCleanupExecutionServiceMock.inspectExpectedExecution.mockResolvedValue(stuckSnapshot);
+    sessionCleanupExecutionServiceMock.inspectLatestExecution.mockResolvedValue(stuckSnapshot);
+    sessionCleanupExecutionServiceMock.inspectExecutionById.mockResolvedValue(stuckSnapshot);
+    operationalAlertsServiceMock.findRecentOperationalAlerts.mockResolvedValue([
+      {
+        id: 'notif-stuck-1',
+        createdAt: new Date('2026-03-07T15:05:00.000Z'),
+        isRead: false,
+        readAt: null,
+        data: {
+          alertAction: 'JOB_STUCK_RUNNING',
+          jobKey: 'system.session_cleanup',
+          alertFingerprint: 'system.session_cleanup:execution-1:2026-03-07T15:00:00.000Z',
+          materializedExecutionId: 'execution-1',
+          expectedScheduledFor: '2026-03-07T15:00:00.000Z',
+        },
+      },
+    ]);
+
+    const result = await service.evaluateWatchdog(new Date('2026-03-07T15:10:00.000Z'));
+
+    expect(result).toEqual({
+      emitted: [],
+      skipped: ['JOB_STUCK_RUNNING:system.session_cleanup:system.session_cleanup:execution-1:2026-03-07T15:00:00.000Z'],
+    });
+    expect(operationalAlertsServiceMock.dispatchOperationalAlert).not.toHaveBeenCalled();
+  });
+
+  it('revalida a execucao antes de notificar e evita falso positivo por corrida', async () => {
+    cronServiceMock.getRuntimeJobs.mockResolvedValue([
+      {
+        key: 'system.session_cleanup',
+        name: 'Session cleanup',
+        description: 'Removes expired sessions',
+        schedule: '*/15 * * * *',
+        enabled: true,
+        runtimeRegistered: true,
+        runtimeActive: true,
+        executionMode: 'materialized',
+        lastStatus: 'success',
+        nextExpectedRunAt: new Date('2026-03-07T15:00:00.000Z'),
+        consecutiveFailureCount: 0,
+      },
+    ]);
     sessionCleanupExecutionServiceMock.inspectExpectedExecution.mockResolvedValue({
       expectedScheduledFor: new Date('2026-03-07T15:00:00.000Z'),
       execution: {
@@ -208,43 +479,34 @@ describe('SystemJobWatchdogService', () => {
       reason: 'running_without_recent_heartbeat',
       scheduleTimeZone: 'UTC',
     });
-
-    await service.evaluateWatchdog(new Date('2026-03-07T15:10:00.000Z'));
-
-    expect(operationalAlertsServiceMock.dispatchOperationalAlert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: 'JOB_STUCK_RUNNING',
-        data: expect.objectContaining({
-          watchdogState: 'stuck',
-          materializedExecutionStatus: 'running',
-        }),
-      }),
-      expect.any(Number),
-    );
-  });
-
-  it('uses the materialized execution as source of truth for session cleanup instead of the stale aggregate heartbeat', async () => {
-    cronServiceMock.getRuntimeJobs.mockResolvedValue([
-      {
-        key: 'system.session_cleanup',
-        name: 'Session cleanup',
-        description: 'Removes expired sessions',
-        schedule: '*/15 * * * *',
-        enabled: true,
-        runtimeRegistered: true,
-        runtimeActive: true,
-        executionMode: 'materialized',
-        lastStatus: 'running',
-        lastStartedAt: new Date('2026-03-07T10:45:00.000Z'),
-        lastHeartbeatAt: new Date('2026-03-07T10:45:10.000Z'),
-        nextExpectedRunAt: new Date('2026-03-07T11:00:00.000Z'),
-        consecutiveFailureCount: 0,
-      },
-    ]);
-    sessionCleanupExecutionServiceMock.inspectExpectedExecution.mockResolvedValue({
+    sessionCleanupExecutionServiceMock.inspectLatestExecution.mockResolvedValue({
       expectedScheduledFor: new Date('2026-03-07T15:00:00.000Z'),
       execution: {
         id: 'execution-1',
+        status: 'running',
+        ownerId: 'instance-a',
+        attempt: 1,
+        leaseVersion: 1n,
+        triggeredAt: new Date('2026-03-07T14:45:01.000Z'),
+        startedAt: new Date('2026-03-07T14:45:02.000Z'),
+        finishedAt: null,
+        heartbeatAt: new Date('2026-03-07T14:45:03.000Z'),
+        lockedUntil: new Date('2026-03-07T14:47:03.000Z'),
+        reason: null,
+        error: null,
+      },
+      latestExecution: null,
+      state: 'stuck',
+      isOverdue: false,
+      isStuck: true,
+      reason: 'running_without_recent_heartbeat',
+      scheduleTimeZone: 'UTC',
+    });
+    sessionCleanupExecutionServiceMock.inspectExecutionById.mockResolvedValue({
+      expectedScheduledFor: new Date('2026-03-07T15:00:00.000Z'),
+      execution: {
+        id: 'execution-1',
+        scheduledFor: new Date('2026-03-07T15:00:00.000Z'),
         status: 'success',
         ownerId: 'instance-a',
         attempt: 1,
@@ -267,16 +529,109 @@ describe('SystemJobWatchdogService', () => {
 
     const result = await service.evaluateWatchdog(new Date('2026-03-07T15:10:00.000Z'));
 
-    expect(sessionCleanupExecutionServiceMock.inspectExpectedExecution).toHaveBeenCalledWith(
-      expect.objectContaining({
-        schedule: '*/15 * * * *',
-        now: new Date('2026-03-07T15:10:00.000Z'),
-      }),
-    );
     expect(result).toEqual({
       emitted: [],
       skipped: ['healthy:system.session_cleanup'],
     });
+    expect(operationalAlertsServiceMock.dispatchOperationalAlert).not.toHaveBeenCalled();
+  });
+
+  it('resolve alerta stuck antigo quando surge execucao terminal mais nova', async () => {
+    cronServiceMock.getRuntimeJobs.mockResolvedValue([
+      {
+        key: 'system.session_cleanup',
+        name: 'Session cleanup',
+        description: 'Removes expired sessions',
+        schedule: '*/15 * * * *',
+        enabled: true,
+        runtimeRegistered: true,
+        runtimeActive: true,
+        executionMode: 'materialized',
+        lastStatus: 'success',
+        nextExpectedRunAt: new Date('2026-03-07T15:00:00.000Z'),
+        consecutiveFailureCount: 0,
+      },
+    ]);
+    sessionCleanupExecutionServiceMock.inspectExpectedExecution.mockResolvedValue({
+      expectedScheduledFor: new Date('2026-03-07T15:15:00.000Z'),
+      execution: {
+        id: 'execution-2',
+        scheduledFor: new Date('2026-03-07T15:15:00.000Z'),
+        status: 'success',
+        ownerId: 'instance-a',
+        attempt: 1,
+        leaseVersion: 2n,
+        triggeredAt: new Date('2026-03-07T15:15:01.000Z'),
+        startedAt: new Date('2026-03-07T15:15:02.000Z'),
+        finishedAt: new Date('2026-03-07T15:15:05.000Z'),
+        heartbeatAt: new Date('2026-03-07T15:15:05.000Z'),
+        lockedUntil: new Date('2026-03-07T15:15:05.000Z'),
+        reason: 'completed',
+        error: null,
+      },
+      latestExecution: null,
+      state: 'success',
+      isOverdue: false,
+      isStuck: false,
+      reason: 'success',
+      scheduleTimeZone: 'UTC',
+    });
+    sessionCleanupExecutionServiceMock.inspectLatestExecution.mockResolvedValue({
+      expectedScheduledFor: new Date('2026-03-07T15:15:00.000Z'),
+      execution: {
+        id: 'execution-2',
+        scheduledFor: new Date('2026-03-07T15:15:00.000Z'),
+        status: 'success',
+        ownerId: 'instance-a',
+        attempt: 1,
+        leaseVersion: 2n,
+        triggeredAt: new Date('2026-03-07T15:15:01.000Z'),
+        startedAt: new Date('2026-03-07T15:15:02.000Z'),
+        finishedAt: new Date('2026-03-07T15:15:05.000Z'),
+        heartbeatAt: new Date('2026-03-07T15:15:05.000Z'),
+        lockedUntil: new Date('2026-03-07T15:15:05.000Z'),
+        reason: 'completed',
+        error: null,
+      },
+      latestExecution: null,
+      state: 'success',
+      isOverdue: false,
+      isStuck: false,
+      reason: 'success',
+      scheduleTimeZone: 'UTC',
+    });
+    operationalAlertsServiceMock.findRecentOperationalAlerts.mockResolvedValue([
+      {
+        id: 'notif-stuck-1',
+        createdAt: new Date('2026-03-07T15:00:00.000Z'),
+        isRead: false,
+        readAt: null,
+        data: {
+          alertAction: 'JOB_STUCK_RUNNING',
+          jobKey: 'system.session_cleanup',
+          alertFingerprint: 'system.session_cleanup:execution-1:2026-03-07T15:00:00.000Z',
+          materializedExecutionId: 'execution-1',
+          expectedScheduledFor: '2026-03-07T15:00:00.000Z',
+        },
+      },
+    ]);
+
+    const result = await service.evaluateWatchdog(new Date('2026-03-07T15:16:00.000Z'));
+
+    expect(result).toEqual({
+      emitted: [],
+      skipped: ['healthy:system.session_cleanup'],
+    });
+    expect(operationalAlertsServiceMock.resolveOperationalAlerts).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ids: ['notif-stuck-1'],
+        resolution: expect.objectContaining({
+          alertResolvedReason: 'newer_terminal_execution_observed',
+          resolvedByExecutionId: 'execution-2',
+          resolvedByStatus: 'success',
+        }),
+      }),
+    );
     expect(operationalAlertsServiceMock.dispatchOperationalAlert).not.toHaveBeenCalled();
   });
 

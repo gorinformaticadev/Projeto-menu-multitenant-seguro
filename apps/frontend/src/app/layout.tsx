@@ -14,19 +14,47 @@ import { MaintenanceBanner } from "@/components/MaintenanceBanner";
 import { SystemNotificationsProvider } from "@/contexts/SystemNotificationsContext";
 import { APP_THEME_VALUES, PUBLIC_THEME_STORAGE_KEY } from "@/lib/app-theme";
 
-export const metadata: Metadata = {
-  title: "Sistema Multitenant", // Será atualizado dinamicamente pelo DynamicTitle
-  description: "Sistema com isolamento de dados e controle de acesso",
-  icons: {
-    icon: [
-      { url: '/favicon.ico', sizes: 'any' },
-      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
-      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
-      { url: '/pwa.svg', type: 'image/svg+xml' },
-    ],
-    apple: '/apple-touch-icon.png',
-  },
-};
+/** Valor padrão usado como fallback quando o backend não está acessível no SSR */
+const PLATFORM_NAME_FALLBACK = "Sistema Multitenant";
+
+/**
+ * Busca o nome da plataforma diretamente no backend durante o SSR.
+ * Usa a URL interna do servidor (NEXT_PUBLIC_API_URL) para evitar
+ * depender do rewrite do Next.js, que só funciona no browser.
+ */
+async function fetchPlatformNameSSR(): Promise<string> {
+  try {
+    const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
+    const apiBase = rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl}/api`;
+    const res = await fetch(`${apiBase}/platform-config/name`, {
+      // Revalidar a cada 60 segundos no cache do Next.js
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return PLATFORM_NAME_FALLBACK;
+    const data = (await res.json()) as { platformName?: unknown };
+    const name = typeof data.platformName === "string" ? data.platformName.trim() : "";
+    return name || PLATFORM_NAME_FALLBACK;
+  } catch {
+    return PLATFORM_NAME_FALLBACK;
+  }
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const platformName = await fetchPlatformNameSSR();
+  return {
+    title: platformName,
+    description: "Sistema com isolamento de dados e controle de acesso",
+    icons: {
+      icon: [
+        { url: '/favicon.ico', sizes: 'any' },
+        { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+        { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+        { url: '/pwa.svg', type: 'image/svg+xml' },
+      ],
+      apple: '/apple-touch-icon.png',
+    },
+  };
+}
 
 export default function RootLayout({
   children,

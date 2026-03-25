@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { CronExpression } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { CronJobDefinition, CronService } from '../../core/cron/cron.service';
@@ -8,7 +8,10 @@ import {
   SessionCleanupExecutionService,
   SessionCleanupWatchdogSnapshot,
 } from './session-cleanup-execution.service';
-import { SystemOperationalAlertsService } from './system-operational-alerts.service';
+import {
+  OperationalAlertRecord,
+  SystemOperationalAlertsService,
+} from './system-operational-alerts.service';
 
 type WatchdogAlertInput = {
   action: 'JOB_NOT_RUNNING' | 'JOB_REPEATED_FAILURES' | 'JOB_STUCK_RUNNING';
@@ -26,11 +29,14 @@ const DEFAULT_WATCHDOG_MIN_STALE_MS = 5 * 60 * 1000;
 const DEFAULT_WATCHDOG_MAX_STALE_MS = 12 * 60 * 60 * 1000;
 const DEFAULT_WATCHDOG_MIN_STUCK_MS = 10 * 60 * 1000;
 const DEFAULT_WATCHDOG_MAX_STUCK_MS = 6 * 60 * 60 * 1000;
+const MATERIALIZED_ALERT_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000;
 
 import { RedisLockService } from './redis-lock.service';
 
 @Injectable()
 export class SystemJobWatchdogService implements OnModuleInit {
+  private readonly logger = new Logger(SystemJobWatchdogService.name);
+
   constructor(
     private readonly cronService: CronService,
     private readonly heartbeatService: CronJobHeartbeatService,
@@ -335,26 +341,137 @@ export class SystemJobWatchdogService implements OnModuleInit {
     staleAfterMs: number,
     stuckAfterMs: number,
   ): Promise<{ emitted?: string; skipped: string }> {
-    const snapshot = await this.sessionCleanupExecutionService.inspectExpectedExecution({
+    const expectedSnapshot = await this.sessionCleanupExecutionService.inspectExpectedExecution({
       schedule: job.schedule,
       now,
       staleAfterMs,
       stuckAfterMs,
     });
+    const latestSnapshot = await this.sessionCleanupExecutionService.inspectLatestExecution({
+      now,
+      stuckAfterMs,
+      timeZone: expectedSnapshot.scheduleTimeZone,
+    });
+    const openAlerts = await this.findOpenMaterializedAlerts(now);
+    const resolvedAlertIds = await this.resolveMaterializedAlertsIfNeeded(
+      job,
+      openAlerts,
+      latestSnapshot,
+      now,
+    );
+    const activeOpenAlerts = openAlerts.filter(
+      (alert) => !resolvedAlertIds.includes(alert.id),
+    );
 
-    if (snapshot.state === 'stuck') {
+    if (
+      expectedSnapshot.state === 'stuck' &&
+      !this.isMaterializedSnapshotCurrentlyStuck(latestSnapshot)
+    ) {
+      this.logMaterializedClassification(
+        'SESSION_CLEANUP_STUCK_DISCARDED',
+        'stale_expected_slot_snapshot',
+        expectedSnapshot.execution,
+        expectedSnapshot,
+        {
+          latestExecutionId: latestSnapshot.execution?.id || null,
+          latestState: latestSnapshot.state,
+          latestStatus: latestSnapshot.execution?.status || null,
+        },
+      );
+    }
+
+    if (this.isMaterializedSnapshotCurrentlyStuck(latestSnapshot)) {
+      const initialExecution = latestSnapshot.execution;
+      if (!initialExecution) {
+        return {
+          skipped: `healthy:${job.key}`,
+        };
+      }
+
+      const revalidationNow = new Date();
+      const revalidatedSnapshot =
+        await this.sessionCleanupExecutionService.inspectExecutionById({
+          executionId: initialExecution.id,
+          now: revalidationNow,
+          stuckAfterMs,
+          timeZone: latestSnapshot.scheduleTimeZone,
+        });
+
+      if (!this.isMaterializedSnapshotCurrentlyStuck(revalidatedSnapshot)) {
+        this.logMaterializedClassification(
+          'SESSION_CLEANUP_STUCK_DISCARDED',
+          'revalidation_not_stuck',
+          revalidatedSnapshot.execution || initialExecution,
+          revalidatedSnapshot,
+          {
+            latestExecutionId: latestSnapshot.execution?.id || null,
+            latestState: revalidatedSnapshot.state,
+          },
+        );
+
+        await this.resolveMaterializedAlertsIfNeeded(
+          job,
+          activeOpenAlerts,
+          revalidatedSnapshot,
+          now,
+        );
+
+        return {
+          skipped: `healthy:${job.key}`,
+        };
+      }
+
+      const fingerprint = this.buildMaterializedAlertFingerprint(
+        job.key,
+        revalidatedSnapshot,
+      );
+
+      if (
+        this.hasOpenAlertForFingerprint(
+          activeOpenAlerts,
+          'JOB_STUCK_RUNNING',
+          fingerprint,
+        )
+      ) {
+        this.logMaterializedClassification(
+          'SESSION_CLEANUP_STUCK_DEDUPED',
+          'open_alert_for_same_execution',
+          revalidatedSnapshot.execution,
+          revalidatedSnapshot,
+          {
+            alertFingerprint: fingerprint,
+          },
+        );
+
+        return {
+          skipped: `JOB_STUCK_RUNNING:${job.key}:${fingerprint}`,
+        };
+      }
+
+      this.logMaterializedClassification(
+        'SESSION_CLEANUP_STUCK_CLASSIFIED',
+        'latest_execution_stuck',
+        revalidatedSnapshot.execution,
+        revalidatedSnapshot,
+        {
+          alertFingerprint: fingerprint,
+        },
+      );
+
       const emitted = await this.emitWatchdogAlert(
         {
           action: 'JOB_STUCK_RUNNING',
-          cooldownKey: `JOB_STUCK_RUNNING:${job.key}`,
+          cooldownKey: `JOB_STUCK_RUNNING:${fingerprint}`,
           severity: 'critical',
           title: 'Job travado em execucao',
           body: `O job ${job.name} ficou em execucao por mais tempo do que o esperado.`,
           pushEligible: true,
           audit: true,
-          data: this.buildMaterializedJobData(job, snapshot, {
+          data: this.buildMaterializedJobData(job, revalidatedSnapshot, {
             stuckAfterMs,
             intervalMs,
+            alertFingerprint: fingerprint,
+            alertLifecycle: 'open',
           }),
         },
         nowMs,
@@ -362,27 +479,78 @@ export class SystemJobWatchdogService implements OnModuleInit {
 
       return {
         emitted: emitted ? `JOB_STUCK_RUNNING:${job.key}` : undefined,
-        skipped: emitted ? `healthy:${job.key}` : `JOB_STUCK_RUNNING:${job.key}`,
+        skipped: emitted
+          ? `healthy:${job.key}`
+          : `JOB_STUCK_RUNNING:${job.key}:${fingerprint}`,
       };
     }
 
     if (
-      (snapshot.state === 'not_created' || snapshot.state === 'pending') &&
-      snapshot.isOverdue
+      (expectedSnapshot.state === 'not_created' || expectedSnapshot.state === 'pending') &&
+      expectedSnapshot.isOverdue
     ) {
+      const revalidationNow = new Date();
+      const revalidatedExpectedSnapshot =
+        await this.sessionCleanupExecutionService.inspectExpectedExecution({
+          schedule: job.schedule,
+          now: revalidationNow,
+          staleAfterMs,
+          stuckAfterMs,
+          timeZone: expectedSnapshot.scheduleTimeZone,
+        });
+
+      if (
+        !(
+          (revalidatedExpectedSnapshot.state === 'not_created' ||
+            revalidatedExpectedSnapshot.state === 'pending') &&
+          revalidatedExpectedSnapshot.isOverdue
+        )
+      ) {
+        this.logMaterializedClassification(
+          'SESSION_CLEANUP_OVERDUE_DISCARDED',
+          'revalidation_not_overdue',
+          revalidatedExpectedSnapshot.execution,
+          revalidatedExpectedSnapshot,
+          {},
+        );
+
+        return {
+          skipped: `healthy:${job.key}`,
+        };
+      }
+
+      const fingerprint = this.buildMaterializedAlertFingerprint(
+        job.key,
+        revalidatedExpectedSnapshot,
+      );
+
+      if (
+        this.hasOpenAlertForFingerprint(
+          activeOpenAlerts,
+          'JOB_NOT_RUNNING',
+          fingerprint,
+        )
+      ) {
+        return {
+          skipped: `JOB_NOT_RUNNING:${job.key}:${fingerprint}`,
+        };
+      }
+
       const emitted = await this.emitWatchdogAlert(
         {
           action: 'JOB_NOT_RUNNING',
-          cooldownKey: `JOB_NOT_RUNNING:${job.key}`,
+          cooldownKey: `JOB_NOT_RUNNING:${fingerprint}`,
           severity: 'critical',
           title: 'Job atrasado',
           body: `O job ${job.name} nao executou no prazo esperado.`,
           pushEligible: true,
           audit: true,
-          data: this.buildMaterializedJobData(job, snapshot, {
+          data: this.buildMaterializedJobData(job, revalidatedExpectedSnapshot, {
             staleAfterMs,
             intervalMs,
-            reason: snapshot.reason,
+            reason: revalidatedExpectedSnapshot.reason,
+            alertFingerprint: fingerprint,
+            alertLifecycle: 'open',
           }),
         },
         nowMs,
@@ -390,7 +558,9 @@ export class SystemJobWatchdogService implements OnModuleInit {
 
       return {
         emitted: emitted ? `JOB_NOT_RUNNING:${job.key}` : undefined,
-        skipped: emitted ? `healthy:${job.key}` : `JOB_NOT_RUNNING:${job.key}`,
+        skipped: emitted
+          ? `healthy:${job.key}`
+          : `JOB_NOT_RUNNING:${job.key}:${fingerprint}`,
       };
     }
 
@@ -490,5 +660,204 @@ export class SystemJobWatchdogService implements OnModuleInit {
     }
 
     return Math.min(raw, 50);
+  }
+
+  private async findOpenMaterializedAlerts(now: Date): Promise<OperationalAlertRecord[]> {
+    const alerts = await this.systemOperationalAlertsService.findRecentOperationalAlerts({
+      source: 'job-watchdog',
+      since: new Date(now.getTime() - MATERIALIZED_ALERT_LOOKBACK_MS),
+      limit: 250,
+    });
+
+    return alerts.filter((alert) => {
+      const action = this.readAlertDataString(alert.data, 'alertAction');
+      const jobKey = this.readAlertDataString(alert.data, 'jobKey');
+      const resolvedAt = this.readAlertDataString(alert.data, 'alertResolvedAt');
+      return (
+        jobKey === SessionCleanupExecutionService.JOB_KEY &&
+        (action === 'JOB_STUCK_RUNNING' || action === 'JOB_NOT_RUNNING') &&
+        !resolvedAt
+      );
+    });
+  }
+
+  private async resolveMaterializedAlertsIfNeeded(
+    job: CronJobDefinition,
+    openAlerts: OperationalAlertRecord[],
+    latestSnapshot: SessionCleanupWatchdogSnapshot,
+    now: Date,
+  ): Promise<string[]> {
+    const latestExecution = latestSnapshot.execution;
+    if (!latestExecution || !this.isTerminalMaterializedState(latestSnapshot.state)) {
+      return [];
+    }
+
+    const latestScheduledForMs = latestExecution.scheduledFor.getTime();
+    const latestExecutionId = latestExecution.id;
+    const idsToResolve = openAlerts
+      .filter((alert) => {
+        const alertExecutionId = this.readAlertDataString(
+          alert.data,
+          'materializedExecutionId',
+        );
+        const alertScheduledFor = this.readAlertDataDate(
+          alert.data,
+          'expectedScheduledFor',
+        );
+        const alertScheduledForMs = alertScheduledFor?.getTime();
+
+        if (alertExecutionId && alertExecutionId === latestExecutionId) {
+          return true;
+        }
+
+        return typeof alertScheduledForMs === 'number' &&
+          Number.isFinite(alertScheduledForMs) &&
+          alertScheduledForMs <= latestScheduledForMs;
+      })
+      .map((alert) => alert.id);
+
+    if (idsToResolve.length === 0) {
+      return [];
+    }
+
+    const resolutionReason = idsToResolve.some((id) => {
+      const alert = openAlerts.find((candidate) => candidate.id === id);
+      const alertExecutionId = this.readAlertDataString(
+        alert?.data || null,
+        'materializedExecutionId',
+      );
+      return alertExecutionId === latestExecutionId;
+    })
+      ? 'terminal_state_observed'
+      : 'newer_terminal_execution_observed';
+
+    const resolved = await this.systemOperationalAlertsService.resolveOperationalAlerts({
+      ids: idsToResolve,
+      resolution: {
+        alertLifecycle: 'resolved',
+        alertResolvedReason: resolutionReason,
+        resolutionSource: 'job-watchdog',
+        resolutionObservedAt: now.toISOString(),
+        resolvedByJobKey: job.key,
+        resolvedByExecutionId: latestExecution.id,
+        resolvedByScheduledFor: latestExecution.scheduledFor.toISOString(),
+        resolvedByStatus: latestExecution.status,
+        resolvedByFinishedAt: latestExecution.finishedAt?.toISOString() || null,
+      },
+      markAsRead: true,
+    });
+
+    if (resolved > 0) {
+      this.logMaterializedClassification(
+        'SESSION_CLEANUP_ALERTS_RESOLVED',
+        resolutionReason,
+        latestExecution,
+        latestSnapshot,
+        {
+          resolvedAlertCount: resolved,
+        },
+      );
+    }
+
+    return resolved === idsToResolve.length ? idsToResolve : [];
+  }
+
+  private isMaterializedSnapshotCurrentlyStuck(
+    snapshot: SessionCleanupWatchdogSnapshot,
+  ): boolean {
+    const execution = snapshot.execution;
+    return Boolean(
+      execution &&
+        snapshot.state === 'stuck' &&
+        execution.status === 'running' &&
+        execution.finishedAt === null,
+    );
+  }
+
+  private isTerminalMaterializedState(state: SessionCleanupWatchdogSnapshot['state']): boolean {
+    return (
+      state === 'success' ||
+      state === 'failed' ||
+      state === 'skipped' ||
+      state === 'superseded' ||
+      state === 'aborted'
+    );
+  }
+
+  private hasOpenAlertForFingerprint(
+    alerts: OperationalAlertRecord[],
+    action: 'JOB_NOT_RUNNING' | 'JOB_STUCK_RUNNING',
+    fingerprint: string,
+  ): boolean {
+    return alerts.some((alert) => {
+      const alertAction = this.readAlertDataString(alert.data, 'alertAction');
+      const alertFingerprint = this.readAlertDataString(alert.data, 'alertFingerprint');
+      return alertAction === action && alertFingerprint === fingerprint;
+    });
+  }
+
+  private buildMaterializedAlertFingerprint(
+    jobKey: string,
+    snapshot: SessionCleanupWatchdogSnapshot,
+  ): string {
+    const scheduledFor = snapshot.execution?.scheduledFor || snapshot.expectedScheduledFor;
+    const scheduledForIso = scheduledFor?.toISOString() || 'unknown-slot';
+    const executionId = snapshot.execution?.id;
+    return executionId
+      ? `${jobKey}:${executionId}:${scheduledForIso}`
+      : `${jobKey}:${scheduledForIso}`;
+  }
+
+  private readAlertDataString(
+    data: Record<string, unknown> | null,
+    key: string,
+  ): string | null {
+    const value = data?.[key];
+    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+  }
+
+  private readAlertDataDate(
+    data: Record<string, unknown> | null,
+    key: string,
+  ): Date | null {
+    const value = this.readAlertDataString(data, key);
+    if (!value) {
+      return null;
+    }
+
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  private logMaterializedClassification(
+    event: string,
+    reason: string,
+    execution: SessionCleanupWatchdogSnapshot['execution'],
+    snapshot: SessionCleanupWatchdogSnapshot,
+    extra: Record<string, unknown>,
+  ): void {
+    const payload = {
+      jobKey: SessionCleanupExecutionService.JOB_KEY,
+      executionId: execution?.id || null,
+      scheduledFor:
+        execution?.scheduledFor?.toISOString() ||
+        snapshot.expectedScheduledFor?.toISOString() ||
+        null,
+      status: execution?.status || null,
+      heartbeatAt: execution?.heartbeatAt?.toISOString() || null,
+      lockedUntil: execution?.lockedUntil?.toISOString() || null,
+      finishedAt: execution?.finishedAt?.toISOString() || null,
+      watchdogState: snapshot.state,
+      watchdogReason: snapshot.reason,
+      classificationReason: reason,
+      ...extra,
+    };
+
+    if (event === 'SESSION_CLEANUP_STUCK_CLASSIFIED') {
+      this.logger.warn(`[${event}] ${JSON.stringify(payload)}`);
+      return;
+    }
+
+    this.logger.log(`[${event}] ${JSON.stringify(payload)}`);
   }
 }

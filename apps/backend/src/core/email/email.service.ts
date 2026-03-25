@@ -3,7 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
 import { PrismaService } from '@core/prisma/prisma.service';
-import { getPlatformName } from '@core/common/constants/platform.constants';
+// Importa do arquivo inicializado pelo PlatformInitService no boot da aplicação
+import { getPlatformName } from '@core/constants/platform.constants';
 import { SecurityConfigService } from '@core/security-config/security-config.service';
 
 @Injectable()

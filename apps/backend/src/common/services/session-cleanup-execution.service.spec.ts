@@ -19,6 +19,7 @@ describe('SessionCleanupExecutionService', () => {
     renewExecution: jest.fn(),
     finalizeExecution: jest.fn(),
     assertExecutionOwnership: jest.fn(),
+    getById: jest.fn(),
     getLatestForJob: jest.fn(),
     getBySlot: jest.fn(),
   };
@@ -86,6 +87,7 @@ describe('SessionCleanupExecutionService', () => {
       execution: createExecution(),
       reason: null,
     });
+    materializedExecutionServiceMock.getById.mockResolvedValue(null);
     materializedExecutionServiceMock.getLatestForJob.mockResolvedValue(null);
     materializedExecutionServiceMock.getBySlot.mockResolvedValue(null);
     processorMock.cleanupExpiredSessions.mockResolvedValue(undefined);
@@ -469,6 +471,37 @@ describe('SessionCleanupExecutionService', () => {
         state: 'stuck',
         isStuck: true,
         reason: 'running_without_recent_heartbeat',
+        scheduleTimeZone: saoPauloTimeZone,
+      }),
+    );
+  });
+
+  it('nao classifica como stuck uma execucao terminal curta apenas por falta de heartbeat continuo', async () => {
+    const successExecution = createExecution({
+      id: 'execution-2',
+      status: 'success',
+      scheduledFor: new Date('2026-03-23T11:15:00.000Z'),
+      triggeredAt: new Date('2026-03-23T11:15:00.050Z'),
+      startedAt: new Date('2026-03-23T11:15:00.060Z'),
+      finishedAt: new Date('2026-03-23T11:15:00.090Z'),
+      heartbeatAt: new Date('2026-03-23T11:15:00.090Z'),
+      lockedUntil: new Date('2026-03-23T11:15:00.090Z'),
+      reason: 'completed',
+    });
+    materializedExecutionServiceMock.getLatestForJob.mockResolvedValue(successExecution);
+
+    await expect(
+      service.inspectLatestExecution({
+        now: new Date('2026-03-23T11:20:00.000Z'),
+        stuckAfterMs: 90 * 1000,
+        timeZone: saoPauloTimeZone,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        expectedScheduledFor: new Date('2026-03-23T11:15:00.000Z'),
+        state: 'success',
+        isStuck: false,
+        reason: 'success',
         scheduleTimeZone: saoPauloTimeZone,
       }),
     );
