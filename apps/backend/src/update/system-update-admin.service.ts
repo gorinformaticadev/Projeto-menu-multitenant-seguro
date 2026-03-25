@@ -1199,7 +1199,7 @@ export class SystemUpdateAdminService {
       case 43:
         return 'Falha ao aplicar seed versionado da nova release.';
       case 44:
-        return 'Artefato da release esta incompleto ou inconsistente.';
+        return 'Artefato standalone da release esta incompleto ou inconsistente.';
       case 45:
         return 'Falha ao publicar a nova release nos links current/previous.';
       case 46:
@@ -1286,7 +1286,7 @@ export class SystemUpdateAdminService {
           code: 'UPDATE_PACKAGE_INTEGRITY_ERROR',
           category: 'UPDATE_PACKAGE_INTEGRITY_ERROR',
           stage: step || 'validate_frontend_artifact',
-          userMessage: 'Artefato da release esta incompleto ou inconsistente.',
+          userMessage: 'Artefato standalone da release esta incompleto ou inconsistente.',
         };
       case 45:
         return {

@@ -412,8 +412,7 @@ native_build_apps() {
     run_as_native_user "cd '${app_dir}' && pnpm --filter backend build"
     run_as_native_user "cd '${app_dir}/apps/backend' && pnpm exec tsc prisma/seed.ts --outDir dist --skipLibCheck --module commonjs --target ES2021 --esModuleInterop --resolveJsonModule"
     run_as_native_user "cd '${app_dir}' && pnpm --filter frontend build"
-    run_as_native_user "cd '${app_dir}' && cp -r apps/frontend/public apps/frontend/.next/standalone/apps/frontend/ || true"
-    run_as_native_user "cd '${app_dir}' && mkdir -p apps/frontend/.next/standalone/apps/frontend/.next/static && cp -r apps/frontend/.next/static/. apps/frontend/.next/standalone/apps/frontend/.next/static/ || true"
+    run_as_native_user "cd '${app_dir}/apps/frontend' && if [[ -f .next/standalone/apps/frontend/server.js ]]; then runtime_dir='.next/standalone/apps/frontend'; elif [[ -f .next/standalone/server.js ]]; then runtime_dir='.next/standalone'; else echo 'ERRO: entrypoint standalone do frontend nao encontrado apos o build.' >&2; exit 1; fi && if [[ -d public ]]; then mkdir -p \"\${runtime_dir}/public\" && cp -a public/. \"\${runtime_dir}/public/\"; fi && if [[ -d .next/static ]]; then mkdir -p \"\${runtime_dir}/.next/static\" && cp -a .next/static/. \"\${runtime_dir}/.next/static/\"; fi"
 
 }
 
@@ -492,7 +491,7 @@ native_start_pm2_apps() {
     local instance_name="$2"
     log_info "Etapa 18/23: iniciando PM2 backend/frontend..."
     run_as_native_user "cd '${app_dir}/apps/backend' && pm2 delete '${instance_name}-backend' >/dev/null 2>&1 || true && pm2 start dist/main.js --name '${instance_name}-backend' --cwd '${app_dir}/apps/backend' --update-env"
-    run_as_native_user "cd '${app_dir}/apps/frontend' && pm2 delete '${instance_name}-frontend' >/dev/null 2>&1 || true && PORT=5000 HOSTNAME=0.0.0.0 pm2 start 'node .next/standalone/apps/frontend/server.js' --name '${instance_name}-frontend' --cwd '${app_dir}/apps/frontend' --update-env"
+    run_as_native_user "cd '${app_dir}/apps/frontend' && frontend_cmd='node scripts/start-standalone.mjs'; if [[ ! -f scripts/start-standalone.mjs ]]; then if [[ -f .next/standalone/apps/frontend/server.js ]]; then frontend_cmd='node .next/standalone/apps/frontend/server.js'; elif [[ -f .next/standalone/server.js ]]; then frontend_cmd='node .next/standalone/server.js'; else echo 'ERRO: entrypoint standalone do frontend nao encontrado para o PM2.' >&2; exit 1; fi; fi && pm2 delete '${instance_name}-frontend' >/dev/null 2>&1 || true && PORT=5000 HOSTNAME=0.0.0.0 pm2 start \"\${frontend_cmd}\" --name '${instance_name}-frontend' --cwd '${app_dir}/apps/frontend' --update-env"
 
     run_as_native_user "pm2 save"
 }

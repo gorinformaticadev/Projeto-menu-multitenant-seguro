@@ -43,12 +43,19 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder --chown=nextjs:nodejs /app/apps/frontend/.next/standalone ./
 
 # Copiar os arquivos estáticos e públicos para o local correto
-COPY --from=builder --chown=nextjs:nodejs /app/apps/frontend/.next/static ./apps/frontend/.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/apps/frontend/public ./apps/frontend/public
+COPY --from=builder --chown=nextjs:nodejs /app/apps/frontend/.next/static ./__frontend_static__
+COPY --from=builder --chown=nextjs:nodejs /app/apps/frontend/public ./__frontend_public__
+RUN set -eux; \
+    if [ -f /app/apps/frontend/server.js ]; then target=/app/apps/frontend; \
+    elif [ -f /app/server.js ]; then target=/app; \
+    else echo 'ERRO: entrypoint standalone do frontend nao encontrado no artefato Docker.' >&2; exit 1; fi; \
+    if [ -d /app/__frontend_public__ ]; then mkdir -p "$target/public"; cp -a /app/__frontend_public__/. "$target/public/"; fi; \
+    if [ -d /app/__frontend_static__ ]; then mkdir -p "$target/.next/static"; cp -a /app/__frontend_static__/. "$target/.next/static/"; fi; \
+    rm -rf /app/__frontend_public__ /app/__frontend_static__
 
 USER nextjs
 EXPOSE 5000
 
 # O server.js está em apps/frontend/server.js dentro do standalone
 # Passar PORT e HOSTNAME explicitamente
-CMD ["sh", "-c", "PORT=5000 HOSTNAME=0.0.0.0 node apps/frontend/server.js"]
+CMD ["sh", "-c", "if [ -f apps/frontend/server.js ]; then entry=apps/frontend/server.js; elif [ -f server.js ]; then entry=server.js; else echo 'ERRO: entrypoint standalone do frontend nao encontrado no container.' >&2; exit 1; fi; exec env PORT=5000 HOSTNAME=0.0.0.0 node \"$entry\""]

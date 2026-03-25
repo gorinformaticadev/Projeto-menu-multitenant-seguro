@@ -937,7 +937,7 @@ check_multitenant_environment() {
         log_success "Arquivo backend encontrado"
     fi
     
-    if [[ ! -f "$PROJECT_ROOT/apps/frontend/.next/standalone/apps/frontend/server.js" ]]; then
+    if [[ ! -f "$PROJECT_ROOT/apps/frontend/.next/standalone/apps/frontend/server.js" ]] && [[ ! -f "$PROJECT_ROOT/apps/frontend/.next/standalone/server.js" ]]; then
         log_error "Arquivo frontend server.js não encontrado"
         log_info "Certifique-se de que o build foi concluído com sucesso"
     else

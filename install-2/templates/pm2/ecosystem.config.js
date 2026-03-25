@@ -25,7 +25,7 @@ module.exports = {
       name: 'multitenant-frontend',
       cwd: '__PROJECT_ROOT__/apps/frontend',
       script: 'node',
-      args: '.next/standalone/apps/frontend/server.js',
+      args: 'scripts/start-standalone.mjs',
       instances: 1,
       exec_mode: 'fork',
       env: {

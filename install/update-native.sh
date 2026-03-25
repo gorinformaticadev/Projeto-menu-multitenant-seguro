@@ -101,6 +101,11 @@ RESOLVED_BRANCH=""
 
 BACKEND_PROC=""
 FRONTEND_PROC=""
+FRONTEND_STANDALONE_LAYOUT=""
+FRONTEND_STANDALONE_ENTRY_REL=""
+FRONTEND_STANDALONE_RUNTIME_DIR=""
+FRONTEND_STANDALONE_BUILD_DIR=""
+LAST_FRONTEND_ARTIFACT_ERROR=""
 
 now_iso() {
   date -u +%Y-%m-%dT%H:%M:%SZ
@@ -807,6 +812,7 @@ restart_pm2_processes() {
   local target_root="$1"
   local backend_name="${PM2_BACKEND_NAME:-$BACKEND_PROC}"
   local frontend_name="${PM2_FRONTEND_NAME:-$FRONTEND_PROC}"
+  local frontend_dir="$target_root/apps/frontend"
 
   if [[ -z "$backend_name" ]]; then
     backend_name="multitenant-backend"
@@ -820,8 +826,10 @@ restart_pm2_processes() {
   pm2 delete "$frontend_name" >/dev/null 2>&1 || true
 
   pm2 start dist/main.js --name "$backend_name" --cwd "$target_root/apps/backend" --update-env || return 1
+  resolve_frontend_standalone_layout "$frontend_dir" || return 1
+  log "Entrypoint standalone do frontend detectado: ${FRONTEND_STANDALONE_LAYOUT} (${FRONTEND_STANDALONE_ENTRY_REL})"
   PORT=5000 HOSTNAME=0.0.0.0 \
-    pm2 start "node .next/standalone/apps/frontend/server.js" --name "$frontend_name" --cwd "$target_root/apps/frontend" --update-env || return 1
+    pm2 start "node ${FRONTEND_STANDALONE_ENTRY_REL}" --name "$frontend_name" --cwd "$frontend_dir" --update-env || return 1
   pm2 save
 
   BACKEND_PROC="$backend_name"
@@ -896,23 +904,84 @@ copy_directory_contents() {
   fi
 }
 
+reset_frontend_standalone_resolution() {
+  FRONTEND_STANDALONE_LAYOUT=""
+  FRONTEND_STANDALONE_ENTRY_REL=""
+  FRONTEND_STANDALONE_RUNTIME_DIR=""
+  FRONTEND_STANDALONE_BUILD_DIR=""
+}
+
+record_frontend_artifact_error() {
+  LAST_FRONTEND_ARTIFACT_ERROR="$1"
+  log_err "$LAST_FRONTEND_ARTIFACT_ERROR"
+}
+
+resolve_frontend_standalone_layout() {
+  local frontend_dir="$1"
+  local resolver_script="$frontend_dir/scripts/start-standalone.mjs"
+  local standalone_dir="$frontend_dir/.next/standalone"
+  local resolved_layout=""
+
+  reset_frontend_standalone_resolution
+  LAST_FRONTEND_ARTIFACT_ERROR=""
+
+  if [[ -f "$resolver_script" ]]; then
+    if resolved_layout="$(node "$resolver_script" --print-layout 2>&1)"; then
+      IFS='|' read -r FRONTEND_STANDALONE_LAYOUT FRONTEND_STANDALONE_ENTRY_REL FRONTEND_STANDALONE_RUNTIME_DIR FRONTEND_STANDALONE_BUILD_DIR <<< "$resolved_layout"
+    else
+      LAST_FRONTEND_ARTIFACT_ERROR="$(printf '%s' "$resolved_layout" | tail -n1)"
+      log_err "$LAST_FRONTEND_ARTIFACT_ERROR"
+      return 1
+    fi
+  elif [[ -f "$frontend_dir/.next/standalone/apps/frontend/server.js" ]]; then
+    FRONTEND_STANDALONE_LAYOUT="monorepo-nested"
+    FRONTEND_STANDALONE_ENTRY_REL=".next/standalone/apps/frontend/server.js"
+    FRONTEND_STANDALONE_RUNTIME_DIR=".next/standalone/apps/frontend"
+    FRONTEND_STANDALONE_BUILD_DIR=".next/standalone/apps/frontend/.next"
+  elif [[ -f "$frontend_dir/.next/standalone/server.js" ]]; then
+    FRONTEND_STANDALONE_LAYOUT="root"
+    FRONTEND_STANDALONE_ENTRY_REL=".next/standalone/server.js"
+    FRONTEND_STANDALONE_RUNTIME_DIR=".next/standalone"
+    FRONTEND_STANDALONE_BUILD_DIR=".next/standalone/.next"
+  else
+    LAST_FRONTEND_ARTIFACT_ERROR="Nenhum entrypoint standalone do frontend foi encontrado. Caminhos verificados: $frontend_dir/.next/standalone/apps/frontend/server.js | $frontend_dir/.next/standalone/server.js"
+    log_err "$LAST_FRONTEND_ARTIFACT_ERROR"
+    if [[ -d "$standalone_dir" ]]; then
+      log "Conteudo atual de $standalone_dir (maxdepth=3):"
+      find "$standalone_dir" -maxdepth 3 \( -type d -o -type f \) | sed 's|^|  - |' | head -n 80 || true
+    else
+      log_err "Diretorio standalone do frontend nao encontrado em $standalone_dir"
+    fi
+    return 1
+  fi
+
+  if [[ -z "$FRONTEND_STANDALONE_ENTRY_REL" ]] || [[ -z "$FRONTEND_STANDALONE_RUNTIME_DIR" ]] || [[ -z "$FRONTEND_STANDALONE_BUILD_DIR" ]]; then
+    LAST_FRONTEND_ARTIFACT_ERROR="Resolver do standalone retornou um layout incompleto para $frontend_dir."
+    log_err "$LAST_FRONTEND_ARTIFACT_ERROR"
+    return 1
+  fi
+
+  return 0
+}
+
 copy_frontend_runtime_assets() {
   local release_dir="$1"
   local frontend_dir="$release_dir/apps/frontend"
   local build_dir="$frontend_dir/.next"
-  local standalone_app_dir="$build_dir/standalone/apps/frontend"
-
-  if [[ ! -f "$standalone_app_dir/server.js" ]]; then
-    log_err "server.js do standalone nao encontrado em $standalone_app_dir/server.js"
-    return 1
-  fi
+  resolve_frontend_standalone_layout "$frontend_dir" || return 1
 
   if [[ -d "$frontend_dir/public" ]]; then
-    copy_directory_contents "$frontend_dir/public" "$standalone_app_dir/public" || return 1
+    if ! copy_directory_contents "$frontend_dir/public" "$frontend_dir/$FRONTEND_STANDALONE_RUNTIME_DIR/public"; then
+      record_frontend_artifact_error "Falha ao copiar public para $frontend_dir/$FRONTEND_STANDALONE_RUNTIME_DIR/public"
+      return 1
+    fi
   fi
 
   if [[ -d "$build_dir/static" ]]; then
-    copy_directory_contents "$build_dir/static" "$standalone_app_dir/.next/static" || return 1
+    if ! copy_directory_contents "$build_dir/static" "$frontend_dir/$FRONTEND_STANDALONE_RUNTIME_DIR/.next/static"; then
+      record_frontend_artifact_error "Falha ao copiar .next/static para $frontend_dir/$FRONTEND_STANDALONE_RUNTIME_DIR/.next/static"
+      return 1
+    fi
   fi
 
   return 0
@@ -932,23 +1001,24 @@ validate_frontend_artifact_layout() {
   local release_dir="$1"
   local frontend_dir="$release_dir/apps/frontend"
   local build_dir="$frontend_dir/.next"
-  local standalone_app_dir="$build_dir/standalone/apps/frontend"
-  local standalone_build_dir="$standalone_app_dir/.next"
+  resolve_frontend_standalone_layout "$frontend_dir" || return 1
+  local standalone_runtime_dir="$frontend_dir/$FRONTEND_STANDALONE_RUNTIME_DIR"
+  local standalone_build_dir="$frontend_dir/$FRONTEND_STANDALONE_BUILD_DIR"
 
   [[ -d "$build_dir" ]] || {
-    log_err "Diretorio .next do frontend nao encontrado em $build_dir"
+    record_frontend_artifact_error "Diretorio .next do frontend nao encontrado em $build_dir"
     return 1
   }
-  [[ -f "$standalone_app_dir/server.js" ]] || {
-    log_err "server.js do standalone nao encontrado em $standalone_app_dir/server.js"
+  [[ -f "$frontend_dir/$FRONTEND_STANDALONE_ENTRY_REL" ]] || {
+    record_frontend_artifact_error "server.js do standalone nao encontrado em $frontend_dir/$FRONTEND_STANDALONE_ENTRY_REL"
     return 1
   }
   [[ -f "$build_dir/BUILD_ID" ]] || {
-    log_err "BUILD_ID do frontend nao encontrado em $build_dir/BUILD_ID"
+    record_frontend_artifact_error "BUILD_ID do frontend nao encontrado em $build_dir/BUILD_ID"
     return 1
   }
   [[ -f "$standalone_build_dir/BUILD_ID" ]] || {
-    log_err "BUILD_ID do standalone nao encontrado em $standalone_build_dir/BUILD_ID"
+    record_frontend_artifact_error "BUILD_ID do standalone nao encontrado em $standalone_build_dir/BUILD_ID"
     return 1
   }
 
@@ -957,17 +1027,17 @@ validate_frontend_artifact_layout() {
   source_build_id="$(tr -d '\r' < "$build_dir/BUILD_ID" || true)"
   standalone_build_id="$(tr -d '\r' < "$standalone_build_dir/BUILD_ID" || true)"
   if [[ -z "$source_build_id" ]] || [[ "$source_build_id" != "$standalone_build_id" ]]; then
-    log_err "BUILD_ID inconsistente entre build e standalone (fonte=${source_build_id:-<vazio>} standalone=${standalone_build_id:-<vazio>})."
+    record_frontend_artifact_error "BUILD_ID inconsistente entre build e standalone (fonte=${source_build_id:-<vazio>} standalone=${standalone_build_id:-<vazio>})."
     return 1
   fi
 
   if [[ -d "$build_dir/static" ]] && [[ ! -d "$standalone_build_dir/static" ]]; then
-    log_err "Diretorio .next/static nao foi copiado para o standalone."
+    record_frontend_artifact_error "Diretorio .next/static nao foi copiado para o standalone."
     return 1
   fi
 
-  if [[ -d "$frontend_dir/public" ]] && [[ ! -d "$standalone_app_dir/public" ]]; then
-    log_err "Diretorio public nao foi copiado para o standalone."
+  if [[ -d "$frontend_dir/public" ]] && [[ ! -d "$standalone_runtime_dir/public" ]]; then
+    record_frontend_artifact_error "Diretorio public nao foi copiado para o standalone."
     return 1
   fi
 
@@ -976,14 +1046,14 @@ validate_frontend_artifact_layout() {
   source_manifest_count="$(count_frontend_manifest_files "$build_dir/server")"
   standalone_manifest_count="$(count_frontend_manifest_files "$standalone_build_dir/server")"
   if (( source_manifest_count > 0 && standalone_manifest_count == 0 )); then
-    log_err "Standalone nao contem manifests de referencia obrigatorios do frontend (fonte=${source_manifest_count}, standalone=${standalone_manifest_count})."
+    record_frontend_artifact_error "Standalone nao contem manifests de referencia obrigatorios do frontend (fonte=${source_manifest_count}, standalone=${standalone_manifest_count})."
     return 1
   fi
 
   local source_500="$build_dir/server/pages/500.html"
   local standalone_500="$standalone_build_dir/server/pages/500.html"
   if [[ -f "$source_500" ]] && [[ ! -f "$standalone_500" ]]; then
-    log_err "Artefato do standalone nao contem a pagina estatica 500 esperada."
+    record_frontend_artifact_error "Artefato do standalone nao contem a pagina estatica 500 esperada."
     return 1
   fi
 
@@ -1022,6 +1092,7 @@ smoke_test_frontend_release() {
   local release_dir="$1"
   local port="${2:-5100}"
   local frontend_dir="$release_dir/apps/frontend"
+  local frontend_entry_rel=""
   local stdout_file="$frontend_dir/.next/frontend-smoke.out"
   local stderr_file="$frontend_dir/.next/frontend-smoke.err"
   local root_html="$frontend_dir/.next/frontend-smoke-root.html"
@@ -1030,11 +1101,13 @@ smoke_test_frontend_release() {
   local status=0
 
   rm -f "$stdout_file" "$stderr_file" "$root_html" "$login_html"
+  resolve_frontend_standalone_layout "$frontend_dir" || return 1
+  frontend_entry_rel="$FRONTEND_STANDALONE_ENTRY_REL"
 
   (
     cd "$frontend_dir"
     PORT="$port" HOSTNAME="127.0.0.1" NODE_ENV=production \
-      node .next/standalone/apps/frontend/server.js > "$stdout_file" 2> "$stderr_file"
+      node "$frontend_entry_rel" > "$stdout_file" 2> "$stderr_file"
   ) &
   frontend_pid=$!
 
@@ -1288,14 +1361,14 @@ pnpm --filter frontend build || fail_and_exit "$EXIT_BUILD_FAILED" "build_fronte
   "Falha ao compilar o frontend da nova release." "pnpm --filter frontend build falhou"
 
 set_step "package_frontend_assets" 58
-log "Copiando assets obrigatorios do frontend para o standalone..."
+log "Preparando o artefato standalone do frontend..."
 copy_frontend_runtime_assets "$NEW_RELEASE_DIR" || fail_and_exit "$EXIT_PACKAGE_INTEGRITY_FAILED" "package_frontend_assets" "UPDATE_PACKAGE_INTEGRITY_ERROR" "UPDATE_PACKAGE_INTEGRITY_ERROR" \
-  "Falha ao preparar os assets do frontend para o standalone." "Copia de public/.next/static para o standalone falhou"
+  "Falha ao preparar o artefato standalone do frontend." "${LAST_FRONTEND_ARTIFACT_ERROR:-Falha ao copiar public/.next/static para o standalone do frontend}"
 
 set_step "validate_frontend_artifact" 62
 log "Validando a integridade do artefato standalone do frontend..."
 validate_frontend_artifact_layout "$NEW_RELEASE_DIR" || fail_and_exit "$EXIT_PACKAGE_INTEGRITY_FAILED" "validate_frontend_artifact" "UPDATE_PACKAGE_INTEGRITY_ERROR" "UPDATE_PACKAGE_INTEGRITY_ERROR" \
-  "Artefato standalone do frontend esta incompleto." "A validacao estrutural do standalone do frontend falhou"
+  "Artefato standalone do frontend esta incompleto." "${LAST_FRONTEND_ARTIFACT_ERROR:-A validacao estrutural do standalone do frontend falhou}"
 
 set_step "pre_swap_smoke_test" 66
 log "Executando smoke test do frontend antes do swap..."

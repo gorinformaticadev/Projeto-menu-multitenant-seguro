@@ -56,6 +56,7 @@ describe('update-flow.utils', () => {
     expect(formatUpdateStage('build_frontend')).toBe('compilando frontend');
     expect(formatUpdateStage('build_prisma_client')).toBe('gerando cliente do banco');
     expect(formatUpdateStage('install_dependencies')).toBe('instalando dependências');
+    expect(formatUpdateStage('package_frontend_assets')).toBe('preparando artefato standalone do frontend');
     expect(formatUpdateStage('publish_release')).toBe('publicando release ativa');
     expect(formatUpdateStage('post_deploy_validation')).toBe('validando release publicada');
     expect(formatUpdateStage('health_check-step')).toBe('health check step');

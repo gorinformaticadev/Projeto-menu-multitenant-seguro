@@ -23,6 +23,7 @@ PREVIOUS_LINK=""
 LOCK_FILE=""
 BACKEND_PROC=""
 FRONTEND_PROC=""
+FRONTEND_START_COMMAND=""
 
 log() {
   echo "[native-rollback] $(date '+%Y-%m-%d %H:%M:%S') $*"
@@ -181,10 +182,34 @@ discover_pm2_name() {
   pm2 jlist 2>/dev/null | grep -oE "\"name\":\"[^\"]*${token}[^\"]*\"" | head -n1 | cut -d'"' -f4 || true
 }
 
+resolve_frontend_start_command() {
+  local frontend_dir="$1"
+  FRONTEND_START_COMMAND=""
+
+  if [[ -f "$frontend_dir/scripts/start-standalone.mjs" ]]; then
+    FRONTEND_START_COMMAND="node scripts/start-standalone.mjs"
+    return 0
+  fi
+
+  if [[ -f "$frontend_dir/.next/standalone/apps/frontend/server.js" ]]; then
+    FRONTEND_START_COMMAND="node .next/standalone/apps/frontend/server.js"
+    return 0
+  fi
+
+  if [[ -f "$frontend_dir/.next/standalone/server.js" ]]; then
+    FRONTEND_START_COMMAND="node .next/standalone/server.js"
+    return 0
+  fi
+
+  log_err "Entrypoint standalone do frontend nao encontrado. Caminhos verificados: $frontend_dir/.next/standalone/apps/frontend/server.js | $frontend_dir/.next/standalone/server.js"
+  return 1
+}
+
 restart_pm2_processes() {
   local target_root="$1"
   local backend_name="${PM2_BACKEND_NAME:-$BACKEND_PROC}"
   local frontend_name="${PM2_FRONTEND_NAME:-$FRONTEND_PROC}"
+  local frontend_dir="$target_root/apps/frontend"
 
   [[ -n "$backend_name" ]] || backend_name="multitenant-backend"
   [[ -n "$frontend_name" ]] || frontend_name="multitenant-frontend"
@@ -193,8 +218,9 @@ restart_pm2_processes() {
   pm2 delete "$frontend_name" >/dev/null 2>&1 || true
 
   pm2 start dist/main.js --name "$backend_name" --cwd "$target_root/apps/backend" --update-env || return 1
+  resolve_frontend_start_command "$frontend_dir" || return 1
   PORT=5000 HOSTNAME=0.0.0.0 \
-    pm2 start "node .next/standalone/apps/frontend/server.js" --name "$frontend_name" --cwd "$target_root/apps/frontend" --update-env || return 1
+    pm2 start "$FRONTEND_START_COMMAND" --name "$frontend_name" --cwd "$frontend_dir" --update-env || return 1
   pm2 save
 
   BACKEND_PROC="$backend_name"
