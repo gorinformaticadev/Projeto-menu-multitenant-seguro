@@ -161,7 +161,7 @@ export class AuthController {
       console.warn('Logout fallback to cookie sweep due to error:', error);
     } finally {
       this.clearAuthCookies(res);
-      this.clearTrustedDeviceCookie(res);
+      // O dispositivo confiavel deve sobreviver ao logout para respeitar a janela de 30 dias.
       this.clearTwoFactorEnrollmentCookie(res);
       this.clearCsrfCookie(res);
     }
