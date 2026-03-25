@@ -206,8 +206,8 @@
     --auth-page-start: oklch(0.12 0.02 240);
     --auth-page-mid: oklch(0.14 0.02 240);
     --auth-page-end: oklch(0.09 0.01 240);
-    --auth-surface: oklch(0.24 0.02 240 / 0.92);
-    --auth-surface-hover: oklch(0.28 0.02 240 / 0.95);
+    --auth-surface: oklch(0.24 0.02 240 / 0.55);
+    --auth-surface-hover: oklch(0.28 0.02 240 / 0.68);
     --auth-border: oklch(1 0 0 / 0.22);
     --auth-border-soft: oklch(1 0 0 / 0.12);
     --auth-text: oklch(0.98 0.01 240);
@@ -276,6 +276,8 @@
     background: var(--auth-surface);
     border: 1px solid var(--auth-border);
     box-shadow: var(--auth-card-shadow);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
   }
 
   .auth-card:hover {
@@ -286,6 +288,8 @@
     background: var(--auth-surface);
     border: 1px solid var(--auth-border);
     box-shadow: var(--auth-shell-shadow);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
   }
 
   .auth-footer-shell {

@@ -140,28 +140,74 @@ export class EmailService implements OnModuleInit {
 
   /**
    * Enviar email de recuperação de senha
+   * Busca configuração e credenciais do banco a cada chamada — não depende
+   * do transporter estático inicializado no boot.
    */
   async sendPasswordResetEmail(email: string, name: string, token: string): Promise<boolean> {
-    if (!this.isEnabled) {
-      this.logger.warn(`Email de recuperação não enviado (serviço desabilitado): ${email}`);
-      return false;
-    }
-
     const resetUrl = `${this.config.get('FRONTEND_URL')}/redefinir-senha?token=${token}`;
-
     const html = this.getPasswordResetEmailTemplate(name, resetUrl);
+    const platformName = await getPlatformName();
+    const subject = `Recuperação de senha - ${platformName}`;
 
     try {
-      const platformName = await getPlatformName();
-      await this.transporter.sendMail({
-        from: `"${this.config.get('EMAIL_FROM_NAME', platformName)}" <${this.config.get('EMAIL_FROM', 'noreply@example.com')}>`,
-        to: email,
-        subject: `Recuperação de senha - ${platformName}`,
-        html,
+      // Buscar configuração ativa do banco
+      const dbConfig = await this.prisma.emailConfiguration.findFirst({
+        where: { isActive: true },
       });
 
-      this.logger.log(`Email de recuperação enviado para: ${email}`);
-      return true;
+      // Buscar credenciais descriptografadas
+      const credentials = await this.securityConfigService.getSmtpCredentials();
+      const smtpUser = credentials.smtpUsername;
+      const smtpPass = credentials.smtpPassword;
+
+      if (dbConfig && smtpUser && smtpPass) {
+        // Usar configuração do banco (mesmo padrão do sendEmailWithCredentials)
+        const tempTransporter = nodemailer.createTransport({
+          host: dbConfig.smtpHost,
+          port: dbConfig.smtpPort,
+          secure: dbConfig.encryption === 'SSL',
+          tls: dbConfig.encryption === 'STARTTLS' ? { rejectUnauthorized: false } : undefined,
+          auth: { user: smtpUser, pass: smtpPass },
+        });
+
+        await tempTransporter.sendMail({
+          from: `"${platformName}" <${smtpUser}>`,
+          to: email,
+          subject,
+          html,
+        });
+
+        this.logger.log(`Email de recuperação enviado para: ${email}`);
+        return true;
+      }
+
+      // Fallback para variáveis de ambiente
+      const envHost = this.config.get('SMTP_HOST');
+      const envUser = this.config.get('SMTP_USER');
+      const envPass = this.config.get('SMTP_PASS');
+
+      if (envHost && envUser && envPass) {
+        const fallbackTransporter = nodemailer.createTransport({
+          host: envHost,
+          port: parseInt(this.config.get('SMTP_PORT', '587')),
+          secure: this.config.get('SMTP_SECURE') === 'true',
+          tls: { rejectUnauthorized: false },
+          auth: { user: envUser, pass: envPass },
+        });
+
+        await fallbackTransporter.sendMail({
+          from: `"${this.config.get('EMAIL_FROM_NAME', platformName)}" <${this.config.get('EMAIL_FROM', envUser)}>`,
+          to: email,
+          subject,
+          html,
+        });
+
+        this.logger.log(`Email de recuperação enviado (env fallback) para: ${email}`);
+        return true;
+      }
+
+      this.logger.warn(`Email de recuperação não enviado — SMTP não configurado: ${email}`);
+      return false;
     } catch (error) {
       this.logger.error(`Erro ao enviar email de recuperação para ${email}:`, error);
       return false;

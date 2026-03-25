@@ -98,9 +98,9 @@ function ResetPasswordForm() {
   };
 
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
-    <div className="auth-theme auth-page relative flex min-h-screen flex-col items-center justify-center gap-3 overflow-hidden p-4 font-sans text-[var(--auth-text)] selection:bg-[color:var(--auth-primary-selection)]">
-      <div className="auth-blob-primary absolute -left-10 top-1/4 h-72 w-72 rounded-full opacity-40 blur-[100px] animate-pulse" />
-      <div className="auth-blob-secondary absolute -right-10 bottom-1/4 h-72 w-72 rounded-full opacity-40 blur-[100px] animate-pulse delay-700" />
+    <div className="auth-theme auth-page relative flex min-h-screen flex-col items-center justify-center gap-3 p-4 font-sans text-[var(--auth-text)] selection:bg-[color:var(--auth-primary-selection)]">
+      <div className="auth-blob-primary fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full opacity-50 blur-[80px] pointer-events-none" />
+      <div className="auth-blob-secondary fixed left-1/2 top-1/2 -translate-x-1/4 -translate-y-1/3 h-[350px] w-[350px] rounded-full opacity-40 blur-[80px] animate-pulse delay-700 pointer-events-none" />
       {children}
     </div>
   );
