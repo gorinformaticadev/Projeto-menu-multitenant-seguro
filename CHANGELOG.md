@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.71](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.70...v0.1.71) (2026-03-25)
+
+
+### Features
+
+* Implementar funcionalidades de atualização do sistema, fluxos de redefinição de senha e serviços de e-mail. ([e82004a](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/e82004acc12905e57b66da98550c9f66d15a90b2))
+
 ### [0.1.70](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.69...v0.1.70) (2026-03-25)
 
 
