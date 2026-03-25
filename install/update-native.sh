@@ -159,6 +159,22 @@ json_number_or_null() {
   fi
 }
 
+recent_failure_detail() {
+  local fallback="$1"
+  local lines="${2:-40}"
+  local excerpt=""
+
+  if [[ -f "$UPDATE_LOG_FILE" ]]; then
+    excerpt="$(tail -n "$lines" "$UPDATE_LOG_FILE" 2>/dev/null | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')"
+  fi
+
+  if [[ -n "$excerpt" ]]; then
+    printf '%s\n' "$excerpt"
+  else
+    printf '%s\n' "$fallback"
+  fi
+}
+
 reset_error_state() {
   STATE_ERROR_CODE=""
   STATE_ERROR_CATEGORY=""
@@ -1343,22 +1359,22 @@ log "Instalando dependencias..."
 cd "$NEW_RELEASE_DIR"
 ensure_command pnpm "$EXIT_INSTALL_FAILED"
 pnpm install --frozen-lockfile || fail_and_exit "$EXIT_INSTALL_FAILED" "install_dependencies" "UPDATE_INSTALL_ERROR" "UPDATE_INSTALL_ERROR" \
-  "Falha ao instalar dependencias do projeto." "pnpm install --frozen-lockfile falhou na nova release"
+  "Falha ao instalar dependencias do projeto." "$(recent_failure_detail 'pnpm install --frozen-lockfile falhou na nova release')"
 
 set_step "build_prisma_client" 44
 log "Gerando cliente Prisma do backend..."
 pnpm --filter backend exec prisma generate || fail_and_exit "$EXIT_BUILD_FAILED" "build_prisma_client" "UPDATE_BUILD_ERROR" "UPDATE_BUILD_ERROR" \
-  "Falha ao gerar o cliente Prisma da nova release." "pnpm --filter backend exec prisma generate falhou"
+  "Falha ao gerar o cliente Prisma da nova release." "$(recent_failure_detail 'pnpm --filter backend exec prisma generate falhou')"
 
 set_step "build_backend" 48
 log "Compilando backend..."
 pnpm --filter backend build || fail_and_exit "$EXIT_BUILD_FAILED" "build_backend" "UPDATE_BUILD_ERROR" "UPDATE_BUILD_ERROR" \
-  "Falha ao compilar o backend da nova release." "pnpm --filter backend build falhou"
+  "Falha ao compilar o backend da nova release." "$(recent_failure_detail 'pnpm --filter backend build falhou')"
 
 set_step "build_frontend" 54
 log "Compilando frontend..."
 pnpm --filter frontend build || fail_and_exit "$EXIT_BUILD_FAILED" "build_frontend" "UPDATE_BUILD_ERROR" "UPDATE_BUILD_ERROR" \
-  "Falha ao compilar o frontend da nova release." "pnpm --filter frontend build falhou"
+  "Falha ao compilar o frontend da nova release." "$(recent_failure_detail 'pnpm --filter frontend build falhou')"
 
 set_step "package_frontend_assets" 58
 log "Preparando o artefato standalone do frontend..."
@@ -1379,11 +1395,11 @@ set_step "migrate" 72
 log "Executando migrations..."
 cd "$NEW_RELEASE_DIR/apps/backend"
 pnpm prisma migrate deploy --schema prisma/schema.prisma || fail_and_exit "$EXIT_MIGRATE_FAILED" "migrate" "UPDATE_MIGRATE_ERROR" "UPDATE_MIGRATE_ERROR" \
-  "Falha ao aplicar as migrations da nova release." "pnpm prisma migrate deploy --schema prisma/schema.prisma falhou"
+  "Falha ao aplicar as migrations da nova release." "$(recent_failure_detail 'pnpm prisma migrate deploy --schema prisma/schema.prisma falhou')"
 
 set_step "seed" 78
 run_seed_deploy "$NEW_RELEASE_DIR" || fail_and_exit "$EXIT_SEED_FAILED" "seed" "UPDATE_SEED_ERROR" "UPDATE_SEED_ERROR" \
-  "Falha ao aplicar o seed versionado da nova release." "node dist/prisma/seed.js deploy falhou"
+  "Falha ao aplicar o seed versionado da nova release." "$(recent_failure_detail 'node dist/prisma/seed.js deploy falhou')"
 
 set_step "publish_release" 84
 enable_maintenance_mode "Atualizando sistema para versao ${TARGET_TAG}"
