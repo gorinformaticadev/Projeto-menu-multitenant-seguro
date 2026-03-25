@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.79](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.78...v0.1.79) (2026-03-25)
+
 ### [0.1.78](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.77...v0.1.78) (2026-03-25)
 
 ### [0.1.77](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.76...v0.1.77) (2026-03-25)
