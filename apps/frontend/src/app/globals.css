@@ -131,11 +131,11 @@
 
     /* Semantic theme tokens - Dark */
     --color-background: 10 10 10;
-    --color-background-elevated: 20 20 24;
-    --color-surface: 24 24 27;
-    --color-surface-hover: 38 38 42;
-    --color-border: 50 50 56;
-    --color-border-strong: 82 82 91;
+    --color-background-elevated: 38 40 58;
+    --color-surface: 44 46 64;
+    --color-surface-hover: 54 56 74;
+    --color-border: 72 76 110;
+    --color-border-strong: 110 115 155;
     --color-text: 250 250 250;
     --color-text-muted: 163 163 163;
     --color-text-inverse: 10 10 10;
@@ -206,10 +206,10 @@
     --auth-page-start: oklch(0.12 0.02 240);
     --auth-page-mid: oklch(0.14 0.02 240);
     --auth-page-end: oklch(0.09 0.01 240);
-    --auth-surface: oklch(0.18 0.02 240 / 0.75);
-    --auth-surface-hover: oklch(0.22 0.02 240 / 0.85);
-    --auth-border: oklch(1 0 0 / 0.15);
-    --auth-border-soft: oklch(1 0 0 / 0.08);
+    --auth-surface: oklch(0.24 0.02 240 / 0.92);
+    --auth-surface-hover: oklch(0.28 0.02 240 / 0.95);
+    --auth-border: oklch(1 0 0 / 0.22);
+    --auth-border-soft: oklch(1 0 0 / 0.12);
     --auth-text: oklch(0.98 0.01 240);
     --auth-text-muted: oklch(0.75 0.02 240);
     --auth-text-soft: oklch(0.55 0.02 240);
@@ -227,8 +227,8 @@
     --auth-input-text: oklch(0.26 0.02 240);
     --auth-input-placeholder: oklch(0.5 0.02 240);
     --auth-input-shadow: inset 1px 1px 3px oklch(0 0 0 / 0.4), inset -1px -1px 2px oklch(1 0 0 / 0.03);
-    --auth-card-shadow: 0 20px 50px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(1 0 0 / 0.05);
-    --auth-card-shadow-hover: 0 20px 60px oklch(0 0 0 / 0.7);
+    --auth-card-shadow: 0 20px 50px oklch(0 0 0 / 0.7), 0 0 0 1px oklch(1 0 0 / 0.10);
+    --auth-card-shadow-hover: 0 20px 60px oklch(0 0 0 / 0.8);
     --auth-shell-shadow: 0 4px 12px oklch(0 0 0 / 0.5);
     --auth-footer-shadow: 0 10px 30px oklch(0 0 0 / 0.4);
     --auth-button-shadow: 0 4px 18px 0 oklch(0.60 0.20 280 / 0.45);
@@ -239,6 +239,29 @@
   .auth-page {
     background: linear-gradient(135deg, var(--auth-page-start), var(--auth-page-mid), var(--auth-page-end));
     color: var(--auth-text);
+  }
+
+  /* Garante que os toasts (que usam tokens skin-*) sejam legíveis
+     dentro do auth-theme, independente do tema claro/escuro do sistema */
+  .auth-theme {
+    --color-background-elevated: 22 24 38;
+    --color-surface: 28 30 46;
+    --color-border: 255 255 255;
+    --color-text: 240 242 255;
+    --color-text-muted: 160 165 200;
+    --color-danger: 248 113 113;
+  }
+
+  /* Sobrescreve tokens skin-* no <html> quando em página pública (auth).
+     O portal Radix (ToastViewport) herda do <html> diretamente,
+     não do .auth-theme — este seletor garante o visual correto no toast. */
+  html.auth-public {
+    --color-background-elevated: 22 24 38;
+    --color-surface: 28 30 46;
+    --color-border: 255 255 255;
+    --color-text: 240 242 255;
+    --color-text-muted: 160 165 200;
+    --color-danger: 248 113 113;
   }
 
   .auth-blob-primary {
@@ -298,6 +321,22 @@
       0 0 0 1000px var(--auth-input-background-focus) inset,
       var(--auth-input-shadow);
     transition: background-color 5000s ease-in-out 0s;
+  }
+
+  /* Toast moderno — barra lateral colorida por variante */
+  [data-radix-toast-viewport] [data-state] {
+    position: relative;
+  }
+
+  [data-radix-toast-viewport] .destructive::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    border-radius: 12px 0 0 12px;
+    background: rgb(var(--color-danger));
   }
 
   .auth-button {
