@@ -38,6 +38,8 @@ type RuntimeExecutionClassification = {
   state: SessionCleanupWatchdogState;
   isStuck: boolean;
   reason: string;
+  heartbeatPresent: boolean;
+  leasePresent: boolean;
   heartbeatStale: boolean;
   lockExpired: boolean;
 };
@@ -280,10 +282,11 @@ export class SessionCleanupExecutionService implements OnModuleInit, OnModuleDes
     stuckAfterMs: number;
     timeZone?: string | null;
   }): Promise<SessionCleanupWatchdogSnapshot> {
-    const [execution, latestExecution] = await Promise.all([
-      this.materializedExecutionService.getById(params.executionId),
-      this.materializedExecutionService.getLatestForJob(SessionCleanupExecutionService.JOB_KEY),
-    ]);
+    const { execution, latestExecution } =
+      await this.materializedExecutionService.getExecutionAndLatestForJob(
+        params.executionId,
+        SessionCleanupExecutionService.JOB_KEY,
+      );
     const scheduleTimeZone = this.resolveScheduleTimeZone(params.timeZone);
 
     if (!execution) {
@@ -311,6 +314,13 @@ export class SessionCleanupExecutionService implements OnModuleInit, OnModuleDes
       params.now,
       params.stuckAfterMs,
       scheduleTimeZone,
+    );
+  }
+
+  async listRunningExecutions(limit = 10): Promise<MaterializedCronExecutionRecord[]> {
+    return this.materializedExecutionService.getRunningExecutionsForJob(
+      SessionCleanupExecutionService.JOB_KEY,
+      limit,
     );
   }
 
@@ -459,18 +469,85 @@ export class SessionCleanupExecutionService implements OnModuleInit, OnModuleDes
     now: Date,
     stuckAfterMs: number,
   ): RuntimeExecutionClassification {
-    const reference = execution.heartbeatAt || execution.startedAt || execution.triggeredAt;
-    const heartbeatStale = now.getTime() > reference.getTime() + stuckAfterMs;
-    const lockExpired = execution.lockedUntil
-      ? now.getTime() > execution.lockedUntil.getTime()
-      : true;
-    const isStuck =
-      execution.finishedAt === null && heartbeatStale && lockExpired;
+    const heartbeatPresent =
+      execution.heartbeatAt instanceof Date &&
+      !Number.isNaN(execution.heartbeatAt.getTime());
+    const leasePresent =
+      execution.lockedUntil instanceof Date &&
+      !Number.isNaN(execution.lockedUntil.getTime());
+    const heartbeatStale = heartbeatPresent
+      ? now.getTime() > execution.heartbeatAt!.getTime() + stuckAfterMs
+      : false;
+    const lockExpired = leasePresent
+      ? now.getTime() > execution.lockedUntil!.getTime()
+      : false;
+
+    if (execution.finishedAt !== null) {
+      return {
+        state: 'running',
+        isStuck: false,
+        reason: 'running_with_finished_record',
+        heartbeatPresent,
+        leasePresent,
+        heartbeatStale,
+        lockExpired,
+      };
+    }
+
+    if (!heartbeatPresent) {
+      return {
+        state: 'running',
+        isStuck: false,
+        reason: 'running_without_heartbeat',
+        heartbeatPresent,
+        leasePresent,
+        heartbeatStale,
+        lockExpired,
+      };
+    }
+
+    if (!leasePresent) {
+      return {
+        state: 'running',
+        isStuck: false,
+        reason: 'running_without_lease',
+        heartbeatPresent,
+        leasePresent,
+        heartbeatStale,
+        lockExpired,
+      };
+    }
+
+    if (!heartbeatStale) {
+      return {
+        state: 'running',
+        isStuck: false,
+        reason: 'running_with_recent_heartbeat',
+        heartbeatPresent,
+        leasePresent,
+        heartbeatStale,
+        lockExpired,
+      };
+    }
+
+    if (!lockExpired) {
+      return {
+        state: 'running',
+        isStuck: false,
+        reason: 'running_with_active_lease',
+        heartbeatPresent,
+        leasePresent,
+        heartbeatStale,
+        lockExpired,
+      };
+    }
 
     return {
-      state: isStuck ? 'stuck' : 'running',
-      isStuck,
-      reason: isStuck ? 'running_without_recent_heartbeat' : 'running',
+      state: 'stuck',
+      isStuck: true,
+      reason: 'running_without_recent_heartbeat',
+      heartbeatPresent,
+      leasePresent,
       heartbeatStale,
       lockExpired,
     };

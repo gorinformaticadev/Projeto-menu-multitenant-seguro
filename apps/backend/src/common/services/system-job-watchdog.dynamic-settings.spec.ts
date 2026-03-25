@@ -193,9 +193,13 @@ describe('SystemJobWatchdogService dynamic watchdog toggle', () => {
     const redisLock = {
       acquireLock: jest.fn().mockResolvedValue(true),
       releaseLock: jest.fn().mockResolvedValue(undefined),
+      isDegraded: jest.fn().mockReturnValue(false),
     };
     const sessionCleanupExecutionService = {
       inspectExpectedExecution: jest.fn(),
+      inspectLatestExecution: jest.fn(),
+      inspectExecutionById: jest.fn(),
+      listRunningExecutions: jest.fn().mockResolvedValue([]),
     };
     const service = new SystemJobWatchdogService(
       cronService as unknown as CronService,

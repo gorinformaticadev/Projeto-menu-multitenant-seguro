@@ -94,6 +94,11 @@ export interface MaterializedCronExecutionOwnershipResult {
   reason: MaterializedCronExecutionFailureReason | null;
 }
 
+export interface MaterializedCronExecutionLookupPair {
+  execution: MaterializedCronExecutionRecord | null;
+  latestExecution: MaterializedCronExecutionRecord | null;
+}
+
 type MaterializedCronExecutionRow = {
   id: string;
   jobKey: string;
@@ -210,7 +215,7 @@ export class MaterializedCronExecutionService {
           "updatedAt"
         FROM "cron_materialized_executions"
         WHERE "jobKey" = ${jobKey}
-        ORDER BY "scheduledFor" DESC
+        ORDER BY "scheduledFor" DESC, "updatedAt" DESC
         LIMIT 1
       `);
 
@@ -218,6 +223,129 @@ export class MaterializedCronExecutionService {
     } catch (error) {
       this.logger.warn(`Falha ao consultar ultima execucao materializada de ${jobKey}: ${String(error)}`);
       return null;
+    }
+  }
+
+  async getExecutionAndLatestForJob(
+    executionId: string,
+    jobKey: string,
+  ): Promise<MaterializedCronExecutionLookupPair> {
+    type LookupRow = MaterializedCronExecutionRow & {
+      lookupType: 'execution' | 'latest';
+    };
+
+    try {
+      const rows = await this.prisma.$queryRaw<LookupRow[]>(Prisma.sql`
+        WITH execution_row AS (
+          SELECT
+            'execution'::text AS "lookupType",
+            "id",
+            "jobKey",
+            "scheduledFor",
+            "triggeredAt",
+            "startedAt",
+            "finishedAt",
+            "status",
+            "ownerId",
+            "attempt",
+            "leaseVersion",
+            "lockedUntil",
+            "heartbeatAt",
+            "reason",
+            "error",
+            "metadata",
+            "createdAt",
+            "updatedAt"
+          FROM "cron_materialized_executions"
+          WHERE "id" = ${executionId}
+        ),
+        latest_row AS (
+          SELECT
+            'latest'::text AS "lookupType",
+            "id",
+            "jobKey",
+            "scheduledFor",
+            "triggeredAt",
+            "startedAt",
+            "finishedAt",
+            "status",
+            "ownerId",
+            "attempt",
+            "leaseVersion",
+            "lockedUntil",
+            "heartbeatAt",
+            "reason",
+            "error",
+            "metadata",
+            "createdAt",
+            "updatedAt"
+          FROM "cron_materialized_executions"
+          WHERE "jobKey" = ${jobKey}
+          ORDER BY "scheduledFor" DESC, "updatedAt" DESC
+          LIMIT 1
+        )
+        SELECT * FROM execution_row
+        UNION ALL
+        SELECT * FROM latest_row
+      `);
+
+      const executionRow = rows.find((row) => row.lookupType === 'execution');
+      const latestRow = rows.find((row) => row.lookupType === 'latest');
+
+      return {
+        execution: executionRow ? this.mapRow(executionRow) : null,
+        latestExecution: latestRow ? this.mapRow(latestRow) : null,
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao consultar execucao ${executionId} e ultima execucao materializada de ${jobKey}: ${String(error)}`,
+      );
+      return {
+        execution: null,
+        latestExecution: null,
+      };
+    }
+  }
+
+  async getRunningExecutionsForJob(
+    jobKey: string,
+    limit = 10,
+  ): Promise<MaterializedCronExecutionRecord[]> {
+    const take = Math.max(1, Math.min(Math.floor(limit), 50));
+
+    try {
+      const rows = await this.prisma.$queryRaw<MaterializedCronExecutionRow[]>(Prisma.sql`
+        SELECT
+          "id",
+          "jobKey",
+          "scheduledFor",
+          "triggeredAt",
+          "startedAt",
+          "finishedAt",
+          "status",
+          "ownerId",
+          "attempt",
+          "leaseVersion",
+          "lockedUntil",
+          "heartbeatAt",
+          "reason",
+          "error",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        FROM "cron_materialized_executions"
+        WHERE "jobKey" = ${jobKey}
+          AND "status" = 'running'
+        ORDER BY "scheduledFor" DESC, "updatedAt" DESC
+        LIMIT ${take}
+      `);
+
+      return rows.map((row) => this.mapRow(row));
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao consultar execucoes running materializadas de ${jobKey}: ${String(error)}`,
+      );
+      return [];
     }
   }
 

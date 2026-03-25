@@ -20,6 +20,7 @@ describe('SessionCleanupExecutionService', () => {
     finalizeExecution: jest.fn(),
     assertExecutionOwnership: jest.fn(),
     getById: jest.fn(),
+    getExecutionAndLatestForJob: jest.fn(),
     getLatestForJob: jest.fn(),
     getBySlot: jest.fn(),
   };
@@ -88,6 +89,10 @@ describe('SessionCleanupExecutionService', () => {
       reason: null,
     });
     materializedExecutionServiceMock.getById.mockResolvedValue(null);
+    materializedExecutionServiceMock.getExecutionAndLatestForJob.mockResolvedValue({
+      execution: null,
+      latestExecution: null,
+    });
     materializedExecutionServiceMock.getLatestForJob.mockResolvedValue(null);
     materializedExecutionServiceMock.getBySlot.mockResolvedValue(null);
     processorMock.cleanupExpiredSessions.mockResolvedValue(undefined);
@@ -439,7 +444,7 @@ describe('SessionCleanupExecutionService', () => {
         expectedScheduledFor: new Date('2026-03-23T11:10:00.000Z'),
         state: 'running',
         isStuck: false,
-        reason: 'running',
+        reason: 'running_with_recent_heartbeat',
         scheduleTimeZone: saoPauloTimeZone,
       }),
     );
@@ -502,6 +507,66 @@ describe('SessionCleanupExecutionService', () => {
         state: 'success',
         isStuck: false,
         reason: 'success',
+        scheduleTimeZone: saoPauloTimeZone,
+      }),
+    );
+  });
+
+  it('nao classifica como stuck uma execucao running sem heartbeat persistido', async () => {
+    const runningExecution = createExecution({
+      id: 'execution-3',
+      status: 'running',
+      scheduledFor: new Date('2026-03-23T11:20:00.000Z'),
+      triggeredAt: new Date('2026-03-23T11:20:01.000Z'),
+      startedAt: new Date('2026-03-23T11:20:02.000Z'),
+      heartbeatAt: null,
+      lockedUntil: new Date('2026-03-23T11:21:00.000Z'),
+      finishedAt: null,
+    });
+    materializedExecutionServiceMock.getLatestForJob.mockResolvedValue(runningExecution);
+
+    await expect(
+      service.inspectLatestExecution({
+        now: new Date('2026-03-23T11:23:00.000Z'),
+        stuckAfterMs: 90 * 1000,
+        timeZone: saoPauloTimeZone,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        expectedScheduledFor: new Date('2026-03-23T11:20:00.000Z'),
+        state: 'running',
+        isStuck: false,
+        reason: 'running_without_heartbeat',
+        scheduleTimeZone: saoPauloTimeZone,
+      }),
+    );
+  });
+
+  it('nao classifica como stuck uma execucao running com heartbeat stale mas lease ausente', async () => {
+    const runningExecution = createExecution({
+      id: 'execution-4',
+      status: 'running',
+      scheduledFor: new Date('2026-03-23T11:25:00.000Z'),
+      triggeredAt: new Date('2026-03-23T11:25:01.000Z'),
+      startedAt: new Date('2026-03-23T11:25:02.000Z'),
+      heartbeatAt: new Date('2026-03-23T11:25:10.000Z'),
+      lockedUntil: null,
+      finishedAt: null,
+    });
+    materializedExecutionServiceMock.getLatestForJob.mockResolvedValue(runningExecution);
+
+    await expect(
+      service.inspectLatestExecution({
+        now: new Date('2026-03-23T11:28:00.000Z'),
+        stuckAfterMs: 90 * 1000,
+        timeZone: saoPauloTimeZone,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        expectedScheduledFor: new Date('2026-03-23T11:25:00.000Z'),
+        state: 'running',
+        isStuck: false,
+        reason: 'running_without_lease',
         scheduleTimeZone: saoPauloTimeZone,
       }),
     );

@@ -14,7 +14,11 @@ import {
 } from './system-operational-alerts.service';
 
 type WatchdogAlertInput = {
-  action: 'JOB_NOT_RUNNING' | 'JOB_REPEATED_FAILURES' | 'JOB_STUCK_RUNNING';
+  action:
+    | 'JOB_NOT_RUNNING'
+    | 'JOB_REPEATED_FAILURES'
+    | 'JOB_STUCK_RUNNING'
+    | 'JOB_SUSPECTED_STUCK_RUNNING';
   cooldownKey: string;
   severity: 'warning' | 'critical';
   title: string;
@@ -22,6 +26,21 @@ type WatchdogAlertInput = {
   data: Record<string, unknown>;
   pushEligible?: boolean;
   audit?: boolean;
+};
+
+type MaterializedStuckEvaluation = {
+  classification: 'healthy' | 'suspected_stuck' | 'confirmed_stuck';
+  decisionReason: string;
+  isStuck: boolean;
+  isSuspected: boolean;
+  isLatestExecution: boolean;
+  heartbeatPresent: boolean;
+  leasePresent: boolean;
+  heartbeatStale: boolean;
+  lockExpired: boolean;
+  coordinationDegraded: boolean;
+  alertExecutionId: string | null;
+  olderRunningExecutionIds: string[];
 };
 
 const DEFAULT_WATCHDOG_FAILURE_THRESHOLD = 3;
@@ -69,11 +88,19 @@ export class SystemJobWatchdogService implements OnModuleInit {
   ): Promise<{ emitted: string[]; skipped: string[] }> {
     const instanceId = process.env.NODE_APP_INSTANCE || process.env.HOSTNAME || 'single-instance';
     const lockKey = 'watchdog:evaluator:lock';
-    
-    // Evitar que multiplas instancias rodem o evaluator ao mesmo tempo
-    const lockAcquired = await this.redisLock.acquireLock(lockKey, 50000, instanceId); // 50s TTL
-    if (!lockAcquired) {
-      return { emitted: [], skipped: ['locked_by_other_instance'] };
+
+    const coordinationDegraded = this.redisLock.isDegraded();
+    let lockAcquired = false;
+
+    if (!coordinationDegraded) {
+      lockAcquired = await this.redisLock.acquireLock(lockKey, 50000, instanceId); // 50s TTL
+      if (!lockAcquired) {
+        return { emitted: [], skipped: ['locked_by_other_instance'] };
+      }
+    } else {
+      this.logger.warn(
+        '[WATCHDOG_COORDINATION_DEGRADED] Avaliando watchdog sem lock distribuido por degradacao de coordenacao.',
+      );
     }
 
     try {
@@ -149,6 +176,7 @@ export class SystemJobWatchdogService implements OnModuleInit {
           intervalMs,
           staleAfterMs,
           stuckAfterMs,
+          coordinationDegraded,
         );
 
         if (materializedEvaluation.emitted) {
@@ -240,7 +268,9 @@ export class SystemJobWatchdogService implements OnModuleInit {
 
     return { emitted, skipped };
     } finally {
-      await this.redisLock.releaseLock(lockKey, instanceId);
+      if (lockAcquired) {
+        await this.redisLock.releaseLock(lockKey, instanceId);
+      }
     }
   }
 
@@ -340,90 +370,104 @@ export class SystemJobWatchdogService implements OnModuleInit {
     intervalMs: number | null,
     staleAfterMs: number,
     stuckAfterMs: number,
+    coordinationDegraded: boolean,
   ): Promise<{ emitted?: string; skipped: string }> {
-    const expectedSnapshot = await this.sessionCleanupExecutionService.inspectExpectedExecution({
-      schedule: job.schedule,
+    const [latestSnapshot, runningExecutions] = await Promise.all([
+      this.sessionCleanupExecutionService.inspectLatestExecution({
+        now,
+        stuckAfterMs,
+      }),
+      this.sessionCleanupExecutionService.listRunningExecutions(10),
+    ]);
+    const latestStuckEvaluation = this.evaluateMaterializedStuckState(
+      latestSnapshot,
       now,
-      staleAfterMs,
       stuckAfterMs,
-    });
-    const latestSnapshot = await this.sessionCleanupExecutionService.inspectLatestExecution({
-      now,
-      stuckAfterMs,
-      timeZone: expectedSnapshot.scheduleTimeZone,
-    });
+      coordinationDegraded,
+      this.extractOlderRunningExecutions(runningExecutions, latestSnapshot.execution?.id || null),
+    );
     const openAlerts = await this.findOpenMaterializedAlerts(now);
     const resolvedAlertIds = await this.resolveMaterializedAlertsIfNeeded(
       job,
       openAlerts,
       latestSnapshot,
+      latestStuckEvaluation,
       now,
     );
     const activeOpenAlerts = openAlerts.filter(
       (alert) => !resolvedAlertIds.includes(alert.id),
     );
 
-    if (
-      expectedSnapshot.state === 'stuck' &&
-      !this.isMaterializedSnapshotCurrentlyStuck(latestSnapshot)
-    ) {
-      this.logMaterializedClassification(
-        'SESSION_CLEANUP_STUCK_DISCARDED',
-        'stale_expected_slot_snapshot',
-        expectedSnapshot.execution,
-        expectedSnapshot,
-        {
-          latestExecutionId: latestSnapshot.execution?.id || null,
-          latestState: latestSnapshot.state,
-          latestStatus: latestSnapshot.execution?.status || null,
-        },
-      );
-    }
-
-    if (this.isMaterializedSnapshotCurrentlyStuck(latestSnapshot)) {
+    if (latestStuckEvaluation.classification === 'confirmed_stuck') {
       const initialExecution = latestSnapshot.execution;
       if (!initialExecution) {
+        this.logMaterializedDecision(latestSnapshot, latestStuckEvaluation, {});
         return {
           skipped: `healthy:${job.key}`,
         };
       }
 
-      const revalidationNow = new Date();
-      const revalidatedSnapshot =
-        await this.sessionCleanupExecutionService.inspectExecutionById({
+      const revalidationNow = new Date(Math.max(Date.now(), now.getTime()));
+      const [revalidatedSnapshot, revalidatedRunningExecutions] = await Promise.all([
+        this.sessionCleanupExecutionService.inspectExecutionById({
           executionId: initialExecution.id,
           now: revalidationNow,
           stuckAfterMs,
           timeZone: latestSnapshot.scheduleTimeZone,
-        });
+        }),
+        this.sessionCleanupExecutionService.listRunningExecutions(10),
+      ]);
+      const revalidatedStuckEvaluation = this.evaluateMaterializedStuckState(
+        revalidatedSnapshot,
+        revalidationNow,
+        stuckAfterMs,
+        coordinationDegraded,
+        this.extractOlderRunningExecutions(
+          revalidatedRunningExecutions,
+          revalidatedSnapshot.execution?.id || null,
+        ),
+      );
 
-      if (!this.isMaterializedSnapshotCurrentlyStuck(revalidatedSnapshot)) {
-        this.logMaterializedClassification(
-          'SESSION_CLEANUP_STUCK_DISCARDED',
-          'revalidation_not_stuck',
-          revalidatedSnapshot.execution || initialExecution,
-          revalidatedSnapshot,
-          {
-            latestExecutionId: latestSnapshot.execution?.id || null,
-            latestState: revalidatedSnapshot.state,
-          },
-        );
-
+      if (revalidatedStuckEvaluation.classification !== 'confirmed_stuck') {
         await this.resolveMaterializedAlertsIfNeeded(
           job,
           activeOpenAlerts,
           revalidatedSnapshot,
+          revalidatedStuckEvaluation,
           now,
         );
+
+        this.logMaterializedDecision(revalidatedSnapshot, revalidatedStuckEvaluation, {
+          latestExecutionId: latestSnapshot.execution?.id || null,
+        });
+
+        if (revalidatedStuckEvaluation.classification === 'suspected_stuck') {
+          return this.emitMaterializedSuspectedAlert(
+            job,
+            revalidatedSnapshot,
+            revalidatedStuckEvaluation,
+            activeOpenAlerts,
+            nowMs,
+            intervalMs,
+            stuckAfterMs,
+          );
+        }
 
         return {
           skipped: `healthy:${job.key}`,
         };
       }
 
-      const fingerprint = this.buildMaterializedAlertFingerprint(
+      const revalidatedExecution = revalidatedSnapshot.execution;
+      if (!revalidatedExecution) {
+        return {
+          skipped: `healthy:${job.key}`,
+        };
+      }
+
+      const fingerprint = this.buildMaterializedStuckAlertFingerprint(
         job.key,
-        revalidatedSnapshot,
+        revalidatedExecution.id,
       );
 
       if (
@@ -433,30 +477,19 @@ export class SystemJobWatchdogService implements OnModuleInit {
           fingerprint,
         )
       ) {
-        this.logMaterializedClassification(
-          'SESSION_CLEANUP_STUCK_DEDUPED',
-          'open_alert_for_same_execution',
-          revalidatedSnapshot.execution,
-          revalidatedSnapshot,
-          {
-            alertFingerprint: fingerprint,
-          },
-        );
+        this.logMaterializedDecision(revalidatedSnapshot, revalidatedStuckEvaluation, {
+          alertFingerprint: fingerprint,
+          deduplicated: true,
+        });
 
         return {
           skipped: `JOB_STUCK_RUNNING:${job.key}:${fingerprint}`,
         };
       }
 
-      this.logMaterializedClassification(
-        'SESSION_CLEANUP_STUCK_CLASSIFIED',
-        'latest_execution_stuck',
-        revalidatedSnapshot.execution,
-        revalidatedSnapshot,
-        {
-          alertFingerprint: fingerprint,
-        },
-      );
+      this.logMaterializedDecision(revalidatedSnapshot, revalidatedStuckEvaluation, {
+        alertFingerprint: fingerprint,
+      });
 
       const emitted = await this.emitWatchdogAlert(
         {
@@ -472,6 +505,9 @@ export class SystemJobWatchdogService implements OnModuleInit {
             intervalMs,
             alertFingerprint: fingerprint,
             alertLifecycle: 'open',
+            classification: revalidatedStuckEvaluation.classification,
+            decisionReason: revalidatedStuckEvaluation.decisionReason,
+            ...this.buildMaterializedDecisionData(revalidatedStuckEvaluation),
           }),
         },
         nowMs,
@@ -485,11 +521,39 @@ export class SystemJobWatchdogService implements OnModuleInit {
       };
     }
 
+    if (latestStuckEvaluation.classification === 'suspected_stuck') {
+      this.logMaterializedDecision(latestSnapshot, latestStuckEvaluation, {});
+      return this.emitMaterializedSuspectedAlert(
+        job,
+        latestSnapshot,
+        latestStuckEvaluation,
+        activeOpenAlerts,
+        nowMs,
+        intervalMs,
+        stuckAfterMs,
+      );
+    }
+
+    if (latestSnapshot.execution?.status === 'running') {
+      this.logMaterializedDecision(latestSnapshot, latestStuckEvaluation, {});
+      return {
+        skipped: `healthy:${job.key}`,
+      };
+    }
+
+    const expectedSnapshot = await this.sessionCleanupExecutionService.inspectExpectedExecution({
+      schedule: job.schedule,
+      now,
+      staleAfterMs,
+      stuckAfterMs,
+      timeZone: latestSnapshot.scheduleTimeZone,
+    });
+
     if (
       (expectedSnapshot.state === 'not_created' || expectedSnapshot.state === 'pending') &&
       expectedSnapshot.isOverdue
     ) {
-      const revalidationNow = new Date();
+      const revalidationNow = new Date(Math.max(Date.now(), now.getTime()));
       const revalidatedExpectedSnapshot =
         await this.sessionCleanupExecutionService.inspectExpectedExecution({
           schedule: job.schedule,
@@ -506,20 +570,16 @@ export class SystemJobWatchdogService implements OnModuleInit {
           revalidatedExpectedSnapshot.isOverdue
         )
       ) {
-        this.logMaterializedClassification(
-          'SESSION_CLEANUP_OVERDUE_DISCARDED',
-          'revalidation_not_overdue',
-          revalidatedExpectedSnapshot.execution,
-          revalidatedExpectedSnapshot,
-          {},
-        );
+        this.logMaterializedDecision(revalidatedExpectedSnapshot, latestStuckEvaluation, {
+          decisionReason: 'revalidation_not_overdue',
+        });
 
         return {
           skipped: `healthy:${job.key}`,
         };
       }
 
-      const fingerprint = this.buildMaterializedAlertFingerprint(
+      const fingerprint = this.buildMaterializedOverdueAlertFingerprint(
         job.key,
         revalidatedExpectedSnapshot,
       );
@@ -564,8 +624,75 @@ export class SystemJobWatchdogService implements OnModuleInit {
       };
     }
 
+    this.logMaterializedDecision(latestSnapshot, latestStuckEvaluation, {});
+
     return {
       skipped: `healthy:${job.key}`,
+    };
+  }
+
+  private async emitMaterializedSuspectedAlert(
+    job: CronJobDefinition,
+    snapshot: SessionCleanupWatchdogSnapshot,
+    evaluation: MaterializedStuckEvaluation,
+    activeOpenAlerts: OperationalAlertRecord[],
+    nowMs: number,
+    intervalMs: number | null,
+    stuckAfterMs: number,
+  ): Promise<{ emitted?: string; skipped: string }> {
+    const fingerprint = this.buildMaterializedSuspectedAlertFingerprint(
+      job.key,
+      evaluation,
+    );
+
+    if (
+      this.hasOpenAlertForFingerprint(
+        activeOpenAlerts,
+        'JOB_SUSPECTED_STUCK_RUNNING',
+        fingerprint,
+      )
+    ) {
+      this.logMaterializedDecision(snapshot, evaluation, {
+        alertFingerprint: fingerprint,
+        deduplicated: true,
+      });
+
+      return {
+        skipped: `JOB_SUSPECTED_STUCK_RUNNING:${job.key}:${fingerprint}`,
+      };
+    }
+
+    const body =
+      evaluation.decisionReason === 'older_active_orphaned_execution'
+        ? `Existe execucao running antiga do job ${job.name} que pode ter ficado orfa; ainda nao ha prova suficiente para confirmar travamento.`
+        : `O job ${job.name} apresentou execucao suspeita, mas ainda sem evidencias suficientes para confirmar travamento.`;
+
+    const emitted = await this.emitWatchdogAlert(
+      {
+        action: 'JOB_SUSPECTED_STUCK_RUNNING',
+        cooldownKey: `JOB_SUSPECTED_STUCK_RUNNING:${fingerprint}`,
+        severity: 'warning',
+        title: 'Execucao suspeita em job materializado',
+        body,
+        audit: true,
+        data: this.buildMaterializedJobData(job, snapshot, {
+          stuckAfterMs,
+          intervalMs,
+          alertFingerprint: fingerprint,
+          alertLifecycle: 'open',
+          classification: evaluation.classification,
+          decisionReason: evaluation.decisionReason,
+          ...this.buildMaterializedDecisionData(evaluation),
+        }),
+      },
+      nowMs,
+    );
+
+    return {
+      emitted: emitted ? `JOB_SUSPECTED_STUCK_RUNNING:${job.key}` : undefined,
+      skipped: emitted
+        ? `healthy:${job.key}`
+        : `JOB_SUSPECTED_STUCK_RUNNING:${job.key}:${fingerprint}`,
     };
   }
 
@@ -675,7 +802,11 @@ export class SystemJobWatchdogService implements OnModuleInit {
       const resolvedAt = this.readAlertDataString(alert.data, 'alertResolvedAt');
       return (
         jobKey === SessionCleanupExecutionService.JOB_KEY &&
-        (action === 'JOB_STUCK_RUNNING' || action === 'JOB_NOT_RUNNING') &&
+        (
+          action === 'JOB_STUCK_RUNNING' ||
+          action === 'JOB_NOT_RUNNING' ||
+          action === 'JOB_SUSPECTED_STUCK_RUNNING'
+        ) &&
         !resolvedAt
       );
     });
@@ -685,17 +816,18 @@ export class SystemJobWatchdogService implements OnModuleInit {
     job: CronJobDefinition,
     openAlerts: OperationalAlertRecord[],
     latestSnapshot: SessionCleanupWatchdogSnapshot,
+    latestStuckEvaluation: MaterializedStuckEvaluation,
     now: Date,
   ): Promise<string[]> {
     const latestExecution = latestSnapshot.execution;
-    if (!latestExecution || !this.isTerminalMaterializedState(latestSnapshot.state)) {
+    if (!latestExecution) {
       return [];
     }
 
-    const latestScheduledForMs = latestExecution.scheduledFor.getTime();
     const latestExecutionId = latestExecution.id;
     const idsToResolve = openAlerts
       .filter((alert) => {
+        const alertAction = this.readAlertDataString(alert.data, 'alertAction');
         const alertExecutionId = this.readAlertDataString(
           alert.data,
           'materializedExecutionId',
@@ -704,15 +836,41 @@ export class SystemJobWatchdogService implements OnModuleInit {
           alert.data,
           'expectedScheduledFor',
         );
-        const alertScheduledForMs = alertScheduledFor?.getTime();
 
-        if (alertExecutionId && alertExecutionId === latestExecutionId) {
-          return true;
+        if (alertAction === 'JOB_STUCK_RUNNING') {
+          if (!alertExecutionId) {
+            return false;
+          }
+
+          return (
+            alertExecutionId === latestExecutionId &&
+            latestStuckEvaluation.classification === 'healthy' &&
+            latestStuckEvaluation.isLatestExecution
+          );
         }
 
-        return typeof alertScheduledForMs === 'number' &&
-          Number.isFinite(alertScheduledForMs) &&
-          alertScheduledForMs <= latestScheduledForMs;
+        if (alertAction === 'JOB_SUSPECTED_STUCK_RUNNING') {
+          if (!alertExecutionId) {
+            return false;
+          }
+
+          return (
+            alertExecutionId === latestStuckEvaluation.alertExecutionId &&
+            latestStuckEvaluation.classification !== 'suspected_stuck'
+          );
+        }
+
+        if (
+          alertAction === 'JOB_NOT_RUNNING' &&
+          this.isTerminalMaterializedState(latestSnapshot.state)
+        ) {
+          const alertScheduledForMs = alertScheduledFor?.getTime();
+          return typeof alertScheduledForMs === 'number' &&
+            Number.isFinite(alertScheduledForMs) &&
+            alertScheduledForMs <= latestExecution.scheduledFor.getTime();
+        }
+
+        return false;
       })
       .map((alert) => alert.id);
 
@@ -722,13 +880,27 @@ export class SystemJobWatchdogService implements OnModuleInit {
 
     const resolutionReason = idsToResolve.some((id) => {
       const alert = openAlerts.find((candidate) => candidate.id === id);
+      const alertAction = this.readAlertDataString(alert?.data || null, 'alertAction');
       const alertExecutionId = this.readAlertDataString(
         alert?.data || null,
         'materializedExecutionId',
       );
-      return alertExecutionId === latestExecutionId;
+      if (alertAction === 'JOB_STUCK_RUNNING' && alertExecutionId === latestExecutionId) {
+        return true;
+      }
+      if (
+        alertAction === 'JOB_SUSPECTED_STUCK_RUNNING' &&
+        alertExecutionId === latestStuckEvaluation.alertExecutionId
+      ) {
+        return true;
+      }
+      return false;
     })
-      ? 'terminal_state_observed'
+      ? this.isTerminalMaterializedState(latestSnapshot.state)
+        ? 'terminal_state_observed'
+        : latestStuckEvaluation.classification === 'healthy'
+          ? 'suspected_state_cleared'
+          : latestStuckEvaluation.decisionReason
       : 'newer_terminal_execution_observed';
 
     const resolved = await this.systemOperationalAlertsService.resolveOperationalAlerts({
@@ -755,6 +927,7 @@ export class SystemJobWatchdogService implements OnModuleInit {
         latestSnapshot,
         {
           resolvedAlertCount: resolved,
+          ...this.buildMaterializedDecisionData(latestStuckEvaluation),
         },
       );
     }
@@ -762,16 +935,216 @@ export class SystemJobWatchdogService implements OnModuleInit {
     return resolved === idsToResolve.length ? idsToResolve : [];
   }
 
-  private isMaterializedSnapshotCurrentlyStuck(
+  private evaluateMaterializedStuckState(
     snapshot: SessionCleanupWatchdogSnapshot,
-  ): boolean {
+    now: Date,
+    stuckAfterMs: number,
+    coordinationDegraded: boolean,
+    olderRunningExecutions: Array<{ id: string }>,
+  ): MaterializedStuckEvaluation {
     const execution = snapshot.execution;
-    return Boolean(
-      execution &&
-        snapshot.state === 'stuck' &&
-        execution.status === 'running' &&
-        execution.finishedAt === null,
+    const latestExecution = snapshot.latestExecution;
+    const heartbeatPresent = Boolean(execution?.heartbeatAt);
+    const leasePresent = Boolean(execution?.lockedUntil);
+    const heartbeatStale = Boolean(
+      execution?.heartbeatAt &&
+        now.getTime() > execution.heartbeatAt.getTime() + stuckAfterMs,
     );
+    const lockExpired = Boolean(
+      execution?.lockedUntil &&
+        now.getTime() > execution.lockedUntil.getTime(),
+    );
+    const isLatestExecution = Boolean(
+      execution &&
+        latestExecution &&
+        execution.id === latestExecution.id,
+    );
+    const olderRunningExecutionIds = olderRunningExecutions.map((candidate) => candidate.id);
+    const latestExecutionId = execution?.id || null;
+
+    if (!execution) {
+      if (olderRunningExecutionIds.length > 0) {
+        return {
+          classification: 'suspected_stuck',
+          decisionReason: coordinationDegraded
+            ? 'coordination_degraded_insufficient_evidence'
+            : 'older_active_orphaned_execution',
+          isStuck: false,
+          isSuspected: true,
+          isLatestExecution: false,
+          heartbeatPresent: false,
+          leasePresent: false,
+          heartbeatStale: false,
+          lockExpired: false,
+          coordinationDegraded,
+          alertExecutionId: olderRunningExecutionIds[0] || null,
+          olderRunningExecutionIds,
+        };
+      }
+
+      return {
+        classification: 'healthy',
+        decisionReason: 'no_materialized_execution',
+        isStuck: false,
+        isSuspected: false,
+        isLatestExecution: false,
+        heartbeatPresent: false,
+        leasePresent: false,
+        heartbeatStale: false,
+        lockExpired: false,
+        coordinationDegraded,
+        alertExecutionId: olderRunningExecutionIds[0] || null,
+        olderRunningExecutionIds,
+      };
+    }
+
+    if (
+      isLatestExecution &&
+      execution.status === 'running' &&
+      execution.finishedAt === null &&
+      heartbeatPresent &&
+      leasePresent &&
+      heartbeatStale &&
+      lockExpired
+    ) {
+      return {
+        classification: 'confirmed_stuck',
+        decisionReason: 'confirmed_stuck',
+        isStuck: true,
+        isSuspected: false,
+        isLatestExecution,
+        heartbeatPresent,
+        leasePresent,
+        heartbeatStale,
+        lockExpired,
+        coordinationDegraded,
+        alertExecutionId: latestExecutionId,
+        olderRunningExecutionIds,
+      };
+    }
+
+    if (olderRunningExecutionIds.length > 0) {
+      return {
+        classification: 'suspected_stuck',
+        decisionReason: 'older_active_orphaned_execution',
+        isStuck: false,
+        isSuspected: true,
+        isLatestExecution,
+        heartbeatPresent,
+        leasePresent,
+        heartbeatStale,
+        lockExpired,
+        coordinationDegraded,
+        alertExecutionId: olderRunningExecutionIds[0] || null,
+        olderRunningExecutionIds,
+      };
+    }
+
+    if (!isLatestExecution) {
+      return {
+        classification: 'healthy',
+        decisionReason: 'revalidated_not_latest_anymore',
+        isStuck: false,
+        isSuspected: false,
+        isLatestExecution,
+        heartbeatPresent,
+        leasePresent,
+        heartbeatStale,
+        lockExpired,
+        coordinationDegraded,
+        alertExecutionId: latestExecutionId,
+        olderRunningExecutionIds,
+      };
+    }
+
+    if (execution.status !== 'running' || execution.finishedAt !== null) {
+      return {
+        classification: 'healthy',
+        decisionReason: 'terminal_execution',
+        isStuck: false,
+        isSuspected: false,
+        isLatestExecution,
+        heartbeatPresent,
+        leasePresent,
+        heartbeatStale,
+        lockExpired,
+        coordinationDegraded,
+        alertExecutionId: latestExecutionId,
+        olderRunningExecutionIds,
+      };
+    }
+
+    if (!heartbeatPresent) {
+      return {
+        classification: 'suspected_stuck',
+        decisionReason: coordinationDegraded
+          ? 'coordination_degraded_insufficient_evidence'
+          : 'missing_heartbeat_evidence',
+        isStuck: false,
+        isSuspected: true,
+        isLatestExecution,
+        heartbeatPresent,
+        leasePresent,
+        heartbeatStale,
+        lockExpired,
+        coordinationDegraded,
+        alertExecutionId: latestExecutionId,
+        olderRunningExecutionIds,
+      };
+    }
+
+    if (!leasePresent) {
+      return {
+        classification: 'suspected_stuck',
+        decisionReason: coordinationDegraded
+          ? 'coordination_degraded_insufficient_evidence'
+          : 'missing_lease_evidence',
+        isStuck: false,
+        isSuspected: true,
+        isLatestExecution,
+        heartbeatPresent,
+        leasePresent,
+        heartbeatStale,
+        lockExpired,
+        coordinationDegraded,
+        alertExecutionId: latestExecutionId,
+        olderRunningExecutionIds,
+      };
+    }
+
+    if (coordinationDegraded && (heartbeatStale || lockExpired)) {
+      return {
+        classification: 'suspected_stuck',
+        decisionReason: 'coordination_degraded_insufficient_evidence',
+        isStuck: false,
+        isSuspected: true,
+        isLatestExecution,
+        heartbeatPresent,
+        leasePresent,
+        heartbeatStale,
+        lockExpired,
+        coordinationDegraded,
+        alertExecutionId: latestExecutionId,
+        olderRunningExecutionIds,
+      };
+    }
+
+    return {
+      classification: 'healthy',
+      decisionReason: heartbeatStale
+        ? 'latest_running_without_expired_lease'
+        : 'latest_running_with_recent_heartbeat',
+      isStuck: false,
+      isSuspected: false,
+      isLatestExecution,
+      heartbeatPresent,
+      leasePresent,
+      heartbeatStale,
+      lockExpired,
+      coordinationDegraded,
+      alertExecutionId: latestExecutionId,
+      olderRunningExecutionIds,
+    };
   }
 
   private isTerminalMaterializedState(state: SessionCleanupWatchdogSnapshot['state']): boolean {
@@ -786,7 +1159,10 @@ export class SystemJobWatchdogService implements OnModuleInit {
 
   private hasOpenAlertForFingerprint(
     alerts: OperationalAlertRecord[],
-    action: 'JOB_NOT_RUNNING' | 'JOB_STUCK_RUNNING',
+    action:
+      | 'JOB_NOT_RUNNING'
+      | 'JOB_STUCK_RUNNING'
+      | 'JOB_SUSPECTED_STUCK_RUNNING',
     fingerprint: string,
   ): boolean {
     return alerts.some((alert) => {
@@ -796,16 +1172,90 @@ export class SystemJobWatchdogService implements OnModuleInit {
     });
   }
 
-  private buildMaterializedAlertFingerprint(
+  private buildMaterializedStuckAlertFingerprint(
+    jobKey: string,
+    executionId: string,
+  ): string {
+    return `${jobKey}:${executionId}`;
+  }
+
+  private buildMaterializedSuspectedAlertFingerprint(
+    jobKey: string,
+    evaluation: MaterializedStuckEvaluation,
+  ): string {
+    const subject = evaluation.alertExecutionId || 'unknown';
+    return `${jobKey}:suspected:${subject}`;
+  }
+
+  private buildMaterializedOverdueAlertFingerprint(
     jobKey: string,
     snapshot: SessionCleanupWatchdogSnapshot,
   ): string {
     const scheduledFor = snapshot.execution?.scheduledFor || snapshot.expectedScheduledFor;
     const scheduledForIso = scheduledFor?.toISOString() || 'unknown-slot';
-    const executionId = snapshot.execution?.id;
-    return executionId
-      ? `${jobKey}:${executionId}:${scheduledForIso}`
-      : `${jobKey}:${scheduledForIso}`;
+    return `${jobKey}:${scheduledForIso}`;
+  }
+
+  private buildMaterializedDecisionData(
+    evaluation: MaterializedStuckEvaluation,
+  ): Record<string, unknown> {
+    return {
+      classification: evaluation.classification,
+      decisionReason: evaluation.decisionReason,
+      materializedExecutionIsLatest: evaluation.isLatestExecution,
+      materializedExecutionHeartbeatPresent: evaluation.heartbeatPresent,
+      materializedExecutionLeasePresent: evaluation.leasePresent,
+      materializedExecutionHeartbeatStale: evaluation.heartbeatStale,
+      materializedExecutionLockExpired: evaluation.lockExpired,
+      coordinationDegraded: evaluation.coordinationDegraded,
+      olderRunningExecutionIds: evaluation.olderRunningExecutionIds,
+      materializedDecisionSubjectExecutionId: evaluation.alertExecutionId,
+    };
+  }
+
+  private extractOlderRunningExecutions<T extends { id: string }>(
+    runningExecutions: T[],
+    latestExecutionId: string | null,
+  ): T[] {
+    return runningExecutions.filter((candidate) => candidate.id !== latestExecutionId);
+  }
+
+  private logMaterializedDecision(
+    snapshot: SessionCleanupWatchdogSnapshot,
+    evaluation: MaterializedStuckEvaluation,
+    extra: Record<string, unknown>,
+  ): void {
+    const execution =
+      evaluation.alertExecutionId &&
+      snapshot.execution &&
+      snapshot.execution.id === evaluation.alertExecutionId
+        ? snapshot.execution
+        : snapshot.execution;
+    const payload = {
+      jobKey: SessionCleanupExecutionService.JOB_KEY,
+      executionId: execution?.id || evaluation.alertExecutionId || null,
+      status: execution?.status || null,
+      startedAt: execution?.startedAt?.toISOString() || null,
+      finishedAt: execution?.finishedAt?.toISOString() || null,
+      heartbeatAt: execution?.heartbeatAt?.toISOString() || null,
+      lockedUntil: execution?.lockedUntil?.toISOString() || null,
+      isLatest: evaluation.isLatestExecution,
+      coordinationDegraded: evaluation.coordinationDegraded,
+      classification: evaluation.classification,
+      decisionReason: evaluation.decisionReason,
+      ...this.buildMaterializedDecisionData(evaluation),
+      ...extra,
+    };
+
+    if (
+      evaluation.classification === 'confirmed_stuck' ||
+      evaluation.classification === 'suspected_stuck'
+    ) {
+      this.logger.warn(`[SESSION_CLEANUP_MATERIALIZED_DECISION] ${JSON.stringify(payload)}`);
+      return;
+    }
+
+    this.logger.log(`[SESSION_CLEANUP_MATERIALIZED_DECISION] ${JSON.stringify(payload)}`);
   }
 
   private readAlertDataString(
@@ -844,6 +1294,7 @@ export class SystemJobWatchdogService implements OnModuleInit {
         snapshot.expectedScheduledFor?.toISOString() ||
         null,
       status: execution?.status || null,
+      startedAt: execution?.startedAt?.toISOString() || null,
       heartbeatAt: execution?.heartbeatAt?.toISOString() || null,
       lockedUntil: execution?.lockedUntil?.toISOString() || null,
       finishedAt: execution?.finishedAt?.toISOString() || null,

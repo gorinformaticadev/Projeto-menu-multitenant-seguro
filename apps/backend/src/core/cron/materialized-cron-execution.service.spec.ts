@@ -138,4 +138,44 @@ describe('MaterializedCronExecutionService', () => {
       }),
     );
   });
+
+  it('reads the target execution and the latest execution in a single lookup pair', async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      {
+        lookupType: 'execution',
+        ...buildRow({
+          id: 'execution-1',
+          status: 'running',
+          ownerId: 'instance-a',
+        }),
+      },
+      {
+        lookupType: 'latest',
+        ...buildRow({
+          id: 'execution-2',
+          scheduledFor: new Date('2026-03-22T15:15:00.000Z'),
+          status: 'success',
+          ownerId: 'instance-b',
+          finishedAt: new Date('2026-03-22T15:15:10.000Z'),
+          heartbeatAt: new Date('2026-03-22T15:15:10.000Z'),
+          lockedUntil: new Date('2026-03-22T15:15:10.000Z'),
+        }),
+      },
+    ]);
+
+    await expect(
+      service.getExecutionAndLatestForJob('execution-1', 'system.session_cleanup'),
+    ).resolves.toEqual({
+      execution: expect.objectContaining({
+        id: 'execution-1',
+        status: 'running',
+        ownerId: 'instance-a',
+      }),
+      latestExecution: expect.objectContaining({
+        id: 'execution-2',
+        status: 'success',
+        ownerId: 'instance-b',
+      }),
+    });
+  });
 });
