@@ -131,11 +131,11 @@
 
     /* Semantic theme tokens - Dark */
     --color-background: 10 10 10;
-    --color-background-elevated: 38 40 58;
-    --color-surface: 44 46 64;
-    --color-surface-hover: 54 56 74;
-    --color-border: 72 76 110;
-    --color-border-strong: 110 115 155;
+    --color-background-elevated: 20 20 24;
+    --color-surface: 24 24 27;
+    --color-surface-hover: 38 38 42;
+    --color-border: 50 50 56;
+    --color-border-strong: 82 82 91;
     --color-text: 250 250 250;
     --color-text-muted: 163 163 163;
     --color-text-inverse: 10 10 10;
