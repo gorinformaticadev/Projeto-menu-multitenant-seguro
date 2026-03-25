@@ -513,6 +513,14 @@ export default function UpdatesPage() {
                       <div className="text-sm text-skin-danger space-y-1">
                         <div><strong>Falha:</strong> {lifecycle.error.userMessage}</div>
                         <div className="text-xs">Codigo: {lifecycle.error.code} | Etapa: {formatUpdateStage(lifecycle.error.stage)}</div>
+                        {lifecycle.error.exitCode != null && (
+                          <div className="text-xs">Saida: {lifecycle.error.exitCode}</div>
+                        )}
+                        {lifecycle.error.technicalMessage && (
+                          <div className="text-xs break-all">
+                            <strong>Detalhe tecnico:</strong> {lifecycle.error.technicalMessage}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
