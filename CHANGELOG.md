@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.70](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.69...v0.1.70) (2026-03-25)
+
+
+### Bug Fixes
+
+* **auth:** preserve trusted device cookie on logout ([ba5008a](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/ba5008a11739e01ba1ff12cd121347e5ecf5bc45))
+
 ### [0.1.69](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.68...v0.1.69) (2026-03-24)
 
 ### [0.1.68](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.67...v0.1.68) (2026-03-24)

@@ -1,6 +1,6 @@
 {
   "private": true,
-  "version": "0.1.69",
+  "version": "0.1.70",
   "workspaces": {
     "packages": [
       "apps/*"
@@ -11,7 +11,7 @@
     ]
   },
   "scripts": {
-    "release": "standard-version",
+    "release": "pnpm dlx standard-version",
     "versao": "pnpm run release && git push --follow-tags",
     "install:all": "pnpm install",
     "check:theming": "node scripts/check-no-hardcoded-colors.js",
@@ -32,9 +32,6 @@
     "@nestjs/cli>glob>minimatch": "^10.2.3",
     "@nestjs/cli>fork-ts-checker-webpack-plugin>schema-utils>ajv": "^6.14.0",
     "@nestjs/cli>@angular-devkit/core>ajv": "^8.18.0"
-  },
-  "devDependencies": {
-    "standard-version": "^9.5.0"
   },
   "dependencies": {
     "googleapis": "^171.3.0"
