@@ -1358,7 +1358,7 @@ set_step "install_dependencies" 35
 log "Instalando dependencias..."
 cd "$NEW_RELEASE_DIR"
 ensure_command pnpm "$EXIT_INSTALL_FAILED"
-pnpm install --frozen-lockfile || fail_and_exit "$EXIT_INSTALL_FAILED" "install_dependencies" "UPDATE_INSTALL_ERROR" "UPDATE_INSTALL_ERROR" \
+NODE_ENV=development npm_config_production=false pnpm install --frozen-lockfile --prod=false || fail_and_exit "$EXIT_INSTALL_FAILED" "install_dependencies" "UPDATE_INSTALL_ERROR" "UPDATE_INSTALL_ERROR" \
   "Falha ao instalar dependencias do projeto." "$(recent_failure_detail 'pnpm install --frozen-lockfile falhou na nova release')"
 
 set_step "build_prisma_client" 44
