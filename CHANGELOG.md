@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.73](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.72...v0.1.73) (2026-03-25)
+
+
+### Bug Fixes
+
+* Add native installation, update, and deployment scripts with PM2, systemd, and Docker support for frontend and backend. ([fca2790](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/fca27902c4218c8e0bf1e0c5720c7a63cef9ae9b))
+
 ### [0.1.72](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.71...v0.1.72) (2026-03-25)
 
 
