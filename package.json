@@ -49,6 +49,7 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "@nestjs/core",
       "@prisma/client",
       "@prisma/engines",
       "@sentry/cli",
