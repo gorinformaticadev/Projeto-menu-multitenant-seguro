@@ -51,10 +51,13 @@ describe('update-flow.utils', () => {
   });
 
   it('normaliza labels de status e etapa', () => {
-    expect(formatUpdateLifecycleStatus('pending_confirmation')).toBe('Aguardando confirmacao');
-    expect(formatUpdateLifecycleStatus('completed')).toBe('Concluido');
+    expect(formatUpdateLifecycleStatus('pending_confirmation')).toBe('Aguardando confirmação');
+    expect(formatUpdateLifecycleStatus('completed')).toBe('Concluído');
     expect(formatUpdateStage('build_frontend')).toBe('compilando frontend');
     expect(formatUpdateStage('build_prisma_client')).toBe('gerando cliente do banco');
+    expect(formatUpdateStage('install_dependencies')).toBe('instalando dependências');
+    expect(formatUpdateStage('publish_release')).toBe('publicando release ativa');
+    expect(formatUpdateStage('post_deploy_validation')).toBe('validando release publicada');
     expect(formatUpdateStage('health_check-step')).toBe('health check step');
     expect(formatUpdateStage(null)).toBe('desconhecida');
   });

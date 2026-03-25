@@ -147,7 +147,7 @@ export class EmailService implements OnModuleInit {
       return false;
     }
 
-    const resetUrl = `${this.config.get('FRONTEND_URL')}/reset-password?token=${token}`;
+    const resetUrl = `${this.config.get('FRONTEND_URL')}/redefinir-senha?token=${token}`;
 
     const html = this.getPasswordResetEmailTemplate(name, resetUrl);
 
@@ -244,47 +244,90 @@ export class EmailService implements OnModuleInit {
    * Template de email de recuperação de senha
    */
   private getPasswordResetEmailTemplate(name: string, resetUrl: string): string {
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: #DC2626; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
-          .button { display: inline-block; padding: 12px 30px; background: #DC2626; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
-          .warning { background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 10px; margin: 15px 0; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>Recuperação de Senha</h1>
-          </div>
-          <div class="content">
-            <p>Olá <strong>${name}</strong>,</p>
-            <p>Recebemos uma solicitação para redefinir a senha da sua conta.</p>
-            <div class="warning">
-              ⚠️ <strong>Atenção:</strong> Se você não solicitou a redefinição de senha, ignore este email e entre em contato com o suporte imediatamente.
-            </div>
-            <p>Clique no botão abaixo para criar uma nova senha:</p>
-            <center>
-              <a href="${resetUrl}" class="button">Redefinir Senha</a>
-            </center>
-            <p>Ou copie e cole o link abaixo no seu navegador:</p>
-            <p style="word-break: break-all; color: #666; font-size: 12px;">${resetUrl}</p>
-            <p><strong>Este link expira em 1 hora por segurança.</strong></p>
-          </div>
-          <div class="footer">
-            <p>Este é um email automático. Por favor, não responda.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
+    return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recuperação de Senha</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f6f9;font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f9;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+
+          <!-- Cabeçalho -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#1e293b 0%,#334155 100%);padding:36px 40px;text-align:center;">
+              <p style="margin:0 0 8px 0;font-size:11px;font-weight:700;letter-spacing:3px;color:#94a3b8;text-transform:uppercase;">Segurança da Conta</p>
+              <h1 style="margin:0;font-size:26px;font-weight:700;color:#f8fafc;letter-spacing:-0.5px;">Recuperação de Senha</h1>
+            </td>
+          </tr>
+
+          <!-- Corpo -->
+          <tr>
+            <td style="padding:40px 40px 32px 40px;">
+              <p style="margin:0 0 16px 0;font-size:16px;color:#374151;">Olá, <strong style="color:#1e293b;">${name}</strong>,</p>
+              <p style="margin:0 0 24px 0;font-size:15px;line-height:1.6;color:#4b5563;">
+                Recebemos uma solicitação para redefinir a senha da sua conta. Clique no botão abaixo para criar uma nova senha.
+              </p>
+
+              <!-- Botão -->
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding:8px 0 32px 0;">
+                    <a href="${resetUrl}"
+                       style="display:inline-block;padding:14px 40px;background-color:#1e293b;color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:700;letter-spacing:0.5px;">
+                      Redefinir Minha Senha
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Aviso de segurança -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                <tr>
+                  <td style="background-color:#fefce8;border-left:4px solid #eab308;border-radius:0 6px 6px 0;padding:14px 16px;">
+                    <p style="margin:0;font-size:13px;color:#713f12;line-height:1.5;">
+                      <strong>⚠️ Não solicitou esta redefinição?</strong><br/>
+                      Ignore este email com segurança. Sua senha permanece inalterada. Se você suspeita de acesso não autorizado, entre em contato com o suporte imediatamente.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Link alternativo -->
+              <p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;">Se o botão não funcionar, copie e cole o link abaixo no seu navegador:</p>
+              <p style="margin:0;font-size:12px;word-break:break-all;color:#6b7280;background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px 12px;">${resetUrl}</p>
+            </td>
+          </tr>
+
+          <!-- Separador -->
+          <tr>
+            <td style="padding:0 40px;">
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:0;" />
+            </td>
+          </tr>
+
+          <!-- Rodapé -->
+          <tr>
+            <td style="padding:24px 40px;text-align:center;">
+              <p style="margin:0 0 6px 0;font-size:12px;color:#9ca3af;">
+                Este link expira em <strong>1 hora</strong> por segurança.
+              </p>
+              <p style="margin:0;font-size:11px;color:#d1d5db;">
+                Este é um email automático — não responda a esta mensagem.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
   }
 
   /**

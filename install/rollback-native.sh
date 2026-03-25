@@ -192,8 +192,9 @@ restart_pm2_processes() {
   pm2 delete "$backend_name" >/dev/null 2>&1 || true
   pm2 delete "$frontend_name" >/dev/null 2>&1 || true
 
-  pm2 start dist/main.js --name "$backend_name" --cwd "$target_root/apps/backend" --update-env
-  PORT=5000 HOSTNAME=0.0.0.0 pm2 start "node .next/standalone/apps/frontend/server.js" --name "$frontend_name" --cwd "$target_root/apps/frontend" --update-env
+  pm2 start dist/main.js --name "$backend_name" --cwd "$target_root/apps/backend" --update-env || return 1
+  PORT=5000 HOSTNAME=0.0.0.0 \
+    pm2 start "node .next/standalone/apps/frontend/server.js" --name "$frontend_name" --cwd "$target_root/apps/frontend" --update-env || return 1
   pm2 save
 
   BACKEND_PROC="$backend_name"
@@ -251,15 +252,71 @@ wait_for_http_ok() {
   done
 }
 
+extract_static_asset_path() {
+  local html_file="$1"
+  if [[ ! -f "$html_file" ]]; then
+    echo ""
+    return 0
+  fi
+
+  grep -oE '/_next/static/[^"'"'"'[:space:]]+' "$html_file" | head -n1 || true
+}
+
+check_http_endpoint() {
+  local url="$1"
+  local label="$2"
+  local body_file="$3"
+
+  if ! curl -fsS --max-time 10 "$url" -o "$body_file"; then
+    log_err "Falha ao validar ${label}: ${url}"
+    return 1
+  fi
+
+  if grep -qiE 'Invariant: The client reference manifest|Failed to load static file|Failed to find Server Action' "$body_file"; then
+    log_err "Resposta de ${label} indica artefato inconsistente: ${url}"
+    return 1
+  fi
+
+  return 0
+}
+
 run_healthchecks() {
   load_runtime_env_from_shared
   local backend_port="${PORT:-4000}"
   local frontend_port="${FRONTEND_PORT:-5000}"
   local backend_url="${BACKEND_HEALTH_URL:-http://127.0.0.1:${backend_port}/api/health}"
-  local frontend_url="${FRONTEND_HEALTH_URL:-http://127.0.0.1:${frontend_port}/}"
+  local frontend_health_url="${FRONTEND_HEALTH_URL:-http://127.0.0.1:${frontend_port}/api/health}"
+  local tmp_dir=""
+  local status=0
+  tmp_dir="$(mktemp -d)"
 
-  wait_for_http_ok "$backend_url" "$HEALTH_TIMEOUT" "backend"
-  wait_for_http_ok "$frontend_url" "$HEALTH_TIMEOUT" "frontend"
+  if ! wait_for_http_ok "$backend_url" "$HEALTH_TIMEOUT" "backend"; then
+    status=1
+  elif ! wait_for_http_ok "$frontend_health_url" "$HEALTH_TIMEOUT" "frontend"; then
+    status=1
+  elif ! check_http_endpoint "http://127.0.0.1:${frontend_port}/" "rota /" "$tmp_dir/frontend-root.html"; then
+    status=1
+  elif ! check_http_endpoint "http://127.0.0.1:${frontend_port}/login" "rota /login" "$tmp_dir/frontend-login.html"; then
+    status=1
+  else
+    local static_asset=""
+    static_asset="$(extract_static_asset_path "$tmp_dir/frontend-login.html")"
+    if [[ -z "$static_asset" ]]; then
+      static_asset="$(extract_static_asset_path "$tmp_dir/frontend-root.html")"
+    fi
+    if [[ -z "$static_asset" ]]; then
+      log_err "Nao foi possivel localizar asset estatico do frontend apos rollback."
+      status=1
+    elif ! check_http_endpoint "http://127.0.0.1:${frontend_port}${static_asset}" "asset estatico ${static_asset}" "$tmp_dir/frontend-static.bin"; then
+      status=1
+    elif [[ -f "$CURRENT_LINK/apps/frontend/public/clear-cache.html" ]] && \
+      ! check_http_endpoint "http://127.0.0.1:${frontend_port}/clear-cache.html" "asset publico clear-cache" "$tmp_dir/frontend-clear-cache.html"; then
+      status=1
+    fi
+  fi
+
+  rm -rf "$tmp_dir"
+  return "$status"
 }
 
 list_releases() {

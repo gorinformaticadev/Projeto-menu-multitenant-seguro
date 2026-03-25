@@ -757,19 +757,26 @@ export class SystemUpdateAdminService {
           });
         } else if (exitCode !== 0) {
           const isRolledBack = state.status === 'rolled_back' || exitCode === 50 || exitCode === 2;
+          const resolvedErrorCode = state.errorCode || descriptor.code;
+          const resolvedErrorCategory = state.errorCategory || descriptor.category;
+          const resolvedErrorStage = state.errorStage || state.step || descriptor.stage;
+          const resolvedUserMessage = state.userMessage || descriptor.userMessage;
+          const resolvedTechnicalMessage =
+            state.technicalMessage || state.lastError || hint || `exitCode=${exitCode}`;
+
           state = await this.mergeState(runtime.statePath, {
             status: isRolledBack ? 'rolled_back' : 'failed',
             finishedAt: this.nowIso(),
-            step: isRolledBack ? 'rollback' : state.step || 'failed',
+            step: isRolledBack ? 'rollback' : resolvedErrorStage || 'failed',
             progress: 100,
             lock: false,
             lastError: state.lastError || hint || `Atualizacao finalizada com erro (code=${exitCode})`,
-            errorCode: descriptor.code,
-            errorCategory: descriptor.category,
-            errorStage: descriptor.stage,
+            errorCode: resolvedErrorCode,
+            errorCategory: resolvedErrorCategory,
+            errorStage: resolvedErrorStage,
             exitCode,
-            userMessage: descriptor.userMessage,
-            technicalMessage: state.lastError || hint || `exitCode=${exitCode}`,
+            userMessage: resolvedUserMessage,
+            technicalMessage: resolvedTechnicalMessage,
           });
         }
       }
@@ -1095,7 +1102,7 @@ export class SystemUpdateAdminService {
       lock: false,
       lastError: null,
       errorCode: 'UPDATE_ROLLBACK_COMPLETED',
-      errorCategory: 'UPDATE_RESTART_ERROR',
+      errorCategory: 'UPDATE_ROLLBACK_ERROR',
       errorStage: 'rollback',
       exitCode: 0,
       userMessage: 'Rollback concluido com sucesso.',
@@ -1118,7 +1125,7 @@ export class SystemUpdateAdminService {
       lock: false,
       lastError: reason,
       errorCode: 'UPDATE_ROLLBACK_ERROR',
-      errorCategory: 'UPDATE_RESTART_ERROR',
+      errorCategory: 'UPDATE_ROLLBACK_ERROR',
       errorStage: 'rollback',
       exitCode: 60,
       userMessage: 'Rollback manual falhou e requer intervencao.',
@@ -1184,11 +1191,25 @@ export class SystemUpdateAdminService {
       case 30:
         return 'Falha ao obter codigo da release.';
       case 40:
-        return 'Falha em build/migrations/restart.';
+        return 'Falha ao instalar dependencias da nova release.';
+      case 41:
+        return 'Falha ao compilar a nova release.';
+      case 42:
+        return 'Falha ao aplicar migrations da nova release.';
+      case 43:
+        return 'Falha ao aplicar seed versionado da nova release.';
+      case 44:
+        return 'Artefato da release esta incompleto ou inconsistente.';
+      case 45:
+        return 'Falha ao publicar a nova release nos links current/previous.';
+      case 46:
+        return 'Falha ao iniciar os processos PM2 da nova release.';
+      case 47:
+        return 'Falha na validacao pos-deploy da nova release.';
       case 50:
-        return 'Healthcheck falhou e rollback automatico foi aplicado.';
+        return 'Validacao pos-deploy falhou e rollback automatico foi aplicado.';
       case 60:
-        return 'Healthcheck falhou e rollback automatico tambem falhou.';
+        return 'Validacao pos-deploy falhou e rollback automatico tambem falhou.';
       case 2:
         return 'Deploy reportou rollback automatico.';
       default:
@@ -1203,8 +1224,8 @@ export class SystemUpdateAdminService {
   ): UpdateFailureDescriptor {
     if (operationType === 'rollback') {
       return {
-        code: 'UPDATE_RESTART_ERROR',
-        category: 'UPDATE_RESTART_ERROR',
+        code: 'UPDATE_ROLLBACK_ERROR',
+        category: 'UPDATE_ROLLBACK_ERROR',
         stage: 'rollback',
         userMessage: 'Rollback manual falhou e requer intervencao manual.',
       };
@@ -1221,38 +1242,87 @@ export class SystemUpdateAdminService {
       case 20:
         return {
           code: 'UPDATE_BACKUP_ERROR',
-          category: 'UPDATE_SCRIPT_ERROR',
+          category: 'UPDATE_BACKUP_ERROR',
           stage: 'backup',
           userMessage: 'Falha ao criar backup antes da atualizacao.',
         };
       case 30:
         return {
-          code: 'UPDATE_GIT_PULL_ERROR',
-          category: 'UPDATE_GIT_PULL_ERROR',
+          code: 'UPDATE_DOWNLOAD_ERROR',
+          category: 'UPDATE_DOWNLOAD_ERROR',
           stage: 'download',
-          userMessage: 'Falha ao baixar a release do repositiorio.',
+          userMessage: 'Falha ao baixar a release do repositório.',
         };
       case 40:
         return {
-          code: 'UPDATE_SCRIPT_ERROR',
-          category: 'UPDATE_SCRIPT_ERROR',
+          code: 'UPDATE_INSTALL_ERROR',
+          category: 'UPDATE_INSTALL_ERROR',
+          stage: 'install_dependencies',
+          userMessage: 'Falha ao instalar dependencias da nova release.',
+        };
+      case 41:
+        return {
+          code: 'UPDATE_BUILD_ERROR',
+          category: 'UPDATE_BUILD_ERROR',
           stage: step || 'build',
-          userMessage: 'Falha durante build, migracao ou seed da atualizacao.',
+          userMessage: 'Falha ao compilar a nova release.',
+        };
+      case 42:
+        return {
+          code: 'UPDATE_MIGRATE_ERROR',
+          category: 'UPDATE_MIGRATE_ERROR',
+          stage: 'migrate',
+          userMessage: 'Falha ao aplicar as migrations da nova release.',
+        };
+      case 43:
+        return {
+          code: 'UPDATE_SEED_ERROR',
+          category: 'UPDATE_SEED_ERROR',
+          stage: 'seed',
+          userMessage: 'Falha ao aplicar o seed versionado da nova release.',
+        };
+      case 44:
+        return {
+          code: 'UPDATE_PACKAGE_INTEGRITY_ERROR',
+          category: 'UPDATE_PACKAGE_INTEGRITY_ERROR',
+          stage: step || 'validate_frontend_artifact',
+          userMessage: 'Artefato da release esta incompleto ou inconsistente.',
+        };
+      case 45:
+        return {
+          code: 'UPDATE_PUBLISH_ERROR',
+          category: 'UPDATE_PUBLISH_ERROR',
+          stage: 'publish_release',
+          userMessage: 'Falha ao publicar a nova release ativa.',
+        };
+      case 46:
+        return {
+          code: 'UPDATE_PM2_START_ERROR',
+          category: 'UPDATE_PM2_START_ERROR',
+          stage: 'restart_pm2',
+          userMessage: 'Falha ao iniciar os processos PM2 da nova release.',
+        };
+      case 47:
+        return {
+          code: 'UPDATE_POST_DEPLOY_VALIDATION_ERROR',
+          category: 'UPDATE_POST_DEPLOY_VALIDATION_ERROR',
+          stage: 'post_deploy_validation',
+          userMessage: 'A nova release falhou na validacao pos-deploy.',
         };
       case 50:
       case 2:
         return {
-          code: 'UPDATE_RESTART_ERROR',
-          category: 'UPDATE_RESTART_ERROR',
-          stage: 'healthcheck',
-          userMessage: 'A nova versao falhou no healthcheck e o sistema voltou para a versao anterior.',
+          code: 'UPDATE_POST_DEPLOY_VALIDATION_ERROR',
+          category: 'UPDATE_POST_DEPLOY_VALIDATION_ERROR',
+          stage: 'post_deploy_validation',
+          userMessage: 'A nova release falhou na validacao pos-deploy e o sistema voltou para a versao anterior.',
         };
       case 60:
         return {
-          code: 'UPDATE_RESTART_ERROR',
-          category: 'UPDATE_RESTART_ERROR',
+          code: 'UPDATE_ROLLBACK_ERROR',
+          category: 'UPDATE_ROLLBACK_ERROR',
           stage: 'rollback',
-          userMessage: 'A nova versao e o rollback falharam. Intervencao manual obrigatoria.',
+          userMessage: 'A nova release falhou na validacao pos-deploy e o rollback automatico tambem falhou.',
         };
       default:
         return {

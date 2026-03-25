@@ -725,11 +725,11 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
   }
 
   private isStartingStep(step: string): boolean {
-    return /^(starting|init|prepare|precheck|backup|download|checkout|build|migrate|seed)/i.test(step);
+    return /^(starting|init|prepare|precheck|backup|download|checkout|install|build|package|validate frontend artifact|pre swap|migrate|seed)/i.test(step);
   }
 
   private isRestartingStep(step: string): boolean {
-    return /(restart|health|swap|switch|rollback|pm2|systemd|container|compose)/i.test(step);
+    return /(restart|health|swap|switch|publish|rollback|pm2|post deploy|validation|systemd|container|compose)/i.test(step);
   }
 
   private parseExecutionLogs(raw: string | null | undefined): Record<string, unknown> {

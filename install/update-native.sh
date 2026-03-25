@@ -13,9 +13,16 @@
 #   10 lock already held
 #   20 backup failed
 #   30 download/checkout failed
-#   40 build/migrations failed
-#   50 healthcheck failed + rollback succeeded
-#   60 healthcheck failed + rollback failed
+#   40 install dependencies failed
+#   41 build failed
+#   42 migrate failed
+#   43 seed failed
+#   44 package integrity failed
+#   45 publish/symlink failed
+#   46 pm2 start failed
+#   47 post-deploy validation failed
+#   50 post-deploy validation failed + rollback succeeded
+#   60 post-deploy validation failed + rollback failed
 # =============================================================================
 
 set -euo pipefail
@@ -39,7 +46,14 @@ EXIT_SUCCESS=0
 EXIT_LOCK_HELD=10
 EXIT_BACKUP_FAILED=20
 EXIT_DOWNLOAD_FAILED=30
-EXIT_BUILD_FAILED=40
+EXIT_INSTALL_FAILED=40
+EXIT_BUILD_FAILED=41
+EXIT_MIGRATE_FAILED=42
+EXIT_SEED_FAILED=43
+EXIT_PACKAGE_INTEGRITY_FAILED=44
+EXIT_PUBLISH_FAILED=45
+EXIT_PM2_FAILED=46
+EXIT_POST_DEPLOY_VALIDATION_FAILED=47
 EXIT_HEALTH_ROLLBACK_OK=50
 EXIT_HEALTH_ROLLBACK_FAILED=60
 
@@ -68,6 +82,12 @@ STATE_STEP="init"
 STATE_PROGRESS=0
 STATE_LOCK="false"
 STATE_LAST_ERROR=""
+STATE_ERROR_CODE=""
+STATE_ERROR_CATEGORY=""
+STATE_ERROR_STAGE=""
+STATE_EXIT_CODE=""
+STATE_USER_MESSAGE=""
+STATE_TECHNICAL_MESSAGE=""
 ROLLBACK_ATTEMPTED="false"
 ROLLBACK_COMPLETED="false"
 ROLLBACK_REASON=""
@@ -123,6 +143,24 @@ json_or_null() {
   else
     echo "\"$(json_escape "$value")\""
   fi
+}
+
+json_number_or_null() {
+  local value="${1:-}"
+  if [[ -z "$value" ]]; then
+    echo "null"
+  else
+    echo "$value"
+  fi
+}
+
+reset_error_state() {
+  STATE_ERROR_CODE=""
+  STATE_ERROR_CATEGORY=""
+  STATE_ERROR_STAGE=""
+  STATE_EXIT_CODE=""
+  STATE_USER_MESSAGE=""
+  STATE_TECHNICAL_MESSAGE=""
 }
 
 write_maintenance_file() {
@@ -216,6 +254,12 @@ write_state_file() {
   "progress": ${STATE_PROGRESS},
   "lock": ${STATE_LOCK},
   "lastError": $(json_or_null "$STATE_LAST_ERROR"),
+  "errorCode": $(json_or_null "$STATE_ERROR_CODE"),
+  "errorCategory": $(json_or_null "$STATE_ERROR_CATEGORY"),
+  "errorStage": $(json_or_null "$STATE_ERROR_STAGE"),
+  "exitCode": $(json_number_or_null "$STATE_EXIT_CODE"),
+  "userMessage": $(json_or_null "$STATE_USER_MESSAGE"),
+  "technicalMessage": $(json_or_null "$STATE_TECHNICAL_MESSAGE"),
   "rollback": {
     "attempted": ${ROLLBACK_ATTEMPTED},
     "completed": ${ROLLBACK_COMPLETED},
@@ -247,6 +291,7 @@ start_state() {
   STATE_PROGRESS=1
   STATE_LOCK="true"
   STATE_LAST_ERROR=""
+  reset_error_state
   ROLLBACK_ATTEMPTED="false"
   ROLLBACK_COMPLETED="false"
   ROLLBACK_REASON=""
@@ -259,6 +304,7 @@ finish_success() {
   STATE_PROGRESS=100
   STATE_LOCK="false"
   STATE_LAST_ERROR=""
+  reset_error_state
   STATE_FINALIZED="true"
   set_step "completed" 100
   write_state_file
@@ -266,23 +312,47 @@ finish_success() {
 
 finish_failed() {
   local code="$1"
-  local message="$2"
+  local stage="${2:-$STATE_STEP}"
+  local error_code="${3:-UPDATE_UNEXPECTED_ERROR}"
+  local error_category="${4:-UPDATE_UNEXPECTED_ERROR}"
+  local user_message="${5:-Falha durante a atualizacao.}"
+  local technical_message="${6:-$user_message}"
   STATE_STATUS="failed"
   STATE_FINISHED_AT="$(now_iso)"
+  STATE_PROGRESS=100
   STATE_LOCK="false"
-  STATE_LAST_ERROR="$message"
+  CURRENT_STEP="$stage"
+  STATE_STEP="$stage"
+  STATE_LAST_ERROR="$technical_message"
+  STATE_ERROR_CODE="$error_code"
+  STATE_ERROR_CATEGORY="$error_category"
+  STATE_ERROR_STAGE="$stage"
+  STATE_EXIT_CODE="$code"
+  STATE_USER_MESSAGE="$user_message"
+  STATE_TECHNICAL_MESSAGE="$technical_message"
   STATE_FINALIZED="true"
   write_state_file
-  log_err "${message} (exit_code=${code})"
+  log_err "${technical_message} (exit_code=${code}, error_code=${error_code}, stage=${stage})"
 }
 
 finish_rolled_back() {
   local message="$1"
+  local stage="${2:-post_deploy_validation}"
+  local error_code="${3:-UPDATE_POST_DEPLOY_VALIDATION_ERROR}"
+  local error_category="${4:-UPDATE_POST_DEPLOY_VALIDATION_ERROR}"
+  local user_message="${5:-A nova release falhou na validacao pos-deploy e o rollback automatico foi aplicado.}"
+  local exit_code="${6:-$EXIT_HEALTH_ROLLBACK_OK}"
   STATE_STATUS="rolled_back"
   STATE_FINISHED_AT="$(now_iso)"
   STATE_PROGRESS=100
   STATE_LOCK="false"
   STATE_LAST_ERROR="$message"
+  STATE_ERROR_CODE="$error_code"
+  STATE_ERROR_CATEGORY="$error_category"
+  STATE_ERROR_STAGE="$stage"
+  STATE_EXIT_CODE="$exit_code"
+  STATE_USER_MESSAGE="$user_message"
+  STATE_TECHNICAL_MESSAGE="$message"
   STATE_FINALIZED="true"
   set_step "rollback" 100
   write_state_file
@@ -290,11 +360,32 @@ finish_rolled_back() {
 
 fail_and_exit() {
   local code="$1"
-  local message="$2"
-  if [[ "$STATE_INITIALIZED" == "true" ]]; then
-    finish_failed "$code" "$message"
+  shift
+
+  local stage=""
+  local error_code=""
+  local error_category=""
+  local user_message=""
+  local technical_message=""
+
+  if [[ $# -le 1 ]]; then
+    technical_message="${1:-Falha durante a atualizacao.}"
+    stage="${STATE_STEP:-$CURRENT_STEP}"
+    error_code="UPDATE_UNEXPECTED_ERROR"
+    error_category="UPDATE_UNEXPECTED_ERROR"
+    user_message="Falha durante a atualizacao."
   else
-    log_err "${message} (exit_code=${code})"
+    stage="$1"
+    error_code="$2"
+    error_category="$3"
+    user_message="$4"
+    technical_message="${5:-$4}"
+  fi
+
+  if [[ "$STATE_INITIALIZED" == "true" ]]; then
+    finish_failed "$code" "$stage" "$error_code" "$error_category" "$user_message" "$technical_message"
+  else
+    log_err "${technical_message} (exit_code=${code}, error_code=${error_code}, stage=${stage})"
   fi
   exit "$code"
 }
@@ -303,7 +394,8 @@ ensure_command() {
   local cmd="$1"
   local code="${2:-$EXIT_BUILD_FAILED}"
   if ! command -v "$cmd" >/dev/null 2>&1; then
-    fail_and_exit "$code" "Comando obrigatorio nao encontrado: $cmd"
+    fail_and_exit "$code" "$CURRENT_STEP" "UPDATE_RUNTIME_PREREQUISITE_ERROR" "UPDATE_RUNTIME_PREREQUISITE_ERROR" \
+      "Dependencia obrigatoria do ambiente nao encontrada." "Comando obrigatorio nao encontrado: $cmd"
   fi
 }
 
@@ -596,11 +688,17 @@ ensure_release_code() {
   local release_dir="$2"
 
   if [[ -d "$release_dir" ]]; then
-    if validate_release_dir "$release_dir"; then
-      log "Release ${target_tag} ja existe em ${release_dir}. Reutilizando."
-      return 0
+    local current_target=""
+    local previous_target=""
+    current_target="$(get_link_target "$CURRENT_LINK")"
+    previous_target="$(get_link_target "$PREVIOUS_LINK")"
+
+    if [[ "$release_dir" == "$current_target" ]] || [[ "$release_dir" == "$previous_target" ]]; then
+      log_err "Release ${release_dir} esta protegida por current/previous e nao pode ser recriada."
+      return 1
     fi
-    log_err "Release existente em ${release_dir} esta inconsistente. Removendo..."
+
+    log "Release ${target_tag} ja existe em ${release_dir}. Removendo para reconstruir do zero."
     rm -rf "$release_dir"
   fi
 
@@ -608,7 +706,8 @@ ensure_release_code() {
 
   if [[ "$UPDATE_CHANNEL" == "release" ]]; then
     if ! download_release_tarball "$target_tag" "$release_dir" "release"; then
-      fail_and_exit "$EXIT_DOWNLOAD_FAILED" "Falha ao baixar release formal (canal release). Verifique se a release existe no GitHub."
+      fail_and_exit "$EXIT_DOWNLOAD_FAILED" "download" "UPDATE_DOWNLOAD_ERROR" "UPDATE_DOWNLOAD_ERROR" \
+        "Falha ao baixar a release formal do repositÃ³rio." "Falha ao baixar release formal (canal release). Verifique se a release existe no GitHub."
     fi
   else
     # Canal tag: tenta tarball primeiro, depois git clone
@@ -627,6 +726,13 @@ ensure_release_code() {
     return 1
   fi
   return 0
+}
+
+reset_release_build_outputs() {
+  local release_dir="$1"
+  rm -rf \
+    "$release_dir/apps/backend/dist" \
+    "$release_dir/apps/frontend/.next"
 }
 
 resolve_build_metadata() {
@@ -713,8 +819,9 @@ restart_pm2_processes() {
   pm2 delete "$backend_name" >/dev/null 2>&1 || true
   pm2 delete "$frontend_name" >/dev/null 2>&1 || true
 
-  pm2 start dist/main.js --name "$backend_name" --cwd "$target_root/apps/backend" --update-env
-  PORT=5000 HOSTNAME=0.0.0.0 pm2 start "node .next/standalone/apps/frontend/server.js" --name "$frontend_name" --cwd "$target_root/apps/frontend" --update-env
+  pm2 start dist/main.js --name "$backend_name" --cwd "$target_root/apps/backend" --update-env || return 1
+  PORT=5000 HOSTNAME=0.0.0.0 \
+    pm2 start "node .next/standalone/apps/frontend/server.js" --name "$frontend_name" --cwd "$target_root/apps/frontend" --update-env || return 1
   pm2 save
 
   BACKEND_PROC="$backend_name"
@@ -754,6 +861,262 @@ healthcheck_http() {
     fi
     sleep 2
   done
+}
+
+wait_for_http_url() {
+  local url="$1"
+  local timeout="${2:-30}"
+  local start_ts now_ts elapsed
+  start_ts="$(date +%s)"
+
+  while true; do
+    if curl -fsS --max-time 5 "$url" >/dev/null 2>&1; then
+      return 0
+    fi
+    now_ts="$(date +%s)"
+    elapsed=$((now_ts - start_ts))
+    if (( elapsed >= timeout )); then
+      return 1
+    fi
+    sleep 2
+  done
+}
+
+copy_directory_contents() {
+  local source_dir="$1"
+  local target_dir="$2"
+
+  mkdir -p "$target_dir"
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --delete "${source_dir}/" "${target_dir}/"
+  else
+    rm -rf "$target_dir"
+    mkdir -p "$target_dir"
+    cp -a "${source_dir}/." "${target_dir}/"
+  fi
+}
+
+copy_frontend_runtime_assets() {
+  local release_dir="$1"
+  local frontend_dir="$release_dir/apps/frontend"
+  local build_dir="$frontend_dir/.next"
+  local standalone_app_dir="$build_dir/standalone/apps/frontend"
+
+  if [[ ! -f "$standalone_app_dir/server.js" ]]; then
+    log_err "server.js do standalone nao encontrado em $standalone_app_dir/server.js"
+    return 1
+  fi
+
+  if [[ -d "$frontend_dir/public" ]]; then
+    copy_directory_contents "$frontend_dir/public" "$standalone_app_dir/public" || return 1
+  fi
+
+  if [[ -d "$build_dir/static" ]]; then
+    copy_directory_contents "$build_dir/static" "$standalone_app_dir/.next/static" || return 1
+  fi
+
+  return 0
+}
+
+count_frontend_manifest_files() {
+  local base_dir="$1"
+  if [[ ! -d "$base_dir" ]]; then
+    echo "0"
+    return 0
+  fi
+
+  find "$base_dir" -type f \( -name '*client-reference-manifest*' -o -name '*server-reference-manifest*' \) | wc -l | tr -d ' '
+}
+
+validate_frontend_artifact_layout() {
+  local release_dir="$1"
+  local frontend_dir="$release_dir/apps/frontend"
+  local build_dir="$frontend_dir/.next"
+  local standalone_app_dir="$build_dir/standalone/apps/frontend"
+  local standalone_build_dir="$standalone_app_dir/.next"
+
+  [[ -d "$build_dir" ]] || {
+    log_err "Diretorio .next do frontend nao encontrado em $build_dir"
+    return 1
+  }
+  [[ -f "$standalone_app_dir/server.js" ]] || {
+    log_err "server.js do standalone nao encontrado em $standalone_app_dir/server.js"
+    return 1
+  }
+  [[ -f "$build_dir/BUILD_ID" ]] || {
+    log_err "BUILD_ID do frontend nao encontrado em $build_dir/BUILD_ID"
+    return 1
+  }
+  [[ -f "$standalone_build_dir/BUILD_ID" ]] || {
+    log_err "BUILD_ID do standalone nao encontrado em $standalone_build_dir/BUILD_ID"
+    return 1
+  }
+
+  local source_build_id=""
+  local standalone_build_id=""
+  source_build_id="$(tr -d '\r' < "$build_dir/BUILD_ID" || true)"
+  standalone_build_id="$(tr -d '\r' < "$standalone_build_dir/BUILD_ID" || true)"
+  if [[ -z "$source_build_id" ]] || [[ "$source_build_id" != "$standalone_build_id" ]]; then
+    log_err "BUILD_ID inconsistente entre build e standalone (fonte=${source_build_id:-<vazio>} standalone=${standalone_build_id:-<vazio>})."
+    return 1
+  fi
+
+  if [[ -d "$build_dir/static" ]] && [[ ! -d "$standalone_build_dir/static" ]]; then
+    log_err "Diretorio .next/static nao foi copiado para o standalone."
+    return 1
+  fi
+
+  if [[ -d "$frontend_dir/public" ]] && [[ ! -d "$standalone_app_dir/public" ]]; then
+    log_err "Diretorio public nao foi copiado para o standalone."
+    return 1
+  fi
+
+  local source_manifest_count="0"
+  local standalone_manifest_count="0"
+  source_manifest_count="$(count_frontend_manifest_files "$build_dir/server")"
+  standalone_manifest_count="$(count_frontend_manifest_files "$standalone_build_dir/server")"
+  if (( source_manifest_count > 0 && standalone_manifest_count == 0 )); then
+    log_err "Standalone nao contem manifests de referencia obrigatorios do frontend (fonte=${source_manifest_count}, standalone=${standalone_manifest_count})."
+    return 1
+  fi
+
+  local source_500="$build_dir/server/pages/500.html"
+  local standalone_500="$standalone_build_dir/server/pages/500.html"
+  if [[ -f "$source_500" ]] && [[ ! -f "$standalone_500" ]]; then
+    log_err "Artefato do standalone nao contem a pagina estatica 500 esperada."
+    return 1
+  fi
+
+  return 0
+}
+
+extract_static_asset_path() {
+  local html_file="$1"
+  if [[ ! -f "$html_file" ]]; then
+    echo ""
+    return 0
+  fi
+
+  grep -oE '/_next/static/[^"'"'"'[:space:]]+' "$html_file" | head -n1 || true
+}
+
+check_frontend_http_endpoint() {
+  local url="$1"
+  local label="$2"
+  local body_file="$3"
+
+  if ! curl -fsS --max-time 10 "$url" -o "$body_file"; then
+    log_err "Falha ao validar ${label}: ${url}"
+    return 1
+  fi
+
+  if grep -qiE 'Invariant: The client reference manifest|Failed to load static file|Failed to find Server Action' "$body_file"; then
+    log_err "Resposta de ${label} indica artefato inconsistente: ${url}"
+    return 1
+  fi
+
+  return 0
+}
+
+smoke_test_frontend_release() {
+  local release_dir="$1"
+  local port="${2:-5100}"
+  local frontend_dir="$release_dir/apps/frontend"
+  local stdout_file="$frontend_dir/.next/frontend-smoke.out"
+  local stderr_file="$frontend_dir/.next/frontend-smoke.err"
+  local root_html="$frontend_dir/.next/frontend-smoke-root.html"
+  local login_html="$frontend_dir/.next/frontend-smoke-login.html"
+  local frontend_pid=""
+  local status=0
+
+  rm -f "$stdout_file" "$stderr_file" "$root_html" "$login_html"
+
+  (
+    cd "$frontend_dir"
+    PORT="$port" HOSTNAME="127.0.0.1" NODE_ENV=production \
+      node .next/standalone/apps/frontend/server.js > "$stdout_file" 2> "$stderr_file"
+  ) &
+  frontend_pid=$!
+
+  cleanup_smoke_test() {
+    if [[ -n "$frontend_pid" ]] && kill -0 "$frontend_pid" >/dev/null 2>&1; then
+      kill "$frontend_pid" >/dev/null 2>&1 || true
+      wait "$frontend_pid" >/dev/null 2>&1 || true
+    fi
+  }
+
+  if ! healthcheck_http "$port" "/api/health" "$HEALTH_TIMEOUT"; then
+    log_err "Frontend temporario nao respondeu ao healthcheck em http://127.0.0.1:${port}/api/health"
+    status=1
+  elif ! check_frontend_http_endpoint "http://127.0.0.1:${port}/" "rota /" "$root_html"; then
+    status=1
+  elif ! check_frontend_http_endpoint "http://127.0.0.1:${port}/login" "rota /login" "$login_html"; then
+    status=1
+  elif [[ -f "$frontend_dir/public/clear-cache.html" ]] && \
+    ! check_frontend_http_endpoint "http://127.0.0.1:${port}/clear-cache.html" "asset publico clear-cache" "$frontend_dir/.next/frontend-smoke-clear-cache.html"; then
+    status=1
+  else
+    local static_asset=""
+    static_asset="$(extract_static_asset_path "$login_html")"
+    if [[ -z "$static_asset" ]]; then
+      static_asset="$(extract_static_asset_path "$root_html")"
+    fi
+    if [[ -z "$static_asset" ]]; then
+      log_err "Nao foi possivel localizar nenhum asset em /_next/static durante o smoke test do frontend."
+      status=1
+    elif ! check_frontend_http_endpoint "http://127.0.0.1:${port}${static_asset}" "asset estatico ${static_asset}" "$frontend_dir/.next/frontend-smoke-static.bin"; then
+      status=1
+    fi
+  fi
+
+  cleanup_smoke_test
+  return "$status"
+}
+
+validate_live_runtime() {
+  local backend_port="${1:-4000}"
+  local frontend_port="${2:-5000}"
+  local tmp_dir=""
+  local status=0
+  tmp_dir="$(mktemp -d)"
+
+  cleanup_live_validation() {
+    rm -rf "$tmp_dir"
+  }
+
+  if ! wait_for_http_url "http://127.0.0.1:${backend_port}/api/health" "$HEALTH_TIMEOUT"; then
+    log_err "Backend nao respondeu ao healthcheck apos o deploy."
+    status=1
+  elif ! wait_for_http_url "http://127.0.0.1:${frontend_port}/api/health" "$HEALTH_TIMEOUT"; then
+    log_err "Frontend nao respondeu ao healthcheck apos o deploy."
+    status=1
+  elif ! check_frontend_http_endpoint "http://127.0.0.1:${backend_port}/api/health" "healthcheck do backend" "$tmp_dir/backend-health.json"; then
+    status=1
+  elif ! check_frontend_http_endpoint "http://127.0.0.1:${frontend_port}/api/health" "healthcheck do frontend" "$tmp_dir/frontend-health.json"; then
+    status=1
+  elif ! check_frontend_http_endpoint "http://127.0.0.1:${frontend_port}/" "rota / em producao" "$tmp_dir/frontend-root.html"; then
+    status=1
+  elif ! check_frontend_http_endpoint "http://127.0.0.1:${frontend_port}/login" "rota /login em producao" "$tmp_dir/frontend-login.html"; then
+    status=1
+  else
+    local static_asset=""
+    static_asset="$(extract_static_asset_path "$tmp_dir/frontend-login.html")"
+    if [[ -z "$static_asset" ]]; then
+      static_asset="$(extract_static_asset_path "$tmp_dir/frontend-root.html")"
+    fi
+    if [[ -z "$static_asset" ]]; then
+      log_err "Nao foi possivel localizar asset estatico no frontend publicado."
+      status=1
+    elif ! check_frontend_http_endpoint "http://127.0.0.1:${frontend_port}${static_asset}" "asset estatico publicado ${static_asset}" "$tmp_dir/frontend-static.bin"; then
+      status=1
+    elif [[ -f "$CURRENT_LINK/apps/frontend/public/clear-cache.html" ]] && \
+      ! check_frontend_http_endpoint "http://127.0.0.1:${frontend_port}/clear-cache.html" "asset publico clear-cache publicado" "$tmp_dir/frontend-clear-cache.html"; then
+      status=1
+    fi
+  fi
+
+  cleanup_live_validation
+  return "$status"
 }
 
 run_seed_deploy() {
@@ -845,8 +1208,30 @@ EOF
 }
 
 cleanup_old_releases() {
-  log "Limpando releases antigas (mantendo ${RELEASES_TO_KEEP})..."
-  ls -1dt "${RELEASES_DIR}"/* | tail -n +$((RELEASES_TO_KEEP + 1)) | xargs rm -rf || true
+  local current_target=""
+  local previous_target=""
+  local kept=0
+  local release_path=""
+  current_target="$(get_link_target "$CURRENT_LINK")"
+  previous_target="$(get_link_target "$PREVIOUS_LINK")"
+
+  log "Limpando releases antigas (mantendo ${RELEASES_TO_KEEP} mais recentes, preservando current/previous)..."
+
+  while IFS= read -r release_path; do
+    [[ -n "$release_path" ]] || continue
+
+    if [[ "$release_path" == "$current_target" ]] || [[ "$release_path" == "$previous_target" ]]; then
+      log "Preservando release protegida: $release_path"
+      continue
+    fi
+
+    if (( kept < RELEASES_TO_KEEP )); then
+      kept=$((kept + 1))
+      continue
+    fi
+
+    rm -rf "$release_path"
+  done < <(ls -1dt "${RELEASES_DIR}"/* 2>/dev/null || true)
 }
 
 # =============================================================================
@@ -864,8 +1249,9 @@ start_state
 bootstrap_atomic_layout
 
 set_step "precheck" 5
-ensure_command pm2 "$EXIT_BUILD_FAILED"
-ensure_shared_env || fail_and_exit "$EXIT_BUILD_FAILED" "Falha ao garantir shared/.env"
+ensure_command pm2 "$EXIT_PM2_FAILED"
+ensure_shared_env || fail_and_exit "$EXIT_PACKAGE_INTEGRITY_FAILED" "precheck" "UPDATE_PACKAGE_INTEGRITY_ERROR" "UPDATE_PACKAGE_INTEGRITY_ERROR" \
+  "Falha ao preparar os arquivos compartilhados da release." "Falha ao garantir shared/.env"
 ensure_shared_frontend_env
 
 load_runtime_env_from_shared
@@ -875,87 +1261,104 @@ NEW_RELEASE_DIR="${RELEASES_DIR}/$(sanitize_release_name "$TARGET_TAG")"
 
 set_step "download" 20
 ensure_release_code "$TARGET_TAG" "$NEW_RELEASE_DIR"
-link_shared_into_release "$NEW_RELEASE_DIR"
+link_shared_into_release "$NEW_RELEASE_DIR" || fail_and_exit "$EXIT_PUBLISH_FAILED" "prepare" "UPDATE_PUBLISH_ERROR" "UPDATE_PUBLISH_ERROR" \
+  "Falha ao preparar os links compartilhados da release." "Nao foi possivel vincular shared/.env/uploads/backups na nova release"
+reset_release_build_outputs "$NEW_RELEASE_DIR"
 
-set_step "build_dependencies" 40
+set_step "install_dependencies" 35
 log "Instalando dependencias..."
 cd "$NEW_RELEASE_DIR"
-ensure_command pnpm "$EXIT_BUILD_FAILED"
-pnpm install --frozen-lockfile || fail_and_exit "$EXIT_BUILD_FAILED" "Falha ao instalar dependencias"
+ensure_command pnpm "$EXIT_INSTALL_FAILED"
+pnpm install --frozen-lockfile || fail_and_exit "$EXIT_INSTALL_FAILED" "install_dependencies" "UPDATE_INSTALL_ERROR" "UPDATE_INSTALL_ERROR" \
+  "Falha ao instalar dependencias do projeto." "pnpm install --frozen-lockfile falhou na nova release"
 
 set_step "build_prisma_client" 44
 log "Gerando cliente Prisma do backend..."
-pnpm --filter backend exec prisma generate || fail_and_exit "$EXIT_BUILD_FAILED" "Falha ao gerar cliente Prisma do backend"
+pnpm --filter backend exec prisma generate || fail_and_exit "$EXIT_BUILD_FAILED" "build_prisma_client" "UPDATE_BUILD_ERROR" "UPDATE_BUILD_ERROR" \
+  "Falha ao gerar o cliente Prisma da nova release." "pnpm --filter backend exec prisma generate falhou"
 
 set_step "build_backend" 48
 log "Compilando backend..."
-pnpm --filter backend build || fail_and_exit "$EXIT_BUILD_FAILED" "Falha ao compilar backend"
+pnpm --filter backend build || fail_and_exit "$EXIT_BUILD_FAILED" "build_backend" "UPDATE_BUILD_ERROR" "UPDATE_BUILD_ERROR" \
+  "Falha ao compilar o backend da nova release." "pnpm --filter backend build falhou"
 
 set_step "build_frontend" 54
 log "Compilando frontend..."
-pnpm --filter frontend build || fail_and_exit "$EXIT_BUILD_FAILED" "Falha ao compilar frontend"
+pnpm --filter frontend build || fail_and_exit "$EXIT_BUILD_FAILED" "build_frontend" "UPDATE_BUILD_ERROR" "UPDATE_BUILD_ERROR" \
+  "Falha ao compilar o frontend da nova release." "pnpm --filter frontend build falhou"
 
-set_step "build_frontend_assets" 58
-log "Organizando arquivos do frontend para execucao standalone..."
-if [[ -d "$NEW_RELEASE_DIR/apps/frontend/public" ]]; then
-  cp -r "$NEW_RELEASE_DIR/apps/frontend/public" "$NEW_RELEASE_DIR/apps/frontend/.next/standalone/apps/frontend/" || true
-fi
-mkdir -p "$NEW_RELEASE_DIR/apps/frontend/.next/standalone/apps/frontend/.next/static"
-if [[ -d "$NEW_RELEASE_DIR/apps/frontend/.next/static" ]]; then
-  cp -r "$NEW_RELEASE_DIR/apps/frontend/.next/static/." "$NEW_RELEASE_DIR/apps/frontend/.next/standalone/apps/frontend/.next/static/" || true
-fi
-mkdir -p "$NEW_RELEASE_DIR/apps/frontend/.next/standalone/apps/frontend/.next/server"
-if [[ -d "$NEW_RELEASE_DIR/apps/frontend/.next/server" ]]; then
-  cp -r "$NEW_RELEASE_DIR/apps/frontend/.next/server/." "$NEW_RELEASE_DIR/apps/frontend/.next/standalone/apps/frontend/.next/server/" || true
-fi
+set_step "package_frontend_assets" 58
+log "Copiando assets obrigatorios do frontend para o standalone..."
+copy_frontend_runtime_assets "$NEW_RELEASE_DIR" || fail_and_exit "$EXIT_PACKAGE_INTEGRITY_FAILED" "package_frontend_assets" "UPDATE_PACKAGE_INTEGRITY_ERROR" "UPDATE_PACKAGE_INTEGRITY_ERROR" \
+  "Falha ao preparar os assets do frontend para o standalone." "Copia de public/.next/static para o standalone falhou"
 
-set_step "migrate" 60
+set_step "validate_frontend_artifact" 62
+log "Validando a integridade do artefato standalone do frontend..."
+validate_frontend_artifact_layout "$NEW_RELEASE_DIR" || fail_and_exit "$EXIT_PACKAGE_INTEGRITY_FAILED" "validate_frontend_artifact" "UPDATE_PACKAGE_INTEGRITY_ERROR" "UPDATE_PACKAGE_INTEGRITY_ERROR" \
+  "Artefato standalone do frontend esta incompleto." "A validacao estrutural do standalone do frontend falhou"
+
+set_step "pre_swap_smoke_test" 66
+log "Executando smoke test do frontend antes do swap..."
+smoke_test_frontend_release "$NEW_RELEASE_DIR" 5100 || fail_and_exit "$EXIT_PACKAGE_INTEGRITY_FAILED" "pre_swap_smoke_test" "UPDATE_PACKAGE_INTEGRITY_ERROR" "UPDATE_PACKAGE_INTEGRITY_ERROR" \
+  "A nova release falhou no smoke test do frontend antes do swap." "O frontend standalone nao respondeu corretamente antes da publicacao da release"
+
+set_step "migrate" 72
 log "Executando migrations..."
 cd "$NEW_RELEASE_DIR/apps/backend"
-pnpm prisma migrate deploy --schema prisma/schema.prisma || fail_and_exit "$EXIT_BUILD_FAILED" "Falha nas migrations"
+pnpm prisma migrate deploy --schema prisma/schema.prisma || fail_and_exit "$EXIT_MIGRATE_FAILED" "migrate" "UPDATE_MIGRATE_ERROR" "UPDATE_MIGRATE_ERROR" \
+  "Falha ao aplicar as migrations da nova release." "pnpm prisma migrate deploy --schema prisma/schema.prisma falhou"
 
-set_step "seed" 70
-run_seed_deploy "$NEW_RELEASE_DIR" || fail_and_exit "$EXIT_BUILD_FAILED" "Falha no seed versionado"
+set_step "seed" 78
+run_seed_deploy "$NEW_RELEASE_DIR" || fail_and_exit "$EXIT_SEED_FAILED" "seed" "UPDATE_SEED_ERROR" "UPDATE_SEED_ERROR" \
+  "Falha ao aplicar o seed versionado da nova release." "node dist/prisma/seed.js deploy falhou"
 
-set_step "switch" 80
+set_step "publish_release" 84
 enable_maintenance_mode "Atualizando sistema para versao ${TARGET_TAG}"
 
 CURRENT_TARGET="$(get_link_target "$CURRENT_LINK")"
 if [[ -n "$CURRENT_TARGET" ]] && [[ "$CURRENT_TARGET" != "$NEW_RELEASE_DIR" ]]; then
-  ln -sfn "$CURRENT_TARGET" "$PREVIOUS_LINK"
+  ln -sfn "$CURRENT_TARGET" "$PREVIOUS_LINK" || fail_and_exit "$EXIT_PUBLISH_FAILED" "publish_release" "UPDATE_PUBLISH_ERROR" "UPDATE_PUBLISH_ERROR" \
+    "Falha ao atualizar o ponteiro da release anterior." "Nao foi possivel atualizar o link previous para ${CURRENT_TARGET}"
 fi
 
 resolve_build_metadata "$NEW_RELEASE_DIR"
 write_build_metadata_files "$NEW_RELEASE_DIR"
-ln -sfn "$NEW_RELEASE_DIR" "$CURRENT_LINK"
+ln -sfn "$NEW_RELEASE_DIR" "$CURRENT_LINK" || fail_and_exit "$EXIT_PUBLISH_FAILED" "publish_release" "UPDATE_PUBLISH_ERROR" "UPDATE_PUBLISH_ERROR" \
+  "Falha ao publicar a nova release ativa." "Nao foi possivel atualizar o link current para ${NEW_RELEASE_DIR}"
 
-set_step "restart" 90
-restart_pm2_processes "$NEW_RELEASE_DIR"
+set_step "restart_pm2" 90
+restart_pm2_processes "$NEW_RELEASE_DIR" || fail_and_exit "$EXIT_PM2_FAILED" "restart_pm2" "UPDATE_PM2_START_ERROR" "UPDATE_PM2_START_ERROR" \
+  "Falha ao iniciar os processos PM2 da nova release." "PM2 nao conseguiu iniciar backend/frontend com a nova release"
 
-set_step "validate" 93
+set_step "validate_backend_storage" 93
 log "Validando storage compartilhado do backend..."
-validate_backend_shared_storage "$NEW_RELEASE_DIR" || fail_and_exit "$EXIT_BUILD_FAILED" "Falha na validacao do storage compartilhado do backend"
+validate_backend_shared_storage "$NEW_RELEASE_DIR" || fail_and_exit "$EXIT_POST_DEPLOY_VALIDATION_FAILED" "validate_backend_storage" "UPDATE_POST_DEPLOY_VALIDATION_ERROR" "UPDATE_POST_DEPLOY_VALIDATION_ERROR" \
+  "Falha ao validar o storage compartilhado do backend apos o deploy." "O backend da nova release nao conseguiu operar no storage compartilhado"
 
-set_step "healthcheck" 95
-log "Validando integridade do sistema..."
-if healthcheck_http 5000 "/api/health" "$HEALTH_TIMEOUT"; then
+set_step "post_deploy_validation" 97
+log "Validando backend, frontend, assets estaticos e rotas criticas apos o swap..."
+if validate_live_runtime 4000 5000; then
   log "Sistema saudavel."
 else
-  log_err "Healthcheck falhou. Iniciando rollback..."
+  log_err "Validacao pos-deploy falhou. Iniciando rollback..."
   ROLLBACK_ATTEMPTED="true"
   PREV_TARGET="$(get_link_target "$PREVIOUS_LINK")"
   if [[ -n "$PREV_TARGET" ]] && [[ -d "$PREV_TARGET" ]]; then
-    ln -sfn "$PREV_TARGET" "$CURRENT_LINK"
-    restart_pm2_processes "$PREV_TARGET"
+    ln -sfn "$PREV_TARGET" "$CURRENT_LINK" || fail_and_exit "$EXIT_HEALTH_ROLLBACK_FAILED" "publish_release" "UPDATE_ROLLBACK_ERROR" "UPDATE_ROLLBACK_ERROR" \
+      "Falha ao reposicionar current para a release anterior durante o rollback." "Nao foi possivel atualizar current para ${PREV_TARGET} durante o rollback"
+    restart_pm2_processes "$PREV_TARGET" || fail_and_exit "$EXIT_HEALTH_ROLLBACK_FAILED" "rollback" "UPDATE_ROLLBACK_ERROR" "UPDATE_ROLLBACK_ERROR" \
+      "Falha ao reiniciar PM2 durante o rollback automatico." "PM2 nao conseguiu reiniciar a release anterior durante o rollback"
     ROLLBACK_COMPLETED="true"
-    ROLLBACK_REASON="Healthcheck falhou apos update para ${TARGET_TAG}"
-    finish_rolled_back "$ROLLBACK_REASON"
+    ROLLBACK_REASON="Validacao pos-deploy falhou apos update para ${TARGET_TAG}"
+    finish_rolled_back "$ROLLBACK_REASON" "post_deploy_validation" "UPDATE_POST_DEPLOY_VALIDATION_ERROR" "UPDATE_POST_DEPLOY_VALIDATION_ERROR" \
+      "A nova release falhou na validacao pos-deploy e o rollback automatico foi aplicado." "$EXIT_HEALTH_ROLLBACK_OK"
     ensure_maintenance_on_failure "Sistema em rollback devido a falha crítica."
     exit "$EXIT_HEALTH_ROLLBACK_OK"
   else
     ROLLBACK_COMPLETED="false"
-    ROLLBACK_REASON="Healthcheck falhou e nao ha release anterior para rollback."
-    fail_and_exit "$EXIT_HEALTH_ROLLBACK_FAILED" "$ROLLBACK_REASON"
+    ROLLBACK_REASON="Validacao pos-deploy falhou e nao ha release anterior para rollback."
+    fail_and_exit "$EXIT_HEALTH_ROLLBACK_FAILED" "post_deploy_validation" "UPDATE_POST_DEPLOY_VALIDATION_ERROR" "UPDATE_POST_DEPLOY_VALIDATION_ERROR" \
+      "A nova release falhou na validacao pos-deploy e nao houve rollback disponivel." "$ROLLBACK_REASON"
   fi
 fi
 

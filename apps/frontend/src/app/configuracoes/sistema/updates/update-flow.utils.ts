@@ -79,12 +79,12 @@ export function formatUpdateLifecycleStatus(status: UpdateLifecycleStatus | stri
   const normalized = String(status || '').trim().toLowerCase();
   if (normalized === 'starting') return 'Iniciando';
   if (normalized === 'running') return 'Executando';
-  if (normalized === 'restarting_services') return 'Reiniciando servicos';
-  if (normalized === 'completed') return 'Concluido';
+  if (normalized === 'restarting_services') return 'Reiniciando serviços';
+  if (normalized === 'completed') return 'Concluído';
   if (normalized === 'failed') return 'Falhou';
-  if (normalized === 'pending_confirmation') return 'Aguardando confirmacao';
-  if (normalized === 'available') return 'Atualizacao disponivel';
-  if (normalized === 'not_available') return 'Sem atualizacao';
+  if (normalized === 'pending_confirmation') return 'Aguardando confirmação';
+  if (normalized === 'available') return 'Atualização disponível';
+  if (normalized === 'not_available') return 'Sem atualização';
   if (normalized === 'checking') return 'Verificando';
   return 'Ocioso';
 }
@@ -97,24 +97,32 @@ export function formatUpdateStage(stage: string | null | undefined): string {
 
   const compact = normalized.toLowerCase().replace(/[_-]+/g, ' ');
   const labels: Record<string, string> = {
-    starting: 'inicializando atualizacao',
-    precheck: 'validando configuracoes',
+    starting: 'inicializando atualização',
+    precheck: 'validando configurações',
     prepare: 'preparando release',
     download: 'baixando release',
     build: 'compilando sistema',
-    'build dependencies': 'instalando dependencias',
+    'build dependencies': 'instalando dependências',
+    'install dependencies': 'instalando dependências',
     'build prisma client': 'gerando cliente do banco',
     'build backend': 'compilando backend',
     'build frontend': 'compilando frontend',
     'build frontend assets': 'organizando arquivos do frontend',
+    'package frontend assets': 'copiando assets do frontend',
+    'validate frontend artifact': 'validando integridade do artefato',
+    'pre swap smoke test': 'executando smoke test pré-swap',
     migrate: 'executando migrations',
-    seed: 'aplicando dados versionados',
+    seed: 'aplicando seed versionado',
     switch: 'trocando release ativa',
-    restart: 'reiniciando servicos',
-    validate: 'validando integracoes',
-    healthcheck: 'validando saude do sistema',
+    'publish release': 'publicando release ativa',
+    restart: 'reiniciando serviços',
+    'restart pm2': 'reiniciando PM2',
+    validate: 'validando integrações',
+    'validate backend storage': 'validando storage compartilhado',
+    healthcheck: 'validando saúde do sistema',
+    'post deploy validation': 'validando release publicada',
     rollback: 'executando rollback',
-    completed: 'concluindo atualizacao',
+    completed: 'concluindo atualização',
   };
 
   return labels[compact] || compact;
