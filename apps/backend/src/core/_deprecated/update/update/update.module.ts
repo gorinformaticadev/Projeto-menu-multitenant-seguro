@@ -5,7 +5,7 @@ import { UpdateController } from './update.controller';
 import { UpdateService } from './update.service';
 import { UpdateCronService } from './update-cron.service';
 import { PrismaModule } from '@core/prisma/prisma.module';
-import { AuditModule } from '../audit/audit.module';
+import { AuditModule } from '../../../audit.module';
 
 /**
  * Módulo do Sistema de Atualizações

@@ -27,6 +27,8 @@ import { RequestSecurityContextService } from '@common/services/request-security
 import { WebsocketConnectionRegistryService } from '@common/services/websocket-connection-registry.service';
 import { sanitizeSensitiveData } from '@common/utils/sanitize-sensitive-data.util';
 import { AuthorizationService } from '@common/services/authorization.service';
+import { DtoMapperService } from '@common/services/dto-mapper.service';
+import { SystemNotificationDto } from './dto/system-notifications.dto';
 
 interface ConnectionMetrics {
   totalConnections: number;
@@ -105,8 +107,13 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     private readonly requestSecurityContext: RequestSecurityContextService,
     private readonly websocketConnectionRegistry: WebsocketConnectionRegistryService,
     private readonly authorizationService: AuthorizationService,
+    private readonly dtoMapper: DtoMapperService,
   ) {
     this.startMonitoring();
+  }
+
+  private mapNotificationToDto(notification: Notification): SystemNotificationDto {
+    return this.dtoMapper.serialize(SystemNotificationDto, notification);
   }
 
   private startMonitoring() {
@@ -292,7 +299,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
       );
 
       if (notification) {
-        client.emit('notification:read', notification);
+        client.emit('notification:read', this.mapNotificationToDto(notification));
 
         const unreadCount = await this.requestSecurityContext.runWithActor(user, () =>
           this.notificationService.countUnread(user),
@@ -402,7 +409,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
       const rooms = this.determineTargetRooms(notification);
       for (const room of rooms) {
         try {
-          this.server.to(room).emit('notification:new', notification);
+          this.server.to(room).emit('notification:new', this.mapNotificationToDto(notification));
           this.logger.log(`Nova notificacao emitida para sala: ${room}`);
         } catch (roomError) {
           this.logger.error(`Erro ao emitir para sala ${room}:`, roomError);
@@ -428,7 +435,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
       }
 
       for (const room of this.determineTargetRooms(notification)) {
-        this.server.to(room).emit('notification:read', notification);
+        this.server.to(room).emit('notification:read', this.mapNotificationToDto(notification));
       }
     } catch (error) {
       this.logger.error('Erro ao emitir notificacao lida:', error);

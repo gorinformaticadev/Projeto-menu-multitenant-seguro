@@ -1,0 +1,54 @@
+﻿node : D:\Compartilhado\Ser
+vidor\GORInformatica\Docume
+nts\GitHub\Projeto-menu-mul
+titenant-seguro\apps\fronte
+nd\node_modules\.bin\vitest
+:2
+No linha:1 caractere:1
++ node 
+node_modules/.bin/vitest 
+run --reporter=json 2>&1 | 
+Out-File -Fi ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~
+    + CategoryInfo         
+     : NotSpecified: (D:\  
+  Compartilhad...s\.bin\   
+ vitest:2:String) [], R    
+emoteException
+    + FullyQualifiedErrorI 
+   d : NativeCommandError
+ 
+basedir=$(dirname "$(echo 
+"$0" | sed -e 's,\\,/,g')")
+          ^^^^^^^
+
+SyntaxError: missing ) 
+after argument list
+    at wrapSafe (node:inter
+nal/modules/cjs/loader:1743
+:18)
+    at Module._compile (nod
+e:internal/modules/cjs/load
+er:1786:20)
+    at Object..js (node:int
+ernal/modules/cjs/loader:19
+43:10)
+    at Module.load (node:in
+ternal/modules/cjs/loader:1
+533:32)
+    at Module._load (node:i
+nternal/modules/cjs/loader:
+1335:12)
+    at wrapModuleLoad (node
+:internal/modules/cjs/loade
+r:255:19)
+    at Module.executeUserEn
+tryPoint [as runMain] (node
+:internal/modules/run_main:
+154:5)
+    at node:internal/main/r
+un_main_module:33:47
+
+Node.js v24.14.0

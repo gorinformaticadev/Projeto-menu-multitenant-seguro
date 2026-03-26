@@ -3,8 +3,10 @@ import { Role } from '@prisma/client';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
+import { ValidateResponse } from '@common/decorators/validate-response.decorator';
 import { DashboardActor } from '../dashboard/system-dashboard.service';
 import { SystemDiagnosticsService } from './system-diagnostics.service';
+import { SystemDiagnosticsResponseDto } from './dto/system-diagnostics-response.dto';
 
 @Controller('system/diagnostics')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -13,8 +15,9 @@ export class SystemDiagnosticsController {
   constructor(private readonly diagnosticsService: SystemDiagnosticsService) {}
 
   @Get()
-  async getDiagnostics(@Request() req: any) {
-    return this.diagnosticsService.getDiagnostics(this.getActor(req));
+  @ValidateResponse(SystemDiagnosticsResponseDto)
+  async getDiagnostics(@Request() req: any): Promise<SystemDiagnosticsResponseDto> {
+    return this.diagnosticsService.getDiagnostics(this.getActor(req)) as unknown as SystemDiagnosticsResponseDto;
   }
 
   private getActor(req: any): DashboardActor {

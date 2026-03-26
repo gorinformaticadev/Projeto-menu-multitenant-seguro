@@ -1,0 +1,928 @@
+﻿[run-jest-cleanly] Iniciando Jest...
+node : [0m[7m[1m[32m 
+PASS [39m[22m[27m[0m [
+2msrc/dashboard/[22m[1msy
+stem-dashboard.service.spec
+.ts[22m
+No linha:1 caractere:1
++ node scripts/run-jest-cle
+anly.js 
+--testNamePattern="FAIL" 
+2>&1 | Out- ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~
+    + CategoryInfo         
+     : NotSpecified: ([0  
+  m[7m[1m[3...ce.spec   
+ .ts[22m:String) [], R    
+emoteException
+    + FullyQualifiedErrorI 
+   d : NativeCommandError
+ 
+[33m[Nest] 16364  - [39m26/03/2026, 10:57:02 [33m   WARN[39m [38;5;3m[SystemDashboardService] [39m[33mFalha ao coletar metrica workers: workers unavailable[39m
+[0m[7m[1m[32m PASS 
+[39m[22m[27m[0m [2msrc
+/common/services/[22m[1ms
+ystem-operational-alerts.se
+rvice.spec.ts[22m
+[0m[7m[1m[32m PASS 
+[39m[22m[27m[0m [2msrc
+/common/services/[22m[1ms
+ystem-job-watchdog.service.
+spec.ts[22m
+[0m[7m[1m[32m PASS 
+[39m[22m[27m[0m [2msrc
+/notifications/[22m[1mnot
+ification.dynamic-settings.
+spec.ts[22m
+[31m[Nest] 2728  - 
+[39m26/03/2026, 10:57:03 
+[31m  ERROR[39m 
+[38;5;3m[CronService] 
+[39m[31mErro ao executar 
+cron job 
+system.manual_test:[39m
+[33m[Nest] 17424  - [39m26/03/2026, 10:57:03 [33m   WARN[39m [38;5;3m[ConfigResolverService] [39m[33mFalha ao ler configuracao dinamica "notifications.enabled" no banco. Usando fallback de ENV/default. Causa: dynamic settings db offline[39m
+[32m[Nest] 17424  - [39m26/03/2026, 10:57:03 [32m    LOG[39m [38;5;3m[NotificationService] [39m[32mNotificacao criada: notification-1 - Modulo atualizado[39m
+[33m[Nest] 17424  - [39m26/03/2026, 10:57:03 [33m   WARN[39m [38;5;3m[ConfigResolverService] [39m[33mFalha ao ler configuracao dinamica "notifications.enabled" no banco. Usando fallback de ENV/default. Causa: dynamic settings db offline[39m
+[32m[Nest] 2728  - [39m26/03/2026, 10:57:03 [32m    LOG[39m [38;5;3m[CronService] [39m[32mCron job registrado: system.manual_test (*/5 * * * *) - ativo: true[39m
+[32m[Nest] 2728  - [39m26/03/2026, 10:57:03 [32m    LOG[39m [38;5;3m[CronService] [39m[32m[LOCK_ACQUIRED] Job system.manual_test ciclo=manual-1774533423434 instanceId=SERVIDOR:pid-2728[39m
+[32m[Nest] 2728  - [39m26/03/2026, 10:57:03 [32m    LOG[39m [38;5;3m[CronService] [39m[32m[DB_LEASE_ACQUIRED] Job system.manual_test cycleId=manual-1774533423434 instanceId=SERVIDOR:pid-2728 leaseVersion=1 mode=initial lockedUntil=2026-03-07T10:02:00.000Z[39m
+[32m[Nest] 2728  - [39m26/03/2026, 10:57:03 [32m    LOG[39m [38;5;3m[CronService] [39m[32m[EXECUTION_STARTED] Executando callback do cron job: system.manual_test[39m
+[32m[Nest] 2728  - [39m26/03/2026, 10:57:03 [32m    LOG[39m [38;5;3m[CronService] [39m[32m[DB_LEASE_RELEASED] Job system.manual_test cycleId=manual-1774533423434 instanceId=SERVIDOR:pid-2728 leaseVersion=1 reason=failed[39m
+[31m[Nest] 2728  - 
+[39m26/03/2026, 10:57:03 
+[31m  ERROR[39m 
+[38;5;3m[CronService] 
+[39mError: Lease 
+persistido de 
+system.manual_test nao foi 
+liberado por 
+ownerId=SERVIDOR:pid-2728 c
+ycleId=manual-1774533423434
+ leaseVersion=1.
+    at releaseLease [90m(D
+:\Compartilhado\Servidor\GO
+RInformatica\Documents\GitH
+ub\Projeto-menu-multitenant
+-seguro\apps\backend\[39ms
+rc\core\cron\cron.service.t
+s:1555:15[90m)[39m
+[90m    at 
+processTicksAndRejections (
+node:internal/process/task_
+queues:104:5)[39m
+    at CronService.executeR
+egisteredJob [90m(D:\Compa
+rtilhado\Servidor\GORInform
+atica\Documents\GitHub\Proj
+eto-menu-multitenant-seguro
+\apps\backend\[39msrc\core
+\cron\cron.service.ts:1666:
+7[90m)[39m
+    at CronService.trigger 
+[90m(D:\Compartilhado\Serv
+idor\GORInformatica\Documen
+ts\GitHub\Projeto-menu-mult
+itenant-seguro\apps\backend
+\[39msrc\core\cron\cron.se
+rvice.ts:317:5[90m)[39m
+    at Object.<anonymous> 
+[90m(D:\Compartilhado\Servi
+dor\GORInformatica\Document
+s\GitHub\Projeto-menu-multi
+tenant-seguro\apps\backend\
+[39msrc\core\cron\cron.ser
+vice.spec.ts:548:5[90m)[3
+9m
+[31m[Nest] 2728  - 
+[39m26/03/2026, 10:57:03 
+[31m  ERROR[39m 
+[38;5;3m[CronService] [39
+m[31m[TERMINAL_FALLBACK_TO
+_FAILED] Job 
+system.manual_test cycleId=
+manual-1774533423512 instan
+ceId=SERVIDOR:pid-2728 
+intended=success 
+stage=markSuccess[39m
+[31m[Nest] 2728  - 
+[39m26/03/2026, 10:57:03 
+[31m  ERROR[39m 
+[38;5;3m[CronService] 
+[39m[31mErro ao executar 
+cron job 
+system.manual_test:[39m
+[31m[Nest] 2728  - 
+[39m26/03/2026, 10:57:03 
+[31m  ERROR[39m 
+[38;5;3m[CronService] 
+[39mError: boom
+    at Object.<anonymous> 
+[90m(D:\Compartilhado\Servi
+dor\GORInformatica\Document
+s\GitHub\Projeto-menu-multi
+tenant-seguro\apps\backend\
+[39msrc\core\cron\cron.ser
+vice.spec.ts:636:50[90m)[
+39m
+    at 
+Promise.then.completed (D:\
+Compartilhado\Servidor\GORI
+nformatica\Documents\GitHub
+\Projeto-menu-multitenant-s
+eguro\node_modules\[4m.pnp
+m[24m\jest-circus@29.7.0_b
+abel-plugin-macros@3.1.0\no
+de_modules\[4mjest-circus
+[24m\build\utils.js:298:28)
+    at new Promise 
+(<anonymous>)
+    at callAsyncCircusFn (D
+:\Compartilhado\Servidor\GO
+RInformatica\Documents\GitH
+ub\Projeto-menu-multitenant
+-seguro\node_modules\[4m.p
+npm[24m\jest-circus@29.7.0
+_babel-plugin-macros@3.1.0\
+node_modules\[4mjest-circu
+s[24m\build\utils.js:231:1
+0)
+    at _callCircusTest (D:\
+Compartilhado\Servidor\GORI
+nformatica\Documents\GitHub
+\Projeto-menu-multitenant-s
+eguro\node_modules\[4m.pnp
+m[24m\jest-circus@29.7.0_b
+abel-plugin-macros@3.1.0\no
+de_modules\[4mjest-circus
+[24m\build\run.js:316:40)
+[90m    at 
+processTicksAndRejections (
+node:internal/process/task_
+queues:104:5)[39m
+    at _runTest (D:\Compart
+ilhado\Servidor\GORInformat
+ica\Documents\GitHub\Projet
+o-menu-multitenant-seguro\n
+ode_modules\[4m.pnpm[24m\
+jest-circus@29.7.0_babel-pl
+ugin-macros@3.1.0\node_modu
+les\[4mjest-circus[24m\bu
+ild\run.js:252:3)
+    at 
+_runTestsForDescribeBlock (
+D:\Compartilhado\Servidor\G
+ORInformatica\Documents\Git
+Hub\Projeto-menu-multitenan
+t-seguro\node_modules\[4m.
+pnpm[24m\jest-circus@29.7.
+0_babel-plugin-macros@3.1.0
+\node_modules\[4mjest-circ
+us[24m\build\run.js:126:9)
+    at 
+_runTestsForDescribeBlock (
+D:\Compartilhado\Servidor\G
+ORInformatica\Documents\Git
+Hub\Projeto-menu-multitenan
+t-seguro\node_modules\[4m.
+pnpm[24m\jest-circus@29.7.
+0_babel-plugin-macros@3.1.0
+\node_modules\[4mjest-circ
+us[24m\build\run.js:121:9)
+    at run (D:\Compartilhad
+o\Servidor\GORInformatica\D
+ocuments\GitHub\Projeto-men
+u-multitenant-seguro\node_m
+odules\[4m.pnpm[24m\jest-
+circus@29.7.0_babel-plugin-
+macros@3.1.0\node_modules\
+[4mjest-circus[24m\build\r
+un.js:71:3)
+    at runAndTransformResul
+tsToJestFormat (D:\Comparti
+lhado\Servidor\GORInformati
+ca\Documents\GitHub\Projeto
+-menu-multitenant-seguro\no
+de_modules\[4m.pnpm[24m\j
+est-circus@29.7.0_babel-plu
+gin-macros@3.1.0\node_modul
+es\[4mjest-circus[24m\bui
+ld\legacy-code-todo-rewrite
+\jestAdapterInit.js:122:21)
+    at jestAdapter (D:\Comp
+artilhado\Servidor\GORInfor
+matica\Documents\GitHub\Pro
+jeto-menu-multitenant-segur
+o\node_modules\[4m.pnpm[2
+4m\jest-circus@29.7.0_babel
+-plugin-macros@3.1.0\node_m
+odules\[4mjest-circus[24m
+\build\legacy-code-todo-rew
+rite\jestAdapter.js:79:19)
+    at runTestInternal (D:\
+Compartilhado\Servidor\GORI
+nformatica\Documents\GitHub
+\Projeto-menu-multitenant-s
+eguro\node_modules\[4m.pnp
+m[24m\jest-runner@29.7.0\n
+ode_modules\[4mjest-runner
+[24m\build\runTest.js:367:
+16)
+    at runTest (D:\Comparti
+lhado\Servidor\GORInformati
+ca\Documents\GitHub\Projeto
+-menu-multitenant-seguro\no
+de_modules\[4m.pnpm[24m\j
+est-runner@29.7.0\node_modu
+les\[4mjest-runner[24m\bu
+ild\runTest.js:444:34)
+    at Object.worker (D:\Co
+mpartilhado\Servidor\GORInf
+ormatica\Documents\GitHub\P
+rojeto-menu-multitenant-seg
+uro\node_modules\[4m.pnpm
+[24m\jest-runner@29.7.0\nod
+e_modules\[4mjest-runner[
+24m\build\testWorker.js:106
+:12)
+[0m[7m[1m[32m PASS 
+[39m[22m[27m[0m [2msrc
+/core/cron/[22m[1mcron.se
+rvice.spec.ts[22m
+[32m[Nest] 2728  - [39m26/03/2026, 10:57:03 [32m    LOG[39m [38;5;3m[CronService] [39m[32mCron job registrado: system.manual_test (*/5 * * * *) - ativo: true[39m
+[32m[Nest] 2728  - [39m26/03/2026, 10:57:03 [32m    LOG[39m [38;5;3m[CronService] [39m[32m[LOCK_ACQUIRED] Job system.manual_test ciclo=manual-1774533423512 instanceId=SERVIDOR:pid-2728[39m
+[32m[Nest] 2728  - [39m26/03/2026, 10:57:03 [32m    LOG[39m [38;5;3m[CronService] [39m[32m[DB_LEASE_ACQUIRED] Job system.manual_test cycleId=manual-1774533423512 instanceId=SERVIDOR:pid-2728 leaseVersion=1 mode=initial lockedUntil=2026-03-07T10:02:00.000Z[39m
+[32m[Nest] 2728  - [39m26/03/2026, 10:57:03 [32m    LOG[39m [38;5;3m[CronService] [39m[32m[EXECUTION_STARTED] Executando callback do cron job: system.manual_test[39m
+[32m[Nest] 2728  - [39m26/03/2026, 10:57:03 [32m    LOG[39m [38;5;3m[CronService] [39m[32m[DB_LEASE_RELEASED] Job system.manual_test cycleId=manual-1774533423512 instanceId=SERVIDOR:pid-2728 leaseVersion=1 reason=completed[39m
+[33m[Nest] 2728  - [39m26/03/2026, 10:57:03 [33m   WARN[39m [38;5;3m[CronService] [39m[33m[EXECUTION_FINISHED_WITH_FALLBACK] Job system.manual_test cycleId=manual-1774533423512 instanceId=SERVIDOR:pid-2728 terminal=failed[39m
+[32m[Nest] 2728  - [39m26/03/2026, 10:57:03 [32m    LOG[39m [38;5;3m[CronService] [39m[32mCron job registrado: system.manual_test (*/5 * * * *) - ativo: true[39m
+[32m[Nest] 2728  - [39m26/03/2026, 10:57:03 [32m    LOG[39m [38;5;3m[CronService] [39m[32m[LOCK_ACQUIRED] Job system.manual_test ciclo=manual-1774533423524 instanceId=SERVIDOR:pid-2728[39m
+[32m[Nest] 2728  - [39m26/03/2026, 10:57:03 [32m    LOG[39m [38;5;3m[CronService] [39m[32m[DB_LEASE_ACQUIRED] Job system.manual_test cycleId=manual-1774533423524 instanceId=SERVIDOR:pid-2728 leaseVersion=1 mode=initial lockedUntil=2026-03-07T10:02:00.000Z[39m
+[32m[Nest] 2728  - [39m26/03/2026, 10:57:03 [32m    LOG[39m [38;5;3m[CronService] [39m[32m[EXECUTION_STARTED] Executando callback do cron job: system.manual_test[39m
+[32m[Nest] 2728  - [39m26/03/2026, 10:57:03 [32m    LOG[39m [38;5;3m[CronService] [39m[32m[DB_LEASE_RELEASED] Job system.manual_test cycleId=manual-1774533423524 instanceId=SERVIDOR:pid-2728 leaseVersion=1 reason=failed[39m
+[33m[Nest] 2728  - [39m26/03/2026, 10:57:03 [33m   WARN[39m [38;5;3m[CronService] [39m[33m[TERMINAL_REJECTED_BY_OWNERSHIP] Job system.manual_test cycleId=manual-1774533423524 instanceId=SERVIDOR:pid-2728 intended=failed stage=markFailure reason=stale_execution heartbeatStatus=running heartbeatCycleId=other-cycle heartbeatInstanceId=other-instance heartbeatLastStartedAt=2026-03-07T10:00:00.000Z heartbeatLastHeartbeatAt=2026-03-07T10:00:00.000Z heartbeatNextExpectedRunAt=2026-03-07T10:05:00.000Z[39m
+[33m[Nest] 2728  - [39m26/03/2026, 10:57:03 [33m   WARN[39m [38;5;3m[CronService] [39m[33m[TERMINAL_FALLBACK_PERSISTED] Job system.manual_test cycleId=manual-1774533423524 instanceId=SERVIDOR:pid-2728 intended=failed terminal=superseded stage=markFailure[39m
+[33m[Nest] 2728  - [39m26/03/2026, 10:57:03 [33m   WARN[39m [38;5;3m[CronService] [39m[33m[EXECUTION_FAILED_WITH_FALLBACK] Job system.manual_test cycleId=manual-1774533423524 instanceId=SERVIDOR:pid-2728 terminal=superseded[39m
+[0m[7m[1m[31m FAIL 
+[39m[22m[27m[0m [2msrc
+/security-regression/[22m
+[1mcritical-endpoints.regre
+ssion.spec.ts[22m 
+([0m[1m[41m8.347 
+s[49m[22m[0m)
+[1m[31m  [1mÔùÅ 
+[22m[1mCritical 
+endpoints regression guard 
+ÔÇ║ fails when a mutating 
+critical-controller route 
+is added without explicit 
+classification[39m[22m
+
+    [2mexpect([22m[31mre
+ceived[39m[2m).[22mtoEqu
+al[2m([22m[32mexpected[
+39m[2m) // deep 
+equality[22m
+
+    [32m- Expected  - 
+1[39m
+    [31m+ Received  + 
+3[39m
+
+    [32m- Array [][39m
+    [31m+ Array [[39m
+    [31m+   "UpdateControl
+ler.testConnectionWithPaylo
+ad",[39m
+    [31m+ ][39m
+[2m[22m
+[2m    [0m [90m 103 
+|[39m     }[22m
+[2m     [90m 104 
+|[39m[22m
+[2m    [31m[1m>[22m[2m
+[39m[90m 105 |[39m     e
+xpect(unclassifiedMutatingR
+outes)[33m.[39mtoEqual([]
+)[33m;[39m[22m
+[2m     [90m     |[39m  
+                           
+           [31m[1m^[22m
+[2m[39m[22m
+[2m     [90m 106 |[39m  
+ })[33m;[39m[22m
+[2m     [90m 107 
+|[39m[22m
+[2m     [90m 108 |[39m  
+ it([32m'keeps all 
+classified critical routes 
+behind dynamic 
+CriticalRateLimit 
+metadata'[39m[33m,[39m 
+() [33m=>[39m {[0m[22m
+[2m[22m
+[2m      [2mat 
+Object.<anonymous> ([22m[
+2m[0m[36msecurity-regress
+ion/critical-endpoints.regr
+ession.spec.ts[39m[0m[2m
+:105:40)[22m[2m[22m
+
+[0m[7m[1m[32m PASS 
+[39m[22m[27m[0m [2msrc
+/common/[22m[1mhttp-csp-a
+dvanced.dynamic-settings.sp
+ec.ts[22m
+[0m[7m[1m[32m PASS 
+[39m[22m[27m[0m [2msrc
+/core/[22m[1mmodule-insta
+ller.dynamic-settings.spec.
+ts[22m
+[0m[7m[1m[32m PASS 
+[39m[22m[27m[0m [2msrc
+/tenants/[22m[1mtenants.d
+ynamic-settings.spec.ts[22
+m
+[33m[Nest] 17424  - [39m26/03/2026, 10:57:04 [33m   WARN[39m [38;5;3m[ConfigResolverService] [39m[33mFalha ao ler configuracao dinamica "security.module_upload.enabled" no banco. Usando fallback de ENV/default. Causa: db offline[39m
+[33m[Nest] 16364  - [39m26/03/2026, 10:57:04 [33m   WARN[39m [38;5;3m[ConfigResolverService] [39m[33mFalha ao ler configuracao dinamica "security.file_signature_validation.enabled" no banco. Usando fallback de ENV/default. Causa: db offline[39m
+[0m[7m[1m[32m PASS 
+[39m[22m[27m[0m [2msrc
+/common/services/[22m[1ms
+ystem-operational-alerts.dy
+namic-settings.spec.ts[22m
+[33m[Nest] 6244  - [39m26/03/2026, 10:57:04 [33m   WARN[39m [38;5;3m[ConfigResolverService] [39m[33mFalha ao ler configuracao dinamica "operations.alerts.enabled" no banco. Usando fallback de ENV/default. Causa: dynamic settings db offline[39m
+[33m[Nest] 6244  - [39m26/03/2026, 10:57:04 [33m   WARN[39m [38;5;3m[ConfigResolverService] [39m[33mFalha ao ler configuracao dinamica "operations.alerts.enabled" no banco. Usando fallback de ENV/default. Causa: dynamic settings db offline[39m
+[0m[7m[1m[32m PASS 
+[39m[22m[27m[0m [2msrc
+/core/secure-files/[22m[1
+msecure-files.dynamic-setti
+ngs.spec.ts[22m
+[0m[7m[1m[32m PASS 
+[39m[22m[27m[0m [2msrc
+/common/services/[22m[1ms
+ystem-job-watchdog.dynamic-
+settings.spec.ts[22m
+[32m[Nest] 17164  - [39m26/03/2026, 10:57:05 [32m    LOG[39m [38;5;3m[SecureFilesService] [39m[32mStarting secure upload: tenant=tenant-1, module=clientes, type=contrato[39m
+[33m[Nest] 6244  - [39m26/03/2026, 10:57:05 [33m   WARN[39m [38;5;3m[ConfigResolverService] [39m[33mFalha ao ler configuracao dinamica "operations.watchdog.enabled" no banco. Usando fallback de ENV/default. Causa: dynamic settings db offline[39m
+[33m[Nest] 17164  - [39m26/03/2026, 10:57:05 [33m   WARN[39m [38;5;3m[ConfigResolverService] [39m[33mFalha ao ler configuracao dinamica "security.file_signature_validation.enabled" no banco. Usando fallback de ENV/default. Causa: db offline[39m
+[33m[Nest] 6244  - [39m26/03/2026, 10:57:05 [33m   WARN[39m [38;5;3m[ConfigResolverService] [39m[33mFalha ao ler configuracao dinamica "operations.watchdog.enabled" no banco. Usando fallback de ENV/default. Causa: dynamic settings db offline[39m
+[31m[Nest] 17520  - 
+[39m10/03/2026, 09:00:00 
+[31m  ERROR[39m [38;5;3m
+[SystemDataRetentionService
+] [39m[31mFalha ao 
+limpar audit logs: audit 
+delete unavailable[39m
+[0m[7m[1m[32m PASS 
+[39m[22m[27m[0m [2msrc
+/retention/[22m[1msystem-
+data-retention.service.spec
+.ts[22m
+[32m[Nest] 17520  - [39m10/03/2026, 09:00:00 [32m    LOG[39m [38;5;3m[SystemDataRetentionService] [39m[32mRetention cleanup executed: source=cron auditLogsDeleted=0 notificationsDeleted=3 limit=1500[39m
+[0m[7m[1m[32m PASS 
+[39m[22m[27m[0m [2msrc
+/system-settings/[22m[1ms
+ystem-settings-read.service
+.spec.ts[22m
+[0m[7m[1m[32m PASS 
+[39m[22m[27m[0m [2msrc
+/common/guards/[22m[1mcsr
+f.guard.dynamic-settings.sp
+ec.ts[22m
+[33m[Nest] 17164  - [39m26/03/2026, 10:57:06 [33m   WARN[39m [38;5;3m[SystemSettingsReadService] [39m[33mFalha ao ler overrides de configuracoes dinamicas para listagem administrativa. Usando apenas o resolvedor. Causa: db offline[39m
+[33m[Nest] 2728  - [39m26/03/2026, 10:57:06 [33m   WARN[39m [38;5;3m[ConfigResolverService] [39m[33mFalha ao ler configuracao dinamica "security.csrf.enabled" no banco. Usando fallback de ENV/default. Causa: dynamic settings db offline[39m
+[33m[Nest] 2728  - [39m26/03/2026, 10:57:06 [33m   WARN[39m [38;5;3m[ConfigResolverService] [39m[33mFalha ao ler configuracao dinamica "security.csrf.enabled" no banco. Usando fallback de ENV/default. Causa: dynamic settings db offline[39m
+[0m[7m[1m[32m PASS 
+[39m[22m[27m[0m [2msrc
+/common/services/[22m[1mr
+edis-throttler.storage.spec
+.ts[22m
+[0m[7m[1m[32m PASS 
+[39m[22m[27m[0m [2msrc
+/common/services/[22m[1mw
+ebsocket-runtime-toggle.ser
+vice.spec.ts[22m
+[0m[7m[1m[32m PASS 
+[39m[22m[27m[0m [2msrc
+/auth/[22m[1mtrusted-devi
+ce.service.spec.ts[22m
+[33m[Nest] 6244  - [39m14/03/2026, 09:00:00 [33m   WARN[39m [38;5;3m[ConfigResolverService] [39m[33mFalha ao ler configuracao dinamica "security.websocket.enabled" no banco. Usando fallback de ENV/default. Causa: dynamic settings db offline[39m
+[33m[Nest] 6244  - [39m14/03/2026, 09:00:00 [33m   WARN[39m [38;5;3m[ConfigResolverService] [39m[33mFalha ao ler configuracao dinamica "security.websocket.enabled" no banco. Usando fallback de ENV/default. Causa: dynamic settings db offline[39m
+[31m[Nest] 17520  - 
+[39m26/03/2026, 10:57:06 
+[31m  ERROR[39m [38;5;3m
+[NotificationService] 
+[39m[31mFalha ao 
+persistir notificacao de 
+sistema: Error: db 
+unavailable[39m
+[0m[7m[1m[32m PASS 
+[39m[22m[27m[0m [2msrc
+/notifications/[22m[1mnot
+ification.service.spec.ts[
+22m
+[0m[7m[1m[32m PASS 
+[39m[22m[27m[0m [2msrc
+/system-settings/[22m[1ms
+ystem-settings-write.servic
+e.spec.ts[22m
+[33m[Nest] 2728  - [39m26/03/2026, 10:57:06 [33m   WARN[39m [38;5;3m[SystemSettingsWriteService] [39m[33mFailed to persist dynamic setting "notifications.enabled" from admin panel. Cause: db offline[39m
+[0m[7m[1m[32m PASS 
+[39m[22m[27m[0m [2msrc
+/security-regression/[22m
+[1msecurity-architecture.re
+gression.spec.ts[22m
+[0m[7m[1m[32m PASS 
+[39m[22m[27m[0m [2msrc
+/core/prisma/[22m[1mprism
+a.service.spec.ts[22m
+[0m[7m[1m[31m FAIL 
+[39m[22m[27m[0m [2msrc
+/notifications/[22m[1mpus
+h-notification.service.spec
+.ts[22m
+  [1mÔùÅ [22mTest suite 
+failed to run
+
+    [96msrc/notifications/
+push-notification.service.s
+pec.ts[0m:[93m44[0m:[93
+m5[0m - 
+[91merror[0m[90m 
+TS2554: [0mExpected 4 
+arguments, but got 3.
+
+    [7m 44[0m     new 
+PushNotificationService(
+    [7m   [0m [91m    ~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+[0m
+    [7m 45[0m       
+prismaMock as unknown as 
+PrismaService,
+    [7m   [0m [91m~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~[0m
+    [7m...[0m 
+    [7m 47[0m       
+configResolverMock as 
+unknown as 
+ConfigResolverService,
+    [7m   [0m [91m~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~[0m
+    [7m 48[0m     );
+    [7m   [0m 
+[91m~~~~~[0m
+
+      [96msrc/notification
+s/push-notification.service
+.ts[0m:[93m69[0m:[93m5
+[0m
+        [7m69[0m     
+private readonly 
+authorizationService: 
+AuthorizationService,
+        [7m  [0m [96m   
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~[0m
+        An argument for 
+'authorizationService' was 
+not provided.
+
+[0m[7m[1m[31m FAIL 
+[39m[22m[27m[0m [2msrc
+/notifications/[22m[1mnot
+ification.gateway.spec.ts[
+22m
+  [1mÔùÅ [22mTest suite 
+failed to run
+
+    [96msrc/notifications/
+notification.gateway.spec.t
+s[0m:[93m61[0m:[93m21[
+0m - [91merror[0m[90m 
+TS2554: [0mExpected 8 
+arguments, but got 7.
+
+    [7m 61[0m     const 
+gateway = new 
+NotificationGateway(
+    [7m   [0m [91m      
+              ~~~~~~~~~~~~~
+~~~~~~~~~~~[0m
+    [7m 62[0m       
+notificationService as any,
+    [7m   [0m [91m~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[0m
+    [7m...[0m 
+    [7m 68[0m       webso
+cketConnectionRegistry as 
+any,
+    [7m   [0m [91m~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~[0m
+    [7m 69[0m     );
+    [7m   [0m 
+[91m~~~~~[0m
+
+      [96msrc/notification
+s/notification.gateway.ts[
+0m:[93m107[0m:[93m5[0m
+        [7m107[0m     
+private readonly 
+authorizationService: 
+AuthorizationService,
+        [7m   [0m [96m  
+  ~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~[0m
+        An argument for 
+'authorizationService' was 
+not provided.
+
+[0m[7m[1m[31m FAIL 
+[39m[22m[27m[0m [2msrc
+/notifications/[22m[1mpus
+h-notification.dynamic-sett
+ings.spec.ts[22m
+  [1mÔùÅ [22mTest suite 
+failed to run
+
+    [96msrc/notifications/
+push-notification.dynamic-s
+ettings.spec.ts[0m:[93m12
+0[0m:[93m19[0m - 
+[91merror[0m[90m 
+TS2554: [0mExpected 4 
+arguments, but got 3.
+
+    [7m120[0m   const 
+service = new 
+PushNotificationService(
+    [7m   [0m [91m      
+            ~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~[0m
+    [7m121[0m     prisma 
+as unknown as 
+PrismaService,
+    [7m   [0m [91m~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~[0m
+    [7m...[0m 
+    [7m123[0m     
+resolver,
+    [7m   [0m 
+[91m~~~~~~~~~~~~~[0m
+    [7m124[0m   );
+    [7m   [0m 
+[91m~~~[0m
+
+      [96msrc/notification
+s/push-notification.service
+.ts[0m:[93m69[0m:[93m5
+[0m
+        [7m69[0m     
+private readonly 
+authorizationService: 
+AuthorizationService,
+        [7m  [0m [96m   
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~[0m
+        An argument for 
+'authorizationService' was 
+not provided.
+
+[0m[7m[1m[31m FAIL 
+[39m[22m[27m[0m [2msrc
+/audit/[22m[1maudit.servi
+ce.spec.ts[22m
+  [1mÔùÅ [22mTest suite 
+failed to run
+
+    [96msrc/audit/audit.se
+rvice.spec.ts[0m:[93m17[
+0m:[93m5[0m - 
+[91merror[0m[90m 
+TS2554: [0mExpected 3 
+arguments, but got 2.
+
+    [7m17[0m     new 
+AuditService(prismaMock as 
+any, rateLimitMetricsServic
+eMock as any);
+    [7m  [0m [91m    ~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~[0m
+
+      [96msrc/audit/audit.
+service.ts[0m:[93m56[0m:
+[93m5[0m
+        [7m56[0m     
+private readonly 
+requestSecurityContext: Req
+uestSecurityContextService,
+        [7m  [0m [96m   
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~[0m
+        An argument for 
+'requestSecurityContext' 
+was not provided.
+
+[1mSummary of all failing 
+tests[22m
+[0m[7m[1m[31m FAIL 
+[39m[22m[27m[0m [2msec
+urity-regression/[22m[1mc
+ritical-endpoints.regressio
+n.spec.ts[22m 
+([0m[1m[41m8.347 
+s[49m[22m[0m)
+[1m[31m  [1mÔùÅ 
+[22m[1mCritical 
+endpoints regression guard 
+ÔÇ║ fails when a mutating 
+critical-controller route 
+is added without explicit 
+classification[39m[22m
+
+    [2mexpect([22m[31mre
+ceived[39m[2m).[22mtoEqu
+al[2m([22m[32mexpected[
+39m[2m) // deep 
+equality[22m
+
+    [32m- Expected  - 
+1[39m
+    [31m+ Received  + 
+3[39m
+
+    [32m- Array [][39m
+    [31m+ Array [[39m
+    [31m+   "UpdateControl
+ler.testConnectionWithPaylo
+ad",[39m
+    [31m+ ][39m
+[2m[22m
+[2m    [0m [90m 103 
+|[39m     }[22m
+[2m     [90m 104 
+|[39m[22m
+[2m    [31m[1m>[22m[2m
+[39m[90m 105 |[39m     e
+xpect(unclassifiedMutatingR
+outes)[33m.[39mtoEqual([]
+)[33m;[39m[22m
+[2m     [90m     |[39m  
+                           
+           [31m[1m^[22m
+[2m[39m[22m
+[2m     [90m 106 |[39m  
+ })[33m;[39m[22m
+[2m     [90m 107 
+|[39m[22m
+[2m     [90m 108 |[39m  
+ it([32m'keeps all 
+classified critical routes 
+behind dynamic 
+CriticalRateLimit 
+metadata'[39m[33m,[39m 
+() [33m=>[39m {[0m[22m
+[2m[22m
+[2m      [2mat 
+Object.<anonymous> ([22m[
+2m[0m[36msecurity-regress
+ion/critical-endpoints.regr
+ession.spec.ts[39m[0m[2m
+:105:40)[22m[2m[22m
+
+[0m[7m[1m[31m FAIL 
+[39m[22m[27m[0m [2mnot
+ifications/[22m[1mpush-no
+tification.service.spec.ts
+[22m
+  [1mÔùÅ [22mTest suite 
+failed to run
+
+    [96msrc/notifications/
+push-notification.service.s
+pec.ts[0m:[93m44[0m:[93
+m5[0m - 
+[91merror[0m[90m 
+TS2554: [0mExpected 4 
+arguments, but got 3.
+
+    [7m 44[0m     new 
+PushNotificationService(
+    [7m   [0m [91m    ~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+[0m
+    [7m 45[0m       
+prismaMock as unknown as 
+PrismaService,
+    [7m   [0m [91m~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~[0m
+    [7m...[0m 
+    [7m 47[0m       
+configResolverMock as 
+unknown as 
+ConfigResolverService,
+    [7m   [0m [91m~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~[0m
+    [7m 48[0m     );
+    [7m   [0m 
+[91m~~~~~[0m
+
+      [96msrc/notification
+s/push-notification.service
+.ts[0m:[93m69[0m:[93m5
+[0m
+        [7m69[0m     
+private readonly 
+authorizationService: 
+AuthorizationService,
+        [7m  [0m [96m   
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~[0m
+        An argument for 
+'authorizationService' was 
+not provided.
+
+[0m[7m[1m[31m FAIL 
+[39m[22m[27m[0m [2mnot
+ifications/[22m[1mnotific
+ation.gateway.spec.ts[22m
+  [1mÔùÅ [22mTest suite 
+failed to run
+
+    [96msrc/notifications/
+notification.gateway.spec.t
+s[0m:[93m61[0m:[93m21[
+0m - [91merror[0m[90m 
+TS2554: [0mExpected 8 
+arguments, but got 7.
+
+    [7m 61[0m     const 
+gateway = new 
+NotificationGateway(
+    [7m   [0m [91m      
+              ~~~~~~~~~~~~~
+~~~~~~~~~~~[0m
+    [7m 62[0m       
+notificationService as any,
+    [7m   [0m [91m~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[0m
+    [7m...[0m 
+    [7m 68[0m       webso
+cketConnectionRegistry as 
+any,
+    [7m   [0m [91m~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~[0m
+    [7m 69[0m     );
+    [7m   [0m 
+[91m~~~~~[0m
+
+      [96msrc/notification
+s/notification.gateway.ts[
+0m:[93m107[0m:[93m5[0m
+        [7m107[0m     
+private readonly 
+authorizationService: 
+AuthorizationService,
+        [7m   [0m [96m  
+  ~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~[0m
+        An argument for 
+'authorizationService' was 
+not provided.
+
+[0m[7m[1m[31m FAIL 
+[39m[22m[27m[0m [2mnot
+ifications/[22m[1mpush-no
+tification.dynamic-settings
+.spec.ts[22m
+  [1mÔùÅ [22mTest suite 
+failed to run
+
+    [96msrc/notifications/
+push-notification.dynamic-s
+ettings.spec.ts[0m:[93m12
+0[0m:[93m19[0m - 
+[91merror[0m[90m 
+TS2554: [0mExpected 4 
+arguments, but got 3.
+
+    [7m120[0m   const 
+service = new 
+PushNotificationService(
+    [7m   [0m [91m      
+            ~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~[0m
+    [7m121[0m     prisma 
+as unknown as 
+PrismaService,
+    [7m   [0m [91m~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~[0m
+    [7m...[0m 
+    [7m123[0m     
+resolver,
+    [7m   [0m 
+[91m~~~~~~~~~~~~~[0m
+    [7m124[0m   );
+    [7m   [0m 
+[91m~~~[0m
+
+      [96msrc/notification
+s/push-notification.service
+.ts[0m:[93m69[0m:[93m5
+[0m
+        [7m69[0m     
+private readonly 
+authorizationService: 
+AuthorizationService,
+        [7m  [0m [96m   
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~[0m
+        An argument for 
+'authorizationService' was 
+not provided.
+
+[0m[7m[1m[31m FAIL 
+[39m[22m[27m[0m [2maud
+it/[22m[1maudit.service.s
+pec.ts[22m
+  [1mÔùÅ [22mTest suite 
+failed to run
+
+    [96msrc/audit/audit.se
+rvice.spec.ts[0m:[93m17[
+0m:[93m5[0m - 
+[91merror[0m[90m 
+TS2554: [0mExpected 3 
+arguments, but got 2.
+
+    [7m17[0m     new 
+AuditService(prismaMock as 
+any, rateLimitMetricsServic
+eMock as any);
+    [7m  [0m [91m    ~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~[0m
+
+      [96msrc/audit/audit.
+service.ts[0m:[93m56[0m:
+[93m5[0m
+        [7m56[0m     
+private readonly 
+requestSecurityContext: Req
+uestSecurityContextService,
+        [7m  [0m [96m   
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~[0m
+        An argument for 
+'requestSecurityContext' 
+was not provided.
+
+
+[1mTest Suites: 
+[22m[1m[31m5 
+failed[39m[22m, 
+[1m[33m59 
+skipped[39m[22m, 
+[1m[32m21 
+passed[39m[22m, 26 of 85 
+total
+[1mTests:       
+[22m[1m[31m1 
+failed[39m[22m, 
+[1m[33m406 
+skipped[39m[22m, 
+[1m[32m25 
+passed[39m[22m, 432 total
+[1mSnapshots:   [22m0 
+total
+[1mTime:[22m        
+[1m[33m14.209 s[39m[22m
+[2mRan all test 
+suites[22m[2m with tests 
+matching 
+[22m"FAIL"[2m.[22m

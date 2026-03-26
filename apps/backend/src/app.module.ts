@@ -40,6 +40,7 @@ import { SystemDashboardModule } from './dashboard/system-dashboard.module';
 import { SystemDiagnosticsModule } from './diagnostics/system-diagnostics.module';
 import { SystemSettingsModule } from './system-settings/system-settings.module';
 import { SecurityRuntimeModule } from './common/security-runtime.module';
+import { ResponseValidationInterceptor } from './common/interceptors/response-validation.interceptor';
 import { RequestSecurityContextMiddleware } from './common/middleware/request-security-context.middleware';
 
 @Module({
@@ -110,6 +111,10 @@ import { RequestSecurityContextMiddleware } from './common/middleware/request-se
     HealthModule,
   ],
   providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ResponseValidationInterceptor,
+    },
     {
       provide: APP_INTERCEPTOR,
       useClass: RequestContextInterceptor,

@@ -8,6 +8,13 @@ import { TenantModuleService } from '../modules/engine/backend/tenant-module.ser
 import { CreateTenantDto } from '../../tenants/dto/create-tenant.dto';
 import { UpdateTenantDto } from '../../tenants/dto/update-tenant.dto';
 import { ChangeAdminPasswordDto } from '../../tenants/dto/change-admin-password.dto';
+import {
+  TenantResponseDto,
+  TenantLogoResponseDto,
+  TenantModulesResponseDto,
+  SimpleMessageResponseDto,
+} from './dto/tenant-response.dto';
+import { ValidateResponse } from '@common/decorators/validate-response.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { Roles } from '@core/common/decorators/roles.decorator';
@@ -90,47 +97,54 @@ export class TenantsController {
   @Get()
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
-  async findAll() {
-    return this.tenantsService.findAll();
+  @ValidateResponse(TenantResponseDto)
+  async findAll(): Promise<TenantResponseDto[]> {
+    return this.tenantsService.findAll() as any;
   }
 
   @Get(':id')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
-  async findOne(@Param('id') id: string) {
-    return this.tenantsService.findOne(id);
+  @ValidateResponse(TenantResponseDto)
+  async findOne(@Param('id') id: string): Promise<TenantResponseDto> {
+    return this.tenantsService.findOne(id) as any;
   }
 
   @Get('my-tenant')
   @Roles(Role.ADMIN)
-  async getMyTenant(@Req() req: TenantRequest) {
-    return this.tenantsService.findOne(req.user.tenantId);
+  @ValidateResponse(TenantResponseDto)
+  async getMyTenant(@Req() req: TenantRequest): Promise<TenantResponseDto> {
+    return this.tenantsService.findOne(req.user.tenantId) as any;
   }
 
   @Post()
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
-  async create(@Body() createTenantDto: CreateTenantDto) {
-    return this.tenantsService.create(createTenantDto);
+  @ValidateResponse(TenantResponseDto)
+  async create(@Body() createTenantDto: CreateTenantDto): Promise<TenantResponseDto> {
+    return this.tenantsService.create(createTenantDto) as any;
   }
 
   @Put(':id')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
-  async update(@Param('id') id: string, @Body() updateTenantDto: UpdateTenantDto) {
-    return this.tenantsService.update(id, updateTenantDto);
+  @ValidateResponse(TenantResponseDto)
+  async update(@Param('id') id: string, @Body() updateTenantDto: UpdateTenantDto): Promise<TenantResponseDto> {
+    return this.tenantsService.update(id, updateTenantDto) as any;
   }
 
   @Put('my-tenant')
   @Roles(Role.ADMIN)
-  async updateMyTenant(@Body() updateTenantDto: UpdateTenantDto, @Req() req: TenantRequest) {
-    return this.tenantsService.update(req.user.tenantId, updateTenantDto);
+  @ValidateResponse(TenantResponseDto)
+  async updateMyTenant(@Body() updateTenantDto: UpdateTenantDto, @Req() req: TenantRequest): Promise<TenantResponseDto> {
+    return this.tenantsService.update(req.user.tenantId, updateTenantDto) as any;
   }
 
   @Post('my-tenant/upload-logo')
   @Roles(Role.ADMIN)
   @UseInterceptors(FileInterceptor('logo', multerConfig))
-  async uploadMyTenantLogo(@Req() req: TenantRequest, @UploadedFile() file: Express.Multer.File) {
+  @ValidateResponse(TenantResponseDto)
+  async uploadMyTenantLogo(@Req() req: TenantRequest, @UploadedFile() file: Express.Multer.File): Promise<TenantResponseDto> {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo foi enviado');
     }
@@ -138,34 +152,38 @@ export class TenantsController {
     // Validação adicional de segurança: verificar assinatura do arquivo
     await this.validateFileSignature(file);
 
-    return this.tenantsService.updateLogo(req.user.tenantId, file.filename);
+    return this.tenantsService.updateLogo(req.user.tenantId, file.filename) as any;
   }
 
   @Patch('my-tenant/remove-logo')
   @Roles(Role.ADMIN)
-  async removeMyTenantLogo(@Req() req: TenantRequest) {
-    return this.tenantsService.removeLogo(req.user.tenantId);
+  @ValidateResponse(TenantResponseDto)
+  async removeMyTenantLogo(@Req() req: TenantRequest): Promise<TenantResponseDto> {
+    return this.tenantsService.removeLogo(req.user.tenantId) as any;
   }
 
   @Patch(':id/toggle-status')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
-  async toggleStatus(@Param('id') id: string) {
-    return this.tenantsService.toggleStatus(id);
+  @ValidateResponse(TenantResponseDto)
+  async toggleStatus(@Param('id') id: string): Promise<TenantResponseDto> {
+    return this.tenantsService.toggleStatus(id) as any;
   }
 
   @Patch(':id/change-admin-password')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
-  async changeAdminPassword(@Param('id') id: string, @Body() changePasswordDto: ChangeAdminPasswordDto) {
-    return this.tenantsService.changeAdminPassword(id, changePasswordDto);
+  @ValidateResponse(TenantResponseDto)
+  async changeAdminPassword(@Param('id') id: string, @Body() changePasswordDto: ChangeAdminPasswordDto): Promise<TenantResponseDto> {
+    return this.tenantsService.changeAdminPassword(id, changePasswordDto) as any;
   }
 
   @Post(':id/upload-logo')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
   @UseInterceptors(FileInterceptor('logo', multerConfig))
-  async uploadLogo(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
+  @ValidateResponse(TenantResponseDto)
+  async uploadLogo(@Param('id') id: string, @UploadedFile() file: Express.Multer.File): Promise<TenantResponseDto> {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo foi enviado');
     }
@@ -173,41 +191,46 @@ export class TenantsController {
     // Validação adicional de segurança: verificar assinatura do arquivo
     await this.validateFileSignature(file);
 
-    return this.tenantsService.updateLogo(id, file.filename);
+    return this.tenantsService.updateLogo(id, file.filename) as any;
   }
 
   @Patch(':id/remove-logo')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
-  async removeLogo(@Param('id') id: string) {
-    return this.tenantsService.removeLogo(id);
+  @ValidateResponse(TenantResponseDto)
+  async removeLogo(@Param('id') id: string): Promise<TenantResponseDto> {
+    return this.tenantsService.removeLogo(id) as any;
   }
 
   @Delete(':id')
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
-  async remove(@Param('id') id: string) {
-    return this.tenantsService.remove(id);
+  @ValidateResponse(TenantResponseDto)
+  async remove(@Param('id') id: string): Promise<TenantResponseDto> {
+    return this.tenantsService.remove(id) as any;
   }
 
   @Public()
   @SkipThrottle()
   @Get('public/master-logo')
-  async getMasterLogo() {
-    return this.tenantsService.getMasterLogo();
+  @ValidateResponse(TenantLogoResponseDto)
+  async getMasterLogo(): Promise<TenantLogoResponseDto> {
+    return this.tenantsService.getMasterLogo() as any;
   }
 
   @Public()
   @SkipThrottle()
   @Get('public/:id/logo')
-  async getTenantLogo(@Param('id') id: string) {
-    return this.tenantsService.getTenantLogo(id);
+  @ValidateResponse(TenantLogoResponseDto)
+  async getTenantLogo(@Param('id') id: string): Promise<TenantLogoResponseDto> {
+    return this.tenantsService.getTenantLogo(id) as any;
   }
 
   @Get('my-tenant/modules/active')
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   @SkipThrottle()
-  async getMyTenantActiveModules(@Req() req: TenantRequest) {
+  @ValidateResponse(TenantModulesResponseDto)
+  async getMyTenantActiveModules(@Req() req: TenantRequest): Promise<TenantModulesResponseDto> {
     if (!req.user.tenantId) {
       if (req.user.role === Role.SUPER_ADMIN) {
         throw new BadRequestException('SUPER_ADMIN não possui contexto de tenant. Use um usuário ADMIN de tenant.');
@@ -228,7 +251,8 @@ export class TenantsController {
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
   @SkipThrottle()
-  async getTenantActiveModules(@Param('id') id: string) {
+  @ValidateResponse(TenantModulesResponseDto)
+  async getTenantActiveModules(@Param('id') id: string): Promise<TenantModulesResponseDto> {
     const modules = await this.tenantModuleService.getModulesForTenant(id);
     return {
       modules: modules.filter(m => m.enabled).map(m => ({
@@ -243,7 +267,8 @@ export class TenantsController {
   @Roles(Role.SUPER_ADMIN)
   @SkipTenantIsolation()
   @SkipThrottle()
-  async activateModuleForTenant(@Param('id') id: string, @Param('moduleName') moduleName: string) {
+  @ValidateResponse(SimpleMessageResponseDto)
+  async activateModuleForTenant(@Param('id') id: string, @Param('moduleName') moduleName: string): Promise<SimpleMessageResponseDto> {
     await this.tenantModuleService.activateModuleForTenant(moduleName, id);
     return { message: `Módulo ${moduleName} ativado para o tenant ${id}` };
   }

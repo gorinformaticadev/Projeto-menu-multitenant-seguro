@@ -38,7 +38,7 @@ describe("SystemNotificationsList", () => {
 
     const article = screen.getByTestId("system-notification-item-notification-1");
     expect(article).toHaveAttribute("data-severity", "critical");
-    expect(article.className).toContain("border-l-red-500");
+    expect(article.className).toContain("border-l-skin-danger");
   });
 
   it("abre detalhe ao clicar e mantem mark-as-read funcional", async () => {

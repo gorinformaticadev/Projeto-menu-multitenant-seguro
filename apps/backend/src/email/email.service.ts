@@ -647,6 +647,51 @@ export class EmailService implements OnModuleInit {
   }
 
   /**
+   * Test SMTP connection with provided configuration
+   */
+  async testConnection(config: any): Promise<boolean> {
+    this.logger.log(`Testando conexão SMTP para: ${config.smtpHost}:${config.smtpPort}`);
+    
+    try {
+      // Get credentials from database
+      const smtpCredentials = await this.securityConfigService.getSmtpCredentials();
+      const smtpUser = smtpCredentials.smtpUsername;
+      const smtpPass = smtpCredentials.smtpPassword;
+
+      if (!smtpUser || !smtpPass) {
+        this.logger.warn('Teste de conexão falhou: credenciais ausentes no banco');
+        return false;
+      }
+
+      // Create a temporary transporter to verify
+      const transporterConfig: any = {
+        host: config.smtpHost,
+        port: config.smtpPort,
+        secure: config.encryption === 'SSL',
+        auth: {
+          user: smtpUser,
+          pass: smtpPass,
+        },
+      };
+
+      if (config.encryption === 'STARTTLS') {
+        transporterConfig.tls = {
+          rejectUnauthorized: false,
+        };
+      }
+
+      const tempTransporter = nodemailer.createTransport(transporterConfig);
+      await tempTransporter.verify();
+      
+      this.logger.log('✅ Conexão SMTP testada com sucesso');
+      return true;
+    } catch (error) {
+      this.logger.error('❌ Falha no teste de conexão SMTP:', error.message);
+      return false;
+    }
+  }
+
+  /**
    * Refresh transporter with new configuration
    */
   async refreshTransporter() {

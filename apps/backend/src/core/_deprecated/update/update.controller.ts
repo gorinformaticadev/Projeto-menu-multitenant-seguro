@@ -18,7 +18,7 @@ import { RolesGuard } from '@core/common/guards/roles.guard';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { UpdateService } from './update.service';
-import { ExecuteUpdateDto, UpdateConfigDto } from './dto/update.dto';
+import { ExecuteUpdateDto, UpdateConfigDto } from './update.dto';
 import { Throttle } from '@nestjs/throttler';
 
 /**
@@ -108,7 +108,7 @@ export class UpdateController {
       );
 
       return result;
-    } catch {
+    } catch (error: any) {
       throw new HttpException(
         error.message || 'Erro ao executar atualização',
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
@@ -192,7 +192,7 @@ export class UpdateController {
         success: true,
         data: log,
       };
-    } catch {
+    } catch (error: any) {
       throw new HttpException(
         error.message || 'Erro ao buscar detalhes do log',
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
@@ -220,7 +220,7 @@ export class UpdateController {
         connected: true,
         ...result,
       };
-    } catch {
+    } catch (error: any) {
       return {
         success: false,
         message: 'Falha na conexão com o repositório',

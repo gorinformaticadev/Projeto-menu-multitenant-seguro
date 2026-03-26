@@ -117,10 +117,14 @@ const createContext = (
     get: jest.fn((key: string) => process.env[key]),
   };
   const resolver = new ConfigResolverService(new SettingsRegistry(), prisma as unknown as PrismaService);
+  const authorizationService = {
+    canAccessModule: jest.fn().mockResolvedValue(true),
+  };
   const service = new PushNotificationService(
     prisma as unknown as PrismaService,
     configService as unknown as ConfigService,
     resolver,
+    authorizationService as any,
   );
   const sendNotificationMock = jest.fn().mockResolvedValue(undefined);
   const setVapidDetailsMock = jest.fn();

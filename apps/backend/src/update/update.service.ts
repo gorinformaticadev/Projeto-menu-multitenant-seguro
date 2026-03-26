@@ -442,7 +442,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
     };
   }
 
-  async updateConfig(data: UpdateConfigDto, userId: string): Promise<void> {
+  async updateConfig(data: UpdateConfigDto, userId: string): Promise<UpdateConfigDto> {
     const current = await this.getSystemSettings();
     const updateData: Prisma.UpdateSystemSettingsUncheckedUpdateInput = {
       gitUsername: data.gitUsername,
@@ -493,6 +493,40 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
         },
       },
     });
+
+    return this.getUpdateConfig();
+  }
+
+  async getLogDetails(id: string): Promise<string[]> {
+    const log = await this.prisma.updateLog.findUnique({ where: { id } });
+    if (!log) {
+      throw new HttpException('Log não encontrado', HttpStatus.NOT_FOUND);
+    }
+
+    try {
+      const parsed = JSON.parse(log.executionLogs || '{}');
+      // If we have a structured finalState, use its messages or similar
+      // Or if it's just raw logs
+      if (parsed.fullOutput) {
+        return Array.isArray(parsed.fullOutput) ? parsed.fullOutput : [String(parsed.fullOutput)];
+      }
+
+      // Default fallback: return some key facts from the log
+      const lines = [
+        `ID: ${log.id}`,
+        `Versão: ${log.version}`,
+        `Status: ${log.status}`,
+        `Início: ${log.startedAt.toISOString()}`,
+      ];
+
+      if (log.completedAt) lines.push(`Fim: ${log.completedAt.toISOString()}`);
+      if (log.duration) lines.push(`Duração: ${log.duration}s`);
+      if (log.errorMessage) lines.push(`Erro: ${log.errorMessage}`);
+
+      return lines;
+    } catch {
+      return ['Erro ao processar detalhes do log'];
+    }
   }
 
   async getUpdateLogs(limit: number = 20): Promise<UpdateLog[]> {

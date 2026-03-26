@@ -2,8 +2,8 @@
 // Servico ativo de updates: apps/backend/src/update/update.service.ts
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '@core/prisma/prisma.service';
-import { AuditService } from '../audit/audit.service';
-import { ExecuteUpdateDto, UpdateConfigDto, UpdateStatusDto } from './dto/update.dto';
+import { AuditService } from '../../audit.service';
+import { ExecuteUpdateDto, UpdateConfigDto, UpdateStatusDto } from './update.dto';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as semver from 'semver';

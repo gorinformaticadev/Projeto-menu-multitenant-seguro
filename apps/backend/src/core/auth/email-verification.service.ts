@@ -147,6 +147,7 @@ export class EmailVerificationService {
     required: boolean;
     level: string;
     shouldBlock: boolean;
+    verifiedAt: Date | null;
     message?: string;
   }> {
     const user = await this.prisma.user.findUnique({
@@ -168,6 +169,7 @@ export class EmailVerificationService {
         required,
         level,
         shouldBlock: false,
+        verifiedAt: null,
       };
     }
 
@@ -178,6 +180,7 @@ export class EmailVerificationService {
         required: false,
         level: 'SOFT',
         shouldBlock: false,
+        verifiedAt: null,
         message: 'Recomendamos verificar seu email para maior segurança',
       };
     }
@@ -189,6 +192,7 @@ export class EmailVerificationService {
         required: true,
         level: 'SOFT',
         shouldBlock: false,
+        verifiedAt: null,
         message: 'Por favor, verifique seu email. Um link de verificação foi enviado.',
       };
     } else if (level === 'MODERATE') {
@@ -197,6 +201,7 @@ export class EmailVerificationService {
         required: true,
         level: 'MODERATE',
         shouldBlock: true,
+        verifiedAt: null,
         message: 'Funcionalidades limitadas. Verifique seu email para acesso completo.',
       };
     } else if (level === 'STRICT') {
@@ -205,6 +210,7 @@ export class EmailVerificationService {
         required: true,
         level: 'STRICT',
         shouldBlock: true,
+        verifiedAt: null,
         message: 'Acesso bloqueado. Verifique seu email para continuar.',
       };
     }
@@ -214,6 +220,7 @@ export class EmailVerificationService {
       required,
       level,
       shouldBlock: false,
+      verifiedAt: null,
     };
   }
 }

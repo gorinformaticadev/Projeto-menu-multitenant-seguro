@@ -429,6 +429,7 @@ describe('Security red team regression attacks', () => {
       requestSecurityContext,
       websocketConnectionRegistry,
       new AuthorizationService(),
+      { serialize: jest.fn(), validateAndSerialize: jest.fn() } as any
     );
   }
 

@@ -1,4 +1,4 @@
-﻿import {
+import {
   Body,
   Controller,
   Get,
@@ -17,10 +17,15 @@ import {
   RunSystemRollbackDto,
   RunSystemUpdateDto,
   SystemUpdateLogQueryDto,
+  SystemUpdateResponseDto,
+  SystemUpdateLogResponseDto,
+  SystemUpdateReleasesResponseDto,
 } from './dto/system-update-admin.dto';
 import { SystemUpdateAdminService } from './system-update-admin.service';
 import { extractAuditContext } from '../audit/audit-request-context.util';
 import { CriticalRateLimit } from '@common/decorators/critical-rate-limit.decorator';
+import { ValidateResponse } from '@common/decorators/validate-response.decorator';
+import { UpdateStatusDto } from './dto/update.dto';
 
 @Controller('system/update')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -37,7 +42,8 @@ export class SystemUpdateController {
 
   @Post('run')
   @CriticalRateLimit('update')
-  async run(@Body() body: RunSystemUpdateDto, @Request() req: any) {
+  @ValidateResponse(SystemUpdateResponseDto)
+  async run(@Body() body: RunSystemUpdateDto, @Request() req: any): Promise<SystemUpdateResponseDto> {
     const { actor, requestCtx } = extractAuditContext(req);
     const userId = actor.userId || 'unknown';
 
@@ -57,16 +63,19 @@ export class SystemUpdateController {
   }
 
   @Get('status')
-  async status() {
+  @ValidateResponse(UpdateStatusDto)
+  async status(): Promise<UpdateStatusDto> {
     try {
-      return await this.systemUpdateAdminService.getStatus();
+      const status = await this.systemUpdateAdminService.getStatus();
+      return status as unknown as UpdateStatusDto;
     } catch (error) {
       this.rethrowPreservingHttp(error, 'Erro ao ler status de update');
     }
   }
 
   @Get('log')
-  async log(@Query() query: SystemUpdateLogQueryDto) {
+  @ValidateResponse(SystemUpdateLogResponseDto)
+  async log(@Query() query: SystemUpdateLogQueryDto): Promise<SystemUpdateLogResponseDto> {
     try {
       const rawTail = query.tail as unknown as number | string | undefined;
       const parsed = Number(rawTail ?? 200);
@@ -78,7 +87,8 @@ export class SystemUpdateController {
 
   @Post('rollback')
   @CriticalRateLimit('update')
-  async rollback(@Body() body: RunSystemRollbackDto, @Request() req: any) {
+  @ValidateResponse(SystemUpdateResponseDto)
+  async rollback(@Body() body: RunSystemRollbackDto, @Request() req: any): Promise<SystemUpdateResponseDto> {
     const { actor, requestCtx } = extractAuditContext(req);
     const userId = actor.userId || 'unknown';
 
@@ -97,7 +107,8 @@ export class SystemUpdateController {
   }
 
   @Get('releases')
-  async releases() {
+  @ValidateResponse(SystemUpdateReleasesResponseDto)
+  async releases(): Promise<SystemUpdateReleasesResponseDto> {
     try {
       return await this.systemUpdateAdminService.listReleases();
     } catch (error) {

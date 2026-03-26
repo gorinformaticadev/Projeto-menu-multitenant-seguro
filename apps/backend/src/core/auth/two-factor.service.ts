@@ -47,6 +47,7 @@ export class TwoFactorService {
     return {
       secret: secret.base32,
       qrCode: qrCodeUrl,
+      otpauthUrl: secret.otpauth_url!,
     };
   }
 
@@ -124,7 +125,14 @@ export class TwoFactorService {
       },
     });
 
-    return { message: '2FA desativado com sucesso' };
+    return {
+      message: '2FA desativado com sucesso',
+      verified: true,
+      required: false, // Assuming 'required' should be false when 2FA is disabled
+      level: 'none', // Assuming 'level' should be 'none' when 2FA is disabled
+      shouldBlock: false,
+      verifiedAt: null,
+    };
   }
 
   /**

@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { CronExpression } from '@nestjs/schedule';
 import { BackupJobStatus } from '@prisma/client';
 import Redis from 'ioredis';
@@ -123,6 +124,36 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     } finally {
       await this.redisLock.releaseLock(lockKey, instanceId);
     }
+  }
+
+  @OnEvent('contract.validation.failed')
+  async handleContractValidationFailed(payload: { dto: string; errorCount: number }) {
+    await this.dispatchOperationalAlert({
+      action: 'OPS_CONTRACT_VALIDATION_FAILED',
+      cooldownKey: `OPS_CONTRACT_VALIDATION_FAILED:${payload.dto}`,
+      severity: 'critical',
+      title: 'Contrato Quebrado em Producao',
+      body: `O DTO ${payload.dto} apresentou ${payload.errorCount} falhas de validacao e foi abortado.`,
+      data: payload,
+      pushEligible: true,
+      audit: true,
+      source: 'security',
+    }, Date.now(), 60); // Cooldown unitario de 60m para que nao haja spam na mesma rota
+  }
+
+  @OnEvent('contract.payload.stripped')
+  async handleContractPayloadStripped(payload: { dto: string; strippedFields: string[] }) {
+    await this.dispatchOperationalAlert({
+      action: 'OPS_CONTRACT_PAYLOAD_STRIPPED',
+      cooldownKey: `OPS_CONTRACT_PAYLOAD_STRIPPED:${payload.dto}`,
+      severity: 'warning',
+      title: 'Drift Estrutural Detectado',
+      body: `O DTO ${payload.dto} descartou as propriedades: ${payload.strippedFields.join(', ')}.`,
+      data: payload,
+      pushEligible: false,
+      audit: false,
+      source: 'telemetry',
+    }, Date.now(), 60 * 24); // Alerta silencioso para revisao de codigo (1x por dia por DTO)
   }
 
   async evaluateOperationalAlerts(

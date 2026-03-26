@@ -55,6 +55,13 @@ describe('NotificationGateway websocket hardening', () => {
       register: jest.fn(),
       unregister: jest.fn(),
     };
+    const authorizationService = {
+      canAccessModule: jest.fn().mockResolvedValue(true),
+    };
+    const dtoMapper = {
+      serialize: jest.fn().mockReturnValue({ id: 'notification-1' }),
+      validateAndSerialize: jest.fn(),
+    };
     const emit = jest.fn();
     const to = jest.fn(() => ({ emit }));
 
@@ -66,6 +73,8 @@ describe('NotificationGateway websocket hardening', () => {
       websocketRuntimeToggleService as any,
       requestSecurityContext,
       websocketConnectionRegistry as any,
+      authorizationService as any,
+      dtoMapper as any,
     );
     gateway.server = { to } as any;
     gateways.push(gateway);
@@ -99,7 +108,7 @@ describe('NotificationGateway websocket hardening', () => {
     await gateway.emitNewNotification(baseNotification, { push: true });
 
     expect(to).toHaveBeenCalledWith('global:super-admins');
-    expect(emit).toHaveBeenCalledWith('notification:new', baseNotification);
+    expect(emit).toHaveBeenCalledWith('notification:new', expect.objectContaining({ id: 'notification-1' }));
     expect(pushNotificationService.sendNotification).toHaveBeenCalledWith(baseNotification);
   });
 

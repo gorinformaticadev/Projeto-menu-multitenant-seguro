@@ -3,6 +3,14 @@ import { Throttle } from '@nestjs/throttler';
 import { SecurityConfigService } from './security-config.service';
 import { UpdateSecurityConfigDto } from './dto/update-security-config.dto';
 import { UpdateWebPushConfigDto } from './dto/update-web-push-config.dto';
+import {
+  SecurityConfigResponseDto,
+  WebPushConfigResponseDto,
+  PasswordPolicyResponseDto,
+  TwoFactorStatusResponseDto,
+  FullSecurityConfigResponseDto,
+} from './dto/security-config-response.dto';
+import { ValidateResponse } from '@common/decorators/validate-response.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { Roles } from '@core/common/decorators/roles.decorator';
@@ -24,8 +32,9 @@ export class SecurityConfigController {
   @Get()
   @Roles(Role.SUPER_ADMIN)
   @Throttle({ default: { limit: 20, ttl: 60000 } })
-  async getConfig() {
-    return this.securityConfigService.getConfig();
+  @ValidateResponse(SecurityConfigResponseDto)
+  async getConfig(): Promise<SecurityConfigResponseDto> {
+    return this.securityConfigService.getConfig() as any;
   }
 
   /**
@@ -36,11 +45,12 @@ export class SecurityConfigController {
   @Put()
   @Roles(Role.SUPER_ADMIN)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ValidateResponse(SecurityConfigResponseDto)
   async updateConfig(
     @Body() dto: UpdateSecurityConfigDto,
     @Request() req: AuthenticatedRequest,
-  ) {
-    return this.securityConfigService.updateConfig(dto, req.user.id);
+  ): Promise<SecurityConfigResponseDto> {
+    return this.securityConfigService.updateConfig(dto, req.user.id) as any;
   }
 
   /**
@@ -51,8 +61,13 @@ export class SecurityConfigController {
   @Get('web-push')
   @Roles(Role.SUPER_ADMIN)
   @Throttle({ default: { limit: 20, ttl: 60000 } })
-  async getWebPushConfig() {
-    return this.securityConfigService.getWebPushConfig();
+  @ValidateResponse(WebPushConfigResponseDto)
+  async getWebPushConfig(): Promise<WebPushConfigResponseDto> {
+    const config = await this.securityConfigService.getWebPushConfig();
+    return {
+      publicKey: config.webPushPublicKey,
+      subject: config.webPushSubject,
+    };
   }
 
   /**
@@ -63,11 +78,12 @@ export class SecurityConfigController {
   @Put('web-push')
   @Roles(Role.SUPER_ADMIN)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ValidateResponse(SecurityConfigResponseDto)
   async updateWebPushConfig(
     @Body() dto: UpdateWebPushConfigDto,
     @Request() req: AuthenticatedRequest,
-  ) {
-    return this.securityConfigService.updateWebPushConfig(dto, req.user.id);
+  ): Promise<SecurityConfigResponseDto> {
+    return this.securityConfigService.updateWebPushConfig(dto, req.user.id) as any;
   }
 
   /**
@@ -76,8 +92,9 @@ export class SecurityConfigController {
    */
   @Public()
   @Get('password-policy')
-  async getPasswordPolicy() {
-    return this.securityConfigService.getPasswordPolicy();
+  @ValidateResponse(PasswordPolicyResponseDto)
+  async getPasswordPolicy(): Promise<PasswordPolicyResponseDto> {
+    return this.securityConfigService.getPasswordPolicy() as any;
   }
 
   /**
@@ -86,7 +103,8 @@ export class SecurityConfigController {
    */
   @Public()
   @Get('2fa-status')
-  async get2FAStatus() {
+  @ValidateResponse(TwoFactorStatusResponseDto)
+  async get2FAStatus(): Promise<TwoFactorStatusResponseDto> {
     const config = await this.securityConfigService.getTwoFactorConfig();
     return {
       enabled: config.enabled,
@@ -102,7 +120,8 @@ export class SecurityConfigController {
    */
   @Public()
   @Get('full')
-  async getFullConfig() {
+  @ValidateResponse(FullSecurityConfigResponseDto)
+  async getFullConfig(): Promise<FullSecurityConfigResponseDto> {
     const config = await this.securityConfigService.getConfig();
     const twoFactorPolicy = await this.securityConfigService.getTwoFactorConfig();
     const passwordPolicy = await this.securityConfigService.getPasswordPolicy();

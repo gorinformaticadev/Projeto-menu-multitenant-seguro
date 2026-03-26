@@ -21,6 +21,8 @@ import { SessionCleanupExecutionService } from './services/session-cleanup-execu
 import { SessionCleanupProcessorService } from './services/session-cleanup-processor.service';
 import { CronModule } from '../core/cron/cron.module';
 import { SystemSettingsModule } from '../system-settings/system-settings.module';
+import { DtoMapperService } from './services/dto-mapper.service';
+import { WebsocketEmitterService } from './services/websocket-emitter.service';
 
 @Module({
   imports: [
@@ -43,6 +45,8 @@ import { SystemSettingsModule } from '../system-settings/system-settings.module'
     SessionCleanupProcessorService,
     SessionCleanupExecutionService,
     SystemJobWatchdogService,
+    DtoMapperService,
+    WebsocketEmitterService,
     {
       provide: 'EventBus',
       useValue: eventBus
@@ -58,6 +62,8 @@ import { SystemSettingsModule } from '../system-settings/system-settings.module'
     SessionCleanupProcessorService,
     SessionCleanupExecutionService,
     SystemJobWatchdogService,
+    DtoMapperService,
+    WebsocketEmitterService,
     PrismaModule  // Export PrismaModule for module dependencies
   ],
 })

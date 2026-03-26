@@ -8,7 +8,6 @@ import {
   Param,
   Post,
   Put,
-  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -17,9 +16,19 @@ import { Role } from '@prisma/client';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
-import { ExecuteUpdateDto, UpdateConfigDto } from './dto/update.dto';
+import {
+  UpdateStatusDto,
+  ExecuteUpdateDto,
+  UpdateConfigDto,
+  CheckUpdateResponseDto,
+  UpdateLogDto,
+  UpdateLogDetailsResponseDto,
+  ConnectionTestResponseDto,
+  ExecuteUpdateResponseDto,
+} from './dto/update.dto';
 import { UpdateService } from './update.service';
 import { CriticalRateLimit } from '@common/decorators/critical-rate-limit.decorator';
+import { ValidateResponse } from '@common/decorators/validate-response.decorator';
 
 @Controller('update')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -37,7 +46,8 @@ export class UpdateController {
   }
 
   @Get('status')
-  async getStatus() {
+  @ValidateResponse(UpdateStatusDto)
+  async getStatus(): Promise<UpdateStatusDto> {
     try {
       return await this.updateService.getUpdateStatus();
     } catch (error) {
@@ -47,7 +57,8 @@ export class UpdateController {
 
   @Get('config')
   @Roles(Role.SUPER_ADMIN)
-  async getConfig() {
+  @ValidateResponse(UpdateConfigDto)
+  async getConfig(): Promise<UpdateConfigDto> {
     try {
       return await this.updateService.getUpdateConfig();
     } catch (error) {
@@ -58,7 +69,8 @@ export class UpdateController {
   @Get('check')
   @Roles(Role.SUPER_ADMIN)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  async checkForUpdates(@Request() _req) {
+  @ValidateResponse(CheckUpdateResponseDto)
+  async checkForUpdates(@Request() _req): Promise<CheckUpdateResponseDto> {
     try {
       const result = await this.updateService.checkForUpdates();
       return {
@@ -77,7 +89,8 @@ export class UpdateController {
   @Roles(Role.SUPER_ADMIN)
   @CriticalRateLimit('update')
   @HttpCode(HttpStatus.ACCEPTED)
-  async executeUpdate(@Body() updateData: ExecuteUpdateDto, @Request() req) {
+  @ValidateResponse(ExecuteUpdateResponseDto)
+  async executeUpdate(@Body() updateData: ExecuteUpdateDto, @Request() req): Promise<ExecuteUpdateResponseDto> {
     try {
       const userId = req.user.sub;
       const ipAddress = req.ip;
@@ -91,7 +104,8 @@ export class UpdateController {
 
   @Put('config')
   @Roles(Role.SUPER_ADMIN)
-  async updateConfig(@Body() config: UpdateConfigDto, @Request() req) {
+  @ValidateResponse(UpdateConfigDto)
+  async updateConfig(@Body() config: UpdateConfigDto, @Request() req): Promise<UpdateConfigDto> {
     try {
       const userId = req.user.sub;
       return await this.updateService.updateConfig(config, userId);
@@ -102,42 +116,35 @@ export class UpdateController {
 
   @Get('logs')
   @Roles(Role.SUPER_ADMIN)
-  async getLogs(@Query('limit') limit?: string) {
+  @ValidateResponse(UpdateLogDto)
+  async getLogs(): Promise<UpdateLogDto[]> {
     try {
-      const limitNum = limit ? parseInt(limit, 10) : 50;
-      if (limitNum > 200) {
-        throw new HttpException('Limite máximo de 200 registros', HttpStatus.BAD_REQUEST);
-      }
-
-      const logs = await this.updateService.getUpdateLogs(limitNum);
-      return {
-        success: true,
-        data: logs,
-        total: logs.length,
-      };
+      return await this.updateService.getUpdateLogs();
     } catch (error) {
-      this.rethrowPreservingHttp(error, 'Erro ao buscar logs de atualização');
+      this.rethrowPreservingHttp(error, 'Erro ao buscar logs');
     }
   }
 
   @Get('logs/:id')
   @Roles(Role.SUPER_ADMIN)
-  async getLogDetails(@Param('id') logId: string) {
+  @ValidateResponse(UpdateLogDetailsResponseDto)
+  async getLogDetails(@Param('id') id: string): Promise<UpdateLogDetailsResponseDto> {
     try {
-      const log = await this.updateService.getUpdateLogDetail(logId);
+      const lines = await this.updateService.getLogDetails(id);
       return {
-        success: true,
-        data: log,
+        lines,
+        total: lines.length,
       };
     } catch (error) {
       this.rethrowPreservingHttp(error, 'Erro ao buscar detalhes do log');
     }
   }
 
-@Get('test-connection')
+  @Post('test-connection')
   @Roles(Role.SUPER_ADMIN)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  async testConnection() {
+  @ValidateResponse(ConnectionTestResponseDto)
+  async testConnection(): Promise<ConnectionTestResponseDto> {
     try {
       const result = await this.updateService.testConnection();
       return {
@@ -149,28 +156,22 @@ export class UpdateController {
       return {
         success: false,
         message: 'Falha na conexão com o repositório',
-        connected: false,
       };
     }
   }
 
-  @Post('test-connection')
+  @Post('test-connection-payload')
   @Roles(Role.SUPER_ADMIN)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  async testConnectionWithPayload(@Body() config: UpdateConfigDto) {
+  @ValidateResponse(ConnectionTestResponseDto)
+  async testConnectionWithPayload(@Body() config: UpdateConfigDto): Promise<ConnectionTestResponseDto> {
     const result = await this.updateService.testConnection(config);
-    if (result.connected) {
-      return {
-        success: true,
-        message: 'Conexão com repositório estabelecida com sucesso',
-        ...result,
-      };
-    }
-
     return {
-      success: false,
-      message: 'Falha na conexão com o repositório',
-      ...result,
+      success: result.connected,
+      message: result.connected
+        ? 'Conexão com repositório estabelecida com sucesso'
+        : 'Falha na conexão com o repositório',
+      details: result,
     };
   }
 }

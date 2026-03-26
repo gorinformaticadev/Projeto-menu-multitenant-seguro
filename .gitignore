@@ -90,7 +90,7 @@ apps/backend/src/modules/ordem_servico/shared/utils/*
 # apps/frontend/src/app/modules/* (Removido para permitir build no CI)
 # Repos externos/espelhos locais
 externos/
-/apps/backend/scripts
+# /apps/backend/scripts
 /.qoder
 GOR.png
 scripts/final_sync.js
