@@ -47,6 +47,7 @@ export class TwoFactorService {
     return {
       secret: secret.base32,
       qrCode: qrCodeUrl,
+      otpauthUrl: secret.otpauth_url,
     };
   }
 

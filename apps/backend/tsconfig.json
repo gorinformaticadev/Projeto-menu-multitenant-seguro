@@ -40,6 +40,7 @@
                         },
     "include":  [
                     "src/**/*",
+                    "test/**/*",
                     "../../packages/modules/**/backend/**/*",
                     "../../packages/modules/**/module.ts",
                     "../../packages/modules/**/permissions.ts"
@@ -47,8 +48,6 @@
     "exclude":  [
                     "node_modules",
                     "dist",
-                    "test",
-                    "**/*spec.ts",
                     "**/*.js",
                     "src/core/_deprecated/**/*",
                     "../../packages/modules/**/frontend/**/*",

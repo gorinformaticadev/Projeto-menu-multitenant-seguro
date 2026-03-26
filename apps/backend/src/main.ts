@@ -19,6 +19,7 @@ import { validateSecurityConfig } from './common/utils/security.utils';
 import { PathsService } from './core/common/paths/paths.service';
 import { ConfigResolverService } from './system-settings/config-resolver.service';
 import { SettingsRegistry } from './system-settings/settings-registry.service';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const requireSecretManager = process.env.REQUIRE_SECRET_MANAGER === 'true';
@@ -186,6 +187,15 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  const config = new DocumentBuilder()
+    .setTitle('API Multitenant Seguro')
+    .setDescription('Documentação dos contratos de API')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document);
 
   const port = process.env.PORT || 4000;
   await app.listen(port, '0.0.0.0');

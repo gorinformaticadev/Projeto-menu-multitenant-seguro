@@ -1,4 +1,4 @@
-﻿import {
+import {
   Body,
   Controller,
   Get,
@@ -21,6 +21,8 @@ import {
 import { SystemUpdateAdminService } from './system-update-admin.service';
 import { extractAuditContext } from '../audit/audit-request-context.util';
 import { CriticalRateLimit } from '@common/decorators/critical-rate-limit.decorator';
+import { ValidateResponse } from '@common/decorators/validate-response.decorator';
+import { UpdateStatusDto } from './dto/update.dto';
 
 @Controller('system/update')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -57,9 +59,11 @@ export class SystemUpdateController {
   }
 
   @Get('status')
-  async status() {
+  @ValidateResponse(UpdateStatusDto)
+  async status(): Promise<UpdateStatusDto> {
     try {
-      return await this.systemUpdateAdminService.getStatus();
+      const status = await this.systemUpdateAdminService.getStatus();
+      return status as unknown as UpdateStatusDto;
     } catch (error) {
       this.rethrowPreservingHttp(error, 'Erro ao ler status de update');
     }

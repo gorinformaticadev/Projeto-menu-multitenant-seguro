@@ -40,11 +40,11 @@ HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-120}"
 HEALTH_INTERVAL="${HEALTH_INTERVAL:-5}"
 RELEASES_TO_KEEP="${RELEASES_TO_KEEP:-5}"
 MAINTENANCE_ETA_SECONDS="${MAINTENANCE_ETA_SECONDS:-300}"
-LEGACY_INPLACE="false"
+# LEGACY_INPLACE="false" (Removido por ser inutilizado)
 
 EXIT_SUCCESS=0
 EXIT_LOCK_HELD=10
-EXIT_BACKUP_FAILED=20
+# EXIT_BACKUP_FAILED=20 (Removido por ser inutilizado)
 EXIT_DOWNLOAD_FAILED=30
 EXIT_INSTALL_FAILED=40
 EXIT_BUILD_FAILED=41
@@ -69,8 +69,7 @@ LOCK_ACQUIRED="false"
 STATE_FILE=""
 UPDATE_LOG_FILE=""
 MAINTENANCE_FILE=""
-STATE_INITIALIZED="false"
-STATE_FINALIZED="false"
+# STATE_FINALIZED="false" (Removido por ser inutilizado)
 
 CURRENT_STEP="init"
 STATE_STATUS="idle"
@@ -119,6 +118,7 @@ log_err() {
   echo "[$(now_iso)] [${CURRENT_STEP}] ERROR: $*" >&2
 }
 
+# shellcheck disable=SC2317
 usage() {
   cat <<'EOF'
 Uso:
@@ -232,7 +232,7 @@ enable_maintenance_mode() {
   log "Maintenance mode ativado. reason=${reason}"
 }
 
-disable_maintenance_mode() {
+disable_maintenance_mode() { # shellcheck disable=SC2120
   local reason="${1:-Update concluido com sucesso}"
   MAINTENANCE_ACTIVE="false"
   write_maintenance_file "false" "$reason" "0"
@@ -326,7 +326,6 @@ finish_success() {
   STATE_LOCK="false"
   STATE_LAST_ERROR=""
   reset_error_state
-  STATE_FINALIZED="true"
   set_step "completed" 100
   write_state_file
 }
@@ -351,7 +350,6 @@ finish_failed() {
   STATE_EXIT_CODE="$code"
   STATE_USER_MESSAGE="$user_message"
   STATE_TECHNICAL_MESSAGE="$technical_message"
-  STATE_FINALIZED="true"
   write_state_file
   log_err "${technical_message} (exit_code=${code}, error_code=${error_code}, stage=${stage})"
 }
@@ -374,7 +372,6 @@ finish_rolled_back() {
   STATE_EXIT_CODE="$exit_code"
   STATE_USER_MESSAGE="$user_message"
   STATE_TECHNICAL_MESSAGE="$message"
-  STATE_FINALIZED="true"
   set_step "rollback" 100
   write_state_file
 }
@@ -498,6 +495,7 @@ acquire_lock() {
   write_state_file
 }
 
+# shellcheck disable=SC2317
 release_lock() {
   if [[ "$LOCK_ACQUIRED" == "true" ]]; then
     flock -u "$LOCK_FD" || true
@@ -529,7 +527,8 @@ bootstrap_atomic_layout() {
     fi
   fi
 
-  local bootstrap_release="$RELEASES_DIR/$(sanitize_release_name "$detected_version")"
+  local bootstrap_release
+  bootstrap_release="$RELEASES_DIR/$(sanitize_release_name "$detected_version")"
   log "Bootstrap da estrutura atomica: criando release base em $bootstrap_release"
 
   if [[ ! -d "$bootstrap_release" ]]; then
@@ -819,6 +818,7 @@ link_shared_into_release() {
   ln -sfn "$SHARED_DIR/backups" "$release_dir/backups"
 }
 
+# shellcheck disable=SC2317
 discover_pm2_name() {
   local token="$1"
   pm2 jlist 2>/dev/null | grep -oE "\"name\":\"[^\"]*${token}[^\"]*\"" | head -n1 | cut -d'"' -f4 || true
@@ -1452,6 +1452,6 @@ else
 fi
 
 cleanup_old_releases
-disable_maintenance_mode
+disable_maintenance_mode "$@" # shellcheck disable=SC2119
 finish_success
 exit "$EXIT_SUCCESS"

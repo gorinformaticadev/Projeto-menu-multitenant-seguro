@@ -7,6 +7,13 @@ import { Roles } from '@core/common/decorators/roles.decorator';
 import { Public } from '@core/common/decorators/public.decorator';
 import { Role } from '@prisma/client';
 import { IsString, IsOptional } from 'class-validator';
+import { ValidateResponse } from '@common/decorators/validate-response.decorator';
+import {
+  PlatformConfigResponseDto,
+  PlatformNameResponseDto,
+  PlatformEmailResponseDto,
+  PlatformPhoneResponseDto,
+} from './dto/platform-config-response.dto';
 
 type AuthenticatedRequest = { user: { id: string; [key: string]: unknown } };
 
@@ -36,8 +43,9 @@ export class PlatformConfigController {
    */
   @Public()
   @Get()
-  async getPlatformConfig() {
-    return this.platformConfigService.getPlatformConfig();
+  @ValidateResponse(PlatformConfigResponseDto)
+  async getPlatformConfig(): Promise<PlatformConfigResponseDto> {
+    return this.platformConfigService.getPlatformConfig() as any;
   }
 
   /**
@@ -48,16 +56,17 @@ export class PlatformConfigController {
   @Put()
   @Roles(Role.SUPER_ADMIN)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ValidateResponse(PlatformConfigResponseDto)
   async updatePlatformConfig(
     @Body() dto: UpdatePlatformConfigDto,
     @Request() req: AuthenticatedRequest,
-  ) {
+  ): Promise<PlatformConfigResponseDto> {
     return this.platformConfigService.updatePlatformConfig(
       dto.platformName,
       dto.platformEmail,
       dto.platformPhone,
       req.user.id
-    );
+    ) as any;
   }
 
   /**
@@ -67,7 +76,8 @@ export class PlatformConfigController {
    */
   @Public()
   @Get('name')
-  async getPlatformName() {
+  @ValidateResponse(PlatformNameResponseDto)
+  async getPlatformName(): Promise<PlatformNameResponseDto> {
     return {
       platformName: await this.platformConfigService.getPlatformName()
     };
@@ -80,7 +90,8 @@ export class PlatformConfigController {
    */
   @Public()
   @Get('email')
-  async getPlatformEmail() {
+  @ValidateResponse(PlatformEmailResponseDto)
+  async getPlatformEmail(): Promise<PlatformEmailResponseDto> {
     return {
       platformEmail: await this.platformConfigService.getPlatformEmail()
     };
@@ -93,7 +104,8 @@ export class PlatformConfigController {
    */
   @Public()
   @Get('phone')
-  async getPlatformPhone() {
+  @ValidateResponse(PlatformPhoneResponseDto)
+  async getPlatformPhone(): Promise<PlatformPhoneResponseDto> {
     return {
       platformPhone: await this.platformConfigService.getPlatformPhone()
     };

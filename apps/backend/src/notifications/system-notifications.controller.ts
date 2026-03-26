@@ -4,10 +4,15 @@ import { Roles } from '@core/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { NotificationService } from './notification.service';
+import { ValidateResponse } from '@common/decorators/validate-response.decorator';
 import {
   ListSystemNotificationsQueryDto,
   ReadAllSystemNotificationsDto,
+  SystemNotificationActionResponseDto,
+  SystemNotificationBulkActionResponseDto,
+  SystemNotificationListResponseDto,
   SystemNotificationSeverityFilter,
+  SystemNotificationUnreadCountResponseDto,
 } from './dto/system-notifications.dto';
 
 @Controller('system/notifications')
@@ -17,6 +22,7 @@ export class SystemNotificationsController {
   constructor(private readonly notificationService: NotificationService) {}
 
   @Get()
+  @ValidateResponse(SystemNotificationListResponseDto)
   async list(@Query() query: ListSystemNotificationsQueryDto) {
     const page = this.parsePositiveInt(query.page);
     const limit = this.parsePositiveInt(query.limit);
@@ -35,6 +41,7 @@ export class SystemNotificationsController {
   }
 
   @Get('unread-count')
+  @ValidateResponse(SystemNotificationUnreadCountResponseDto)
   async unreadCount() {
     const count = await this.notificationService.getUnreadCount({
       targetRole: 'SUPER_ADMIN',
@@ -44,6 +51,7 @@ export class SystemNotificationsController {
   }
 
   @Post(':id/read')
+  @ValidateResponse(SystemNotificationActionResponseDto)
   async markRead(@Param('id') id: string, @Request() req: any) {
     const notification = await this.notificationService.markSystemNotificationAsRead(id, {
       userId: req?.user?.id || req?.user?.sub,
@@ -53,11 +61,12 @@ export class SystemNotificationsController {
 
     return {
       success: !!notification,
-      notification,
+      notification: notification || undefined,
     };
   }
 
   @Post('read-all')
+  @ValidateResponse(SystemNotificationBulkActionResponseDto)
   async markAllRead(@Request() req: any, @Query() query: ReadAllSystemNotificationsDto) {
     const count = await this.notificationService.markAllSystemNotificationsAsRead({
       userId: query?.targetUserId || req?.user?.id || req?.user?.sub,

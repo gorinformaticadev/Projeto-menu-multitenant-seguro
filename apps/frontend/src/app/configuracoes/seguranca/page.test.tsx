@@ -647,8 +647,8 @@ describe("/configuracoes/seguranca", () => {
       name: /Tornar 2FA Obrigatório/i,
     });
 
-    expect(readonlyToggle).toHaveClass("data-[state=unchecked]:bg-destructive/80");
-    expect(legacyUncheckedToggle).toHaveClass("data-[state=unchecked]:bg-destructive/80");
+    expect(readonlyToggle).toHaveClass("data-[state=unchecked]:bg-skin-danger/80");
+    expect(legacyUncheckedToggle).toHaveClass("data-[state=unchecked]:bg-skin-danger/80");
   });
 
   it("exibe security.headers.enabled como somente leitura visivel, com reinicio explicito e observacao operacional", async () => {

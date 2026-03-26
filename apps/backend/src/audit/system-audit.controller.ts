@@ -5,6 +5,8 @@ import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { AuditService } from './audit.service';
 import { isSystemAuditAction, SYSTEM_AUDIT_ACTION_PREFIXES } from './system-audit.constants';
+import { ValidateResponse } from '@common/decorators/validate-response.decorator';
+import { AuditListResponseDto, AuditStatsResponseDto, AuditLogResponseDto } from './dto/audit-response.dto';
 
 @Controller('system/audit')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -13,6 +15,7 @@ export class SystemAuditController {
   constructor(private readonly auditService: AuditService) {}
 
   @Get()
+  @ValidateResponse(AuditListResponseDto)
   async findAll(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -21,7 +24,7 @@ export class SystemAuditController {
     @Query('actorUserId') actorUserId?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
-  ) {
+  ): Promise<AuditListResponseDto> {
     return this.auditService.findAll({
       page: this.parsePositiveInt(page),
       limit: this.parsePositiveInt(limit),
@@ -31,29 +34,31 @@ export class SystemAuditController {
       actorUserId,
       from: this.parseDate(from),
       to: this.parseDate(to),
-    });
+    }) as any;
   }
 
   @Get('stats')
+  @ValidateResponse(AuditStatsResponseDto)
   async getStats(
     @Query('from') from?: string,
     @Query('to') to?: string,
-  ) {
+  ): Promise<AuditStatsResponseDto> {
     return this.auditService.getStatsByActionPrefixes({
       allowedActionPrefixes: [...SYSTEM_AUDIT_ACTION_PREFIXES],
       startDate: this.parseDate(from),
       endDate: this.parseDate(to),
-    });
+    }) as any;
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string) {
+  @ValidateResponse(AuditLogResponseDto)
+  async findOne(@Param('id') id: string): Promise<AuditLogResponseDto | null> {
     const log = await this.auditService.findOne(id);
     if (!log || typeof log.action !== 'string') {
       return null;
     }
 
-    return isSystemAuditAction(log.action) ? log : null;
+    return isSystemAuditAction(log.action) ? (log as any) : null;
   }
 
   private parsePositiveInt(value?: string): number | undefined {

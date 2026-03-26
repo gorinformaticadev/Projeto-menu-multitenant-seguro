@@ -55,6 +55,9 @@ describe('NotificationGateway websocket hardening', () => {
       register: jest.fn(),
       unregister: jest.fn(),
     };
+    const authorizationService = {
+      canAccessModule: jest.fn().mockResolvedValue(true),
+    };
     const emit = jest.fn();
     const to = jest.fn(() => ({ emit }));
 
@@ -66,6 +69,7 @@ describe('NotificationGateway websocket hardening', () => {
       websocketRuntimeToggleService as any,
       requestSecurityContext,
       websocketConnectionRegistry as any,
+      authorizationService as any,
     );
     gateway.server = { to } as any;
     gateways.push(gateway);

@@ -25,6 +25,9 @@ describe('PushNotificationService', () => {
       source: 'default',
     }),
   };
+  const authorizationServiceMock = {
+    canAccessModule: jest.fn().mockResolvedValue(true),
+  };
 
   const baseNotification: Notification = {
     id: 'notif-1',
@@ -45,6 +48,7 @@ describe('PushNotificationService', () => {
       prismaMock as unknown as PrismaService,
       configServiceMock as unknown as ConfigService,
       configResolverMock as unknown as ConfigResolverService,
+      authorizationServiceMock as any,
     );
 
   beforeEach(() => {

@@ -2,6 +2,10 @@
   "private": true,
   "version": "0.1.81",
   "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20.0.0 <21.0.0",
+    "pnpm": ">=9.0.0"
+  },
   "workspaces": {
     "packages": [
       "apps/*"
@@ -15,7 +19,7 @@
     "release": "pnpm dlx standard-version",
     "versao": "pnpm run release && git push --follow-tags",
     "install:all": "pnpm install",
-    "check:theming": "node scripts/check-no-hardcoded-colors.js",
+    "check:theming": "node Scripts/check-no-hardcoded-colors.js",
     "dev:backend": "corepack pnpm --filter backend start:dev",
     "dev:frontend": "corepack pnpm --filter frontend dev",
     "build:all": "corepack pnpm -r run build",

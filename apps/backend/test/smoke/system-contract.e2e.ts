@@ -8,7 +8,7 @@ import {
   Module,
   UnauthorizedException,
 } from '@nestjs/common';
-import { APP_GUARD, Reflector } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR, Reflector } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { Role } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
@@ -35,6 +35,7 @@ import { SystemDashboardController } from '../../src/dashboard/system-dashboard.
 import { SystemDashboardService } from '../../src/dashboard/system-dashboard.service';
 import { SystemOperationalAlertsService } from '../../src/common/services/system-operational-alerts.service';
 import { SystemTelemetryService } from '../../src/common/services/system-telemetry.service';
+import { ResponseValidationInterceptor } from '../../src/common/interceptors/response-validation.interceptor';
 
 const DEFAULT_MAINTENANCE_STATE: MaintenanceState = {
   enabled: false,
@@ -46,28 +47,37 @@ const DEFAULT_MAINTENANCE_STATE: MaintenanceState = {
 };
 
 const UPDATE_STATUS_RESPONSE = {
-  status: 'idle',
-  startedAt: null,
-  finishedAt: null,
-  fromVersion: 'v1.0.0',
-  toVersion: 'v1.0.1',
-  step: 'idle',
-  progress: 0,
-  lock: false,
-  lastError: null,
-  rollback: {
-    attempted: false,
-    completed: false,
-    reason: null,
+  currentVersion: 'v1.0.0',
+  availableVersion: 'v1.0.1',
+  updateAvailable: true,
+  lastCheck: new Date(),
+  isConfigured: true,
+  checkEnabled: true,
+  mode: 'docker',
+  updateChannel: 'release',
+  updateLifecycle: {
+    status: 'idle',
+    availabilityStatus: 'available',
+    rawStatus: 'idle',
+    step: 'idle',
+    progress: 0,
+    startedAt: null,
+    finishedAt: null,
+    mode: 'docker',
+    lock: false,
+    stale: false,
+    operation: {
+      active: false,
+      operationId: null,
+      type: null,
+    },
+    rollback: {
+      attempted: false,
+      completed: false,
+      reason: null,
+    },
+    error: null,
   },
-  operation: {
-    active: false,
-    operationId: null,
-    type: null,
-  },
-  stale: false,
-  lockPath: '/tmp/update.lock',
-  statePath: '/tmp/update-state.json',
 };
 
 const SYSTEM_NOTIFICATIONS_FIXTURE = {
@@ -95,7 +105,7 @@ let maintenanceState = { ...DEFAULT_MAINTENANCE_STATE };
 
 const maintenanceModeServiceMock = {
   getState: jest.fn(async () => maintenanceState),
-};
+} as any;
 
 const systemUpdateAdminServiceMock = {
   getStatus: jest.fn(async () => UPDATE_STATUS_RESPONSE),
@@ -103,7 +113,7 @@ const systemUpdateAdminServiceMock = {
   listReleases: jest.fn(),
   runUpdate: jest.fn(),
   runRollback: jest.fn(),
-};
+} as any;
 
 const notificationServiceMock = {
   list: jest.fn(async () => ({ ...SYSTEM_NOTIFICATIONS_FIXTURE })),
@@ -115,7 +125,7 @@ const notificationServiceMock = {
     readAt: new Date('2026-03-05T22:05:00Z'),
   })),
   markAllSystemNotificationsAsRead: jest.fn(async () => SYSTEM_NOTIFICATIONS_FIXTURE.unreadCount),
-};
+} as any;
 
 const auditServiceMock = {
   findAll: jest.fn(async () => ({
@@ -123,9 +133,16 @@ const auditServiceMock = {
       {
         id: 'audit-1',
         action: 'UPDATE_STARTED',
+        actionLabel: 'Update iniciado',
         severity: 'warning',
         message: 'Update iniciado',
         actorUserId: 'smoke-admin',
+        actorEmail: 'admin@example.com',
+        actorRole: 'SUPER_ADMIN',
+        tenantId: null,
+        ipAddress: '127.0.0.1',
+        userAgent: 'SmokeTest',
+        details: {},
         metadata: { source: 'panel' },
         createdAt: new Date('2026-03-06T10:00:00Z'),
       },
@@ -135,14 +152,21 @@ const auditServiceMock = {
   findOne: jest.fn(async (id: string) => ({
     id,
     action: 'UPDATE_STARTED',
+    actionLabel: 'Update iniciado',
     severity: 'warning',
     message: 'Update iniciado',
     actorUserId: 'smoke-admin',
+    actorEmail: 'admin@example.com',
+    actorRole: 'SUPER_ADMIN',
+    tenantId: null,
+    ipAddress: '127.0.0.1',
+    userAgent: 'SmokeTest',
+    details: {},
     metadata: { source: 'panel' },
     createdAt: new Date('2026-03-06T10:00:00Z'),
   })),
   log: jest.fn(async () => null),
-};
+} as any;
 
 const retentionServiceMock = {
   runRetentionCleanup: jest.fn(async () => ({
@@ -154,18 +178,24 @@ const retentionServiceMock = {
     notificationRetentionDays: 30,
     errors: [],
   })),
-};
+} as any;
 
 const systemTelemetryServiceMock = {
   recordSecurityEvent: jest.fn(),
-};
+} as any;
 const systemOperationalAlertsServiceMock = {
   notifyMaintenanceBypassUsed: jest.fn(async () => true),
-};
+} as any;
 
 const systemDashboardServiceMock = {
   getDashboard: jest.fn(async () => ({
     generatedAt: '2026-03-06T14:00:00.000Z',
+    responseTimeMs: 120,
+    filtersApplied: {
+      periodMinutes: 60,
+      tenantId: null,
+      severity: 'all',
+    },
     version: { status: 'ok', version: 'v1.2.3' },
     uptime: { status: 'ok', human: '01:22:33' },
     maintenance: { status: 'ok', enabled: false },
@@ -191,7 +221,12 @@ const systemDashboardServiceMock = {
     filtersJson: { periodMinutes: 60, severity: 'all', hiddenWidgetIds: [] },
     updatedAt: '2026-03-06T14:02:00.000Z',
   })),
-};
+  getModuleCards: jest.fn(async () => ({
+    generatedAt: new Date().toISOString(),
+    cards: [],
+    widgets: { available: [] },
+  })),
+} as any;
 
 @Injectable()
 class MockJwtAuthGuard implements CanActivate {
@@ -258,6 +293,10 @@ class DummyTenantsController {
     {
       provide: APP_GUARD,
       useExisting: MaintenanceModeGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ResponseValidationInterceptor,
     },
     {
       provide: MaintenanceModeService,
@@ -387,8 +426,36 @@ describe('System contract smoke', () => {
       startedAt: '2026-03-05T22:00:00Z',
       etaSeconds: 300,
     });
+    
+    // Validação rígida de tipos e campos obrigatórios
+    expect(typeof response.body.enabled).toBe('boolean');
+    expect(typeof response.body.reason).toBe('string');
+    expect(typeof response.body.startedAt).toBe('string');
+    expect(typeof response.body.etaSeconds).toBe('number');
+    
     expect(response.body.allowedRoles).toBeUndefined();
     expect(response.body.bypassHeader).toBeUndefined();
+  });
+
+  it('GET /api/system/maintenance/state fails if contract is violated (Internal Server Error)', async () => {
+    // Simulamos um payload inválido vindo do service (ex: faltando campo obrigatório 'enabled')
+    // Usamos mockResolvedValue para garantir que tanto o Guard quanto o Controller vejam o erro
+    maintenanceModeServiceMock.getState.mockResolvedValue({
+      reason: 'invalid payload test',
+      startedAt: '2026-03-05T22:00:00Z',
+      etaSeconds: 300,
+    } as any);
+
+    try {
+      const response = await request(app.getHttpServer())
+        .get('/api/system/maintenance/state');
+      
+      expect(response.status).toBe(500);
+      expect(response.body.message).toMatch(/viola o contrato definido|Erro interno/);
+    } finally {
+      // Restauramos o mock para o comportamento padrão
+      maintenanceModeServiceMock.getState.mockImplementation(async () => maintenanceState);
+    }
   });
 
   it('GET /api/system/update/status enforces auth and returns 200 for mocked admin auth', async () => {
@@ -399,8 +466,8 @@ describe('System contract smoke', () => {
       .set('Authorization', 'Bearer smoke-admin-token')
       .expect(200);
 
-    expect(response.body.status).toBe('idle');
-    expect(response.body.operation).toEqual({
+    expect(response.body.updateLifecycle.status).toBe('idle');
+    expect(response.body.updateLifecycle.operation).toEqual({
       active: false,
       operationId: null,
       type: null,
