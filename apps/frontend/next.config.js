@@ -99,9 +99,9 @@ const nextConfig = {
   },
   experimental: {
     optimizeCss: true,
-    // Mantido desabilitado para evitar falha estrutural do build no ambiente atual.
     workerThreads: false,
     webpackBuildWorker: false,
+    cpus: 1,
   },
   output: "standalone",
   staticPageGenerationTimeout: 1000,
