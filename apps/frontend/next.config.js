@@ -104,6 +104,7 @@ const nextConfig = {
     webpackBuildWorker: false,
   },
   output: "standalone",
+  staticPageGenerationTimeout: 1000,
 };
 
 export default nextConfig;

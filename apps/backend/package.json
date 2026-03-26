@@ -82,7 +82,9 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@angular-devkit/schematics-cli": "^21.2.3",
     "@nestjs/cli": "^11.0.16",
+    "@nestjs/schematics": "^11.0.9",
     "@nestjs/testing": "^11.1.14",
     "@types/bcrypt": "^5.0.2",
     "@types/cookie-parser": "^1.4.10",
@@ -92,9 +94,9 @@
     "@types/multer": "^2.0.0",
     "@types/node": "^20.19.33",
     "@types/nodemailer": "^6.4.23",
-    "@types/supertest": "^6.0.3",
     "@types/passport-jwt": "^4.0.1",
     "@types/semver": "^7.7.1",
+    "@types/supertest": "^6.0.3",
     "@types/uuid": "^10.0.0",
     "@types/validator": "^13.15.10",
     "@typescript-eslint/eslint-plugin": "^8.56.0",
