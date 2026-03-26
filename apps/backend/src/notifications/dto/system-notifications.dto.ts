@@ -74,7 +74,7 @@ export class SystemNotificationDto {
   @ApiProperty()
   @Expose()
   @IsObject()
-  data: Record<string, any>;
+  data: Record<string, unknown>;
 
   @ApiProperty({ nullable: true })
   @Expose()

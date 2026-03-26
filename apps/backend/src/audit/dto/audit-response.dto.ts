@@ -90,13 +90,13 @@ export class AuditLogResponseDto {
   @Expose()
   @IsOptional()
   @IsObject()
-  details: Record<string, any> | null;
+  details: Record<string, unknown> | null;
 
   @ApiProperty({ nullable: true })
   @Expose()
   @IsOptional()
   @IsObject()
-  metadata: Record<string, any> | null;
+  metadata: Record<string, unknown> | null;
 
   @ApiProperty()
   @Expose()

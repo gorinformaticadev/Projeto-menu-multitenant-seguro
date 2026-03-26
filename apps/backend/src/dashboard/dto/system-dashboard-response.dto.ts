@@ -811,21 +811,248 @@ export class DashboardWidgetsDto {
   available: string[];
 }
 
+export class GridItemDto {
+  @ApiProperty()
+  @Expose()
+  @IsString()
+  i: string;
+
+  @ApiProperty()
+  @Expose()
+  @IsNumber()
+  x: number;
+
+  @ApiProperty()
+  @Expose()
+  @IsNumber()
+  y: number;
+
+  @ApiProperty()
+  @Expose()
+  @IsNumber()
+  w: number;
+
+  @ApiProperty()
+  @Expose()
+  @IsNumber()
+  h: number;
+
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsBoolean()
+  static?: boolean;
+}
+
+export class DashboardLayoutDataDto {
+  @ApiProperty({ type: [GridItemDto], required: false })
+  @Expose()
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => GridItemDto)
+  lg?: GridItemDto[];
+
+  @ApiProperty({ type: [GridItemDto], required: false })
+  @Expose()
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => GridItemDto)
+  md?: GridItemDto[];
+
+  @ApiProperty({ type: [GridItemDto], required: false })
+  @Expose()
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => GridItemDto)
+  sm?: GridItemDto[];
+
+  @ApiProperty({ type: [GridItemDto], required: false })
+  @Expose()
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => GridItemDto)
+  xs?: GridItemDto[];
+
+  @ApiProperty({ type: [GridItemDto], required: false })
+  @Expose()
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => GridItemDto)
+  xxs?: GridItemDto[];
+}
+
+export class DashboardFiltersJsonDto {
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsNumber()
+  periodMinutes?: number;
+
+  @ApiProperty({ required: false, nullable: true })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  tenantId?: string | null;
+
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  severity?: string;
+
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsBoolean()
+  operationalPinned?: boolean;
+
+  @ApiProperty({ required: false, type: [String] })
+  @Expose()
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  hiddenWidgetIds?: string[];
+}
+
+export class ModuleCardStatDto {
+  @ApiProperty()
+  @Expose()
+  @IsString()
+  label: string;
+
+  @ApiProperty()
+  @Expose()
+  @IsString()
+  value: string;
+}
+
+export class ModuleCardItemEntryDto {
+  @ApiProperty()
+  @Expose()
+  @IsString()
+  id: string;
+
+  @ApiProperty()
+  @Expose()
+  @IsString()
+  label: string;
+
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  value?: string;
+
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  column?: string;
+
+  @ApiProperty({ required: false, enum: ['neutral', 'good', 'warn', 'danger'] })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  tone?: 'neutral' | 'good' | 'warn' | 'danger';
+}
+
+export class ModuleCardItemDto {
+  @ApiProperty()
+  @Expose()
+  @IsString()
+  id: string;
+
+  @ApiProperty()
+  @Expose()
+  @IsString()
+  title: string;
+
+  @ApiProperty({ required: false, nullable: true })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  description?: string | null;
+
+  @ApiProperty()
+  @Expose()
+  @IsString()
+  module: string;
+
+  @ApiProperty({ enum: Role, required: false })
+  @Expose()
+  @IsOptional()
+  @IsEnum(Role)
+  visibilityRole?: Role;
+
+  @ApiProperty({ required: false, enum: ['summary', 'list', 'kanban'] })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  kind?: 'summary' | 'list' | 'kanban';
+
+  @ApiProperty({ required: false, nullable: true })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  icon?: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  href?: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  actionLabel?: string | null;
+
+  @ApiProperty({ required: false, enum: ['small', 'medium', 'large'] })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  size?: 'small' | 'medium' | 'large';
+
+  @ApiProperty({ type: [ModuleCardStatDto], required: false })
+  @Expose()
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ModuleCardStatDto)
+  stats?: ModuleCardStatDto[];
+
+  @ApiProperty({ type: [ModuleCardItemEntryDto], required: false })
+  @Expose()
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ModuleCardItemEntryDto)
+  items?: ModuleCardItemEntryDto[];
+}
+
 export class DashboardLayoutResponseDto {
   @ApiProperty({ enum: Role })
   @Expose()
   @IsEnum(Role)
   role: Role;
 
-  @ApiProperty()
+  @ApiProperty({ type: DashboardLayoutDataDto })
   @Expose()
-  @IsObject()
-  layoutJson: any;
+  @ValidateNested()
+  @Type(() => DashboardLayoutDataDto)
+  layoutJson: DashboardLayoutDataDto;
 
-  @ApiProperty()
+  @ApiProperty({ type: DashboardFiltersJsonDto })
   @Expose()
-  @IsObject()
-  filtersJson: any;
+  @ValidateNested()
+  @Type(() => DashboardFiltersJsonDto)
+  filtersJson: DashboardFiltersJsonDto;
 
   @ApiProperty()
   @Expose()
@@ -839,10 +1066,12 @@ export class DashboardModuleCardsResponseDto {
   @IsDateString()
   generatedAt: string;
 
-  @ApiProperty({ type: [Object] })
+  @ApiProperty({ type: [ModuleCardItemDto] })
   @Expose()
   @IsArray()
-  cards: any[];
+  @ValidateNested({ each: true })
+  @Type(() => ModuleCardItemDto)
+  cards: ModuleCardItemDto[];
 
   @ApiProperty({ type: DashboardWidgetsDto })
   @Expose()

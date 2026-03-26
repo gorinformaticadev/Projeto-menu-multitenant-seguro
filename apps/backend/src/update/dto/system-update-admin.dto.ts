@@ -1,4 +1,6 @@
-import { IsBoolean, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, Matches, Max, Min, IsArray, IsObject, ValidateNested, IsNumber } from 'class-validator';
+import { Expose, Type } from 'class-transformer';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class RunSystemUpdateDto {
   @IsString()
@@ -29,3 +31,96 @@ export class SystemUpdateLogQueryDto {
   tail?: number;
 }
 
+export class SystemUpdateResponseDto {
+  @ApiProperty()
+  @Expose()
+  @IsBoolean()
+  success: boolean;
+
+  @ApiProperty()
+  @Expose()
+  @IsString()
+  operationId: string;
+
+  @ApiProperty()
+  @Expose()
+  @IsString()
+  message: string;
+}
+
+export class SystemUpdateLogResponseDto {
+  @ApiProperty()
+  @Expose()
+  @IsNumber()
+  tail: number;
+
+  @ApiProperty()
+  @Expose()
+  @IsNumber()
+  totalLines: number;
+
+  @ApiProperty({ type: [String] })
+  @Expose()
+  @IsArray()
+  @IsString({ each: true })
+  lines: string[];
+
+  @ApiProperty()
+  @Expose()
+  @IsString()
+  logPath: string;
+}
+
+export class ReleaseRowDto {
+  @ApiProperty()
+  @Expose()
+  @IsString()
+  name: string;
+
+  @ApiProperty()
+  @Expose()
+  @IsString()
+  path: string;
+
+  @ApiProperty()
+  @Expose()
+  @IsBoolean()
+  isCurrent: boolean;
+
+  @ApiProperty()
+  @Expose()
+  @IsBoolean()
+  isPrevious: boolean;
+
+  @ApiProperty({ nullable: true })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  modifiedAt: string | null;
+}
+
+export class SystemUpdateReleasesResponseDto {
+  @ApiProperty({ nullable: true })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  current: string | null;
+
+  @ApiProperty({ nullable: true })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  previous: string | null;
+
+  @ApiProperty({ type: [ReleaseRowDto] })
+  @Expose()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ReleaseRowDto)
+  releases: ReleaseRowDto[];
+
+  @ApiProperty()
+  @Expose()
+  @IsString()
+  baseDir: string;
+}
