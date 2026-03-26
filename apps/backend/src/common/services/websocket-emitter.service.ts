@@ -28,7 +28,12 @@ export class WebsocketEmitterService {
       this.logger.error(`Attempt to emit ${event} failed. Server not initialized.`);
       return;
     }
-    const cleanPayload = this.dtoMapper.serialize(dtoClass, payload);
+    const cleanPayload = this.dtoMapper.serialize(dtoClass, payload, {
+      origin: 'ws',
+      method: 'WS',
+      route: this.buildTelemetryRoute(event),
+      operationType: 'emit',
+    });
     this.server.to(room).emit(event, cleanPayload);
   }
 
@@ -49,5 +54,18 @@ export class WebsocketEmitterService {
 
   public emitPrimitiveToClient(client: any, event: string, payload: Record<string, string | number | boolean | null>): void {
     client.emit(event, payload);
+  }
+
+  private buildTelemetryRoute(event: string): string {
+    const segments = String(event || '')
+      .split(/[:.]/)
+      .map((segment) => segment.trim().toLowerCase().replace(/[^a-z0-9_-]/g, ''))
+      .filter((segment) => segment.length > 0);
+
+    if (segments.length === 0) {
+      return '/ws/unknown';
+    }
+
+    return `/ws/${segments.join('/')}`;
   }
 }

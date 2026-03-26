@@ -113,7 +113,13 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
   }
 
   private mapNotificationToDto(notification: Notification): SystemNotificationDto {
-    return this.dtoMapper.serialize(SystemNotificationDto, notification);
+    return this.dtoMapper.serialize(SystemNotificationDto, notification, {
+      origin: 'ws',
+      method: 'WS',
+      route: '/ws/notifications/notification',
+      module: 'notifications',
+      operationType: 'emit',
+    });
   }
 
   private startMonitoring() {

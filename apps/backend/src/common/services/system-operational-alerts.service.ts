@@ -1,5 +1,4 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { CronExpression } from '@nestjs/schedule';
 import { BackupJobStatus } from '@prisma/client';
 import Redis from 'ioredis';
@@ -12,11 +11,18 @@ import { PushNotificationService } from '../../notifications/push-notification.s
 import { ConfigResolverService } from '../../system-settings/config-resolver.service';
 import {
   ApiTelemetrySnapshot,
+  ContractAnomalyDtoSummary,
+  ContractAnomalyRouteSummary,
+  ContractAnomalySnapshot,
   RouteTelemetrySummary,
   SecurityTelemetrySnapshot,
   SystemTelemetryService,
 } from './system-telemetry.service';
 import { RedisLockService } from './redis-lock.service';
+import {
+  ContractMetricSeverity,
+  ContractObservabilityThresholds,
+} from './contract-observability.types';
 
 type InfraServiceKey = 'database' | 'redis';
 
@@ -31,6 +37,21 @@ type EvaluatorConfig = {
   minDeniedSample: number;
   jobFailureStormThreshold: number;
   infraDegradedMinConsecutive: number;
+  contractWindowMinutes: number;
+  contractValidationWarningCount: number;
+  contractValidationCriticalCount: number;
+  contractPayloadWarningCount: number;
+  contractPayloadCriticalCount: number;
+  contractValidationWarningRatePerThousand: number;
+  contractValidationCriticalRatePerThousand: number;
+  contractPayloadWarningRatePerThousand: number;
+  contractPayloadCriticalRatePerThousand: number;
+  contractTrendWarningPercent: number;
+  contractTrendCriticalPercent: number;
+  contractTrendBucketMinutes: number;
+  contractTrendWarningGrowthMinutes: number;
+  contractTrendCriticalGrowthMinutes: number;
+  contractTrendMinEventCount: number;
 };
 
 type AlertDispatchInput = {
@@ -68,6 +89,21 @@ const DEFAULT_ALERT_DENIED_SPIKE_THRESHOLD = 15;
 const DEFAULT_ALERT_MIN_DENIED_SAMPLE = 12;
 const DEFAULT_ALERT_JOB_FAILURE_STORM_THRESHOLD = 4;
 const DEFAULT_ALERT_INFRA_DEGRADED_MIN_CONSECUTIVE = 3;
+const DEFAULT_ALERT_CONTRACT_WINDOW_MINUTES = 10;
+const DEFAULT_ALERT_CONTRACT_VALIDATION_WARNING_COUNT = 3;
+const DEFAULT_ALERT_CONTRACT_VALIDATION_CRITICAL_COUNT = 8;
+const DEFAULT_ALERT_CONTRACT_PAYLOAD_WARNING_COUNT = 5;
+const DEFAULT_ALERT_CONTRACT_PAYLOAD_CRITICAL_COUNT = 12;
+const DEFAULT_ALERT_CONTRACT_VALIDATION_WARNING_RATE_PER_1000 = 2;
+const DEFAULT_ALERT_CONTRACT_VALIDATION_CRITICAL_RATE_PER_1000 = 5;
+const DEFAULT_ALERT_CONTRACT_PAYLOAD_WARNING_RATE_PER_1000 = 5;
+const DEFAULT_ALERT_CONTRACT_PAYLOAD_CRITICAL_RATE_PER_1000 = 15;
+const DEFAULT_ALERT_CONTRACT_TREND_WARNING_PERCENT = 100;
+const DEFAULT_ALERT_CONTRACT_TREND_CRITICAL_PERCENT = 200;
+const DEFAULT_ALERT_CONTRACT_TREND_BUCKET_MINUTES = 10;
+const DEFAULT_ALERT_CONTRACT_TREND_WARNING_GROWTH_MINUTES = 30;
+const DEFAULT_ALERT_CONTRACT_TREND_CRITICAL_GROWTH_MINUTES = 60;
+const DEFAULT_ALERT_CONTRACT_TREND_MIN_EVENT_COUNT = 4;
 
 @Injectable()
 export class SystemOperationalAlertsService implements OnModuleInit {
@@ -126,36 +162,6 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     }
   }
 
-  @OnEvent('contract.validation.failed')
-  async handleContractValidationFailed(payload: { dto: string; errorCount: number }) {
-    await this.dispatchOperationalAlert({
-      action: 'OPS_CONTRACT_VALIDATION_FAILED',
-      cooldownKey: `OPS_CONTRACT_VALIDATION_FAILED:${payload.dto}`,
-      severity: 'critical',
-      title: 'Contrato Quebrado em Producao',
-      body: `O DTO ${payload.dto} apresentou ${payload.errorCount} falhas de validacao e foi abortado.`,
-      data: payload,
-      pushEligible: true,
-      audit: true,
-      source: 'security',
-    }, Date.now(), 60); // Cooldown unitario de 60m para que nao haja spam na mesma rota
-  }
-
-  @OnEvent('contract.payload.stripped')
-  async handleContractPayloadStripped(payload: { dto: string; strippedFields: string[] }) {
-    await this.dispatchOperationalAlert({
-      action: 'OPS_CONTRACT_PAYLOAD_STRIPPED',
-      cooldownKey: `OPS_CONTRACT_PAYLOAD_STRIPPED:${payload.dto}`,
-      severity: 'warning',
-      title: 'Drift Estrutural Detectado',
-      body: `O DTO ${payload.dto} descartou as propriedades: ${payload.strippedFields.join(', ')}.`,
-      data: payload,
-      pushEligible: false,
-      audit: false,
-      source: 'telemetry',
-    }, Date.now(), 60 * 24); // Alerta silencioso para revisao de codigo (1x por dia por DTO)
-  }
-
   async evaluateOperationalAlerts(
     now = new Date(),
   ): Promise<{
@@ -167,6 +173,12 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     const windowMs = config.windowMinutes * 60 * 1000;
     const apiSnapshot = this.systemTelemetryService.getApiSnapshot(windowMs);
     const securitySnapshot = this.systemTelemetryService.getSecuritySnapshot(windowMs);
+    const contractSnapshot = this.systemTelemetryService.getContractAnomalySnapshot(
+      config.contractWindowMinutes * 60 * 1000,
+      {
+        thresholds: this.buildContractThresholds(config),
+      },
+    );
     const emitted: string[] = [];
     const skipped: string[] = [];
 
@@ -213,6 +225,22 @@ export class SystemOperationalAlertsService implements OnModuleInit {
       emitted.push('OPS_ACCESS_DENIED_SPIKE');
     } else {
       skipped.push('OPS_ACCESS_DENIED_SPIKE');
+    }
+
+    if (
+      await this.evaluateContractValidationRegressionAlert(contractSnapshot, config, nowMs)
+    ) {
+      emitted.push('OPS_CONTRACT_VALIDATION_REGRESSION');
+    } else {
+      skipped.push('OPS_CONTRACT_VALIDATION_REGRESSION');
+    }
+
+    if (
+      await this.evaluateContractPayloadRegressionAlert(contractSnapshot, config, nowMs)
+    ) {
+      emitted.push('OPS_CONTRACT_PAYLOAD_REGRESSION');
+    } else {
+      skipped.push('OPS_CONTRACT_PAYLOAD_REGRESSION');
     }
 
     if (
@@ -448,6 +476,116 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     );
   }
 
+  private async evaluateContractValidationRegressionAlert(
+    snapshot: ContractAnomalySnapshot,
+    config: EvaluatorConfig,
+    nowMs: number,
+  ): Promise<boolean> {
+    const severity = this.resolveContractAlertSeverity(snapshot, 'validation_failed');
+    if (!severity) {
+      return false;
+    }
+
+    const topRoute = this.findTopContractRoute(snapshot, 'validation_failed');
+    const topDto = this.findTopContractDto(snapshot, 'validation_failed');
+    const increasePercent = this.resolveContractIncreasePercent(snapshot, 'validation_failed');
+
+    return this.emitAlertIfNeeded(
+      {
+        action: 'OPS_CONTRACT_VALIDATION_REGRESSION',
+        cooldownKey: 'OPS_CONTRACT_VALIDATION_REGRESSION',
+        severity,
+        title:
+          severity === 'critical'
+            ? 'Falhas de contrato em aceleracao'
+            : 'Falhas de contrato acima do normal',
+        body: this.buildContractAlertBody({
+          label: 'falhas de validacao de contrato',
+          count: snapshot.totalValidationErrors,
+          windowMinutes: config.contractWindowMinutes,
+          ratePerThousandRequests: snapshot.failureRatePerThousandRequests,
+          increasePercent,
+          continuousGrowthMinutes: snapshot.trends.continuousGrowthMinutes,
+          topRoute,
+          topDto,
+        }),
+        data: {
+          windowMinutes: config.contractWindowMinutes,
+          eventCount: snapshot.totalValidationErrors,
+          previousEventCount: snapshot.trends.previousValidationErrors,
+          ratePerThousandRequests: snapshot.failureRatePerThousandRequests,
+          increasePercent,
+          continuousGrowthMinutes: snapshot.trends.continuousGrowthMinutes,
+          topRoute,
+          topDto,
+          thresholds: snapshot.thresholds.validationFailed,
+          trendThresholds: snapshot.thresholds.trend,
+          snapshotSeverity: snapshot.severity.validationFailed,
+        },
+        pushEligible: severity === 'critical',
+        audit: severity === 'critical',
+        source: 'contract-observability',
+      },
+      nowMs,
+      config.cooldownMinutes,
+    );
+  }
+
+  private async evaluateContractPayloadRegressionAlert(
+    snapshot: ContractAnomalySnapshot,
+    config: EvaluatorConfig,
+    nowMs: number,
+  ): Promise<boolean> {
+    const severity = this.resolveContractAlertSeverity(snapshot, 'payload_stripped');
+    if (!severity) {
+      return false;
+    }
+
+    const topRoute = this.findTopContractRoute(snapshot, 'payload_stripped');
+    const topDto = this.findTopContractDto(snapshot, 'payload_stripped');
+    const increasePercent = this.resolveContractIncreasePercent(snapshot, 'payload_stripped');
+
+    return this.emitAlertIfNeeded(
+      {
+        action: 'OPS_CONTRACT_PAYLOAD_REGRESSION',
+        cooldownKey: 'OPS_CONTRACT_PAYLOAD_REGRESSION',
+        severity,
+        title:
+          severity === 'critical'
+            ? 'Drift de contrato em aceleracao'
+            : 'Stripping de payload acima do normal',
+        body: this.buildContractAlertBody({
+          label: 'eventos de stripping de payload',
+          count: snapshot.totalPayloadStrips,
+          windowMinutes: config.contractWindowMinutes,
+          ratePerThousandRequests: snapshot.strippingRatePerThousandRequests,
+          increasePercent,
+          continuousGrowthMinutes: snapshot.trends.continuousGrowthMinutes,
+          topRoute,
+          topDto,
+        }),
+        data: {
+          windowMinutes: config.contractWindowMinutes,
+          eventCount: snapshot.totalPayloadStrips,
+          previousEventCount: snapshot.trends.previousPayloadStrips,
+          ratePerThousandRequests: snapshot.strippingRatePerThousandRequests,
+          increasePercent,
+          continuousGrowthMinutes: snapshot.trends.continuousGrowthMinutes,
+          topRoute,
+          topDto,
+          thresholds: snapshot.thresholds.payloadStripped,
+          trendThresholds: snapshot.thresholds.trend,
+          snapshotSeverity: snapshot.severity.payloadStripped,
+        },
+        pushEligible: severity === 'critical',
+        audit: false,
+        source: 'contract-observability',
+      },
+      nowMs,
+      config.cooldownMinutes,
+    );
+  }
+
   private async evaluateJobFailureStormAlert(
     config: EvaluatorConfig,
     now: Date,
@@ -587,6 +725,191 @@ export class SystemOperationalAlertsService implements OnModuleInit {
         );
       }) || null
     );
+  }
+
+  private buildContractThresholds(config: EvaluatorConfig): ContractObservabilityThresholds {
+    return {
+      validationFailed: {
+        volume: {
+          warning: config.contractValidationWarningCount,
+          critical: config.contractValidationCriticalCount,
+        },
+        ratePerThousandRequests: {
+          warning: config.contractValidationWarningRatePerThousand,
+          critical: config.contractValidationCriticalRatePerThousand,
+        },
+      },
+      payloadStripped: {
+        volume: {
+          warning: config.contractPayloadWarningCount,
+          critical: config.contractPayloadCriticalCount,
+        },
+        ratePerThousandRequests: {
+          warning: config.contractPayloadWarningRatePerThousand,
+          critical: config.contractPayloadCriticalRatePerThousand,
+        },
+      },
+      trend: {
+        warningPercent: config.contractTrendWarningPercent,
+        criticalPercent: config.contractTrendCriticalPercent,
+        bucketMinutes: config.contractTrendBucketMinutes,
+        warningGrowthMinutes: config.contractTrendWarningGrowthMinutes,
+        criticalGrowthMinutes: config.contractTrendCriticalGrowthMinutes,
+        minEventCount: config.contractTrendMinEventCount,
+      },
+    };
+  }
+
+  private resolveContractAlertSeverity(
+    snapshot: ContractAnomalySnapshot,
+    type: 'validation_failed' | 'payload_stripped',
+  ): SystemNotificationSeverity | null {
+    const thresholds = snapshot.thresholds;
+    const count =
+      type === 'validation_failed' ? snapshot.totalValidationErrors : snapshot.totalPayloadStrips;
+    if (count <= 0) {
+      return null;
+    }
+
+    const rate =
+      type === 'validation_failed'
+        ? snapshot.failureRatePerThousandRequests
+        : snapshot.strippingRatePerThousandRequests;
+    const topRoute = this.findTopContractRoute(snapshot, type);
+    const topRouteRate =
+      type === 'validation_failed'
+        ? topRoute?.failureRatePerThousandRequests
+        : topRoute?.strippingRatePerThousandRequests;
+    const typeThresholds =
+      type === 'validation_failed' ? thresholds.validationFailed : thresholds.payloadStripped;
+    let severity: ContractMetricSeverity = 'normal';
+
+    if (
+      count >= typeThresholds.volume.critical ||
+      (rate !== null && rate >= typeThresholds.ratePerThousandRequests.critical) ||
+      (topRouteRate !== null &&
+        topRouteRate !== undefined &&
+        topRouteRate >= typeThresholds.ratePerThousandRequests.critical)
+    ) {
+      severity = 'critical';
+    } else if (
+      count >= typeThresholds.volume.warning ||
+      (rate !== null && rate >= typeThresholds.ratePerThousandRequests.warning) ||
+      (topRouteRate !== null &&
+        topRouteRate !== undefined &&
+        topRouteRate >= typeThresholds.ratePerThousandRequests.warning)
+    ) {
+      severity = 'warning';
+    }
+
+    if (count >= thresholds.trend.minEventCount) {
+      const trendPercent = this.resolveContractIncreasePercent(snapshot, type);
+      if (
+        (trendPercent !== null && trendPercent >= thresholds.trend.criticalPercent) ||
+        (snapshot.trends.increasingForLastHour &&
+          snapshot.trends.continuousGrowthMinutes >= thresholds.trend.criticalGrowthMinutes)
+      ) {
+        severity = this.maxContractSeverity(severity, 'critical');
+      } else if (
+        (trendPercent !== null && trendPercent >= thresholds.trend.warningPercent) ||
+        snapshot.trends.continuousGrowthMinutes >= thresholds.trend.warningGrowthMinutes
+      ) {
+        severity = this.maxContractSeverity(severity, 'warning');
+      }
+    }
+
+    return severity === 'normal' ? null : severity;
+  }
+
+  private findTopContractRoute(
+    snapshot: ContractAnomalySnapshot,
+    type: 'validation_failed' | 'payload_stripped',
+  ): ContractAnomalyRouteSummary | null {
+    return (
+      snapshot.byRoute.find((entry) =>
+        type === 'validation_failed' ? entry.validationFailed > 0 : entry.payloadStripped > 0,
+      ) || null
+    );
+  }
+
+  private findTopContractDto(
+    snapshot: ContractAnomalySnapshot,
+    type: 'validation_failed' | 'payload_stripped',
+  ): ContractAnomalyDtoSummary | null {
+    return (
+      snapshot.byDto.find((entry) =>
+        type === 'validation_failed' ? entry.validationFailed > 0 : entry.payloadStripped > 0,
+      ) || null
+    );
+  }
+
+  private resolveContractIncreasePercent(
+    snapshot: ContractAnomalySnapshot,
+    type: 'validation_failed' | 'payload_stripped',
+  ): number | null {
+    if (type === 'validation_failed') {
+      return this.maxDefinedNumber(
+        snapshot.trends.validationIncreasePercent,
+        snapshot.trends.lastBucketIncreasePercent,
+      );
+    }
+
+    return this.maxDefinedNumber(
+      snapshot.trends.payloadIncreasePercent,
+      snapshot.trends.lastBucketIncreasePercent,
+    );
+  }
+
+  private buildContractAlertBody(input: {
+    label: string;
+    count: number;
+    windowMinutes: number;
+    ratePerThousandRequests: number | null;
+    increasePercent: number | null;
+    continuousGrowthMinutes: number;
+    topRoute: ContractAnomalyRouteSummary | null;
+    topDto: ContractAnomalyDtoSummary | null;
+  }): string {
+    const rateLabel =
+      input.ratePerThousandRequests === null
+        ? 'sem amostra suficiente de requests'
+        : `${input.ratePerThousandRequests}/1000 req`;
+    const routeLabel = input.topRoute
+      ? this.formatContractRouteLabel(input.topRoute)
+      : 'sem rota dominante';
+    const dtoLabel = input.topDto?.dto || 'sem DTO dominante';
+    const trendLabel =
+      input.increasePercent !== null
+        ? `e aumento de ${input.increasePercent}% na janela comparada`
+        : input.continuousGrowthMinutes > 0
+          ? `e crescimento continuo por ${input.continuousGrowthMinutes} min`
+          : 'sem baseline suficiente para calcular variacao percentual';
+
+    return `Detectamos ${input.count} ${input.label} em ${input.windowMinutes} min (${rateLabel}), com destaque para ${routeLabel} e DTO ${dtoLabel}, ${trendLabel}.`;
+  }
+
+  private formatContractRouteLabel(route: ContractAnomalyRouteSummary): string {
+    const method = route.method || route.origin.toUpperCase();
+    const moduleLabel = route.module ? ` [${route.module}]` : '';
+    return `${method} ${route.route}${moduleLabel}`;
+  }
+
+  private maxDefinedNumber(...values: Array<number | null>): number | null {
+    const defined = values.filter((value): value is number => Number.isFinite(value));
+    return defined.length > 0 ? Math.max(...defined) : null;
+  }
+
+  private maxContractSeverity(
+    current: ContractMetricSeverity,
+    candidate: ContractMetricSeverity,
+  ): ContractMetricSeverity {
+    const weights: Record<ContractMetricSeverity, number> = {
+      normal: 0,
+      warning: 1,
+      critical: 2,
+    };
+
+    return weights[candidate] > weights[current] ? candidate : current;
   }
 
   // This is the original emitAlertIfNeeded, kept because dispatchOperationalAlert still uses it.
@@ -820,6 +1143,96 @@ export class SystemOperationalAlertsService implements OnModuleInit {
         DEFAULT_ALERT_INFRA_DEGRADED_MIN_CONSECUTIVE,
         1,
         100,
+      ),
+      contractWindowMinutes: this.readIntFromEnv(
+        'OPS_ALERT_CONTRACT_WINDOW_MINUTES',
+        DEFAULT_ALERT_CONTRACT_WINDOW_MINUTES,
+        1,
+        120,
+      ),
+      contractValidationWarningCount: this.readIntFromEnv(
+        'OPS_ALERT_CONTRACT_VALIDATION_WARNING_COUNT',
+        DEFAULT_ALERT_CONTRACT_VALIDATION_WARNING_COUNT,
+        1,
+        100_000,
+      ),
+      contractValidationCriticalCount: this.readIntFromEnv(
+        'OPS_ALERT_CONTRACT_VALIDATION_CRITICAL_COUNT',
+        DEFAULT_ALERT_CONTRACT_VALIDATION_CRITICAL_COUNT,
+        1,
+        100_000,
+      ),
+      contractPayloadWarningCount: this.readIntFromEnv(
+        'OPS_ALERT_CONTRACT_PAYLOAD_WARNING_COUNT',
+        DEFAULT_ALERT_CONTRACT_PAYLOAD_WARNING_COUNT,
+        1,
+        100_000,
+      ),
+      contractPayloadCriticalCount: this.readIntFromEnv(
+        'OPS_ALERT_CONTRACT_PAYLOAD_CRITICAL_COUNT',
+        DEFAULT_ALERT_CONTRACT_PAYLOAD_CRITICAL_COUNT,
+        1,
+        100_000,
+      ),
+      contractValidationWarningRatePerThousand: this.readFloatFromEnv(
+        'OPS_ALERT_CONTRACT_VALIDATION_WARNING_RATE_PER_1000',
+        DEFAULT_ALERT_CONTRACT_VALIDATION_WARNING_RATE_PER_1000,
+        0.1,
+        10_000,
+      ),
+      contractValidationCriticalRatePerThousand: this.readFloatFromEnv(
+        'OPS_ALERT_CONTRACT_VALIDATION_CRITICAL_RATE_PER_1000',
+        DEFAULT_ALERT_CONTRACT_VALIDATION_CRITICAL_RATE_PER_1000,
+        0.1,
+        10_000,
+      ),
+      contractPayloadWarningRatePerThousand: this.readFloatFromEnv(
+        'OPS_ALERT_CONTRACT_PAYLOAD_WARNING_RATE_PER_1000',
+        DEFAULT_ALERT_CONTRACT_PAYLOAD_WARNING_RATE_PER_1000,
+        0.1,
+        10_000,
+      ),
+      contractPayloadCriticalRatePerThousand: this.readFloatFromEnv(
+        'OPS_ALERT_CONTRACT_PAYLOAD_CRITICAL_RATE_PER_1000',
+        DEFAULT_ALERT_CONTRACT_PAYLOAD_CRITICAL_RATE_PER_1000,
+        0.1,
+        10_000,
+      ),
+      contractTrendWarningPercent: this.readFloatFromEnv(
+        'OPS_ALERT_CONTRACT_TREND_WARNING_PERCENT',
+        DEFAULT_ALERT_CONTRACT_TREND_WARNING_PERCENT,
+        1,
+        10_000,
+      ),
+      contractTrendCriticalPercent: this.readFloatFromEnv(
+        'OPS_ALERT_CONTRACT_TREND_CRITICAL_PERCENT',
+        DEFAULT_ALERT_CONTRACT_TREND_CRITICAL_PERCENT,
+        1,
+        10_000,
+      ),
+      contractTrendBucketMinutes: this.readIntFromEnv(
+        'OPS_ALERT_CONTRACT_TREND_BUCKET_MINUTES',
+        DEFAULT_ALERT_CONTRACT_TREND_BUCKET_MINUTES,
+        1,
+        60,
+      ),
+      contractTrendWarningGrowthMinutes: this.readIntFromEnv(
+        'OPS_ALERT_CONTRACT_TREND_WARNING_GROWTH_MINUTES',
+        DEFAULT_ALERT_CONTRACT_TREND_WARNING_GROWTH_MINUTES,
+        1,
+        240,
+      ),
+      contractTrendCriticalGrowthMinutes: this.readIntFromEnv(
+        'OPS_ALERT_CONTRACT_TREND_CRITICAL_GROWTH_MINUTES',
+        DEFAULT_ALERT_CONTRACT_TREND_CRITICAL_GROWTH_MINUTES,
+        1,
+        240,
+      ),
+      contractTrendMinEventCount: this.readIntFromEnv(
+        'OPS_ALERT_CONTRACT_TREND_MIN_EVENT_COUNT',
+        DEFAULT_ALERT_CONTRACT_TREND_MIN_EVENT_COUNT,
+        1,
+        100_000,
       ),
     };
   }

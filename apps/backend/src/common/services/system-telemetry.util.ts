@@ -1,3 +1,9 @@
+import { createHash } from 'node:crypto';
+import {
+  ContractEventOrigin,
+  ContractOperationType,
+} from './contract-observability.types';
+
 type RequestLike = Record<string, any>;
 
 const REQUEST_EXCLUDED_PATHS = [
@@ -33,6 +39,69 @@ const OPAQUE_SEGMENT_PATTERN = /^[a-z0-9_\-~=+.]{24,}$/i;
 export function normalizeTelemetryMethod(method: unknown): string {
   const normalized = String(method || '').trim().toUpperCase();
   return normalized.length > 0 ? normalized : 'GET';
+}
+
+export function resolveTelemetryModule(rawRoute: unknown): string | null {
+  const normalizedRoute = normalizeTelemetryPath(rawRoute);
+  const segments = normalizedRoute.split('/').filter((segment) => segment.length > 0);
+  if (segments.length === 0) {
+    return null;
+  }
+
+  if (segments[0] === 'api' || segments[0] === 'ws') {
+    return normalizeModuleSegment(segments[1]);
+  }
+
+  return normalizeModuleSegment(segments[0]);
+}
+
+export function resolveContractOperationType(
+  method: unknown,
+  origin: ContractEventOrigin,
+): ContractOperationType {
+  if (origin === 'ws') {
+    return 'emit';
+  }
+
+  if (origin === 'system') {
+    return 'command';
+  }
+
+  const normalizedMethod = normalizeTelemetryMethod(method);
+  switch (normalizedMethod) {
+    case 'GET':
+    case 'HEAD':
+      return 'read';
+    case 'POST':
+      return 'create';
+    case 'PUT':
+    case 'PATCH':
+      return 'update';
+    case 'DELETE':
+      return 'delete';
+    default:
+      return 'unknown';
+  }
+}
+
+export function hashTelemetryTenant(tenantId: unknown, secret?: string): string | null {
+  const normalizedTenantId = typeof tenantId === 'string' ? tenantId.trim() : '';
+  if (!normalizedTenantId) {
+    return null;
+  }
+
+  const safeSecret =
+    typeof secret === 'string' && secret.trim().length > 0
+      ? secret.trim()
+      : process.env.OBSERVABILITY_HASH_SALT ||
+        process.env.JWT_SECRET ||
+        process.env.ENCRYPTION_KEY ||
+        'contract-observability';
+
+  return createHash('sha256')
+    .update(`${safeSecret}:${normalizedTenantId}`)
+    .digest('hex')
+    .slice(0, 16);
 }
 
 export function normalizeTelemetryPath(rawPath: unknown): string {
@@ -178,6 +247,15 @@ function matchesPath(actualPath: string, expectedBasePath: string): boolean {
   return actualPath === expectedBasePath || actualPath.startsWith(`${expectedBasePath}/`);
 }
 
+function normalizeModuleSegment(segment: unknown): string | null {
+  if (typeof segment !== 'string') {
+    return null;
+  }
+
+  const normalized = segment.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  return normalized.length > 0 ? normalized : null;
+}
+
 function readHeader(request: RequestLike, headerName: string): string | null {
   const headers = request?.headers || {};
   const value = headers[headerName] || headers[headerName.toLowerCase()];
@@ -202,6 +280,5 @@ function normalizeIp(value: unknown): string {
 
   return normalized;
 }
-
 
 

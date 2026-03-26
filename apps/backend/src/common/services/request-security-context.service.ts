@@ -84,6 +84,10 @@ export class RequestSecurityContextService {
     return this.getActor()?.tenantId ?? null;
   }
 
+  getSource(): 'http' | 'ws' | 'system' {
+    return this.getStore()?.source || 'system';
+  }
+
   isTenantEnforcementBypassed(): boolean {
     return this.getStore()?.tenantEnforcementBypassed === true;
   }
