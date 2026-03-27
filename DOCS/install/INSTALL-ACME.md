@@ -55,8 +55,8 @@ Se você tem um servidor sem nada instalado:
 
 ```bash
 # Clone o repositório
-git clone https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git
-cd Projeto-menu-multitenant-seguro
+git clone https://github.com/gorinformaticadev/Pluggor.git
+cd Pluggor
 
 # Execute o instalador
 sudo bash install/install-acme menu.exemplo.com.br admin@exemplo.com.br
@@ -75,8 +75,8 @@ Se você já tem o **ticketz-docker-acme** rodando no servidor:
 
 ```bash
 # Clone o repositório
-git clone https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git
-cd Projeto-menu-multitenant-seguro
+git clone https://github.com/gorinformaticadev/Pluggor.git
+cd Pluggor
 
 # Execute o instalador (mesmo comando)
 sudo bash install/install-acme menu.exemplo.com.br admin@exemplo.com.br
@@ -121,8 +121,8 @@ Este modo usa **Nginx instalado no host** (fora do Docker) e **Certbot** para ce
 
 ```bash
 # Clone o repositório
-git clone https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git
-cd Projeto-menu-multitenant-seguro
+git clone https://github.com/gorinformaticadev/Pluggor.git
+cd Pluggor
 
 # Execute com flag --external-nginx
 sudo bash install/install-acme menu.exemplo.com.br admin@exemplo.com.br --external-nginx
@@ -482,7 +482,7 @@ Se você preferir configurar o Nginx manualmente ao invés de usar o instalador:
 ### 1. Subir containers
 
 ```bash
-cd /caminho/para/Projeto-menu-multitenant-seguro
+cd /caminho/para/Pluggor
 
 # Criar .env
 cp .env.example .env

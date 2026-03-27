@@ -18,8 +18,8 @@ Certifique-se de que as portas 80 e 443 não estão sendo usadas por nenhum serv
 
 ### 2. Execução
 ```bash
-git clone https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git
-cd Projeto-menu-multitenant-seguro
+git clone https://github.com/gorinformaticadev/Pluggor.git
+cd Pluggor
 sudo bash install/install-acme-int menu.exemplo.com.br admin@exemplo.com.br
 ```
 

@@ -5,7 +5,7 @@ Se você vai trocar de domínio e quer garantir que não haja conflitos de certi
 ## 1. Limpeza Total (No VPS)
 
 ```bash
-cd /home/ubuntu/Projeto-menu-multitenant-seguro
+cd /home/ubuntu/Pluggor
 
 # Parar e remover tudo (containers, redes e volumes)
 docker compose --env-file install/.env.production -f docker-compose.prod.yml down -v

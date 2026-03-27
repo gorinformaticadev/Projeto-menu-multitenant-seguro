@@ -3,7 +3,7 @@ Write-Host "🔄 Reiniciando Backend..." -ForegroundColor Cyan
 Write-Host ""
 
 # Navegar para o diretório do backend
-Set-Location -Path "D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\backend"
+Set-Location -Path "D:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Pluggor\backend"
 
 Write-Host "📦 Compilando alterações..." -ForegroundColor Yellow
 npm run build

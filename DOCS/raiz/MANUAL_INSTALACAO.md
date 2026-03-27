@@ -15,8 +15,8 @@ Antes de iniciar, certifique-se de que o servidor possui:
 ### 1. Clonar o Repositório
 Acesse seu servidor via terminal e clone o projeto:
 ```bash
-git clone https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git
-cd Projeto-menu-multitenant-seguro
+git clone https://github.com/gorinformaticadev/Pluggor.git
+cd Pluggor
 ```
 
 ### 2. Executar o Instalador

@@ -127,7 +127,7 @@ console.log('Buffer final para escrita:', {
 ### 1. Reiniciar Backend
 
 ```powershell
-cd d:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\backend
+cd d:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Pluggor\backend
 
 # Parar processo anterior (Ctrl+C)
 

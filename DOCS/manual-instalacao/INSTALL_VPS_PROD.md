@@ -65,8 +65,8 @@ Utilizaremos o script automatizado `install.sh` que gerencia toda a configuraç�
 ### 1. Clonar o Repositório
 
 ```bash
-git clone https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git
-cd Projeto-menu-multitenant-seguro
+git clone https://github.com/gorinformaticadev/Pluggor.git
+cd Pluggor
 ```
 
 ### 2. Executar o Instalador

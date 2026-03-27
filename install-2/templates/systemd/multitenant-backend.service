@@ -1,6 +1,6 @@
 [Unit]
 Description=Multitenant Backend (NestJS)
-Documentation=https://github.com/Projeto-menu-multitenant-seguro
+Documentation=https://github.com/Pluggor
 After=network.target postgresql.service redis-server.service
 Wants=postgresql.service redis-server.service
 

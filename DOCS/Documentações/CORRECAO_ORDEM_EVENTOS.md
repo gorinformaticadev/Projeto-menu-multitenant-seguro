@@ -24,7 +24,7 @@ O `CoreBootstrap` estava disparando os eventos de registro **ANTES** de carregar
 
 ## ✅ Solução Aplicada
 
-Correção da ordem de execução no [`core/bootstrap/CoreBootstrap.ts`](file:///d:/Usuarios/Servidor/GORInformatica/Documents/GitHub/Projeto-menu-multitenant-seguro/core/bootstrap/CoreBootstrap.ts):
+Correção da ordem de execução no [`core/bootstrap/CoreBootstrap.ts`](file:///d:/Usuarios/Servidor/GORInformatica/Documents/GitHub/Pluggor/core/bootstrap/CoreBootstrap.ts):
 
 ```typescript
 // ✅ ORDEM CORRETA (DEPOIS)
@@ -246,13 +246,13 @@ console.log('Roles:', managers.acl.getRoles());
 ## 📚 Arquivos Relacionados
 
 1. **Corrigidos**
-   - [`core/bootstrap/CoreBootstrap.ts`](file:///d:/Usuarios/Servidor/GORInformatica/Documents/GitHub/Projeto-menu-multitenant-seguro/core/bootstrap/CoreBootstrap.ts) - Ordem de eventos corrigida
+   - [`core/bootstrap/CoreBootstrap.ts`](file:///d:/Usuarios/Servidor/GORInformatica/Documents/GitHub/Pluggor/core/bootstrap/CoreBootstrap.ts) - Ordem de eventos corrigida
 
 2. **Testados**
-   - [`modules/demo-completo/index.ts`](file:///d:/Usuarios/Servidor/GORInformatica/Documents/GitHub/Projeto-menu-multitenant-seguro/modules/demo-completo/index.ts) - Módulo funcionando
+   - [`modules/demo-completo/index.ts`](file:///d:/Usuarios/Servidor/GORInformatica/Documents/GitHub/Pluggor/modules/demo-completo/index.ts) - Módulo funcionando
 
 3. **Criados**
-   - [`test-core-demo.ts`](file:///d:/Usuarios/Servidor/GORInformatica/Documents/GitHub/Projeto-menu-multitenant-seguro/test-core-demo.ts) - Script de teste
+   - [`test-core-demo.ts`](file:///d:/Usuarios/Servidor/GORInformatica/Documents/GitHub/Pluggor/test-core-demo.ts) - Script de teste
 
 ---
 

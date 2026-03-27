@@ -229,7 +229,7 @@ remove_docker_installation() {
     done < <(docker network ls --format '{{.Name}}' 2>/dev/null | grep -E '_multitenant-network$' || true)
 
     local image_ids=()
-    mapfile -t image_ids < <(docker images --format '{{.Repository}} {{.ID}}' 2>/dev/null | awk '/multitenant|projeto-menu-multitenant-seguro/{print $2}' | sort -u || true)
+    mapfile -t image_ids < <(docker images --format '{{.Repository}} {{.ID}}' 2>/dev/null | awk '/multitenant|Pluggor/{print $2}' | sort -u || true)
     if [[ "${#image_ids[@]}" -gt 0 ]]; then
         log_info "Removendo imagens locais da aplicacao..."
         docker rmi -f "${image_ids[@]}" >/dev/null 2>&1 || true

@@ -85,7 +85,7 @@ which docker > /dev/null || curl -sSL https://get.docker.com | sh
 
 # Passo 2: Baixa o projeto e entra na pasta
 echo "Baixando o código fonte..."
-[ -d projeto-multitenant ] || git clone https://github.com/seu-usuario/Projeto-menu-multitenant-seguro.git projeto-multitenant
+[ -d projeto-multitenant ] || git clone https://github.com/seu-usuario/Pluggor.git projeto-multitenant
 cd projeto-multitenant
 
 # Salva alterações locais se existirem
@@ -396,7 +396,7 @@ which docker > /dev/null || curl -sSL https://get.docker.com | sh
 
 # Passo 2: Baixa o projeto e entra na pasta
 echo "Baixando o código fonte..."
-[ -d projeto-multitenant ] || git clone https://github.com/seu-usuario/Projeto-menu-multitenant-seguro.git projeto-multitenant
+[ -d projeto-multitenant ] || git clone https://github.com/seu-usuario/Pluggor.git projeto-multitenant
 cd projeto-multitenant
 
 # Salva alterações locais se existirem

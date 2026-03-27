@@ -28,7 +28,7 @@ cd "$DIR"
 
 # Clonar repositório
 echo "📥 Clonando repositório..."
-git clone https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git .
+git clone https://github.com/gorinformaticadev/Pluggor.git .
 git checkout main
 
 # Docker

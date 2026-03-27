@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
-## [0.2.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.1...v0.2.0) (2025-12-11)
+## [0.2.0](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.1...v0.2.0) (2025-12-11)
 
 
 ### ⚠ BREAKING CHANGES
@@ -11,20 +11,20 @@ All notable changes to this project will be documented in this file. See [standa
 
 ### Features
 
-* add tenant branding and security configuration ([0f5884f](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/0f5884fe4fa0b5469a311cec9c9daf8d68806dc6))
-* **auth:** add password reset functionality ([e8b81af](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/e8b81afa54a965d57a110a558d909b5af0c9f4bf))
-* **auth:** implement password input component with enhanced validation ([347b043](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/347b0432751e1a1efa8ffbc9796e446ba271280a))
-* **cpf-cnpj:** adicionar validação para CPF/CNPJ em DTOs de locatários e formulários front-end ([6573e40](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/6573e4003bbc125b553544e9377aaa6d666183ae))
-* update tenant seeding and topbar display ([f336cb3](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/f336cb3a9f05f2906dce16514adc55de9bd3ce49))
+* add tenant branding and security configuration ([0f5884f](https://github.com/gorinformaticadev/Pluggor/commit/0f5884fe4fa0b5469a311cec9c9daf8d68806dc6))
+* **auth:** add password reset functionality ([e8b81af](https://github.com/gorinformaticadev/Pluggor/commit/e8b81afa54a965d57a110a558d909b5af0c9f4bf))
+* **auth:** implement password input component with enhanced validation ([347b043](https://github.com/gorinformaticadev/Pluggor/commit/347b0432751e1a1efa8ffbc9796e446ba271280a))
+* **cpf-cnpj:** adicionar validação para CPF/CNPJ em DTOs de locatários e formulários front-end ([6573e40](https://github.com/gorinformaticadev/Pluggor/commit/6573e4003bbc125b553544e9377aaa6d666183ae))
+* update tenant seeding and topbar display ([f336cb3](https://github.com/gorinformaticadev/Pluggor/commit/f336cb3a9f05f2906dce16514adc55de9bd3ce49))
 
-### [0.1.1](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.1.0...v0.1.1) (2025-12-11)
+### [0.1.1](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.0...v0.1.1) (2025-12-11)
 
 
 ### Features
 
-* **auth:** add remember me functionality to login page ([6e27e9d](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/6e27e9d5ceedc5683cc3043bf234dcadf5480805))
+* **auth:** add remember me functionality to login page ([6e27e9d](https://github.com/gorinformaticadev/Pluggor/commit/6e27e9d5ceedc5683cc3043bf234dcadf5480805))
 
-## [0.1.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.0.6...v0.1.0) (2025-12-11)
+## [0.1.0](https://github.com/gorinformaticadev/Pluggor/compare/v0.0.6...v0.1.0) (2025-12-11)
 
 
 ### ⚠ BREAKING CHANGES
@@ -33,19 +33,19 @@ All notable changes to this project will be documented in this file. See [standa
 
 ### Features
 
-* **ui:** add click-outside functionality to user menu ([1ffec7d](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/1ffec7dd6b9f334379b03a9c65341b9f4fe61df1))
+* **ui:** add click-outside functionality to user menu ([1ffec7d](https://github.com/gorinformaticadev/Pluggor/commit/1ffec7dd6b9f334379b03a9c65341b9f4fe61df1))
 
 
 ### Bug Fixes
 
-* cc ([d594f27](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/d594f27fcb01f38c14cb5019bc293c253ff60781))
+* cc ([d594f27](https://github.com/gorinformaticadev/Pluggor/commit/d594f27fcb01f38c14cb5019bc293c253ff60781))
 
-### [0.0.6](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.0.1...v0.0.6) (2025-12-11)
+### [0.0.6](https://github.com/gorinformaticadev/Pluggor/compare/v0.0.1...v0.0.6) (2025-12-11)
 
 
 ### Features
 
-* **ui:** add system version display in top bar ([8e6fc5e](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/8e6fc5e4cb8791004eefd138f7ccb907d599bb56))
+* **ui:** add system version display in top bar ([8e6fc5e](https://github.com/gorinformaticadev/Pluggor/commit/8e6fc5e4cb8791004eefd138f7ccb907d599bb56))
 
 ## 2.0.0 (2025-12-11)
 
@@ -65,26 +65,26 @@ All notable changes to this project will be documented in this file. See [standa
 
 ### Features
 
-* add CORS for static files, user profile editing, and favicon support ([f82c9e3](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/f82c9e3d08db68c9945849b503b64ae38be377ec))
-* add tenant self-management for admins and enhance password validation ([c92ac81](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/c92ac81610558a923f682a9e22a951a20c6b68ac))
-* **auth:** add strong password validation and change password feature ([8fcbf1d](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/8fcbf1d8740a98293fffc34ca47cbe7313b9527e))
-* **auth:** implement token rotation and secure session management ([23fc190](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/23fc1905d1b1418e6fbf52b15922c416334c1a8d))
-* **config:** add configurable platform name and contact information ([293b409](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/293b4090604a452fbabbb2f8bc8de42db41451c3))
-* **email:** add email configuration management with database support ([c47525a](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/c47525a2985c5e53d1f8079ed0958762fdf1bdd3))
-* **frontend:** add security logs and configurations pages ([a0fd8c2](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/a0fd8c2f007654e40a19f562c21884d6e5cfd363))
-* **layout:** centralize sidebar in root AppLayout for unified UI structure  Introduce a new AppLayout component at the app root to handle sidebar globally, removing it from the dashboard-specific layout. This promotes consistent navigation across pages and streamlines layout management by avoiding duplication. ([8670f9e](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/8670f9e76bdc61f8908b6b000510ade3e68a8d0c))
-* **security:** add email verification, enhanced 2FA, and security configurations ([427b9a2](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/427b9a25a5948c180572f1da8bbf956b927105a0))
-* **security:** add login attempt blocking, Sentry monitoring, input sanitization, and HTTPS enforcement ([5f7829a](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/5f7829a7d3e96825b1cde92acaa191e553264755))
-* **security:** add rate limiting, audit logging, and security headers ([4c996fb](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/4c996fb8745e14a69a4f8b9c7a5fb5e34bfa4436))
-* **security:** add refresh functionality for security config and clean up login UI ([fd2b722](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/fd2b7227bff8ee3500979d60f9d25e05f4d6d5a9))
-* **security:** add two-factor authentication and advanced CSP policies ([7079255](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/7079255ecf899c1665a10561cf8e5f5e3d1d46a5))
-* **security:** enhance authentication and security configurations ([a9c02a5](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/a9c02a511e0b9c706cd0a4c87fca11843234b476))
-* **security:** enhance login security with configurable lock duration and 2FA management ([a8443a9](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/a8443a92fa59ef39f4f401562c2ad058c1755338))
-* **tenants:** add comprehensive tenant management with admin creation and CRUD operations ([4d04443](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/4d044432f8d397ac64ddc1f0e4fe40bd3c8d7955))
-* **tenants:** add logo upload and management for tenants ([5a05245](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/5a05245854e749a0f9fc34ac4bf48742e28ca361))
-* **tenants:** prevent deactivation of default tenant ([3bdac20](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/3bdac2074c805bc9794909bdcaaf7c72c475a85d))
-* **ui:** add collapsible sidebar functionality  Implement a toggle button to expand or collapse the sidebar, allowing for a more flexible UI layout. The sidebar now transitions smoothly between expanded (showing full content) and collapsed (icon-only) states, improving space utilization on smaller screens. Adjusted the dashboard layout to remove fixed width, enabling dynamic sizing. ([e8823d5](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/e8823d5ba7b33b5e352caf5a4f5b580374ea4d5c))
-* **ui:** add tenant logo display in top bar ([3ac66d9](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/3ac66d981c95148a4d0786dabbdfb389890b5efc))
-* **ui:** add top bar component and update app layout ([d4805cf](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/d4805cff5e689a6946a4e6d86e0cf950d4cb3087))
-* **update:** implement system update functionality with git integration ([2b85961](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/2b8596148efe834459119785b96d330a51727157))
-* **users:** add users module and management interface ([c7df6a8](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/c7df6a8a0b1c4c0fe4f731b058ad565f465de954))
+* add CORS for static files, user profile editing, and favicon support ([f82c9e3](https://github.com/gorinformaticadev/Pluggor/commit/f82c9e3d08db68c9945849b503b64ae38be377ec))
+* add tenant self-management for admins and enhance password validation ([c92ac81](https://github.com/gorinformaticadev/Pluggor/commit/c92ac81610558a923f682a9e22a951a20c6b68ac))
+* **auth:** add strong password validation and change password feature ([8fcbf1d](https://github.com/gorinformaticadev/Pluggor/commit/8fcbf1d8740a98293fffc34ca47cbe7313b9527e))
+* **auth:** implement token rotation and secure session management ([23fc190](https://github.com/gorinformaticadev/Pluggor/commit/23fc1905d1b1418e6fbf52b15922c416334c1a8d))
+* **config:** add configurable platform name and contact information ([293b409](https://github.com/gorinformaticadev/Pluggor/commit/293b4090604a452fbabbb2f8bc8de42db41451c3))
+* **email:** add email configuration management with database support ([c47525a](https://github.com/gorinformaticadev/Pluggor/commit/c47525a2985c5e53d1f8079ed0958762fdf1bdd3))
+* **frontend:** add security logs and configurations pages ([a0fd8c2](https://github.com/gorinformaticadev/Pluggor/commit/a0fd8c2f007654e40a19f562c21884d6e5cfd363))
+* **layout:** centralize sidebar in root AppLayout for unified UI structure  Introduce a new AppLayout component at the app root to handle sidebar globally, removing it from the dashboard-specific layout. This promotes consistent navigation across pages and streamlines layout management by avoiding duplication. ([8670f9e](https://github.com/gorinformaticadev/Pluggor/commit/8670f9e76bdc61f8908b6b000510ade3e68a8d0c))
+* **security:** add email verification, enhanced 2FA, and security configurations ([427b9a2](https://github.com/gorinformaticadev/Pluggor/commit/427b9a25a5948c180572f1da8bbf956b927105a0))
+* **security:** add login attempt blocking, Sentry monitoring, input sanitization, and HTTPS enforcement ([5f7829a](https://github.com/gorinformaticadev/Pluggor/commit/5f7829a7d3e96825b1cde92acaa191e553264755))
+* **security:** add rate limiting, audit logging, and security headers ([4c996fb](https://github.com/gorinformaticadev/Pluggor/commit/4c996fb8745e14a69a4f8b9c7a5fb5e34bfa4436))
+* **security:** add refresh functionality for security config and clean up login UI ([fd2b722](https://github.com/gorinformaticadev/Pluggor/commit/fd2b7227bff8ee3500979d60f9d25e05f4d6d5a9))
+* **security:** add two-factor authentication and advanced CSP policies ([7079255](https://github.com/gorinformaticadev/Pluggor/commit/7079255ecf899c1665a10561cf8e5f5e3d1d46a5))
+* **security:** enhance authentication and security configurations ([a9c02a5](https://github.com/gorinformaticadev/Pluggor/commit/a9c02a511e0b9c706cd0a4c87fca11843234b476))
+* **security:** enhance login security with configurable lock duration and 2FA management ([a8443a9](https://github.com/gorinformaticadev/Pluggor/commit/a8443a92fa59ef39f4f401562c2ad058c1755338))
+* **tenants:** add comprehensive tenant management with admin creation and CRUD operations ([4d04443](https://github.com/gorinformaticadev/Pluggor/commit/4d044432f8d397ac64ddc1f0e4fe40bd3c8d7955))
+* **tenants:** add logo upload and management for tenants ([5a05245](https://github.com/gorinformaticadev/Pluggor/commit/5a05245854e749a0f9fc34ac4bf48742e28ca361))
+* **tenants:** prevent deactivation of default tenant ([3bdac20](https://github.com/gorinformaticadev/Pluggor/commit/3bdac2074c805bc9794909bdcaaf7c72c475a85d))
+* **ui:** add collapsible sidebar functionality  Implement a toggle button to expand or collapse the sidebar, allowing for a more flexible UI layout. The sidebar now transitions smoothly between expanded (showing full content) and collapsed (icon-only) states, improving space utilization on smaller screens. Adjusted the dashboard layout to remove fixed width, enabling dynamic sizing. ([e8823d5](https://github.com/gorinformaticadev/Pluggor/commit/e8823d5ba7b33b5e352caf5a4f5b580374ea4d5c))
+* **ui:** add tenant logo display in top bar ([3ac66d9](https://github.com/gorinformaticadev/Pluggor/commit/3ac66d981c95148a4d0786dabbdfb389890b5efc))
+* **ui:** add top bar component and update app layout ([d4805cf](https://github.com/gorinformaticadev/Pluggor/commit/d4805cff5e689a6946a4e6d86e0cf950d4cb3087))
+* **update:** implement system update functionality with git integration ([2b85961](https://github.com/gorinformaticadev/Pluggor/commit/2b8596148efe834459119785b96d330a51727157))
+* **users:** add users module and management interface ([c7df6a8](https://github.com/gorinformaticadev/Pluggor/commit/c7df6a8a0b1c4c0fe4f731b058ad565f465de954))

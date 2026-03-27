@@ -3,7 +3,7 @@
 # ============================================================================
 # update-acme - Atualizador para instalações ACME (Interno ou Externo)
 # ============================================================================
-# Este script atualiza o Projeto-menu-multitenant-seguro mantendo a
+# Este script atualiza o Pluggor mantendo a
 # compatibilidade com as configurações de Nginx (Docker ou Host).
 #
 # Uso:
@@ -51,7 +51,7 @@ update_app() {
     if [ ! -d ".git" ]; then
         log_info "Diretório não é um repositório Git. Inicializando..."
         git init
-        git remote add origin https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git
+        git remote add origin https://github.com/gorinformaticadev/Pluggor.git
         git fetch origin
         git checkout -f main || git checkout -f master
     fi

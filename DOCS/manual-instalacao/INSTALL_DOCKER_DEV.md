@@ -13,8 +13,8 @@ Este guia descreve como configurar o ambiente de desenvolvimento local usando Do
 ### 1. Clonar o Repositório
 
 ```bash
-git clone https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git
-cd Projeto-menu-multitenant-seguro
+git clone https://github.com/gorinformaticadev/Pluggor.git
+cd Pluggor
 ```
 
 ### 2. Configurar Variáveis de Ambiente

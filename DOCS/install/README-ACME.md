@@ -5,16 +5,16 @@
 ### Opção 1: Com nginx-proxy Docker (compatível com Ticketz)
 
 ```bash
-git clone https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git
-cd Projeto-menu-multitenant-seguro
+git clone https://github.com/gorinformaticadev/Pluggor.git
+cd Pluggor
 sudo bash install/install-acme menu.exemplo.com.br admin@exemplo.com.br
 ```
 
 ### Opção 2: Com Nginx externo (fora do Docker)
 
 ```bash
-git clone https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git
-cd Projeto-menu-multitenant-seguro
+git clone https://github.com/gorinformaticadev/Pluggor.git
+cd Pluggor
 sudo bash install/install-acme menu.exemplo.com.br admin@exemplo.com.br --external-nginx
 ```
 
