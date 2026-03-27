@@ -245,18 +245,31 @@ export class SystemDiagnosticsService {
     const dashboard = await this.systemDashboardService.getDashboard(actor, {
       periodMinutes: DIAGNOSTICS_WINDOW_MINUTES,
     });
+    const versionMetric = this.pickMetric<{ version?: unknown }>(dashboard?.version, 'version');
+    const uptimeMetric = this.pickMetric<{ human?: unknown; startedAt?: unknown }>(dashboard?.uptime, 'human');
+    const maintenanceMetric = this.pickMetric<{ enabled?: unknown; reason?: unknown; startedAt?: unknown }>(
+      dashboard?.maintenance,
+      'enabled',
+    );
+    const databaseMetric = this.pickMetric<{ status?: unknown }>(dashboard?.database, 'status');
+    const redisMetric = this.pickMetric<{ status?: unknown }>(dashboard?.redis, 'status');
+    const routeErrorsMetric = this.pickMetric<{ errorRateRecent?: unknown }>(
+      dashboard?.routeErrors,
+      'errorRateRecent',
+    );
+    const errorsMetric = this.pickMetric<{ recent?: unknown }>(dashboard?.errors, 'recent');
 
     return {
-      version: this.normalizeString(dashboard?.version?.version),
-      uptimeHuman: this.normalizeString(dashboard?.uptime?.human),
-      uptimeStartedAt: this.normalizeString(dashboard?.uptime?.startedAt),
-      maintenanceActive: Boolean(dashboard?.maintenance?.enabled),
-      maintenanceReason: this.normalizeString(dashboard?.maintenance?.reason),
-      maintenanceStartedAt: this.normalizeString(dashboard?.maintenance?.startedAt),
-      databaseStatus: this.normalizeString(dashboard?.database?.status),
-      redisStatus: this.normalizeString(dashboard?.redis?.status),
-      apiErrorRateRecent: this.toNumberOrNull(dashboard?.routeErrors?.errorRateRecent),
-      criticalErrorsRecent: Array.isArray(dashboard?.errors?.recent) ? dashboard.errors.recent.length : 0,
+      version: this.normalizeString(versionMetric?.version),
+      uptimeHuman: this.normalizeString(uptimeMetric?.human),
+      uptimeStartedAt: this.normalizeString(uptimeMetric?.startedAt),
+      maintenanceActive: Boolean(maintenanceMetric?.enabled),
+      maintenanceReason: this.normalizeString(maintenanceMetric?.reason),
+      maintenanceStartedAt: this.normalizeString(maintenanceMetric?.startedAt),
+      databaseStatus: this.normalizeString(databaseMetric?.status),
+      redisStatus: this.normalizeString(redisMetric?.status),
+      apiErrorRateRecent: this.toNumberOrNull(routeErrorsMetric?.errorRateRecent),
+      criticalErrorsRecent: Array.isArray(errorsMetric?.recent) ? errorsMetric.recent.length : 0,
     };
   }
 
@@ -711,6 +724,14 @@ export class SystemDiagnosticsService {
     } as const;
 
     return weight[next] > weight[current] ? next : current;
+  }
+
+  private pickMetric<T extends Record<string, unknown>>(value: unknown, field: keyof T): T | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value) || !(field in value)) {
+      return null;
+    }
+
+    return value as T;
   }
 
   private normalizeString(value: unknown): string | null {

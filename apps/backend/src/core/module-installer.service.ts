@@ -1227,7 +1227,7 @@ export class ModuleInstallerService {
      * Executa migrations uma por vez, parando no primeiro erro
      * Versão mais robusta que fornece informações detalhadas sobre falhas
      */
-    private async executeMigrationsOneByOne(slug: string, modulePath: string, type: string): Promise<number> {
+    private async executeMigrationsOneByOne(slug: string, modulePath: string, type: MigrationType): Promise<number> {
         const migrationsPath = path.join(modulePath, type === 'migration' ? 'migrations' : 'seeds');
         if (!fs.existsSync(migrationsPath)) {
             this.logger.log(`📁 Pasta ${type} não encontrada: ${migrationsPath}`);
@@ -1244,7 +1244,7 @@ export class ModuleInstallerService {
             this.logger.log(`🔍 Processando ${type}: ${file}`);
 
             const existing = await this.prisma.moduleMigration.findUnique({
-                where: { moduleId_filename_type: { moduleId, filename: file, type: type as any } }
+                where: { moduleId_filename_type: { moduleId, filename: file, type } }
             });
 
             if (existing) {
@@ -1267,7 +1267,7 @@ export class ModuleInstallerService {
 
                 // Registrar execução
                 await this.prisma.moduleMigration.create({
-                    data: { moduleId, filename: file, type: type as any, executedAt: new Date() }
+                    data: { moduleId, filename: file, type, executedAt: new Date() }
                 });
 
                 executed++;
@@ -1295,7 +1295,7 @@ export class ModuleInstallerService {
                     this.logger.warn(`⚠️ ${type} ${file} - Objetos já existem no banco. Registrando como executada...`);
 
                     await this.prisma.moduleMigration.create({
-                        data: { moduleId, filename: file, type: type as any, executedAt: new Date() }
+                        data: { moduleId, filename: file, type, executedAt: new Date() }
                     });
 
                     executed++;
@@ -1344,12 +1344,12 @@ export class ModuleInstallerService {
         };
     }
 
-    async uninstallModule(slug: string, options: any) {
+    async uninstallModule(slug: string, options: UninstallModuleOptions) {
         const module = await this.prisma.module.findUnique({ where: { slug } });
         if (!module) throw new BadRequestException('Módulo não encontrado');
 
-        const confirmation = options.confirmationName || options;
-        if (confirmation !== slug && options.confirmationName !== slug) {
+        const confirmationName = typeof options === 'string' ? options : options.confirmationName;
+        if (confirmationName !== slug) {
             throw new BadRequestException('Nome de confirmação inválido');
         }
 
@@ -1366,8 +1366,50 @@ export class ModuleInstallerService {
         return { success: true, message: 'Módulo desinstalado.' };
     }
 
-    private async registerModuleMenus(moduleId: string, menus: any[]) {
-        for (const menu of menus) {
+    private normalizeModuleMenus(menus: readonly unknown[] | null | undefined): ModuleMenuDefinition[] {
+        if (!Array.isArray(menus) || menus.length === 0) {
+            return [];
+        }
+
+        return menus.map((menu, index) => {
+            if (!menu || typeof menu !== 'object' || Array.isArray(menu)) {
+                throw new BadRequestException(`Menu invÃ¡lido na posiÃ§Ã£o ${index + 1}`);
+            }
+
+            const rawMenu = menu as Record<string, unknown>;
+            const label = typeof rawMenu.label === 'string' ? rawMenu.label.trim() : '';
+            const route = typeof rawMenu.route === 'string' ? rawMenu.route.trim() : '';
+
+            if (!label || !route) {
+                throw new BadRequestException(`Menu invÃ¡lido na posiÃ§Ã£o ${index + 1}: label e route sÃ£o obrigatÃ³rios`);
+            }
+
+            const icon = typeof rawMenu.icon === 'string' && rawMenu.icon.trim().length > 0
+                ? rawMenu.icon.trim()
+                : null;
+            const parentId = typeof rawMenu.parentId === 'string' && rawMenu.parentId.trim().length > 0
+                ? rawMenu.parentId.trim()
+                : null;
+            const permission = typeof rawMenu.permission === 'string' && rawMenu.permission.trim().length > 0
+                ? rawMenu.permission.trim()
+                : null;
+            const rawOrder = typeof rawMenu.order === 'number' ? rawMenu.order : Number(rawMenu.order);
+
+            return {
+                label,
+                icon,
+                route,
+                parentId,
+                order: Number.isFinite(rawOrder) ? rawOrder : 0,
+                permission,
+                isUserMenu: rawMenu.isUserMenu !== false
+            };
+        });
+    }
+
+    private async registerModuleMenus(moduleId: string, menus: readonly unknown[]) {
+        const normalizedMenus = this.normalizeModuleMenus(menus);
+        for (const menu of normalizedMenus) {
             await this.prisma.moduleMenu.create({
                 data: {
                     moduleId,
@@ -1383,7 +1425,7 @@ export class ModuleInstallerService {
         }
     }
 
-    private async executeMigrations(slug: string, modulePath: string, type: string): Promise<number> {
+    private async executeMigrations(slug: string, modulePath: string, type: MigrationType): Promise<number> {
         const migrationsPath = path.join(modulePath, type === 'migration' ? 'migrations' : 'seeds');
         if (!fs.existsSync(migrationsPath)) {
             this.logger.log(`📁 Pasta ${type} não encontrada: ${migrationsPath}`);
@@ -1400,7 +1442,7 @@ export class ModuleInstallerService {
             this.logger.log(`🔍 Verificando ${type}: ${file}`);
 
             const existing = await this.prisma.moduleMigration.findUnique({
-                where: { moduleId_filename_type: { moduleId, filename: file, type: type as any } }
+                where: { moduleId_filename_type: { moduleId, filename: file, type } }
             });
 
             if (existing) {
@@ -1419,7 +1461,7 @@ export class ModuleInstallerService {
                 await this.dbExecutor.executeInTransaction(sql);
 
                 await this.prisma.moduleMigration.create({
-                    data: { moduleId, filename: file, type: type as any, executedAt: new Date() }
+                    data: { moduleId, filename: file, type, executedAt: new Date() }
                 });
 
                 executed++;
@@ -1447,7 +1489,7 @@ export class ModuleInstallerService {
                     this.logger.warn(`⚠️ ${type} ${file} - Objetos já existem no banco. Registrando como executada...`);
 
                     await this.prisma.moduleMigration.create({
-                        data: { moduleId, filename: file, type: type as any, executedAt: new Date() }
+                        data: { moduleId, filename: file, type, executedAt: new Date() }
                     });
 
                     executed++;

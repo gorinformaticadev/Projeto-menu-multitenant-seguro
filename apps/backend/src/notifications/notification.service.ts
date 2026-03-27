@@ -3,6 +3,7 @@
  */
 
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import { Notification as PrismaNotification, Prisma } from '@prisma/client';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { ConfigResolverService } from '../system-settings/config-resolver.service';
 import { Observable, Subject } from 'rxjs';
@@ -75,6 +76,12 @@ export interface SystemNotificationDto {
 }
 
 export interface NotificationsToggleState extends NotificationConfigurationStatusDto {}
+
+interface NormalizedNotificationActor {
+  id: string | null;
+  role: string;
+  tenantId: string | null;
+}
 
 const SYSTEM_ALERT_RULES: Record<string, { severity: SystemNotificationSeverity; title: string }> = {
   UPDATE_STARTED: {
@@ -202,7 +209,9 @@ export class NotificationService {
     return this.mapToEntity(row);
   }
 
-  private async persistSystemNotification(input: CreateSystemNotificationInput): Promise<any | null> {
+  private async persistSystemNotification(
+    input: CreateSystemNotificationInput,
+  ): Promise<PrismaNotification | null> {
     if (!(await this.areNotificationsEnabled())) {
       return null;
     }
@@ -231,7 +240,7 @@ export class NotificationService {
           title,
           body,
           message: body,
-          data: data as any,
+          data: this.toInputJson(data),
           targetRole,
           targetUserId,
           isRead: false,
@@ -419,7 +428,7 @@ export class NotificationService {
   /**
    * Cria uma nova notificacao
    */
-  async create(data: NotificationCreateData, authorInfo?: any): Promise<Notification | null> {
+  async create(data: NotificationCreateData, authorInfo?: unknown): Promise<Notification | null> {
     if (!(await this.areNotificationsEnabled())) {
       return null;
     }
@@ -440,7 +449,7 @@ export class NotificationService {
           userId: scopedData.userId,
           targetRole: scopedData.userId ? null : scopedData.tenantId ? 'ADMIN' : 'SUPER_ADMIN',
           targetUserId: scopedData.userId,
-          data: this.sanitizeData(scopedData.metadata || {}) as any,
+          data: this.toInputJson(this.sanitizeData(scopedData.metadata || {})),
           isRead: false,
           read: false,
         },
@@ -482,7 +491,7 @@ export class NotificationService {
   /**
    * Busca notificacoes com filtros e paginacao
    */
-  async findMany(user: any, filters: NotificationFilters = {}): Promise<NotificationResponse> {
+  async findMany(user: unknown, filters: NotificationFilters = {}): Promise<NotificationResponse> {
     const where = this.buildWhereClause(user, filters);
     const unreadWhere = this.buildUnreadWhere(where);
     const page = filters.page || 1;
@@ -569,7 +578,7 @@ export class NotificationService {
   /**
    * Marca todas as notificacoes como lidas
    */
-  async markAllAsRead(user: any, filters?: NotificationFilters): Promise<number> {
+  async markAllAsRead(user: unknown, filters?: NotificationFilters): Promise<number> {
     const where = this.buildWhereClause(user, filters);
 
     const result = await this.prisma.notification.updateMany({
@@ -656,13 +665,13 @@ export class NotificationService {
   /**
    * Envia notificacao em massa (Broadcast)
    */
-  async broadcast(dto: BroadcastNotificationDto, authorInfo: any): Promise<{ count: number }> {
+  async broadcast(dto: BroadcastNotificationDto, authorInfo: unknown): Promise<{ count: number }> {
     if (!(await this.areNotificationsEnabled())) {
       return { count: 0 };
     }
 
     const actor = this.normalizeNotificationActor(authorInfo);
-    const where: any = {};
+    const where: Prisma.UserWhereInput = {};
 
     if (dto.target === 'admins_only') {
       where.role = actor.role === 'SUPER_ADMIN' ? { in: ['ADMIN', 'SUPER_ADMIN'] } : 'ADMIN';
@@ -679,7 +688,10 @@ export class NotificationService {
       }
       where.tenantId = actor.tenantId;
     } else if (dto.scope === 'tenants' && dto.tenantIds && dto.tenantIds.length > 0) {
-      where.tenantId = { in: dto.tenantIds };
+      const tenantIds = dto.tenantIds.filter((tenantId): tenantId is string => typeof tenantId === 'string');
+      if (tenantIds.length > 0) {
+        where.tenantId = { in: tenantIds };
+      }
     }
 
     const users = await this.prisma.user.findMany({
@@ -708,7 +720,7 @@ export class NotificationService {
       audience: 'user',
       isRead: false,
       read: false,
-      data: metadata as any,
+      data: this.toInputJson(metadata),
       createdAt: new Date(),
       updatedAt: new Date(),
     }));
@@ -739,16 +751,21 @@ export class NotificationService {
   // METODOS PRIVADOS
   // ============================================================================
 
-  private buildWhereClause(user: any, filters?: NotificationFilters) {
+  private buildWhereClause(user: unknown, filters?: NotificationFilters): Prisma.NotificationWhereInput {
     const actor = this.normalizeNotificationActor(user);
-    return this.authorizationService.buildNotificationWhere(actor, filters);
+    return this.authorizationService.buildNotificationWhere(actor, filters) as Prisma.NotificationWhereInput;
   }
 
-  private normalizeNotificationActor(authorInfo: any): { id: string | null; role: string; tenantId: string | null } {
+  private normalizeNotificationActor(authorInfo: unknown): NormalizedNotificationActor {
+    const actor =
+      authorInfo && typeof authorInfo === 'object'
+        ? (authorInfo as Record<string, unknown>)
+        : {};
+
     return {
-      id: typeof authorInfo?.id === 'string' ? authorInfo.id : null,
-      role: String(authorInfo?.role || '').trim().toUpperCase(),
-      tenantId: typeof authorInfo?.tenantId === 'string' ? authorInfo.tenantId : null,
+      id: typeof actor.id === 'string' ? actor.id : null,
+      role: String(actor.role || '').trim().toUpperCase(),
+      tenantId: typeof actor.tenantId === 'string' ? actor.tenantId : null,
     };
   }
 
@@ -784,7 +801,7 @@ export class NotificationService {
     }
   }
 
-  private async applyNotificationAuthorScope(data: NotificationCreateData, authorInfo?: any) {
+  private async applyNotificationAuthorScope(data: NotificationCreateData, authorInfo?: unknown) {
     const actor = this.normalizeNotificationActor(authorInfo);
     if (!actor.role) {
       return data;
@@ -839,7 +856,7 @@ export class NotificationService {
     return scopedData;
   }
 
-  private mapToEntity(notification: any): Notification {
+  private mapToEntity(notification: PrismaNotification): Notification {
     return {
       id: notification.id,
       title: notification.title,
@@ -903,8 +920,8 @@ export class NotificationService {
     return normalized || 'SYSTEM_ALERT';
   }
 
-  private buildSystemListWhere(params: SystemNotificationListParams): any {
-    const where: any = this.buildSystemScopeWhere({
+  private buildSystemListWhere(params: SystemNotificationListParams): Prisma.NotificationWhereInput {
+    const where: Prisma.NotificationWhereInput = this.buildSystemScopeWhere({
       targetRole: params.targetRole,
       targetUserId: params.targetUserId,
     });
@@ -924,7 +941,7 @@ export class NotificationService {
     return where;
   }
 
-  private resolveSystemScope(actor?: NotificationActorScope): any {
+  private resolveSystemScope(actor?: NotificationActorScope): Prisma.NotificationWhereInput {
     if (!actor) {
       return this.buildSystemScopeWhere({ targetRole: 'SUPER_ADMIN' });
     }
@@ -940,10 +957,13 @@ export class NotificationService {
     });
   }
 
-  private buildSystemScopeWhere(scope?: { targetRole?: string; targetUserId?: string }): any {
+  private buildSystemScopeWhere(scope?: {
+    targetRole?: string;
+    targetUserId?: string;
+  }): Prisma.NotificationWhereInput {
     const targetRole = String(this.normalizeText(scope?.targetRole || 'SUPER_ADMIN', 40) || '').toUpperCase();
     const targetUserId = this.normalizeText(scope?.targetUserId || undefined, 80);
-    const or: any[] = [];
+    const or: Prisma.NotificationWhereInput[] = [];
 
     if (targetRole) {
       or.push({ targetRole });
@@ -984,7 +1004,9 @@ export class NotificationService {
       .join(' ');
   }
 
-  private isSystemNotificationRecord(row: any): boolean {
+  private isSystemNotificationRecord(
+    row: Pick<PrismaNotification, 'targetRole' | 'audience'> | null | undefined,
+  ): boolean {
     if (!row) {
       return false;
     }
@@ -994,7 +1016,7 @@ export class NotificationService {
     return role === 'SUPER_ADMIN' || audience === 'super_admin';
   }
 
-  private toSystemNotificationDto(row: any): SystemNotificationDto {
+  private toSystemNotificationDto(row: PrismaNotification): SystemNotificationDto {
     return {
       id: row.id,
       type: String(row.type || 'SYSTEM_ALERT'),
@@ -1192,24 +1214,33 @@ export class NotificationService {
     return sanitized;
   }
 
-  private parseMetadata(data: unknown): Record<string, any> {
+  private parseMetadata(data: unknown): Record<string, unknown> {
     if (!data) {
       return {};
     }
 
     if (typeof data === 'string') {
       try {
-        return JSON.parse(data || '{}');
+        const parsed = JSON.parse(data || '{}');
+        return this.isRecord(parsed) ? parsed : {};
       } catch {
         return {};
       }
     }
 
-    if (typeof data === 'object' && !Array.isArray(data)) {
-      return data as Record<string, any>;
+    if (this.isRecord(data)) {
+      return data;
     }
 
     return {};
+  }
+
+  private toInputJson(data: Record<string, unknown>): Prisma.InputJsonValue {
+    return data as Prisma.InputJsonValue;
+  }
+
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 
   private normalizeText(value: string | undefined, maxLength: number): string {

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { BackupJobStatus, BackupJobType, Role } from '@prisma/client';
+import { BackupJobStatus, BackupJobType, Prisma, Role } from '@prisma/client';
 import Redis from 'ioredis';
 import * as fs from 'fs/promises';
 import * as os from 'os';
@@ -63,7 +63,7 @@ export interface DashboardLayoutInput {
   filtersJson?: unknown;
 }
 
-interface DashboardMetricFallback {
+export interface DashboardMetricFallback {
   status: 'error' | 'degraded' | 'unavailable';
   error: string;
 }
@@ -76,9 +76,9 @@ interface LatestMaterializedSessionCleanupExecutionRow {
   updatedAt: Date;
 }
 
-type DashboardMetric<T extends Record<string, unknown>> = T | DashboardMetricFallback;
+export type DashboardMetric<T extends Record<string, unknown>> = T | DashboardMetricFallback;
 type DashboardLayoutBreakpoint = 'lg' | 'md' | 'sm';
-interface DashboardHistoryPoint {
+export interface DashboardHistoryPoint {
   at: string;
   value: number | null;
   sampleSize?: number;
@@ -90,6 +90,22 @@ interface MemoryHistoryEntry {
   usedPercent: number | null;
   rssBytes: number;
   heapUsedBytes: number;
+}
+
+interface AvailableModuleMenu extends Record<string, unknown> {
+  icon?: unknown;
+  label?: unknown;
+  permission?: unknown;
+  roles?: unknown;
+  route?: unknown;
+}
+
+interface AvailableModuleEntry extends Record<string, unknown> {
+  description?: unknown;
+  menus?: unknown;
+  name?: unknown;
+  slug?: unknown;
+  version?: unknown;
 }
 
 interface DashboardMetricCacheEntry {
@@ -475,12 +491,12 @@ export class SystemDashboardService {
       create: {
         userId: actor.userId,
         role: actor.role,
-        layoutJson: layoutJson as any,
-        filtersJson: filtersJson as any,
+        layoutJson: this.toInputJson(layoutJson),
+        filtersJson: this.toInputJson(filtersJson),
       },
       update: {
-        layoutJson: layoutJson as any,
-        filtersJson: filtersJson as any,
+        layoutJson: this.toInputJson(layoutJson),
+        filtersJson: this.toInputJson(filtersJson),
       },
       select: {
         role: true,
@@ -589,7 +605,7 @@ export class SystemDashboardService {
 
   private async getDiskMetric() {
     const baseDir = path.resolve(process.env.APP_BASE_DIR || process.cwd());
-    const stat = await fs.statfs(baseDir as any);
+    const stat = await fs.statfs(baseDir);
 
     const blockSize = Number(stat.bsize || 0);
     const blocks = Number(stat.blocks || 0);
@@ -851,7 +867,7 @@ export class SystemDashboardService {
     severity: DashboardSeverity,
   ) {
     const effectiveSeverity = severity === 'all' ? 'critical' : severity;
-    const where: any = {
+    const where: Prisma.AuditLogWhereInput = {
       createdAt: {
         gte: windowStart,
       },
@@ -1061,10 +1077,10 @@ export class SystemDashboardService {
     return `Historico: success posterior em ${resolvedAt.toISOString()} para o slot ${latestExecution.scheduledFor.toISOString()}.`;
   }
 
-  private buildNotificationsScope(actor: DashboardActor): any {
+  private buildNotificationsScope(actor: DashboardActor): Prisma.NotificationWhereInput {
     const role = String(actor.role || '').toUpperCase();
     const targetUserId = String(actor.userId || '').trim();
-    const or: any[] = [];
+    const or: Prisma.NotificationWhereInput[] = [];
 
     if (role) {
       or.push({ targetRole: role });
@@ -1144,19 +1160,20 @@ export class SystemDashboardService {
     const availableModules = tenantId
       ? await this.moduleSecurityService.getAvailableModules(tenantId, role)
       : [];
-    const modulesBySlug = new Map<string, Record<string, any>>();
+    const modulesBySlug = new Map<string, AvailableModuleEntry>();
 
     for (const moduleEntry of availableModules) {
-      if (!moduleEntry || typeof moduleEntry !== 'object') {
+      const normalizedEntry = this.toAvailableModuleEntry(moduleEntry);
+      if (!normalizedEntry) {
         continue;
       }
 
-      const slug = String((moduleEntry as Record<string, unknown>).slug || '').trim();
+      const slug = String(normalizedEntry.slug || '').trim();
       if (!slug) {
         continue;
       }
 
-      modulesBySlug.set(slug, moduleEntry as Record<string, any>);
+      modulesBySlug.set(slug, normalizedEntry);
     }
 
     const cards: DashboardModuleCard[] = await this.buildPlatformCards(
@@ -1210,7 +1227,7 @@ export class SystemDashboardService {
 
   private async buildPlatformCards(
     actor: DashboardActor,
-    availableModules: Record<string, any>[],
+    availableModules: AvailableModuleEntry[],
   ): Promise<DashboardModuleCard[]> {
     const cards: DashboardModuleCard[] = [
       this.buildWelcomePlatformCard(actor, availableModules),
@@ -1225,7 +1242,7 @@ export class SystemDashboardService {
 
   private buildWelcomePlatformCard(
     actor: DashboardActor,
-    availableModules: Record<string, any>[],
+    availableModules: AvailableModuleEntry[],
   ): DashboardModuleCard {
     const displayName = this.normalizeNullableString(actor.name) || 'Usuario';
     const tenantName =
@@ -1274,7 +1291,7 @@ export class SystemDashboardService {
 
   private async buildStatisticsPlatformCard(
     actor: DashboardActor,
-    availableModules: Record<string, any>[],
+    availableModules: AvailableModuleEntry[],
   ): Promise<DashboardModuleCard> {
     const tenantScopeWhere =
       actor.role === Role.SUPER_ADMIN
@@ -1283,7 +1300,7 @@ export class SystemDashboardService {
           ? { tenantId: actor.tenantId }
           : { id: '__no_user__' };
     const totalMenus = availableModules.reduce((total, moduleEntry) => {
-      const menus = Array.isArray(moduleEntry?.menus) ? moduleEntry.menus : [];
+      const menus = this.getAvailableModuleMenus(moduleEntry);
       return total + menus.length;
     }, 0);
 
@@ -1352,7 +1369,7 @@ export class SystemDashboardService {
 
   private mapRegisteredModuleCard(
     widget: ModuleDashboardWidget,
-    modulesBySlug: Map<string, Record<string, any>>,
+    modulesBySlug: Map<string, AvailableModuleEntry>,
   ): DashboardModuleCard | null {
     const moduleSlug = String(widget.module || '').trim();
     if (!moduleSlug) {
@@ -1378,7 +1395,9 @@ export class SystemDashboardService {
         moduleEntry,
       ),
       kind,
-      icon: this.normalizeNullableString(widget.icon) || this.normalizeNullableString(moduleEntry?.menus?.[0]?.icon),
+      icon:
+        this.normalizeNullableString(widget.icon) ||
+        this.normalizeNullableString(this.getAvailableModuleMenus(moduleEntry)[0]?.icon),
       href: this.normalizeNullableString(widget.route) || route,
       actionLabel: this.normalizeNullableString(widget.actionLabel) || (route ? 'Abrir modulo' : null),
       order: Number.isFinite(Number(widget.order)) ? Number(widget.order) : 50,
@@ -1389,8 +1408,8 @@ export class SystemDashboardService {
   }
 
   private async buildInstalledManifestModuleCards(
-    moduleEntry: Record<string, any>,
-    modulesBySlug: Map<string, Record<string, any>>,
+    moduleEntry: AvailableModuleEntry,
+    modulesBySlug: Map<string, AvailableModuleEntry>,
   ): Promise<DashboardModuleCard[]> {
     const moduleSlug = String(moduleEntry.slug || '').trim();
     if (!moduleSlug) {
@@ -1511,11 +1530,11 @@ export class SystemDashboardService {
     return null;
   }
 
-  private buildFallbackModuleCard(moduleEntry: Record<string, any>): DashboardModuleCard {
+  private buildFallbackModuleCard(moduleEntry: AvailableModuleEntry): DashboardModuleCard {
     const moduleSlug = String(moduleEntry.slug || '').trim();
-    const menus = Array.isArray(moduleEntry.menus) ? moduleEntry.menus : [];
+    const menus = this.getAvailableModuleMenus(moduleEntry);
     const route = this.resolveModulePrimaryRoute(moduleEntry);
-    const items = menus.slice(0, 6).map((menu: Record<string, unknown>, index: number) => ({
+    const items = menus.slice(0, 6).map((menu, index: number) => ({
       id: `${moduleSlug}:menu:${index}`,
       label: String(menu.label || menu.route || 'Acesso rapido').trim(),
       value: this.normalizeNullableString(menu.route) || undefined,
@@ -1543,10 +1562,10 @@ export class SystemDashboardService {
     };
   }
 
-  private resolveModulePrimaryRoute(moduleEntry?: Record<string, any> | null): string | null {
-    const menus = Array.isArray(moduleEntry?.menus) ? moduleEntry.menus : [];
+  private resolveModulePrimaryRoute(moduleEntry?: AvailableModuleEntry | null): string | null {
+    const menus = this.getAvailableModuleMenus(moduleEntry);
     const firstRoute = menus
-      .map((menu: Record<string, unknown>) => this.normalizeNullableString(menu.route))
+      .map((menu) => this.normalizeNullableString(menu.route))
       .find((route) => Boolean(route));
 
     return firstRoute || null;
@@ -1605,7 +1624,7 @@ export class SystemDashboardService {
 
   private resolveWidgetVisibilityRole(
     roles: string[] | undefined,
-    moduleEntry?: Record<string, any>,
+    moduleEntry?: AvailableModuleEntry,
   ): Role {
     if (Array.isArray(roles) && roles.length > 0) {
       const ranked = roles
@@ -1622,11 +1641,9 @@ export class SystemDashboardService {
     return this.resolveModuleVisibilityRole(moduleEntry);
   }
 
-  private resolveModuleVisibilityRole(moduleEntry?: Record<string, any>): Role {
-    const menus = Array.isArray(moduleEntry?.menus) ? moduleEntry.menus : [];
-    const declaredRoles = menus.flatMap((menu: Record<string, unknown>) =>
-      Array.isArray(menu.roles) ? menu.roles : [],
-    );
+  private resolveModuleVisibilityRole(moduleEntry?: AvailableModuleEntry): Role {
+    const menus = this.getAvailableModuleMenus(moduleEntry);
+    const declaredRoles = menus.flatMap((menu) => (Array.isArray(menu.roles) ? menu.roles : []));
     const parsedRole = this.resolveWidgetVisibilityRoleFromCandidates(declaredRoles);
     if (parsedRole) {
       return parsedRole;
@@ -1761,7 +1778,7 @@ export class SystemDashboardService {
     return actorTenantId || null;
   }
 
-  private applyRoleProjection(payload: Record<string, any>, role: Role): Record<string, any> {
+  private applyRoleProjection<T extends Record<string, unknown>>(payload: T, role: Role): T {
     if (role === Role.SUPER_ADMIN) {
       return payload;
     }
@@ -1774,7 +1791,7 @@ export class SystemDashboardService {
         redis: this.pickIfAvailable(payload.redis, ['status', 'latencyMs', 'error']),
         workers: this.pickIfAvailable(payload.workers, ['status', 'activeWorkers', 'runningJobs', 'pendingJobs', 'error']),
         security: this.maskSecurityMetric(payload.security),
-      };
+      } as T;
     }
 
     return {
@@ -1793,13 +1810,23 @@ export class SystemDashboardService {
       jobs: { status: 'restricted' },
       errors: { status: 'restricted' },
       tenants: { status: 'restricted' },
-    };
+    } as T;
   }
 
-  private maskSecurityMetric(value: any) {
-    if (!value || typeof value !== 'object') {
+  private maskSecurityMetric(value: unknown): unknown {
+    if (!this.isRecord(value)) {
       return value;
     }
+
+    const summary = this.pickIfAvailable(value, [
+      'status',
+      'windowStart',
+      'windowSeconds',
+      'maintenanceBypassAttemptsRecent',
+      'routeDistribution',
+      'tenantScopeApplied',
+      'error',
+    ]);
 
     const topDeniedIps = Array.isArray(value.topDeniedIps)
       ? value.topDeniedIps.map((entry: Record<string, unknown>) => ({
@@ -1827,15 +1854,7 @@ export class SystemDashboardService {
       : [];
 
     return {
-      ...this.pickIfAvailable(value, [
-        'status',
-        'windowStart',
-        'windowSeconds',
-        'maintenanceBypassAttemptsRecent',
-        'routeDistribution',
-        'tenantScopeApplied',
-        'error',
-      ]),
+      ...(this.isRecord(summary) ? summary : {}),
       topDeniedIps,
       topRateLimitedIps,
       accessDeniedRecent,
@@ -1843,8 +1862,8 @@ export class SystemDashboardService {
     };
   }
 
-  private pickIfAvailable(value: any, fields: string[]) {
-    if (!value || typeof value !== 'object') {
+  private pickIfAvailable(value: unknown, fields: string[]): unknown {
+    if (!this.isRecord(value)) {
       return value;
     }
 
@@ -1855,6 +1874,26 @@ export class SystemDashboardService {
       }
     }
     return output;
+  }
+
+  private toInputJson(value: Record<string, unknown>): Prisma.InputJsonValue {
+    return value as Prisma.InputJsonValue;
+  }
+
+  private toAvailableModuleEntry(value: unknown): AvailableModuleEntry | null {
+    return this.isRecord(value) ? (value as AvailableModuleEntry) : null;
+  }
+
+  private getAvailableModuleMenus(moduleEntry?: AvailableModuleEntry | null): AvailableModuleMenu[] {
+    if (!moduleEntry || !Array.isArray(moduleEntry.menus)) {
+      return [];
+    }
+
+    return moduleEntry.menus.filter((menu): menu is AvailableModuleMenu => this.isRecord(menu));
+  }
+
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 
   private sanitizeJson(input: unknown, fallback: Record<string, unknown>): Record<string, unknown> {
@@ -2193,4 +2232,3 @@ export class SystemDashboardService {
     return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3)}...` : normalized;
   }
 }
-
