@@ -32,7 +32,6 @@ function run(command, args) {
   const result = spawnSync(command, args, {
     cwd: repoRoot,
     stdio: "inherit",
-    shell: process.platform === "win32",
   });
 
   if (result.error) {
@@ -49,6 +48,19 @@ function run(command, args) {
   return true;
 }
 
+function hasCommand(command, args = ["--version"]) {
+  const result = spawnSync(command, args, {
+    cwd: repoRoot,
+    stdio: "ignore",
+  });
+
+  if (result.error) {
+    return false;
+  }
+
+  return result.status === 0;
+}
+
 for (const script of syntaxScripts) {
   if (!existsSync(resolve(repoRoot, script))) {
     console.error(`Script obrigatorio nao encontrado: ${script}`);
@@ -56,7 +68,7 @@ for (const script of syntaxScripts) {
   }
 }
 
-if (run("bash", ["--version"])) {
+if (hasCommand("bash")) {
   for (const script of syntaxScripts) {
     run("bash", ["-n", script]);
   }
@@ -65,7 +77,7 @@ if (run("bash", ["--version"])) {
   console.warn("bash nao encontrado no PATH; validacao bash -n ignorada nesta maquina.");
 }
 
-if (run("shellcheck", ["--version"])) {
+if (hasCommand("shellcheck")) {
   run("shellcheck", ["-x", "-e", "SC1090,SC1091", ...shellcheckScripts]);
   console.log("shellcheck OK");
 } else {
