@@ -4,7 +4,7 @@ import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
 import { PrismaService } from '@core/prisma/prisma.service';
 // Importa do arquivo inicializado pelo PlatformInitService no boot da aplicação
-import { getPlatformName } from '@core/constants/platform.constants';
+import { getPlatformName, getPlatformConfig } from '@core/constants/platform.constants';
 import { SecurityConfigService } from '@core/security-config/security-config.service';
 
 @Injectable()
@@ -108,13 +108,14 @@ export class EmailService implements OnModuleInit {
     }
 
     const verificationUrl = `${this.config.get('FRONTEND_URL')}/verify-email?token=${token}`;
-    const html = this.getVerificationEmailTemplate(name, verificationUrl);
+    const platformConfig = await getPlatformConfig();
+    const html = this.getVerificationEmailTemplate(name, verificationUrl, platformConfig);
 
     // If database configuration is active and credentials are provided, use them
     if (this.dbConfig && smtpUser && smtpPass) {
       return this.sendEmailWithCredentials(
         email,
-        `Verifique seu email - ${await getPlatformName()}`,
+        `Verifique seu email - ${platformConfig.platformName}`,
         html,
         smtpUser,
         smtpPass
@@ -123,11 +124,10 @@ export class EmailService implements OnModuleInit {
 
     // Otherwise, use the default transporter (environment variables)
     try {
-      const platformName = await getPlatformName();
       await this.transporter.sendMail({
-        from: `"${this.config.get('EMAIL_FROM_NAME', platformName)}" <${this.config.get('EMAIL_FROM', 'noreply@example.com')}>`,
+        from: `"${this.config.get('EMAIL_FROM_NAME', platformConfig.platformName)}" <${this.config.get('EMAIL_FROM', 'noreply@example.com')}>`,
         to: email,
-        subject: `Verifique seu email - ${platformName}`,
+        subject: `Verifique seu email - ${platformConfig.platformName}`,
         html,
       });
 
@@ -149,15 +149,14 @@ export class EmailService implements OnModuleInit {
     }
 
     const resetUrl = `${this.config.get('FRONTEND_URL')}/redefinir-senha?token=${token}`;
-
-    const html = this.getPasswordResetEmailTemplate(name, resetUrl);
+    const platformConfig = await getPlatformConfig();
+    const html = this.getPasswordResetEmailTemplate(name, resetUrl, platformConfig);
 
     try {
-      const platformName = await getPlatformName();
       await this.transporter.sendMail({
-        from: `"${this.config.get('EMAIL_FROM_NAME', platformName)}" <${this.config.get('EMAIL_FROM', 'noreply@example.com')}>`,
+        from: `"${this.config.get('EMAIL_FROM_NAME', platformConfig.platformName)}" <${this.config.get('EMAIL_FROM', 'noreply@example.com')}>`,
         to: email,
-        subject: `Recuperação de senha - ${platformName}`,
+        subject: `Recuperação de senha - ${platformConfig.platformName}`,
         html,
       });
 
@@ -178,12 +177,12 @@ export class EmailService implements OnModuleInit {
       return false;
     }
 
-    const html = this.getSecurityAlertTemplate(name, alertType, details);
+    const platformConfig = await getPlatformConfig();
+    const html = this.getSecurityAlertTemplate(name, alertType, details, platformConfig);
 
     try {
-      const platformName = await getPlatformName();
       await this.transporter.sendMail({
-        from: `"${this.config.get('EMAIL_FROM_NAME', platformName)}" <${this.config.get('EMAIL_FROM', 'noreply@example.com')}>`,
+        from: `"${this.config.get('EMAIL_FROM_NAME', platformConfig.platformName)}" <${this.config.get('EMAIL_FROM', 'noreply@example.com')}>`,
         to: email,
         subject: `Alerta de Segurança - ${alertType}`,
         html,
@@ -200,7 +199,7 @@ export class EmailService implements OnModuleInit {
   /**
    * Template de email de verificação
    */
-  private getVerificationEmailTemplate(name: string, verificationUrl: string): string {
+  private getVerificationEmailTemplate(name: string, verificationUrl: string, platformConfig: any): string {
     return `
       <!DOCTYPE html>
       <html>
@@ -236,7 +235,7 @@ export class EmailService implements OnModuleInit {
             <p>Este é um email automático. Por favor, não responda.</p>
           </div>
           <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;">
-            ${this.getEmailFooter()}
+            ${this.getEmailFooter(platformConfig)}
           </table>
         </div>
       </body>
@@ -247,7 +246,7 @@ export class EmailService implements OnModuleInit {
   /**
    * Template de email de recuperação de senha
    */
-  private getPasswordResetEmailTemplate(name: string, resetUrl: string): string {
+  private getPasswordResetEmailTemplate(name: string, resetUrl: string, platformConfig: any): string {
     return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -326,8 +325,11 @@ export class EmailService implements OnModuleInit {
             </td>
           </tr>
 
-          ${this.getEmailFooter()}
+        </table>
 
+        <!-- Rodapé de Email posicionado fora do bloco principal para correta exibição -->
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;margin-top:16px;">
+          ${this.getEmailFooter(platformConfig)}
         </table>
       </td>
     </tr>
@@ -339,7 +341,7 @@ export class EmailService implements OnModuleInit {
   /**
    * Template de alerta de segurança
    */
-  private getSecurityAlertTemplate(name: string, alertType: string, details: string): string {
+  private getSecurityAlertTemplate(name: string, alertType: string, details: string, platformConfig: any): string {
     return `
       <!DOCTYPE html>
       <html>
@@ -379,7 +381,7 @@ export class EmailService implements OnModuleInit {
             <p>Este é um email automático. Por favor, não responda.</p>
           </div>
           <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;">
-            ${this.getEmailFooter()}
+            ${this.getEmailFooter(platformConfig)}
           </table>
         </div>
       </body>
@@ -453,15 +455,14 @@ export class EmailService implements OnModuleInit {
       await tempTransporter.verify();
       this.logger.log('✅ Conexão SMTP verificada com sucesso');
 
-      const html = this.getTestEmailTemplate(name, config);
-
       this.logger.log('Enviando email de teste...');
-      const platformName = await getPlatformName();
+      const platformConfig = await getPlatformConfig();
+      const html = this.getTestEmailTemplate(name, config, platformConfig);
 
       const info = await tempTransporter.sendMail({
-        from: `"${platformName}" <${smtpUser}>`,
+        from: `"${platformConfig.platformName}" <${smtpUser}>`,
         to: email,
-        subject: `Teste de Configuração de Email - ${platformName}`,
+        subject: `Teste de Configuração de Email - ${platformConfig.platformName}`,
         html,
       });
 
@@ -568,7 +569,7 @@ export class EmailService implements OnModuleInit {
   /**
    * Template de email de teste
    */
-  private getTestEmailTemplate(name: string, config: any): string {
+  private getTestEmailTemplate(name: string, config: any, platformConfig: any): string {
     return `
       <!DOCTYPE html>
       <html>
@@ -605,7 +606,7 @@ export class EmailService implements OnModuleInit {
             <p>Este é um email automático. Por favor, não responda.</p>
           </div>
           <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;">
-            ${this.getEmailFooter()}
+            ${this.getEmailFooter(platformConfig)}
           </table>
         </div>
       </body>
@@ -617,7 +618,7 @@ export class EmailService implements OnModuleInit {
    * Rodapé padrão de identidade visual — inserido em todos os templates de email.
    * A logo é carregada via URL pública do frontend (FRONTEND_URL/android-chrome-512x512.png).
    */
-  private getEmailFooter(): string {
+  private getEmailFooter(platformConfig: any): string {
     const frontendUrl = (this.config.get<string>('FRONTEND_URL') ?? '').replace(/\/+$/, '');
     const logoUrl = `${frontendUrl}/android-chrome-512x512.png`;
 
@@ -641,7 +642,7 @@ export class EmailService implements OnModuleInit {
                       </tr>
                       <tr>
                         <td style="padding-top:6px;text-align:center;">
-                          <span style="font-size:13px;font-weight:700;color:#1e4d6b;letter-spacing:0.5px;">Pluggor</span>
+                          <span style="font-size:13px;font-weight:700;color:#1e4d6b;letter-spacing:0.5px;">${platformConfig.platformName}</span>
                         </td>
                       </tr>
                     </table>
@@ -655,20 +656,20 @@ export class EmailService implements OnModuleInit {
 
                   <!-- Coluna direita: nome, subtítulo e contatos -->
                   <td style="padding:20px 28px 20px 16px;vertical-align:middle;">
-                    <p style="margin:0 0 2px 0;font-size:22px;font-weight:700;color:#1e4d6b;letter-spacing:-0.5px;">Pluggor</p>
+                    <p style="margin:0 0 2px 0;font-size:22px;font-weight:700;color:#1e4d6b;letter-spacing:-0.5px;">${platformConfig.platformName}</p>
                     <p style="margin:0 0 12px 0;font-size:13px;color:#4b7a96;">by GOR Informática</p>
 
                     <table cellpadding="0" cellspacing="0">
                       <tr>
                         <td style="padding:3px 0;">
                           <span style="display:inline-block;width:20px;height:20px;border:1.5px solid #1e4d6b;border-radius:50%;text-align:center;line-height:18px;font-size:11px;color:#1e4d6b;margin-right:8px;vertical-align:middle;">&#9990;</span>
-                          <span style="font-size:13px;color:#374151;vertical-align:middle;">+55 (61) 3359-7358</span>
+                          <span style="font-size:13px;color:#374151;vertical-align:middle;">${platformConfig.platformPhone || '+55 (61) 3359-7358'}</span>
                         </td>
                       </tr>
                       <tr>
                         <td style="padding:3px 0;">
                           <span style="display:inline-block;width:20px;height:20px;border:1.5px solid #1e4d6b;border-radius:50%;text-align:center;line-height:18px;font-size:11px;color:#1e4d6b;margin-right:8px;vertical-align:middle;">&#9993;</span>
-                          <span style="font-size:13px;color:#374151;vertical-align:middle;">atendimento@gorinformatica.com.br</span>
+                          <span style="font-size:13px;color:#374151;vertical-align:middle;">${platformConfig.platformEmail || 'atendimento@gorinformatica.com.br'}</span>
                         </td>
                       </tr>
                       <tr>
