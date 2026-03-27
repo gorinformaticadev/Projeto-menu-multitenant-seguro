@@ -1,4 +1,5 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { MigrationType, Prisma } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as AdmZip from 'adm-zip';
@@ -117,6 +118,24 @@ interface NpmDependencySyncResult {
     added: ModuleNpmDependencyRecord[];
     installExecuted: boolean;
 }
+
+interface ArchiveEntryLike {
+    header?: {
+        attr?: number;
+    };
+}
+
+interface ModuleMenuDefinition {
+    label: string;
+    icon: string | null;
+    route: string;
+    parentId: string | null;
+    order: number;
+    permission: string | null;
+    isUserMenu: boolean;
+}
+
+type UninstallModuleOptions = string | { confirmationName?: string };
 
 class ModuleNpmInstallFailedError extends BadRequestException {
     readonly preserveModule = true;
@@ -781,7 +800,7 @@ export class ModuleInstallerService {
         }
     }
 
-    private isSymlinkEntry(entry: any): boolean {
+    private isSymlinkEntry(entry: ArchiveEntryLike): boolean {
         const attr = entry.header?.attr || 0;
         const mode = (attr >> 16) & 0xF000;
         return mode === 0xA000;
@@ -1141,14 +1160,16 @@ export class ModuleInstallerService {
                 }
             });
 
-            await this.prisma.$transaction(async (tx) => {
-                await (tx as any).moduleMenu.deleteMany({
+            const normalizedMenus = this.normalizeModuleMenus(validatedModule.menus);
+
+            await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+                await tx.moduleMenu.deleteMany({
                     where: { moduleId: module.id }
                 });
 
-                if (validatedModule.menus && validatedModule.menus.length > 0) {
-                    for (const menu of (validatedModule.menus as any[])) {
-                        await (tx as any).moduleMenu.create({
+                if (normalizedMenus.length > 0) {
+                    for (const menu of normalizedMenus) {
+                        await tx.moduleMenu.create({
                             data: {
                                 moduleId: module.id,
                                 label: menu.label,
@@ -1787,4 +1808,3 @@ export class ModuleInstallerService {
         if (!fs.existsSync(this.uploadsPath)) fs.mkdirSync(this.uploadsPath, { recursive: true });
     }
 }
-

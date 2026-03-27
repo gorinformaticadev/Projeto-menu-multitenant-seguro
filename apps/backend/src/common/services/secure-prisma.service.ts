@@ -5,55 +5,88 @@ type PrismaModelDelegateKey = {
   [K in keyof PrismaService]: PrismaService[K] extends { findMany: (...args: never[]) => Promise<unknown> } ? K : never;
 }[keyof PrismaService] & string;
 
+type SecurePrismaWhere = Record<string, unknown>;
+type SecurePrismaData = Record<string, unknown>;
+
+interface SecurePrismaQueryOptions {
+  select?: unknown;
+  include?: unknown;
+  orderBy?: unknown;
+  skip?: number;
+  take?: number;
+}
+
+interface SecurePrismaRecord extends Record<string, unknown> {
+  id?: string | number;
+  tenantId?: string | null;
+}
+
+interface SecureUsageStats {
+  timestamp: string;
+}
+
+interface SecurePrismaDelegate<TRecord extends SecurePrismaRecord> {
+  findMany(args: {
+    where: SecurePrismaWhere;
+    select?: unknown;
+    include?: unknown;
+    orderBy?: unknown;
+    skip?: number;
+    take?: number;
+  }): Promise<TRecord[]>;
+  findUnique(args: {
+    where: SecurePrismaWhere;
+    select?: unknown;
+    include?: unknown;
+  }): Promise<TRecord | null>;
+  create(args: { data: SecurePrismaData }): Promise<TRecord>;
+  update(args: {
+    where: SecurePrismaWhere;
+    data: SecurePrismaData;
+  }): Promise<TRecord>;
+  delete(args: { where: SecurePrismaWhere }): Promise<TRecord>;
+}
+
 @Injectable()
 export class SecurePrismaService {
   private readonly logger = new Logger(SecurePrismaService.name);
 
-  constructor(private prisma: PrismaService) {
-    // Empty implementation
-  }
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Wrapper seguro para findMany com validação automática de tenant isolation
+   * Secure wrapper for findMany with automatic tenant isolation.
    */
-  async findManySecure<T>(
+  async findManySecure<T extends SecurePrismaRecord>(
     model: PrismaModelDelegateKey,
-    where: any,
+    where: SecurePrismaWhere,
     tenantId: string,
     userRole: string,
-    options: {
-      select?: unknown;
-      include?: unknown;
-      orderBy?: unknown;
-      skip?: number;
-      take?: number;
-    } = {
-        // Empty implementation
-      }
+    options: SecurePrismaQueryOptions = {},
   ): Promise<T[]> {
     try {
-      // Aplicar tenant isolation automaticamente
-      const tenantWhere = userRole !== 'SUPER_ADMIN'
-        ? { ...where, tenantId }
-        : where;
+      const tenantWhere =
+        userRole !== 'SUPER_ADMIN'
+          ? {
+              ...where,
+              tenantId,
+            }
+          : where;
 
-      // Adicionar logging de segurança para operações sensíveis
       this.logger.debug(`Busca segura em ${String(model)} para tenant ${tenantId}`, {
         userRole,
         whereKeys: Object.keys(where),
-        hasTenantFilter: userRole !== 'SUPER_ADMIN'
+        hasTenantFilter: userRole !== 'SUPER_ADMIN',
       });
 
-      const result = await (this.prisma as Record<string, any>)[model].findMany({
+      const delegate = this.getModelDelegate<T>(model);
+      return await delegate.findMany({
         where: tenantWhere,
         select: options.select,
         include: options.include,
         orderBy: options.orderBy,
         skip: options.skip,
-        take: options.take
+        take: options.take,
       });
-
-      return result as T[];
     } catch (error) {
       this.logger.error(`Erro na busca segura em ${String(model)}:`, error);
       throw error;
@@ -61,213 +94,193 @@ export class SecurePrismaService {
   }
 
   /**
-   * Wrapper seguro para findUnique com validação de ownership
+   * Secure wrapper for findUnique with ownership validation.
    */
-  async findUniqueSecure<T>(
+  async findUniqueSecure<T extends SecurePrismaRecord>(
     model: PrismaModelDelegateKey,
-    where: any,
+    where: SecurePrismaWhere,
     tenantId: string,
     userRole: string,
-    options: {
-      select?: unknown;
-      include?: unknown;
-    } = {
-        // Empty implementation
-      }
+    options: Pick<SecurePrismaQueryOptions, 'select' | 'include'> = {},
   ): Promise<T | null> {
     try {
-      const result = await (this.prisma as Record<string, any>)[model].findUnique({
+      const delegate = this.getModelDelegate<T>(model);
+      const result = await delegate.findUnique({
         where,
         select: options.select,
-        include: options.include
+        include: options.include,
       });
 
       if (!result) {
         return null;
       }
 
-      // Para SUPER_ADMIN, permitir acesso a qualquer recurso
       if (userRole === 'SUPER_ADMIN') {
         this.logger.debug(`SUPER_ADMIN acessando recurso em ${String(model)}`, {
-          resourceId: where.id,
-          tenantId
+          resourceId: this.readRecordId(where),
+          tenantId,
         });
-        return result as T;
+        return result;
       }
 
-      // Verificar se o recurso pertence ao tenant do usuário
-      const resourceTenantId = (result as any).tenantId;
+      const resourceTenantId = this.readTenantId(result);
       if (resourceTenantId !== tenantId) {
-        this.logger.warn(`Tentativa de acesso cross-tenant bloqueada`, {
+        this.logger.warn('Tentativa de acesso cross-tenant bloqueada', {
           model: String(model),
-          resourceId: where.id,
+          resourceId: this.readRecordId(where),
           userTenant: tenantId,
           resourceTenant: resourceTenantId,
-          userRole
+          userRole,
         });
-        return null; // Ou lançar exceção, dependendo da política
+        return null;
       }
 
-      return result as T;
+      return result;
     } catch (error) {
-      this.logger.error(`Erro na busca única segura em ${String(model)}:`, error);
+      this.logger.error(`Erro na busca unica segura em ${String(model)}:`, error);
       throw error;
     }
   }
 
   /**
-   * Wrapper seguro para create com validação de tenant
+   * Secure wrapper for create with tenant enforcement.
    */
-  async createSecure<T>(
+  async createSecure<T extends SecurePrismaRecord>(
     model: PrismaModelDelegateKey,
-    data: any,
+    data: SecurePrismaData,
     tenantId: string,
     userId: string,
-    userRole: string
+    userRole: string,
   ): Promise<T> {
     try {
-      // Sempre associar o recurso ao tenant do usuário
-      const secureData = {
+      const requestedTenantId = this.readTenantId(data);
+      const secureData: SecurePrismaData = {
         ...data,
-        tenantId: userRole !== 'SUPER_ADMIN' ? tenantId : (data.tenantId || tenantId),
-        createdBy: userId
+        tenantId: userRole !== 'SUPER_ADMIN' ? tenantId : requestedTenantId || tenantId,
+        createdBy: userId,
       };
 
-      this.logger.debug(`Criação segura em ${String(model)}`, {
+      this.logger.debug(`Criacao segura em ${String(model)}`, {
         model: String(model),
         tenantId,
         userId,
-        hasExplicitTenant: !!data.tenantId
+        hasExplicitTenant: Boolean(requestedTenantId),
       });
 
-      const result = await (this.prisma as Record<string, any>)[model].create({
-        data: secureData
+      const delegate = this.getModelDelegate<T>(model);
+      const result = await delegate.create({
+        data: secureData,
       });
 
-      // Logar criação para auditoria
       this.logger.log(`Recurso criado: ${String(model)}`, {
-        id: (result as any).id,
-        tenantId: (result as any).tenantId,
+        id: this.readRecordId(result),
+        tenantId: this.readTenantId(result),
         createdBy: userId,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
 
-      return result as T;
+      return result;
     } catch (error) {
-      this.logger.error(`Erro na criação segura em ${String(model)}:`, error);
+      this.logger.error(`Erro na criacao segura em ${String(model)}:`, error);
       throw error;
     }
   }
 
   /**
-   * Wrapper seguro para update com validação de ownership
+   * Secure wrapper for update with ownership validation.
    */
-  async updateSecure<T>(
+  async updateSecure<T extends SecurePrismaRecord>(
     model: PrismaModelDelegateKey,
-    where: any,
-    data: any,
+    where: SecurePrismaWhere,
+    data: SecurePrismaData,
     tenantId: string,
     userId: string,
-    userRole: string
+    userRole: string,
   ): Promise<T> {
     try {
-      // Primeiro verificar se o recurso existe e pertence ao tenant
-      const existing = await this.findUniqueSecure(
-        model,
-        where,
-        tenantId,
-        userRole
-      );
-
+      const existing = await this.findUniqueSecure<T>(model, where, tenantId, userRole);
       if (!existing) {
-        throw new Error('Recurso não encontrado ou acesso não autorizado');
+        throw new Error('Recurso nao encontrado ou acesso nao autorizado');
       }
 
-      this.logger.debug(`Atualização segura em ${String(model)}`, {
-        resourceId: where.id,
+      this.logger.debug(`Atualizacao segura em ${String(model)}`, {
+        resourceId: this.readRecordId(where),
         tenantId,
-        userId
+        userId,
       });
 
-      const result = await (this.prisma as Record<string, any>)[model].update({
+      const delegate = this.getModelDelegate<T>(model);
+      const result = await delegate.update({
         where,
         data: {
           ...data,
           updatedBy: userId,
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       });
 
-      // Logar atualização para auditoria
       this.logger.log(`Recurso atualizado: ${String(model)}`, {
-        id: where.id,
-        tenantId: (result as any).tenantId,
+        id: this.readRecordId(where),
+        tenantId: this.readTenantId(result),
         updatedBy: userId,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
 
-      return result as T;
+      return result;
     } catch (error) {
-      this.logger.error(`Erro na atualização segura em ${String(model)}:`, error);
+      this.logger.error(`Erro na atualizacao segura em ${String(model)}:`, error);
       throw error;
     }
   }
 
   /**
-   * Wrapper seguro para delete com validação de ownership
+   * Secure wrapper for delete with ownership validation.
    */
-  async deleteSecure<T>(
+  async deleteSecure<T extends SecurePrismaRecord>(
     model: PrismaModelDelegateKey,
-    where: any,
+    where: SecurePrismaWhere,
     tenantId: string,
     userId: string,
-    userRole: string
+    userRole: string,
   ): Promise<T> {
     try {
-      // Verificar ownership antes de deletar
-      const existing = await this.findUniqueSecure(
-        model,
-        where,
-        tenantId,
-        userRole
-      );
-
+      const existing = await this.findUniqueSecure<T>(model, where, tenantId, userRole);
       if (!existing) {
-        throw new Error('Recurso não encontrado ou acesso não autorizado');
+        throw new Error('Recurso nao encontrado ou acesso nao autorizado');
       }
 
-      this.logger.warn(`Exclusão segura em ${String(model)}`, {
-        resourceId: where.id,
+      this.logger.warn(`Exclusao segura em ${String(model)}`, {
+        resourceId: this.readRecordId(where),
         tenantId,
         userId,
-        userRole
+        userRole,
       });
 
-      const result = await (this.prisma as Record<string, any>)[model].delete({
-        where
+      const delegate = this.getModelDelegate<T>(model);
+      const result = await delegate.delete({
+        where,
       });
 
-      // Logar exclusão para auditoria
-      this.logger.log(`Recurso excluído: ${String(model)}`, {
-        id: where.id,
-        tenantId: (result as any).tenantId,
+      this.logger.log(`Recurso excluido: ${String(model)}`, {
+        id: this.readRecordId(where),
+        tenantId: this.readTenantId(result),
         deletedBy: userId,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
 
-      return result as T;
+      return result;
     } catch (error) {
-      this.logger.error(`Erro na exclusão segura em ${String(model)}:`, error);
+      this.logger.error(`Erro na exclusao segura em ${String(model)}:`, error);
       throw error;
     }
   }
 
   /**
-   * Previnir injeção de SQL em raw queries
+   * Prevent SQL injection in raw queries.
    */
   sanitizeRawQuery(query: string, params: unknown[]): string {
-    return query.replace(/\$\d+/g, (match, _index) => {
-      const paramIndex = parseInt(match.slice(1)) - 1;
+    return query.replace(/\$\d+/g, (match) => {
+      const paramIndex = parseInt(match.slice(1), 10) - 1;
       const param = params[paramIndex];
 
       if (param === null || param === undefined) {
@@ -275,7 +288,6 @@ export class SecurePrismaService {
       }
 
       if (typeof param === 'string') {
-        // Escapar aspas simples
         return `'${param.replace(/'/g, "''")}'`;
       }
 
@@ -287,39 +299,54 @@ export class SecurePrismaService {
         return `'${param.toISOString()}'`;
       }
 
-      // Para objetos/arrays, converter para JSON
       return `'${JSON.stringify(param).replace(/'/g, "''")}'`;
     });
   }
 
   /**
-   * Executar query raw com sanitização
+   * Execute raw query with sanitization.
    */
   async executeRawSecure(query: string, params: unknown[] = []): Promise<unknown> {
     try {
       const sanitizedQuery = this.sanitizeRawQuery(query, params);
 
       this.logger.debug('Executando query raw sanitizada', {
-        queryPreview: sanitizedQuery.substring(0, 200) + (sanitizedQuery.length > 200 ? '...' : '')
+        queryPreview:
+          sanitizedQuery.substring(0, 200) + (sanitizedQuery.length > 200 ? '...' : ''),
       });
 
-      // Em produção, usar prepared statements
       return await this.prisma.$executeRawUnsafe(sanitizedQuery, ...params);
     } catch (error) {
-      this.logger.error('Erro na execução de query raw:', error);
+      this.logger.error('Erro na execucao de query raw:', error);
       throw error;
     }
   }
 
   /**
-   * Obter estatísticas de uso para monitoramento
+   * Usage stats placeholder for monitoring.
    */
-  getUsageStats(): any {
-    // Implementar coleta de métricas de uso do Prisma
+  getUsageStats(): SecureUsageStats {
     return {
       timestamp: new Date().toISOString(),
-      // Adicionar métricas relevantes
     };
   }
-}
 
+  private getModelDelegate<T extends SecurePrismaRecord>(
+    model: PrismaModelDelegateKey,
+  ): SecurePrismaDelegate<T> {
+    const delegate = (this.prisma as unknown as Record<string, unknown>)[model];
+    if (!delegate || typeof delegate !== 'object') {
+      throw new Error(`Delegate Prisma invalido para o modelo ${String(model)}`);
+    }
+    return delegate as SecurePrismaDelegate<T>;
+  }
+
+  private readRecordId(value: Record<string, unknown>): string | number | undefined {
+    const id = value.id;
+    return typeof id === 'string' || typeof id === 'number' ? id : undefined;
+  }
+
+  private readTenantId(value: Record<string, unknown>): string | null {
+    return typeof value.tenantId === 'string' ? value.tenantId : null;
+  }
+}

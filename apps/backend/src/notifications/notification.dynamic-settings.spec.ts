@@ -380,7 +380,7 @@ describe('NotificationService dynamic notifications toggle', () => {
   });
 
   it('uses the default setting to create notifications, keeps existing notifications readable, and persists system alerts', async () => {
-    const { controller, notificationGateway, prisma } = createContext();
+    const { controller, notificationGateway, notificationService, prisma } = createContext();
 
     await expect(controller.create(createNotificationDto, { user: requestUser } as any)).resolves.toMatchObject({
       success: true,

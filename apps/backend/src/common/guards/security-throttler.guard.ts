@@ -60,8 +60,46 @@ type RateLimitExecution = {
   ttl: number;
 };
 
+type HeaderValue = string | string[] | undefined;
+
+interface RequestUserLike {
+  id?: unknown;
+  sub?: unknown;
+  tenantId?: unknown;
+  apiKeyId?: unknown;
+}
+
+interface RequestApiKeyLike {
+  id?: unknown;
+  tenantId?: unknown;
+}
+
+interface RequestAuthLike {
+  apiKeyId?: unknown;
+}
+
+interface RequestRouteLike {
+  path?: unknown;
+}
+
+interface RequestLike {
+  ip?: unknown;
+  originalUrl?: unknown;
+  url?: unknown;
+  path?: unknown;
+  method?: unknown;
+  route?: RequestRouteLike;
+  headers?: Record<string, HeaderValue>;
+  body?: Record<string, unknown>;
+  user?: RequestUserLike;
+  apiKey?: RequestApiKeyLike;
+  auth?: RequestAuthLike;
+  tenantId?: unknown;
+  __rateLimitContext?: RateLimitExecution;
+}
+
 type RateLimitTelemetry = {
-  req: Record<string, any>;
+  req: RequestLike;
   identity: ThrottleIdentity;
   blocked: boolean;
   limit: number;
@@ -97,7 +135,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
 
   protected async handleRequest(requestProps: ThrottlerRequest): Promise<boolean> {
     const { context } = requestProps;
-    const req = context.switchToHttp().getRequest();
+    const req = context.switchToHttp().getRequest<RequestLike>();
     const identity = this.resolveThrottleIdentity(req);
     const execution = await this.resolveRateLimitExecution(requestProps, identity);
 
@@ -151,7 +189,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     }
   }
 
-  protected async getTracker(req: Record<string, any>): Promise<string> {
+  protected async getTracker(req: RequestLike): Promise<string> {
     return this.resolveThrottleIdentity(req).tracker;
   }
 
@@ -276,7 +314,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     }
   }
 
-  private resolveCriticalTracker(req: Record<string, any>): string {
+  private resolveCriticalTracker(req: RequestLike): string {
     const principal = this.resolvePrincipalIdentity(req);
     const tenantId = principal.tenantId || 'global';
     const userId = principal.userId || 'anonymous';
@@ -366,7 +404,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     }
   }
 
-  private resolveThrottleIdentity(req: Record<string, any>): ThrottleIdentity {
+  private resolveThrottleIdentity(req: RequestLike): ThrottleIdentity {
     const path = this.getRequestPath(req);
     const clientIp = this.resolveClientIp(req);
 
@@ -429,11 +467,11 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     };
   }
 
-  private resolveTenantId(req: Record<string, any>): string | null {
+  private resolveTenantId(req: RequestLike): string | null {
     return this.normalizeText(req?.apiKey?.tenantId || req?.user?.tenantId || req?.tenantId);
   }
 
-  private resolvePrincipalIdentity(req: Record<string, any>): PrincipalIdentity {
+  private resolvePrincipalIdentity(req: RequestLike): PrincipalIdentity {
     const fromRequest = {
       userId: this.normalizeText(req?.user?.id || req?.user?.sub),
       tenantId: this.resolveTenantId(req),
@@ -464,7 +502,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     return fromRequest;
   }
 
-  private extractBearerToken(req: Record<string, any>): string | null {
+  private extractBearerToken(req: RequestLike): string | null {
     const authorizationHeader = req?.headers?.authorization;
     const authorization = Array.isArray(authorizationHeader)
       ? authorizationHeader[0]
@@ -531,7 +569,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     }
   }
 
-  private resolveAuthTarget(path: string, req: Record<string, any>): string | null {
+  private resolveAuthTarget(path: string, req: RequestLike): string | null {
     const email = this.normalizeText(req?.body?.email);
     const token = this.normalizeText(req?.body?.token);
 
@@ -550,19 +588,19 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     return null;
   }
 
-  private getRequestPath(req: Record<string, any>): string {
+  private getRequestPath(req: RequestLike): string {
     const rawPath =
       this.normalizeText(req?.originalUrl || req?.url || req?.path || req?.route?.path) || '/';
     const [pathWithoutQuery] = rawPath.split('?');
     return pathWithoutQuery.toLowerCase();
   }
 
-  private resolveRequestMethod(req: Record<string, any>): string {
+  private resolveRequestMethod(req: RequestLike): string {
     const method = this.normalizeText(req?.method);
     return method ? method.toUpperCase() : 'UNKNOWN';
   }
 
-  private resolveUserAgent(req: Record<string, any>): string | undefined {
+  private resolveUserAgent(req: RequestLike): string | undefined {
     const header = req?.headers?.['user-agent'];
     const userAgent = Array.isArray(header) ? header[0] : header;
 
@@ -574,7 +612,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     return normalized.length > 0 ? normalized : undefined;
   }
 
-  private resolveClientIp(req: Record<string, any>): string {
+  private resolveClientIp(req: RequestLike): string {
     if (typeof req?.ip === 'string' && req.ip.trim().length > 0) {
       return req.ip.trim();
     }
