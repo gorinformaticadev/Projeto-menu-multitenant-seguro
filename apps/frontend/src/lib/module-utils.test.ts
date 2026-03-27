@@ -39,9 +39,9 @@ const createModule = (overrides: Partial<InstalledModule> = {}): InstalledModule
 
 describe("module-utils lifecycle action gating", () => {
   it("permite preparar banco somente quando lifecycle indica arquivos e dependencias prontas", () => {
-    const module = createModule();
+    const moduleItem = createModule();
 
-    expect(getAllowedModuleActions(module)).toMatchObject({
+    expect(getAllowedModuleActions(moduleItem)).toMatchObject({
       updateDatabase: true,
       activate: false,
       deactivate: false,
@@ -49,7 +49,7 @@ describe("module-utils lifecycle action gating", () => {
   });
 
   it("bloqueia preparar banco quando dependencias estao bloqueadas e usa o motivo do lifecycle", () => {
-    const module = createModule({
+    const moduleItem = createModule({
       lifecycle: {
         ...createModule().lifecycle!,
         blockers: ["Dependencia base_module desativada."],
@@ -63,12 +63,12 @@ describe("module-utils lifecycle action gating", () => {
       },
     });
 
-    expect(getAllowedModuleActions(module).updateDatabase).toBe(false);
-    expect(getDisabledTooltip("updateDatabase", module)).toBe("Dependencia base_module desativada.");
+    expect(getAllowedModuleActions(moduleItem).updateDatabase).toBe(false);
+    expect(getDisabledTooltip("updateDatabase", moduleItem)).toBe("Dependencia base_module desativada.");
   });
 
   it("bloqueia ativacao quando o build do frontend esta bloqueado", () => {
-    const module = createModule({
+    const moduleItem = createModule({
       status: "db_ready",
       lifecycle: {
         ...createModule().lifecycle!,
@@ -84,12 +84,12 @@ describe("module-utils lifecycle action gating", () => {
       },
     });
 
-    expect(getAllowedModuleActions(module).activate).toBe(false);
-    expect(getDisabledTooltip("activate", module)).toBe("Frontend nao pronto.");
+    expect(getAllowedModuleActions(moduleItem).activate).toBe(false);
+    expect(getDisabledTooltip("activate", moduleItem)).toBe("Frontend nao pronto.");
   });
 
   it("permite ativacao quando todas as etapas exigidas estao prontas", () => {
-    const module = createModule({
+    const moduleItem = createModule({
       status: "db_ready",
       lifecycle: {
         ...createModule().lifecycle!,
@@ -104,7 +104,7 @@ describe("module-utils lifecycle action gating", () => {
       },
     });
 
-    expect(getAllowedModuleActions(module)).toMatchObject({
+    expect(getAllowedModuleActions(moduleItem)).toMatchObject({
       updateDatabase: false,
       activate: true,
       deactivate: false,

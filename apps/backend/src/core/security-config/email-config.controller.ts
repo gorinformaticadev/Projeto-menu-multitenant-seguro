@@ -1,5 +1,4 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
-import { Public } from '@core/common/decorators/public.decorator';
 import { Throttle } from '@nestjs/throttler';
 import { EmailConfigService } from './email-config.service';
 import { CreateEmailConfigDto, UpdateEmailConfigDto } from './dto/email-config.dto';

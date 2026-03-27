@@ -33,6 +33,17 @@ interface RestoreJobView {
   error?: string;
 }
 
+type BackupArtifactResponse = Partial<AvailableBackup>;
+
+function normalizeAvailableBackup(artifact: BackupArtifactResponse): AvailableBackup {
+  return {
+    id: artifact.id || '',
+    fileName: artifact.fileName || '',
+    fileSize: artifact.fileSize || 0,
+    createdAt: artifact.createdAt || '',
+  };
+}
+
 export function RestoreSection({
   onRestoreComplete,
   disabled = false,
@@ -60,15 +71,10 @@ export function RestoreSection({
     try {
       setLoadingBackups(true);
       const response = await api.get('/backups?limit=200');
-      const artifacts = response.data?.data?.artifacts || [];
-      setAvailableBackups(
-        artifacts.map((artifact: any) => ({
-          id: artifact.id,
-          fileName: artifact.fileName,
-          fileSize: artifact.fileSize,
-          createdAt: artifact.createdAt,
-        })),
-      );
+      const artifacts = Array.isArray(response.data?.data?.artifacts)
+        ? (response.data.data.artifacts as BackupArtifactResponse[])
+        : [];
+      setAvailableBackups(artifacts.map(normalizeAvailableBackup));
     } catch (error) {
       console.error('Erro ao carregar backups:', error);
       toast({

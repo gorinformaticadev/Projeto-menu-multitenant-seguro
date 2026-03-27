@@ -13,7 +13,6 @@ import {
   History,
   CheckCircle,
   XCircle,
-  Clock,
   AlertTriangle,
   Info,
   Database,
@@ -24,7 +23,6 @@ import api from '@/lib/api';
 import { BackupSection } from './components/BackupSection';
 import { RestoreSection } from './components/RestoreSection';
 import { useSystemVersion } from '@/hooks/useSystemVersion';
-import { useAuth } from '@/contexts/AuthContext';
 import { useMaintenance } from '@/contexts/MaintenanceContext';
 import {
   formatUpdateLifecycleStatus,
@@ -112,18 +110,6 @@ interface UpdateConfigResponse {
   hasGitToken?: boolean;
 }
 
-interface BackupLog {
-  id: string;
-  operationType: string;
-  status: string;
-  startedAt: string;
-  fileName?: string;
-  fileSize?: number;
-  durationSeconds?: number;
-  executedBy?: string;
-  errorMessage?: string;
-}
-
 function normalizeVersionTag(version: string): string {
   const value = (version || '').trim();
   if (!value) return value;
@@ -132,13 +118,6 @@ function normalizeVersionTag(version: string): string {
 
 function getApiErrorMessage(error: unknown, fallback = 'Erro interno do servidor'): string {
   return parseUpdateApiError(error, fallback).userMessage;
-}
-
-function formatBuildDate(value?: string): string {
-  if (!value) return 'N/A';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'N/A';
-  return date.toLocaleString('pt-BR');
 }
 
 function formatElapsedTime(startedAt: string | null | undefined): string | null {
@@ -162,10 +141,8 @@ function formatElapsedTime(startedAt: string | null | undefined): string | null 
 export default function UpdatesPage() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const { user } = useAuth();
-  const { version, versionInfo, loading: versionLoading, refreshVersion } = useSystemVersion();
+  const { version, loading: versionLoading } = useSystemVersion();
   const { state: maintenanceState, isMaintenanceActive } = useMaintenance();
-  const canShowVersionSource = user?.role === 'SUPER_ADMIN' || process.env.NODE_ENV !== 'production';
   const maintenanceReason = maintenanceState.reason || 'Atualizacao em andamento';
 
   // Estados
@@ -191,7 +168,6 @@ export default function UpdatesPage() {
 
   const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState('status');
-  const [backupLogs, setBackupLogs] = useState<BackupLog[]>([]);
   const [hasSavedGitToken, setHasSavedGitToken] = useState(false);
   const lifecycle = status?.updateLifecycle;
   const lifecycleStatus = lifecycle?.status || 'idle';
@@ -258,21 +234,15 @@ export default function UpdatesPage() {
     }
   }, []);
 
-  const loadBackupLogs = useCallback(async () => {
-    try {
-      const response = await api.get('/api/backup/logs?limit=50');
-      setBackupLogs(response.data);
-    } catch (error: unknown) {
-      console.error('Erro ao carregar logs de backup:', error);
-    }
-  }, []);
+  const refreshOperationalHistory = useCallback(async () => {
+    await Promise.all([loadStatus({ silent: true }), loadLogs({ silent: true })]);
+  }, [loadLogs, loadStatus]);
 
   useEffect(() => {
     void loadStatus();
     void loadConfig();
     void loadLogs();
-    void loadBackupLogs();
-  }, [loadStatus, loadConfig, loadLogs, loadBackupLogs]);
+  }, [loadStatus, loadConfig, loadLogs]);
 
   useEffect(() => {
     if (!isUpdateRunning && !isMaintenanceActive) {
@@ -585,8 +555,8 @@ export default function UpdatesPage() {
 
         {activeTab === 'backup' && (
           <div className="space-y-6">
-            <BackupSection onBackupComplete={loadBackupLogs} disabled={isMaintenanceActive} disabledReason={maintenanceReason} />
-            <RestoreSection onRestoreComplete={loadBackupLogs} disabled={isMaintenanceActive} disabledReason={maintenanceReason} />
+            <BackupSection onBackupComplete={refreshOperationalHistory} disabled={isMaintenanceActive} disabledReason={maintenanceReason} />
+            <RestoreSection onRestoreComplete={refreshOperationalHistory} disabled={isMaintenanceActive} disabledReason={maintenanceReason} />
           </div>
         )}
 

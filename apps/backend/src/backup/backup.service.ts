@@ -2087,7 +2087,7 @@ export class BackupService {
   private buildStoredFileName(prefix: string, extension: string): string {
     const safePrefix = prefix
       .normalize('NFKD')
-      .replace(/[^\x00-\x7F]/g, '')
+      .replace(/[^\p{ASCII}]/gu, '')
       .replace(/[^a-zA-Z0-9._-]/g, '_')
       .replace(/_+/g, '_')
       .replace(/^[_\-.]+|[_\-.]+$/g, '')
@@ -2246,7 +2246,9 @@ export class BackupService {
   private async tryRecoverPrismaConnection(): Promise<void> {
     try {
       await this.prisma.$disconnect();
-    } catch {}
+    } catch {
+      // Ignora falhas de disconnect durante a tentativa de recuperacao.
+    }
 
     if (this.prisma.isCutoverBlocked()) {
       return;
@@ -2289,7 +2291,9 @@ export class BackupService {
 
       try {
         await this.prisma.$disconnect();
-      } catch {}
+      } catch {
+        // Ignora falhas de disconnect antes de recriar a conexao.
+      }
       try {
         await this.prisma.$connect();
       } catch (error) {

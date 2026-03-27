@@ -1,7 +1,6 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { BadRequestException } from '@nestjs/common';
 import { SecureFilesService } from './secure-files.service';
 import { ConfigResolverService } from '../../system-settings/config-resolver.service';
 import { SettingsRegistry } from '../../system-settings/settings-registry.service';

@@ -61,9 +61,6 @@ const dashboardCardToneClassName = {
     "border-skin-danger/30 bg-skin-surface/95",
 } as const;
 
-const dashboardInsetPanelClassName =
-  "rounded-[18px] border border-skin-border/80 bg-skin-background-elevated/70 px-3 py-2.5 ";
-
 function InfoButton({
   label,
   children,
@@ -718,5 +715,4 @@ export default function SecurityConfigPage() {
     </div>
   );
 }
-
 

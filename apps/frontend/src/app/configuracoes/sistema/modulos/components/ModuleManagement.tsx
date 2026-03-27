@@ -409,13 +409,13 @@ export function ModuleManagement() {
     }
   };
 
-  const openRemoveDialog = (module: InstalledModule) => {
+  const openRemoveDialog = useCallback((moduleItem: InstalledModule) => {
     setOpenActionMenuFor(null);
     setShowInfoDialog(false);
-    setSelectedModule(module);
+    setSelectedModule(moduleItem);
     setConfirmationInput("");
     setShowRemoveDialog(true);
-  };
+  }, []);
 
   const handleRemoveModule = async () => {
     if (!moduleUploadEnabled) {
@@ -511,7 +511,7 @@ export function ModuleManagement() {
     }
   };
 
-  const prepareModuleDatabase = async (moduleName: string) => {
+  const prepareModuleDatabase = useCallback(async (moduleName: string) => {
     setUpdatingDatabase(moduleName);
     setDbUpdateStatus("Validando modulo...");
 
@@ -542,9 +542,9 @@ export function ModuleManagement() {
       setUpdatingDatabase(null);
       setDbUpdateStatus("");
     }
-  };
+  }, [refreshModuleData, toast]);
 
-  const activateModule = async (moduleName: string) => {
+  const activateModule = useCallback(async (moduleName: string) => {
     try {
       const response = await api.post(`/configuracoes/sistema/modulos/${moduleName}/activate`);
 
@@ -563,9 +563,9 @@ export function ModuleManagement() {
         variant: "destructive",
       });
     }
-  };
+  }, [refreshModuleData, toast]);
 
-  const deactivateModule = async (moduleName: string) => {
+  const deactivateModule = useCallback(async (moduleName: string) => {
     try {
       const response = await api.post(`/configuracoes/sistema/modulos/${moduleName}/deactivate`);
 
@@ -584,9 +584,9 @@ export function ModuleManagement() {
         variant: "destructive",
       });
     }
-  };
+  }, [refreshModuleData, toast]);
 
-  const reloadModuleConfig = async (moduleName: string) => {
+  const reloadModuleConfig = useCallback(async (moduleName: string) => {
     if (!moduleUploadEnabled) {
       toast({
         title: "Operacao bloqueada",
@@ -620,7 +620,7 @@ export function ModuleManagement() {
     } finally {
       setReloadingConfig(null);
     }
-  };
+  }, [installerCapabilities?.message, moduleUploadEnabled, refreshModuleData, toast]);
 
   const getPrimaryAction = useCallback(
     (module: InstalledModule, allowedActions: AllowedModuleActions): ModuleActionConfig | null => {
@@ -1596,5 +1596,4 @@ export function ModuleManagement() {
     </div>
   );
 }
-
 

@@ -31,4 +31,23 @@ module.exports = [
       'no-irregular-whitespace': 'warn',
     },
   },
+  {
+    files: ['src/**/*.spec.ts', 'src/**/*.e2e-spec.ts', 'src/**/*.dynamic-settings.spec.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  {
+    files: ['src/core/_deprecated/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      'no-console': 'off',
+    },
+  },
+  {
+    files: ['src/main.ts', 'src/reset-admin-password.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
 ];

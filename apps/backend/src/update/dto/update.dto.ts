@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, Matches } from 'class-validator';
+import { IsString, IsOptional, Matches } from 'class-validator';
 
 /**
  * DTO para execucao de atualizacao

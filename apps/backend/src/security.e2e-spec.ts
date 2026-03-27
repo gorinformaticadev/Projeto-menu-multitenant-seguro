@@ -353,7 +353,7 @@ describe('Security red team regression attacks', () => {
     };
     const gateway = createNotificationGateway({ prismaService: prisma });
 
-    // @ts-ignore - accessing private method for test
+    // @ts-expect-error - accessing private method for test
     const targetUsers = await gateway.getTargetUsers({
       id: 'notif-1',
       tenantId: 'tenant-1',

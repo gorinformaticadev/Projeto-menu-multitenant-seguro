@@ -6,13 +6,11 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as semver from 'semver';
 import * as crypto from 'crypto';
-import * as path from 'path';
 import * as fs from 'fs';
 import { Prisma, UpdateLog, UpdateSystemSettings } from '@prisma/client';
 import { SystemVersionService } from '@common/services/system-version.service';
 import { SystemUpdateAdminService } from './system-update-admin.service';
 
-type UpdateExecutionResult = { stdout: string; stderr: string };
 type UpdateExecutionStatus = 'starting' | 'completed';
 type UpdateLifecycleStatus =
   | 'idle'

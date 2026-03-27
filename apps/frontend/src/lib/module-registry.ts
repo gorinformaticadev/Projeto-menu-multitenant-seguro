@@ -177,7 +177,7 @@ class ModuleRegistry {
           timeout: MODULE_REGISTRY_REQUEST_TIMEOUT_MS,
         });
 
-        this.apiModules = response.data.modules.filter((module) => module.enabled !== false);
+        this.apiModules = response.data.modules.filter((moduleItem) => moduleItem.enabled !== false);
         this.isLoaded = true;
 
         if (typeof window !== "undefined") {
@@ -319,8 +319,8 @@ class ModuleRegistry {
   private getDynamicGroups(userRole?: string): NavigationGroupDefinition[] {
     const groups: NavigationGroupDefinition[] = [];
 
-    for (const module of this.apiModules) {
-      const items = this.filterMenusByAccess(module.menus || [], userRole)
+    for (const moduleItem of this.apiModules) {
+      const items = this.filterMenusByAccess(moduleItem.menus || [], userRole)
         .map((menu) => ({
           ...menu,
           id: menu.id || menu.route,
@@ -332,15 +332,15 @@ class ModuleRegistry {
         continue;
       }
 
-      const configuredGroup = STATIC_GROUP_CONFIG[module.slug];
+      const configuredGroup = STATIC_GROUP_CONFIG[moduleItem.slug];
       const mainMenu =
-        items.find((menu) => menu.label === module.name) ||
+        items.find((menu) => menu.label === moduleItem.name) ||
         items.find((menu) => menu.children && menu.children.length > 0) ||
         items[0];
 
       groups.push({
-        id: module.slug,
-        name: configuredGroup?.name || module.name,
+        id: moduleItem.slug,
+        name: configuredGroup?.name || moduleItem.name,
         icon: configuredGroup?.icon || mainMenu?.icon || "Menu",
         order: configuredGroup?.order ?? 100,
         placement: configuredGroup?.placement ?? "main",
@@ -392,8 +392,8 @@ class ModuleRegistry {
     }
 
     return this.apiModules
-      .map((module) => {
-        const items = this.filterMenusByAccess(module.menus || [], userRole);
+      .map((moduleItem) => {
+        const items = this.filterMenusByAccess(moduleItem.menus || [], userRole);
         const mainMenu = items[0];
 
         if (!mainMenu) {
@@ -401,8 +401,8 @@ class ModuleRegistry {
         }
 
         return {
-          id: `taskbar-${module.slug}`,
-          name: mainMenu.label || module.name,
+          id: `taskbar-${moduleItem.slug}`,
+          name: mainMenu.label || moduleItem.name,
           icon: mainMenu.icon || "Package",
           href: mainMenu.route,
           order: mainMenu.order || 50,
@@ -478,9 +478,9 @@ class ModuleRegistry {
   getAllMenus(): ModuleMenu[] {
     const allMenus: ModuleMenu[] = [];
 
-    for (const module of this.apiModules) {
-      if (module.menus?.length) {
-        allMenus.push(...module.menus);
+    for (const moduleItem of this.apiModules) {
+      if (moduleItem.menus?.length) {
+        allMenus.push(...moduleItem.menus);
       }
     }
 
@@ -498,8 +498,8 @@ class ModuleRegistry {
 
     const userMenuItems: ModuleUserMenuItem[] = [];
 
-    for (const module of this.apiModules) {
-      const menus = this.filterMenusByAccess(module.menus || [], userRole);
+    for (const moduleItem of this.apiModules) {
+      const menus = this.filterMenusByAccess(moduleItem.menus || [], userRole);
 
       for (const menu of menus) {
         if (menu.children?.length) {
@@ -507,7 +507,7 @@ class ModuleRegistry {
         }
 
         userMenuItems.push({
-          id: `usermenu-${module.slug}-${menu.id || menu.route}`,
+          id: `usermenu-${moduleItem.slug}-${menu.id || menu.route}`,
           label: menu.label,
           icon: menu.icon,
           href: menu.route,
@@ -520,20 +520,20 @@ class ModuleRegistry {
   }
 
   hasModule(slug: string): boolean {
-    return this.apiModules.some((module) => module.slug === slug);
+    return this.apiModules.some((moduleItem) => moduleItem.slug === slug);
   }
 
   getModule(slug: string): ModuleData | undefined {
-    return this.apiModules.find((module) => module.slug === slug);
+    return this.apiModules.find((moduleItem) => moduleItem.slug === slug);
   }
 
   getAvailableModules(): string[] {
-    return this.apiModules.map((module) => module.slug);
+    return this.apiModules.map((moduleItem) => moduleItem.slug);
   }
 
   getModuleMenus(slug: string): ModuleMenu[] {
-    const module = this.getModule(slug);
-    return module?.menus || [];
+    const moduleItem = this.getModule(slug);
+    return moduleItem?.menus || [];
   }
 }
 

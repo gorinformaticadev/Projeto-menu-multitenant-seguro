@@ -22,10 +22,12 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps & { chi
     if (hasAuthenticatedUser) {
       const authenticatedShellTheme = resolveAuthenticatedShellTheme(user?.preferences?.theme);
       const {
-        forcedTheme: _ignoredForcedTheme,
-        storageKey: _ignoredStorageKey,
+        forcedTheme,
+        storageKey,
         ...sharedProviderProps
       } = props;
+      void forcedTheme;
+      void storageKey;
 
       return (
         <NextThemesProvider
@@ -41,12 +43,10 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps & { chi
     // ao tema do sistema — o auth-theme é fixo e autossuficiente.
     // A classe auth-public no <html> garante que o portal Radix (toast)
     // herde os tokens corretos do auth-theme.
-    const {
-      forcedTheme: _ignoredForcedTheme,
-      storageKey: _ignoredStorageKey,
-      enableSystem: _ignoredEnableSystem,
-      ...publicProviderProps
-    } = props;
+    const { forcedTheme, storageKey, enableSystem, ...publicProviderProps } = props;
+    void forcedTheme;
+    void storageKey;
+    void enableSystem;
 
     return (
       <NextThemesProvider

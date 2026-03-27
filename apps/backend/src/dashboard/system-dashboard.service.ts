@@ -4,6 +4,7 @@ import Redis from 'ioredis';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
+import { createRequire } from 'module';
 import { humanizeAuditAction, resolveAuditDisplayMessage } from '../audit/audit-log-presentation.util';
 import { SystemVersionService } from '../common/services/system-version.service';
 import { MaintenanceModeService } from '../maintenance/maintenance-mode.service';
@@ -177,6 +178,7 @@ const RECENT_BACKUPS_LIMIT = 10;
 const RECENT_JOB_FAILURES_LIMIT = 20;
 const RECENT_CRITICAL_ERRORS_LIMIT = 20;
 const LEGACY_CORE_PLATFORM_WIDGET_IDS = new Set(['welcome-widget', 'stats-widget']);
+const requireFromCommonJs = createRequire(__filename);
 
 // Curto cache em memoria para widgets caros/externos no polling do agregado.
 // Nao cacheamos maintenance, uptime, notifications nem version para manter o estado mais fresco.
@@ -668,7 +670,9 @@ export class SystemDashboardService {
       } catch {
         try {
           redis.disconnect();
-        } catch {}
+        } catch {
+          // Ignora falhas de disconnect do Redis depois da tentativa de quit.
+        }
       }
     }
   }
@@ -1583,7 +1587,7 @@ export class SystemDashboardService {
     getDashboardWidgets: (userRole?: string, permissions?: string[]) => ModuleDashboardWidget[];
   } | null {
     try {
-      const loaded = require('../core/shared/registry/module-registry');
+      const loaded = requireFromCommonJs('../core/shared/registry/module-registry');
       return loaded?.moduleRegistry ?? null;
     } catch {
       return null;
@@ -1592,7 +1596,7 @@ export class SystemDashboardService {
 
   private loadRegisterCoreModule(): (() => void) | null {
     try {
-      const loaded = require('../core/shared/modules/core-module');
+      const loaded = requireFromCommonJs('../core/shared/modules/core-module');
       return typeof loaded?.registerCoreModule === 'function' ? loaded.registerCoreModule : null;
     } catch {
       return null;
@@ -2189,6 +2193,4 @@ export class SystemDashboardService {
     return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3)}...` : normalized;
   }
 }
-
-
 

@@ -17,6 +17,7 @@ import {
 } from "@/app/configuracoes/sistema/diagnostico/diagnostics.utils";
 
 type Section<T> = ({ status: "ok" } & T) | { status: "error"; message: string };
+type DiagnosticsRecord = Record<string, unknown>;
 
 const diagnosticsCardClassName =
   "rounded-[2rem] border border-skin-border bg-skin-surface shadow-sm";
@@ -44,17 +45,29 @@ type DiagnosticsData = {
     backups: string | null;
     notifications: string | null;
   };
-  operational: Section<Record<string, any>>;
-  scheduler: Section<Record<string, any>>;
-  update: Section<Record<string, any>>;
-  backup: Section<Record<string, any>>;
-  alerts: Section<Record<string, any>>;
-  audit: Section<Record<string, any>>;
-  logs: Section<Record<string, any>>;
+  operational: Section<DiagnosticsRecord>;
+  scheduler: Section<DiagnosticsRecord>;
+  update: Section<DiagnosticsRecord>;
+  backup: Section<DiagnosticsRecord>;
+  alerts: Section<DiagnosticsRecord>;
+  audit: Section<DiagnosticsRecord>;
+  logs: Section<DiagnosticsRecord>;
 };
 
 function okSection<T>(section: Section<T> | null | undefined): T | null {
   return section && section.status === "ok" ? (section as T) : null;
+}
+
+function isDiagnosticsRecord(value: unknown): value is DiagnosticsRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getDiagnosticsRecords(value: unknown): DiagnosticsRecord[] {
+  return Array.isArray(value) ? value.filter(isDiagnosticsRecord) : [];
+}
+
+function getStringValues(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
 function formatDate(value: unknown) {
@@ -96,7 +109,7 @@ function SectionCard({
 }: {
   title: string;
   description: string;
-  section: Section<Record<string, any>>;
+  section: Section<DiagnosticsRecord>;
   href?: string | null;
   actionLabel?: string;
   children: React.ReactNode;
@@ -163,13 +176,18 @@ export default function DiagnosticoSistemaPage() {
     void load(true);
   }, [load]);
 
-  const operational = okSection<Record<string, any>>(data?.operational);
-  const scheduler = okSection<Record<string, any>>(data?.scheduler);
-  const update = okSection<Record<string, any>>(data?.update);
-  const backup = okSection<Record<string, any>>(data?.backup);
-  const alerts = okSection<Record<string, any>>(data?.alerts);
-  const audit = okSection<Record<string, any>>(data?.audit);
-  const logs = okSection<Record<string, any>>(data?.logs);
+  const operational = okSection<DiagnosticsRecord>(data?.operational);
+  const scheduler = okSection<DiagnosticsRecord>(data?.scheduler);
+  const update = okSection<DiagnosticsRecord>(data?.update);
+  const backup = okSection<DiagnosticsRecord>(data?.backup);
+  const alerts = okSection<DiagnosticsRecord>(data?.alerts);
+  const audit = okSection<DiagnosticsRecord>(data?.audit);
+  const logs = okSection<DiagnosticsRecord>(data?.logs);
+  const schedulerProblematic = getDiagnosticsRecords(scheduler?.problematic);
+  const recentAlerts = getDiagnosticsRecords(alerts?.recent);
+  const recentTechnicalIssues = getDiagnosticsRecords(logs?.recentTechnicalIssues);
+  const recentAuditEvents = getDiagnosticsRecords(audit?.recent);
+  const logCoverage = getStringValues(logs?.coverage);
   const overall = getDiagnosticsLevelPresentation(data?.overall.level || "attention");
 
   return (
@@ -220,7 +238,7 @@ export default function DiagnosticoSistemaPage() {
                 <div className="grid gap-3 md:grid-cols-2"><Metric label="Versao atual" value={String(operational?.version || "Sem leitura")} /><Metric label="Uptime" value={String(operational?.uptimeHuman || "Sem leitura")} /><Metric label="Banco" value={formatLabel(operational?.databaseStatus)} /><Metric label="Redis" value={formatLabel(operational?.redisStatus)} /><Metric label="Taxa de erro da API" value={operational?.apiErrorRateRecent === null || operational?.apiErrorRateRecent === undefined ? "Sem leitura" : `${Number(operational.apiErrorRateRecent).toFixed(1)}%`} /><Metric label="Maintenance" value={operational?.maintenanceActive ? "Ativo" : "Inativo"} /></div>
               </SectionCard>
               <SectionCard title="Scheduler e tarefas" description="Runtime real das tarefas, com falhas, atrasos e travamentos." section={data.scheduler} href={data.links.cron} actionLabel="Abrir tarefas">
-                <div className="space-y-4"><div className="grid gap-3 md:grid-cols-4"><Metric label="Ativas" value={String(scheduler?.enabled || 0)} /><Metric label="Com falha" value={String(scheduler?.failed || 0)} /><Metric label="Atrasadas" value={String(scheduler?.stale || 0)} /><Metric label="Travadas" value={String(scheduler?.stuck || 0)} /></div>{Array.isArray(scheduler?.problematic) && scheduler.problematic.length > 0 ? scheduler.problematic.map((item: Record<string, any>) => <div key={String(item.key)} className={diagnosticsPanelClassName}><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-skin-text">{String(item.name)}</p><Badge variant="outline" className="border-skin-border bg-skin-surface text-skin-text">{formatLabel(item.type)}</Badge></div><p className="mt-1 text-xs text-skin-text-muted">{String(item.summary)}</p><div className="mt-2 grid gap-2 text-xs text-skin-text-muted md:grid-cols-2"><span>Proximo esperado: {formatDate(item.nextExpectedRunAt)}</span><span>Ultimo sucesso: {formatDate(item.lastSucceededAt)}</span></div></div>) : <DashboardSurfaceState title="Sem tarefas problematicas" description="O runtime nao reportou atrasos ou falhas relevantes." tone="neutral" />}</div>
+                <div className="space-y-4"><div className="grid gap-3 md:grid-cols-4"><Metric label="Ativas" value={String(scheduler?.enabled || 0)} /><Metric label="Com falha" value={String(scheduler?.failed || 0)} /><Metric label="Atrasadas" value={String(scheduler?.stale || 0)} /><Metric label="Travadas" value={String(scheduler?.stuck || 0)} /></div>{schedulerProblematic.length > 0 ? schedulerProblematic.map((item) => <div key={String(item.key)} className={diagnosticsPanelClassName}><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-skin-text">{String(item.name)}</p><Badge variant="outline" className="border-skin-border bg-skin-surface text-skin-text">{formatLabel(item.type)}</Badge></div><p className="mt-1 text-xs text-skin-text-muted">{String(item.summary)}</p><div className="mt-2 grid gap-2 text-xs text-skin-text-muted md:grid-cols-2"><span>Proximo esperado: {formatDate(item.nextExpectedRunAt)}</span><span>Ultimo sucesso: {formatDate(item.lastSucceededAt)}</span></div></div>) : <DashboardSurfaceState title="Sem tarefas problematicas" description="O runtime nao reportou atrasos ou falhas relevantes." tone="neutral" />}</div>
               </SectionCard>
               <SectionCard title="Update e deploy" description="Estado reaproveitado do sistema de updates." section={data.update} href={update?.href || null} actionLabel="Abrir updates">
                 <div className="grid gap-3 md:grid-cols-2"><Metric label="Versao atual" value={String(update?.currentVersion || "Sem leitura")} /><Metric label="Atualizacao disponivel" value={update?.updateAvailable ? "Sim" : "Nao"} /><Metric label="Ultima checagem" value={formatDate(update?.lastCheck)} /><Metric label="Execucao em andamento" value={update?.inProgress ? "Sim" : "Nao"} /><Metric label="Ultima execucao" value={update?.lastUpdate ? `${formatLabel(update.lastUpdate.status)} - ${String(update.lastUpdate.version || "Sem versao")}` : "Nenhuma execucao recente"} /><Metric label="Ultimo rollback" value={update?.lastRollback ? `${formatLabel(update.lastRollback.status)} - ${String(update.lastRollback.version || "Sem versao")}` : "Nenhum rollback recente"} /></div>
@@ -229,13 +247,13 @@ export default function DiagnosticoSistemaPage() {
                 <div className="grid gap-3 md:grid-cols-2"><Metric label="Pendentes" value={String(backup?.pendingJobs || 0)} /><Metric label="Executando" value={String(backup?.runningJobs || 0)} /><Metric label="Ultimo backup" value={backup?.lastBackup ? `${formatLabel(backup.lastBackup.type)} - ${formatLabel(backup.lastBackup.status)}` : "Sem registro"} /><Metric label="Ultimo restore" value={backup?.lastRestore ? `${formatLabel(backup.lastRestore.type)} - ${formatLabel(backup.lastRestore.status)}` : "Sem registro"} /><Metric label="Falha recente" value={backup?.recentFailure ? `${formatLabel(backup.recentFailure.type)} - ${formatLabel(backup.recentFailure.status)}` : "Sem falhas"} /></div>
               </SectionCard>
               <SectionCard title="Alertas operacionais" description="Ultimos alertas automaticos, sem criar uma nova inbox." section={data.alerts} href={alerts?.href || null} actionLabel="Abrir notificacoes">
-                <div className="space-y-4"><div className="grid gap-3 md:grid-cols-3"><Metric label="Alertas recentes" value={String(alerts?.recentCount || 0)} /><Metric label="Criticos" value={String(alerts?.criticalCount || 0)} /><Metric label="Inbox dedicada" value={alerts?.inboxAvailable ? "Disponivel" : "Nao disponivel"} /></div>{Array.isArray(alerts?.recent) && alerts.recent.length > 0 ? alerts.recent.map((item: Record<string, any>) => <div key={String(item.id)} className={diagnosticsPanelClassName}><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-skin-text">{String(item.title)}</p><Badge variant="outline" className="border-skin-border bg-skin-surface text-skin-text">{formatLabel(item.severity)}</Badge></div><p className="mt-1 text-sm text-skin-text-muted">{String(item.body)}</p><div className="mt-2 text-xs text-skin-text-muted">{formatDate(item.createdAt)}</div></div>) : <DashboardSurfaceState title="Sem alertas recentes" description="Nenhum alerta operacional foi emitido na janela atual." tone="neutral" />}</div>
+                <div className="space-y-4"><div className="grid gap-3 md:grid-cols-3"><Metric label="Alertas recentes" value={String(alerts?.recentCount || 0)} /><Metric label="Criticos" value={String(alerts?.criticalCount || 0)} /><Metric label="Inbox dedicada" value={alerts?.inboxAvailable ? "Disponivel" : "Nao disponivel"} /></div>{recentAlerts.length > 0 ? recentAlerts.map((item) => <div key={String(item.id)} className={diagnosticsPanelClassName}><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-skin-text">{String(item.title)}</p><Badge variant="outline" className="border-skin-border bg-skin-surface text-skin-text">{formatLabel(item.severity)}</Badge></div><p className="mt-1 text-sm text-skin-text-muted">{String(item.body)}</p><div className="mt-2 text-xs text-skin-text-muted">{formatDate(item.createdAt)}</div></div>) : <DashboardSurfaceState title="Sem alertas recentes" description="Nenhum alerta operacional foi emitido na janela atual." tone="neutral" />}</div>
               </SectionCard>
               <SectionCard title="Auditoria e logs" description="Reaproveita a pagina /logs existente e mostra a cobertura real dos dados." section={data.logs} href={data.links.logs} actionLabel="Abrir logs">
-                <div className="space-y-4"><div className={diagnosticsPanelClassName}><p className="text-sm font-semibold text-skin-text">{String(logs?.summary || "Sem resumo")}</p><p className="mt-1 text-xs text-skin-text-muted">Escopo atual: {String(logs?.pageKind || "auditoria")}</p></div><div className="flex flex-wrap gap-2">{Array.isArray(logs?.coverage) ? logs.coverage.map((item: string) => <Badge key={item} variant="outline" className="border-skin-border bg-skin-surface text-skin-text">{item}</Badge>) : null}</div>{Array.isArray(logs?.recentTechnicalIssues) && logs.recentTechnicalIssues.length > 0 ? logs.recentTechnicalIssues.map((item: Record<string, any>) => <div key={String(item.id)} className="rounded-2xl border border-skin-border bg-skin-surface px-4 py-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-skin-text">{String(item.title)}</p><Badge variant="outline" className="border-skin-border bg-skin-surface text-skin-text">{String(item.origin)}</Badge></div><p className="mt-1 text-sm text-skin-text-muted">{String(item.detail || "Sem detalhe adicional")}</p><div className="mt-2 text-xs text-skin-text-muted">{formatDate(item.occurredAt)}</div></div>) : <DashboardSurfaceState title="Sem falhas tecnicas recentes" description="Nao foram identificadas falhas tecnicas recentes nas bases reaproveitadas." tone="neutral" />}</div>
+                <div className="space-y-4"><div className={diagnosticsPanelClassName}><p className="text-sm font-semibold text-skin-text">{String(logs?.summary || "Sem resumo")}</p><p className="mt-1 text-xs text-skin-text-muted">Escopo atual: {String(logs?.pageKind || "auditoria")}</p></div><div className="flex flex-wrap gap-2">{logCoverage.map((item) => <Badge key={item} variant="outline" className="border-skin-border bg-skin-surface text-skin-text">{item}</Badge>)}</div>{recentTechnicalIssues.length > 0 ? recentTechnicalIssues.map((item) => <div key={String(item.id)} className="rounded-2xl border border-skin-border bg-skin-surface px-4 py-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-skin-text">{String(item.title)}</p><Badge variant="outline" className="border-skin-border bg-skin-surface text-skin-text">{String(item.origin)}</Badge></div><p className="mt-1 text-sm text-skin-text-muted">{String(item.detail || "Sem detalhe adicional")}</p><div className="mt-2 text-xs text-skin-text-muted">{formatDate(item.occurredAt)}</div></div>) : <DashboardSurfaceState title="Sem falhas tecnicas recentes" description="Nao foram identificadas falhas tecnicas recentes nas bases reaproveitadas." tone="neutral" />}</div>
               </SectionCard>
               <SectionCard title="Eventos criticos de auditoria" description="Ultimos eventos criticos relevantes ja persistidos." section={data.audit} href={data.links.audit} actionLabel="Abrir auditoria">
-                <div className="space-y-2">{Array.isArray(audit?.recent) && audit.recent.length > 0 ? audit.recent.map((item: Record<string, any>) => <div key={String(item.id)} className={diagnosticsPanelClassName}><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-skin-text">{String(item.actionLabel || item.action)}</p><Badge variant="outline" className="border-skin-border bg-skin-surface text-skin-text">{formatLabel(item.severity)}</Badge></div><p className="mt-1 text-sm text-skin-text-muted">{String(item.message || item.action)}</p><div className="mt-2 text-xs text-skin-text-muted">{formatDate(item.createdAt)}</div></div>) : <DashboardSurfaceState title="Sem eventos criticos" description="A auditoria nao registrou eventos criticos recentes nesta visao." tone="neutral" />}</div>
+                <div className="space-y-2">{recentAuditEvents.length > 0 ? recentAuditEvents.map((item) => <div key={String(item.id)} className={diagnosticsPanelClassName}><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-skin-text">{String(item.actionLabel || item.action)}</p><Badge variant="outline" className="border-skin-border bg-skin-surface text-skin-text">{formatLabel(item.severity)}</Badge></div><p className="mt-1 text-sm text-skin-text-muted">{String(item.message || item.action)}</p><div className="mt-2 text-xs text-skin-text-muted">{formatDate(item.createdAt)}</div></div>) : <DashboardSurfaceState title="Sem eventos criticos" description="A auditoria nao registrou eventos criticos recentes nesta visao." tone="neutral" />}</div>
               </SectionCard>
             </div>
           </>

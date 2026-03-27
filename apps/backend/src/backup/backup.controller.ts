@@ -173,7 +173,7 @@ export class BackupsController {
   async downloadByArtifactId(@Param('id') artifactId: string, @Res() res: Response) {
     const download = await this.backupService.resolveArtifactDownload(artifactId);
     res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename=\"${download.fileName}\"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${download.fileName}"`);
     res.setHeader('Content-Length', String(download.size));
     res.sendFile(download.filePath);
   }
@@ -302,7 +302,7 @@ export class BackupLegacyController {
   async downloadByFileName(@Param('fileName') fileName: string, @Res() res: Response) {
     const download = await this.backupService.resolveArtifactByFileName(fileName);
     res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename=\"${download.fileName}\"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${download.fileName}"`);
     res.setHeader('Content-Length', String(download.size));
     res.sendFile(download.filePath);
   }

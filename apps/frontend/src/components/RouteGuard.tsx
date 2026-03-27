@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
-import { isProtectedRoute, isAuthRoute, ROUTE_CONFIG } from '@/lib/routes';
+import { isProtectedRoute, ROUTE_CONFIG } from '@/lib/routes';
 
 interface RouteGuardProps {
   children: React.ReactNode;

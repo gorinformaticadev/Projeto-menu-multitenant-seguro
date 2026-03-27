@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import {
@@ -167,7 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  const clearAuthState = (shouldRedirect = false) => {
+  const clearAuthState = useCallback((shouldRedirect = false) => {
     setUser(null);
     setToken(null);
 
@@ -185,7 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         `${ROUTE_CONFIG.unauthenticatedFallback}?callbackUrl=${encodeURIComponent(window.location.pathname)}`,
       );
     }
-  };
+  }, [router]);
 
 
   const handleAuthenticatedResponse = async (payload: AuthenticatedResponsePayload) => {
@@ -247,7 +247,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       window.removeEventListener("auth:logout", handleForcedLogout);
     };
-  }, []);
+  }, [clearAuthState]);
 
   async function login(email: string, password: string) {
     const result = await loginWithCredentials(email, password);

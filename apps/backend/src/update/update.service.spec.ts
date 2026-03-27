@@ -6,15 +6,6 @@ import { AuditService } from '../audit/audit.service';
 import { SystemUpdateAdminService } from './system-update-admin.service';
 import { UpdateService } from './update.service';
 
-type UpdateServicePrivateApi = {
-  execFileAsync: jest.Mock;
-  getRemoteTagsOutput: (repoUrl: string, encryptedGitToken?: string) => Promise<string>;
-  encryptToken: (token: string) => string;
-  sanitizeGitError: (output: string, token?: string) => string;
-  formatVersion: (version: string) => string;
-  normalizeHttpStatus: (statusLike: unknown, fallback?: number) => number;
-};
-
 function createService() {
   process.env.ENCRYPTION_KEY = '12345678901234567890123456789012-strong-key-material';
 

@@ -121,7 +121,7 @@ export class SystemJobWatchdogService implements OnModuleInit {
     // Limpa jobs órfãos/travados antes de avaliar status
     try {
       await this.heartbeatService.reconcileOrphans();
-    } catch (error) {
+    } catch {
       // Já logado internamente
     }
 
