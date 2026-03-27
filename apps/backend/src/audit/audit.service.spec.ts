@@ -12,6 +12,9 @@ describe('AuditService rate limit observability', () => {
   const rateLimitMetricsServiceMock = {
     getStats: jest.fn(),
   };
+  const requestSecurityContextMock = {
+    getRequest: jest.fn(() => undefined),
+  };
 
   const requestSecurityContextMock = {
     getRequest: jest.fn(),

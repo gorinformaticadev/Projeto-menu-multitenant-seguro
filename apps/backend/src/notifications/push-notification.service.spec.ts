@@ -3,6 +3,7 @@ import { PrismaService } from '@core/prisma/prisma.service';
 import { Notification } from './notification.entity';
 import { PushNotificationService } from './push-notification.service';
 import { ConfigResolverService } from '../system-settings/config-resolver.service';
+import { AuthorizationService } from '@common/services/authorization.service';
 
 describe('PushNotificationService', () => {
   const prismaMock = {
@@ -26,7 +27,7 @@ describe('PushNotificationService', () => {
     }),
   };
   const authorizationServiceMock = {
-    canAccessModule: jest.fn().mockResolvedValue(true),
+    canReceiveNotification: jest.fn().mockReturnValue(true),
   };
 
   const baseNotification: Notification = {
@@ -48,7 +49,7 @@ describe('PushNotificationService', () => {
       prismaMock as unknown as PrismaService,
       configServiceMock as unknown as ConfigService,
       configResolverMock as unknown as ConfigResolverService,
-      authorizationServiceMock as any,
+      authorizationServiceMock as unknown as AuthorizationService,
     );
 
   beforeEach(() => {
@@ -100,6 +101,7 @@ describe('PushNotificationService', () => {
         setVapidDetails: jest.fn(),
       };
     });
+    jest.spyOn(service as any, 'validatePushEndpoint').mockResolvedValue(undefined);
 
     await service.sendNotification(baseNotification);
 

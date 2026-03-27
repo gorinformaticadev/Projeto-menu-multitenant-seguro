@@ -1,6 +1,6 @@
 {
   "name": "backend",
-  "version": "0.1.81",
+  "version": "0.1.77",
   "description": "Backend NestJS com segurança e isolamento multitenant - GOR Informática",
   "author": "GOR Informática <contato@gorinformatica.com.br>",
   "license": "AGPL-3.0",
@@ -11,19 +11,18 @@
     "start:dev": "nest start --watch --exec \"ts-node -r tsconfig-paths/register src/main.ts\"",
     "start:prod": "node dist/main.js",
     "build": "prisma generate && nest build",
-    "test": "node ./scripts/ensure-prisma-client.js && node ./scripts/run-jest-cleanly.js",
+    "test": "prisma generate && jest",
     "test:security-regression": "jest src/security-regression/security-architecture.regression.spec.ts src/security-regression/critical-endpoints.regression.spec.ts src/core/security-config/security-runtime-config.service.spec.ts src/common/guards/security-throttler.guard.spec.ts src/common/services/redis-throttler.storage.spec.ts src/auth/auth.service.spec.ts src/auth/user-session.service.spec.ts src/prisma-seed/default-users.seed.spec.ts --runInBand",
     "test:smoke": "jest --config ./test/jest-smoke.json --runInBand --passWithNoTests",
     "prisma:generate": "pnpm exec prisma generate",
-    "prisma:generate:test": "node ./scripts/ensure-prisma-client.js",
+    "prisma:generate:test": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
-    "seed:deploy": "node dist/prisma/seed.js deploy",
-    "seed:force": "node dist/prisma/seed.js deploy --force",
+    "seed:deploy": "tsx prisma/seed.ts deploy",
+    "seed:force": "tsx prisma/seed.ts deploy --force",
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
-    "contract:audit": "ts-node scripts/audit-contracts.ts",
     "security:audit": "pnpm audit --audit-level=moderate",
-    "security:check": "pnpm run lint && pnpm run contract:audit && pnpm run security:audit && pnpm run security:validate",
+    "security:check": "pnpm run lint && pnpm run security:audit && pnpm run security:validate",
     "security:guardrails": "node ../../Scripts/tests/security-regression-guardrails.js",
     "security:regression": "pnpm run security:guardrails && pnpm run test:security-regression",
     "security:validate": "ts-node ../../scripts/backend/simple-security-check.ts",
@@ -43,7 +42,6 @@
     "@nestjs/platform-socket.io": "^11.1.14",
     "@nestjs/schedule": "^6.1.1",
     "@nestjs/serve-static": "^5.0.4",
-    "@nestjs/swagger": "^11.2.6",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/websockets": "^11.1.14",
     "@prisma/client": "6.19.2",
@@ -80,14 +78,11 @@
     "semver": "^7.7.4",
     "socket.io": "^4.8.3",
     "speakeasy": "^2.0.0",
-    "swagger-ui-express": "^5.0.1",
     "uuid": "^8.3.2",
     "web-push": "^3.6.7"
   },
   "devDependencies": {
-    "@angular-devkit/schematics-cli": "^21.2.3",
     "@nestjs/cli": "^11.0.16",
-    "@nestjs/schematics": "^11.0.9",
     "@nestjs/testing": "^11.1.14",
     "@types/bcrypt": "^5.0.2",
     "@types/cookie-parser": "^1.4.10",
@@ -97,9 +92,9 @@
     "@types/multer": "^2.0.0",
     "@types/node": "^20.19.33",
     "@types/nodemailer": "^6.4.23",
+    "@types/supertest": "^6.0.3",
     "@types/passport-jwt": "^4.0.1",
     "@types/semver": "^7.7.1",
-    "@types/supertest": "^6.0.3",
     "@types/uuid": "^10.0.0",
     "@types/validator": "^13.15.10",
     "@typescript-eslint/eslint-plugin": "^8.56.0",
@@ -112,7 +107,6 @@
     "jest": "^29.7.0",
     "supertest": "^7.1.4",
     "ts-jest": "^29.4.6",
-    "ts-morph": "^27.0.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.21.0",
@@ -143,11 +137,6 @@
   "overrides": {
     "diff": "^8.0.3",
     "multer": "^2.1.1",
-    "socket.io-parser": "^4.2.6",
-    "flatted": "^3.4.2",
-    "picomatch": "^2.3.2"
-  },
-  "prisma": {
-    "seed": "node dist/prisma/seed.js deploy"
+    "socket.io-parser": "^4.2.6"
   }
 }

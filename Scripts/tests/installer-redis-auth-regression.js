@@ -60,7 +60,7 @@ expectRegex(
 );
 expectRegex(
   installMain,
-  /pm2 start dist\/main\.js --name '[^']+-backend' --update-env/,
+  /pm2 start dist\/main\.js --name '[^']+-backend'(?: [^"'&|]+|'[^']*'|"[^"]*")* --update-env/,
   'native pm2 start must use --update-env',
 );
 

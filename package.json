@@ -1,11 +1,7 @@
 {
   "private": true,
-  "version": "0.1.81",
+  "version": "0.1.77",
   "packageManager": "pnpm@9.15.9",
-  "engines": {
-    "node": ">=20.0.0 <21.0.0",
-    "pnpm": ">=9.0.0"
-  },
   "workspaces": {
     "packages": [
       "apps/*"
@@ -20,10 +16,10 @@
     "versao": "pnpm run release && git push --follow-tags",
     "install:all": "pnpm install",
     "check:theming": "node Scripts/check-no-hardcoded-colors.js",
-    "dev:backend": "corepack pnpm --filter backend start:dev",
-    "dev:frontend": "corepack pnpm --filter frontend dev",
-    "build:all": "corepack pnpm -r run build",
-    "test:all": "corepack pnpm -r run test",
+    "dev:backend": "pnpm --filter backend start:dev",
+    "dev:frontend": "pnpm --filter frontend dev",
+    "build:all": "pnpm -r run build",
+    "test:all": "pnpm -r run test",
     "test:installer-regression": "node Scripts/tests/installer-redis-auth-regression.js",
     "clean": "pnpm -r exec rm -rf node_modules dist .next"
   },
@@ -53,7 +49,6 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "@nestjs/core",
       "@prisma/client",
       "@prisma/engines",
       "@sentry/cli",
