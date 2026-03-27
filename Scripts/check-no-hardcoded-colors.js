@@ -13,12 +13,6 @@ const IGNORED_DIRS = new Set([
   "coverage",
   "out",
 ]);
-const IGNORED_PATH_PREFIXES = [
-  "apps/frontend/src/app/modules/",
-];
-const IGNORED_FILES = new Set([
-  "apps/frontend/src/components/ui/toast.tsx",
-]);
 const TEXT_EXTENSIONS = new Set([
   ".js",
   ".jsx",
@@ -31,6 +25,114 @@ const TEXT_EXTENSIONS = new Set([
   ".mjs",
   ".cjs",
 ]);
+const ALLOWED_FINDINGS = [
+  {
+    file: "apps/frontend/src/app/modules/[...slug]/DynamicModulePageClient.tsx",
+    rule: "Tailwind direct color",
+    value: "text-gray-600",
+  },
+  {
+    file: "apps/frontend/src/app/modules/[...slug]/module-exemplo-settings.tsx",
+    rule: "Tailwind direct color",
+    value: "text-gray-900",
+  },
+  {
+    file: "apps/frontend/src/app/modules/[...slug]/module-exemplo-settings.tsx",
+    rule: "Tailwind direct color",
+    value: "text-gray-600",
+  },
+  {
+    file: "apps/frontend/src/app/modules/[...slug]/module-exemplo-settings.tsx",
+    rule: "Tailwind direct color",
+    value: "bg-blue-50",
+  },
+  {
+    file: "apps/frontend/src/app/modules/[...slug]/module-exemplo-settings.tsx",
+    rule: "Tailwind direct color",
+    value: "text-blue-700",
+  },
+  {
+    file: "apps/frontend/src/app/modules/[...slug]/module-exemplo-settings.tsx",
+    rule: "Tailwind direct color",
+    value: "border-blue-200",
+  },
+  {
+    file: "apps/frontend/src/app/modules/[...slug]/module-exemplo-settings.tsx",
+    rule: "Tailwind direct color",
+    value: "bg-gray-50",
+  },
+  {
+    file: "apps/frontend/src/app/modules/[...slug]/module-exemplo-settings.tsx",
+    rule: "Tailwind direct color",
+    value: "text-blue-900",
+  },
+  {
+    file: "apps/frontend/src/app/modules/[...slug]/module-exemplo-settings.tsx",
+    rule: "Tailwind direct color",
+    value: "border-green-200",
+  },
+  {
+    file: "apps/frontend/src/app/modules/[...slug]/module-exemplo-settings.tsx",
+    rule: "Tailwind direct color",
+    value: "bg-green-50",
+  },
+  {
+    file: "apps/frontend/src/app/modules/[...slug]/module-exemplo-settings.tsx",
+    rule: "Tailwind direct color",
+    value: "text-green-600",
+  },
+  {
+    file: "apps/frontend/src/app/modules/[...slug]/module-exemplo-settings.tsx",
+    rule: "Tailwind direct color",
+    value: "text-green-900",
+  },
+  {
+    file: "apps/frontend/src/app/modules/[...slug]/module-exemplo-settings.tsx",
+    rule: "Tailwind direct color",
+    value: "text-green-700",
+  },
+  {
+    file: "apps/frontend/src/app/modules/[...slug]/module-exemplo-settings.tsx",
+    rule: "Tailwind direct color",
+    value: "text-blue-600",
+  },
+  {
+    file: "apps/frontend/src/app/modules/[...slug]/module-exemplo-settings.tsx",
+    rule: "Tailwind direct color",
+    value: "border-blue-600",
+  },
+  {
+    file: "apps/frontend/src/app/modules/[module]/[...slug]/ModulePageClient.tsx",
+    rule: "Legacy theme class",
+    value: "text-muted-foreground",
+  },
+  {
+    file: "apps/frontend/src/app/modules/[module]/[...slug]/ModulePageClient.tsx",
+    rule: "Tailwind direct color",
+    value: "bg-blue-50",
+  },
+  {
+    file: "apps/frontend/src/app/modules/[module]/[...slug]/ModulePageClient.tsx",
+    rule: "Tailwind direct color",
+    value: "border-blue-200",
+  },
+  {
+    file: "apps/frontend/src/app/modules/[module]/[...slug]/ModulePageClient.tsx",
+    rule: "Tailwind direct color",
+    value: "text-blue-900",
+  },
+  {
+    file: "apps/frontend/src/app/modules/[module]/[...slug]/ModulePageClient.tsx",
+    rule: "Tailwind direct color",
+    value: "bg-blue-100",
+  },
+  {
+    file: "apps/frontend/src/components/ui/toast.tsx",
+    rule: "RGB/HSL color",
+    value: "rgba(",
+    snippetIncludes: "shadow-[0_8px_32px_rgba(0,0,0,0.28)]",
+  },
+];
 
 const RULES = [
   {
@@ -44,17 +146,14 @@ const RULES = [
   },
   {
     name: "Hex color",
-    regex: /#([0-9a-fA-F]{3,8})/g,
+    regex: /(?<!&)#([0-9a-fA-F]{3,8})\b/g,
   },
   {
     name: "RGB/HSL color",
     regex: /(rgb|hsl)a?\(/g,
     validate: (match, content) => {
-      const lineStart = content.lastIndexOf("\n", match.index) + 1;
-      const lineEnd = content.indexOf("\n", match.index);
-      const line =
-        content.slice(lineStart, lineEnd === -1 ? content.length : lineEnd);
-      return !line.includes("var(--");
+      const functionCall = extractCssFunctionCall(content, match.index);
+      return !functionCall.includes("var(--");
     },
   },
   {
@@ -108,14 +207,52 @@ function getLineText(content, lineNumber) {
   return content.split(/\r?\n/)[lineNumber - 1] || "";
 }
 
+function extractCssFunctionCall(content, startIndex) {
+  let index = startIndex;
+  let depth = 0;
+
+  while (index < content.length) {
+    const char = content[index];
+
+    if (char === "(") {
+      depth += 1;
+    } else if (char === ")") {
+      depth -= 1;
+      if (depth === 0) {
+        return content.slice(startIndex, index + 1);
+      }
+    }
+
+    index += 1;
+  }
+
+  return content.slice(startIndex, index);
+}
+
+function isAllowedFinding(finding) {
+  return ALLOWED_FINDINGS.some((allowed) => {
+    if (allowed.file !== finding.file) {
+      return false;
+    }
+
+    if (allowed.rule !== finding.rule) {
+      return false;
+    }
+
+    if (allowed.value !== finding.value) {
+      return false;
+    }
+
+    if (allowed.snippetIncludes && !finding.snippet.includes(allowed.snippetIncludes)) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
 function collectFindings(filePath) {
   const relativePath = path.relative(ROOT_DIR, filePath).replace(/\\/g, "/");
-  if (
-    IGNORED_FILES.has(relativePath) ||
-    IGNORED_PATH_PREFIXES.some((prefix) => relativePath.startsWith(prefix))
-  ) {
-    return [];
-  }
   const content = fs.readFileSync(filePath, "utf8");
   const findings = [];
 
@@ -129,14 +266,18 @@ function collectFindings(filePath) {
       }
 
       const { line, column } = getLineAndColumn(content, match.index);
-      findings.push({
+      const finding = {
         rule: rule.name,
         file: relativePath,
         line,
         column,
         snippet: getLineText(content, line).trim(),
         value: match[0],
-      });
+      };
+
+      if (!isAllowedFinding(finding)) {
+        findings.push(finding);
+      }
     }
   }
 
