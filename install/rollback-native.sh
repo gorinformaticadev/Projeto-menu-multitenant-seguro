@@ -395,7 +395,9 @@ resolve_target_release_path() {
   fi
 
   if [[ "$requested" = /* ]] && [[ -d "$requested" ]]; then
-    echo "$(cd "$requested" && pwd)"
+    (
+      cd "$requested" && pwd
+    )
     return 0
   fi
 

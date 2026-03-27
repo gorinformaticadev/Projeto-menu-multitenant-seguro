@@ -40,11 +40,9 @@ HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-120}"
 HEALTH_INTERVAL="${HEALTH_INTERVAL:-5}"
 RELEASES_TO_KEEP="${RELEASES_TO_KEEP:-5}"
 MAINTENANCE_ETA_SECONDS="${MAINTENANCE_ETA_SECONDS:-300}"
-LEGACY_INPLACE="false"
 
 EXIT_SUCCESS=0
 EXIT_LOCK_HELD=10
-EXIT_BACKUP_FAILED=20
 EXIT_DOWNLOAD_FAILED=30
 EXIT_INSTALL_FAILED=40
 EXIT_BUILD_FAILED=41
@@ -70,7 +68,6 @@ STATE_FILE=""
 UPDATE_LOG_FILE=""
 MAINTENANCE_FILE=""
 STATE_INITIALIZED="false"
-STATE_FINALIZED="false"
 
 CURRENT_STEP="init"
 STATE_STATUS="idle"
@@ -127,9 +124,42 @@ Uso:
 Opcoes:
   --tag <tag>            Define tag alvo (padrao: env TARGET_TAG/RELEASE_TAG)
   --base-dir <dir>       Define BASE_DIR (padrao: APP_BASE_DIR ou autodetect)
-  --legacy-inplace       Executa update antigo in-place (compatibilidade)
   --help                 Mostra ajuda
 EOF
+}
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --tag)
+        if [[ $# -lt 2 ]]; then
+          log_err "A opcao --tag exige um valor."
+          usage
+          exit 1
+        fi
+        TARGET_TAG="$2"
+        shift 2
+        ;;
+      --base-dir)
+        if [[ $# -lt 2 ]]; then
+          log_err "A opcao --base-dir exige um valor."
+          usage
+          exit 1
+        fi
+        APP_BASE_DIR="$2"
+        shift 2
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      *)
+        log_err "Opcao invalida: $1"
+        usage
+        exit 1
+        ;;
+    esac
+  done
 }
 
 json_escape() {
@@ -326,7 +356,6 @@ finish_success() {
   STATE_LOCK="false"
   STATE_LAST_ERROR=""
   reset_error_state
-  STATE_FINALIZED="true"
   set_step "completed" 100
   write_state_file
 }
@@ -351,7 +380,6 @@ finish_failed() {
   STATE_EXIT_CODE="$code"
   STATE_USER_MESSAGE="$user_message"
   STATE_TECHNICAL_MESSAGE="$technical_message"
-  STATE_FINALIZED="true"
   write_state_file
   log_err "${technical_message} (exit_code=${code}, error_code=${error_code}, stage=${stage})"
 }
@@ -374,7 +402,6 @@ finish_rolled_back() {
   STATE_EXIT_CODE="$exit_code"
   STATE_USER_MESSAGE="$user_message"
   STATE_TECHNICAL_MESSAGE="$message"
-  STATE_FINALIZED="true"
   set_step "rollback" 100
   write_state_file
 }
@@ -498,12 +525,11 @@ acquire_lock() {
   write_state_file
 }
 
+# shellcheck disable=SC2317
 release_lock() {
-  if [[ "$LOCK_ACQUIRED" == "true" ]]; then
-    flock -u "$LOCK_FD" || true
-    eval "exec ${LOCK_FD}>&-"
-    LOCK_ACQUIRED="false"
-  fi
+  flock -u "$LOCK_FD" 2>/dev/null || true
+  eval "exec ${LOCK_FD}>&-" 2>/dev/null || true
+  LOCK_ACQUIRED="false"
 }
 
 get_link_target() {
@@ -529,7 +555,8 @@ bootstrap_atomic_layout() {
     fi
   fi
 
-  local bootstrap_release="$RELEASES_DIR/$(sanitize_release_name "$detected_version")"
+  local bootstrap_release=""
+  bootstrap_release="$RELEASES_DIR/$(sanitize_release_name "$detected_version")"
   log "Bootstrap da estrutura atomica: criando release base em $bootstrap_release"
 
   if [[ ! -d "$bootstrap_release" ]]; then
@@ -817,11 +844,6 @@ link_shared_into_release() {
   fi
   ln -sfn "$SHARED_DIR/uploads" "$release_dir/uploads"
   ln -sfn "$SHARED_DIR/backups" "$release_dir/backups"
-}
-
-discover_pm2_name() {
-  local token="$1"
-  pm2 jlist 2>/dev/null | grep -oE "\"name\":\"[^\"]*${token}[^\"]*\"" | head -n1 | cut -d'"' -f4 || true
 }
 
 restart_pm2_processes() {
@@ -1327,6 +1349,7 @@ cleanup_old_releases() {
 # Main Execution Flow
 # =============================================================================
 
+parse_args "$@"
 resolve_base_dir
 prepare_base_layout
 initialize_logging_and_state
@@ -1452,6 +1475,6 @@ else
 fi
 
 cleanup_old_releases
-disable_maintenance_mode
+disable_maintenance_mode "Update concluido com sucesso"
 finish_success
 exit "$EXIT_SUCCESS"
