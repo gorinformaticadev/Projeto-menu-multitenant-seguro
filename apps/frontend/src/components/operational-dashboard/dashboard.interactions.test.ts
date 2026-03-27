@@ -36,13 +36,14 @@ describe("dashboard.interactions", () => {
   });
 
   it("classifica telemetria de rota como infraestrutura", () => {
-    const result = filterDashboardWidgetIds(["routeLatency", "routeErrors", "jobs"], "infrastructure", {
+    const result = filterDashboardWidgetIds(["routeLatency", "routeErrors", "contractObservability", "jobs"], "infrastructure", {
       routeLatency: { status: "healthy" },
       routeErrors: { status: "healthy" },
+      contractObservability: { status: "healthy", totalEvents: 2 },
       jobs: { status: "healthy" },
     });
 
-    expect(result).toEqual(["routeLatency", "routeErrors"]);
+    expect(result).toEqual(["routeLatency", "routeErrors", "contractObservability"]);
   });
 
   it("retorna o drill-down correto por widget quando existe destino util", () => {
@@ -89,4 +90,3 @@ describe("dashboard.interactions", () => {
     expect(adminActions.map((item) => item.id)).toEqual(["updates", "backups"]);
   });
 });
-

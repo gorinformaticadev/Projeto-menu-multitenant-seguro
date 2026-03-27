@@ -109,6 +109,27 @@ describe('SystemOperationalAlertsService', () => {
         process.env.OPS_ALERT_INFRA_DEGRADED_MIN_CONSECUTIVE,
       OPS_ALERT_COOLDOWN_MINUTES: process.env.OPS_ALERT_COOLDOWN_MINUTES,
       OPS_ALERT_REDIS_REQUIRED: process.env.OPS_ALERT_REDIS_REQUIRED,
+      OPS_ALERT_CONTRACT_WINDOW_MINUTES: process.env.OPS_ALERT_CONTRACT_WINDOW_MINUTES,
+      OPS_ALERT_CONTRACT_VALIDATION_WARNING_COUNT:
+        process.env.OPS_ALERT_CONTRACT_VALIDATION_WARNING_COUNT,
+      OPS_ALERT_CONTRACT_VALIDATION_CRITICAL_COUNT:
+        process.env.OPS_ALERT_CONTRACT_VALIDATION_CRITICAL_COUNT,
+      OPS_ALERT_CONTRACT_PAYLOAD_WARNING_COUNT:
+        process.env.OPS_ALERT_CONTRACT_PAYLOAD_WARNING_COUNT,
+      OPS_ALERT_CONTRACT_PAYLOAD_CRITICAL_COUNT:
+        process.env.OPS_ALERT_CONTRACT_PAYLOAD_CRITICAL_COUNT,
+      OPS_ALERT_CONTRACT_WS_VALIDATION_WARNING_RATE_PER_1000:
+        process.env.OPS_ALERT_CONTRACT_WS_VALIDATION_WARNING_RATE_PER_1000,
+      OPS_ALERT_CONTRACT_WS_VALIDATION_CRITICAL_RATE_PER_1000:
+        process.env.OPS_ALERT_CONTRACT_WS_VALIDATION_CRITICAL_RATE_PER_1000,
+      OPS_ALERT_CONTRACT_WS_PAYLOAD_WARNING_RATE_PER_1000:
+        process.env.OPS_ALERT_CONTRACT_WS_PAYLOAD_WARNING_RATE_PER_1000,
+      OPS_ALERT_CONTRACT_WS_PAYLOAD_CRITICAL_RATE_PER_1000:
+        process.env.OPS_ALERT_CONTRACT_WS_PAYLOAD_CRITICAL_RATE_PER_1000,
+      OPS_ALERT_CONTRACT_TREND_WARNING_PERCENT:
+        process.env.OPS_ALERT_CONTRACT_TREND_WARNING_PERCENT,
+      OPS_ALERT_CONTRACT_TREND_CRITICAL_PERCENT:
+        process.env.OPS_ALERT_CONTRACT_TREND_CRITICAL_PERCENT,
     };
 
     process.env.OPS_ALERT_5XX_RATE_THRESHOLD = '10';
@@ -122,6 +143,17 @@ describe('SystemOperationalAlertsService', () => {
     process.env.OPS_ALERT_INFRA_DEGRADED_MIN_CONSECUTIVE = '3';
     process.env.OPS_ALERT_COOLDOWN_MINUTES = '15';
     process.env.OPS_ALERT_REDIS_REQUIRED = 'false';
+    process.env.OPS_ALERT_CONTRACT_WINDOW_MINUTES = '10';
+    process.env.OPS_ALERT_CONTRACT_VALIDATION_WARNING_COUNT = '3';
+    process.env.OPS_ALERT_CONTRACT_VALIDATION_CRITICAL_COUNT = '8';
+    process.env.OPS_ALERT_CONTRACT_PAYLOAD_WARNING_COUNT = '5';
+    process.env.OPS_ALERT_CONTRACT_PAYLOAD_CRITICAL_COUNT = '12';
+    process.env.OPS_ALERT_CONTRACT_WS_VALIDATION_WARNING_RATE_PER_1000 = '5';
+    process.env.OPS_ALERT_CONTRACT_WS_VALIDATION_CRITICAL_RATE_PER_1000 = '15';
+    process.env.OPS_ALERT_CONTRACT_WS_PAYLOAD_WARNING_RATE_PER_1000 = '10';
+    process.env.OPS_ALERT_CONTRACT_WS_PAYLOAD_CRITICAL_RATE_PER_1000 = '25';
+    process.env.OPS_ALERT_CONTRACT_TREND_WARNING_PERCENT = '100';
+    process.env.OPS_ALERT_CONTRACT_TREND_CRITICAL_PERCENT = '200';
 
     notificationServiceMock.createSystemNotificationEntity.mockResolvedValue(baseNotification);
     notificationServiceMock.findSystemNotificationEntityById.mockResolvedValue(baseNotification);
@@ -247,6 +279,119 @@ describe('SystemOperationalAlertsService', () => {
     expect(notificationGatewayMock.emitNewNotification).toHaveBeenCalledWith(
       baseNotification,
       expect.objectContaining({ push: false }),
+    );
+  });
+
+  it('emits aggregated contract validation alerts based on volume and rate', async () => {
+    for (let index = 1; index <= 40; index += 1) {
+      telemetryService.recordRequest({
+        method: 'GET',
+        route: `/api/users/${index}`,
+        durationMs: 90,
+        statusCode: 200,
+      });
+    }
+
+    for (let index = 0; index < 4; index += 1) {
+      telemetryService.recordContractAnomaly({
+        type: 'validation_failed',
+        dto: 'UserResponseDto',
+        route: '/api/users/:id',
+        method: 'GET',
+        module: 'users',
+        origin: 'http',
+        tenantHash: 'tenant-a',
+        operationType: 'read',
+        detailCount: 2,
+      });
+    }
+
+    await service.evaluateOperationalAlerts(new Date());
+
+    expect(notificationServiceMock.createSystemNotificationEntity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Falhas de contrato em aceleracao',
+        severity: 'critical',
+        source: 'contract-observability',
+        data: expect.objectContaining({
+          alertAction: 'OPS_CONTRACT_VALIDATION_REGRESSION',
+          eventCount: 4,
+          ratePerThousandRequests: 100,
+          topDto: expect.objectContaining({
+            dto: 'UserResponseDto',
+          }),
+          topRoute: expect.objectContaining({
+            route: '/api/users/:id',
+            validationFailed: 4,
+          }),
+        }),
+      }),
+    );
+    expect(pushNotificationServiceMock.getPublicKey).toHaveBeenCalledTimes(1);
+    expect(notificationGatewayMock.emitNewNotification).toHaveBeenCalledWith(
+      baseNotification,
+      expect.objectContaining({ push: true }),
+    );
+  });
+
+  it('emits contract payload alert when the current window jumps 200%', async () => {
+    for (let index = 1; index <= 60; index += 1) {
+      telemetryService.recordRequest({
+        method: 'GET',
+        route: `/api/contracts/${index}`,
+        durationMs: 70,
+        statusCode: 200,
+      });
+    }
+
+    jest.setSystemTime(new Date('2026-03-07T13:45:00.000Z'));
+    for (let index = 0; index < 2; index += 1) {
+      telemetryService.recordContractAnomaly({
+        type: 'payload_stripped',
+        dto: 'ContractDto',
+        route: '/api/contracts/:id',
+        method: 'GET',
+        module: 'contracts',
+        origin: 'http',
+        tenantHash: 'tenant-c',
+        operationType: 'read',
+        detailCount: 1,
+      });
+    }
+
+    jest.setSystemTime(new Date('2026-03-07T13:55:00.000Z'));
+    for (let index = 0; index < 6; index += 1) {
+      telemetryService.recordContractAnomaly({
+        type: 'payload_stripped',
+        dto: 'ContractDto',
+        route: '/api/contracts/:id',
+        method: 'GET',
+        module: 'contracts',
+        origin: 'http',
+        tenantHash: 'tenant-c',
+        operationType: 'read',
+        detailCount: 1,
+      });
+    }
+
+    jest.setSystemTime(new Date('2026-03-07T14:00:00.000Z'));
+    await service.evaluateOperationalAlerts(new Date());
+
+    expect(notificationServiceMock.createSystemNotificationEntity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Drift de contrato em aceleracao',
+        severity: 'critical',
+        data: expect.objectContaining({
+          alertAction: 'OPS_CONTRACT_PAYLOAD_REGRESSION',
+          eventCount: 6,
+          previousEventCount: 2,
+          increasePercent: 200,
+        }),
+      }),
+    );
+    expect(notificationGatewayMock.emitNewNotification).toHaveBeenCalledWith(
+      baseNotification,
+      expect.objectContaining({ push: true }),
     );
   });
 

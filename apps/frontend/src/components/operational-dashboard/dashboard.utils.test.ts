@@ -22,7 +22,7 @@ describe("dashboard.utils", () => {
 
   it("returns role specific widget sets", () => {
     expect(allowedWidgetIdsByRole("SUPER_ADMIN")).toContain("redis");
-    expect(allowedWidgetIdsByRole("ADMIN")).toEqual(expect.arrayContaining(["routeLatency", "routeErrors"]));
+    expect(allowedWidgetIdsByRole("ADMIN")).toEqual(expect.arrayContaining(["routeLatency", "routeErrors", "contractObservability"]));
     expect(allowedWidgetIdsByRole("USER")).not.toContain("redis");
     expect(allowedWidgetIdsByRole("USER")).not.toContain("routeLatency");
   });
@@ -85,4 +85,3 @@ describe("dashboard.utils", () => {
     expect(isDashboardMobileViewport(1024)).toBe(false);
   });
 });
-

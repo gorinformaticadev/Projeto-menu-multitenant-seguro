@@ -69,7 +69,7 @@ describe('SystemTelemetryService', () => {
 
     expect((service as any).requestEvents.length).toBeLessThanOrEqual(5_000);
 
-    jest.advanceTimersByTime(16 * 60 * 1000);
+    jest.advanceTimersByTime(31 * 60 * 1000);
     service.getApiSnapshot(15 * 60 * 1000);
 
     expect((service as any).requestEvents.length).toBe(0);
@@ -149,6 +149,259 @@ describe('SystemTelemetryService', () => {
         ip: '10.0.0.10',
         count: 1,
       }),
+    );
+  });
+
+  it('agrega anomalias de contrato por minuto, DTO, rota e tenant anonimizado', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-07T13:00:00.000Z'));
+
+    for (let index = 0; index < 20; index += 1) {
+      service.recordRequest({
+        method: 'GET',
+        route: `/api/users/${index}`,
+        durationMs: 80,
+        statusCode: 200,
+      });
+    }
+
+    service.recordContractAnomaly({
+      type: 'validation_failed',
+      dto: 'UserResponseDto',
+      route: '/api/users/:id',
+      method: 'GET',
+      module: 'users',
+      origin: 'http',
+      tenantHash: 'tenant-hash-a',
+      operationType: 'read',
+      detailCount: 2,
+    });
+    jest.advanceTimersByTime(60_000);
+    service.recordContractAnomaly({
+      type: 'payload_stripped',
+      dto: 'UserResponseDto',
+      route: '/api/users/:id',
+      method: 'GET',
+      module: 'users',
+      origin: 'http',
+      tenantHash: 'tenant-hash-a',
+      operationType: 'read',
+      detailCount: 1,
+    });
+    service.recordContractAnomaly({
+      type: 'payload_stripped',
+      dto: 'OrderResponseDto',
+      route: '/api/orders/:id',
+      method: 'GET',
+      module: 'orders',
+      origin: 'http',
+      tenantHash: 'tenant-hash-b',
+      operationType: 'read',
+      detailCount: 3,
+    });
+
+    const snapshot = await service.getContractAnomalySnapshot(10 * 60 * 1000);
+
+    expect(snapshot.totalEvents).toBe(3);
+    expect(snapshot.totalValidationErrors).toBe(1);
+    expect(snapshot.totalPayloadStrips).toBe(2);
+    expect(snapshot.failureRatePerThousandRequests).toBe(50);
+    expect(snapshot.byDto).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          dto: 'UserResponseDto',
+          count: 2,
+          validationFailed: 1,
+          payloadStripped: 1,
+        }),
+      ]),
+    );
+    expect(snapshot.byRoute).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          route: '/api/users/:id',
+          validationFailed: 1,
+          payloadStripped: 1,
+          totalRatePerThousandRequests: 100,
+        }),
+      ]),
+    );
+    expect(snapshot.byTenant).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          tenantHash: 'tenant-hash-a',
+          count: 2,
+        }),
+      ]),
+    );
+    expect(snapshot.eventsPerMinute).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          total: 1,
+          validationFailed: 1,
+        }),
+        expect.objectContaining({
+          total: 2,
+          payloadStripped: 2,
+        }),
+      ]),
+    );
+  });
+
+  it('detecta aumento percentual de 200% entre a janela atual e a anterior', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-07T14:00:00.000Z'));
+
+    jest.setSystemTime(new Date('2026-03-07T13:45:00.000Z'));
+    for (let index = 0; index < 2; index += 1) {
+      service.recordContractAnomaly({
+        type: 'payload_stripped',
+        dto: 'GrowthDto',
+        route: '/api/contracts/:id',
+        method: 'GET',
+        module: 'contracts',
+        origin: 'http',
+        tenantHash: 'tenant-growth',
+        operationType: 'read',
+        detailCount: 1,
+      });
+    }
+
+    jest.setSystemTime(new Date('2026-03-07T13:55:00.000Z'));
+    for (let index = 0; index < 6; index += 1) {
+      service.recordContractAnomaly({
+        type: 'payload_stripped',
+        dto: 'GrowthDto',
+        route: '/api/contracts/:id',
+        method: 'GET',
+        module: 'contracts',
+        origin: 'http',
+        tenantHash: 'tenant-growth',
+        operationType: 'read',
+        detailCount: 1,
+      });
+    }
+
+    jest.setSystemTime(new Date('2026-03-07T14:00:00.000Z'));
+    const snapshot = await service.getContractAnomalySnapshot(10 * 60 * 1000);
+
+    expect(snapshot.trends.previousPayloadStrips).toBe(2);
+    expect(snapshot.trends.payloadIncreasePercent).toBe(200);
+    expect(snapshot.severity.trend).toBe('critical');
+  });
+
+  it('detecta crescimento continuo por uma hora nas anomalias de contrato', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-07T14:00:00.000Z'));
+
+    const growthBuckets = [1, 2, 3, 4, 5, 6];
+    growthBuckets.forEach((count, bucketIndex) => {
+      const bucketStart = new Date(`2026-03-07T13:${String(bucketIndex * 10).padStart(2, '0')}:00.000Z`);
+      jest.setSystemTime(bucketStart);
+      for (let eventIndex = 0; eventIndex < count; eventIndex += 1) {
+        service.recordContractAnomaly({
+          type: 'payload_stripped',
+          dto: 'GrowthDto',
+          route: '/api/contracts/:id',
+          method: 'GET',
+          module: 'contracts',
+          origin: 'http',
+          tenantHash: 'tenant-growth',
+          operationType: 'read',
+          detailCount: 1,
+        });
+      }
+    });
+
+    jest.setSystemTime(new Date('2026-03-07T14:00:00.000Z'));
+    const snapshot = await service.getContractAnomalySnapshot(10 * 60 * 1000);
+
+    expect(snapshot.trends.continuousGrowthMinutes).toBe(60);
+    expect(snapshot.trends.increasingForLastHour).toBe(true);
+    expect(snapshot.severity.trend).toBe('critical');
+    expect(snapshot.severity.overall).toBe('critical');
+  });
+
+  it('bucketiza tenants fora do limite de cardinalidade por minuto', async () => {
+    const previousLimit = process.env.CONTRACT_OBSERVABILITY_TENANT_CARDINALITY_LIMIT;
+    try {
+      process.env.CONTRACT_OBSERVABILITY_TENANT_CARDINALITY_LIMIT = '5';
+      service = new SystemTelemetryService();
+      jest.useFakeTimers().setSystemTime(new Date('2026-03-07T15:00:00.000Z'));
+
+      for (let index = 0; index < 6; index += 1) {
+        service.recordContractAnomaly({
+          type: 'payload_stripped',
+          dto: 'TenantHeavyDto',
+          route: '/api/contracts/:id',
+          method: 'GET',
+          module: 'contracts',
+          origin: 'http',
+          tenantHash: `tenant-${index}`,
+          operationType: 'read',
+          detailCount: 1,
+        });
+      }
+
+      const snapshot = await service.getContractAnomalySnapshot(10 * 60 * 1000);
+
+      expect(snapshot.byTenant).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            tenantHash: 'other',
+            count: 1,
+          }),
+        ]),
+      );
+      expect(snapshot.cardinality.totalOverflowedEvents).toBeGreaterThan(0);
+    } finally {
+      if (previousLimit === undefined) {
+        delete process.env.CONTRACT_OBSERVABILITY_TENANT_CARDINALITY_LIMIT;
+      } else {
+        process.env.CONTRACT_OBSERVABILITY_TENANT_CARDINALITY_LIMIT = previousLimit;
+      }
+    }
+  });
+
+  it('calcula taxa especifica de WS por eventos avaliados', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-07T16:00:00.000Z'));
+
+    for (let index = 0; index < 20; index += 1) {
+      service.handleContractEvaluated({
+        dto: 'WsDto',
+        route: '/ws/contracts/updated',
+        method: 'WS',
+        module: 'contracts',
+        origin: 'ws',
+        tenantHash: 'tenant-ws',
+        operationType: 'emit',
+        timestamp: new Date(),
+      });
+    }
+
+    for (let index = 0; index < 2; index += 1) {
+      service.recordContractAnomaly({
+        type: 'validation_failed',
+        dto: 'WsDto',
+        route: '/ws/contracts/updated',
+        method: 'WS',
+        module: 'contracts',
+        origin: 'ws',
+        tenantHash: 'tenant-ws',
+        operationType: 'emit',
+        detailCount: 1,
+      });
+    }
+
+    const snapshot = await service.getContractAnomalySnapshot(10 * 60 * 1000);
+
+    expect(snapshot.wsEvaluationsInWindow).toBe(20);
+    expect(snapshot.wsFailureRatePerThousandEvents).toBe(100);
+    expect(snapshot.byOrigin).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          origin: 'ws',
+          validationFailed: 2,
+          denominatorCount: 20,
+        }),
+      ]),
     );
   });
 });

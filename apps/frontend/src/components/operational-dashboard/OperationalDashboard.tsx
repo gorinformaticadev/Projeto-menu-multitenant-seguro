@@ -207,6 +207,40 @@ type SecurityRecentTelemetryItem = {
   at: string;
 };
 
+type ContractOriginTelemetryItem = {
+  origin: string;
+  count: number;
+  validationFailed: number;
+  payloadStripped: number;
+  denominatorKind: string;
+  denominatorCount: number;
+  severity: string;
+};
+
+type ContractRouteTelemetryItem = {
+  route: string;
+  method: string | null;
+  module: string | null;
+  origin: string;
+  count: number;
+  validationFailed: number;
+  payloadStripped: number;
+};
+
+type ContractDtoTelemetryItem = {
+  dto: string;
+  count: number;
+  validationFailed: number;
+  payloadStripped: number;
+};
+
+type ContractMinuteTelemetryItem = {
+  minuteStart: string;
+  total: number;
+  validationFailed: number;
+  payloadStripped: number;
+};
+
 type OperationalAlertListItem = {
   id: string;
   title: string;
@@ -238,6 +272,7 @@ const widgetLabelById: Record<string, string> = {
   backup: "Backup",
   routeLatency: "Rotas lentas",
   routeErrors: "Rotas com erro",
+  contractObservability: "Contratos",
   errors: "Erros",
   security: "Seguranca",
   tenants: "Tenants",
@@ -456,6 +491,84 @@ function normalizeSecurityRecentTelemetryItems(value: unknown): SecurityRecentTe
         route: String(row.route || "--").trim() || "--",
         ip: String(row.ip || "--"),
         at: String(row.at || row.createdAt || ""),
+      };
+    });
+}
+
+function normalizeContractOriginTelemetryItems(value: unknown): ContractOriginTelemetryItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item) => item && typeof item === "object" && !Array.isArray(item))
+    .map((item) => {
+      const row = item as Record<string, unknown>;
+      return {
+        origin: String(row.origin || "system").trim(),
+        count: Number(row.count || 0),
+        validationFailed: Number(row.validationFailed || 0),
+        payloadStripped: Number(row.payloadStripped || 0),
+        denominatorKind: String(row.denominatorKind || "events").trim(),
+        denominatorCount: Number(row.denominatorCount || 0),
+        severity: String(row.severity || "normal").trim(),
+      };
+    });
+}
+
+function normalizeContractRouteTelemetryItems(value: unknown): ContractRouteTelemetryItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item) => item && typeof item === "object" && !Array.isArray(item))
+    .map((item) => {
+      const row = item as Record<string, unknown>;
+      return {
+        route: String(row.route || "--").trim() || "--",
+        method: row.method ? String(row.method) : null,
+        module: row.module ? String(row.module) : null,
+        origin: String(row.origin || "system").trim(),
+        count: Number(row.count || 0),
+        validationFailed: Number(row.validationFailed || 0),
+        payloadStripped: Number(row.payloadStripped || 0),
+      };
+    });
+}
+
+function normalizeContractDtoTelemetryItems(value: unknown): ContractDtoTelemetryItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item) => item && typeof item === "object" && !Array.isArray(item))
+    .map((item) => {
+      const row = item as Record<string, unknown>;
+      return {
+        dto: String(row.dto || "--").trim() || "--",
+        count: Number(row.count || 0),
+        validationFailed: Number(row.validationFailed || 0),
+        payloadStripped: Number(row.payloadStripped || 0),
+      };
+    });
+}
+
+function normalizeContractMinuteTelemetryItems(value: unknown): ContractMinuteTelemetryItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item) => item && typeof item === "object" && !Array.isArray(item))
+    .map((item) => {
+      const row = item as Record<string, unknown>;
+      return {
+        minuteStart: String(row.minuteStart || row.at || "").trim(),
+        total: Number(row.total || 0),
+        validationFailed: Number(row.validationFailed || 0),
+        payloadStripped: Number(row.payloadStripped || 0),
       };
     });
 }
@@ -2525,6 +2638,193 @@ export function OperationalDashboard({
       </OperationalDashboardWidget>,
     );
 
+    const contractMetric = toMetric(dashboard?.contractObservability);
+    const contractMetricState = resolveDashboardMetricState(contractMetric);
+    const contractOrigins = normalizeContractOriginTelemetryItems(contractMetric?.byOrigin);
+    const contractRoutes = normalizeContractRouteTelemetryItems(contractMetric?.topRoutes);
+    const contractDtos = normalizeContractDtoTelemetryItems(contractMetric?.topDtos);
+    const contractSeries = normalizeContractMinuteTelemetryItems(contractMetric?.eventsPerMinute).map((item) => ({
+      ...item,
+      label: formatTimeOfDay(item.minuteStart),
+    }));
+    map.set(
+      "contractObservability",
+      <OperationalDashboardWidget
+        id="contractObservability"
+        title="Observabilidade de contratos"
+        subtitle={metricStatusLabel(contractMetric)}
+        tone={operationalWidgetTone(contractMetric)}
+        isEditing={layoutEditingActive}
+        onHide={hideHandler}
+      >
+        {contractMetricState ? (
+          <DashboardMetricState metric={contractMetric} />
+        ) : contractOrigins.length > 0 || contractRoutes.length > 0 || contractDtos.length > 0 ? (
+          <div className="flex h-full min-h-0 flex-col gap-3">
+            <div className="grid gap-2 sm:grid-cols-4">
+              <div className="rounded-[18px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70">
+                <p className="text-[1.45rem] font-bold tracking-tight text-skin-danger">
+                  {String(contractMetric?.totalValidationErrors ?? 0)}
+                </p>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-skin-text-muted">validacao</p>
+              </div>
+              <div className="rounded-[18px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70">
+                <p className="text-[1.45rem] font-bold tracking-tight text-skin-warning">
+                  {String(contractMetric?.totalPayloadStrips ?? 0)}
+                </p>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-skin-text-muted">stripping</p>
+              </div>
+              <div className="rounded-[18px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70">
+                <p className="text-[1.45rem] font-bold tracking-tight text-skin-info">
+                  {contractMetric?.failureRatePerThousandRequests !== null && contractMetric?.failureRatePerThousandRequests !== undefined
+                    ? `${contractMetric.failureRatePerThousandRequests}/1000`
+                    : "--"}
+                </p>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-skin-text-muted">taxa HTTP</p>
+              </div>
+              <div className="rounded-[18px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70">
+                <p className="text-[1.45rem] font-bold tracking-tight text-skin-success">
+                  {contractMetric?.wsFailureRatePerThousandEvents !== null && contractMetric?.wsFailureRatePerThousandEvents !== undefined
+                    ? `${contractMetric.wsFailureRatePerThousandEvents}/1000`
+                    : "--"}
+                </p>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-skin-text-muted">taxa WS</p>
+              </div>
+            </div>
+            <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[1.25fr_1fr]">
+              <div className="min-h-0 space-y-3">
+                <div className="rounded-[20px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-skin-text-muted">tendencia recente</p>
+                      <p className="mt-1 text-[11px] text-skin-text-muted">
+                        Janela {String(contractMetric?.windowSeconds ?? "--")}s
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      {contractOrigins.slice(0, 3).map((item) => (
+                        <span
+                          key={item.origin}
+                          className="rounded-full border border-skin-border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-skin-text-muted"
+                        >
+                          {item.origin} {item.count}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="mt-3 h-28">
+                    {contractSeries.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={contractSeries}>
+                          <defs>
+                            <linearGradient id="contractArea" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor={DASHBOARD_CHART_WARNING} stopOpacity={0.32} />
+                              <stop offset="95%" stopColor={DASHBOARD_CHART_WARNING} stopOpacity={0.04} />
+                            </linearGradient>
+                          </defs>
+                          <XAxis dataKey="label" tick={{ fill: DASHBOARD_CHART_AXIS, fontSize: 10 }} axisLine={false} tickLine={false} />
+                          <YAxis hide />
+                          <RechartsTooltip contentStyle={DASHBOARD_TOOLTIP_STYLE} />
+                          <Area
+                            type="monotone"
+                            dataKey="total"
+                            stroke={DASHBOARD_CHART_WARNING}
+                            fill="url(#contractArea)"
+                            strokeWidth={2}
+                            isAnimationActive={false}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-skin-text-muted">rotas com drift</p>
+                    {contractRoutes.slice(0, 4).map((item) => (
+                      <div
+                        key={`${item.origin}:${item.method || "na"}:${item.route}`}
+                        className="rounded-[18px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-[11px] font-semibold text-skin-text">
+                              {(item.method || item.origin.toUpperCase())} {item.route}
+                            </p>
+                            <p className="mt-1 truncate text-[10px] text-skin-text-muted">
+                              validacao {item.validationFailed} - stripping {item.payloadStripped}
+                            </p>
+                          </div>
+                          <span className="text-sm font-semibold text-skin-warning">{item.count}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-skin-text-muted">DTOs mais afetados</p>
+                    {contractDtos.slice(0, 4).map((item) => (
+                      <div
+                        key={item.dto}
+                        className="rounded-[18px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-[11px] font-semibold text-skin-text">{item.dto}</p>
+                            <p className="mt-1 truncate text-[10px] text-skin-text-muted">
+                              validacao {item.validationFailed} - stripping {item.payloadStripped}
+                            </p>
+                          </div>
+                          <span className="text-sm font-semibold text-skin-danger">{item.count}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-skin-text-muted">thresholds e origem</p>
+                {contractOrigins.slice(0, 4).map((item) => (
+                  <div
+                    key={`${item.origin}:${item.denominatorKind}`}
+                    className="rounded-[18px] border border-skin-border/70 px-3 py-2 dark:border-skin-border/70"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase text-skin-text">{item.origin}</p>
+                        <p className="mt-1 text-[10px] text-skin-text-muted">
+                          {item.denominatorCount} {item.denominatorKind} - validacao {item.validationFailed}
+                        </p>
+                      </div>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${
+                        item.severity === "critical"
+                          ? "bg-skin-danger/10 text-skin-danger"
+                          : item.severity === "warning"
+                            ? "bg-skin-warning/10 text-skin-warning"
+                            : "bg-skin-info/10 text-skin-info"
+                      }`}>
+                        {item.severity}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                <div className="rounded-[18px] border border-skin-border/70 px-3 py-2 text-[10px] text-skin-text-muted dark:border-skin-border/70">
+                  <p>Persistencia: <span className="font-medium text-skin-text">{String((contractMetric?.persistence as Record<string, unknown> | undefined)?.mode || "--")}</span></p>
+                  <p className="mt-1">Overflow: <span className="font-medium text-skin-text">{String(((contractMetric?.cardinality as Record<string, unknown> | undefined)?.totalOverflowedEvents) ?? 0)}</span></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <DashboardSurfaceState
+            title="Sem dados"
+            description="Nenhum evento de contrato relevante na janela atual."
+            centered
+            className="mt-auto"
+          />
+        )}
+      </OperationalDashboardWidget>,
+    );
+
     const errorsMetric = toMetric(dashboard?.errors);
     const errorsMetricState = resolveDashboardMetricState(errorsMetric);
     const recentErrors = Array.isArray(errorsMetric?.recent) ? errorsMetric.recent : [];
@@ -3359,4 +3659,3 @@ export function OperationalDashboard({
     </TooltipProvider >
   );
 }
-

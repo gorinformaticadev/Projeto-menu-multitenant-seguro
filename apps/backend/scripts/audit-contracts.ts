@@ -4,10 +4,8 @@ import * as fs from 'fs';
 
 /**
  * Script de auditoria estrutural para garantir a blindagem de contratos.
- * Com suporte a baseline para migração progressiva.
+ * Suporte a baseline removido: O enforcement agora é estrito e bloqueante no CI.
  */
-
-const BASELINE_FILE = path.join(__dirname, '../contract-audit-baseline.json');
 
 async function runAudit() {
   const project = new Project({
@@ -65,44 +63,27 @@ async function runAudit() {
           currentViolations.push(violation);
           console.log(`[ERRO] ${violation}`);
         }
+
+        // 4. Verificação Mínima de Swagger como fonte de verdade
+        if (!decorators.includes('ApiOperation')) {
+          if (cls.getName() !== 'HealthController') {
+             const violation = `MISSING_SWAGGER_API_OPERATION: ${methodName} in ${relativePath}`;
+             currentViolations.push(violation);
+             console.log(`[ERRO] ${violation}`);
+          }
+        }
       }
     }
   }
 
-  // Carregar baseline se existir
-  let baseline: string[] = [];
-  if (fs.existsSync(BASELINE_FILE)) {
-    baseline = JSON.parse(fs.readFileSync(BASELINE_FILE, 'utf8'));
-  } else {
-    // Se não existir, criar um inicial com as violações atuais
-    console.log(`\n⚠️  Baseline não encontrado. Criando baseline inicial com ${currentViolations.length} violações.`);
-    fs.writeFileSync(BASELINE_FILE, JSON.stringify(currentViolations.sort(), null, 2));
-    baseline = currentViolations;
-  }
-
-  const newViolations = currentViolations.filter(v => !baseline.includes(v));
-  const fixedViolations = baseline.filter(v => !currentViolations.includes(v));
-
-  if (fixedViolations.length > 0) {
-    console.log(`\n✅ ${fixedViolations.length} violações do legado foram corrigidas! Atualizando baseline...`);
-    fs.writeFileSync(BASELINE_FILE, JSON.stringify(currentViolations.sort(), null, 2));
-  }
-
-  if (newViolations.length > 0) {
-    console.error(`\n❌ FALHA: ${newViolations.length} novas violações de contrato detectadas (não estão no baseline):`);
-    newViolations.forEach(v => console.error(`   - ${v}`));
+  if (currentViolations.length > 0) {
+    console.error(`\n❌ FALHA CRÍTICA (ENFORCEMENT ATIVADO): ${currentViolations.length} violações de contrato detectadas.`);
+    currentViolations.forEach(v => console.error(`   - ${v}`));
     process.exit(1);
   }
 
-  console.log(`\n=== Resumo da Auditoria ===`);
-  console.log(`Total de violações atuais: ${currentViolations.length}`);
-  console.log(`Violações no baseline: ${baseline.length}`);
-  
-  if (currentViolations.length > 0) {
-    console.warn(`\n⚠️  Atenção: Ainda existem ${currentViolations.length} violações legadas. Continue a migração.`);
-  } else {
-    console.log(`\n✨ SUCESSO: Todos os contratos estão blindados e o baseline está zerado!`);
-  }
+  console.log(`\n✨ SUCESSO STRICT: Todos os controllers e métodos respeitam as regras de contrato!`);
+
 
   process.exit(0);
 }

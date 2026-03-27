@@ -434,6 +434,32 @@ export class UpdateLogDetailsResponseDto {
   total: number;
 }
 
+export class ConnectionTestDetailsDto {
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsBoolean()
+  connected?: boolean;
+
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  url?: string;
+
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsNumber()
+  statusCode?: number;
+
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
 export class ConnectionTestResponseDto {
   @ApiProperty()
   @Expose()
@@ -445,9 +471,10 @@ export class ConnectionTestResponseDto {
   @IsString()
   message: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, type: ConnectionTestDetailsDto })
   @Expose()
   @IsOptional()
-  @IsObject()
-  details?: Record<string, unknown>;
+  @ValidateNested()
+  @Type(() => ConnectionTestDetailsDto)
+  details?: ConnectionTestDetailsDto;
 }

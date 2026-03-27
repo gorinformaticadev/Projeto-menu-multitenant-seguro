@@ -41,6 +41,18 @@ module.exports = [
           selector: 'ClassDeclaration[id.name=/.*Controller$/] MethodDefinition[kind="method"] TSAnyKeyword',
           message: 'O tipo "any" é proibido em endpoints de Controller. Use um DTO.',
         },
+        {
+          selector: 'CallExpression[callee.property.name="emit"][callee.object.property.name="server"]',
+          message: 'O uso direto de server.emit é proibido. Utilize o WebsocketEmitterService para garantir a serialização dos DTOs.',
+        },
+        {
+          selector: 'CallExpression[callee.property.name="emit"][callee.object.name="client"]',
+          message: 'O uso direto de client.emit é proibido em Gateways. Utilize o WebsocketEmitterService.',
+        },
+        {
+          selector: 'ClassDeclaration[id.name!=/.*Audit.*/] TSUnknownKeyword',
+          message: 'O tipo "unknown" só é permitido no módulo de Auditoria por sua natureza polimórfica estrutural. Nos demais, o uso é proibido para evitar drift de contratos.',
+        },
       ],
       'no-useless-escape': 'warn',
       'no-prototype-builtins': 'warn',

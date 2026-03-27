@@ -86,12 +86,15 @@ export class AuditLogResponseDto {
   @IsString()
   userAgent: string | null;
 
+  // JUSTIFICATIVA: Mantido aberto (Record<string, unknown>) porque captura o diff dinâmico (antes/depois)
+  // ou payloads variados das requisições interceptadas da auditoria do sistema. A estrutura varia por entidade.
   @ApiProperty({ nullable: true })
   @Expose()
   @IsOptional()
   @IsObject()
   details: Record<string, unknown> | null;
 
+  // JUSTIFICATIVA: Mantido aberto pois captura propriedades flexíveis do ciclo de vida da requisição (headers específicos, infos de job, etc)
   @ApiProperty({ nullable: true })
   @Expose()
   @IsOptional()

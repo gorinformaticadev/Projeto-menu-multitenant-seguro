@@ -44,6 +44,38 @@ export class ReadAllSystemNotificationsDto {
   targetUserId?: string;
 }
 
+export class SystemNotificationActionDataDto {
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  jobId?: string;
+
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  tenantId?: string;
+
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  actionUrl?: string;
+
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  entityId?: string;
+
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  entityType?: string;
+}
+
 export class SystemNotificationDto {
   @ApiProperty()
   @Expose()
@@ -71,10 +103,12 @@ export class SystemNotificationDto {
   @IsString()
   body: string;
 
-  @ApiProperty()
+  @ApiProperty({ type: SystemNotificationActionDataDto })
   @Expose()
-  @IsObject()
-  data: Record<string, unknown>;
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SystemNotificationActionDataDto)
+  data: SystemNotificationActionDataDto;
 
   @ApiProperty({ nullable: true })
   @Expose()

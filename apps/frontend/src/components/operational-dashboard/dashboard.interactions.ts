@@ -85,6 +85,7 @@ const infrastructureWidgetIds = new Set([
   "workers",
   "routeLatency",
   "routeErrors",
+  "contractObservability",
   "security",
 ]);
 
@@ -163,6 +164,14 @@ function hasProblemSignal(widgetId: string, metric: DashboardMetric | null | und
     return asCount(metric?.totalErrorCount) > 0 || asCount(metric?.errorRateRecent) > 0;
   }
 
+  if (widgetId === "contractObservability") {
+    return (
+      asCount(metric?.totalEvents) > 0 ||
+      asCount(metric?.totalValidationErrors) > 0 ||
+      asCount(metric?.totalPayloadStrips) > 0
+    );
+  }
+
   if (widgetId === "security") {
     return (
       getDeniedAccessCount(metric) > 0 ||
@@ -196,6 +205,13 @@ function hasCriticalSignal(widgetId: string, metric: DashboardMetric | null | un
 
   if (widgetId === "routeErrors") {
     return asCount(metric?.totalErrorCount) > 0 || asCount(metric?.errorRateRecent) > 0;
+  }
+
+  if (widgetId === "contractObservability") {
+    const severity = String(metric?.severity && typeof metric.severity === "object"
+      ? (metric.severity as Record<string, unknown>).overall || ""
+      : "");
+    return severity === "critical" || asCount(metric?.totalValidationErrors) > 0;
   }
 
   if (widgetId === "security") {
@@ -332,4 +348,3 @@ export function getDashboardQuickActions(
     ];
   });
 }
-

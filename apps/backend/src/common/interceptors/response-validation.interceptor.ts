@@ -8,10 +8,9 @@ import {
   Type,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { plainToInstance } from 'class-transformer';
-import { validate } from 'class-validator';
 import { mergeMap, Observable } from 'rxjs';
 import { VALIDATE_RESPONSE_KEY } from '../decorators/validate-response.decorator';
+import { DtoMapperService } from '../services/dto-mapper.service';
 
 /**
  * Interceptor para validação automática da resposta contra um DTO.
@@ -24,7 +23,10 @@ import { VALIDATE_RESPONSE_KEY } from '../decorators/validate-response.decorator
 export class ResponseValidationInterceptor implements NestInterceptor {
   private readonly logger = new Logger(ResponseValidationInterceptor.name);
 
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly dtoMapper: DtoMapperService,
+  ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const handler = context.getHandler();
@@ -57,28 +59,16 @@ export class ResponseValidationInterceptor implements NestInterceptor {
           return data;
         }
 
-        // 1. Transformação para instância do DTO
-        const instance = plainToInstance(dto, data, {
-          excludeExtraneousValues: true,
-          enableImplicitConversion: true,
-          exposeUnsetFields: true,
-        });
-
-        // 2. Validação contra o DTO
-        const errors = await validate(instance, {
-          whitelist: true,
-          forbidNonWhitelisted: true,
-          stopAtFirstError: false,
-        });
+        const { data: mappedData, errors } = await this.dtoMapper.validateAndSerialize(dto, data);
 
         if (errors.length > 0) {
           const errorDetail = JSON.stringify(errors.map(e => ({
             property: e.property,
             constraints: e.constraints,
           })));
-          
+
           this.logger.error(`[CONTRATO VIOLADO] O endpoint retornou dados incompatíveis com ${dto.name}: ${errorDetail}`);
-          
+
           throw new InternalServerErrorException({
             message: 'Resposta do servidor viola o contrato definido.',
             dto: dto.name,
@@ -86,12 +76,7 @@ export class ResponseValidationInterceptor implements NestInterceptor {
           });
         }
 
-        // 3. Retorno sanitizado
-        return plainToInstance(dto, data, {
-          excludeExtraneousValues: true,
-          enableImplicitConversion: true,
-          exposeUnsetFields: false,
-        });
+        return mappedData;
       }),
     );
   }
