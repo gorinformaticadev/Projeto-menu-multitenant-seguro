@@ -62,12 +62,22 @@ function isDiagnosticsRecord(value: unknown): value is DiagnosticsRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function getDiagnosticsRecord(value: unknown): DiagnosticsRecord | null {
+  return isDiagnosticsRecord(value) ? value : null;
+}
+
 function getDiagnosticsRecords(value: unknown): DiagnosticsRecord[] {
   return Array.isArray(value) ? value.filter(isDiagnosticsRecord) : [];
 }
 
 function getStringValues(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function getOptionalHref(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  return normalized ? normalized : null;
 }
 
 function formatDate(value: unknown) {
@@ -189,6 +199,14 @@ export default function DiagnosticoSistemaPage() {
   const recentAuditEvents = getDiagnosticsRecords(audit?.recent);
   const logCoverage = getStringValues(logs?.coverage);
   const overall = getDiagnosticsLevelPresentation(data?.overall.level || "attention");
+  const updateHref = getOptionalHref(update?.href);
+  const backupHref = getOptionalHref(backup?.href);
+  const alertsHref = getOptionalHref(alerts?.href);
+  const lastUpdate = getDiagnosticsRecord(update?.lastUpdate);
+  const lastRollback = getDiagnosticsRecord(update?.lastRollback);
+  const lastBackup = getDiagnosticsRecord(backup?.lastBackup);
+  const lastRestore = getDiagnosticsRecord(backup?.lastRestore);
+  const recentFailure = getDiagnosticsRecord(backup?.recentFailure);
 
   return (
     <ProtectedRoute allowedRoles={["SUPER_ADMIN", "ADMIN"]}>
@@ -240,13 +258,13 @@ export default function DiagnosticoSistemaPage() {
               <SectionCard title="Scheduler e tarefas" description="Runtime real das tarefas, com falhas, atrasos e travamentos." section={data.scheduler} href={data.links.cron} actionLabel="Abrir tarefas">
                 <div className="space-y-4"><div className="grid gap-3 md:grid-cols-4"><Metric label="Ativas" value={String(scheduler?.enabled || 0)} /><Metric label="Com falha" value={String(scheduler?.failed || 0)} /><Metric label="Atrasadas" value={String(scheduler?.stale || 0)} /><Metric label="Travadas" value={String(scheduler?.stuck || 0)} /></div>{schedulerProblematic.length > 0 ? schedulerProblematic.map((item) => <div key={String(item.key)} className={diagnosticsPanelClassName}><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-skin-text">{String(item.name)}</p><Badge variant="outline" className="border-skin-border bg-skin-surface text-skin-text">{formatLabel(item.type)}</Badge></div><p className="mt-1 text-xs text-skin-text-muted">{String(item.summary)}</p><div className="mt-2 grid gap-2 text-xs text-skin-text-muted md:grid-cols-2"><span>Proximo esperado: {formatDate(item.nextExpectedRunAt)}</span><span>Ultimo sucesso: {formatDate(item.lastSucceededAt)}</span></div></div>) : <DashboardSurfaceState title="Sem tarefas problematicas" description="O runtime nao reportou atrasos ou falhas relevantes." tone="neutral" />}</div>
               </SectionCard>
-              <SectionCard title="Update e deploy" description="Estado reaproveitado do sistema de updates." section={data.update} href={update?.href || null} actionLabel="Abrir updates">
-                <div className="grid gap-3 md:grid-cols-2"><Metric label="Versao atual" value={String(update?.currentVersion || "Sem leitura")} /><Metric label="Atualizacao disponivel" value={update?.updateAvailable ? "Sim" : "Nao"} /><Metric label="Ultima checagem" value={formatDate(update?.lastCheck)} /><Metric label="Execucao em andamento" value={update?.inProgress ? "Sim" : "Nao"} /><Metric label="Ultima execucao" value={update?.lastUpdate ? `${formatLabel(update.lastUpdate.status)} - ${String(update.lastUpdate.version || "Sem versao")}` : "Nenhuma execucao recente"} /><Metric label="Ultimo rollback" value={update?.lastRollback ? `${formatLabel(update.lastRollback.status)} - ${String(update.lastRollback.version || "Sem versao")}` : "Nenhum rollback recente"} /></div>
+              <SectionCard title="Update e deploy" description="Estado reaproveitado do sistema de updates." section={data.update} href={updateHref} actionLabel="Abrir updates">
+                <div className="grid gap-3 md:grid-cols-2"><Metric label="Versao atual" value={String(update?.currentVersion || "Sem leitura")} /><Metric label="Atualizacao disponivel" value={update?.updateAvailable ? "Sim" : "Nao"} /><Metric label="Ultima checagem" value={formatDate(update?.lastCheck)} /><Metric label="Execucao em andamento" value={update?.inProgress ? "Sim" : "Nao"} /><Metric label="Ultima execucao" value={lastUpdate ? `${formatLabel(lastUpdate.status)} - ${String(lastUpdate.version || "Sem versao")}` : "Nenhuma execucao recente"} /><Metric label="Ultimo rollback" value={lastRollback ? `${formatLabel(lastRollback.status)} - ${String(lastRollback.version || "Sem versao")}` : "Nenhum rollback recente"} /></div>
               </SectionCard>
-              <SectionCard title="Backup e restore" description="Resumo do ultimo backup, ultimo restore e falhas recentes." section={data.backup} href={backup?.href || null} actionLabel="Abrir backups">
-                <div className="grid gap-3 md:grid-cols-2"><Metric label="Pendentes" value={String(backup?.pendingJobs || 0)} /><Metric label="Executando" value={String(backup?.runningJobs || 0)} /><Metric label="Ultimo backup" value={backup?.lastBackup ? `${formatLabel(backup.lastBackup.type)} - ${formatLabel(backup.lastBackup.status)}` : "Sem registro"} /><Metric label="Ultimo restore" value={backup?.lastRestore ? `${formatLabel(backup.lastRestore.type)} - ${formatLabel(backup.lastRestore.status)}` : "Sem registro"} /><Metric label="Falha recente" value={backup?.recentFailure ? `${formatLabel(backup.recentFailure.type)} - ${formatLabel(backup.recentFailure.status)}` : "Sem falhas"} /></div>
+              <SectionCard title="Backup e restore" description="Resumo do ultimo backup, ultimo restore e falhas recentes." section={data.backup} href={backupHref} actionLabel="Abrir backups">
+                <div className="grid gap-3 md:grid-cols-2"><Metric label="Pendentes" value={String(backup?.pendingJobs || 0)} /><Metric label="Executando" value={String(backup?.runningJobs || 0)} /><Metric label="Ultimo backup" value={lastBackup ? `${formatLabel(lastBackup.type)} - ${formatLabel(lastBackup.status)}` : "Sem registro"} /><Metric label="Ultimo restore" value={lastRestore ? `${formatLabel(lastRestore.type)} - ${formatLabel(lastRestore.status)}` : "Sem registro"} /><Metric label="Falha recente" value={recentFailure ? `${formatLabel(recentFailure.type)} - ${formatLabel(recentFailure.status)}` : "Sem falhas"} /></div>
               </SectionCard>
-              <SectionCard title="Alertas operacionais" description="Ultimos alertas automaticos, sem criar uma nova inbox." section={data.alerts} href={alerts?.href || null} actionLabel="Abrir notificacoes">
+              <SectionCard title="Alertas operacionais" description="Ultimos alertas automaticos, sem criar uma nova inbox." section={data.alerts} href={alertsHref} actionLabel="Abrir notificacoes">
                 <div className="space-y-4"><div className="grid gap-3 md:grid-cols-3"><Metric label="Alertas recentes" value={String(alerts?.recentCount || 0)} /><Metric label="Criticos" value={String(alerts?.criticalCount || 0)} /><Metric label="Inbox dedicada" value={alerts?.inboxAvailable ? "Disponivel" : "Nao disponivel"} /></div>{recentAlerts.length > 0 ? recentAlerts.map((item) => <div key={String(item.id)} className={diagnosticsPanelClassName}><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-skin-text">{String(item.title)}</p><Badge variant="outline" className="border-skin-border bg-skin-surface text-skin-text">{formatLabel(item.severity)}</Badge></div><p className="mt-1 text-sm text-skin-text-muted">{String(item.body)}</p><div className="mt-2 text-xs text-skin-text-muted">{formatDate(item.createdAt)}</div></div>) : <DashboardSurfaceState title="Sem alertas recentes" description="Nenhum alerta operacional foi emitido na janela atual." tone="neutral" />}</div>
               </SectionCard>
               <SectionCard title="Auditoria e logs" description="Reaproveita a pagina /logs existente e mostra a cobertura real dos dados." section={data.logs} href={data.links.logs} actionLabel="Abrir logs">
