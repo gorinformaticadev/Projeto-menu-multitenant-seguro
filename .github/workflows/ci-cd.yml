@@ -72,8 +72,11 @@ jobs:
       - name: Frontend theming guard
         run: pnpm check:theming
 
+      - name: Frontend typecheck
+        run: pnpm -C apps/frontend typecheck
+
       - name: Frontend build
-        run: pnpm -C apps/frontend build
+        run: pnpm -C apps/frontend build:ci
 
       - name: Frontend lint
         run: pnpm -C apps/frontend run --if-present lint
