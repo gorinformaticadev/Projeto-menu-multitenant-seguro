@@ -114,7 +114,7 @@ CREATE TABLE "security_config" (
     "sessionTimeoutMinutes" INTEGER NOT NULL DEFAULT 30,
     "smtpUsername" TEXT,
     "smtpPassword" TEXT,
-    "platformName" TEXT DEFAULT 'Sistema Multitenant',
+    "platformName" TEXT DEFAULT 'Pluggor',
     "platformEmail" TEXT,
     "platformPhone" TEXT,
     "updatedAt" TIMESTAMP(3) NOT NULL,

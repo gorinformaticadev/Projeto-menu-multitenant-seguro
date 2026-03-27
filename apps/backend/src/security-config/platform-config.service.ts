@@ -31,8 +31,8 @@ export class PlatformConfigService {
       const securityConfig = await this.prisma.securityConfig.findFirst();
       
       const config: PlatformConfig = {
-        platformName: securityConfig?.platformName || 'Sistema Multitenant',
-        platformEmail: securityConfig?.platformEmail || 'contato@sistema.com',
+        platformName: securityConfig?.platformName || 'Pluggor',
+        platformEmail: securityConfig?.platformEmail || 'contato@pluggor.com.br',
         platformPhone: securityConfig?.platformPhone || '(11) 99999-9999',
       };
 
@@ -46,8 +46,8 @@ export class PlatformConfigService {
       
       // Return default values on error
       return {
-        platformName: 'Sistema Multitenant',
-        platformEmail: 'contato@sistema.com',
+        platformName: 'Pluggor',
+        platformEmail: 'contato@pluggor.com.br',
         platformPhone: '(11) 99999-9999',
       };
     }
@@ -85,8 +85,8 @@ export class PlatformConfigService {
         securityConfig = await this.prisma.securityConfig.create({
           data: {
             ...updateData,
-            platformName: platformName || 'Sistema Multitenant',
-            platformEmail: platformEmail || 'contato@sistema.com',
+            platformName: platformName || 'Pluggor',
+            platformEmail: platformEmail || 'contato@pluggor.com.br',
             platformPhone: platformPhone || '(11) 99999-9999',
           },
         });

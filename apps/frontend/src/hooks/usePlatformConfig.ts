@@ -14,11 +14,11 @@ export interface PlatformConfig {
 }
 
 export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
-  platformName: "Sistema Multitenant",
+  platformName: "Pluggor",
   platformLogoUrl: null,
   masterLogoUrl: null,
   platformBrandLogoUrl: null,
-  platformEmail: "contato@sistema.com",
+  platformEmail: "contato@pluggor.com.br",
   platformPhone: "(11) 99999-9999",
 };
 

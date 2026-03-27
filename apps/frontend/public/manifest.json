@@ -1,6 +1,6 @@
 {
-  "name": "Sistema Multitenant",
-  "short_name": "Multitenant",
+  "name": "Pluggor",
+  "short_name": "Pluggor",
   "description": "Sistema com isolamento de dados e controle de acesso",
   "start_url": "/",
   "display": "fullscreen",

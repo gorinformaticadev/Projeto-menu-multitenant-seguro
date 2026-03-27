@@ -32,7 +32,7 @@ describe('PlatformConfigService logo management', () => {
         findFirst: jest.fn().mockResolvedValue({
           platformName: 'Sistema',
           platformLogoUrl: fileName,
-          platformEmail: 'contato@sistema.com',
+          platformEmail: 'contato@pluggor.com.br',
           platformPhone: '(11) 99999-9999',
         }),
       },
@@ -53,7 +53,7 @@ describe('PlatformConfigService logo management', () => {
           id: 'cfg-1',
           platformName: 'Sistema',
           platformLogoUrl: storedLogo,
-          platformEmail: 'contato@sistema.com',
+          platformEmail: 'contato@pluggor.com.br',
           platformPhone: '(11) 99999-9999',
         })),
         create: jest.fn(),
@@ -66,7 +66,7 @@ describe('PlatformConfigService logo management', () => {
             id: 'cfg-1',
             platformName: 'Sistema',
             platformLogoUrl: storedLogo,
-            platformEmail: 'contato@sistema.com',
+            platformEmail: 'contato@pluggor.com.br',
             platformPhone: '(11) 99999-9999',
           };
         }),

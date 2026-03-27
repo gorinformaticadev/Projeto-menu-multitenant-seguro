@@ -13,7 +13,7 @@ const inter = Inter({ subsets: ["latin"] });
 // Nota: este arquivo é legado. O layout canônico é apps/frontend/src/app/layout.tsx.
 // O título é resolvido dinamicamente via generateMetadata() no layout principal.
 export const metadata: Metadata = {
-  title: "Sistema Multitenant",
+  title: "Pluggor",
   description: "Sistema com isolamento de dados e controle de acesso",
   icons: {
     icon: [

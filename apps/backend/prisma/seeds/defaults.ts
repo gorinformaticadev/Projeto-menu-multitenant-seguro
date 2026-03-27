@@ -71,8 +71,8 @@ export const DEFAULT_SECURITY_CONFIG = {
   passwordRequireSpecial: true,
   loginMaxAttempts: 5,
   loginLockDurationMinutes: 15,
-  platformName: 'Sistema Multitenant',
-  platformEmail: 'admin@sistema.com',
+  platformName: 'Pluggor',
+  platformEmail: 'contato@pluggor.com.br',
 } as const;
 
 export const SEED_LOCK_KEY = `seed.pipeline.${process.env.SEED_LOCK_ID || 87456321}`;

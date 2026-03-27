@@ -31,9 +31,9 @@ export class PlatformConfigService {
       const platformLogoUrl = await this.resolveExistingPlatformLogo(securityConfig?.platformLogoUrl);
 
       const config: PlatformConfig = {
-        platformName: securityConfig?.platformName || 'Sistema Multitenant',
+        platformName: securityConfig?.platformName || 'Pluggor',
         platformLogoUrl,
-        platformEmail: securityConfig?.platformEmail || 'contato@sistema.com',
+        platformEmail: securityConfig?.platformEmail || 'contato@pluggor.com.br',
         platformPhone: securityConfig?.platformPhone || '(11) 99999-9999',
       };
 
@@ -43,9 +43,9 @@ export class PlatformConfigService {
     } catch (error) {
       this.logger.error('Error fetching platform configuration:', error);
       return {
-        platformName: 'Sistema Multitenant',
+        platformName: 'Pluggor',
         platformLogoUrl: null,
-        platformEmail: 'contato@sistema.com',
+        platformEmail: 'contato@pluggor.com.br',
         platformPhone: '(11) 99999-9999',
       };
     }
@@ -243,8 +243,8 @@ export class PlatformConfigService {
 
     return this.prisma.securityConfig.create({
       data: {
-        platformName: 'Sistema Multitenant',
-        platformEmail: 'contato@sistema.com',
+        platformName: 'Pluggor',
+        platformEmail: 'contato@pluggor.com.br',
         platformPhone: '(11) 99999-9999',
       },
     });

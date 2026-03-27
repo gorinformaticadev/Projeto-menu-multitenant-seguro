@@ -15,7 +15,7 @@ import { SystemNotificationsProvider } from "@/contexts/SystemNotificationsConte
 import { APP_THEME_VALUES, PUBLIC_THEME_STORAGE_KEY } from "@/lib/app-theme";
 
 /** Valor padrão usado como fallback quando o backend não está acessível no SSR */
-const PLATFORM_NAME_FALLBACK = "Sistema Multitenant";
+const PLATFORM_NAME_FALLBACK = "Pluggor";
 
 /**
  * Busca o nome da plataforma diretamente no backend durante o SSR.

@@ -7,8 +7,8 @@ Implementei um sistema completo para gerenciar as configurações básicas da pl
 ## ✅ Funcionalidades Implementadas
 
 ### 1. **Campos no Banco de Dados**
-- `platformName` - Nome da plataforma (padrão: "Sistema Multitenant")
-- `platformEmail` - Email informativo (padrão: "contato@sistema.com")  
+- `platformName` - Nome da plataforma (padrão: "Pluggor")
+- `platformEmail` - Email informativo (padrão: "contato@pluggor.com.br")  
 - `platformPhone` - Telefone de contato (padrão: "(11) 99999-9999")
 
 ### 2. **Backend (NestJS)**

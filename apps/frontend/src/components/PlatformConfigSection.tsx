@@ -278,7 +278,7 @@ export default function PlatformConfigSection() {
               id="platform-name"
               value={config.platformName}
               onChange={(e) => handleInputChange("platformName", e.target.value)}
-              placeholder="Sistema Multitenant"
+              placeholder="Pluggor"
             />
           </div>
 
@@ -291,7 +291,7 @@ export default function PlatformConfigSection() {
               type="email"
               value={config.platformEmail}
               onChange={(e) => handleInputChange("platformEmail", e.target.value)}
-              placeholder="contato@sistema.com"
+              placeholder="contato@pluggor.com.br"
             />
           </div>
 

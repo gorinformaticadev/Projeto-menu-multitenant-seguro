@@ -4,8 +4,8 @@
  * Default platform configuration values
  */
 export const DEFAULT_PLATFORM_CONFIG = {
-  PLATFORM_NAME: 'Sistema Multitenant',
-  PLATFORM_EMAIL: 'contato@sistema.com',
+  PLATFORM_NAME: 'Pluggor',
+  PLATFORM_EMAIL: 'contato@pluggor.com.br',
   PLATFORM_PHONE: '(11) 99999-9999',
 } as const;
 

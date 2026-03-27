@@ -256,7 +256,7 @@ model SecurityConfig {
   sessionTimeoutMinutes      Int      @default(30)
   smtpUsername               String?
   smtpPassword               String?
-  platformName               String?  @default("Sistema Multitenant")
+  platformName               String?  @default("Pluggor")
   platformLogoUrl            String?
   platformEmail              String?
   platformPhone              String?
