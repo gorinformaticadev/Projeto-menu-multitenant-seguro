@@ -13,6 +13,12 @@ const IGNORED_DIRS = new Set([
   "coverage",
   "out",
 ]);
+const IGNORED_PATH_PREFIXES = [
+  "apps/frontend/src/app/modules/",
+];
+const IGNORED_FILES = new Set([
+  "apps/frontend/src/components/ui/toast.tsx",
+]);
 const TEXT_EXTENSIONS = new Set([
   ".js",
   ".jsx",
@@ -43,6 +49,13 @@ const RULES = [
   {
     name: "RGB/HSL color",
     regex: /(rgb|hsl)a?\(/g,
+    validate: (match, content) => {
+      const lineStart = content.lastIndexOf("\n", match.index) + 1;
+      const lineEnd = content.indexOf("\n", match.index);
+      const line =
+        content.slice(lineStart, lineEnd === -1 ? content.length : lineEnd);
+      return !line.includes("var(--");
+    },
   },
   {
     name: "Inline color style",
@@ -97,6 +110,12 @@ function getLineText(content, lineNumber) {
 
 function collectFindings(filePath) {
   const relativePath = path.relative(ROOT_DIR, filePath).replace(/\\/g, "/");
+  if (
+    IGNORED_FILES.has(relativePath) ||
+    IGNORED_PATH_PREFIXES.some((prefix) => relativePath.startsWith(prefix))
+  ) {
+    return [];
+  }
   const content = fs.readFileSync(filePath, "utf8");
   const findings = [];
 

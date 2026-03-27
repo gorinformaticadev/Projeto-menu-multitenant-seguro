@@ -331,7 +331,9 @@ describe('Security red team regression attacks', () => {
         }),
       },
     });
-    const client = createSocketClient('socket-super-admin-tenant');
+    const client = createSocketClient('socket-super-admin-tenant', {
+      authToken: 'Bearer test-token',
+    });
 
     await gateway.handleConnection(client as any);
 

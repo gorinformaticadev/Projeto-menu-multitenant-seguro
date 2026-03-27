@@ -383,10 +383,10 @@ describe('System contract smoke', () => {
 
     expect(response.body).toEqual({
       enabled: true,
-      reason: 'planned maintenance',
-      startedAt: '2026-03-05T22:00:00Z',
       etaSeconds: 300,
     });
+    expect(response.body.reason).toBeUndefined();
+    expect(response.body.startedAt).toBeUndefined();
     expect(response.body.allowedRoles).toBeUndefined();
     expect(response.body.bypassHeader).toBeUndefined();
   });
@@ -569,4 +569,3 @@ describe('System contract smoke', () => {
       .expect(503);
   });
 });
-

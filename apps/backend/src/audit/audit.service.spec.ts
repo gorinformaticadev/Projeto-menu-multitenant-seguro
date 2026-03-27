@@ -12,9 +12,16 @@ describe('AuditService rate limit observability', () => {
   const rateLimitMetricsServiceMock = {
     getStats: jest.fn(),
   };
+  const requestSecurityContextMock = {
+    getRequest: jest.fn(() => undefined),
+  };
 
   const createService = () =>
-    new AuditService(prismaMock as any, rateLimitMetricsServiceMock as any);
+    new AuditService(
+      prismaMock as any,
+      rateLimitMetricsServiceMock as any,
+      requestSecurityContextMock as any,
+    );
 
   beforeEach(() => {
     jest.clearAllMocks();

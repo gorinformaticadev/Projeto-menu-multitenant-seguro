@@ -1,5 +1,4 @@
 import { HttpException } from '@nestjs/common';
-import * as fs from 'fs';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { SystemVersionService } from '@common/services/system-version.service';
@@ -13,9 +12,7 @@ type UpdateServicePrivateApi = {
   encryptToken: (token: string) => string;
   sanitizeGitError: (output: string, token?: string) => string;
   formatVersion: (version: string) => string;
-  runSafeNativeDeploy: (version: string, settings: Record<string, unknown>) => Promise<{ stdout: string; stderr: string }>;
   normalizeHttpStatus: (statusLike: unknown, fallback?: number) => number;
-  getProjectRoot?: () => string;
 };
 
 function createService() {
@@ -163,7 +160,7 @@ describe('UpdateService', () => {
     ]);
   });
 
-  it('repo privado com token usa http.extraHeader Authorization basic', async () => {
+  it('repo privado com token usa http.extraHeader Authorization Bearer', async () => {
     const { service } = createService();
     const calls: Array<{ cmd: string; args: string[] }> = [];
 
@@ -178,7 +175,7 @@ describe('UpdateService', () => {
     expect(calls.length).toBe(1);
     expect(calls[0].cmd).toBe('git');
     expect(calls[0].args[0]).toBe('-c');
-    expect(calls[0].args[1].startsWith('http.extraHeader=AUTHORIZATION: basic ')).toBe(true);
+    expect(calls[0].args[1].startsWith('http.extraHeader=AUTHORIZATION: Bearer ')).toBe(true);
     expect(calls[0].args.slice(2)).toEqual(['ls-remote', '--tags', 'https://github.com/org/private.git']);
   });
 
@@ -223,38 +220,6 @@ describe('UpdateService', () => {
     expect(result.updateAvailable).toBe(true);
   });
 
-  it('runSafeNativeDeploy injeta repo e auth header quando git esta configurado', async () => {
-    const { service } = createService();
-    const existsSyncSpy = jest.spyOn(fs, 'existsSync').mockImplementation((target: fs.PathLike) => {
-      return String(target).replace(/\\/g, '/').endsWith('/install/update-native.sh');
-    });
-
-    const calls: Array<{ cmd: string; args: string[]; options: Record<string, any> }> = [];
-    jest.spyOn(service as unknown as { getProjectRoot: () => string }, 'getProjectRoot').mockReturnValue('/repo-root');
-    service.execFileAsync = jest.fn(async (cmd: string, args: string[], options: Record<string, any>) => {
-      calls.push({ cmd, args, options });
-      return { stdout: 'ok', stderr: '' };
-    });
-
-    const encryptedToken = service.encryptToken('my-secret-token');
-    await service.runSafeNativeDeploy('v1.2.3', {
-      gitUsername: 'org',
-      gitRepository: 'repo',
-      gitToken: encryptedToken,
-    });
-
-    expect(calls.length).toBe(1);
-    expect(calls[0].cmd).toBe('bash');
-    expect(calls[0].args[0].replace(/\\/g, '/')).toBe('install/update-native.sh');
-    expect(calls[0].options.cwd).toBe('/repo-root');
-    expect(calls[0].options.env.PROJECT_ROOT).toBe('/repo-root');
-    expect(calls[0].options.env.RELEASE_TAG).toBe('v1.2.3');
-    expect(calls[0].options.env.GIT_REPO_URL).toBe('https://github.com/org/repo.git');
-    expect(String(calls[0].options.env.GIT_AUTH_HEADER || '').startsWith('AUTHORIZATION: basic ')).toBe(true);
-
-    existsSyncSpy.mockRestore();
-  });
-
   it('executeUpdate inicia job assincrono e retorna operationId', async () => {
     const { service, prismaMock, systemUpdateAdminServiceMock } = createService();
 
@@ -265,7 +230,7 @@ describe('UpdateService', () => {
       logId: 'log-1',
       operationId: 'update-123',
       status: 'starting',
-      message: 'Update iniciado para versao v1.2.3.',
+      message: 'Processo de atualizacao para v1.2.3 iniciado com sucesso.',
     });
     expect(systemUpdateAdminServiceMock.runUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -354,7 +319,7 @@ describe('UpdateService', () => {
 
     const status = await service.getUpdateStatus();
 
-    expect(status.mode).toBe('native');
+    expect(status.mode).toBe('docker');
     expect(status.updateLifecycle).toMatchObject({
       status: 'restarting_services',
       step: 'healthcheck',

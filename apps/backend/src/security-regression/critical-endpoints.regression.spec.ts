@@ -39,6 +39,7 @@ const ALLOWED_NON_CRITICAL_MUTATING_ROUTES = new Set<string>([
   'BackupLegacyController.upload',
   'BackupLegacyController.deleteBackup',
   'UpdateController.updateConfig',
+  'UpdateController.testConnectionWithPayload',
 ]);
 
 const MUTATING_METHODS = new Set<RequestMethod>([

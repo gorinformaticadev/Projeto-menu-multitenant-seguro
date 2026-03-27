@@ -1,6 +1,7 @@
 import { NotificationGateway } from './notification.gateway';
 import { Notification } from './notification.entity';
 import { RequestSecurityContextService } from '@common/services/request-security-context.service';
+import { AuthorizationService } from '@common/services/authorization.service';
 
 describe('NotificationGateway websocket hardening', () => {
   const gateways: NotificationGateway[] = [];
@@ -66,6 +67,7 @@ describe('NotificationGateway websocket hardening', () => {
       websocketRuntimeToggleService as any,
       requestSecurityContext,
       websocketConnectionRegistry as any,
+      new AuthorizationService(),
     );
     gateway.server = { to } as any;
     gateways.push(gateway);

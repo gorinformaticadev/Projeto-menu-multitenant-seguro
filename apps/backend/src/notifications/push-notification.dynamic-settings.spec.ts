@@ -4,6 +4,7 @@ import { ConfigResolverService } from '../system-settings/config-resolver.servic
 import { SettingsRegistry } from '../system-settings/settings-registry.service';
 import { Notification } from './notification.entity';
 import { PushNotificationService } from './push-notification.service';
+import { AuthorizationService } from '@common/services/authorization.service';
 
 type PushToggleState = {
   available: boolean;
@@ -117,10 +118,14 @@ const createContext = (
     get: jest.fn((key: string) => process.env[key]),
   };
   const resolver = new ConfigResolverService(new SettingsRegistry(), prisma as unknown as PrismaService);
+  const authorizationService = {
+    canReceiveNotification: jest.fn().mockReturnValue(true),
+  };
   const service = new PushNotificationService(
     prisma as unknown as PrismaService,
     configService as unknown as ConfigService,
     resolver,
+    authorizationService as unknown as AuthorizationService,
   );
   const sendNotificationMock = jest.fn().mockResolvedValue(undefined);
   const setVapidDetailsMock = jest.fn();
@@ -132,6 +137,7 @@ const createContext = (
       setVapidDetails: setVapidDetailsMock,
     };
   });
+  jest.spyOn(service as any, 'validatePushEndpoint').mockResolvedValue(undefined);
 
   return {
     prisma,
