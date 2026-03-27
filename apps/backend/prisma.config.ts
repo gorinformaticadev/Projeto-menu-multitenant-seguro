@@ -4,6 +4,6 @@ import { defineConfig } from 'prisma/config';
 export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
-    seed: 'node dist/prisma/seed.js deploy',
+    seed: 'tsx prisma/seed.ts deploy',
   },
 });

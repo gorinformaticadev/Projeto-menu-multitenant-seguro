@@ -17,8 +17,8 @@
     "prisma:generate": "pnpm exec prisma generate",
     "prisma:generate:test": "node .\\scripts\\ensure-prisma-client.js",
     "prisma:migrate": "prisma migrate deploy",
-    "seed:deploy": "node dist/prisma/seed.js deploy",
-    "seed:force": "node dist/prisma/seed.js deploy --force",
+    "seed:deploy": "tsx prisma/seed.ts deploy",
+    "seed:force": "tsx prisma/seed.ts deploy --force",
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "security:audit": "pnpm audit --audit-level=moderate",
@@ -138,8 +138,5 @@
     "diff": "^8.0.3",
     "multer": "^2.1.1",
     "socket.io-parser": "^4.2.6"
-  },
-  "prisma": {
-    "seed": "node dist/prisma/seed.js"
   }
 }
