@@ -9,14 +9,13 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  CI_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_db?schema=public
 
 jobs:
   backend-build:
     name: backend-build
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_db?schema=public
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -36,7 +35,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Prisma generate
-        run: pnpm -C apps/backend exec prisma generate
+        run: pnpm -C apps/backend run prisma:generate
 
       - name: Backend build
         run: pnpm -C apps/backend build
