@@ -38,15 +38,7 @@ export class DtoMapperService {
     metadata: ContractSerializationMetadata = {},
   ): T {
     const context = this.resolveContractEventContext(metadata);
-    const instance = plainToInstance(cls, plain, {
-      excludeExtraneousValues: true,
-      enableImplicitConversion: true,
-      exposeUnsetFields: false,
-    });
-
-    this.detectAndLogStrippedFields(cls.name, plain, instance, context);
-
-    return instance;
+    return this.serializeInternal(cls, plain, context, true);
   }
 
   /**
@@ -63,6 +55,7 @@ export class DtoMapperService {
     }
 
     const context = this.resolveContractEventContext(metadata);
+    this.emitContractEvaluation(cls.name, context);
     const validationInstance = plainToInstance(cls, plain, {
       excludeExtraneousValues: true,
       enableImplicitConversion: true,
@@ -98,7 +91,7 @@ export class DtoMapperService {
       return { data: null, errors };
     }
 
-    const data = this.serialize(cls, plain, context);
+    const data = this.serializeInternal(cls, plain, context, false);
     return { data, errors: [] };
   }
 
@@ -162,6 +155,34 @@ export class DtoMapperService {
       dto: dtoName,
       strippedFields,
       strippedFieldCount: strippedFields.length,
+      timestamp: new Date(),
+      ...context,
+    });
+  }
+
+  private serializeInternal<T, V extends Record<string, any>>(
+    cls: Type<T>,
+    plain: V,
+    context: ContractEventContext,
+    emitEvaluation: boolean,
+  ): T {
+    if (emitEvaluation) {
+      this.emitContractEvaluation(cls.name, context);
+    }
+
+    const instance = plainToInstance(cls, plain, {
+      excludeExtraneousValues: true,
+      enableImplicitConversion: true,
+      exposeUnsetFields: false,
+    });
+
+    this.detectAndLogStrippedFields(cls.name, plain, instance, context);
+    return instance;
+  }
+
+  private emitContractEvaluation(dtoName: string, context: ContractEventContext): void {
+    this.eventEmitter?.emit('contract.evaluated', {
+      dto: dtoName,
       timestamp: new Date(),
       ...context,
     });

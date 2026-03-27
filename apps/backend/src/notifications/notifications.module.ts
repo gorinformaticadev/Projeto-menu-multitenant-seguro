@@ -10,6 +10,7 @@ import { NotificationsController } from './notifications.controller';
 import { SystemNotificationsController } from './system-notifications.controller';
 import { PrismaModule } from '@core/prisma/prisma.module';
 import { WebsocketRuntimeToggleService } from '@common/services/websocket-runtime-toggle.service';
+import { DtoMapperService } from '@common/services/dto-mapper.service';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
@@ -40,6 +41,7 @@ import { AuthModule } from '../auth/auth.module';
     PushNotificationService,
     SystemAlertDeliveryService,
     WebsocketRuntimeToggleService,
+    DtoMapperService,
   ],
   exports: [NotificationService, NotificationGateway, PushNotificationService],
 })

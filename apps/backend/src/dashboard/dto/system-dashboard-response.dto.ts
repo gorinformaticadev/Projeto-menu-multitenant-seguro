@@ -503,6 +503,233 @@ export class DashboardRouteErrorsDto extends DashboardMetricStatusDto {
   tenantScopeApplied?: boolean;
 }
 
+export class DashboardContractOriginDto {
+  @ApiProperty()
+  @Expose()
+  @IsString()
+  origin: string;
+
+  @ApiProperty()
+  @Expose()
+  @IsNumber()
+  count: number;
+
+  @ApiProperty()
+  @Expose()
+  @IsNumber()
+  validationFailed: number;
+
+  @ApiProperty()
+  @Expose()
+  @IsNumber()
+  payloadStripped: number;
+
+  @ApiProperty()
+  @Expose()
+  @IsString()
+  denominatorKind: string;
+
+  @ApiProperty()
+  @Expose()
+  @IsNumber()
+  denominatorCount: number;
+}
+
+export class DashboardContractMinuteDto {
+  @ApiProperty()
+  @Expose()
+  @IsString()
+  minuteStart: string;
+
+  @ApiProperty()
+  @Expose()
+  @IsNumber()
+  total: number;
+
+  @ApiProperty()
+  @Expose()
+  @IsNumber()
+  validationFailed: number;
+
+  @ApiProperty()
+  @Expose()
+  @IsNumber()
+  payloadStripped: number;
+}
+
+export class DashboardContractRouteDto {
+  @ApiProperty()
+  @Expose()
+  @IsString()
+  route: string;
+
+  @ApiProperty({ required: false, nullable: true })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  method?: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  module?: string | null;
+
+  @ApiProperty()
+  @Expose()
+  @IsString()
+  origin: string;
+
+  @ApiProperty()
+  @Expose()
+  @IsNumber()
+  count: number;
+
+  @ApiProperty()
+  @Expose()
+  @IsNumber()
+  validationFailed: number;
+
+  @ApiProperty()
+  @Expose()
+  @IsNumber()
+  payloadStripped: number;
+}
+
+export class DashboardContractDtoEntryDto {
+  @ApiProperty()
+  @Expose()
+  @IsString()
+  dto: string;
+
+  @ApiProperty()
+  @Expose()
+  @IsNumber()
+  count: number;
+
+  @ApiProperty()
+  @Expose()
+  @IsNumber()
+  validationFailed: number;
+
+  @ApiProperty()
+  @Expose()
+  @IsNumber()
+  payloadStripped: number;
+}
+
+export class DashboardContractObservabilityDto extends DashboardMetricStatusDto {
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsString()
+  windowStart?: string;
+
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsNumber()
+  windowSeconds?: number;
+
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsNumber()
+  totalEvents?: number;
+
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsNumber()
+  totalValidationErrors?: number;
+
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsNumber()
+  totalPayloadStrips?: number;
+
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsNumber()
+  failureRatePerThousandRequests?: number | null;
+
+  @ApiProperty({ required: false })
+  @Expose()
+  @IsOptional()
+  @IsNumber()
+  wsFailureRatePerThousandEvents?: number | null;
+
+  @ApiProperty({ required: false, type: [DashboardContractOriginDto] })
+  @Expose()
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DashboardContractOriginDto)
+  byOrigin?: DashboardContractOriginDto[];
+
+  @ApiProperty({ required: false, type: [DashboardContractRouteDto] })
+  @Expose()
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DashboardContractRouteDto)
+  topRoutes?: DashboardContractRouteDto[];
+
+  @ApiProperty({ required: false, type: [DashboardContractDtoEntryDto] })
+  @Expose()
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DashboardContractDtoEntryDto)
+  topDtos?: DashboardContractDtoEntryDto[];
+
+  @ApiProperty({ required: false, type: [DashboardContractMinuteDto] })
+  @Expose()
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DashboardContractMinuteDto)
+  eventsPerMinute?: DashboardContractMinuteDto[];
+
+  @ApiProperty({ required: false, type: Object })
+  @Expose()
+  @IsOptional()
+  @IsObject()
+  trends?: Record<string, unknown>;
+
+  @ApiProperty({ required: false, type: Object })
+  @Expose()
+  @IsOptional()
+  @IsObject()
+  thresholds?: Record<string, unknown>;
+
+  @ApiProperty({ required: false, type: Object })
+  @Expose()
+  @IsOptional()
+  @IsObject()
+  severity?: Record<string, unknown>;
+
+  @ApiProperty({ required: false, type: Object })
+  @Expose()
+  @IsOptional()
+  @IsObject()
+  persistence?: Record<string, unknown>;
+
+  @ApiProperty({ required: false, type: Object })
+  @Expose()
+  @IsOptional()
+  @IsObject()
+  cardinality?: Record<string, unknown>;
+
+  @ApiProperty({ required: false, type: Object, nullable: true })
+  @Expose()
+  @IsOptional()
+  @IsObject()
+  calibration?: Record<string, unknown> | null;
+}
+
 export class DashboardSecurityIncidentDto {
   @ApiProperty()
   @Expose()
@@ -1294,6 +1521,13 @@ export class SystemDashboardResponseDto {
   @ValidateNested()
   @Type(() => DashboardRouteErrorsDto)
   routeErrors?: DashboardRouteErrorsDto;
+
+  @ApiProperty({ type: DashboardContractObservabilityDto, required: false })
+  @Expose()
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DashboardContractObservabilityDto)
+  contractObservability?: DashboardContractObservabilityDto;
 
   @ApiProperty({ type: DashboardSecurityDto, required: false })
   @Expose()

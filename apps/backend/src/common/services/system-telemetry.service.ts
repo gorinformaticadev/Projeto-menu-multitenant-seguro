@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import type {
+  ContractEvaluatedEvent,
   ContractEventOrigin,
   ContractMetricSeverity,
   ContractObservabilityThresholds,
@@ -8,6 +9,7 @@ import type {
   ContractPayloadStrippedEvent,
   ContractValidationFailedEvent,
 } from './contract-observability.types';
+import { ContractObservabilityStore } from './contract-observability.store';
 import {
   maskTelemetryIp,
   normalizeTelemetryMethod,
@@ -27,115 +29,16 @@ export type SecurityTelemetryEventType =
   | 'maintenance_blocked'
   | 'maintenance_bypass_attempt';
 
-export type ContractAnomalyType = 'payload_stripped' | 'validation_failed';
-
-export interface ContractAnomalyRecord {
-  at: number;
-  type: ContractAnomalyType;
-  dto: string;
-  route: string | null;
-  method: string | null;
-  module: string | null;
-  origin: ContractEventOrigin;
-  tenantHash: string | null;
-  operationType: ContractOperationType;
-  detailCount: number;
-}
-
-export interface ContractAnomalySummary {
-  dto: string;
-  type: ContractAnomalyType;
-  count: number;
-  detailCount: number;
-  lastOccurrenceMs: number;
-}
-
-export interface ContractAnomalyDtoSummary {
-  dto: string;
-  count: number;
-  validationFailed: number;
-  payloadStripped: number;
-  detailCount: number;
-  lastOccurrenceAt: string;
-  topRoute: string | null;
-}
-
-export interface ContractAnomalyMinuteSummary {
-  minuteStart: string;
-  total: number;
-  validationFailed: number;
-  payloadStripped: number;
-}
-
-export interface ContractAnomalyRouteSummary {
-  route: string;
-  method: string | null;
-  module: string | null;
-  origin: ContractEventOrigin;
-  operationType: ContractOperationType | null;
-  count: number;
-  validationFailed: number;
-  payloadStripped: number;
-  detailCount: number;
-  requests: number;
-  failureRatePerThousandRequests: number | null;
-  strippingRatePerThousandRequests: number | null;
-  totalRatePerThousandRequests: number | null;
-  lastOccurrenceAt: string;
-}
-
-export interface ContractAnomalyTenantSummary {
-  tenantHash: string;
-  count: number;
-  validationFailed: number;
-  payloadStripped: number;
-  detailCount: number;
-  lastOccurrenceAt: string;
-}
-
-export interface ContractTrendSnapshot {
-  previousWindowStart: string;
-  previousWindowSeconds: number;
-  previousTotalEvents: number;
-  previousValidationErrors: number;
-  previousPayloadStrips: number;
-  totalIncreasePercent: number | null;
-  validationIncreasePercent: number | null;
-  payloadIncreasePercent: number | null;
-  lastBucketIncreasePercent: number | null;
-  continuousGrowthMinutes: number;
-  continuousGrowthBuckets: number;
-  increasingForLastHour: boolean;
-}
-
-export interface ContractSeveritySnapshot {
-  validationFailed: ContractMetricSeverity;
-  payloadStripped: ContractMetricSeverity;
-  trend: ContractMetricSeverity;
-  overall: ContractMetricSeverity;
-}
-
-export interface ContractAnomalySnapshot {
-  status: 'ok';
-  windowStart: string;
-  windowSeconds: number;
-  requestsInWindow: number;
-  totalEvents: number;
-  totalValidationErrors: number;
-  totalPayloadStrips: number;
-  totalDetails: number;
-  eventsPerMinuteAvg: number;
-  failureRatePerThousandRequests: number | null;
-  strippingRatePerThousandRequests: number | null;
-  distribution: ContractAnomalySummary[];
-  byDto: ContractAnomalyDtoSummary[];
-  byRoute: ContractAnomalyRouteSummary[];
-  byTenant: ContractAnomalyTenantSummary[];
-  eventsPerMinute: ContractAnomalyMinuteSummary[];
-  thresholds: ContractObservabilityThresholds;
-  trends: ContractTrendSnapshot;
-  severity: ContractSeveritySnapshot;
-}
+export type ContractAnomalyType = import('./contract-observability.types').ContractAnomalyType;
+export type ContractAnomalyRecord = import('./contract-observability.types').ContractAnomalyRecord;
+export type ContractAnomalySummary = import('./contract-observability.types').ContractAnomalySummary;
+export type ContractAnomalyDtoSummary = import('./contract-observability.types').ContractAnomalyDtoSummary;
+export type ContractAnomalyMinuteSummary = import('./contract-observability.types').ContractAnomalyMinuteSummary;
+export type ContractAnomalyRouteSummary = import('./contract-observability.types').ContractAnomalyRouteSummary;
+export type ContractAnomalyTenantSummary = import('./contract-observability.types').ContractAnomalyTenantSummary;
+export type ContractTrendSnapshot = import('./contract-observability.types').ContractTrendSnapshot;
+export type ContractSeveritySnapshot = import('./contract-observability.types').ContractSeveritySnapshot;
+export type ContractAnomalySnapshot = import('./contract-observability.types').ContractAnomalySnapshot;
 
 export interface RouteTelemetrySummary {
   route: string;
@@ -277,6 +180,7 @@ type ContractEventMinuteAggregate = {
 type ContractSnapshotOptions = {
   topLimit?: number;
   thresholds?: ContractObservabilityThresholds;
+  includeCalibration?: boolean;
 };
 
 const REQUEST_RETENTION_MS = 30 * 60 * 1000;
@@ -315,6 +219,20 @@ const DEFAULT_CONTRACT_THRESHOLDS: ContractObservabilityThresholds = {
       critical: 15,
     },
   },
+  ws: {
+    validationFailed: {
+      ratePerThousandEvents: {
+        warning: 5,
+        critical: 15,
+      },
+    },
+    payloadStripped: {
+      ratePerThousandEvents: {
+        warning: 10,
+        critical: 25,
+      },
+    },
+  },
   trend: {
     warningPercent: 100,
     criticalPercent: 200,
@@ -326,10 +244,15 @@ const DEFAULT_CONTRACT_THRESHOLDS: ContractObservabilityThresholds = {
 };
 
 @Injectable()
-export class SystemTelemetryService {
+export class SystemTelemetryService implements OnModuleDestroy {
   private readonly requestEvents: RequestTelemetryRecord[] = [];
   private readonly securityEvents: SecurityTelemetryRecord[] = [];
   private readonly contractEvents: ContractAnomalyRecord[] = [];
+  private readonly contractStore = new ContractObservabilityStore();
+
+  async onModuleDestroy(): Promise<void> {
+    await this.contractStore.destroy();
+  }
 
   recordRequest(input: {
     method?: unknown;
@@ -359,6 +282,11 @@ export class SystemTelemetryService {
       route,
       durationMs: Number(durationMs.toFixed(2)),
       statusCode,
+    });
+    this.contractStore.recordHttpRequest({
+      at: Date.now(),
+      method,
+      route,
     });
 
     this.trimRequestEvents();
@@ -429,6 +357,11 @@ export class SystemTelemetryService {
       detailCount: payload.strippedFieldCount || payload.strippedFields?.length || 1,
       at: this.toEventTimestamp(payload.timestamp),
     });
+  }
+
+  @OnEvent('contract.evaluated')
+  handleContractEvaluated(payload: ContractEvaluatedEvent): void {
+    this.contractStore.recordEvaluation(payload);
   }
 
   getApiSnapshot(windowMs = DEFAULT_REQUEST_WINDOW_MS, topLimit = DEFAULT_TOP_LIMIT): ApiTelemetrySnapshot {
@@ -579,160 +512,33 @@ export class SystemTelemetryService {
             dto: String(dto || '').trim() || 'UnknownDto',
           }
         : typeOrInput;
-
-    this.pruneContractEvents();
-    const lastAt =
-      this.contractEvents.length > 0 ? this.contractEvents[this.contractEvents.length - 1].at : undefined;
-    const at = this.toMonotonicTimestamp(
-      this.toEventTimestamp(input.at) ?? Date.now(),
-      lastAt,
-    );
-    const origin = this.normalizeContractOrigin(input.origin);
-    const route = this.normalizeContractRoute(input.route, origin);
-    const method = this.normalizeContractMethod(input.method, origin);
-    const moduleName = this.normalizeContractModule(input.module, route);
-    const operationType = this.normalizeContractOperationType(input.operationType, method, origin);
-    const detailCount = this.normalizeDetailCount(input.detailCount);
-
-    this.contractEvents.push({
-      at,
+    this.contractStore.recordAnomaly({
+      at: this.toEventTimestamp(input.at) ?? Date.now(),
       type: input.type,
       dto: String(input.dto || '').trim() || 'UnknownDto',
-      route,
-      method,
-      module: moduleName,
-      origin,
+      route: input.route || null,
+      method: input.method || null,
+      module: input.module || null,
+      origin: this.normalizeContractOrigin(input.origin),
       tenantHash:
         typeof input.tenantHash === 'string' && input.tenantHash.trim().length > 0
           ? input.tenantHash.trim()
           : null,
-      operationType,
-      detailCount,
+      operationType: this.normalizeContractOperationType(
+        input.operationType,
+        this.normalizeContractMethod(input.method, this.normalizeContractOrigin(input.origin)),
+        this.normalizeContractOrigin(input.origin),
+      ),
+      detailCount: this.normalizeDetailCount(input.detailCount),
     });
-
-    this.trimContractEvents();
   }
 
-  getContractAnomalySnapshot(
+  async getContractAnomalySnapshot(
     windowMs = DEFAULT_CONTRACT_WINDOW_MS,
     options: ContractSnapshotOptions = {},
-  ): ContractAnomalySnapshot {
-    const normalizedWindowMs = this.normalizeWindowMs(windowMs, DEFAULT_CONTRACT_WINDOW_MS);
-    const topLimit = Math.max(1, Number(options.topLimit || DEFAULT_CONTRACT_TOP_LIMIT));
+  ): Promise<ContractAnomalySnapshot> {
     const thresholds = options.thresholds || DEFAULT_CONTRACT_THRESHOLDS;
-    const nowMs = Date.now();
-    const cutoff = nowMs - normalizedWindowMs;
-    const previousCutoff = cutoff - normalizedWindowMs;
-
-    this.pruneContractEvents();
-    this.pruneRequestEvents();
-
-    const relevant = this.contractEvents.filter((event) => event.at >= cutoff);
-    const previousRelevant = this.contractEvents.filter(
-      (event) => event.at >= previousCutoff && event.at < cutoff,
-    );
-    const requestCountsByRoute = this.countRequestsByRoute(cutoff, nowMs);
-    const requestsInWindow = this.countRequestsInWindow(cutoff, nowMs);
-
-    const currentAggregates = this.aggregateContractEvents(relevant, requestCountsByRoute, topLimit);
-    const previousAggregates = this.aggregateContractEvents(previousRelevant, new Map(), topLimit);
-    const bucketMinutes = Math.max(1, thresholds.trend.bucketMinutes);
-    const bucketMs = bucketMinutes * 60 * 1000;
-    const bucketCount = Math.max(1, Math.floor(CONTRACT_TREND_LOOKBACK_MINUTES / bucketMinutes));
-    const trendBuckets = this.buildContractTrendBuckets(bucketMs, bucketCount, nowMs);
-    const lastBucketIncreasePercent = this.computePercentageChange(
-      trendBuckets[trendBuckets.length - 1] || 0,
-      trendBuckets.length > 1 ? trendBuckets[trendBuckets.length - 2] : 0,
-    );
-    const continuousGrowthBuckets = this.resolveContinuousGrowthBuckets(trendBuckets);
-    const continuousGrowthMinutes = continuousGrowthBuckets * bucketMinutes;
-    const increasingForLastHour =
-      continuousGrowthBuckets >= bucketCount &&
-      trendBuckets.reduce((total, value) => total + value, 0) >= thresholds.trend.minEventCount;
-    const failureRatePerThousandRequests = this.computeRatePerThousand(
-      currentAggregates.totalValidationErrors,
-      requestsInWindow,
-    );
-    const strippingRatePerThousandRequests = this.computeRatePerThousand(
-      currentAggregates.totalPayloadStrips,
-      requestsInWindow,
-    );
-    const severity = this.resolveContractSeverity(
-      {
-        totalValidationErrors: currentAggregates.totalValidationErrors,
-        totalPayloadStrips: currentAggregates.totalPayloadStrips,
-        failureRatePerThousandRequests,
-        strippingRatePerThousandRequests,
-        totalEvents: currentAggregates.totalEvents,
-      },
-      {
-        totalIncreasePercent: this.computePercentageChange(
-          currentAggregates.totalEvents,
-          previousAggregates.totalEvents,
-        ),
-        validationIncreasePercent: this.computePercentageChange(
-          currentAggregates.totalValidationErrors,
-          previousAggregates.totalValidationErrors,
-        ),
-        payloadIncreasePercent: this.computePercentageChange(
-          currentAggregates.totalPayloadStrips,
-          previousAggregates.totalPayloadStrips,
-        ),
-        lastBucketIncreasePercent,
-        continuousGrowthMinutes,
-        increasingForLastHour,
-      },
-      thresholds,
-    );
-
-    return {
-      status: 'ok',
-      windowStart: new Date(cutoff).toISOString(),
-      windowSeconds: Math.floor(normalizedWindowMs / 1000),
-      requestsInWindow,
-      totalEvents: currentAggregates.totalEvents,
-      totalValidationErrors: currentAggregates.totalValidationErrors,
-      totalPayloadStrips: currentAggregates.totalPayloadStrips,
-      totalDetails: currentAggregates.totalDetails,
-      eventsPerMinuteAvg: Number(
-        (
-          currentAggregates.totalEvents /
-          Math.max(1, Math.ceil(normalizedWindowMs / 60_000))
-        ).toFixed(2),
-      ),
-      failureRatePerThousandRequests,
-      strippingRatePerThousandRequests,
-      distribution: currentAggregates.distribution,
-      byDto: currentAggregates.byDto,
-      byRoute: currentAggregates.byRoute,
-      byTenant: currentAggregates.byTenant,
-      eventsPerMinute: this.buildContractMinuteSeries(relevant, cutoff, normalizedWindowMs),
-      thresholds,
-      trends: {
-        previousWindowStart: new Date(previousCutoff).toISOString(),
-        previousWindowSeconds: Math.floor(normalizedWindowMs / 1000),
-        previousTotalEvents: previousAggregates.totalEvents,
-        previousValidationErrors: previousAggregates.totalValidationErrors,
-        previousPayloadStrips: previousAggregates.totalPayloadStrips,
-        totalIncreasePercent: this.computePercentageChange(
-          currentAggregates.totalEvents,
-          previousAggregates.totalEvents,
-        ),
-        validationIncreasePercent: this.computePercentageChange(
-          currentAggregates.totalValidationErrors,
-          previousAggregates.totalValidationErrors,
-        ),
-        payloadIncreasePercent: this.computePercentageChange(
-          currentAggregates.totalPayloadStrips,
-          previousAggregates.totalPayloadStrips,
-        ),
-        lastBucketIncreasePercent,
-        continuousGrowthMinutes,
-        continuousGrowthBuckets,
-        increasingForLastHour,
-      },
-      severity,
-    };
+    return this.contractStore.getSnapshot(windowMs, thresholds, options);
   }
 
   maskIp(ip: unknown): string {
@@ -924,7 +730,7 @@ export class SystemTelemetryService {
       })
       .slice(0, topLimit);
 
-    const byRoute = Array.from(routeMap.values())
+    const byRoute: ContractAnomalyRouteSummary[] = Array.from(routeMap.values())
       .map((entry) => {
         const requestKey =
           entry.origin === 'http' && entry.method && entry.route
@@ -943,9 +749,15 @@ export class SystemTelemetryService {
           payloadStripped: entry.payloadStripped,
           detailCount: entry.detailCount,
           requests,
+          evaluations: 0,
+          denominatorKind: 'requests' as const,
+          denominatorCount: requests,
           failureRatePerThousandRequests: this.computeRatePerThousand(entry.validationFailed, requests),
           strippingRatePerThousandRequests: this.computeRatePerThousand(entry.payloadStripped, requests),
           totalRatePerThousandRequests: this.computeRatePerThousand(entry.count, requests),
+          failureRatePerThousandEvents: null,
+          strippingRatePerThousandEvents: null,
+          totalRatePerThousandEvents: null,
           lastOccurrenceAt: new Date(entry.lastOccurrenceAt).toISOString(),
         };
       })
@@ -1034,6 +846,8 @@ export class SystemTelemetryService {
         total: entry?.total || 0,
         validationFailed: entry?.validationFailed || 0,
         payloadStripped: entry?.payloadStripped || 0,
+        httpRequests: 0,
+        wsEvaluations: 0,
       };
     });
   }

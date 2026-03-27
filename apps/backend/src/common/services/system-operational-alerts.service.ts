@@ -11,15 +11,16 @@ import { PushNotificationService } from '../../notifications/push-notification.s
 import { ConfigResolverService } from '../../system-settings/config-resolver.service';
 import {
   ApiTelemetrySnapshot,
-  ContractAnomalyDtoSummary,
-  ContractAnomalyRouteSummary,
-  ContractAnomalySnapshot,
   RouteTelemetrySummary,
   SecurityTelemetrySnapshot,
   SystemTelemetryService,
 } from './system-telemetry.service';
 import { RedisLockService } from './redis-lock.service';
 import {
+  ContractAnomalyDtoSummary,
+  ContractAnomalyOriginSummary,
+  ContractAnomalyRouteSummary,
+  ContractAnomalySnapshot,
   ContractMetricSeverity,
   ContractObservabilityThresholds,
 } from './contract-observability.types';
@@ -46,6 +47,10 @@ type EvaluatorConfig = {
   contractValidationCriticalRatePerThousand: number;
   contractPayloadWarningRatePerThousand: number;
   contractPayloadCriticalRatePerThousand: number;
+  contractWsValidationWarningRatePerThousand: number;
+  contractWsValidationCriticalRatePerThousand: number;
+  contractWsPayloadWarningRatePerThousand: number;
+  contractWsPayloadCriticalRatePerThousand: number;
   contractTrendWarningPercent: number;
   contractTrendCriticalPercent: number;
   contractTrendBucketMinutes: number;
@@ -98,6 +103,10 @@ const DEFAULT_ALERT_CONTRACT_VALIDATION_WARNING_RATE_PER_1000 = 2;
 const DEFAULT_ALERT_CONTRACT_VALIDATION_CRITICAL_RATE_PER_1000 = 5;
 const DEFAULT_ALERT_CONTRACT_PAYLOAD_WARNING_RATE_PER_1000 = 5;
 const DEFAULT_ALERT_CONTRACT_PAYLOAD_CRITICAL_RATE_PER_1000 = 15;
+const DEFAULT_ALERT_CONTRACT_WS_VALIDATION_WARNING_RATE_PER_1000 = 5;
+const DEFAULT_ALERT_CONTRACT_WS_VALIDATION_CRITICAL_RATE_PER_1000 = 15;
+const DEFAULT_ALERT_CONTRACT_WS_PAYLOAD_WARNING_RATE_PER_1000 = 10;
+const DEFAULT_ALERT_CONTRACT_WS_PAYLOAD_CRITICAL_RATE_PER_1000 = 25;
 const DEFAULT_ALERT_CONTRACT_TREND_WARNING_PERCENT = 100;
 const DEFAULT_ALERT_CONTRACT_TREND_CRITICAL_PERCENT = 200;
 const DEFAULT_ALERT_CONTRACT_TREND_BUCKET_MINUTES = 10;
@@ -173,10 +182,11 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     const windowMs = config.windowMinutes * 60 * 1000;
     const apiSnapshot = this.systemTelemetryService.getApiSnapshot(windowMs);
     const securitySnapshot = this.systemTelemetryService.getSecuritySnapshot(windowMs);
-    const contractSnapshot = this.systemTelemetryService.getContractAnomalySnapshot(
+    const contractSnapshot = await this.systemTelemetryService.getContractAnomalySnapshot(
       config.contractWindowMinutes * 60 * 1000,
       {
         thresholds: this.buildContractThresholds(config),
+        includeCalibration: false,
       },
     );
     const emitted: string[] = [];
@@ -488,6 +498,7 @@ export class SystemOperationalAlertsService implements OnModuleInit {
 
     const topRoute = this.findTopContractRoute(snapshot, 'validation_failed');
     const topDto = this.findTopContractDto(snapshot, 'validation_failed');
+    const dominantOrigin = this.findDominantContractOrigin(snapshot, 'validation_failed');
     const increasePercent = this.resolveContractIncreasePercent(snapshot, 'validation_failed');
 
     return this.emitAlertIfNeeded(
@@ -503,7 +514,11 @@ export class SystemOperationalAlertsService implements OnModuleInit {
           label: 'falhas de validacao de contrato',
           count: snapshot.totalValidationErrors,
           windowMinutes: config.contractWindowMinutes,
-          ratePerThousandRequests: snapshot.failureRatePerThousandRequests,
+          rateLabel: this.formatContractRateLabel(
+            dominantOrigin,
+            snapshot.failureRatePerThousandRequests,
+            snapshot.wsFailureRatePerThousandEvents,
+          ),
           increasePercent,
           continuousGrowthMinutes: snapshot.trends.continuousGrowthMinutes,
           topRoute,
@@ -514,11 +529,14 @@ export class SystemOperationalAlertsService implements OnModuleInit {
           eventCount: snapshot.totalValidationErrors,
           previousEventCount: snapshot.trends.previousValidationErrors,
           ratePerThousandRequests: snapshot.failureRatePerThousandRequests,
+          wsRatePerThousandEvents: snapshot.wsFailureRatePerThousandEvents,
           increasePercent,
           continuousGrowthMinutes: snapshot.trends.continuousGrowthMinutes,
           topRoute,
           topDto,
+          dominantOrigin,
           thresholds: snapshot.thresholds.validationFailed,
+          wsThresholds: snapshot.thresholds.ws.validationFailed,
           trendThresholds: snapshot.thresholds.trend,
           snapshotSeverity: snapshot.severity.validationFailed,
         },
@@ -543,6 +561,7 @@ export class SystemOperationalAlertsService implements OnModuleInit {
 
     const topRoute = this.findTopContractRoute(snapshot, 'payload_stripped');
     const topDto = this.findTopContractDto(snapshot, 'payload_stripped');
+    const dominantOrigin = this.findDominantContractOrigin(snapshot, 'payload_stripped');
     const increasePercent = this.resolveContractIncreasePercent(snapshot, 'payload_stripped');
 
     return this.emitAlertIfNeeded(
@@ -558,7 +577,11 @@ export class SystemOperationalAlertsService implements OnModuleInit {
           label: 'eventos de stripping de payload',
           count: snapshot.totalPayloadStrips,
           windowMinutes: config.contractWindowMinutes,
-          ratePerThousandRequests: snapshot.strippingRatePerThousandRequests,
+          rateLabel: this.formatContractRateLabel(
+            dominantOrigin,
+            snapshot.strippingRatePerThousandRequests,
+            snapshot.wsStrippingRatePerThousandEvents,
+          ),
           increasePercent,
           continuousGrowthMinutes: snapshot.trends.continuousGrowthMinutes,
           topRoute,
@@ -569,11 +592,14 @@ export class SystemOperationalAlertsService implements OnModuleInit {
           eventCount: snapshot.totalPayloadStrips,
           previousEventCount: snapshot.trends.previousPayloadStrips,
           ratePerThousandRequests: snapshot.strippingRatePerThousandRequests,
+          wsRatePerThousandEvents: snapshot.wsStrippingRatePerThousandEvents,
           increasePercent,
           continuousGrowthMinutes: snapshot.trends.continuousGrowthMinutes,
           topRoute,
           topDto,
+          dominantOrigin,
           thresholds: snapshot.thresholds.payloadStripped,
+          wsThresholds: snapshot.thresholds.ws.payloadStripped,
           trendThresholds: snapshot.thresholds.trend,
           snapshotSeverity: snapshot.severity.payloadStripped,
         },
@@ -749,6 +775,20 @@ export class SystemOperationalAlertsService implements OnModuleInit {
           critical: config.contractPayloadCriticalRatePerThousand,
         },
       },
+      ws: {
+        validationFailed: {
+          ratePerThousandEvents: {
+            warning: config.contractWsValidationWarningRatePerThousand,
+            critical: config.contractWsValidationCriticalRatePerThousand,
+          },
+        },
+        payloadStripped: {
+          ratePerThousandEvents: {
+            warning: config.contractWsPayloadWarningRatePerThousand,
+            critical: config.contractWsPayloadCriticalRatePerThousand,
+          },
+        },
+      },
       trend: {
         warningPercent: config.contractTrendWarningPercent,
         criticalPercent: config.contractTrendCriticalPercent,
@@ -764,61 +804,16 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     snapshot: ContractAnomalySnapshot,
     type: 'validation_failed' | 'payload_stripped',
   ): SystemNotificationSeverity | null {
-    const thresholds = snapshot.thresholds;
     const count =
       type === 'validation_failed' ? snapshot.totalValidationErrors : snapshot.totalPayloadStrips;
     if (count <= 0) {
       return null;
     }
+    const severity =
+      type === 'validation_failed' ? snapshot.severity.validationFailed : snapshot.severity.payloadStripped;
+    const combined = this.maxContractSeverity(severity, snapshot.severity.trend);
 
-    const rate =
-      type === 'validation_failed'
-        ? snapshot.failureRatePerThousandRequests
-        : snapshot.strippingRatePerThousandRequests;
-    const topRoute = this.findTopContractRoute(snapshot, type);
-    const topRouteRate =
-      type === 'validation_failed'
-        ? topRoute?.failureRatePerThousandRequests
-        : topRoute?.strippingRatePerThousandRequests;
-    const typeThresholds =
-      type === 'validation_failed' ? thresholds.validationFailed : thresholds.payloadStripped;
-    let severity: ContractMetricSeverity = 'normal';
-
-    if (
-      count >= typeThresholds.volume.critical ||
-      (rate !== null && rate >= typeThresholds.ratePerThousandRequests.critical) ||
-      (topRouteRate !== null &&
-        topRouteRate !== undefined &&
-        topRouteRate >= typeThresholds.ratePerThousandRequests.critical)
-    ) {
-      severity = 'critical';
-    } else if (
-      count >= typeThresholds.volume.warning ||
-      (rate !== null && rate >= typeThresholds.ratePerThousandRequests.warning) ||
-      (topRouteRate !== null &&
-        topRouteRate !== undefined &&
-        topRouteRate >= typeThresholds.ratePerThousandRequests.warning)
-    ) {
-      severity = 'warning';
-    }
-
-    if (count >= thresholds.trend.minEventCount) {
-      const trendPercent = this.resolveContractIncreasePercent(snapshot, type);
-      if (
-        (trendPercent !== null && trendPercent >= thresholds.trend.criticalPercent) ||
-        (snapshot.trends.increasingForLastHour &&
-          snapshot.trends.continuousGrowthMinutes >= thresholds.trend.criticalGrowthMinutes)
-      ) {
-        severity = this.maxContractSeverity(severity, 'critical');
-      } else if (
-        (trendPercent !== null && trendPercent >= thresholds.trend.warningPercent) ||
-        snapshot.trends.continuousGrowthMinutes >= thresholds.trend.warningGrowthMinutes
-      ) {
-        severity = this.maxContractSeverity(severity, 'warning');
-      }
-    }
-
-    return severity === 'normal' ? null : severity;
+    return combined === 'normal' ? null : combined;
   }
 
   private findTopContractRoute(
@@ -864,16 +859,12 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     label: string;
     count: number;
     windowMinutes: number;
-    ratePerThousandRequests: number | null;
+    rateLabel: string;
     increasePercent: number | null;
     continuousGrowthMinutes: number;
     topRoute: ContractAnomalyRouteSummary | null;
     topDto: ContractAnomalyDtoSummary | null;
   }): string {
-    const rateLabel =
-      input.ratePerThousandRequests === null
-        ? 'sem amostra suficiente de requests'
-        : `${input.ratePerThousandRequests}/1000 req`;
     const routeLabel = input.topRoute
       ? this.formatContractRouteLabel(input.topRoute)
       : 'sem rota dominante';
@@ -885,13 +876,36 @@ export class SystemOperationalAlertsService implements OnModuleInit {
           ? `e crescimento continuo por ${input.continuousGrowthMinutes} min`
           : 'sem baseline suficiente para calcular variacao percentual';
 
-    return `Detectamos ${input.count} ${input.label} em ${input.windowMinutes} min (${rateLabel}), com destaque para ${routeLabel} e DTO ${dtoLabel}, ${trendLabel}.`;
+    return `Detectamos ${input.count} ${input.label} em ${input.windowMinutes} min (${input.rateLabel}), com destaque para ${routeLabel} e DTO ${dtoLabel}, ${trendLabel}.`;
   }
 
   private formatContractRouteLabel(route: ContractAnomalyRouteSummary): string {
     const method = route.method || route.origin.toUpperCase();
     const moduleLabel = route.module ? ` [${route.module}]` : '';
     return `${method} ${route.route}${moduleLabel}`;
+  }
+
+  private findDominantContractOrigin(
+    snapshot: ContractAnomalySnapshot,
+    type: 'validation_failed' | 'payload_stripped',
+  ): ContractAnomalyOriginSummary | null {
+    return (
+      snapshot.byOrigin.find((entry) =>
+        type === 'validation_failed' ? entry.validationFailed > 0 : entry.payloadStripped > 0,
+      ) || null
+    );
+  }
+
+  private formatContractRateLabel(
+    dominantOrigin: ContractAnomalyOriginSummary | null,
+    httpRatePerThousand: number | null,
+    wsRatePerThousand: number | null,
+  ): string {
+    if (dominantOrigin?.origin === 'ws') {
+      return wsRatePerThousand === null ? 'sem amostra suficiente de eventos WS' : `${wsRatePerThousand}/1000 eventos WS`;
+    }
+
+    return httpRatePerThousand === null ? 'sem amostra suficiente de requests' : `${httpRatePerThousand}/1000 req`;
   }
 
   private maxDefinedNumber(...values: Array<number | null>): number | null {
@@ -1195,6 +1209,30 @@ export class SystemOperationalAlertsService implements OnModuleInit {
       contractPayloadCriticalRatePerThousand: this.readFloatFromEnv(
         'OPS_ALERT_CONTRACT_PAYLOAD_CRITICAL_RATE_PER_1000',
         DEFAULT_ALERT_CONTRACT_PAYLOAD_CRITICAL_RATE_PER_1000,
+        0.1,
+        10_000,
+      ),
+      contractWsValidationWarningRatePerThousand: this.readFloatFromEnv(
+        'OPS_ALERT_CONTRACT_WS_VALIDATION_WARNING_RATE_PER_1000',
+        DEFAULT_ALERT_CONTRACT_WS_VALIDATION_WARNING_RATE_PER_1000,
+        0.1,
+        10_000,
+      ),
+      contractWsValidationCriticalRatePerThousand: this.readFloatFromEnv(
+        'OPS_ALERT_CONTRACT_WS_VALIDATION_CRITICAL_RATE_PER_1000',
+        DEFAULT_ALERT_CONTRACT_WS_VALIDATION_CRITICAL_RATE_PER_1000,
+        0.1,
+        10_000,
+      ),
+      contractWsPayloadWarningRatePerThousand: this.readFloatFromEnv(
+        'OPS_ALERT_CONTRACT_WS_PAYLOAD_WARNING_RATE_PER_1000',
+        DEFAULT_ALERT_CONTRACT_WS_PAYLOAD_WARNING_RATE_PER_1000,
+        0.1,
+        10_000,
+      ),
+      contractWsPayloadCriticalRatePerThousand: this.readFloatFromEnv(
+        'OPS_ALERT_CONTRACT_WS_PAYLOAD_CRITICAL_RATE_PER_1000',
+        DEFAULT_ALERT_CONTRACT_WS_PAYLOAD_CRITICAL_RATE_PER_1000,
         0.1,
         10_000,
       ),

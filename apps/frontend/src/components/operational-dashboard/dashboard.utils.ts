@@ -41,7 +41,7 @@ export const dashboardGridCols = {
 export const dashboardGridRowHeight = 104;
 export const dashboardMobileEditingMaxWidth = 640;
 
-const analyticsWidgetIds = new Set(["api", "cpu", "memory", "disk", "security", "errors", "routeLatency", "routeErrors"]);
+const analyticsWidgetIds = new Set(["api", "cpu", "memory", "disk", "security", "errors", "routeLatency", "routeErrors", "contractObservability"]);
 
 const tallWidgetIds = new Set(["backup"]);
 const smallViewportPriority = [
@@ -50,6 +50,7 @@ const smallViewportPriority = [
   "platform:statistics",
   "errors",
   "routeErrors",
+  "contractObservability",
   "security",
   "routeLatency",
   "backup",
@@ -155,6 +156,7 @@ export function allowedWidgetIdsByRole(role: DashboardRole): string[] {
       "backup",
       "routeLatency",
       "routeErrors",
+      "contractObservability",
       "errors",
       "security",
       "tenants",
@@ -175,6 +177,7 @@ export function allowedWidgetIdsByRole(role: DashboardRole): string[] {
       "backup",
       "routeLatency",
       "routeErrors",
+      "contractObservability",
       "errors",
       "security",
       "notifications",

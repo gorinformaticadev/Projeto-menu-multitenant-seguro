@@ -47,6 +47,7 @@ describe('SystemDashboardService', () => {
   const systemTelemetryServiceMock = {
     getApiSnapshot: jest.fn(),
     getSecuritySnapshot: jest.fn(),
+    getContractAnomalySnapshot: jest.fn(),
     maskIp: jest.fn((value) => 'masked:' + String(value)),
   };
   const moduleSecurityServiceMock = {
@@ -186,6 +187,23 @@ describe('SystemDashboardService', () => {
         windowSeconds: 3600,
         tenantScopeApplied: false,
       },
+      getContractObservabilityMetric: {
+        status: 'ok',
+        totalEvents: 3,
+        totalValidationErrors: 1,
+        totalPayloadStrips: 2,
+        failureRatePerThousandRequests: 50,
+        wsFailureRatePerThousandEvents: 100,
+        byOrigin: [],
+        topRoutes: [],
+        topDtos: [],
+        eventsPerMinute: [],
+        severity: { overall: 'warning' },
+        thresholds: {},
+        persistence: { mode: 'memory' },
+        cardinality: { totalOverflowedEvents: 0 },
+        calibration: null,
+      },
       getBackupMetric: {
         status: 'ok',
         lastBackup: null,
@@ -241,6 +259,35 @@ describe('SystemDashboardService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useRealTimers();
+    systemTelemetryServiceMock.getContractAnomalySnapshot.mockResolvedValue({
+      status: 'ok',
+      windowStart: '2026-03-06T17:00:00.000Z',
+      windowSeconds: 3600,
+      requestsInWindow: 10,
+      totalEvaluationsInWindow: 10,
+      wsEvaluationsInWindow: 0,
+      totalEvents: 0,
+      totalValidationErrors: 0,
+      totalPayloadStrips: 0,
+      totalDetails: 0,
+      eventsPerMinuteAvg: 0,
+      failureRatePerThousandRequests: 0,
+      strippingRatePerThousandRequests: 0,
+      wsFailureRatePerThousandEvents: null,
+      wsStrippingRatePerThousandEvents: null,
+      distribution: [],
+      byDto: [],
+      byRoute: [],
+      byTenant: [],
+      byOrigin: [],
+      eventsPerMinute: [],
+      thresholds: {},
+      trends: {},
+      severity: { overall: 'normal' },
+      persistence: { mode: 'memory' },
+      cardinality: { totalOverflowedEvents: 0 },
+      calibration: null,
+    });
     moduleSecurityServiceMock.getAvailableModules.mockResolvedValue([]);
     prismaMock.user.count.mockResolvedValue(0);
     prismaMock.tenant.count.mockResolvedValue(0);
@@ -632,7 +679,7 @@ describe('SystemDashboardService', () => {
       tenantId: 'tenant-1',
     });
 
-    expect(adminResult.widgets.available).toEqual(expect.arrayContaining(['routeLatency', 'routeErrors']));
+    expect(adminResult.widgets.available).toEqual(expect.arrayContaining(['routeLatency', 'routeErrors', 'contractObservability']));
     expect(adminResult.security).toEqual(
       expect.objectContaining({
         topDeniedIps: [expect.objectContaining({ ip: 'masked:10.0.0.15' })],
@@ -642,6 +689,7 @@ describe('SystemDashboardService', () => {
     expect(userResult.widgets.available).not.toContain('routeLatency');
     expect(userResult.routeLatency).toEqual({ status: 'restricted' });
     expect(userResult.routeErrors).toEqual({ status: 'restricted' });
+    expect(userResult.contractObservability).toEqual({ status: 'restricted' });
   });
 
   it('caches expensive metrics for a short ttl and recomputes after expiration', async () => {
@@ -965,6 +1013,7 @@ describe('SystemDashboardService', () => {
           'backup',
           'routeLatency',
           'routeErrors',
+          'contractObservability',
           'errors',
           'security',
           'notifications',
@@ -978,7 +1027,3 @@ describe('SystemDashboardService', () => {
     );
   });
 });
-
-
-
-

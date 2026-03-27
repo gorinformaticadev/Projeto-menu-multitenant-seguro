@@ -152,7 +152,7 @@ describe('SystemTelemetryService', () => {
     );
   });
 
-  it('agrega anomalias de contrato por minuto, DTO, rota e tenant anonimizado', () => {
+  it('agrega anomalias de contrato por minuto, DTO, rota e tenant anonimizado', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-03-07T13:00:00.000Z'));
 
     for (let index = 0; index < 20; index += 1) {
@@ -199,7 +199,7 @@ describe('SystemTelemetryService', () => {
       detailCount: 3,
     });
 
-    const snapshot = service.getContractAnomalySnapshot(10 * 60 * 1000);
+    const snapshot = await service.getContractAnomalySnapshot(10 * 60 * 1000);
 
     expect(snapshot.totalEvents).toBe(3);
     expect(snapshot.totalValidationErrors).toBe(1);
@@ -247,7 +247,7 @@ describe('SystemTelemetryService', () => {
     );
   });
 
-  it('detecta aumento percentual de 200% entre a janela atual e a anterior', () => {
+  it('detecta aumento percentual de 200% entre a janela atual e a anterior', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-03-07T14:00:00.000Z'));
 
     jest.setSystemTime(new Date('2026-03-07T13:45:00.000Z'));
@@ -281,14 +281,14 @@ describe('SystemTelemetryService', () => {
     }
 
     jest.setSystemTime(new Date('2026-03-07T14:00:00.000Z'));
-    const snapshot = service.getContractAnomalySnapshot(10 * 60 * 1000);
+    const snapshot = await service.getContractAnomalySnapshot(10 * 60 * 1000);
 
     expect(snapshot.trends.previousPayloadStrips).toBe(2);
     expect(snapshot.trends.payloadIncreasePercent).toBe(200);
     expect(snapshot.severity.trend).toBe('critical');
   });
 
-  it('detecta crescimento continuo por uma hora nas anomalias de contrato', () => {
+  it('detecta crescimento continuo por uma hora nas anomalias de contrato', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-03-07T14:00:00.000Z'));
 
     const growthBuckets = [1, 2, 3, 4, 5, 6];
@@ -311,11 +311,97 @@ describe('SystemTelemetryService', () => {
     });
 
     jest.setSystemTime(new Date('2026-03-07T14:00:00.000Z'));
-    const snapshot = service.getContractAnomalySnapshot(10 * 60 * 1000);
+    const snapshot = await service.getContractAnomalySnapshot(10 * 60 * 1000);
 
     expect(snapshot.trends.continuousGrowthMinutes).toBe(60);
     expect(snapshot.trends.increasingForLastHour).toBe(true);
     expect(snapshot.severity.trend).toBe('critical');
     expect(snapshot.severity.overall).toBe('critical');
+  });
+
+  it('bucketiza tenants fora do limite de cardinalidade por minuto', async () => {
+    const previousLimit = process.env.CONTRACT_OBSERVABILITY_TENANT_CARDINALITY_LIMIT;
+    try {
+      process.env.CONTRACT_OBSERVABILITY_TENANT_CARDINALITY_LIMIT = '5';
+      service = new SystemTelemetryService();
+      jest.useFakeTimers().setSystemTime(new Date('2026-03-07T15:00:00.000Z'));
+
+      for (let index = 0; index < 6; index += 1) {
+        service.recordContractAnomaly({
+          type: 'payload_stripped',
+          dto: 'TenantHeavyDto',
+          route: '/api/contracts/:id',
+          method: 'GET',
+          module: 'contracts',
+          origin: 'http',
+          tenantHash: `tenant-${index}`,
+          operationType: 'read',
+          detailCount: 1,
+        });
+      }
+
+      const snapshot = await service.getContractAnomalySnapshot(10 * 60 * 1000);
+
+      expect(snapshot.byTenant).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            tenantHash: 'other',
+            count: 1,
+          }),
+        ]),
+      );
+      expect(snapshot.cardinality.totalOverflowedEvents).toBeGreaterThan(0);
+    } finally {
+      if (previousLimit === undefined) {
+        delete process.env.CONTRACT_OBSERVABILITY_TENANT_CARDINALITY_LIMIT;
+      } else {
+        process.env.CONTRACT_OBSERVABILITY_TENANT_CARDINALITY_LIMIT = previousLimit;
+      }
+    }
+  });
+
+  it('calcula taxa especifica de WS por eventos avaliados', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-07T16:00:00.000Z'));
+
+    for (let index = 0; index < 20; index += 1) {
+      service.handleContractEvaluated({
+        dto: 'WsDto',
+        route: '/ws/contracts/updated',
+        method: 'WS',
+        module: 'contracts',
+        origin: 'ws',
+        tenantHash: 'tenant-ws',
+        operationType: 'emit',
+        timestamp: new Date(),
+      });
+    }
+
+    for (let index = 0; index < 2; index += 1) {
+      service.recordContractAnomaly({
+        type: 'validation_failed',
+        dto: 'WsDto',
+        route: '/ws/contracts/updated',
+        method: 'WS',
+        module: 'contracts',
+        origin: 'ws',
+        tenantHash: 'tenant-ws',
+        operationType: 'emit',
+        detailCount: 1,
+      });
+    }
+
+    const snapshot = await service.getContractAnomalySnapshot(10 * 60 * 1000);
+
+    expect(snapshot.wsEvaluationsInWindow).toBe(20);
+    expect(snapshot.wsFailureRatePerThousandEvents).toBe(100);
+    expect(snapshot.byOrigin).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          origin: 'ws',
+          validationFailed: 2,
+          denominatorCount: 20,
+        }),
+      ]),
+    );
   });
 });

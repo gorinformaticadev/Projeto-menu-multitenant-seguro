@@ -189,6 +189,7 @@ const DASHBOARD_CACHED_METRIC_TTLS = {
   backup: 10_000,
   security: 10_000,
   errors: 10_000,
+  contractObservability: 10_000,
 } as const;
 
 const SUPER_ADMIN_WIDGET_IDS = [
@@ -207,6 +208,7 @@ const SUPER_ADMIN_WIDGET_IDS = [
   'backup',
   'routeLatency',
   'routeErrors',
+  'contractObservability',
   'errors',
   'security',
   'tenants',
@@ -225,6 +227,7 @@ const ADMIN_WIDGET_IDS = [
   'backup',
   'routeLatency',
   'routeErrors',
+  'contractObservability',
   'errors',
   'security',
   'notifications',
@@ -338,6 +341,15 @@ export class SystemDashboardService {
         fallbackStatus: 'degraded',
       },
     );
+    const contractObservability = await this.safeMetric(
+      'contractObservability',
+      async () => this.getContractObservabilityMetric(filters.periodMinutes),
+      {
+        cacheKey: `contract-observability:${filters.periodMinutes}`,
+        cacheTtlMs: DASHBOARD_CACHED_METRIC_TTLS.contractObservability,
+        fallbackStatus: 'degraded',
+      },
+    );
     const backup = await this.safeMetric(
       'backup',
       async () => this.getBackupMetric(tenantFilter),
@@ -395,6 +407,7 @@ export class SystemDashboardService {
       api,
       routeLatency,
       routeErrors,
+      contractObservability,
       security,
       backup,
       jobs,
@@ -763,6 +776,42 @@ export class SystemDashboardService {
       windowStart: snapshot.windowStart,
       windowSeconds: snapshot.windowSeconds,
       tenantScopeApplied: false,
+    };
+  }
+
+  private async getContractObservabilityMetric(periodMinutes: number) {
+    const snapshot = await this.systemTelemetryService.getContractAnomalySnapshot(
+      this.resolveTelemetryWindowMs(periodMinutes),
+    );
+
+    return {
+      status: snapshot.severity.overall === 'critical'
+        ? 'error'
+        : snapshot.severity.overall === 'warning'
+          ? 'warning'
+          : 'ok',
+      windowStart: snapshot.windowStart,
+      windowSeconds: snapshot.windowSeconds,
+      totalEvents: snapshot.totalEvents,
+      totalValidationErrors: snapshot.totalValidationErrors,
+      totalPayloadStrips: snapshot.totalPayloadStrips,
+      requestsInWindow: snapshot.requestsInWindow,
+      totalEvaluationsInWindow: snapshot.totalEvaluationsInWindow,
+      wsEvaluationsInWindow: snapshot.wsEvaluationsInWindow,
+      failureRatePerThousandRequests: snapshot.failureRatePerThousandRequests,
+      strippingRatePerThousandRequests: snapshot.strippingRatePerThousandRequests,
+      wsFailureRatePerThousandEvents: snapshot.wsFailureRatePerThousandEvents,
+      wsStrippingRatePerThousandEvents: snapshot.wsStrippingRatePerThousandEvents,
+      byOrigin: snapshot.byOrigin,
+      topRoutes: snapshot.byRoute.slice(0, 5),
+      topDtos: snapshot.byDto.slice(0, 5),
+      trends: snapshot.trends,
+      eventsPerMinute: snapshot.eventsPerMinute,
+      thresholds: snapshot.thresholds,
+      severity: snapshot.severity,
+      persistence: snapshot.persistence,
+      cardinality: snapshot.cardinality,
+      calibration: snapshot.calibration,
     };
   }
 
@@ -1785,6 +1834,7 @@ export class SystemDashboardService {
       security: { status: 'restricted' },
       routeLatency: { status: 'restricted' },
       routeErrors: { status: 'restricted' },
+      contractObservability: { status: 'restricted' },
       backup: { status: 'restricted' },
       jobs: { status: 'restricted' },
       errors: { status: 'restricted' },
@@ -2189,6 +2239,5 @@ export class SystemDashboardService {
     return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3)}...` : normalized;
   }
 }
-
 
 
