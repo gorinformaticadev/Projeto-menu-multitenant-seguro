@@ -104,7 +104,7 @@ bash install/check.sh --json
 Sempre a partir da **raiz do monorepo**, usando o env em `install/`:
 
 ```bash
-cd /caminho/Projeto-menu-multitenant-seguro
+cd /caminho/Pluggor
 
 # Subir
 docker compose --env-file install/.env.production -f docker-compose.prod.yml up -d
@@ -188,7 +188,7 @@ O instalador não altera o pipeline em `.github/workflows/ci-cd.yml`:
 
 ## Solução de problemas
 
-- **Certificado válido (Let's Encrypt):** O instalador tenta obter o cert automaticamente. Se falhar (DNS não apontando, porta 80 bloqueada), rode depois: `sudo bash install/install.sh cert` (usa DOMAIN e LETSENCRYPT_EMAIL de `install/.env.production`). Para renovação automática, agende: `0 3 * * * root /caminho/Projeto-menu-multitenant-seguro/install/renew-cert.sh`.
+- **Certificado válido (Let's Encrypt):** O instalador tenta obter o cert automaticamente. Se falhar (DNS não apontando, porta 80 bloqueada), rode depois: `sudo bash install/install.sh cert` (usa DOMAIN e LETSENCRYPT_EMAIL de `install/.env.production`). Para renovação automática, agende: `0 3 * * * root /caminho/Pluggor/install/renew-cert.sh`.
 - **Aviso de certificado:** Se ainda aparecer aviso, o Let's Encrypt não foi obtido; use o comando `cert` acima após garantir que o domínio aponta para o servidor e a porta 80 está aberta.
 
 - **Não consigo fazer login:** O backend precisa de `FRONTEND_URL` com a URL pública (ex.: `https://seu-dominio.com`) para CORS aceitar o browser; e o frontend precisa chamar a API pela mesma origem (`/api`). Confira em `install/.env.production`: `FRONTEND_URL=https://SEU_DOMINIO`. Reconstrua a imagem do frontend para que a URL da API seja relativa: `docker compose --env-file install/.env.production -f docker-compose.prod.yml build --no-cache frontend` e depois `up -d`.

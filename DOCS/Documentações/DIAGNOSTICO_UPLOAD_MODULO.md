@@ -68,7 +68,7 @@ Logs adicionados no método `installModuleFromZip`:
 
 ```powershell
 # No diretório backend
-cd d:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\backend
+cd d:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Pluggor\backend
 
 # Parar processo existente (Ctrl+C no terminal do backend)
 

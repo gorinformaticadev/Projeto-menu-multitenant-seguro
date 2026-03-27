@@ -15,7 +15,7 @@ All notable changes to this project will be documented in this file. See [standa
 * **ops:** refine the scheduled tasks screen with friendly PT-BR labels, popover descriptions, simplified cron editing, and a single gear-driven edit flow
 * **ops:** add `/api/system/diagnostics` and `/configuracoes/sistema/diagnostico`, reuse the existing `/logs` page with role-aware audit sources, and harden log filters/date windows and auth guards
 
-## [3.0.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v2.0.0...v3.0.0) (2026-01-27)
+## [3.0.0](https://github.com/gorinformaticadev/Pluggor/compare/v2.0.0...v3.0.0) (2026-01-27)
 
 
 ### ⚠ BREAKING CHANGES
@@ -24,23 +24,23 @@ All notable changes to this project will be documented in this file. See [standa
 
 ### Features
 
-* Add CI/CD workflow for automated testing and Docker image builds, and document service order status improvements for service orders. ([800c1d9](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/800c1d9827cc7106269a2fdaab7c9f11e446301f))
-* add table UI component with its sub-components for structured data display. ([240471d](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/240471dad7db2695682c140d46b80de0c1a8c5a1))
-* **backup:** add backup and restore functionality ([d3b3d71](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/d3b3d710e71e403e13659475d6ecb63b01695c97))
-* **backup:** add delete backup functionality ([b8fe083](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/b8fe08398d77baf1d81f656321bcd5b5612832aa))
-* Implement the WhatsApp module, including new UI components, pages, and data models. ([19b2993](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/19b29930f8a163dc6bffc76c235ebeb1c0a563df))
-* Initialize monorepo structure with pnpm, and introduce backend notification and authentication features. ([cd4a074](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/cd4a074324513443624b5d1972dccc4f130252b3))
-* **modules:** improve migrations and seeds execution to run pendents only ([1367398](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/13673985689cf908490bddc3b0597b2da3b62b85))
-* **modules:** integrate ordem_servico module ([658c84b](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/658c84b5c3fe8bf3ab021122cc8b6f7bf09da878))
-* **security:** add rate limiting for critical endpoints ([e80580c](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/e80580ceaeb905401c4bd6b8c64a4a1805594312))
-* **users:** add role restrictions to update preferences ([c43c6ad](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/c43c6ada0efa41b6633841e1f61562b01ce279d3))
+* Add CI/CD workflow for automated testing and Docker image builds, and document service order status improvements for service orders. ([800c1d9](https://github.com/gorinformaticadev/Pluggor/commit/800c1d9827cc7106269a2fdaab7c9f11e446301f))
+* add table UI component with its sub-components for structured data display. ([240471d](https://github.com/gorinformaticadev/Pluggor/commit/240471dad7db2695682c140d46b80de0c1a8c5a1))
+* **backup:** add backup and restore functionality ([d3b3d71](https://github.com/gorinformaticadev/Pluggor/commit/d3b3d710e71e403e13659475d6ecb63b01695c97))
+* **backup:** add delete backup functionality ([b8fe083](https://github.com/gorinformaticadev/Pluggor/commit/b8fe08398d77baf1d81f656321bcd5b5612832aa))
+* Implement the WhatsApp module, including new UI components, pages, and data models. ([19b2993](https://github.com/gorinformaticadev/Pluggor/commit/19b29930f8a163dc6bffc76c235ebeb1c0a563df))
+* Initialize monorepo structure with pnpm, and introduce backend notification and authentication features. ([cd4a074](https://github.com/gorinformaticadev/Pluggor/commit/cd4a074324513443624b5d1972dccc4f130252b3))
+* **modules:** improve migrations and seeds execution to run pendents only ([1367398](https://github.com/gorinformaticadev/Pluggor/commit/13673985689cf908490bddc3b0597b2da3b62b85))
+* **modules:** integrate ordem_servico module ([658c84b](https://github.com/gorinformaticadev/Pluggor/commit/658c84b5c3fe8bf3ab021122cc8b6f7bf09da878))
+* **security:** add rate limiting for critical endpoints ([e80580c](https://github.com/gorinformaticadev/Pluggor/commit/e80580ceaeb905401c4bd6b8c64a4a1805594312))
+* **users:** add role restrictions to update preferences ([c43c6ad](https://github.com/gorinformaticadev/Pluggor/commit/c43c6ada0efa41b6633841e1f61562b01ce279d3))
 
 
 ### Bug Fixes
 
-* **notifications:** re-enable real-time notifications with direct WebSocket authentication ([3d05808](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/3d05808ce913c99922b28e324064a1d5dd47f82c))
+* **notifications:** re-enable real-time notifications with direct WebSocket authentication ([3d05808](https://github.com/gorinformaticadev/Pluggor/commit/3d05808ce913c99922b28e324064a1d5dd47f82c))
 
-## [2.0.0](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/compare/v0.5.2...v2.0.0) (2026-01-19)
+## [2.0.0](https://github.com/gorinformaticadev/Pluggor/compare/v0.5.2...v2.0.0) (2026-01-19)
 
 
 ### ⚠ BREAKING CHANGES
@@ -51,29 +51,29 @@ All notable changes to this project will be documented in this file. See [standa
 
 ### Features
 
-* Add CI/CD pipeline with test, lint, audit, and Docker image build/push steps for backend and frontend applications. ([7459bb4](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/7459bb4f7e053b9abe94cd731f380c534e2d824e))
-* Add multi-stage Dockerfile for NestJS backend with Prisma, production setup, and health checks. ([46a506a](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/46a506ab2c6d5c4c23454241109d2bccf2ceb59e))
-* Initialize backend project with CI/CD pipeline and Prisma configuration. ([fdb21c8](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/fdb21c81c92a4f27a27d66a7eb13bf9742d6b885))
-* Introduce initial NestJS backend application with its dependencies and related debug logs. ([63fed09](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/63fed099ee2a830d54118fd759010051d33cf1f8))
+* Add CI/CD pipeline with test, lint, audit, and Docker image build/push steps for backend and frontend applications. ([7459bb4](https://github.com/gorinformaticadev/Pluggor/commit/7459bb4f7e053b9abe94cd731f380c534e2d824e))
+* Add multi-stage Dockerfile for NestJS backend with Prisma, production setup, and health checks. ([46a506a](https://github.com/gorinformaticadev/Pluggor/commit/46a506ab2c6d5c4c23454241109d2bccf2ceb59e))
+* Initialize backend project with CI/CD pipeline and Prisma configuration. ([fdb21c8](https://github.com/gorinformaticadev/Pluggor/commit/fdb21c81c92a4f27a27d66a7eb13bf9742d6b885))
+* Introduce initial NestJS backend application with its dependencies and related debug logs. ([63fed09](https://github.com/gorinformaticadev/Pluggor/commit/63fed099ee2a830d54118fd759010051d33cf1f8))
 
 
 ### Bug Fixes
 
-* **modules:** Correções de modulos ([fc3590d](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/fc3590db2d5682fa48713bd9bc0518f96eea3ab9))
-* padroniza secrets Docker Hub ([fdce607](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/fdce607b6db11205fb63239474b96aa4026b81b1))
-* **prisma:** migrate datasource URL to prisma.config.ts (Prisma 7) ([c9a4885](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/c9a4885356e925738376c8047d2e8e05a2aabce7))
-* resolve conflito no .gitignore após merge da CI ([3065439](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/30654391339c1e76175a4b7b284066ff34fca9b3))
-* **sistema:** Introduce email configuration management with a dedicated UI and backend API, alongside new core UI components and cron job management. ([892eba7](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/892eba7a57883557c64765d605ae8ee0e93773b8))
-* **usuarios:** Correção da pagina de usuários ([db83602](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/db8360219fb4d8f3f80706e28c241af19d86d350))
+* **modules:** Correções de modulos ([fc3590d](https://github.com/gorinformaticadev/Pluggor/commit/fc3590db2d5682fa48713bd9bc0518f96eea3ab9))
+* padroniza secrets Docker Hub ([fdce607](https://github.com/gorinformaticadev/Pluggor/commit/fdce607b6db11205fb63239474b96aa4026b81b1))
+* **prisma:** migrate datasource URL to prisma.config.ts (Prisma 7) ([c9a4885](https://github.com/gorinformaticadev/Pluggor/commit/c9a4885356e925738376c8047d2e8e05a2aabce7))
+* resolve conflito no .gitignore após merge da CI ([3065439](https://github.com/gorinformaticadev/Pluggor/commit/30654391339c1e76175a4b7b284066ff34fca9b3))
+* **sistema:** Introduce email configuration management with a dedicated UI and backend API, alongside new core UI components and cron job management. ([892eba7](https://github.com/gorinformaticadev/Pluggor/commit/892eba7a57883557c64765d605ae8ee0e93773b8))
+* **usuarios:** Correção da pagina de usuários ([db83602](https://github.com/gorinformaticadev/Pluggor/commit/db8360219fb4d8f3f80706e28c241af19d86d350))
 
 
-* **backend:** upgrade Prisma to v7.2.0 with adapter support ([a19f832](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/a19f8329b46de332a2c48449a8d5ab5f8d4c5c33))
-* **frontend:** downgrade Next.js to 15.1.11 and adapt async params ([11a4530](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/11a45302b71b9030e36835771b80293c6ef54943))
+* **backend:** upgrade Prisma to v7.2.0 with adapter support ([a19f832](https://github.com/gorinformaticadev/Pluggor/commit/a19f8329b46de332a2c48449a8d5ab5f8d4c5c33))
+* **frontend:** downgrade Next.js to 15.1.11 and adapt async params ([11a4530](https://github.com/gorinformaticadev/Pluggor/commit/11a45302b71b9030e36835771b80293c6ef54943))
 
 
 ### build
 
-* **frontend:** migrate configs to ES modules and update Next.js ([a570753](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/commit/a570753d5313a3e7d70d30ad959423a3a0b91af8))
+* **frontend:** migrate configs to ES modules and update Next.js ([a570753](https://github.com/gorinformaticadev/Pluggor/commit/a570753d5313a3e7d70d30ad959423a3a0b91af8))
 
 ### [0.5.2](https://github.com/gorinformatica/menu-multitenant/compare/v0.5.1...v0.5.2) (2026-01-16)
 

@@ -66,7 +66,7 @@ Opções para install:
   -d, --domain DOMAIN       Domínio principal (ex: app.exemplo.com.br).
   -e, --email EMAIL         Email para Let's Encrypt e admin.
   -u, --image-owner OWNER   Owner no GHCR (ex: gorinformatica).
-  -r, --image-repo REPO     Prefixo das imagens no GHCR (default: projeto-menu-multitenant-seguro).
+  -r, --image-repo REPO     Prefixo das imagens no GHCR (default: Pluggor).
   -t, --image-tag TAG       Tag da imagem (default: latest).
   -l, --local-build-only    Ignora pull de imagens e faz build local no servidor.
   -a, --admin-email EMAIL   Email do administrador (default: mesmo de -e).
@@ -81,7 +81,7 @@ Variáveis de ambiente (alternativa às opções):
   DB_USER, DB_PASSWORD, DB_NAME, JWT_SECRET, ENCRYPTION_KEY, TRUSTED_DEVICE_TOKEN_SECRET
 
 Exemplos:
-  sudo bash install/install.sh install -d menu.empresa.com -e admin@empresa.com -u gorinformatica -r projeto-menu-multitenant-seguro -t v1.0.0
+  sudo bash install/install.sh install -d menu.empresa.com -e admin@empresa.com -u gorinformatica -r Pluggor -t v1.0.0
   sudo bash install/install.sh install -d dev.empresa.com -e admin@empresa.com -l
   sudo INSTALL_DOMAIN=app.empresa.com LETSENCRYPT_EMAIL=admin@empresa.com bash install/install.sh install --no-prompt
   sudo bash install/install.sh update
@@ -1350,7 +1350,7 @@ run_install() {
     local domain="${INSTALL_DOMAIN:-}"
     local email="${LETSENCRYPT_EMAIL:-}"
     local image_owner="${IMAGE_OWNER:-}"
-    local image_repo="${IMAGE_REPO:-projeto-menu-multitenant-seguro}"
+    local image_repo="${IMAGE_REPO:-Pluggor}"
     local image_tag="${IMAGE_TAG:-latest}"
     local local_build_only="${LOCAL_BUILD_ONLY:-false}"
     local admin_email="${INSTALL_ADMIN_EMAIL:-$email}"
@@ -1430,8 +1430,8 @@ run_install() {
             read -p "GHCR owner (ex: org/user): " image_owner
         fi
         if [[ "$install_mode" == "docker" ]]; then
-            [[ -z "$image_repo" ]] && read -p "Image repo prefix [projeto-menu-multitenant-seguro]: " image_repo
-            image_repo="${image_repo:-projeto-menu-multitenant-seguro}"
+            [[ -z "$image_repo" ]] && read -p "Image repo prefix [Pluggor]: " image_repo
+            image_repo="${image_repo:-Pluggor}"
             [[ -z "$image_tag" ]] && image_tag="latest"
         fi
         [[ -z "$admin_email" ]] && admin_email="$email"
@@ -1761,7 +1761,7 @@ run_update() {
     fi
 
     IMAGE_OWNER="${IMAGE_OWNER:-$(resolve_image_owner)}"
-    IMAGE_REPO="${IMAGE_REPO:-projeto-menu-multitenant-seguro}"
+    IMAGE_REPO="${IMAGE_REPO:-Pluggor}"
     IMAGE_TAG="${IMAGE_TAG:-latest}"
     LOCAL_BUILD_ONLY="${LOCAL_BUILD_ONLY:-false}"
     LOCAL_BUILD_ONLY="$(echo "$LOCAL_BUILD_ONLY" | tr '[:upper:]' '[:lower:]')"

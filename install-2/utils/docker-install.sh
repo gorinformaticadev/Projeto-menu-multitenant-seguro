@@ -385,7 +385,7 @@ run_docker_vps_install() {
     local build_mode="$3"  # "local" ou "registry"
 
     local image_owner="${IMAGE_OWNER:-}"
-    local image_repo="${IMAGE_REPO:-projeto-menu-multitenant-seguro}"
+    local image_repo="${IMAGE_REPO:-Pluggor}"
     local image_tag="${IMAGE_TAG:-latest}"
     local local_build_only="false"
     local admin_email="${INSTALL_ADMIN_EMAIL:-$email}"
@@ -402,8 +402,8 @@ run_docker_vps_install() {
         if [[ -z "$image_owner" && "$local_build_only" != "true" ]]; then
             read -p "GHCR owner (ex: org/user): " image_owner
         fi
-        [[ -z "$image_repo" ]] && read -p "Image repo prefix [projeto-menu-multitenant-seguro]: " image_repo
-        image_repo="${image_repo:-projeto-menu-multitenant-seguro}"
+        [[ -z "$image_repo" ]] && read -p "Image repo prefix [Pluggor]: " image_repo
+        image_repo="${image_repo:-Pluggor}"
         [[ -z "$image_tag" ]] && image_tag="latest"
         [[ -z "$admin_email" ]] && admin_email="$email"
     fi

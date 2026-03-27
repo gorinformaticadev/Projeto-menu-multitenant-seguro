@@ -7,7 +7,7 @@ Esta implementação permite a instalação completa do Sistema Multitenant Segu
 ## 🎯 Comando Final para Usuários
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Projeto-menu-multitenant-seguro/main/install.sh | sudo bash -s app.exemplo.com.br
+curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Pluggor/main/install.sh | sudo bash -s app.exemplo.com.br
 ```
 
 ## 🏗️ Como Funciona
@@ -20,7 +20,7 @@ curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Projeto-menu-multi
 ## 📁 Estrutura no Repositório
 
 ```
-Projeto-menu-multitenant-seguro/
+Pluggor/
 ├── install.sh                 # Script de instalação principal ✅
 ├── install-system.sh          # Script local para desenvolvimento
 ├── install-system.ps1          # Script PowerShell para Windows
@@ -84,7 +84,7 @@ sudo ./install.sh teste.local
 ### Teste simulando o curl:
 ```bash
 # Baixar e executar como usuário final faria
-curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Projeto-menu-multitenant-seguro/main/install.sh | sudo bash -s teste.exemplo.com.br
+curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Pluggor/main/install.sh | sudo bash -s teste.exemplo.com.br
 ```
 
 ## 🛡️ Considerações de Segurança
@@ -98,10 +98,10 @@ curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Projeto-menu-multi
 ### Recomendações:
 ```bash
 # Sempre verificar o script antes de executar
-curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Projeto-menu-multitenant-seguro/main/install.sh | less
+curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Pluggor/main/install.sh | less
 
 # Ou baixar e inspecionar primeiro
-wget https://raw.githubusercontent.com/gorinformaticadev/Projeto-menu-multitenant-seguro/main/install.sh
+wget https://raw.githubusercontent.com/gorinformaticadev/Pluggor/main/install.sh
 less install.sh
 ```
 
@@ -176,17 +176,17 @@ ls -la /var/www/
 
 ### Instalação Padrão:
 ```bash
-curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Projeto-menu-multitenant-seguro/main/install.sh | sudo bash -s meusistema.com.br
+curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Pluggor/main/install.sh | sudo bash -s meusistema.com.br
 ```
 
 ### Instalação em Ambiente de Teste:
 ```bash
-curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Projeto-menu-multitenant-seguro/main/install.sh | sudo bash -s teste.meusistema.com.br
+curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Pluggor/main/install.sh | sudo bash -s teste.meusistema.com.br
 ```
 
 ### Instalação Silenciosa:
 ```bash
-curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Projeto-menu-multitenant-seguro/main/install.sh | sudo bash -s --silent producao.com.br
+curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Pluggor/main/install.sh | sudo bash -s --silent producao.com.br
 ```
 
 ## 🔒 Melhores Práticas
@@ -224,7 +224,7 @@ Esta implementação permite a instalação completa do Sistema Multitenant Segu
 ## 🎯 Comando Final para Usuários
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Projeto-menu-multitenant-seguro/main/install.sh | sudo bash -s app.exemplo.com.br
+curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Pluggor/main/install.sh | sudo bash -s app.exemplo.com.br
 ```
 
 ## 🏗️ Como Funciona
@@ -237,7 +237,7 @@ curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Projeto-menu-multi
 ## 📁 Estrutura no Repositório
 
 ```
-Projeto-menu-multitenant-seguro/
+Pluggor/
 ├── install.sh                 # Script de instalação principal ✅
 ├── install-system.sh          # Script local para desenvolvimento
 ├── install-system.ps1          # Script PowerShell para Windows
@@ -301,7 +301,7 @@ sudo ./install.sh teste.local
 ### Teste simulando o curl:
 ```bash
 # Baixar e executar como usuário final faria
-curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Projeto-menu-multitenant-seguro/main/install.sh | sudo bash -s teste.exemplo.com.br
+curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Pluggor/main/install.sh | sudo bash -s teste.exemplo.com.br
 ```
 
 ## 🛡️ Considerações de Segurança
@@ -315,10 +315,10 @@ curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Projeto-menu-multi
 ### Recomendações:
 ```bash
 # Sempre verificar o script antes de executar
-curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Projeto-menu-multitenant-seguro/main/install.sh | less
+curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Pluggor/main/install.sh | less
 
 # Ou baixar e inspecionar primeiro
-wget https://raw.githubusercontent.com/gorinformaticadev/Projeto-menu-multitenant-seguro/main/install.sh
+wget https://raw.githubusercontent.com/gorinformaticadev/Pluggor/main/install.sh
 less install.sh
 ```
 
@@ -393,17 +393,17 @@ ls -la /var/www/
 
 ### Instalação Padrão:
 ```bash
-curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Projeto-menu-multitenant-seguro/main/install.sh | sudo bash -s meusistema.com.br
+curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Pluggor/main/install.sh | sudo bash -s meusistema.com.br
 ```
 
 ### Instalação em Ambiente de Teste:
 ```bash
-curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Projeto-menu-multitenant-seguro/main/install.sh | sudo bash -s teste.meusistema.com.br
+curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Pluggor/main/install.sh | sudo bash -s teste.meusistema.com.br
 ```
 
 ### Instalação Silenciosa:
 ```bash
-curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Projeto-menu-multitenant-seguro/main/install.sh | sudo bash -s --silent producao.com.br
+curl -sSL https://raw.githubusercontent.com/gorinformaticadev/Pluggor/main/install.sh | sudo bash -s --silent producao.com.br
 ```
 
 ## 🔒 Melhores Práticas

@@ -49,7 +49,7 @@ Após iniciar, verifique:
 
 ```powershell
 # 1. Certifique-se de estar na pasta do projeto
-cd d:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro
+cd d:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Pluggor
 
 # 2. Instalar dependências (se ainda não instalou)
 cd frontend

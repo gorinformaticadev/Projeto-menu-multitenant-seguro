@@ -1,6 +1,6 @@
 # Sistema Menu Multitenant Seguro
 
-[![CI/CD Pipeline](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro/actions/workflows/ci-cd.yml)
+[![CI/CD Pipeline](https://github.com/gorinformaticadev/Pluggor/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/gorinformaticadev/Pluggor/actions/workflows/ci-cd.yml)
 
 Plataforma SaaS multitenant orientada a isolamento de dados, segurança operacional e implantação simplificada via Docker. Projetado para operação contínua em produção com arquitetura modular pronta para evolução funcional.
 

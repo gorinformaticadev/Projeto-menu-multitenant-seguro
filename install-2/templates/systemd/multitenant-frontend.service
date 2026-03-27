@@ -1,6 +1,6 @@
 [Unit]
 Description=Multitenant Frontend (Next.js)
-Documentation=https://github.com/Projeto-menu-multitenant-seguro
+Documentation=https://github.com/Pluggor
 After=network.target multitenant-backend.service
 Wants=multitenant-backend.service
 

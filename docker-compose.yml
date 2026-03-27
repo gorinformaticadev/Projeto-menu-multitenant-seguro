@@ -1,5 +1,5 @@
 # VariÃƒÂ¡veis da stack: use install/.env.production (monorepo: env nÃƒÂ£o fica na raiz).
-# Subir: cd /caminho/Projeto-menu-multitenant-seguro && docker compose --env-file install/.env.production up -d
+# Subir: cd /caminho/Pluggor && docker compose --env-file install/.env.production up -d
 services:
   nginx:
     image: nginx:1.25-alpine

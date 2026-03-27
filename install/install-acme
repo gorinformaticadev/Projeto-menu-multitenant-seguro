@@ -3,7 +3,7 @@
 # ============================================================================
 # install-acme - Instalador compatível com ticketz-docker-acme
 # ============================================================================
-# Este script permite instalar o Projeto-menu-multitenant-seguro usando
+# Este script permite instalar o Pluggor usando
 # Nginx externo (fora do Docker) e é compatível com instalações existentes
 # do ticketz-docker-acme.
 #

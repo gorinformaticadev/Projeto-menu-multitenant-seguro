@@ -22,8 +22,8 @@ sudo systemctl enable --now docker
 ## 1. Clonar somente a branch dev
 
 ```bash
-git clone --branch dev --single-branch https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git
-cd Projeto-menu-multitenant-seguro
+git clone --branch dev --single-branch https://github.com/gorinformaticadev/Pluggor.git
+cd Pluggor
 git branch --show-current
 ```
 

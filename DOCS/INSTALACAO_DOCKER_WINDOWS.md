@@ -20,8 +20,8 @@ Este guia cobre a instalação e execução do projeto em ambiente de desenvolvi
 Abra seu terminal e clone o projeto para uma pasta de sua preferência.
 
 ```bash
-git clone https://github.com/gorinformaticadev/Projeto-menu-multitenant-seguro.git
-cd Projeto-menu-multitenant-seguro
+git clone https://github.com/gorinformaticadev/Pluggor.git
+cd Pluggor
 ```
 
 ### 2. Configurar Variáveis de Ambiente
@@ -63,7 +63,7 @@ O Docker no Windows pode ter problemas com permissões de volumes. Para evitar e
 
 1.  Certifique-se de que não existem volumes antigos conflitantes:
     ```powershell
-    docker volume rm projeto-menu-multitenant-seguro_uploads
+    docker volume rm Pluggor_uploads
     ```
     *(Este comando removerá uploads antigos. Pule se não quiser perder dados, mas saiba que pode gerar erro de permissão EACCES).*
 
@@ -128,7 +128,7 @@ docker compose --env-file install/.env.production -f docker-compose.prod.yml res
 *   **Solução:**
     ```powershell
     docker compose -f docker-compose.prod.yml down
-    docker volume rm projeto-menu-multitenant-seguro_uploads
+    docker volume rm Pluggor_uploads
     docker compose --env-file install/.env.production -f docker-compose.prod.yml up -d
     ```
 

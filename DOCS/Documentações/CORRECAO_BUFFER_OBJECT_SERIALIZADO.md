@@ -165,7 +165,7 @@ first4Bytes: ['0x50', '0x4b', '0x03', '0x04']
 ### 1. Reiniciar Backend
 
 ```powershell
-cd d:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\backend
+cd d:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Pluggor\backend
 
 # Parar processo (Ctrl+C)
 npm run start:dev

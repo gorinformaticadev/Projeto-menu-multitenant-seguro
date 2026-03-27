@@ -3,7 +3,7 @@
 
 set -e
 
-PROJECT="projeto-menu-multitenant-seguro"
+PROJECT="Pluggor"
 
 echo "==============================="
 echo "DESINSTALAÇÃO MULTITENANT"
@@ -46,8 +46,8 @@ docker volume rm \
 echo "➡️  Removendo imagens locais geradas pelo projeto..."
 
 docker rmi \
-  projeto-menu-multitenant-seguro-frontend \
-  projeto-menu-multitenant-seguro-backend 2>/dev/null || true
+  Pluggor-frontend \
+  Pluggor-backend 2>/dev/null || true
 
 # 4) Limpar arquivos gerados
 echo "➡️  Limpando arquivos locais gerados..."

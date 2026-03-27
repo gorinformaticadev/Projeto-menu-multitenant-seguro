@@ -15,7 +15,7 @@
 
 ```bash
 # 1. Renomear arquivo atual como backup
-cd d:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Projeto-menu-multitenant-seguro\backend\src\core
+cd d:\Usuarios\Servidor\GORInformatica\Documents\GitHub\Pluggor\backend\src\core
 mv module-installer.service.ts module-installer.service.OLD.ts
 
 # 2. Renomear arquivo refatorado
