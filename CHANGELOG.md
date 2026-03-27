@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.81](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.77...v0.1.81) (2026-03-27)
+
+
+### Bug Fixes
+
+* Correção do git ci/cD ([9ef053c](https://github.com/gorinformaticadev/Pluggor/commit/9ef053c5eeab41b72eb97d3bed480289fa4e2068))
+
 ### [0.1.80](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.77...v0.1.80) (2026-03-27)
 
 
