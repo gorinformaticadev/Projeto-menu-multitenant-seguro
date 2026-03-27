@@ -62,7 +62,6 @@ CURRENT_LINK=""
 PREVIOUS_LINK=""
 LOCK_FILE=""
 LOCK_FD=99
-LOCK_ACQUIRED="false"
 
 STATE_FILE=""
 UPDATE_LOG_FILE=""
@@ -520,7 +519,6 @@ acquire_lock() {
     exit "$EXIT_LOCK_HELD"
   fi
 
-  LOCK_ACQUIRED="true"
   STATE_LOCK="true"
   write_state_file
 }
@@ -529,7 +527,6 @@ acquire_lock() {
 release_lock() {
   flock -u "$LOCK_FD" 2>/dev/null || true
   eval "exec ${LOCK_FD}>&-" 2>/dev/null || true
-  LOCK_ACQUIRED="false"
 }
 
 get_link_target() {
