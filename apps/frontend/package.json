@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev --webpack -p 5000",
     "build": "next build --webpack",
+    "build:ci": "cross-env NEXT_DIST_DIR=.next-ci next build --webpack",
     "typecheck": "tsc --noEmit --pretty false",
     "clean:next": "node ./scripts/clean-next-output.mjs",
     "start": "node scripts/start-standalone.mjs",

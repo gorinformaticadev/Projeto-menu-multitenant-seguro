@@ -32,7 +32,7 @@
     "ci:local": "pnpm install --frozen-lockfile && pnpm run ci:backend && pnpm run ci:frontend && pnpm run ci:scripts && pnpm run ci:smoke",
     "ci:backend": "pnpm -C apps/backend exec prisma generate && pnpm -C apps/backend build && pnpm -C apps/backend test && pnpm -C apps/backend run security:guardrails && pnpm -C apps/backend run test:security-regression && pnpm -C apps/backend run lint",
     "ci:frontend": "pnpm check:theming && pnpm -C apps/frontend build && pnpm -C apps/frontend run --if-present lint",
-    "ci:scripts": "bash Scripts/ci-local-scripts-check.sh",
+    "ci:scripts": "node Scripts/ci-local-scripts-check.mjs",
     "ci:smoke": "pnpm -C apps/backend run test:smoke"
   },
   "dependencies": {
