@@ -6,7 +6,7 @@ import {
   resolveTelemetryClientIp,
   resolveTelemetryRoute,
   shouldCollectRequestTelemetry,
-  shouldCollectSecurityTelemetry,
+  shouldCollectSecurityTelemetry, type TelemetryRequestLike,
 } from './system-telemetry.util';
 
 export type SecurityTelemetryEventType =
@@ -79,24 +79,7 @@ export interface SecurityTelemetrySnapshot {
   deniedAccess: SecurityTelemetryIpSummary[];
 }
 
-export type TelemetryRequestLike = {
-  method?: unknown;
-  route?: {
-    path?: string | string[];
-  };
-  baseUrl?: unknown;
-  originalUrl?: unknown;
-  url?: unknown;
-  path?: unknown;
-  headers?: Record<string, unknown>;
-  ip?: unknown;
-  socket?: {
-    remoteAddress?: unknown;
-  };
-  connection?: {
-    remoteAddress?: unknown;
-  };
-};
+
 
 type RequestTelemetryRecord = {
   at: number;

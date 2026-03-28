@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { SettingsRegistry } from './settings-registry.service';
 import { readEnvValueForSetting } from './system-settings-value.utils';
@@ -51,7 +52,7 @@ export class SystemSettingsBootstrapService implements OnApplicationBootstrap {
         await this.prisma.systemSetting.create({
           data: {
             key: definition.key,
-            valueJson: envValue.value,
+            valueJson: envValue.value as Prisma.InputJsonValue,
             valueType: definition.type,
             category: definition.category,
             scope: 'system',

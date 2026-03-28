@@ -6,10 +6,15 @@ Esta pasta contem a documentacao tecnica e operacional do sistema.
 
 ```
 DOCS/
-├── assets/                  # Imagens e recursos
-├── install/                 # Documentacao do instalador
-├── manual-instalacao/       # Guias por ambiente
-└── INICIO_RAPIDO.md         # Guia rapido
+├── assets/                      # Imagens e recursos
+├── install/                     # Documentacao do instalador
+├── manual-instalacao/           # Guias por ambiente
+├── Modulo/                      # Guias de modulos
+├── raiz/                        # Regras e guias gerais
+├── COMANDOS_UTEIS.md            # Comandos de desenvolvimento
+├── INICIO_RAPIDO.md             # Guia rapido
+├── README.md                    # Este arquivo
+└── REGRAS_CRIACAO_MODULOS.md    # Regras para criar modulos
 ```
 
 ## Instalacao e Operacao
@@ -24,6 +29,17 @@ DOCS/
 - Docker Local (Prod): `manual-instalacao/INSTALL_DOCKER_LOCAL.md`
 - VPS Producao: `manual-instalacao/INSTALL_VPS_PROD.md`
 - VPS Dev/Staging: `manual-instalacao/INSTALL_VPS_DEV.md`
+
+## Desenvolvimento
+
+- Comandos uteis: `COMANDOS_UTEIS.md`
+- Regras para modulos: `REGRAS_CRIACAO_MODULOS.md`
+- Regras para IA: `raiz/AI_DEVELOPMENT_RULES.md`
+
+## Modulos
+
+- Upload e exibicao de imagens: `Modulo/GUIA_IMAGENS_UPLOAD_EXIBICAO.md`
+- Busca no banco de dados: `Modulo/guia_de_busca_no_banco.md`
 
 ## Scripts de Instalacao
 

@@ -25,6 +25,23 @@ const FIND_UNIQUE_ACTION_REWRITES: Record<string, Prisma.PrismaAction> = {
   findUniqueOrThrow: 'findFirstOrThrow',
 };
 
+type PrismaMiddlewareParams = {
+  model?: string;
+  action: Prisma.PrismaAction;
+  args?: {
+    where?: unknown;
+    data?: unknown;
+    create?: unknown;
+    update?: unknown;
+  } & Record<string, unknown>;
+};
+
+type PrismaMiddlewareNext = (params: PrismaMiddlewareParams) => Promise<unknown>;
+
+type PrismaMiddlewareCapable = {
+  $use?: (middleware: (params: PrismaMiddlewareParams, next: PrismaMiddlewareNext) => Promise<unknown>) => void;
+};
+
 export class PrismaReconnectFailed extends Error {
   constructor(
     message: string,
@@ -47,16 +64,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     private readonly requestSecurityContext: RequestSecurityContextService = new RequestSecurityContextService(),
   ) {
     super();
-    (
-      this as unknown as {
-        $use?: (
-          middleware: (
-            params: any,
-            next: (params: any) => Promise<unknown>,
-          ) => Promise<unknown>,
-        ) => void;
-      }
-    ).$use?.((params, next) => this.applyTenantEnforcement(params, next));
+    (this as unknown as PrismaMiddlewareCapable).$use?.((params, next) =>
+      this.applyTenantEnforcement(params, next),
+    );
   }
 
   async onModuleInit(): Promise<void> {
@@ -175,8 +185,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   private async applyTenantEnforcement(
-    params: any,
-    next: (params: any) => Promise<unknown>,
+    params: PrismaMiddlewareParams,
+    next: PrismaMiddlewareNext,
   ): Promise<unknown> {
     if (!params.model || !TENANT_SCOPED_MODELS.has(params.model)) {
       return next(params);
@@ -357,6 +367,6 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       throw new Error(`Prisma delegate not found for model ${model}`);
     }
 
-    return delegate;
+    return delegate as { findFirst: (args: Record<string, unknown>) => Promise<unknown> };
   }
 }

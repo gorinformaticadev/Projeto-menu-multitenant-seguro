@@ -1,58 +1,44 @@
 {
-    "compilerOptions":  {
-                            "module":  "commonjs",
-                            "declaration":  true,
-                            "removeComments":  true,
-                            "emitDecoratorMetadata":  true,
-                            "experimentalDecorators":  true,
-                            "allowSyntheticDefaultImports":  true,
-                            "target":  "ES2021",
-                            "sourceMap":  true,
-                            "outDir":  "./dist",
-                            "baseUrl":  "./",
-                            "incremental":  true,
-                            "skipLibCheck":  true,
-                            "strictNullChecks":  false,
-                            "noImplicitAny":  false,
-                            "strictBindCallApply":  false,
-                            "forceConsistentCasingInFileNames":  false,
-                            "noFallthroughCasesInSwitch":  false,
-                            "paths":  {
-                                          "@core/*":  [
-                                                          "src/core/*"
-                                                      ],
-                                          "@notifications/*":  [
-                                                                   "src/notifications/*"
-                                                               ],
-                                          "@common/*":  [
-                                                            "src/common/*"
-                                                        ],
-                                          "@modules/*":  [
-                                                             "../../packages/modules/*"
-                                                         ],
-                                          "@prisma/*":  [
-                                                            "./node_modules/@prisma/*"
-                                                        ],
-                                          "*":  [
-                                                    "node_modules/*"
-                                                ]
-                                      }
-                        },
-    "include":  [
-                    "src/**/*",
-                    "../../packages/modules/**/backend/**/*",
-                    "../../packages/modules/**/module.ts",
-                    "../../packages/modules/**/permissions.ts"
-                ],
-    "exclude":  [
-                    "node_modules",
-                    "dist",
-                    "test",
-                    "**/*spec.ts",
-                    "**/*.js",
-                    "src/core/_deprecated/**/*",
-                    "../../packages/modules/**/frontend/**/*",
-                    "src/**/frontend/**/*",
-                    "src/modules/**/*"
-                ]
+    "compilerOptions": {
+        "module": "commonjs",
+        "declaration": true,
+        "removeComments": true,
+        "emitDecoratorMetadata": true,
+        "experimentalDecorators": true,
+        "allowSyntheticDefaultImports": true,
+        "target": "ES2021",
+        "sourceMap": true,
+        "outDir": "./dist",
+        "baseUrl": "./",
+        "incremental": true,
+        "skipLibCheck": true,
+        "strictNullChecks": false,
+        "noImplicitAny": false,
+        "strictBindCallApply": false,
+        "forceConsistentCasingInFileNames": false,
+        "noFallthroughCasesInSwitch": false,
+        "paths": {
+            "@core/*": ["src/core/*"],
+            "@notifications/*": ["src/notifications/*"],
+            "@common/*": ["src/common/*"],
+            "@modules/*": ["../../packages/modules/*"]
+        }
+    },
+    "include": [
+        "src/**/*",
+        "../../packages/modules/**/backend/**/*",
+        "../../packages/modules/**/module.ts",
+        "../../packages/modules/**/permissions.ts"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist",
+        "test",
+        "**/*spec.ts",
+        "**/*.js",
+        "src/core/_deprecated/**/*",
+        "../../packages/modules/**/frontend/**/*",
+        "src/**/frontend/**/*",
+        "src/modules/**/*"
+    ]
 }

@@ -4,7 +4,6 @@
   Injectable,
   NestInterceptor,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { Observable } from 'rxjs';
 
 export interface RequestContextPayload {
@@ -12,7 +11,12 @@ export interface RequestContextPayload {
   userAgent: string | null;
 }
 
-type RequestLike = Request & {
+type RequestLike = {
+  headers?: Record<string, string | string[] | undefined>;
+  ip?: string;
+  socket?: {
+    remoteAddress?: string;
+  };
   requestCtx?: RequestContextPayload;
 };
 

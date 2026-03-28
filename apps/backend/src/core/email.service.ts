@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { EmailConfiguration } from '@prisma/client';
 import { getPlatformName } from '@core/common/constants/platform.constants';
@@ -418,7 +419,7 @@ export class EmailService implements OnModuleInit {
 
     try {
       // Create a temporary transporter with the provided credentials
-      const transporterConfig = {
+      const transporterConfig: SMTPTransport.Options = {
         host: config.smtpHost,
         port: config.smtpPort,
         secure: config.encryption === 'SSL', // true for port 465, false for other ports

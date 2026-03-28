@@ -3,7 +3,7 @@ import { PrismaService } from './prisma/prisma.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
-type ModuleMenuNode = {
+export type ModuleMenuNode = {
     id: string;
     label: string;
     icon?: string | null;
@@ -14,7 +14,7 @@ type ModuleMenuNode = {
     children?: ModuleMenuNode[];
 };
 
-type AvailableModule = {
+export type AvailableModule = {
     slug: string;
     name: string;
     description: string | null;

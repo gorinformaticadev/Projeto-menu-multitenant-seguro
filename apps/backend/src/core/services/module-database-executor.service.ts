@@ -18,7 +18,7 @@ export class ModuleDatabaseExecutorService {
     }
 
     private getErrorMessage(error: unknown): string {
-        return error instanceof Error ? error.message : String(error);
+        return error instanceof Error ? this.getErrorMessage(error) : String(error);
     }
 
     /**
@@ -68,8 +68,8 @@ export class ModuleDatabaseExecutorService {
 
         } catch (error: unknown) {
             await client.query('ROLLBACK');
-            this.logger.error('❌ Erro na transação, rollback executado:', error.message);
-            throw new BadRequestException(`Erro ao executar SQL: ${error.message}`);
+            this.logger.error('❌ Erro na transação, rollback executado:', this.getErrorMessage(error));
+            throw new BadRequestException(`Erro ao executar SQL: ${this.getErrorMessage(error)}`);
         } finally {
             client.release();
         }
@@ -99,8 +99,8 @@ export class ModuleDatabaseExecutorService {
 
         } catch (error: unknown) {
             await client.query('ROLLBACK');
-            this.logger.error('❌ Erro em transação múltipla, rollback executado:', error.message);
-            throw new BadRequestException(`Erro ao executar queries: ${error.message}`);
+            this.logger.error('❌ Erro em transação múltipla, rollback executado:', this.getErrorMessage(error));
+            throw new BadRequestException(`Erro ao executar queries: ${this.getErrorMessage(error)}`);
         } finally {
             client.release();
         }
@@ -121,8 +121,8 @@ export class ModuleDatabaseExecutorService {
             return result.rows;
 
         } catch (error: unknown) {
-            this.logger.error('❌ Erro ao executar query:', error.message);
-            throw new BadRequestException(`Erro na query: ${error.message}`);
+            this.logger.error('❌ Erro ao executar query:', this.getErrorMessage(error));
+            throw new BadRequestException(`Erro na query: ${this.getErrorMessage(error)}`);
         } finally {
             client.release();
         }
@@ -174,7 +174,7 @@ export class ModuleDatabaseExecutorService {
             client.release();
             return true;
         } catch (error: unknown) {
-            this.logger.error('❌ Health check do pool falhou:', error.message);
+            this.logger.error('❌ Health check do pool falhou:', this.getErrorMessage(error));
             return false;
         }
     }

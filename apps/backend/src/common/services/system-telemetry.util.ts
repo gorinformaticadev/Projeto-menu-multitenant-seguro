@@ -1,4 +1,8 @@
 export type TelemetryRequestLike = {
+  method?: string;
+  res?: {
+    statusCode?: number | string;
+  };
   route?: {
     path?: string | string[];
   };

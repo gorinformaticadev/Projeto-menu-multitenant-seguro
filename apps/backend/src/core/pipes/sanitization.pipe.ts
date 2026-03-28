@@ -12,7 +12,7 @@ export class SanitizationPipe implements PipeTransform {
 
     // Se for objeto, sanitiza recursivamente
     if (typeof value === 'object' && !Array.isArray(value)) {
-      return this.sanitizeObject(value);
+      return this.sanitizeObject(value as Record<string, unknown>);
     }
 
     // Se for array, sanitiza cada item
@@ -38,7 +38,7 @@ export class SanitizationPipe implements PipeTransform {
         if (typeof value === 'string') {
           sanitized[key] = this.sanitizeString(value);
         } else if (typeof value === 'object' && value !== null) {
-          sanitized[key] = this.sanitizeObject(value);
+          sanitized[key] = this.sanitizeObject(value as Record<string, unknown>);
         } else {
           sanitized[key] = value;
         }

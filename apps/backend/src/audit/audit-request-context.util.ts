@@ -1,4 +1,3 @@
-import { Request } from 'express';
 import { AuditActor, AuditRequestContext } from './audit.service';
 import { extractRequestContext } from '../common/interceptors/request-context.interceptor';
 
@@ -13,10 +12,15 @@ type AuditRequestUser = {
   id?: string;
   email?: string;
   role?: string;
-  tenantId?: string;
+  tenantId?: string | null;
 };
 
-type AuditRequest = Request & {
+type AuditRequest = {
+  headers?: Record<string, string | string[] | undefined>;
+  ip?: string;
+  socket?: {
+    remoteAddress?: string;
+  };
   user?: AuditRequestUser;
 };
 

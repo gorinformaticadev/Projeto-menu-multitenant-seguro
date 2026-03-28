@@ -252,7 +252,7 @@ export class AWSSecretManager implements SecretManager {
       return response.SecretList.map((secret) => ({
         name: secret.Name,
         value: '', // Não retornamos o valor em listagens
-        version: secret.LastChangedDate,
+        version: String(secret.LastChangedDate || ''),
         createdDate: new Date(secret.CreatedDate),
         lastModifiedDate: new Date(secret.LastChangedDate),
         description: secret.Description

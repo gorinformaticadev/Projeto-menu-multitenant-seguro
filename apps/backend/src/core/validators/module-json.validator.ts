@@ -158,27 +158,27 @@ export class ModuleJsonValidator {
 
         // name: apenas letras, números, hífen e underscore
         const nameRegex = /^[a-zA-Z0-9_-]+$/;
-        if (!nameRegex.test(json.name)) {
+        if (!nameRegex.test(json.name as string)) {
             throw new BadRequestException(
                 'Campo "name" deve conter apenas letras, números, hífen e underscore'
             );
         }
 
         // name: comprimento
-        if (json.name.length < 2 || json.name.length > 50) {
+        if ((json.name as string).length < 2 || (json.name as string).length > 50) {
             throw new BadRequestException('Campo "name" deve ter entre 2 e 50 caracteres');
         }
 
         // version: formato semântico (X.Y.Z)
         const versionRegex = /^\d+\.\d+\.\d+$/;
-        if (!versionRegex.test(json.version)) {
+        if (!versionRegex.test(json.version as string)) {
             throw new BadRequestException(
                 'Campo "version" deve seguir formato semântico (ex: 1.0.0)'
             );
         }
 
         // displayName: comprimento
-        if (json.displayName.length < 2 || json.displayName.length > 100) {
+        if ((json.displayName as string).length < 2 || (json.displayName as string).length > 100) {
             throw new BadRequestException('Campo "displayName" deve ter entre 2 e 100 caracteres');
         }
 

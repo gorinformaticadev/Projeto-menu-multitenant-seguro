@@ -22,6 +22,7 @@ import { SecurityRuntimeConfigService } from '@core/security-config/security-run
 import { AuditService } from '../../audit/audit.service';
 import { RateLimitMetricsService } from '../services/rate-limit-metrics.service';
 import { SystemTelemetryService } from '@common/services/system-telemetry.service';
+import type { TelemetryRequestLike } from '@common/services/system-telemetry.util';
 import {
   CRITICAL_RATE_LIMIT_KEY,
   CriticalRateLimitAction,
@@ -79,15 +80,16 @@ interface RequestAuthLike {
 }
 
 interface RequestRouteLike {
-  path?: unknown;
+  path?: string | string[];
 }
 
-interface RequestLike {
+interface RequestLike extends TelemetryRequestLike {
   ip?: unknown;
-  originalUrl?: unknown;
-  url?: unknown;
-  path?: unknown;
-  method?: unknown;
+  baseUrl?: string;
+  originalUrl?: string;
+  url?: string;
+  path?: string;
+  method?: string;
   route?: RequestRouteLike;
   headers?: Record<string, HeaderValue>;
   body?: Record<string, unknown>;

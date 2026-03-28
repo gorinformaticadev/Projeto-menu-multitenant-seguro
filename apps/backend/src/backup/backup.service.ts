@@ -40,7 +40,7 @@ interface JobLogEntry {
   message: string;
 }
 
-interface LegacyBackupLogEntry {
+export interface LegacyBackupLogEntry {
   id: string;
   operationType: BackupJobType;
   status: BackupJobStatus;
@@ -537,7 +537,7 @@ export class BackupService {
     );
   }
 
-  async markJobSuccess(jobId: string, details: Partial<BackupJob> = {}): Promise<void> {
+  async markJobSuccess(jobId: string, details: Prisma.BackupJobUpdateInput = {}): Promise<void> {
     await this.withPrismaConnectionRetry('markJobSuccess', async () => {
       await this.prisma.backupJob.update({
         where: { id: jobId },

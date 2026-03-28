@@ -344,7 +344,7 @@ export class MaintenanceModeGuard implements CanActivate {
       return;
     }
 
-    const { actor, requestCtx, tenantId } = extractAuditContext({
+    const auditRequest = {
       headers: request.headers,
       ip: request.ip,
       socket: request.socket,
@@ -355,7 +355,9 @@ export class MaintenanceModeGuard implements CanActivate {
         role,
         tenantId: userPayload?.tenantId,
       },
-    });
+    };
+
+    const { actor, requestCtx, tenantId } = extractAuditContext(auditRequest);
 
     await this.auditService.log({
       action: 'MAINTENANCE_BYPASS_USED',

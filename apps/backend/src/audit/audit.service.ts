@@ -717,7 +717,7 @@ export class AuditService {
     return Math.max(min, Math.min(max, value));
   }
 
-  private sanitizeAuditLogRow(log: Prisma.AuditLog | AuditLogWithUser) {
+  private sanitizeAuditLogRow(log: AuditLogWithUser) {
     const parsedDetails = this.parseDetails(typeof log.details === 'string' ? log.details : null);
     const metadataInput = this.normalizeMetadataInput(log.metadata);
     const actionLabel = humanizeAuditAction(log.action);
