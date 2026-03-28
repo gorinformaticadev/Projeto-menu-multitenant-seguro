@@ -1,2 +1,0 @@
-﻿# Resumo Final - Implementacao Completa de Seguranca
-

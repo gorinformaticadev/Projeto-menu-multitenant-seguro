@@ -1,4 +1,4 @@
-﻿# Boas vindas
+# Boas Vindas ao Pluggor
 
 Este repositorio usa uma estrutura padrao para documentacao e automacao.
 
@@ -11,19 +11,26 @@ Este repositorio usa uma estrutura padrao para documentacao e automacao.
 
 ## Fluxo oficial de operacao
 
-1. Instalar
+### Instalar
 ```bash
-bash install/install.sh
+sudo bash install/install.sh install
 ```
 
-2. Atualizar
+### Atualizar
 ```bash
-bash install/update.sh
+sudo bash install/install.sh update
 ```
 
-3. Desinstalar
+### Desinstalar
 ```bash
-bash install/uninstall.sh
+sudo bash install/uninstall.sh
+```
+
+### Desenvolvimento
+```bash
+pnpm install:all     # Instalar dependencias
+pnpm dev:backend     # Iniciar backend
+pnpm dev:frontend    # Iniciar frontend
 ```
 
 ## Proximas leituras

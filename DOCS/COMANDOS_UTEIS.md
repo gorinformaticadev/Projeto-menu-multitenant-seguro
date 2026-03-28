@@ -1,552 +1,227 @@
-# 🛠️ Comandos Úteis
+# Comandos Uteis
 
-Este documento contém comandos úteis para desenvolvimento e manutenção do sistema.
+Comandos para desenvolvimento e manutencao do sistema Pluggor.
 
-## 📦 Instalação
+## Instalacao
 
-### Instalação Completa (Recomendado)
-
+### Instalacao Completa (Recomendado)
 ```bash
-# Instalar dependências de backend e frontend
-npm run install:all
-
-# Ou instalar separadamente
-npm run install:backend
-npm run install:frontend
+pnpm install:all
 ```
 
 ### Setup Completo do Projeto
-
 ```bash
 # Instala tudo, gera Prisma Client, executa migrations e seed
-npm run setup
+pnpm install:all
 ```
 
-## 🚀 Desenvolvimento
+## Desenvolvimento
 
-### Executar Backend e Frontend Simultaneamente
-
+### Executar Backend e Frontend
 ```bash
-# Requer o pacote 'concurrently' instalado na raiz
-npm run dev
+# Backend
+pnpm dev:backend
+
+# Frontend (em outro terminal)
+pnpm dev:frontend
 ```
 
 ### Executar Separadamente
-
 ```bash
 # Terminal 1 - Backend
-cd backend
-npm run start:dev
+pnpm --filter backend start:dev
 
 # Terminal 2 - Frontend
-cd frontend
-npm run dev
+pnpm --filter frontend dev
 ```
 
-## 🗄️ Banco de Dados (Prisma)
+## Banco de Dados (Prisma)
 
 ### Gerar Prisma Client
-
 ```bash
-cd backend
-npm run prisma:generate
+pnpm --filter backend exec prisma generate
 ```
 
 ### Criar e Executar Migrations
-
 ```bash
-cd backend
-npm run prisma:migrate
-
-# Ou com nome específico
-npx prisma migrate dev --name nome_da_migration
+pnpm --filter backend exec prisma migrate dev --name nome_da_migration
 ```
 
-### Resetar Banco de Dados
-
+### Aplicar Migrations em Producao
 ```bash
-cd backend
-npx prisma migrate reset
-# Isso vai:
-# 1. Dropar o banco
-# 2. Criar novamente
-# 3. Executar todas as migrations
-# 4. Executar o seed (se configurado)
-```
-
-### Executar Seed Manualmente
-
-```bash
-cd backend
-npx ts-node prisma/seed.ts
-```
-
-### Abrir Prisma Studio (Interface Visual)
-
-```bash
-cd backend
-npx prisma studio
-# Abre em http://localhost:5555
+pnpm --filter backend exec prisma migrate deploy
 ```
 
 ### Ver Status das Migrations
-
 ```bash
-cd backend
-npx prisma migrate status
+pnpm --filter backend exec prisma migrate status
 ```
 
-### Criar Migration sem Executar
-
+### Resetar Banco de Dados
 ```bash
-cd backend
-npx prisma migrate dev --create-only --name nome_da_migration
+pnpm --filter backend exec prisma migrate reset
 ```
 
-## 🏗️ Build para Produção
+### Abrir Prisma Studio (Interface Visual)
+```bash
+pnpm --filter backend exec prisma studio
+# Abre em http://localhost:5555
+```
+
+### Executar Seed Manualmente
+```bash
+pnpm --filter backend exec prisma db seed
+```
+
+## Build para Producao
 
 ### Build Completo
-
 ```bash
-npm run build
+pnpm build:all
 ```
 
 ### Build Separado
-
 ```bash
 # Backend
-cd backend
-npm run build
+pnpm --filter backend build
 
 # Frontend
-cd frontend
-npm run build
+pnpm --filter frontend build
 ```
 
-### Executar Build de Produção
+## Testes
 
 ```bash
-# Backend
-cd backend
-npm run start:prod
+# Todos os testes
+pnpm test:all
 
-# Frontend
-cd frontend
-npm start
-```
-
-## 🧪 Testes (A Implementar)
-
-```bash
-# Backend - Testes unitários
-cd backend
-npm run test
+# Backend - Testes unitarios
+pnpm --filter backend test
 
 # Backend - Testes e2e
-cd backend
-npm run test:e2e
+pnpm --filter backend test:e2e
 
 # Backend - Coverage
-cd backend
-npm run test:cov
-
-# Frontend - Testes
-cd frontend
-npm run test
+pnpm --filter backend test:cov
 ```
 
-## 🔍 Linting e Formatação
-
-```bash
-# Backend - Lint
-cd backend
-npm run lint
-
-# Frontend - Lint
-cd frontend
-npm run lint
-```
-
-## 🐛 Debug
-
-### Backend com Debug
-
-```bash
-cd backend
-npm run start:debug
-# Conecte o debugger na porta 9229
-```
-
-### Ver Logs do Backend
-
-```bash
-cd backend
-npm run start:dev
-# Logs aparecem no terminal
-```
-
-## 🗑️ Limpeza
-
-### Limpar node_modules
+## Linting
 
 ```bash
 # Backend
-cd backend
-rm -rf node_modules package-lock.json
-npm install
+pnpm --filter backend lint
 
 # Frontend
-cd frontend
-rm -rf node_modules package-lock.json
-npm install
+pnpm --filter frontend lint
+
+# Verificacao de cores hardcoded (theming)
+pnpm check:theming
 ```
 
-### Limpar Build
+## CI Local
 
 ```bash
-# Backend
-cd backend
-rm -rf dist
-
-# Frontend
-cd frontend
-rm -rf .next
+pnpm ci:local
 ```
 
-### Limpar Tudo
+Executa: install, build backend, test backend, security guardrails, security regression, lint, theming check, build frontend, lint frontend, scripts check, smoke tests.
+
+## Seguranca
 
 ```bash
-# Backend
-cd backend
-rm -rf node_modules dist package-lock.json
+# Security guardrails
+pnpm --filter backend run security:guardrails
 
-# Frontend
-cd frontend
-rm -rf node_modules .next package-lock.json
+# Security regression tests
+pnpm --filter backend run test:security-regression
 ```
 
-## 🔐 Segurança
-
-### Gerar Nova Secret para JWT
+## Versionamento
 
 ```bash
-# Node.js
-node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+# Gerar release (bump version + changelog)
+pnpm release
 
-# OpenSSL
-openssl rand -hex 64
+# Release + push tags
+pnpm versao
 ```
 
-### Verificar Vulnerabilidades
-
-```bash
-# Backend
-cd backend
-npm audit
-
-# Frontend
-cd frontend
-npm audit
-```
-
-### Corrigir Vulnerabilidades
-
-```bash
-# Backend
-cd backend
-npm audit fix
-
-# Frontend
-cd frontend
-npm audit fix
-```
-
-## 📊 Análise de Código
-
-### Ver Tamanho do Bundle (Frontend)
-
-```bash
-cd frontend
-npm run build
-# Analise o output do build
-```
-
-### Analisar Dependências
-
-```bash
-# Backend
-cd backend
-npm list --depth=0
-
-# Frontend
-cd frontend
-npm list --depth=0
-```
-
-## 🌐 Variáveis de Ambiente
-
-### Backend (.env)
-
-```bash
-cd backend
-cp .env.example .env
-# Edite o arquivo .env com suas configurações
-```
-
-### Frontend (.env.local)
-
-```bash
-cd frontend
-cp .env.local.example .env.local
-# Edite o arquivo .env.local se necessário
-```
-
-## 🐳 Docker
+## Docker
 
 ### Desenvolvimento
-
 ```bash
-# Construir e iniciar todos os serviços (desenvolvimento)
 docker-compose -f docker-compose.dev.yml up --build
-
-# Executar em background (desenvolvimento)
-docker-compose -f docker-compose.dev.yml up --build -d
-
-# Parar os serviços (desenvolvimento)
-docker-compose -f docker-compose.dev.yml down
+docker-compose -f docker-compose.dev.yml up --build -d   # background
+docker-compose -f docker-compose.dev.yml down            # parar
 ```
 
-### Produção
-
+### Producao
 ```bash
-# Construir e iniciar todos os serviços (produção)
-docker-compose up --build
-
-# Executar em background (produção)
-docker-compose up --build -d
-
-# Parar os serviços (produção)
-docker-compose down
+docker-compose -f docker-compose.prod.yml up --build -d
+docker-compose -f docker-compose.prod.yml down
 ```
 
-### Comandos Úteis
-
+### Logs
 ```bash
-# Ver logs em tempo real
-docker-compose logs -f
-
-# Ver logs de um serviço específico
-docker-compose logs -f backend
-
-# Acessar o shell do container Backend
-docker-compose exec backend sh
-
-# Acessar o shell do container Frontend
-docker-compose exec frontend sh
-
-# Executar migrações do banco de dados (desenvolvimento)
-docker-compose -f docker-compose.dev.yml exec backend npm run prisma:migrate
-
-# Executar migrações do banco de dados (produção)
-docker-compose exec backend npm run prisma:migrate
-
-# Popular o banco com dados iniciais (desenvolvimento)
-docker-compose -f docker-compose.dev.yml exec backend npx ts-node prisma/seed.ts
-
-# Popular o banco com dados iniciais (produção)
-docker-compose exec backend npx ts-node prisma/seed.ts
+docker-compose logs -f                  # todos
+docker-compose logs -f backend          # especifico
 ```
 
-## 📝 Git
+### Executar comandos em containers
+```bash
+docker-compose exec backend pnpm --filter backend exec prisma migrate deploy
+docker-compose exec backend pnpm --filter backend exec prisma db seed
+```
 
-### Commit Convencional
+## Limpeza
 
 ```bash
-# Feat: Nova funcionalidade
-git commit -m "feat: adiciona endpoint de usuários"
+# Limpar todos os node_modules, dist e .next
+pnpm clean
+```
 
-# Fix: Correção de bug
-git commit -m "fix: corrige validação de email"
+## Git
 
-# Docs: Documentação
+```bash
+# Commit convencional
+git commit -m "feat: adiciona endpoint de usuarios"
+git commit -m "fix: corrige validacao de email"
 git commit -m "docs: atualiza README"
-
-# Style: Formatação
-git commit -m "style: formata código com prettier"
-
-# Refactor: Refatoração
 git commit -m "refactor: melhora estrutura do AuthService"
-
-# Test: Testes
 git commit -m "test: adiciona testes para TenantService"
-
-# Chore: Manutenção
-git commit -m "chore: atualiza dependências"
+git commit -m "chore: atualiza dependencias"
 ```
 
-## 🔄 Atualizar Dependências
+## Variaveis de Ambiente
 
-### Verificar Atualizações Disponíveis
-
+### Backend (.env)
 ```bash
-# Backend
-cd backend
-npm outdated
-
-# Frontend
-cd frontend
-npm outdated
+cp .env.example .env
+# Edite o arquivo .env com suas configuracoes
 ```
 
-### Atualizar Dependências
-
-```bash
-# Backend
-cd backend
-npm update
-
-# Frontend
-cd frontend
-npm update
-```
-
-### Atualizar para Versões Maiores
-
-```bash
-# Instalar npm-check-updates
-npm install -g npm-check-updates
-
-# Backend
-cd backend
-ncu -u
-npm install
-
-# Frontend
-cd frontend
-ncu -u
-npm install
-```
-
-## 🚨 Troubleshooting
+## Troubleshooting
 
 ### Erro: Port already in use
-
 ```bash
-# Windows - Matar processo na porta 3001
-netstat -ano | findstr :3001
-taskkill /PID <PID> /F
-
-# Linux/Mac - Matar processo na porta 3001
-lsof -ti:3001 | xargs kill -9
-```
-
-### Erro: Cannot find module
-
-```bash
-# Reinstalar dependências
-cd backend
-rm -rf node_modules package-lock.json
-npm install
+# Linux/Mac
+lsof -ti:3000 | xargs kill -9
+lsof -ti:4000 | xargs kill -9
 ```
 
 ### Erro: Prisma Client not generated
-
 ```bash
-cd backend
-npm run prisma:generate
+pnpm --filter backend exec prisma generate
 ```
 
 ### Erro: Database connection failed
+Verifique se PostgreSQL esta rodando e confirme o DATABASE_URL no `.env`.
 
-```bash
-# Verificar se PostgreSQL está rodando
-# Windows: Serviços > PostgreSQL
-# Linux/Mac: sudo service postgresql status
+## Editor
 
-# Verificar .env
-cd backend
-cat .env
-# Confirme que DATABASE_URL está correto
-```
-
-### Erro: CORS
-
-```bash
-# Verificar FRONTEND_URL no backend/.env
-# Deve corresponder à URL do frontend
-```
-
-## 📚 Documentação
-
-### Gerar Documentação da API (Swagger)
-
-```bash
-# A implementar
-cd backend
-npm run docs
-```
-
-### Ver Documentação do Prisma
-
-```bash
-cd backend
-npx prisma studio
-```
-
-## 🎯 Atalhos Úteis
-
-```bash
-# Alias para comandos frequentes (adicione ao .bashrc ou .zshrc)
-alias dev-backend="cd backend && npm run start:dev"
-alias dev-frontend="cd frontend && npm run dev"
-alias prisma-studio="cd backend && npx prisma studio"
-alias prisma-reset="cd backend && npx prisma migrate reset"
-```
-
-## 📊 Monitoramento
-
-### Ver Uso de Memória (Node.js)
-
-```bash
-# Backend
-cd backend
-node --inspect npm run start:dev
-# Abra chrome://inspect no Chrome
-```
-
-### Ver Logs em Tempo Real
-
-```bash
-# Backend
-cd backend
-npm run start:dev | tee logs.txt
-```
-
-## 🔧 Configuração do Editor
-
-### VSCode - Extensões Recomendadas
-
-```json
-{
-  "recommendations": [
-    "dbaeumer.vscode-eslint",
-    "esbenp.prettier-vscode",
-    "prisma.prisma",
-    "bradlc.vscode-tailwindcss",
-    "ms-vscode.vscode-typescript-next"
-  ]
-}
-```
-
-### VSCode - Settings
-
-```json
-{
-  "editor.formatOnSave": true,
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "[typescript]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  }
-}
-```
-
+### VSCode - Extensoes Recomendadas
+- dbaeumer.vscode-eslint
+- esbenp.prettier-vscode
+- prisma.prisma
+- bradlc.vscode-tailwindcss
+- ms-vscode.vscode-typescript-next
