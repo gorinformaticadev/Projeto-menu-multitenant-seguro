@@ -80,6 +80,35 @@ export class SystemNotificationsController {
     };
   }
 
+  @Get('grouped')
+  async listGrouped(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.notificationService.listSystemGroups({
+      page: page ? this.parsePositiveInt(page) : undefined,
+      limit: limit ? this.parsePositiveInt(limit) : undefined,
+    });
+  }
+
+  @Get('groups/:groupId/items')
+  async listGroupItems(
+    @Param('groupId') groupId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.notificationService.listGroupItems(groupId, { role: 'SUPER_ADMIN' }, {
+      page: page ? this.parsePositiveInt(page) : undefined,
+      limit: limit ? this.parsePositiveInt(limit) : undefined,
+    });
+  }
+
+  @Post('groups/:groupId/read-all')
+  async markGroupRead(@Param('groupId') groupId: string) {
+    const count = await this.notificationService.markGroupAsRead(groupId, { role: 'SUPER_ADMIN' });
+    return { success: true, count };
+  }
+
   private parsePositiveInt(value?: string): number | undefined {
     if (!value) {
       return undefined;

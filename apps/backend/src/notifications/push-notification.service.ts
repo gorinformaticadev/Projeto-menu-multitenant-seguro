@@ -182,6 +182,11 @@ export class PushNotificationService {
         return;
       }
 
+      const moduleName = String((notification.metadata as Record<string, unknown>)?.module || '').trim();
+      const pushTag = moduleName && moduleName.toLowerCase() !== 'system'
+        ? `module:${moduleName}`
+        : 'system:general';
+
       const payload = JSON.stringify({
         title: notification.title,
         body: notification.description,
@@ -190,6 +195,7 @@ export class PushNotificationService {
         type: notification.type,
         tenantId: notification.tenantId || null,
         createdAt: notification.createdAt,
+        tag: pushTag,
       });
 
       const staleIds: string[] = [];

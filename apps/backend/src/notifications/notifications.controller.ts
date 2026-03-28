@@ -245,4 +245,44 @@ export class NotificationsController {
 
     return { success: !!notification };
   }
+
+  /**
+   * Lista grupos de notificações agrupadas
+   */
+  @Get('grouped')
+  async getGrouped(
+    @Query('page') page: string,
+    @Query('limit') limit: string,
+    @Request() req,
+  ) {
+    return this.notificationService.listGroups(req.user, {
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
+  /**
+   * Lista notificações individuais de um grupo
+   */
+  @Get('groups/:groupId/items')
+  async getGroupItems(
+    @Param('groupId') groupId: string,
+    @Query('page') page: string,
+    @Query('limit') limit: string,
+    @Request() req,
+  ) {
+    return this.notificationService.listGroupItems(groupId, req.user, {
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
+  /**
+   * Marca todas as notificações de um grupo como lidas
+   */
+  @Patch('groups/:groupId/read-all')
+  async markGroupAsRead(@Param('groupId') groupId: string, @Request() req) {
+    const count = await this.notificationService.markGroupAsRead(groupId, req.user);
+    return { success: true, count };
+  }
 }

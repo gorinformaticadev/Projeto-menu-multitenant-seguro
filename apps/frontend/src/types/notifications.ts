@@ -42,3 +42,32 @@ export interface CreateNotificationData {
   userId?: string | null;
   metadata?: Record<string, unknown>;
 }
+
+export interface NotificationGroup {
+  id: string;
+  tenantId: string | null;
+  userId: string | null;
+  scopeType: string;
+  scopeKey: string;
+  unreadCount: number;
+  totalCount: number;
+  lastNotificationAt: string;
+  lastTitle: string;
+  lastBody: string | null;
+}
+
+export interface NotificationGroupListResponse {
+  groups: NotificationGroup[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
+export interface NotificationGroupItemsResponse {
+  notifications: Notification[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}

@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Bell, CheckCheck, RefreshCw, Search } from "lucide-react";
+import { Bell, CheckCheck, FolderOpen, List, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SystemNotificationsList } from "@/components/system-notifications/SystemNotificationsList";
+import { GroupedNotificationsList } from "@/components/system-notifications/GroupedNotificationsList";
 import {
   filterSystemNotifications,
   getNotificationAction,
@@ -18,6 +19,8 @@ import { useSystemNotificationsContext } from "@/contexts/SystemNotificationsCon
 const DEFAULT_READ_FILTER: NotificationReadFilter = "all";
 const DEFAULT_SEVERITY_FILTER: NotificationSeverityFilter = "all";
 const DEFAULT_CATEGORY_FILTER: NotificationCategoryFilter = "all";
+
+type ViewMode = "individual" | "grouped";
 
 export default function NotificationsPage() {
   const {
@@ -39,6 +42,7 @@ export default function NotificationsPage() {
   const [categoryFilter, setCategoryFilter] = useState<NotificationCategoryFilter>(
     DEFAULT_CATEGORY_FILTER,
   );
+  const [viewMode, setViewMode] = useState<ViewMode>("grouped");
 
   const filteredItems = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -107,6 +111,31 @@ export default function NotificationsPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <div className="flex rounded-lg bg-skin-background-elevated p-1">
+            <button
+              onClick={() => setViewMode("grouped")}
+              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                viewMode === "grouped"
+                  ? "bg-skin-surface text-skin-text shadow-sm"
+                  : "text-skin-text-muted hover:text-skin-text"
+              }`}
+            >
+              <FolderOpen className="h-3.5 w-3.5" />
+              Agrupadas
+            </button>
+            <button
+              onClick={() => setViewMode("individual")}
+              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                viewMode === "individual"
+                  ? "bg-skin-surface text-skin-text shadow-sm"
+                  : "text-skin-text-muted hover:text-skin-text"
+              }`}
+            >
+              <List className="h-3.5 w-3.5" />
+              Individuais
+            </button>
+          </div>
+
           <Button
             type="button"
             variant="outline"
@@ -155,101 +184,114 @@ export default function NotificationsPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Filtros</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="grid gap-3 md:grid-cols-4">
-            <label className="space-y-1">
-              <span className="text-xs font-medium text-skin-text-muted">Busca</span>
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-skin-text-muted" />
-                <Input
-                  className="pl-8"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Titulo, mensagem ou acao"
-                />
+      {viewMode === "grouped" ? (
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Notificacoes Agrupadas</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <GroupedNotificationsList endpoint="/system/notifications" />
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Filtros</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="grid gap-3 md:grid-cols-4">
+                <label className="space-y-1">
+                  <span className="text-xs font-medium text-skin-text-muted">Busca</span>
+                  <div className="relative">
+                    <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-skin-text-muted" />
+                    <Input
+                      className="pl-8"
+                      value={searchTerm}
+                      onChange={(event) => setSearchTerm(event.target.value)}
+                      placeholder="Titulo, mensagem ou acao"
+                    />
+                  </div>
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-xs font-medium text-skin-text-muted">Leitura</span>
+                  <select
+                    className="h-9 w-full rounded-md border border-skin-input-border bg-skin-input-background px-2 text-sm text-skin-text"
+                    value={readFilter}
+                    onChange={(event) => setReadFilter(event.target.value as NotificationReadFilter)}
+                  >
+                    <option value="all">Todas</option>
+                    <option value="unread">Nao lidas</option>
+                    <option value="read">Lidas</option>
+                  </select>
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-xs font-medium text-skin-text-muted">Severidade</span>
+                  <select
+                    className="h-9 w-full rounded-md border border-skin-input-border bg-skin-input-background px-2 text-sm text-skin-text"
+                    value={severityFilter}
+                    onChange={(event) =>
+                      setSeverityFilter(event.target.value as NotificationSeverityFilter)
+                    }
+                  >
+                    <option value="all">Todas</option>
+                    <option value="critical">Criticas</option>
+                    <option value="warning">Avisos</option>
+                    <option value="info">Informativas</option>
+                  </select>
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-xs font-medium text-skin-text-muted">Categoria</span>
+                  <select
+                    className="h-9 w-full rounded-md border border-skin-input-border bg-skin-input-background px-2 text-sm text-skin-text"
+                    value={categoryFilter}
+                    onChange={(event) =>
+                      setCategoryFilter(event.target.value as NotificationCategoryFilter)
+                    }
+                  >
+                    <option value="all">Todas</option>
+                    <option value="update">Atualizacoes</option>
+                    <option value="maintenance">Manutencao</option>
+                    <option value="backup">Backup</option>
+                    <option value="restore">Restauracao</option>
+                  </select>
+                </label>
               </div>
-            </label>
 
-            <label className="space-y-1">
-              <span className="text-xs font-medium text-skin-text-muted">Leitura</span>
-              <select
-                className="h-9 w-full rounded-md border border-skin-input-border bg-skin-input-background px-2 text-sm text-skin-text"
-                value={readFilter}
-                onChange={(event) => setReadFilter(event.target.value as NotificationReadFilter)}
-              >
-                <option value="all">Todas</option>
-                <option value="unread">Nao lidas</option>
-                <option value="read">Lidas</option>
-              </select>
-            </label>
+              <div className="mt-3 flex justify-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearFilters}
+                  disabled={!hasActiveFilters}
+                >
+                  Limpar filtros
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-            <label className="space-y-1">
-              <span className="text-xs font-medium text-skin-text-muted">Severidade</span>
-              <select
-                className="h-9 w-full rounded-md border border-skin-input-border bg-skin-input-background px-2 text-sm text-skin-text"
-                value={severityFilter}
-                onChange={(event) =>
-                  setSeverityFilter(event.target.value as NotificationSeverityFilter)
-                }
-              >
-                <option value="all">Todas</option>
-                <option value="critical">Criticas</option>
-                <option value="warning">Avisos</option>
-                <option value="info">Informativas</option>
-              </select>
-            </label>
-
-            <label className="space-y-1">
-              <span className="text-xs font-medium text-skin-text-muted">Categoria</span>
-              <select
-                className="h-9 w-full rounded-md border border-skin-input-border bg-skin-input-background px-2 text-sm text-skin-text"
-                value={categoryFilter}
-                onChange={(event) =>
-                  setCategoryFilter(event.target.value as NotificationCategoryFilter)
-                }
-              >
-                <option value="all">Todas</option>
-                <option value="update">Atualizacoes</option>
-                <option value="maintenance">Manutencao</option>
-                <option value="backup">Backup</option>
-                <option value="restore">Restauracao</option>
-              </select>
-            </label>
-          </div>
-
-          <div className="mt-3 flex justify-end">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={clearFilters}
-              disabled={!hasActiveFilters}
-            >
-              Limpar filtros
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="overflow-hidden">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Notificacoes ({filteredItems.length})</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <SystemNotificationsList
-            items={filteredItems}
-            loading={loading}
-            error={error}
-            hasActiveFilters={hasActiveFilters}
-            variant="full"
-            onMarkAsRead={markAsRead}
-          />
-        </CardContent>
-      </Card>
+          <Card className="overflow-hidden">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Notificacoes ({filteredItems.length})</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <SystemNotificationsList
+                items={filteredItems}
+                loading={loading}
+                error={error}
+                hasActiveFilters={hasActiveFilters}
+                variant="full"
+                onMarkAsRead={markAsRead}
+              />
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }

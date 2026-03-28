@@ -481,6 +481,30 @@ model ModuleNpmDependency {
   @@map("module_npm_dependencies")
 }
 
+model NotificationGroup {
+  id                 String     @id @default(uuid())
+  tenantId           String?
+  userId             String?
+  scopeType          String
+  scopeKey           String
+  unreadCount        Int        @default(0)
+  totalCount         Int        @default(0)
+  lastNotificationId String?
+  lastNotificationAt DateTime   @default(now())
+  lastTitle          String
+  lastBody           String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  notifications      Notification[] @relation("NotificationGroupNotifications")
+
+  @@unique([tenantId, userId, scopeType, scopeKey])
+  @@index([tenantId, userId])
+  @@index([scopeType, scopeKey])
+  @@index([lastNotificationAt])
+  @@map("notification_groups")
+}
+
 model Notification {
   id           String    @id @default(uuid())
   type         String    @default("SYSTEM_ALERT")
@@ -503,6 +527,10 @@ model Notification {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  // Campos para agrupamento
+  notificationGroupId String?
+  group               NotificationGroup? @relation("NotificationGroupNotifications", fields: [notificationGroupId], references: [id], onDelete: Cascade)
+
   @@index([tenantId])
   @@index([userId])
   @@index([targetUserId])
@@ -518,6 +546,7 @@ model Notification {
   @@index([userId, read])
   @@index([targetRole, isRead, createdAt])
   @@index([targetUserId, isRead, createdAt])
+  @@index([notificationGroupId]) // Novo índice para agrupamento
   @@map("notifications")
 }
 
