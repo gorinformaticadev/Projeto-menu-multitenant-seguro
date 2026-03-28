@@ -1,49 +1,40 @@
 # Guia de Upload e Exibicao de Imagens (Multi-Tenant)
 
-Este guia documenta o padrao atual para upload, armazenamento seguro e exibicao de imagens no sistema Pluggor.
+## Visao Geral
 
-## Visao Geral da Arquitetura
+- **Upload**: Frontend → FormData → API Proxy (`/api/...`) → Controller → Valida Buffer → Salva em Disco (isolado por tenant)
+- **Exibicao**: `<img src="...">` → Next.js Proxy → Backend → `res.sendFile` ou `useStaticAssets`
 
-- **Fluxo de Upload**: Frontend envia FormData → API Proxy (`/api/...`) → Controller Backend → Valida Buffer → Salva em Disco (Tenant-Isolated)
-- **Fluxo de Exibicao**: Frontend (`<img src="...">`) → Next.js Proxy (`/api/...` ou `/uploads/...`) → Backend Endpoint → `res.sendFile` ou `useStaticAssets`
+## Estrutura de Diretorios
 
-## Estrutura de Diretorios de Upload
-
-O diretorio raiz e gerenciado por `PathsService` e configurado via env `UPLOADS_DIR`.
+Gerenciado por `PathsService` (`core/common/paths/paths.service.ts`), configurado via `UPLOADS_DIR` env.
 
 ```
 uploads/
 ├── tenants/
 │   └── {tenantId}/
-│       ├── logos/                        # Logos do tenant
+│       ├── logos/                      # Logos do tenant
 │       └── users/
 │           └── {userId}/
-│               └── avatar/              # Avatares de usuarios
+│               └── avatar/            # Avatares de usuarios
 ├── platform/
-│   └── logos/                           # Logo da plataforma
+│   └── logos/                         # Logo da plataforma
 ├── modules/
-│   └── {slug}/                          # Uploads de modulos
-├── temp/                                # Staging temporario
-└── secure/                              # Arquivos seguros (com metadata no banco)
-    └── tenants/
-        └── {tenantId}/
-            └── modules/
-                └── {moduleName}/
-                    └── {documentType}/
+│   └── {slug}/                        # Uploads de modulos
+├── temp/                              # Staging (secure-files, backups)
+└── secure/                            # Arquivos com metadata no banco
 ```
 
-## Padroes de Upload por Tipo
+## Controllers de Upload (Codigo Real)
 
-### 1. Imagens em Memoria (Avatares, Logos de Plataforma)
+### 1. Avatar de Usuario
 
-Usar `createImageMulterOptions()` + `validateUploadedImageBuffer()`:
+**Arquivo**: `apps/backend/src/users/users.controller.ts`
 
 ```typescript
-import { createImageMulterOptions, validateUploadedImageBuffer } from '@/core/common/utils/image-upload.util';
-
-@Post('avatar')
-@UseInterceptors(FileInterceptor('file', createImageMulterOptions()))
-async uploadAvatar(@UploadedFile() file: any) {
+@Post('profile/avatar')
+@UseInterceptors(FileInterceptor('avatar', createImageMulterOptions()))
+async uploadAvatar(@UploadedFile() file: any, @Req() req) {
   const upload = validateUploadedImageBuffer(file);
 
   const avatarDir = path.join(
@@ -59,124 +50,166 @@ async uploadAvatar(@UploadedFile() file: any) {
 }
 ```
 
-### 2. Imagens em Disco (Logos de Tenant)
+### 2. Logo do Tenant
 
-Usar `multerConfig` com disk storage:
+**Arquivo**: `apps/backend/src/core/tenants/tenants.controller.ts`
 
 ```typescript
-import { multerConfig } from '@/core/common/config/multer.config';
-
-@Post('logo')
-@UseInterceptors(FileInterceptor('file', multerConfig))
+@Post('my-tenant/upload-logo')
+@UseInterceptors(FileInterceptor('logo', multerConfig))
 async uploadLogo(@UploadedFile() file: any) {
-  // file ja foi salvo pelo multer no diretorio correto
+  // multerConfig salva automaticamente em tenants/{tenantId}/logos/
+  // Validacao de magic numbers feita por validateFileSignature()
   return { url: `/api/tenants/public/${tenantId}/logo-file` };
+}
+
+@Post(':id/upload-logo')  // SUPER_ADMIN
+@UseInterceptors(FileInterceptor('logo', multerConfig))
+async uploadLogoById(@Param('id') tenantId: string, @UploadedFile() file: any) { }
+```
+
+### 3. Logo da Plataforma
+
+**Arquivo**: `apps/backend/src/core/security-config/platform-config.controller.ts`
+
+```typescript
+@Post('logo')
+@UseInterceptors(FileInterceptor('logo', createImageMulterOptions()))
+async uploadLogo(@UploadedFile() file: any) {
+  const upload = validateUploadedImageBuffer(file);
+  // Salva em uploads/platform/logos/
+  return { url: '/api/platform-config/logo-file' };
 }
 ```
 
-### 3. Arquivos de Modulo
+### 4. Arquivos Seguros
 
-Upload para diretorio isolado por modulo:
+**Arquivo**: `apps/backend/src/core/secure-files/secure-files.controller.ts`
 
 ```typescript
-const uploadDir = path.join(
-  process.cwd(), 'uploads', 'modules',
-  slug, resource, tenantId
-);
-fs.mkdirSync(uploadDir, { recursive: true });
+@Post('upload')
+@UseInterceptors(FileInterceptor('file', {
+  storage: diskStorage({
+    destination: 'uploads/temp/',
+    filename: (req, file, cb) => cb(null, `${uuidv4()}_${sanitizedName}`)
+  })
+}))
+async uploadSecureFile(@UploadedFile() file: any) {
+  // Apos upload em temp/, move para uploads/secure/tenants/{tenantId}/modules/{slug}/{type}/
+  // Tipos aceitos: JPEG, PNG, WebP, GIF, PDF, DOC, DOCX, XLS, XLSX
+}
+```
 
-const uniqueName = `${uuidv4()}_${sanitizedName}`;
-fs.writeFileSync(path.join(uploadDir, uniqueName), bufferData);
+### 5. Upload de Modulos (ZIP)
 
-return { url: `/api/${slug}/${resource}/uploads/${tenantId}/${uniqueName}` };
+**Arquivo**: `apps/backend/src/core/module-installer.controller.ts`
+
+```typescript
+@Post('upload')
+@UseInterceptors(FileInterceptor('file', {
+  storage: memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }  // 50MB
+}))
+async uploadModule(@UploadedFile() file: any) { }
+```
+
+### 6. Upload de Backups
+
+**Arquivo**: `apps/backend/src/backup/backup.controller.ts`
+
+```typescript
+@Post('upload')
+@UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+async uploadBackup(@UploadedFile() file: any) { }
 ```
 
 ## Servindo Arquivos
 
-### Endpoints Publicos (para `<img>` sem auth)
-
-Usar `@Public()` decorator para endpoints de exibicao:
+### Static Assets (main.ts)
 
 ```typescript
-import { Public } from '@/core/common/decorators/public.decorator';
+const logosPath = pathsService.getLogosDir();
 
+// 4 prefixos para compatibilidade
+app.useStaticAssets(logosPath, { prefix: '/logos', setHeaders: setLogosHeaders });
+app.useStaticAssets(logosPath, { prefix: '/api/logos', setHeaders: setLogosHeaders });
+app.useStaticAssets(logosPath, { prefix: '/uploads/logos', setHeaders: setLogosHeaders });
+app.useStaticAssets(logosPath, { prefix: '/api/uploads/logos', setHeaders: setLogosHeaders });
+```
+
+Headers configurados:
+- `Cache-Control: public, max-age=86400`
+- `Cross-Origin-Resource-Policy: cross-origin`
+- `Access-Control-Allow-Origin: *`
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+
+### Endpoints Publicos (res.sendFile)
+
+```typescript
 @Get('public/:id/avatar-file')
 @Public()
 async serveAvatar(@Param('id') userId: string, @Res() res: Response) {
-  const avatarPath = pathsService.resolveAvatarPath(userId);
-  if (fs.existsSync(avatarPath)) {
-    res.setHeader('Cache-Control', 'public, max-age=300');
-    res.sendFile(avatarPath);
-  } else {
-    res.status(404).json({ message: 'Avatar nao encontrado' });
-  }
+  const avatarPath = pathsService.resolveTenantUserAvatarFilePath(tenantId, userId);
+  res.setHeader('Cache-Control', 'public, max-age=300');
+  res.sendFile(avatarPath);
 }
 ```
 
-### Static Assets (Logos)
+Endpoints publicos no core:
+- `GET /api/users/public/:id/avatar-file` — Avatares
+- `GET /api/tenants/public/:id/logo-file` — Logos de tenant
+- `GET /api/platform-config/logo-file` — Logo da plataforma
 
-No `main.ts`, logos sao servidas como static assets:
-
-```typescript
-app.useStaticAssets(logosPath, { prefix: '/logos' });
-app.useStaticAssets(logosPath, { prefix: '/api/logos' });
-```
-
-Com headers: `Cache-Control: public, max-age=86400`
-
-### Proxy do Frontend (next.config.js)
-
-O proxy reescreve URLs para o backend:
+### Proxy Frontend (next.config.js)
 
 - `/api/*` → `NEXT_PUBLIC_API_URL/api/*`
 - `/uploads/*` → `NEXT_PUBLIC_API_URL/uploads/*`
 
+## Utilitarios Compartilhados
+
+| Utilitario | Arquivo | Uso |
+|-----------|---------|-----|
+| `createImageMulterOptions()` | `core/common/utils/image-upload.util.ts` | Multer memoria (5MB padrao) |
+| `validateUploadedImageBuffer()` | `core/common/utils/image-upload.util.ts` | Validacao magic numbers |
+| `sanitizeOriginalImageName()` | `core/common/utils/image-upload.util.ts` | Sanitiza nome do arquivo |
+| `multerConfig` | `core/common/config/multer.config.ts` | Multer disco (logos tenant) |
+| `validateFileSignature()` | `core/common/config/multer.config.ts` | Validacao assinatura |
+| `PathsService` | `core/common/paths/paths.service.ts` | Resolucao de caminhos |
+| `sanitizeStorageSegment()` | `core/common/paths/paths.service.ts` | Valida segmentos de path |
+| `@Public()` | `core/common/decorators/public.decorator.ts` | Endpoints sem auth |
+
 ## Seguranca
 
-### Validacao de Buffer (Magic Numbers)
-
-`validateUploadedImageBuffer()` verifica assinaturas de arquivo:
+### Magic Numbers (validateUploadedImageBuffer)
 - JPEG: `FF D8 FF`
 - PNG: `89 50 4E 47`
 - WebP: `RIFF....WEBP`
 - GIF: `GIF87a` / `GIF89a`
 
-### Protecao contra Path Traversal
-
-- `validatePathSegment()` bloqueia `..`, `/`, `\`, `\0`
+### Path Traversal
 - `sanitizeStorageSegment()` valida `^[a-zA-Z0-9._-]+$`
 - Nomes unicos com UUID previnem colisoes
+- `mode: 0o600` para avatares
 
-### Permissoes de Arquivo
+### CORS (Static Assets)
+- `Access-Control-Allow-Origin: *`
+- `Access-Control-Allow-Methods: GET, OPTIONS`
+- `Cross-Origin-Resource-Policy: cross-origin`
 
-- Avatares: `mode: 0o600` (leitura/escrita apenas pelo owner)
-- Cache: `max-age=300` (5 min) para avatares, `max-age=86400` (24h) para logos
-
-## Frontend - Exibicao de Imagens
+## Frontend — Exibicao
 
 ```tsx
-// Avatar do usuario
 <img
   src={user.avatarUrl || '/placeholder-avatar.png'}
   alt="Avatar"
   className="h-10 w-10 rounded-full"
-  onError={(e) => e.currentTarget.src = '/placeholder-avatar.png'}
+  onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-avatar.png'; }}
 />
 
-// Logo do tenant
 <img
   src={tenant.logoUrl || '/placeholder-logo.png'}
   alt="Logo"
   className="h-16"
 />
 ```
-
-## Utilitarios Compartilhados
-
-| Utilitario | Local | Uso |
-|-----------|-------|-----|
-| `createImageMulterOptions()` | `core/common/utils/image-upload.util.ts` | Config multer memoria |
-| `validateUploadedImageBuffer()` | `core/common/utils/image-upload.util.ts` | Validacao de buffer |
-| `multerConfig` | `core/common/config/multer.config.ts` | Config multer disco |
-| `PathsService` | `core/common/paths/paths.service.ts` | Resolucao de caminhos |
-| `@Public()` | `core/common/decorators/public.decorator.ts` | Endpoints sem auth |

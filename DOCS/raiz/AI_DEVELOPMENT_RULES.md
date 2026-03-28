@@ -1,71 +1,183 @@
 # Regras de Desenvolvimento para IA
 
-## Visao Geral do Projeto
+## Visao Geral
 
-Sistema Multitenant Seguro full-stack com isolamento de dados e controle de acesso baseado em roles (RBAC).
+Sistema SaaS multitenant com isolamento de dados, controle RBAC e implantacao simplificada via Docker.
 
-### Arquitetura
-- **Backend:** NestJS com TypeScript (pnpm workspace)
-- **Frontend:** Next.js com React e TypeScript
-- **Banco de Dados:** PostgreSQL com Prisma ORM
-- **Autenticacao:** JWT + 2FA (TOTP)
-- **Estilizacao:** Tailwind CSS + Radix UI
+### Stack
+- **Backend:** NestJS 11 + TypeScript (pnpm workspace)
+- **Frontend:** Next.js 16 + React 19 + TypeScript
+- **Banco:** PostgreSQL + Prisma ORM 6.19
+- **Cache:** Redis (ioredis + redis)
+- **Auth:** JWT + 2FA (TOTP/speakeasy)
+- **WS:** Socket.IO + Redis Adapter
+- **Estilo:** Tailwind CSS 3 + Radix UI + MUI 7
 - **Monitoramento:** Sentry
-- **Pacotes:** pnpm (monorepo workspace)
+- **Pacotes:** pnpm monorepo
 
 ---
 
-## Stack Tecnologica
+## Dependencias Reais
 
-### Backend (NestJS)
-- `@nestjs/common`, `@nestjs/core`, `@nestjs/platform-express`
-- `@nestjs/jwt`, `@nestjs/passport`, `passport-jwt`, `bcrypt`
-- `@prisma/client`, `prisma`
-- `@nestjs/throttler`, `helmet`, `class-validator`, `class-transformer`
-- `nodemailer`, `speakeasy`, `qrcode`
-- `@sentry/node`, `uuid`, `multer`, `cookie-parser`, `socket.io`
+### Backend (apps/backend/package.json)
 
-### Frontend (Next.js)
-- `next`, `react`, `react-dom`
-- `@radix-ui/*`, `lucide-react`, `tailwindcss`
-- `axios`
-- `clsx`, `class-variance-authority`, `tailwind-merge`
-- `@sentry/nextjs`, `next-themes`
+```json
+{
+  "dependencies": {
+    "@nestjs/common": "^11.1.14",
+    "@nestjs/config": "^4.0.3",
+    "@nestjs/core": "^11.1.14",
+    "@nestjs/event-emitter": "^3.0.1",
+    "@nestjs/jwt": "^11.0.2",
+    "@nestjs/passport": "^11.0.5",
+    "@nestjs/platform-express": "^11.1.14",
+    "@nestjs/platform-socket.io": "^11.1.14",
+    "@nestjs/schedule": "^6.1.1",
+    "@nestjs/serve-static": "^5.0.4",
+    "@nestjs/throttler": "^6.5.0",
+    "@nestjs/websockets": "^11.1.14",
+    "@prisma/client": "6.19.2",
+    "@sentry/node": "^8.55.0",
+    "@socket.io/redis-adapter": "^8.3.0",
+    "adm-zip": "^0.5.16",
+    "bcrypt": "^6.0.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.4",
+    "cookie-parser": "^1.4.7",
+    "cron": "^4.4.0",
+    "express": "^5.2.1",
+    "googleapis": "^171.3.0",
+    "helmet": "^8.1.0",
+    "ioredis": "^5.10.0",
+    "multer": "^2.1.1",
+    "nodemailer": "^7.0.13",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "pg": "^8.19.0",
+    "puppeteer": "^24.37.5",
+    "qrcode": "^1.5.4",
+    "redis": "^5.11.0",
+    "rxjs": "^7.8.2",
+    "sanitize-html": "^2.17.1",
+    "semver": "^7.7.4",
+    "socket.io": "^4.8.3",
+    "speakeasy": "^2.0.0",
+    "uuid": "^8.3.2",
+    "web-push": "^3.6.7"
+  }
+}
+```
 
-### Banco de Dados
-- **PostgreSQL** (producao)
-- **Prisma ORM** (migrations, queries, schema)
-- **Redis** (cache/sessions)
+### Frontend (apps/frontend/package.json)
+
+```json
+{
+  "dependencies": {
+    "@mui/material": "^7.3.8",
+    "@mui/icons-material": "^7.3.8",
+    "@radix-ui/react-avatar": "^1.1.11",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-popover": "^1.1.15",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "@radix-ui/react-toast": "^1.2.15",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "@sentry/nextjs": "^10.40.0",
+    "@tiptap/react": "^3.20.0",
+    "@tiptap/starter-kit": "^3.20.0",
+    "axios": "^1.13.6",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0",
+    "html2pdf.js": "^0.14.0",
+    "lucide-react": "^0.563.0",
+    "next": "^16.1.7",
+    "next-themes": "^0.4.6",
+    "qrcode.react": "^4.2.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-grid-layout": "^2.2.2",
+    "recharts": "^3.8.0",
+    "rrule": "^2.8.1",
+    "socket.io-client": "^4.8.3",
+    "tailwind-merge": "^2.6.1",
+    "zustand": "^5.0.11"
+  }
+}
+```
 
 ---
 
-## Principios de Desenvolvimento
+## Estrutura Real
 
-### 1. SOLID Principles
-- Single Responsibility: cada classe/funcao uma responsabilidade
-- Dependency Injection: usar construtores do NestJS
+### Backend (apps/backend/src/)
+```
+app.module.ts           main.ts
+audit/                  auth/
+backup/                 common/
+core/                   dashboard/
+diagnostics/            email/
+health/                 maintenance/
+modules/                notifications/
+prisma-seed/            retention/
+security/               security-config/
+security-regression/    system-settings/
+tenants/                update/
+users/
+```
+
+### Frontend (apps/frontend/src/)
+```
+app/                    components/
+contexts/               core/
+hooks/                  lib/
+modules/                providers/
+services/               test/
+theme/                  traducoes/
+types/
+```
+
+### Raiz do Projeto
+```
+apps/
+  backend/              API NestJS
+  frontend/             Next.js
+DOCS/                   Documentacao
+Scripts/                Scripts auxiliares
+install/                Scripts de instalacao
+docker-compose.*.yml    Configuracoes Docker
+package.json            Workspace root (pnpm)
+pnpm-workspace.yaml     Configuracao workspace
+```
+
+---
+
+## Princios de Desenvolvimento
+
+### SOLID
+- Single Responsibility: cada service uma responsabilidade
+- Dependency Injection: construtores do NestJS
 - Open/Closed: extender, nao modificar
 
-### 2. Clean Code
+### Clean Code
 - Nomes descritivos e em ingles
 - Funcoes pequenas e focadas
-- Evitar magic numbers (usar constantes)
+- Constantes em `apps/backend/src/common/constants/`
 
-### 3. DRY
-- Reutilizar logica comum via services e guards do core
-- Usar constantes definidas em `apps/backend/src/common/constants/`
+### DRY
+- Reutilizar guards, interceptors e decorators do core
+- Utilitarios compartilhados em `core/common/utils/`
 
-### 4. KISS
-- Simples e direto antes de complexo
-- Premature optimization e raiz de todos os males
+### KISS
+- Simples antes de complexo
 
 ---
 
-## Regras de Seguranca (OBRIGATORIAS)
+## Regras de Seguranca
 
-### 1. Sanitizacao de Entradas
+### 1. Entradas
 ```typescript
-// Sempre usar DTOs com validacao
 export class CreateUserDto {
   @IsEmail()
   @IsNotEmpty()
@@ -77,7 +189,7 @@ export class CreateUserDto {
 }
 ```
 
-### 2. Tratamento de Excecoes
+### 2. Excecoes
 ```typescript
 try {
   const user = await this.userService.create(userData);
@@ -88,15 +200,15 @@ try {
 }
 ```
 
-### 3. Prisma (Prepared Statements)
-Prisma ja usa prepared statements automaticamente. Sempre passar `tenantId` nos filtros.
+### 3. Prisma
+Prisma usa prepared statements. Sempre filtrar por `tenantId`.
 
-### 4. Protecao de Densiveis
+### 4. Dados Sensíveis
 - NUNCA expor senhas em responses
-- Hash de senhas com `bcrypt.hash(password, 10)`
-- Logs NUNCA devem conter senhas, tokens ou chaves
+- Hash com `bcrypt.hash(password, 10)`
+- Logs NUNCA com senhas, tokens ou chaves
 
-### 5. Autenticacao e Autorizacao
+### 5. Auth/Autorizacao
 ```typescript
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.SUPER_ADMIN)
@@ -104,111 +216,39 @@ Prisma ja usa prepared statements automaticamente. Sempre passar `tenantId` nos 
 export class AdminController { }
 ```
 
+### 6. Raw SQL
+Preferir `$queryRaw` com `Prisma.sql` tagged templates sobre `$queryRawUnsafe`:
+```typescript
+// Preferido
+const results = await this.prisma.$queryRaw(
+  Prisma.sql`SELECT * FROM tabela WHERE tenant_id = ${tenantId}`
+);
+// Funcional mas menos seguro
+const results = await this.prisma.$queryRawUnsafe(
+  `SELECT * FROM tabela WHERE tenant_id = $1`, tenantId
+);
+```
+
 ---
 
-## Proibicoes Absolutas
+## Proibicoes
 
-### NUNCA Fazer:
-- Senhas reais hardcoded
-- Chaves de API reais no codigo
-- Tokens JWT hardcoded
+### NUNCA
+- Senhas/chaves/tokens hardcoded no codigo
 - Dados sensiveis em logs ou console.log
 - `eval()` ou `Function()` com input do usuario
 - `any` como tipo (usar tipos especificos)
+- Alterar arquivos em `core/` para criar modulos
 
-### Sempre Usar:
+### Sempre
 - Variaveis de ambiente (`process.env.*`)
 - Exemplos ficticios para documentacao
 - Placeholders como `YOUR_TOKEN_HERE`
+- `pnpm` como gerenciador de pacotes
 
 ---
 
-## Estrutura de Arquivos
-
-### Monorepo (pnpm workspace)
-```
-apps/
-  backend/          # API NestJS
-    src/
-      auth/         # Autenticacao
-      users/        # Gestao de usuarios
-      tenants/      # Isolamento multitenant
-      security-config/ # Configuracoes de seguranca
-      common/       # Guards, interceptors, decorators, constants
-      modules/      # Modulos dinamicos (instalados via ZIP)
-      prisma/       # Modulo Prisma
-      core/         # Infraestrutura de modulos
-    prisma/
-      schema.prisma # Schema do banco
-      migrations/   # Migrations versionadas
-  frontend/         # Next.js
-    src/
-      app/          # App Router
-      components/   # Componentes React
-      contexts/     # Contextos
-      hooks/        # Hooks customizados
-      lib/          # Utilitarios (api, utils)
-      theme/        # Sistema de temas
-DOCS/               # Documentacao tecnica
-Scripts/            # Scripts auxiliares
-install/            # Scripts de instalacao
-```
-
----
-
-## Regras de Comentarios
-
-### Backend (TypeScript)
-```typescript
-/**
- * Servico de autenticacao
- * Implementa JWT + 2FA com isolamento multitenant
- */
-@Injectable()
-export class AuthService {
-  /**
-   * Realiza login do usuario
-   * @param email - Email do usuario
-   * @param password - Senha em texto plano
-   * @returns Tokens de acesso
-   */
-  async login(email: string, password: string): Promise<LoginResult> {
-    // Buscar usuario por email
-    const user = await this.findUserByEmail(email);
-    // ...
-  }
-}
-```
-
-### Frontend (React/TypeScript)
-```typescript
-/**
- * Hook para gerenciar configuracoes da plataforma
- */
-export function usePlatformConfig() {
-  const [config, setConfig] = useState<PlatformConfig>(DEFAULT_CONFIG);
-  // ...
-}
-```
-
----
-
-## Estrategia de Desenvolvimento
-
-### 1. Comecar Simples
-Primeiro o esqueleto basico, depois adicionar funcionalidades.
-
-### 2. Modularidade
-Separar responsabilidades em modulos NestJS distintos.
-
-### 3. Performance
-- Evitar N+1 queries (usar `include` do Prisma)
-- Usar indices no banco
-- Cache com Redis quando apropriado
-
----
-
-## Comandos Uteis
+## Comandos
 
 ```bash
 # Desenvolvimento
@@ -221,6 +261,8 @@ pnpm build:all
 # Prisma
 pnpm --filter backend exec prisma generate
 pnpm --filter backend exec prisma migrate dev --name nome
+pnpm --filter backend exec prisma migrate deploy
+pnpm --filter backend exec prisma studio
 
 # Testes
 pnpm --filter backend test
@@ -241,28 +283,32 @@ pnpm --filter backend run test:security-regression
 # Versionamento
 pnpm release
 pnpm versao
+
+# Docker
+docker compose -f docker-compose.dev.yml up --build -d
+docker compose --env-file install/.env.production -f docker-compose.prod.yml up -d
 ```
 
 ---
 
-## Checklist de Desenvolvimento
+## Checklist
 
-Antes de implementar qualquer codigo:
+Antes de implementar:
 - [ ] Explicar o que o codigo faz
-- [ ] Verificar se segue principios SOLID
-- [ ] Garantir simplicidade (KISS)
+- [ ] Seguir SOLID
+- [ ] Simplicidade (KISS)
 - [ ] Evitar repeticao (DRY)
-- [ ] Implementar sanitizacao de entradas
-- [ ] Adicionar tratamento de excecoes
-- [ ] Verificar seguranca (auth/authz)
-- [ ] Manter consistencia com codigo existente
-- [ ] Usar `pnpm` para todos os comandos
+- [ ] Sanitizar entradas (DTOs)
+- [ ] Tratar excecoes
+- [ ] Verificar auth/authz
+- [ ] Consistencia com codigo existente
+- [ ] Usar `pnpm` para comandos
 
-### Perguntas obrigatorias antes de codificar:
-1. "Posso fazer isso de forma mais simples?"
+### Perguntas obrigatorias:
+1. "Posso fazer de forma mais simples?"
 2. "Este codigo esta seguro?"
-3. "Estou seguindo os padroes do projeto?"
-4. "Este codigo e reutilizavel?"
+3. "Estou seguindo os padroes?"
+4. "E reutilizavel?"
 
 ---
 
@@ -272,5 +318,5 @@ Antes de implementar qualquer codigo:
 - [Next.js](https://nextjs.org/docs)
 - [Prisma](https://www.prisma.io/docs)
 - [Tailwind CSS](https://tailwindcss.com/docs)
-
-Consulte `DOCS/` para documentacao tecnica especifica.
+- [Radix UI](https://www.radix-ui.com/)
+- [MUI](https://mui.com/)
