@@ -40,7 +40,7 @@ export class SseJwtGuard implements CanActivate {
 
       return true;
     } catch (error: unknown) {
-      const errorName = error instanceof Error ? error.name : '';
+      const errorName = this.getErrorName(error);
       if (errorName === 'TokenExpiredError' && this.isSseProgressRequest(request)) {
         const decoded = this.jwtService.decode(token);
         if (!decoded || typeof decoded !== 'object') {
@@ -89,5 +89,18 @@ export class SseJwtGuard implements CanActivate {
   private isSseProgressRequest(request: SseRequest): boolean {
     const requestPath = String(request.path || request.url || '');
     return requestPath.includes('/backup/progress/');
+  }
+
+  private getErrorName(error: unknown): string {
+    if (error instanceof Error) {
+      return error.name;
+    }
+
+    if (error && typeof error === 'object' && 'name' in error) {
+      const name = error.name;
+      return typeof name === 'string' ? name : '';
+    }
+
+    return '';
   }
 }

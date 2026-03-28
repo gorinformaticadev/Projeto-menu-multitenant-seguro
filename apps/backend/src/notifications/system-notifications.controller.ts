@@ -1,6 +1,5 @@
 import { Controller, Get, Param, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
-import { Request as ExpressRequest } from 'express';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
@@ -11,7 +10,7 @@ import {
   SystemNotificationSeverityFilter,
 } from './dto/system-notifications.dto';
 
-type NotificationsRequest = ExpressRequest & {
+type NotificationsRequest = {
   user?: {
     id?: string;
     sub?: string;

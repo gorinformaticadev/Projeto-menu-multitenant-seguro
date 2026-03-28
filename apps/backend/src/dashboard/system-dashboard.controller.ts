@@ -1,13 +1,12 @@
 import { Body, Controller, Get, Put, Query, Request, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
-import { Request as ExpressRequest } from 'express';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { SystemDashboardQueryDto, UpdateSystemDashboardLayoutDto } from './dto/system-dashboard.dto';
 import { DashboardActor, DashboardModuleCardsResponse, SystemDashboardService } from './system-dashboard.service';
 
-type DashboardRequest = ExpressRequest & {
+type DashboardRequest = {
   user?: {
     id?: string;
     sub?: string;

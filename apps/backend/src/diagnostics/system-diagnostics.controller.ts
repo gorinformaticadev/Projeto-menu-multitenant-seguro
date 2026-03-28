@@ -1,13 +1,12 @@
 import { Controller, Get, Request, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
-import { Request as ExpressRequest } from 'express';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { DashboardActor } from '../dashboard/system-dashboard.service';
 import { SystemDiagnosticsService } from './system-diagnostics.service';
 
-type DiagnosticsRequest = ExpressRequest & {
+type DiagnosticsRequest = {
   user?: {
     id?: string;
     sub?: string;
