@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.86](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.85...v0.1.86) (2026-03-28)
+
+
+### Bug Fixes
+
+* **backend:** remove no-explicit-any warnings ([6a15f72](https://github.com/gorinformaticadev/Pluggor/commit/6a15f722c992a9c2f8b1cfe54cc06ae356036393))
+
 ### [0.1.85](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.84...v0.1.85) (2026-03-27)
 
 ### [0.1.84](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.83...v0.1.84) (2026-03-27)

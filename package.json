@@ -1,6 +1,6 @@
 {
   "private": true,
-  "version": "0.1.85",
+  "version": "0.1.86",
   "packageManager": "pnpm@9.15.9",
   "workspaces": {
     "packages": [
