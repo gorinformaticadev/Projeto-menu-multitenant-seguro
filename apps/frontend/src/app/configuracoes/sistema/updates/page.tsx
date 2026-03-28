@@ -25,10 +25,12 @@ import { RestoreSection } from './components/RestoreSection';
 import { useSystemVersion } from '@/hooks/useSystemVersion';
 import { useMaintenance } from '@/contexts/MaintenanceContext';
 import {
+  buildUpdateLifecycleViewModel,
   formatUpdateLifecycleStatus,
   formatUpdateStage,
   isUpdateLifecycleRunning,
   parseUpdateApiError,
+  UpdateLifecyclePayload,
   UpdateLifecycleStatus,
 } from './update-flow.utils';
 
@@ -45,36 +47,7 @@ interface UpdateStatus {
   checkEnabled: boolean;
   mode: 'docker' | 'native';
   updateChannel: 'release' | 'tag';
-  updateLifecycle?: {
-    status: UpdateLifecycleStatus;
-    availabilityStatus: 'available' | 'not_available';
-    rawStatus: 'idle' | 'running' | 'success' | 'failed' | 'rolled_back';
-    step: string;
-    progress: number;
-    startedAt: string | null;
-    finishedAt: string | null;
-    mode: 'docker' | 'native';
-    lock: boolean;
-    stale: boolean;
-    operation: {
-      active: boolean;
-      operationId: string | null;
-      type: 'update' | 'rollback' | null;
-    };
-    rollback: {
-      attempted: boolean;
-      completed: boolean;
-      reason: string | null;
-    };
-    error: {
-      code: string;
-      category: string;
-      stage: string;
-      userMessage: string;
-      technicalMessage: string | null;
-      exitCode: number | null;
-    } | null;
-  };
+  updateLifecycle?: UpdateLifecyclePayload;
 }
 
 interface UpdateLog {
@@ -143,7 +116,7 @@ export default function UpdatesPage() {
   const { toast } = useToast();
   const { version, loading: versionLoading } = useSystemVersion();
   const { state: maintenanceState, isMaintenanceActive } = useMaintenance();
-  const maintenanceReason = maintenanceState.reason || 'Atualizacao em andamento';
+  const maintenanceReason = maintenanceState.reason || 'Atualização em andamento';
 
   // Estados
   const [status, setStatus] = useState<UpdateStatus | null>(null);
@@ -170,6 +143,7 @@ export default function UpdatesPage() {
   const [activeTab, setActiveTab] = useState('status');
   const [hasSavedGitToken, setHasSavedGitToken] = useState(false);
   const lifecycle = status?.updateLifecycle;
+  const lifecycleView = buildUpdateLifecycleViewModel(lifecycle);
   const lifecycleStatus = lifecycle?.status || 'idle';
   const isUpdateRunning = isUpdateLifecycleRunning(lifecycleStatus) || loading.update;
   const lastTerminalLifecycleRef = useRef<UpdateLifecycleStatus | null>(null);
@@ -286,7 +260,7 @@ export default function UpdatesPage() {
       const response = await api.get('/api/update/check');
       toast({
         title: 'Verificação concluída',
-        description: response.data.message,
+        description: response.data?.message || 'Verificação concluída.',
       });
       await loadStatus();
     } catch (error: unknown) {
@@ -309,8 +283,8 @@ export default function UpdatesPage() {
         packageManager: config.packageManager,
       });
       toast({
-        title: 'Atualizacao iniciada',
-        description: response.data.message,
+        title: 'Atualização iniciada',
+        description: response.data?.message || 'O processo de atualização foi iniciado.',
       });
       setShowUpdateConfirm(false);
       await Promise.all([loadStatus(), loadLogs()]);
@@ -343,7 +317,7 @@ export default function UpdatesPage() {
       const response = await api.put('/api/update/config', payload);
       toast({
         title: 'Configurações salvas',
-        description: response.data.message,
+        description: response.data?.message || 'Configurações de update salvas com sucesso.',
       });
       setConfig(prev => ({ ...prev, gitToken: '' }));
       await Promise.all([loadStatus(), loadConfig()]);
@@ -367,7 +341,7 @@ export default function UpdatesPage() {
         gitToken: config.gitToken.trim() || undefined,
       };
       const response = await api.post('/api/update/test-connection', payload);
-      toast({ title: 'Conexão OK', description: response.data.message });
+      toast({ title: 'Conexão OK', description: response.data?.message || 'Conexão com o repositório validada.' });
     } catch (error: unknown) {
       toast({
         title: 'Falha na conexão',
@@ -459,39 +433,81 @@ export default function UpdatesPage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
-                    Fluxo de Atualizacao
+                    Fluxo de Atualização
                     {isUpdateLifecycleRunning(lifecycle.status) && <RefreshCw className="h-4 w-4 animate-spin text-skin-primary" />}
                   </CardTitle>
                   <CardDescription>Estado atual: {formatUpdateLifecycleStatus(lifecycle.status)}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-skin-text-muted">Etapa: {formatUpdateStage(lifecycle.step)}</span>
-                    <span className="font-medium">{Math.max(0, Math.min(100, lifecycle.progress || 0))}%</span>
+                    <span className="text-skin-text-muted">Etapa real: {lifecycleView.currentStepLabel}</span>
+                    <span className="font-medium">
+                      {lifecycleView.progressKnown && lifecycleView.progressPercent != null
+                        ? `${Math.max(0, Math.min(100, lifecycleView.progressPercent))}%`
+                        : 'Sem percentual confiável'}
+                    </span>
                   </div>
-                  {isUpdateLifecycleRunning(lifecycle.status) && lifecycle.startedAt && (
+                  {lifecycleView.lastCompletedStepLabel && (
                     <div className="text-xs text-skin-text-muted">
-                      Em execucao ha {formatElapsedTime(lifecycle.startedAt) || 'alguns instantes'}
+                      Última etapa concluída: {lifecycleView.lastCompletedStepLabel}
                     </div>
                   )}
-                  <div className="h-2 w-full rounded bg-skin-border overflow-hidden">
-                    <div className="h-2 rounded bg-skin-primary transition-all duration-300" style={{ width: `${Math.max(0, Math.min(100, lifecycle.progress || 0))}%` }} />
-                  </div>
+                  {lifecycleView.failedStepLabel && (
+                    <div className="text-xs text-skin-danger">
+                      Etapa com falha: {lifecycleView.failedStepLabel}
+                    </div>
+                  )}
+                  {isUpdateLifecycleRunning(lifecycle.status) && lifecycle.startedAt && (
+                    <div className="text-xs text-skin-text-muted">
+                      Em execução há {formatElapsedTime(lifecycle.startedAt) || 'alguns instantes'}
+                    </div>
+                  )}
+                  {lifecycleView.showProgressBar && lifecycleView.progressPercent != null && (
+                    <div className="h-2 w-full rounded bg-skin-border overflow-hidden">
+                      <div className="h-2 rounded bg-skin-primary transition-all duration-300" style={{ width: `${Math.max(0, Math.min(100, lifecycleView.progressPercent))}%` }} />
+                    </div>
+                  )}
+                  {lifecycle.persistenceError && (
+                    <div className="flex items-start gap-2 p-3 border border-skin-warning/30 bg-skin-warning/10 rounded-lg">
+                      <AlertTriangle className="h-4 w-4 text-skin-warning flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-skin-warning space-y-1">
+                        <div><strong>Falha de observabilidade:</strong> {lifecycle.persistenceError.userMessage}</div>
+                        <div className="text-xs">Fonte do fallback: {lifecycle.persistence.source}</div>
+                        {lifecycle.currentStep && (
+                          <div className="text-xs">Etapa recuperada: {lifecycle.currentStep.label}</div>
+                        )}
+                        {lifecycle.persistence.technicalMessage && (
+                          <div className="text-xs break-all">
+                            <strong>Detalhe técnico:</strong> {lifecycle.persistence.technicalMessage}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   {lifecycle.error && (
                     <div className="flex items-start gap-2 p-3 border border-skin-danger/30 bg-skin-danger/10 rounded-lg">
                       <XCircle className="h-4 w-4 text-skin-danger flex-shrink-0 mt-0.5" />
                       <div className="text-sm text-skin-danger space-y-1">
                         <div><strong>Falha:</strong> {lifecycle.error.userMessage}</div>
-                        <div className="text-xs">Codigo: {lifecycle.error.code} | Etapa: {formatUpdateStage(lifecycle.error.stage)}</div>
+                        <div className="text-xs">Código: {lifecycle.error.code} | Etapa: {formatUpdateStage(lifecycle.error.stage)}</div>
                         {lifecycle.error.exitCode != null && (
-                          <div className="text-xs">Saida: {lifecycle.error.exitCode}</div>
+                          <div className="text-xs">Saída: {lifecycle.error.exitCode}</div>
                         )}
                         {lifecycle.error.technicalMessage && (
                           <div className="text-xs break-all">
-                            <strong>Detalhe tecnico:</strong> {lifecycle.error.technicalMessage}
+                            <strong>Detalhe técnico:</strong> {lifecycle.error.technicalMessage}
                           </div>
                         )}
                       </div>
+                    </div>
+                  )}
+                  {process.env.NODE_ENV !== 'production' && (
+                    <div className="rounded-lg border border-skin-border p-3 text-xs text-skin-text-muted space-y-1">
+                      <div><strong>Debug local:</strong></div>
+                      <div>Arquivo de estado: {lifecycle.persistence.statePath || 'n/a'}</div>
+                      <div>Arquivo de log: {lifecycle.persistence.logPath || 'n/a'}</div>
+                      <div>Fonte do status: {lifecycle.persistence.source}</div>
+                      <div>Etapa bruta: {lifecycleView.currentStepRaw || lifecycle.step || 'n/a'}</div>
                     </div>
                   )}
                 </CardContent>

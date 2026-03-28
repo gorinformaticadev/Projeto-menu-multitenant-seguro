@@ -10,6 +10,8 @@ import * as fs from 'fs';
 import { Prisma, UpdateLog, UpdateSystemSettings } from '@prisma/client';
 import { SystemVersionService } from '@common/services/system-version.service';
 import { SystemUpdateAdminService } from './system-update-admin.service';
+import { resolvePlatformUpdateStep } from './platform-update-steps';
+import type { PersistedUpdateDiagnostics } from './platform-update-state.persistence';
 
 type UpdateExecutionStatus = 'starting' | 'completed';
 type UpdateLifecycleStatus =
@@ -59,6 +61,9 @@ type SystemUpdateStateSnapshot = {
     type: 'update' | 'rollback' | null;
   };
   stale?: boolean;
+  persistence?: PersistedUpdateDiagnostics;
+  statePath?: string;
+  logPath?: string;
 };
 
 type StructuredUpdateErrorPayload = {
@@ -430,6 +435,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
       gitUsername: settings.gitUsername || undefined,
       gitRepository: settings.gitRepository || undefined,
       gitToken: settings.gitToken ? '********' : undefined,
+      hasGitToken: Boolean(settings.gitToken),
       gitReleaseBranch: settings.gitReleaseBranch || 'main',
       packageManager: settings.packageManager || 'docker',
       updateChannel: this.normalizeUpdateChannel(settings.updateChannel),
@@ -440,7 +446,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
     };
   }
 
-  async updateConfig(data: UpdateConfigDto, userId: string): Promise<void> {
+  async updateConfig(data: UpdateConfigDto, userId: string): Promise<{ message: string }> {
     const current = await this.getSystemSettings();
     const updateData: Prisma.UpdateSystemSettingsUncheckedUpdateInput = {
       gitUsername: data.gitUsername,
@@ -461,6 +467,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
 
     try {
       await this.updateSystemSettings(updateData);
+      return { message: 'Configuracoes de update salvas com sucesso.' };
     } catch (error) {
       this.logger.error(`Falha ao salvar configuracoes de update: ${String(error)}`);
       throw new HttpException(
@@ -643,23 +650,59 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
     const rawStatus = systemState?.status || 'idle';
     const step = systemState?.step || 'idle';
     const progress = Number.isFinite(Number(systemState?.progress)) ? Number(systemState?.progress) : 0;
+    const progressPercent = systemState?.persistence?.progressKnown === false
+      ? null
+      : (progress < 0 ? 0 : progress > 100 ? 100 : Math.floor(progress));
     const hasStructuredError = Boolean(
       systemState?.errorCode || systemState?.errorCategory || systemState?.errorStage || systemState?.lastError,
     );
-
+    const persistenceError = this.buildPersistenceError(systemState);
     const lifecycleStatus = this.resolveLifecycleStatus(settings, systemState);
+    const currentStep = resolvePlatformUpdateStep(step, {
+      source: this.mapStepSource(systemState?.persistence?.source),
+      detail: systemState?.persistence?.healthy === false
+        ? systemState?.persistence?.technicalMessage || systemState?.persistence?.message || null
+        : null,
+      status: this.mapStepStatus(rawStatus, lifecycleStatus),
+    });
+    const failedStep = systemState?.errorStage
+      ? resolvePlatformUpdateStep(systemState.errorStage, {
+          source: this.mapStepSource(systemState?.persistence?.source),
+          detail: systemState?.technicalMessage || systemState?.lastError || null,
+          status: 'failed',
+        })
+      : rawStatus === 'failed' || rawStatus === 'rolled_back'
+        ? resolvePlatformUpdateStep(step, {
+            source: this.mapStepSource(systemState?.persistence?.source),
+            detail: systemState?.technicalMessage || systemState?.lastError || null,
+            status: 'failed',
+          })
+        : null;
+    const lastCompletedStep =
+      rawStatus === 'success' || rawStatus === 'rolled_back'
+        ? resolvePlatformUpdateStep(step, {
+            source: this.mapStepSource(systemState?.persistence?.source),
+            detail: null,
+            status: 'completed',
+          })
+        : null;
 
     return {
       status: lifecycleStatus,
       availabilityStatus: settings.updateAvailable ? 'available' : 'not_available',
       rawStatus,
       step,
-      progress: progress < 0 ? 0 : progress > 100 ? 100 : Math.floor(progress),
+      progress: progressPercent ?? 0,
+      progressPercent,
+      progressKnown: systemState?.persistence?.progressKnown !== false,
       startedAt: systemState?.startedAt || null,
       finishedAt: systemState?.finishedAt || null,
       mode: systemState?.mode || this.getInstallationMode(settings),
       lock: Boolean(systemState?.lock),
       stale: Boolean(systemState?.stale),
+      currentStep,
+      lastCompletedStep,
+      failedStep,
       operation: {
         active: Boolean(systemState?.operation?.active),
         operationId: systemState?.operation?.operationId || null,
@@ -670,6 +713,20 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
         completed: Boolean(systemState?.rollback?.completed),
         reason: systemState?.rollback?.reason || null,
       },
+      persistence: {
+        healthy: systemState?.persistence?.healthy ?? true,
+        source: systemState?.persistence?.source || 'state_file',
+        fallbackApplied: Boolean(systemState?.persistence?.fallbackApplied),
+        progressKnown: systemState?.persistence?.progressKnown !== false,
+        statePath: systemState?.statePath || '',
+        logPath: systemState?.logPath || null,
+        issueCode: systemState?.persistence?.issueCode || null,
+        message: systemState?.persistence?.message || null,
+        technicalMessage: systemState?.persistence?.technicalMessage || null,
+        rawExcerpt: systemState?.persistence?.rawExcerpt || null,
+        recoveredStepCode: systemState?.persistence?.recoveredStepCode || null,
+      },
+      persistenceError,
       error: hasStructuredError
         ? {
             code: systemState?.errorCode || 'UPDATE_UNEXPECTED_ERROR',
@@ -681,6 +738,59 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
           }
         : null,
     };
+  }
+
+  private buildPersistenceError(
+    systemState: SystemUpdateStateSnapshot | null,
+  ): UpdateStatusDto['updateLifecycle']['persistenceError'] {
+    if (!systemState?.persistence?.issueCode) {
+      return null;
+    }
+
+    return {
+      code: systemState.persistence.issueCode,
+      category: 'UPDATE_STATUS_PERSISTENCE_ERROR',
+      stage: 'state_read',
+      userMessage: systemState.persistence.message || 'Falha ao ler o estado persistido da atualizacao.',
+      technicalMessage: systemState.persistence.technicalMessage || null,
+      exitCode: null,
+    };
+  }
+
+  private mapStepSource(source: PersistedUpdateDiagnostics['source'] | undefined): 'state_file' | 'partial_state_recovery' | 'log_recovery' | 'last_good_state' | 'fallback' | 'none' {
+    if (
+      source === 'state_file' ||
+      source === 'partial_state_recovery' ||
+      source === 'log_recovery' ||
+      source === 'last_good_state'
+    ) {
+      return source;
+    }
+
+    if (source === 'state_missing' || source === 'state_empty' || source === 'state_invalid_json' || source === 'state_invalid_shape') {
+      return 'fallback';
+    }
+
+    return 'none';
+  }
+
+  private mapStepStatus(
+    rawStatus: SystemUpdateStateSnapshot['status'] | null | undefined,
+    lifecycleStatus: UpdateLifecycleStatus,
+  ): 'idle' | 'running' | 'completed' | 'failed' | 'unknown' {
+    if (rawStatus === 'idle' && lifecycleStatus === 'idle') {
+      return 'idle';
+    }
+    if (rawStatus === 'success' || lifecycleStatus === 'completed') {
+      return 'completed';
+    }
+    if (rawStatus === 'failed' || rawStatus === 'rolled_back' || lifecycleStatus === 'failed') {
+      return 'failed';
+    }
+    if (rawStatus === 'running' || lifecycleStatus === 'running' || lifecycleStatus === 'starting' || lifecycleStatus === 'restarting_services') {
+      return 'running';
+    }
+    return 'unknown';
   }
 
   private resolveLifecycleStatus(

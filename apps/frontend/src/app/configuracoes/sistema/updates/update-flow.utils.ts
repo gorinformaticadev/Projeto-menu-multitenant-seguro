@@ -10,6 +10,83 @@ export type UpdateLifecycleStatus =
   | 'completed'
   | 'failed';
 
+export type UpdateLifecycleStep = {
+  code: string;
+  label: string;
+  raw: string | null;
+  source: string;
+  detail: string | null;
+  status: 'idle' | 'running' | 'completed' | 'failed' | 'unknown';
+};
+
+export type UpdateLifecycleError = {
+  code: string;
+  category: string;
+  stage: string;
+  userMessage: string;
+  technicalMessage: string | null;
+  exitCode: number | null;
+};
+
+export type UpdateLifecycleObservability = {
+  healthy: boolean;
+  source: string;
+  fallbackApplied: boolean;
+  progressKnown: boolean;
+  statePath: string;
+  logPath: string | null;
+  issueCode: string | null;
+  message: string | null;
+  technicalMessage: string | null;
+  rawExcerpt: string | null;
+  recoveredStepCode: string | null;
+};
+
+export type UpdateLifecyclePayload = {
+  status: UpdateLifecycleStatus;
+  availabilityStatus: 'available' | 'not_available';
+  rawStatus: 'idle' | 'running' | 'success' | 'failed' | 'rolled_back';
+  step: string;
+  progress: number;
+  progressPercent: number | null;
+  progressKnown: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  mode: 'docker' | 'native';
+  lock: boolean;
+  stale: boolean;
+  currentStep: UpdateLifecycleStep | null;
+  lastCompletedStep: UpdateLifecycleStep | null;
+  failedStep: UpdateLifecycleStep | null;
+  operation: {
+    active: boolean;
+    operationId: string | null;
+    type: 'update' | 'rollback' | null;
+  };
+  rollback: {
+    attempted: boolean;
+    completed: boolean;
+    reason: string | null;
+  };
+  persistence: UpdateLifecycleObservability;
+  persistenceError: UpdateLifecycleError | null;
+  error: UpdateLifecycleError | null;
+};
+
+export type UpdateLifecycleViewModel = {
+  currentStepLabel: string;
+  currentStepCode: string | null;
+  currentStepRaw: string | null;
+  currentStepDetail: string | null;
+  progressPercent: number | null;
+  progressKnown: boolean;
+  failedStepLabel: string | null;
+  lastCompletedStepLabel: string | null;
+  persistenceError: UpdateLifecycleError | null;
+  persistenceSource: string;
+  showProgressBar: boolean;
+};
+
 type ApiErrorPayload = {
   message?: string;
   code?: string;
@@ -126,6 +203,30 @@ export function formatUpdateStage(stage: string | null | undefined): string {
   };
 
   return labels[compact] || compact;
+}
+
+export function buildUpdateLifecycleViewModel(
+  lifecycle: UpdateLifecyclePayload | null | undefined,
+): UpdateLifecycleViewModel {
+  const currentStep = lifecycle?.currentStep || null;
+  const lastCompletedStep = lifecycle?.lastCompletedStep || null;
+  const failedStep = lifecycle?.failedStep || null;
+  const progressKnown = lifecycle?.progressKnown === true && Number.isFinite(Number(lifecycle.progressPercent));
+  const progressPercent = progressKnown ? Number(lifecycle?.progressPercent) : null;
+
+  return {
+    currentStepLabel: currentStep?.label || 'Etapa real indisponível',
+    currentStepCode: currentStep?.code || null,
+    currentStepRaw: currentStep?.raw || null,
+    currentStepDetail: currentStep?.detail || null,
+    progressPercent,
+    progressKnown,
+    failedStepLabel: failedStep?.label || null,
+    lastCompletedStepLabel: lastCompletedStep?.label || null,
+    persistenceError: lifecycle?.persistenceError || null,
+    persistenceSource: lifecycle?.persistence?.source || 'none',
+    showProgressBar: progressKnown,
+  };
 }
 
 function normalizeNullableString(value: unknown): string | null {

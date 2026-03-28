@@ -36,6 +36,9 @@ export class UpdateConfigDto {
   gitToken?: string;
 
   @IsOptional()
+  hasGitToken?: boolean;
+
+  @IsOptional()
   @IsString()
   gitReleaseBranch?: string = 'main';
 
@@ -91,11 +94,37 @@ export class UpdateStatusDto {
     rawStatus: 'idle' | 'running' | 'success' | 'failed' | 'rolled_back';
     step: string;
     progress: number;
+    progressPercent: number | null;
+    progressKnown: boolean;
     startedAt: string | null;
     finishedAt: string | null;
     mode: 'docker' | 'native';
     lock: boolean;
     stale: boolean;
+    currentStep: {
+      code: string;
+      label: string;
+      raw: string | null;
+      source: string;
+      detail: string | null;
+      status: 'idle' | 'running' | 'completed' | 'failed' | 'unknown';
+    } | null;
+    lastCompletedStep: {
+      code: string;
+      label: string;
+      raw: string | null;
+      source: string;
+      detail: string | null;
+      status: 'idle' | 'running' | 'completed' | 'failed' | 'unknown';
+    } | null;
+    failedStep: {
+      code: string;
+      label: string;
+      raw: string | null;
+      source: string;
+      detail: string | null;
+      status: 'idle' | 'running' | 'completed' | 'failed' | 'unknown';
+    } | null;
     operation: {
       active: boolean;
       operationId: string | null;
@@ -106,6 +135,27 @@ export class UpdateStatusDto {
       completed: boolean;
       reason: string | null;
     };
+    persistence: {
+      healthy: boolean;
+      source: string;
+      fallbackApplied: boolean;
+      progressKnown: boolean;
+      statePath: string;
+      logPath: string | null;
+      issueCode: string | null;
+      message: string | null;
+      technicalMessage: string | null;
+      rawExcerpt: string | null;
+      recoveredStepCode: string | null;
+    };
+    persistenceError: {
+      code: string;
+      category: string;
+      stage: string;
+      userMessage: string;
+      technicalMessage: string | null;
+      exitCode: number | null;
+    } | null;
     error: {
       code: string;
       category: string;

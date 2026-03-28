@@ -112,6 +112,21 @@ function createService() {
         type: null,
       },
       stale: false,
+      statePath: '/tmp/update-state.json',
+      logPath: '/tmp/update.log',
+      persistence: {
+        healthy: true,
+        source: 'state_file',
+        fallbackApplied: false,
+        progressKnown: true,
+        statePath: '/tmp/update-state.json',
+        logPath: '/tmp/update.log',
+        issueCode: null,
+        message: null,
+        technicalMessage: null,
+        rawExcerpt: null,
+        recoveredStepCode: 'idle',
+      },
     })),
   };
 
@@ -306,6 +321,21 @@ describe('UpdateService', () => {
         type: 'update',
       },
       stale: false,
+      statePath: '/tmp/update-state.json',
+      logPath: '/tmp/update.log',
+      persistence: {
+        healthy: true,
+        source: 'state_file',
+        fallbackApplied: false,
+        progressKnown: true,
+        statePath: '/tmp/update-state.json',
+        logPath: '/tmp/update.log',
+        issueCode: null,
+        message: null,
+        technicalMessage: null,
+        rawExcerpt: null,
+        recoveredStepCode: 'healthcheck',
+      },
     });
 
     const status = await service.getUpdateStatus();
@@ -315,9 +345,77 @@ describe('UpdateService', () => {
       status: 'restarting_services',
       step: 'healthcheck',
       progress: 82,
+      progressPercent: 82,
+      progressKnown: true,
+      currentStep: {
+        code: 'post_deploy_validation',
+      },
       operation: {
         active: true,
         operationId: 'update-123',
+      },
+    });
+  });
+
+  it('getUpdateStatus preserva falha de persistencia com fallback coerente', async () => {
+    const { service, systemUpdateAdminServiceMock } = createService();
+
+    systemUpdateAdminServiceMock.getStatus.mockResolvedValueOnce({
+      status: 'running',
+      mode: 'docker',
+      startedAt: '2026-03-12T10:00:00.000Z',
+      finishedAt: null,
+      fromVersion: 'v1.0.0',
+      toVersion: 'v1.2.3',
+      step: 'pull_images',
+      progress: 0,
+      lock: true,
+      lastError: null,
+      errorCode: null,
+      errorCategory: null,
+      errorStage: null,
+      exitCode: null,
+      userMessage: null,
+      technicalMessage: null,
+      rollback: {
+        attempted: false,
+        completed: false,
+        reason: null,
+      },
+      operation: {
+        active: true,
+        operationId: 'update-999',
+        type: 'update',
+      },
+      stale: false,
+      statePath: '/tmp/update-state.json',
+      logPath: '/tmp/update.log',
+      persistence: {
+        healthy: false,
+        source: 'log_recovery',
+        fallbackApplied: true,
+        progressKnown: false,
+        statePath: '/tmp/update-state.json',
+        logPath: '/tmp/update.log',
+        issueCode: 'UPDATE_STATUS_PERSISTENCE_ERROR',
+        message: 'Falha ao ler o estado persistido da atualizacao.',
+        technicalMessage: 'Arquivo update-state.json invalido',
+        rawExcerpt: '{INVALID',
+        recoveredStepCode: 'pull_images',
+      },
+    });
+
+    const status = await service.getUpdateStatus();
+
+    expect(status.updateLifecycle).toMatchObject({
+      status: 'running',
+      progressPercent: null,
+      progressKnown: false,
+      currentStep: {
+        code: 'pull_images',
+      },
+      persistenceError: {
+        code: 'UPDATE_STATUS_PERSISTENCE_ERROR',
       },
     });
   });

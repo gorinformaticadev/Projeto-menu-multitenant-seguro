@@ -6,33 +6,21 @@ import * as path from 'path';
 import { AuditService } from '../audit/audit.service';
 import { NotificationService } from '../notifications/notification.service';
 import { PathsService } from '@core/common/paths/paths.service';
+import {
+  type PersistedUpdateDiagnostics,
+  type PersistedUpdateReadResult,
+  type PersistedUpdateState,
+  readPersistedUpdateState,
+  writePersistedUpdateState,
+} from './platform-update-state.persistence';
 
-type UpdateStateStatus = 'idle' | 'running' | 'success' | 'failed' | 'rolled_back';
 type UpdateMode = 'docker' | 'native';
 
-type UpdateState = {
-  status: UpdateStateStatus;
-  mode: UpdateMode;
-  startedAt: string | null;
-  finishedAt: string | null;
-  fromVersion: string;
-  toVersion: string;
-  step: string;
-  progress: number;
-  lock: boolean;
-  lastError: string | null;
-  errorCode: string | null;
-  errorCategory: string | null;
-  errorStage: string | null;
-  exitCode: number | null;
-  userMessage: string | null;
-  technicalMessage: string | null;
-  rollback: {
-    attempted: boolean;
-    completed: boolean;
-    reason: string | null;
-  };
+type UpdateState = PersistedUpdateState & {
+  persistence?: PersistedUpdateDiagnostics;
 };
+
+type UpdateStateWithoutDiagnostics = PersistedUpdateState;
 
 type UpdateOperationType = 'update' | 'rollback';
 
@@ -67,36 +55,13 @@ type UpdateFailureDescriptor = {
   userMessage: string;
 };
 
-const DEFAULT_UPDATE_STATE: UpdateState = {
-  status: 'idle',
-  mode: 'native',
-  startedAt: null,
-  finishedAt: null,
-  fromVersion: 'unknown',
-  toVersion: 'unknown',
-  step: 'idle',
-  progress: 0,
-  lock: false,
-  lastError: null,
-  errorCode: null,
-  errorCategory: null,
-  errorStage: null,
-  exitCode: null,
-  userMessage: null,
-  technicalMessage: null,
-  rollback: {
-    attempted: false,
-    completed: false,
-    reason: null,
-  },
-};
-
 @Injectable()
 export class SystemUpdateAdminService {
   private readonly logger = new Logger(SystemUpdateAdminService.name);
   private activeProcess: ChildProcessWithoutNullStreams | null = null;
   private activeOperationId: string | null = null;
   private activeOperationType: UpdateOperationType | null = null;
+  private readonly lastHealthyStateByPath = new Map<string, UpdateStateWithoutDiagnostics>();
 
   constructor(
     private readonly pathsService: PathsService,
@@ -309,13 +274,16 @@ export class SystemUpdateAdminService {
     stale: boolean;
     lockPath: string;
     statePath: string;
+    logPath: string;
   }> {
     const runtime = this.resolveRuntimePaths();
-    const state = await this.readState(runtime.statePath);
+    const stateResult = await this.readStateResult(runtime);
+    const state = stateResult.state;
     const stale = this.isStaleRunningState(state);
 
     return {
       ...state,
+      persistence: stateResult.diagnostics,
       operation: {
         active: this.activeProcess !== null,
         operationId: this.activeOperationId,
@@ -324,6 +292,7 @@ export class SystemUpdateAdminService {
       stale,
       lockPath: runtime.lockPath,
       statePath: runtime.statePath,
+      logPath: runtime.logPath,
     };
   }
 
@@ -531,7 +500,7 @@ export class SystemUpdateAdminService {
   }
 
   private async assertNoRunningOperation(runtime: RuntimePaths, raiseConflict = false): Promise<void> {
-    const state = await this.readState(runtime.statePath);
+    const state = (await this.readStateResult(runtime)).state;
     const runningByState = state.status === 'running' && state.lock;
     const runningInMemory = this.activeProcess !== null;
     const staleState = runningByState && this.isStaleRunningState(state) && !runningInMemory;
@@ -635,9 +604,7 @@ export class SystemUpdateAdminService {
       const output = chunk.toString().trim();
       if (output) {
         this.logger.log(`[${meta.operationType}] ${output}`);
-        if (meta.operationType === 'rollback') {
-          void this.appendLog(runtime.logPath, 'rollback', output);
-        }
+        void this.appendLog(runtime.logPath, meta.operationType, output);
       }
     });
 
@@ -645,9 +612,7 @@ export class SystemUpdateAdminService {
       const output = chunk.toString().trim();
       if (output) {
         this.logger.warn(`[${meta.operationType}] ${output}`);
-        if (meta.operationType === 'rollback') {
-          void this.appendLog(runtime.logPath, 'rollback', `ERROR: ${output}`);
-        }
+        void this.appendLog(runtime.logPath, meta.operationType, `ERROR: ${output}`);
       }
     });
 
@@ -739,7 +704,7 @@ export class SystemUpdateAdminService {
         }
       }
 
-      let state = await this.readState(runtime.statePath);
+      let state = (await this.readStateResult(runtime)).state;
       if (meta.operationType === 'update') {
         if (exitCode === 0 && state.status !== 'success' && state.status !== 'rolled_back') {
           state = await this.mergeState(runtime.statePath, {
@@ -873,101 +838,34 @@ export class SystemUpdateAdminService {
     this.activeOperationType = null;
   }
 
-  private async readState(statePath: string): Promise<UpdateState> {
-    let raw = '';
-    try {
-      raw = await fsp.readFile(statePath, 'utf8');
-    } catch {
-      return { ...DEFAULT_UPDATE_STATE };
+  private async readStateResult(runtime: RuntimePaths): Promise<PersistedUpdateReadResult> {
+    const result = await readPersistedUpdateState({
+      statePath: runtime.statePath,
+      logPath: runtime.logPath,
+      lastKnownState: this.lastHealthyStateByPath.get(runtime.statePath) || null,
+      detectMode: () => this.detectInstallationMode(),
+      activeOperation: {
+        active: this.activeProcess !== null,
+        type: this.activeOperationType,
+      },
+    });
+
+    if (result.diagnostics.healthy) {
+      this.lastHealthyStateByPath.set(runtime.statePath, result.state);
     }
 
-    try {
-      const parsed = JSON.parse(raw) as Partial<UpdateState>;
-      const status = this.normalizeStateStatus(parsed.status);
-      return {
-        status,
-        mode: this.normalizeMode(parsed.mode),
-        startedAt: this.normalizeNullableString(parsed.startedAt),
-        finishedAt: this.normalizeNullableString(parsed.finishedAt),
-        fromVersion: this.normalizeString(parsed.fromVersion, 'unknown'),
-        toVersion: this.normalizeString(parsed.toVersion, 'unknown'),
-        step: this.normalizeString(parsed.step, 'idle'),
-        progress: this.normalizeProgress(parsed.progress),
-        lock: Boolean(parsed.lock),
-        lastError: this.normalizeNullableString(parsed.lastError),
-        errorCode: this.normalizeNullableString(parsed.errorCode),
-        errorCategory: this.normalizeNullableString(parsed.errorCategory),
-        errorStage: this.normalizeNullableString(parsed.errorStage),
-        exitCode: this.normalizeNullableNumber(parsed.exitCode),
-        userMessage: this.normalizeNullableString(parsed.userMessage),
-        technicalMessage: this.normalizeNullableString(parsed.technicalMessage),
-        rollback: {
-          attempted: Boolean(parsed.rollback?.attempted),
-          completed: Boolean(parsed.rollback?.completed),
-          reason: this.normalizeNullableString(parsed.rollback?.reason),
-        },
-      };
-    } catch {
-      return {
-        ...DEFAULT_UPDATE_STATE,
-        status: 'failed',
-        lastError: 'update-state.json invalido',
-        errorCode: 'UPDATE_STATUS_PERSISTENCE_ERROR',
-        errorCategory: 'UPDATE_STATUS_PERSISTENCE_ERROR',
-        errorStage: 'state-read',
-        technicalMessage: 'Arquivo update-state.json invalido',
-        userMessage: 'Falha ao ler o estado persistido da atualizacao.',
-      };
+    if (!result.diagnostics.healthy && this.shouldEmitPersistenceDiagnostics()) {
+      this.logger.warn(
+        `Status degradado do update. source=${result.diagnostics.source} statePath=${runtime.statePath} ` +
+        `issue=${result.diagnostics.issueCode || 'none'} detail=${result.diagnostics.technicalMessage || 'n/a'}`,
+      );
     }
+
+    return result;
   }
 
-  private normalizeStateStatus(value: unknown): UpdateStateStatus {
-    const allowed: UpdateStateStatus[] = ['idle', 'running', 'success', 'failed', 'rolled_back'];
-    const normalized = String(value || '').trim() as UpdateStateStatus;
-    if (allowed.includes(normalized)) {
-      return normalized;
-    }
-    return 'idle';
-  }
-
-  private normalizeMode(value: unknown): UpdateMode {
-    const normalized = String(value || '').trim().toLowerCase();
-    if (normalized === 'docker' || normalized === 'native') {
-      return normalized;
-    }
-    return this.detectInstallationMode();
-  }
-
-  private normalizeString(value: unknown, fallback: string): string {
-    const normalized = String(value || '').trim();
-    return normalized || fallback;
-  }
-
-  private normalizeNullableString(value: unknown): string | null {
-    const normalized = String(value || '').trim();
-    return normalized || null;
-  }
-
-  private normalizeNullableNumber(value: unknown): number | null {
-    const normalized = Number(value);
-    if (!Number.isFinite(normalized)) {
-      return null;
-    }
-    return normalized;
-  }
-
-  private normalizeProgress(value: unknown): number {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) {
-      return 0;
-    }
-    if (numeric < 0) {
-      return 0;
-    }
-    if (numeric > 100) {
-      return 100;
-    }
-    return Math.floor(numeric);
+  private shouldEmitPersistenceDiagnostics(): boolean {
+    return process.env.NODE_ENV !== 'production' || process.env.UPDATE_STATUS_DEBUG === 'true';
   }
 
   private isStaleRunningState(state: UpdateState): boolean {
@@ -1013,16 +911,15 @@ export class SystemUpdateAdminService {
     }
   }
 
-  private async writeState(statePath: string, state: UpdateState): Promise<void> {
-    await this.ensureDir(path.dirname(statePath));
-    const tmpPath = `${statePath}.tmp-${process.pid}-${Date.now()}`;
-    await fsp.writeFile(tmpPath, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
-    await fsp.rename(tmpPath, statePath);
+  private async writeState(statePath: string, state: UpdateStateWithoutDiagnostics): Promise<void> {
+    await writePersistedUpdateState(statePath, state);
+    this.lastHealthyStateByPath.set(statePath, state);
   }
 
-  private async mergeState(statePath: string, patch: Partial<UpdateState>): Promise<UpdateState> {
-    const current = await this.readState(statePath);
-    const merged: UpdateState = {
+  private async mergeState(statePath: string, patch: Partial<UpdateStateWithoutDiagnostics>): Promise<UpdateStateWithoutDiagnostics> {
+    const runtime = this.resolveRuntimePaths();
+    const current = (await this.readStateResult({ ...runtime, statePath })).state;
+    const merged: UpdateStateWithoutDiagnostics = {
       ...current,
       ...patch,
       rollback: {
@@ -1030,7 +927,7 @@ export class SystemUpdateAdminService {
         ...(patch.rollback ?? {}),
       },
     };
-    merged.progress = this.normalizeProgress(merged.progress);
+    merged.progress = Math.max(0, Math.min(100, Math.floor(Number.isFinite(Number(merged.progress)) ? Number(merged.progress) : 0)));
     await this.writeState(statePath, merged);
     return merged;
   }
