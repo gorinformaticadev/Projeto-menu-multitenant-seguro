@@ -537,7 +537,7 @@ export class BackupService {
     );
   }
 
-  async markJobSuccess(jobId: string, details: Prisma.BackupJobUpdateInput = {}): Promise<void> {
+  async markJobSuccess(jobId: string, details: Prisma.BackupJobUncheckedUpdateInput = {}): Promise<void> {
     await this.withPrismaConnectionRetry('markJobSuccess', async () => {
       await this.prisma.backupJob.update({
         where: { id: jobId },

@@ -240,3 +240,8 @@ Verifique se PostgreSQL esta rodando e confirme o DATABASE_URL no `.env`.
 - prisma.prisma
 - bradlc.vscode-tailwindcss
 - ms-vscode.vscode-typescript-next
+
+### Matar processos node
+```bash
+taskkill /F /IM node.exe 
+```
