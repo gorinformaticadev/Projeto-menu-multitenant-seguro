@@ -10,6 +10,24 @@
 import { moduleRegistry } from '../registry/module-registry';
 import { ModuleContribution } from '../types/module.types';
 
+type ModuleMenuData = {
+  id?: string;
+  label?: string;
+  route?: string;
+  icon?: string;
+  order?: number;
+};
+
+type ExternalModuleData = {
+  slug: string;
+  name: string;
+  menus?: ModuleMenuData[];
+};
+
+type ModuleDefinitionExport = {
+  default?: ModuleContribution;
+};
+
 /**
  * Carrega módulos externos baseado nos dados da API
  * Não há lista fixa - os módulos são descobertos dinamicamente
@@ -50,17 +68,17 @@ export async function loadExternalModules(): Promise<void> {
  * Carrega um módulo específico dinamicamente
  * Tenta importar o módulo baseado em convenção de nomes
  */
-async function loadModuleDynamically(moduleData: any): Promise<void> {
+async function loadModuleDynamically(moduleData: ExternalModuleData): Promise<void> {
   const { slug, name, menus } = moduleData;
 
   try {
     // Tentar carregar definição do módulo se existir
     // Convenção: @modules/{slug}/frontend/index.ts exporta ModuleContribution
     // Import dinâmico (pode falhar se módulo não tiver definição frontend)
-    const moduleDefinition = await import(
+    const moduleDefinition = (await import(
       /* webpackIgnore: true */
       `../../../../../packages/modules/${slug}/frontend/index`
-    ).catch(() => null);
+    ).catch(() => null)) as ModuleDefinitionExport | null;
 
     if (moduleDefinition && moduleDefinition.default) {
       // Módulo tem definição completa - registrar
@@ -72,7 +90,7 @@ async function loadModuleDynamically(moduleData: any): Promise<void> {
         name: name,
         version: '1.0.0',
         enabled: true,
-        sidebar: menus?.map((menu: any, index: number) => ({
+        sidebar: menus?.map((menu: ModuleMenuData, index: number) => ({
           id: menu.id || `${slug}-${index}`,
           name: menu.label,
           href: menu.route,
@@ -94,7 +112,7 @@ async function loadModuleDynamically(moduleData: any): Promise<void> {
       name: name,
       version: '1.0.0',
       enabled: true,
-      sidebar: menus?.map((menu: any, index: number) => ({
+      sidebar: menus?.map((menu: ModuleMenuData, index: number) => ({
         id: menu.id || `${slug}-${index}`,
         name: menu.label,
         href: menu.route,
@@ -107,4 +125,3 @@ async function loadModuleDynamically(moduleData: any): Promise<void> {
     moduleRegistry.register(fallbackContribution);
   }
 }
-

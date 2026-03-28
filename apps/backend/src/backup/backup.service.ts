@@ -12,6 +12,7 @@ import {
   BackupJob,
   BackupJobStatus,
   BackupJobType,
+  Prisma,
   Role,
 } from '@prisma/client';
 import { createHash, randomUUID } from 'crypto';
@@ -23,7 +24,7 @@ import { PathsService } from '../core/common/paths/paths.service';
 import { CronService } from '../core/cron/cron.service';
 import { PrismaReconnectFailed, PrismaService } from '../core/prisma/prisma.service';
 import { BackupConfigService } from './backup-config.service';
-import { BackupProcessService } from './backup-process.service';
+import { BackupProcessService, ProcessExecutionResult } from './backup-process.service';
 import { BackupRuntimeStateService } from './backup-runtime-state.service';
 import { RestoreJobDto } from './dto/restore-job.dto';
 
@@ -37,6 +38,19 @@ interface JobLogEntry {
   at: string;
   level: 'INFO' | 'WARN' | 'ERROR';
   message: string;
+}
+
+interface LegacyBackupLogEntry {
+  id: string;
+  operationType: BackupJobType;
+  status: BackupJobStatus;
+  fileName: string | null;
+  fileSize: number | null;
+  startedAt: Date;
+  completedAt: Date | null;
+  durationSeconds: number | null;
+  executedBy: string;
+  errorMessage: string | null;
 }
 
 type BackupOperationSource = 'panel' | 'cron' | 'system' | 'wrapper';
@@ -411,7 +425,7 @@ export class BackupService {
     return artifact;
   }
 
-  async listLegacyLogs(limit = 50): Promise<any[]> {
+  async listLegacyLogs(limit = 50): Promise<LegacyBackupLogEntry[]> {
     const safeLimit = Math.max(1, Math.min(limit, 200));
     const jobs = await this.prisma.backupJob.findMany({
       orderBy: { createdAt: 'desc' },
@@ -647,7 +661,7 @@ export class BackupService {
       await this.prisma.backupJob.update({
         where: { id: jobId },
         data: {
-          logs: trimmed as any,
+          logs: this.toInputJson(trimmed),
         },
       });
     });
@@ -1020,7 +1034,7 @@ export class BackupService {
         filePath: artifact.filePath,
         sizeBytes: artifact.sizeBytes,
         checksumSha256: artifact.checksumSha256,
-        metadata: {
+        metadata: this.toInputJson({
           ...(this.toJsonRecord(job.metadata) || {}),
           safetyBackupArtifactId: safetyArtifact?.id || null,
           stagingDatabase,
@@ -1028,7 +1042,7 @@ export class BackupService {
           rollbackDatabase,
           restoredUploadsPath,
           promotedAt: new Date().toISOString(),
-        } as any,
+        }),
       });
 
       const restoreCompletedMetadata = {
@@ -2226,7 +2240,8 @@ export class BackupService {
   }
 
   private isRetryablePrismaConnectionError(error: unknown): boolean {
-    const code = typeof (error as any)?.code === 'string' ? String((error as any).code).toUpperCase() : '';
+    const errorRecord = this.toJsonRecord(error);
+    const code = typeof errorRecord?.code === 'string' ? String(errorRecord.code).toUpperCase() : '';
     if (code === 'P1001' || code === 'P1017') {
       return true;
     }
@@ -2263,7 +2278,7 @@ export class BackupService {
 
   private errorMessage(error: unknown): string {
     if (error instanceof Error) {
-      const commandResult = (error as any).result;
+      const commandResult = this.readProcessExecutionResult(error);
       if (commandResult?.stderr) {
         const stderr = String(commandResult.stderr);
         const tail = stderr.slice(-4000);
@@ -2477,6 +2492,19 @@ export class BackupService {
     }
 
     return sanitized.length > 1000 ? `${sanitized.slice(0, 997)}...` : sanitized;
+  }
+
+  private toInputJson(value: unknown): Prisma.InputJsonValue {
+    return value as Prisma.InputJsonValue;
+  }
+
+  private readProcessExecutionResult(error: Error): ProcessExecutionResult | null {
+    const result = (error as Error & { result?: unknown }).result;
+    if (!result || typeof result !== 'object' || Array.isArray(result)) {
+      return null;
+    }
+
+    return result as ProcessExecutionResult;
   }
 
   private async notifyFailure(jobId: string, message: string): Promise<void> {

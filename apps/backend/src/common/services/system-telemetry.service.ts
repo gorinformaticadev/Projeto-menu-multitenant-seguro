@@ -79,6 +79,25 @@ export interface SecurityTelemetrySnapshot {
   deniedAccess: SecurityTelemetryIpSummary[];
 }
 
+export type TelemetryRequestLike = {
+  method?: unknown;
+  route?: {
+    path?: string | string[];
+  };
+  baseUrl?: unknown;
+  originalUrl?: unknown;
+  url?: unknown;
+  path?: unknown;
+  headers?: Record<string, unknown>;
+  ip?: unknown;
+  socket?: {
+    remoteAddress?: unknown;
+  };
+  connection?: {
+    remoteAddress?: unknown;
+  };
+};
+
 type RequestTelemetryRecord = {
   at: number;
   method: string;
@@ -132,7 +151,7 @@ export class SystemTelemetryService {
   recordRequest(input: {
     method?: unknown;
     route?: unknown;
-    request?: Record<string, any>;
+    request?: TelemetryRequestLike;
     durationMs: number;
     statusCode: number;
   }): void {
@@ -166,7 +185,7 @@ export class SystemTelemetryService {
     type: SecurityTelemetryEventType;
     method?: unknown;
     route?: unknown;
-    request?: Record<string, any>;
+    request?: TelemetryRequestLike;
     ip?: unknown;
     statusCode: number;
   }): void {

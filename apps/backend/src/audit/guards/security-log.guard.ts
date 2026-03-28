@@ -1,8 +1,20 @@
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { AuditService } from '../audit.service';
+import { AuditLogData, AuditService } from '../audit.service';
 import { SECURITY_LOG_KEY, SecurityLogOptions } from '../decorators/security-log.decorator';
 import { Request } from 'express';
+
+type SecurityLogRequestUser = {
+  id?: string;
+  name?: string;
+  email?: string;
+  role?: string;
+  tenantId?: string | null;
+};
+
+type SecurityLogRequest = Request & {
+  user?: SecurityLogRequestUser;
+};
 
 @Injectable()
 export class SecurityLogGuard implements CanActivate {
@@ -21,27 +33,30 @@ export class SecurityLogGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<SecurityLogRequest>();
 
     // Coletar informações baseadas nas opções
-    const logData: any = {
+    const logData: AuditLogData = {
       action: securityLogOptions.action
     };
 
     // Incluir usuário se solicitado
     if (securityLogOptions.includeUser) {
-      const user = (request as any).user;
+      const user = request.user;
       if (user) {
         logData.userId = user.id;
-        logData.userName = user.name;
-        logData.userEmail = user.email;
-        logData.userRole = user.role;
+        logData.metadata = {
+          ...(logData.metadata || {}),
+          userName: user.name,
+          userEmail: user.email,
+          userRole: user.role,
+        };
       }
     }
 
     // Incluir tenant se solicitado
     if (securityLogOptions.includeTenant) {
-      const user = (request as any).user;
+      const user = request.user;
       if (user?.tenantId) {
         logData.tenantId = user.tenantId;
       }
@@ -58,7 +73,7 @@ export class SecurityLogGuard implements CanActivate {
     }
 
     // Detalhes personalizados
-    const details: any = {
+    const details: Record<string, unknown> = {
       method: request.method,
       url: request.url,
       timestamp: new Date().toISOString(),
@@ -67,11 +82,11 @@ export class SecurityLogGuard implements CanActivate {
 
     // Adicionar parâmetros da requisição (sem dados sensíveis)
     if (request.params && Object.keys(request.params).length > 0) {
-      details.params = this.sanitizeParams(request.params);
+      details.params = this.sanitizeParams(request.params as Record<string, unknown>);
     }
 
     if (request.query && Object.keys(request.query).length > 0) {
-      details.query = this.sanitizeParams(request.query);
+      details.query = this.sanitizeParams(request.query as Record<string, unknown>);
     }
 
     logData.details = details;
@@ -97,8 +112,8 @@ export class SecurityLogGuard implements CanActivate {
     );
   }
 
-  private sanitizeParams(params: any): any {
-    const sanitized: any = {};
+  private sanitizeParams(params: Record<string, unknown>): Record<string, unknown> {
+    const sanitized: Record<string, unknown> = {};
 
     // Campos sensíveis que devem ser mascarados
     const sensitiveFields = [

@@ -10,6 +10,7 @@ import { SystemTelemetryService } from '@common/services/system-telemetry.servic
 import {
   resolveTelemetryRoute,
   shouldCollectRequestTelemetry,
+  type TelemetryRequestLike,
 } from '@common/services/system-telemetry.util';
 
 @Injectable()
@@ -21,7 +22,7 @@ export class SystemTelemetryInterceptor implements NestInterceptor {
       return next.handle();
     }
 
-    const request = context.switchToHttp().getRequest<any>();
+    const request = context.switchToHttp().getRequest<TelemetryRequestLike>();
     const route = resolveTelemetryRoute(request);
     if (!shouldCollectRequestTelemetry(request?.method, route)) {
       return next.handle();

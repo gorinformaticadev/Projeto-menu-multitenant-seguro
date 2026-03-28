@@ -50,7 +50,7 @@ export class RolesGuard implements CanActivate {
     return true;
   }
 
-  private recordForbidden(request: Record<string, any>) {
+  private recordForbidden(request: Record<string, unknown>) {
     this.systemTelemetryService.recordSecurityEvent({
       type: 'forbidden',
       request,

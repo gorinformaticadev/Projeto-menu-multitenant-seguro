@@ -58,7 +58,7 @@ export class SentryService {
   /**
    * Capturar exceção manualmente
    */
-  captureException(exception: any, context?: Record<string, unknown>) {
+  captureException(exception: unknown, context?: Record<string, unknown>) {
     Sentry.captureException(exception, {
       extra: context,
     });
@@ -79,7 +79,7 @@ export class SentryService {
       id: user.id,
       email: user.email,
       role: user.role,
-    } as any);
+    });
   }
 
   /**

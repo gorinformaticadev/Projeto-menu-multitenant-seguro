@@ -18,7 +18,7 @@ import {
   resolveTenantUserAvatarFilePath,
 } from '@core/common/paths/paths.service';
 import * as bcrypt from 'bcrypt';
-import { Role } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ThemeEnum } from './dto/update-preferences.dto';
@@ -38,6 +38,16 @@ type ScopedUser = {
   role: Role;
   tenantId?: string | null;
   isLocked?: boolean;
+};
+
+type SanitizableUser = {
+  id?: string | number;
+  password?: string | null;
+  avatarUrl?: string | null;
+};
+
+type SanitizedUser<T extends SanitizableUser> = Omit<T, 'password'> & {
+  avatarUrl: string | null;
 };
 
 @Injectable()
@@ -85,7 +95,7 @@ export class UsersService {
     return this.sanitizeUser(user);
   }
 
-  async findAll(tenantId?: string): Promise<any[]> {
+  async findAll(tenantId?: string) {
     const users = await this.prisma.user.findMany({
       where: tenantId ? { tenantId } : {},
       orderBy: { createdAt: 'desc' },
@@ -102,7 +112,7 @@ export class UsersService {
     return users.map((item) => this.sanitizeUser(item));
   }
 
-  async findOne(id: string, actor?: UserScopeActor): Promise<any> {
+  async findOne(id: string, actor?: UserScopeActor) {
     const user = await this.prisma.user.findFirst({
       where: this.buildUserScopeWhere(id, actor),
       include: {
@@ -113,7 +123,7 @@ export class UsersService {
           },
         },
         preferences: true,
-      } as any,
+      },
     });
 
     if (!user) {
@@ -140,7 +150,7 @@ export class UsersService {
       }
     }
 
-    const data: Record<string, any> = { ...updateUserDto };
+    const data: Prisma.UserUncheckedUpdateInput = { ...updateUserDto };
     let passwordUpdated = false;
     if (updateUserDto.password && updateUserDto.password.trim() !== '') {
       await this.assertPasswordMatchesPolicy(updateUserDto.password);
@@ -269,15 +279,17 @@ export class UsersService {
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
+    const passwordUpdateData: Prisma.UserUncheckedUpdateInput = {
+      password: hashedPassword,
+      lastPasswordChange: new Date(),
+      sessionVersion: {
+        increment: 1,
+      },
+    };
+
     await this.prisma.user.update({
       where: { id: userId },
-      data: {
-        password: hashedPassword,
-        lastPasswordChange: new Date(),
-        sessionVersion: {
-          increment: 1,
-        },
-      } as any,
+      data: passwordUpdateData,
     });
 
     await this.prisma.refreshToken.deleteMany({
@@ -587,15 +599,17 @@ export class UsersService {
     return `/api/users/public/${encodeURIComponent(userId)}/avatar-file`;
   }
 
-  private sanitizeUser(user: any): any {
+  private sanitizeUser<T extends SanitizableUser>(user: T): SanitizedUser<T> {
     const safeUser = { ...user };
     delete safeUser.password;
     if (safeUser?.id) {
       safeUser.avatarUrl = safeUser.avatarUrl
         ? this.buildUserAvatarPublicUrl(String(safeUser.id))
         : null;
+    } else {
+      safeUser.avatarUrl = null;
     }
-    return safeUser;
+    return safeUser as SanitizedUser<T>;
   }
 
   private async assertPasswordMatchesPolicy(password: string): Promise<void> {

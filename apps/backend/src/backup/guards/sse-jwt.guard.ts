@@ -1,5 +1,16 @@
 import { CanActivate, ExecutionContext, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { Request } from 'express';
+
+type SseAuthPayload = {
+  sub?: string;
+  [key: string]: unknown;
+};
+
+type SseRequest = Request & {
+  user?: SseAuthPayload;
+  downloadTokenPayload?: SseAuthPayload;
+};
 
 @Injectable()
 export class SseJwtGuard implements CanActivate {
@@ -8,7 +19,7 @@ export class SseJwtGuard implements CanActivate {
   constructor(private readonly jwtService: JwtService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<SseRequest>();
     const token = this.extractToken(request);
 
     if (!token) {
@@ -28,14 +39,15 @@ export class SseJwtGuard implements CanActivate {
       }
 
       return true;
-    } catch (error: any) {
-      if (error?.name === 'TokenExpiredError' && this.isSseProgressRequest(request)) {
+    } catch (error: unknown) {
+      const errorName = error instanceof Error ? error.name : '';
+      if (errorName === 'TokenExpiredError' && this.isSseProgressRequest(request)) {
         const decoded = this.jwtService.decode(token);
         if (!decoded || typeof decoded !== 'object') {
           throw new UnauthorizedException('Token invalido');
         }
 
-        request.user = decoded;
+        request.user = decoded as SseAuthPayload;
         this.logger.warn('Token expirado aceito apenas para stream de progresso SSE.');
         return true;
       }
@@ -44,7 +56,7 @@ export class SseJwtGuard implements CanActivate {
     }
   }
 
-  private extractToken(request: any): string | null {
+  private extractToken(request: SseRequest): string | null {
     const authHeader = request.headers?.authorization as string | undefined;
     if (authHeader?.startsWith('Bearer ')) {
       const bearerToken = authHeader.slice(7).trim();
@@ -66,7 +78,7 @@ export class SseJwtGuard implements CanActivate {
     return null;
   }
 
-  private readQueryToken(request: any, key: 'token' | 'downloadToken'): string | null {
+  private readQueryToken(request: SseRequest, key: 'token' | 'downloadToken'): string | null {
     const value = request.query?.[key];
     if (typeof value === 'string' && value.trim()) {
       return value.trim();
@@ -74,7 +86,7 @@ export class SseJwtGuard implements CanActivate {
     return null;
   }
 
-  private isSseProgressRequest(request: any): boolean {
+  private isSseProgressRequest(request: SseRequest): boolean {
     const requestPath = String(request.path || request.url || '');
     return requestPath.includes('/backup/progress/');
   }

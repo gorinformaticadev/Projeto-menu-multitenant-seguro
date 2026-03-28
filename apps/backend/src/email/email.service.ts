@@ -3,15 +3,18 @@ import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
 import { PrismaService } from '@core/prisma/prisma.service';
+import { EmailConfiguration } from '@prisma/client';
 import { getPlatformName } from '@core/common/constants/platform.constants';
 import { SecurityConfigService } from '@core/security-config/security-config.service';
+
+type EmailRuntimeConfig = Pick<EmailConfiguration, 'smtpHost' | 'smtpPort' | 'encryption' | 'authMethod'>;
 
 @Injectable()
 export class EmailService implements OnModuleInit {
   private transporter: Transporter;
   private readonly logger = new Logger(EmailService.name);
   private isEnabled: boolean;
-  private dbConfig: any = null;
+  private dbConfig: EmailConfiguration | null = null;
 
 
   constructor(
@@ -427,7 +430,7 @@ export class EmailService implements OnModuleInit {
   /**
    * Send test email
    */
-  async sendTestEmail(email: string, name: string, config: any, smtpUser: string, smtpPass: string): Promise<boolean> {
+  async sendTestEmail(email: string, name: string, config: EmailRuntimeConfig, smtpUser: string, smtpPass: string): Promise<boolean> {
     this.logger.log(`Iniciando teste de email para: ${email}`);
 
     // If no credentials provided, try to get from database
@@ -461,7 +464,7 @@ export class EmailService implements OnModuleInit {
 
     try {
       // Create a temporary transporter with the provided credentials
-      const transporterConfig: any = {
+      const transporterConfig = {
         host: config.smtpHost,
         port: config.smtpPort,
         secure: config.encryption === 'SSL', // true for port 465, false for other ports
@@ -604,7 +607,7 @@ export class EmailService implements OnModuleInit {
   /**
    * Template de email de teste
    */
-  private getTestEmailTemplate(name: string, config: any): string {
+  private getTestEmailTemplate(name: string, config: EmailRuntimeConfig): string {
     return `
       <!DOCTYPE html>
       <html>

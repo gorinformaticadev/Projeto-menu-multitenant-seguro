@@ -47,6 +47,12 @@ interface ResolvedVapidConfig {
   source: 'database' | 'env';
 }
 
+type NotificationRecipient = {
+  id: string;
+  role: string;
+  tenantId: string | null;
+};
+
 @Injectable()
 export class PushNotificationService {
   private readonly logger = new Logger(PushNotificationService.name);
@@ -293,7 +299,7 @@ export class PushNotificationService {
     return authorizedIds;
   }
 
-  private async fetchCandidateUsers(notification: Notification): Promise<any[]> {
+  private async fetchCandidateUsers(notification: Notification): Promise<NotificationRecipient[]> {
     if (notification.userId) {
       const user = await this.prisma.user.findUnique({
         where: { id: notification.userId },

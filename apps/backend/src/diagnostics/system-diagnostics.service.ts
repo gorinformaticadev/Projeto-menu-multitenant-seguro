@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { BackupJobStatus, Role } from '@prisma/client';
+import { BackupJobStatus, Prisma, Role } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { BackupService } from '../backup/backup.service';
 import { CronJobDefinition, CronService } from '../core/cron/cron.service';
@@ -342,7 +342,7 @@ export class SystemDiagnosticsService {
   }
 
   private async getAlertsSection(actor: DashboardActor, windowStart: Date): Promise<AlertsSection> {
-    const where: Record<string, unknown> = {
+    const where: Prisma.NotificationWhereInput = {
       module: 'operational-alerts',
       createdAt: {
         gte: windowStart,
@@ -350,15 +350,15 @@ export class SystemDiagnosticsService {
     };
 
     const [recentCount, criticalCount, recentRows] = await Promise.all([
-      this.prisma.notification.count({ where: where as any }),
+      this.prisma.notification.count({ where }),
       this.prisma.notification.count({
         where: {
-          ...(where as any),
+          ...where,
           severity: 'critical',
         },
       }),
       this.prisma.notification.findMany({
-        where: where as any,
+        where,
         orderBy: { createdAt: 'desc' },
         take: 5,
         select: {

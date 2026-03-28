@@ -1,5 +1,6 @@
 import { Controller, Get, Param, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
+import { Request as ExpressRequest } from 'express';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
@@ -9,6 +10,14 @@ import {
   ReadAllSystemNotificationsDto,
   SystemNotificationSeverityFilter,
 } from './dto/system-notifications.dto';
+
+type NotificationsRequest = ExpressRequest & {
+  user?: {
+    id?: string;
+    sub?: string;
+    role?: string;
+  };
+};
 
 @Controller('system/notifications')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -44,7 +53,7 @@ export class SystemNotificationsController {
   }
 
   @Post(':id/read')
-  async markRead(@Param('id') id: string, @Request() req: any) {
+  async markRead(@Param('id') id: string, @Request() req: NotificationsRequest) {
     const notification = await this.notificationService.markSystemNotificationAsRead(id, {
       userId: req?.user?.id || req?.user?.sub,
       role: req?.user?.role,
@@ -58,7 +67,7 @@ export class SystemNotificationsController {
   }
 
   @Post('read-all')
-  async markAllRead(@Request() req: any, @Query() query: ReadAllSystemNotificationsDto) {
+  async markAllRead(@Request() req: NotificationsRequest, @Query() query: ReadAllSystemNotificationsDto) {
     const count = await this.notificationService.markAllSystemNotificationsAsRead({
       userId: query?.targetUserId || req?.user?.id || req?.user?.sub,
       role: req?.user?.role,

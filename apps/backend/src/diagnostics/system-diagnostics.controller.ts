@@ -1,10 +1,24 @@
 import { Controller, Get, Request, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
+import { Request as ExpressRequest } from 'express';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { DashboardActor } from '../dashboard/system-dashboard.service';
 import { SystemDiagnosticsService } from './system-diagnostics.service';
+
+type DiagnosticsRequest = ExpressRequest & {
+  user?: {
+    id?: string;
+    sub?: string;
+    role?: string;
+    tenantId?: string | null;
+    name?: string;
+    email?: string;
+    tenant?: { nomeFantasia?: string | null };
+    tenantName?: string | null;
+  };
+};
 
 @Controller('system/diagnostics')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -13,11 +27,11 @@ export class SystemDiagnosticsController {
   constructor(private readonly diagnosticsService: SystemDiagnosticsService) {}
 
   @Get()
-  async getDiagnostics(@Request() req: any) {
+  async getDiagnostics(@Request() req: DiagnosticsRequest) {
     return this.diagnosticsService.getDiagnostics(this.getActor(req));
   }
 
-  private getActor(req: any): DashboardActor {
+  private getActor(req: DiagnosticsRequest): DashboardActor {
     const roleRaw = String(req?.user?.role || '').trim().toUpperCase();
     const roleValues = new Set(Object.values(Role));
     const role = roleValues.has(roleRaw as Role) ? (roleRaw as Role) : Role.USER;

@@ -3,6 +3,13 @@ import { PrismaService } from '@core/prisma/prisma.service';
 import { CreateEmailConfigDto, UpdateEmailConfigDto } from './dto/email-config.dto';
 import { EmailConfiguration } from '@prisma/client';
 import { SecurityConfigService } from './security-config.service';
+import { EmailService } from '../email/email.service';
+
+type AuthenticatedEmailUser = {
+  id: string;
+  name?: string;
+  email?: string;
+};
 
 @Injectable()
 export class EmailConfigService {
@@ -173,7 +180,11 @@ export class EmailConfigService {
    * Test email configuration by sending a test email
    * Credentials are fetched from the database (SecurityConfig)
    */
-  async testConfig(email: string, user: any, emailService: any): Promise<{ success: boolean; message: string }> {
+  async testConfig(
+    email: string,
+    user: AuthenticatedEmailUser,
+    emailService: Pick<EmailService, 'sendTestEmail'>,
+  ): Promise<{ success: boolean; message: string }> {
     try {
       this.logger.log(`Testing email configuration for user ${user.id} to ${email}`);
 

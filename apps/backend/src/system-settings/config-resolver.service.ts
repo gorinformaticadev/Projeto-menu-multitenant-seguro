@@ -86,7 +86,7 @@ export class ConfigResolverService {
     definition: SettingDefinition<T>,
   ): Promise<ResolvedSetting<T> | null> {
     try {
-      const setting = await (this.prisma as any).systemSetting.findUnique({
+      const setting = await this.prisma.systemSetting.findUnique({
         where: { key: definition.key },
       });
 

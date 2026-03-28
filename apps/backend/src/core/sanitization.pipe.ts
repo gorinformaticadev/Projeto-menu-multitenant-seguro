@@ -28,8 +28,8 @@ export class SanitizationPipe implements PipeTransform {
     return value;
   }
 
-  private sanitizeObject(obj: any): any {
-    const sanitized: any = {};
+  private sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
+    const sanitized: Record<string, unknown> = {};
 
     for (const key in obj) {
       if (Object.prototype.hasOwnProperty.call(obj, key)) {

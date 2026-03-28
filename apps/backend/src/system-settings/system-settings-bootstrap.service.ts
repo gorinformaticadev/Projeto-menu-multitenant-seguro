@@ -24,7 +24,6 @@ export class SystemSettingsBootstrapService implements OnApplicationBootstrap {
 
   async bootstrapFromEnv(): Promise<void> {
     let createdCount = 0;
-    const prisma = this.prisma as any;
 
     for (const definition of this.settingsRegistry.getAll()) {
       const envValue = readEnvValueForSetting(definition);
@@ -40,7 +39,7 @@ export class SystemSettingsBootstrapService implements OnApplicationBootstrap {
       }
 
       try {
-        const existing = await prisma.systemSetting.findUnique({
+        const existing = await this.prisma.systemSetting.findUnique({
           where: { key: definition.key },
           select: { id: true },
         });
@@ -49,7 +48,7 @@ export class SystemSettingsBootstrapService implements OnApplicationBootstrap {
           continue;
         }
 
-        await prisma.systemSetting.create({
+        await this.prisma.systemSetting.create({
           data: {
             key: definition.key,
             valueJson: envValue.value,

@@ -9,6 +9,7 @@
   Request,
   UseGuards,
 } from '@nestjs/common';
+import { Request as ExpressRequest } from 'express';
 import { Role } from '@prisma/client';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
@@ -21,6 +22,16 @@ import {
 import { SystemUpdateAdminService } from './system-update-admin.service';
 import { extractAuditContext } from '../audit/audit-request-context.util';
 import { CriticalRateLimit } from '@common/decorators/critical-rate-limit.decorator';
+
+type AuthenticatedRequest = ExpressRequest & {
+  user?: {
+    id?: string;
+    sub?: string;
+    email?: string;
+    role?: string;
+    tenantId?: string | null;
+  };
+};
 
 @Controller('system/update')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -37,7 +48,7 @@ export class SystemUpdateController {
 
   @Post('run')
   @CriticalRateLimit('update')
-  async run(@Body() body: RunSystemUpdateDto, @Request() req: any) {
+  async run(@Body() body: RunSystemUpdateDto, @Request() req: AuthenticatedRequest) {
     const { actor, requestCtx } = extractAuditContext(req);
     const userId = actor.userId || 'unknown';
 
@@ -78,7 +89,7 @@ export class SystemUpdateController {
 
   @Post('rollback')
   @CriticalRateLimit('update')
-  async rollback(@Body() body: RunSystemRollbackDto, @Request() req: any) {
+  async rollback(@Body() body: RunSystemRollbackDto, @Request() req: AuthenticatedRequest) {
     const { actor, requestCtx } = extractAuditContext(req);
     const userId = actor.userId || 'unknown';
 

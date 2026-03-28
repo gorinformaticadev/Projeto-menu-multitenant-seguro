@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'crypto';
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Request } from 'express';
 import { isIP } from 'net';
 
 const DEFAULT_ALLOWED_CIDRS = '127.0.0.1/32,::1/128';
@@ -18,6 +19,12 @@ interface ParsedCidr {
   prefix: number;
   maxPrefix: number;
 }
+
+type BackupInternalRequest = Request & {
+  connection?: {
+    remoteAddress?: string;
+  };
+};
 
 @Injectable()
 export class BackupInternalGuard implements CanActivate {
@@ -55,7 +62,7 @@ export class BackupInternalGuard implements CanActivate {
     return true;
   }
 
-  private resolveSourceIp(request: any, remoteIp: ParsedIp): ParsedIp {
+  private resolveSourceIp(request: BackupInternalRequest, remoteIp: ParsedIp): ParsedIp {
     if (!this.readBoolean('BACKUP_INTERNAL_TRUST_PROXY', false)) {
       return remoteIp;
     }

@@ -1,4 +1,5 @@
 import { Injectable, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { PathsService } from '@core/common/paths/paths.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
@@ -73,9 +74,9 @@ export class TenantsService {
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
     // Cria o tenant e o usuário admin em uma transação
-    return this.prisma.$transaction(async (prisma) => {
+    return this.prisma.$transaction(async (prisma: Prisma.TransactionClient) => {
       // Cria o tenant
-      const tenant = await (prisma as any).tenant.create({
+      const tenant = await prisma.tenant.create({
         data: {
           email,
           cnpjCpf,
@@ -86,7 +87,7 @@ export class TenantsService {
       });
 
       // Cria o usuário admin do tenant
-      await (prisma as any).user.create({
+      await prisma.user.create({
         data: {
           email: adminEmail,
           password: hashedPassword,
@@ -97,14 +98,14 @@ export class TenantsService {
       });
 
       // Buscar todos os módulos ativos do sistema
-      const activeModules = await (prisma as any).module.findMany({
+      const activeModules = await prisma.module.findMany({
         where: { status: 'active' },
       });
 
       // Vincular módulos ao novo tenant (DESABILITADOS por padrão)
       // Cada tenant deve ativar os módulos que deseja usar
       if (activeModules.length > 0) {
-        await (prisma as any).moduleTenant.createMany({
+        await prisma.moduleTenant.createMany({
           data: activeModules.map((module) => ({
             tenantId: tenant.id,
             moduleId: module.id,
@@ -356,5 +357,4 @@ export class TenantsService {
     throw new BadRequestException('Use o novo sistema de módulos');
   }
 }
-
 

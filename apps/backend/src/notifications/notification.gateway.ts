@@ -47,6 +47,12 @@ interface AuthenticatedSocket extends Socket {
   accessToken?: string;
 }
 
+type NotificationRecipient = {
+  id: string;
+  role: string;
+  tenantId: string | null;
+};
+
 @WebSocketGateway({
   namespace: '/notifications',
   cors: {
@@ -107,6 +113,19 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     private readonly authorizationService: AuthorizationService,
   ) {
     this.startMonitoring();
+  }
+
+  private getErrorDetails(error: unknown): { message: string; stack?: string } {
+    if (error instanceof Error) {
+      return {
+        message: error.message,
+        stack: error.stack,
+      };
+    }
+
+    return {
+      message: String(error),
+    };
   }
 
   private startMonitoring() {
@@ -301,10 +320,11 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
 
         this.logger.log(`Notificacao marcada como lida via Socket.IO: ${data.id}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorDetails = this.getErrorDetails(error);
       this.logger.error(`Erro ao marcar notificacao como lida: ${data.id}`, {
-        error: error?.message,
-        stack: error?.stack,
+        error: errorDetails.message,
+        stack: errorDetails.stack,
         clientId: client.id,
         userId: client.user?.id,
         timestamp: new Date().toISOString(),
@@ -332,10 +352,11 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
       client.emit('notification:unread-count', { count: 0 });
 
       this.logger.log(`${count} notificacoes marcadas como lidas via Socket.IO`);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorDetails = this.getErrorDetails(error);
       this.logger.error('Erro ao marcar todas como lidas:', {
-        error: error?.message,
-        stack: error?.stack,
+        error: errorDetails.message,
+        stack: errorDetails.stack,
         clientId: client.id,
         userId: client.user?.id,
         timestamp: new Date().toISOString(),
@@ -374,10 +395,11 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
 
         this.logger.log(`Notificacao deletada via Socket.IO: ${data.id}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorDetails = this.getErrorDetails(error);
       this.logger.error(`Erro ao deletar notificacao: ${data.id}`, {
-        error: error?.message,
-        stack: error?.stack,
+        error: errorDetails.message,
+        stack: errorDetails.stack,
         clientId: client.id,
         userId: client.user?.id,
         timestamp: new Date().toISOString(),
@@ -519,7 +541,7 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     return authorizedIds;
   }
 
-  private async fetchCandidateUsers(notification: Notification): Promise<any[]> {
+  private async fetchCandidateUsers(notification: Notification): Promise<NotificationRecipient[]> {
     if (notification.userId) {
       const user = await this.prismaService.user.findUnique({
         where: { id: notification.userId },

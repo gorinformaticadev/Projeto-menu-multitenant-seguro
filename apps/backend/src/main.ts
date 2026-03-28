@@ -2,6 +2,7 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ModuleRef, NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { Response } from 'express';
 import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
 import { useContainer } from 'class-validator';
@@ -60,7 +61,7 @@ async function bootstrap() {
   // - usa ModuleRef (nao proxy) para evitar ExceptionsZone fatal do app.get() em token ausente
   useContainer(
     {
-      get<T>(token: new (...args: any[]) => T): T | undefined {
+      get<T>(token: new (...args: unknown[]) => T): T | undefined {
         try {
           return moduleRef.get(token, { strict: false });
         } catch {
@@ -121,7 +122,7 @@ async function bootstrap() {
 
   const pathsService = app.get(PathsService);
   const logosPath = pathsService.getLogosDir();
-  const setLogosHeaders = (res: any) => {
+  const setLogosHeaders = (res: Pick<Response, 'setHeader'>) => {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');

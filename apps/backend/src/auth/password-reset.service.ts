@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { SecurityConfigService } from '@core/security-config/security-config.service';
 import { EmailService } from '../email/email.service';
@@ -156,22 +157,23 @@ export class PasswordResetService {
 
       // Hash da nova senha
       const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
+      const userPasswordUpdate: Prisma.UserUncheckedUpdateInput = {
+        password: hashedPassword,
+        // Resetar tentativas de login se houver
+        loginAttempts: 0,
+        lockedUntil: null,
+        lastPasswordChange: new Date(),
+        sessionVersion: {
+          increment: 1,
+        },
+      };
 
       // Atualizar a senha do usuário e marcar o token como usado
       await this.prisma.$transaction([
         // Atualizar senha do usuário
         this.prisma.user.update({
           where: { id: resetTokenRecord.userId },
-          data: {
-            password: hashedPassword,
-            // Resetar tentativas de login se houver
-            loginAttempts: 0,
-            lockedUntil: null,
-            lastPasswordChange: new Date(),
-            sessionVersion: {
-              increment: 1,
-            },
-          } as any,
+          data: userPasswordUpdate,
         }),
         // Marcar token como usado
         this.prisma.passwordResetToken.update({

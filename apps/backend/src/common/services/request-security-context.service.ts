@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { Request } from 'express';
 
 export interface SecurityActor {
   id?: string | null;
@@ -10,8 +11,22 @@ export interface SecurityActor {
   sessionId?: string | null;
 }
 
+type RequestUser = {
+  id?: string;
+  sub?: string;
+  name?: string;
+  email?: string;
+  role?: string;
+  tenantId?: string | null;
+  sid?: string;
+};
+
+type RequestLike = Request & {
+  user?: RequestUser;
+};
+
 type SecurityContextStore = {
-  request?: any;
+  request?: RequestLike;
   actor?: SecurityActor | null;
   source?: 'http' | 'ws' | 'system';
   tenantEnforcementBypassed?: boolean;
@@ -22,7 +37,7 @@ type SecurityContextStore = {
 export class RequestSecurityContextService {
   private readonly storage = new AsyncLocalStorage<SecurityContextStore>();
 
-  runWithRequest<T>(request: any, callback: () => T): T {
+  runWithRequest<T>(request: RequestLike, callback: () => T): T {
     return this.storage.run(
       {
         request,
@@ -56,7 +71,7 @@ export class RequestSecurityContextService {
     );
   }
 
-  getRequest<T = any>(): T | undefined {
+  getRequest<T = RequestLike>(): T | undefined {
     return this.getStore()?.request as T | undefined;
   }
 

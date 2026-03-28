@@ -6,6 +6,14 @@ import { CoreContext } from './context/CoreContext';
 import { ModuleContract, RegisteredModule } from './contracts/ModuleContract';
 import { ModuleStatus } from '@prisma/client';
 
+type ModuleMetadata = {
+    slug: string;
+};
+
+type ModuleContractExport = ModuleContract & {
+    default?: ModuleContract;
+};
+
 /**
  * Loader seguro de módulos
  * Princípio: NENHUM código de módulo executa sem autorização do CORE
@@ -120,7 +128,7 @@ export class ModuleLoader implements OnModuleInit {
      */
     private async loadModule(moduleData: unknown) {
         try {
-            const moduleSlug = (moduleData as any).slug;
+            const moduleSlug = this.resolveModuleSlug(moduleData);
             const modulePath = path.join(this.modulesPath, moduleSlug);
             const moduleEntry = this.findModuleEntry(modulePath);
 
@@ -137,7 +145,7 @@ export class ModuleLoader implements OnModuleInit {
                 return;
             }
 
-            const moduleContract: ModuleContract = (moduleExports as any).default || moduleExports;
+            const moduleContract = this.resolveModuleContract(moduleExports);
 
             // Registrar no módulo
             await moduleContract.register(this.coreContext);
@@ -154,7 +162,7 @@ export class ModuleLoader implements OnModuleInit {
             this.logger.log(`🚀 Módulo carregado com sucesso: ${moduleSlug}`);
 
         } catch (error) {
-            const moduleSlug = (moduleData as any).slug;
+            const moduleSlug = this.resolveModuleSlug(moduleData);
             this.logger.error(`❌ Erro ao carregar módulo ${moduleSlug}:`, error);
 
             // Atualizar status no banco
@@ -205,7 +213,7 @@ export class ModuleLoader implements OnModuleInit {
      * Valida se o módulo implementa o contrato obrigatório
      */
     private validateModuleContract(moduleExport: unknown): moduleExport is ModuleContract {
-        const m = (moduleExport as any)?.default || moduleExport;
+        const m = this.resolveModuleContractCandidate(moduleExport);
         return (
             m &&
             typeof m.name === 'string' &&
@@ -227,6 +235,35 @@ export class ModuleLoader implements OnModuleInit {
      */
     getLoadedModules(): RegisteredModule[] {
         return Array.from(this.loadedModules.values());
+    }
+
+    private resolveModuleSlug(moduleData: unknown): string {
+        if (typeof moduleData === 'object' && moduleData !== null && 'slug' in moduleData) {
+            const slug = (moduleData as ModuleMetadata).slug;
+            if (typeof slug === 'string' && slug.trim().length > 0) {
+                return slug;
+            }
+        }
+
+        throw new Error('Modulo invalido: slug ausente');
+    }
+
+    private resolveModuleContractCandidate(moduleExport: unknown): ModuleContract | null {
+        if (typeof moduleExport !== 'object' || moduleExport === null) {
+            return null;
+        }
+
+        const exportCandidate = moduleExport as ModuleContractExport;
+        return exportCandidate.default || exportCandidate;
+    }
+
+    private resolveModuleContract(moduleExport: unknown): ModuleContract {
+        const moduleContract = this.resolveModuleContractCandidate(moduleExport);
+        if (!moduleContract) {
+            throw new Error('Contrato invalido para modulo');
+        }
+
+        return moduleContract;
     }
 
     /**
@@ -297,4 +334,3 @@ export class ModuleLoader implements OnModuleInit {
         }
     }
 }
-

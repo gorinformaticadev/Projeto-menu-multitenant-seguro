@@ -7,7 +7,7 @@ export class DuplicateRequestInterceptor implements NestInterceptor {
   private requestLog = new Map<string, number>();
   private readonly DUPLICATE_THRESHOLD = 1000; // 1 segundo
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest();
     const method = request.method;
     const url = request.url;

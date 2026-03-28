@@ -3,6 +3,28 @@ import { PrismaService } from './prisma/prisma.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
+type ModuleMenuNode = {
+    id: string;
+    label: string;
+    icon?: string | null;
+    route?: string | null;
+    order?: number | null;
+    permission?: string | null;
+    parentId?: string | null;
+    children?: ModuleMenuNode[];
+};
+
+type AvailableModule = {
+    slug: string;
+    name: string;
+    description: string | null;
+    version: string;
+    enabled: boolean;
+    menus: ModuleMenuNode[];
+    hasBackend: boolean;
+    hasFrontend: boolean;
+};
+
 /**
  * Serviço de Segurança para Módulos
  * Garante que apenas módulos autorizados executem código
@@ -139,7 +161,7 @@ export class ModuleSecurityService {
     /**
      * Lista módulos disponíveis para um tenant, filtrados por permissão de usuário
      */
-    async getAvailableModules(tenantId: string, userRole?: string): Promise<any[]> {
+    async getAvailableModules(tenantId: string, userRole?: string): Promise<AvailableModule[]> {
         try {
             const modules = await this.prisma.module.findMany({
                 where: {
@@ -178,7 +200,7 @@ export class ModuleSecurityService {
                 // Forçar a permissão 'admin' para o módulo de integrações em tempo de execução
                 if (module.slug === 'integracoes') {
                     // Aplica recursivamente a permissão de admin
-                    const applyAdminPermission = (items: any[]) => {
+                    const applyAdminPermission = (items: ModuleMenuNode[]) => {
                         items.forEach(item => {
                             // Se não tiver permissão definida, ou se não for admin, IMPÔR admin
                             if (!item.permission || !item.permission.includes('admin')) {
@@ -226,7 +248,7 @@ export class ModuleSecurityService {
         }
     }
 
-    private filterMenusByRole(menus: any[], role?: string): any[] {
+    private filterMenusByRole(menus: ModuleMenuNode[], role?: string): ModuleMenuNode[] {
         return menus.filter(menu => {
             // Regra: Se permissão contiver 'admin', e usuário não for ADMIN/SUPER_ADMIN, tchau.
             if (menu.permission && menu.permission.includes('admin') && role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
@@ -247,7 +269,7 @@ export class ModuleSecurityService {
     /**
      * Constrói árvore hierárquica de menus
      */
-    private buildMenuTree(menus: any[]): any[] {
+    private buildMenuTree(menus: ModuleMenuNode[]): ModuleMenuNode[] {
         // Separar menus pai (sem parentId) e filhos
         const parentMenus = menus.filter(m => !m.parentId);
         const childMenus = menus.filter(m => m.parentId);
@@ -273,7 +295,7 @@ export class ModuleSecurityService {
         }));
     }
 
-    private getModuleIntegrity(module: { slug: string; hasBackend: boolean; hasFrontend: boolean; menus: any[] }) {
+    private getModuleIntegrity(module: { slug: string; hasBackend: boolean; hasFrontend: boolean; menus: ModuleMenuNode[] }) {
         const issues: string[] = [];
         const backendPath = path.join(this.backendModulesPath, module.slug);
         const frontendPath = path.join(this.frontendModulesPath, module.slug);

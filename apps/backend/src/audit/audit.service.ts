@@ -1,4 +1,5 @@
-﻿import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { RequestSecurityContextService } from '../common/services/request-security-context.service';
 import { RateLimitMetricsService, RateLimitStatsParams } from '../common/services/rate-limit-metrics.service';
@@ -46,6 +47,19 @@ export interface AuditLogListParams {
   endDate?: Date;
 }
 
+type AuditLogWithUser = Prisma.AuditLogGetPayload<{
+  include: {
+    user: {
+      select: {
+        id: true;
+        name: true;
+        email: true;
+        role: true;
+      };
+    };
+  };
+}>;
+
 @Injectable()
 export class AuditService {
   private readonly logger = new Logger(AuditService.name);
@@ -90,7 +104,7 @@ export class AuditService {
           ipAddress: ip,
           userAgent,
           details,
-          metadata: metadata as any,
+          metadata: this.toInputJson(metadata),
         },
       });
     } catch (error) {
@@ -107,7 +121,7 @@ export class AuditService {
     const limit = this.clamp(this.toPositiveInt(params.limit, 20), 1, 100);
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: Prisma.AuditLogWhereInput = {};
     const allowedActionPrefixes = this.normalizeActionPrefixes(params.allowedActionPrefixes);
 
     const action = this.normalizeString(params.action);
@@ -120,12 +134,19 @@ export class AuditService {
     }
 
     if (allowedActionPrefixes.length > 0) {
-      where.AND = where.AND || [];
-      where.AND.push({
+      const currentAnd = where.AND;
+      const andArray: Prisma.AuditLogWhereInput[] = Array.isArray(currentAnd)
+        ? currentAnd
+        : currentAnd
+          ? [currentAnd]
+          : [];
+
+      andArray.push({
         OR: allowedActionPrefixes.map((prefix) => ({
           action: { startsWith: prefix },
         })),
       });
+      where.AND = andArray;
     }
 
     const severity = this.normalizeSeverityFilter(params.severity);
@@ -225,7 +246,7 @@ export class AuditService {
    * Estatisticas de logs
    */
   async getStats(params: { startDate?: Date; endDate?: Date; tenantId?: string }) {
-    const where: any = {};
+    const where: Prisma.AuditLogWhereInput = {};
 
     if (params.startDate || params.endDate) {
       where.createdAt = {};
@@ -287,7 +308,7 @@ export class AuditService {
     endDate?: Date;
     tenantId?: string;
   }) {
-    const where: any = {};
+    const where: Prisma.AuditLogWhereInput = {};
     const allowedActionPrefixes = this.normalizeActionPrefixes(params.allowedActionPrefixes);
 
     if (params.startDate || params.endDate) {
@@ -305,12 +326,19 @@ export class AuditService {
     }
 
     if (allowedActionPrefixes.length > 0) {
-      where.AND = where.AND || [];
-      where.AND.push({
+      const currentAnd = where.AND;
+      const andArray: Prisma.AuditLogWhereInput[] = Array.isArray(currentAnd)
+        ? currentAnd
+        : currentAnd
+          ? [currentAnd]
+          : [];
+
+      andArray.push({
         OR: allowedActionPrefixes.map((prefix) => ({
           action: { startsWith: prefix },
         })),
       });
+      where.AND = andArray;
     }
 
     const [total, byAction, byUser] = await Promise.all([
@@ -370,7 +398,7 @@ export class AuditService {
     const skip = (page - 1) * limit;
     const startDate = new Date(Date.now() - hours * 3600 * 1000);
 
-    const where: any = {
+    const where: Prisma.AuditLogWhereInput = {
       action: 'RATE_LIMIT_BLOCKED',
       createdAt: {
         gte: startDate,
@@ -689,7 +717,7 @@ export class AuditService {
     return Math.max(min, Math.min(max, value));
   }
 
-  private sanitizeAuditLogRow(log: any) {
+  private sanitizeAuditLogRow(log: Prisma.AuditLog | AuditLogWithUser) {
     const parsedDetails = this.parseDetails(typeof log.details === 'string' ? log.details : null);
     const metadataInput = this.normalizeMetadataInput(log.metadata);
     const actionLabel = humanizeAuditAction(log.action);
@@ -730,5 +758,8 @@ export class AuditService {
 
     return {};
   }
-}
 
+  private toInputJson(value: Record<string, unknown>): Prisma.InputJsonValue {
+    return value as Prisma.InputJsonValue;
+  }
+}

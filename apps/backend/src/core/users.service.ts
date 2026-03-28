@@ -4,7 +4,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import * as bcrypt from 'bcrypt';
-import { Role } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
@@ -87,7 +87,7 @@ export class UsersService {
           },
         },
         preferences: true,
-      } as any,
+      },
     });
 
     if (!user) {
@@ -120,7 +120,7 @@ export class UsersService {
     }
 
     // Se está atualizando senha, faz o hash
-    const data: any = { ...updateUserDto };
+    const data: Prisma.UserUncheckedUpdateInput = { ...updateUserDto };
     if (updateUserDto.password && updateUserDto.password.trim() !== '') {
       data.password = await bcrypt.hash(updateUserDto.password, 10);
     } else {
@@ -304,4 +304,3 @@ export class UsersService {
     return userWithoutPassword;
   }
 }
-

@@ -3,6 +3,31 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@core/prisma/prisma.service';
 
+type WsAuthPayload = {
+  sub?: string;
+};
+
+type WsClientUser = {
+  id: string;
+  tenantId: string | null;
+  role: string;
+  email: string;
+  name: string;
+};
+
+type WsClient = {
+  id?: string;
+  handshake?: {
+    auth?: {
+      token?: string;
+    };
+    headers?: {
+      authorization?: string;
+    };
+  };
+  user?: WsClientUser;
+};
+
 @Injectable()
 export class WsJwtGuard implements CanActivate {
   private readonly logger = new Logger(WsJwtGuard.name);
@@ -16,7 +41,7 @@ export class WsJwtGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     this.logger.log(`🔐 WsJwtGuard: INÍCIO - Verificando cliente`);
     try {
-      const client = context.switchToWs().getClient();
+      const client = context.switchToWs().getClient<WsClient>();
       const token = this.extractToken(client);
 
       this.logger.log(`🔐 WsJwtGuard: Cliente ${client.id} - Token extraído:`, token ? 'Presente' : 'Ausente');
@@ -26,7 +51,7 @@ export class WsJwtGuard implements CanActivate {
         return false;
       }
 
-      const payload = this.jwtService.verify(token, {
+      const payload = this.jwtService.verify<WsAuthPayload>(token, {
         secret: this.configService.get('JWT_SECRET'),
       });
 
@@ -46,7 +71,7 @@ export class WsJwtGuard implements CanActivate {
       }
 
       // Anexar contexto do usuário ao cliente
-      (client as any).user = {
+      client.user = {
         id: user.id,
         tenantId: user.tenantId,
         role: user.role,
@@ -55,17 +80,17 @@ export class WsJwtGuard implements CanActivate {
       };
 
       this.logger.log(`✅ Autenticação WebSocket bem-sucedida: Usuário ${user.id} (${user.email})`);
-      this.logger.log(`✅ User anexado ao cliente:`, (client as any).user);
+      this.logger.log(`✅ User anexado ao cliente:`, client.user);
       return true;
 
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error('❌ EXCEPTION na autenticação WebSocket:', error);
-      this.logger.error('❌ Stack trace:', error.stack);
+      this.logger.error('❌ Stack trace:', error instanceof Error ? error.stack : undefined);
       return false;
     }
   }
 
-  private extractToken(client: any): string | null {
+  private extractToken(client: WsClient): string | null {
     return client.handshake?.auth?.token ||
       client.handshake?.headers?.authorization?.replace('Bearer ', '') ||
       null;

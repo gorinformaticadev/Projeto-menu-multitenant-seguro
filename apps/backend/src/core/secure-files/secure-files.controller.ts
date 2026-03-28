@@ -14,7 +14,7 @@ import {
   Body,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { SecureFileAccessGuard } from './guards/secure-file-access.guard';
 import { SecureFilesService } from './secure-files.service';
@@ -24,6 +24,14 @@ import { diskStorage } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import { extname } from 'path';
 import { ensureDirectory, resolveCanonicalPaths } from '@core/common/paths/paths.service';
+
+type SecureFilesRequest = Request & {
+  user: {
+    id: string;
+    tenantId: string;
+    role?: string | null;
+  };
+};
 
 /**
  * Controller para gerenciamento de arquivos sensíveis
@@ -86,7 +94,7 @@ export class SecureFilesController {
   async uploadFile(
     @UploadedFile() file: Express.Multer.File,
     @Body() uploadDto: UploadFileDto,
-    @Req() req: any,
+    @Req() req: SecureFilesRequest,
   ) {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo foi enviado');
@@ -114,7 +122,7 @@ export class SecureFilesController {
   @UseGuards(SecureFileAccessGuard)
   async getFile(
     @Param('fileId') fileId: string,
-    @Req() req: any,
+    @Req() req: SecureFilesRequest,
     @Res() res: Response,
   ) {
     const user = req.user;
@@ -136,7 +144,7 @@ export class SecureFilesController {
    */
   @Get(':fileId/metadata')
   @UseGuards(SecureFileAccessGuard)
-  async getFileMetadata(@Param('fileId') fileId: string, @Req() req: any) {
+  async getFileMetadata(@Param('fileId') fileId: string, @Req() req: SecureFilesRequest) {
     const user = req.user;
     return await this.secureFilesService.getFileMetadata(fileId, user);
   }
@@ -147,7 +155,7 @@ export class SecureFilesController {
    */
   @Delete(':fileId')
   @UseGuards(SecureFileAccessGuard)
-  async deleteFile(@Param('fileId') fileId: string, @Req() req: any) {
+  async deleteFile(@Param('fileId') fileId: string, @Req() req: SecureFilesRequest) {
     const user = req.user;
     await this.secureFilesService.deleteFile(fileId, user);
     return { message: 'Arquivo deletado com sucesso' };
@@ -158,7 +166,7 @@ export class SecureFilesController {
    * GET /secure-files/list
    */
   @Get()
-  async listFiles(@Query() query: FileQueryDto, @Req() req: any) {
+  async listFiles(@Query() query: FileQueryDto, @Req() req: SecureFilesRequest) {
     const user = req.user;
     return await this.secureFilesService.listFiles(
       user,

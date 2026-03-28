@@ -4,10 +4,15 @@ import {
   ExecutionContext,
   ForbiddenException,
 } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { Reflector } from '@nestjs/core';
 import * as crypto from 'crypto';
 
 export const SKIP_CSRF_KEY = 'skipCsrf';
+
+type CsrfRequest = Request & {
+  cookies?: Record<string, string | undefined>;
+};
 
 /**
  * CSRF Guard - Proteção contra Cross-Site Request Forgery
@@ -64,7 +69,7 @@ export class CsrfGuard implements CanActivate {
   /**
    * Gera e define token CSRF no cookie
    */
-  private setCsrfToken(request: any, response: any): void {
+  private setCsrfToken(request: CsrfRequest, response: Response): void {
     // Se já existe token válido, não gerar novo
     if (request.cookies?.['XSRF-TOKEN']) {
       return;

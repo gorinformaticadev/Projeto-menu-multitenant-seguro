@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException, Inject, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TwoFactorService } from './auth/two-factor.service';
@@ -90,7 +91,7 @@ export class AuthService {
       const newAttempts = user.loginAttempts + 1;
 
       // Atualizar tentativas
-      const updateData: any = {
+      const updateData: Prisma.UserUncheckedUpdateInput = {
         loginAttempts: newAttempts,
         lastFailedLoginAt: new Date(),
       };

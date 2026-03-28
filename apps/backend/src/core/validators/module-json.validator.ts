@@ -51,7 +51,7 @@ export class ModuleJsonValidator {
      * Valida presença de campos obrigatórios
      */
     private static validateRequiredFields(moduleJson: unknown): void {
-        const json = moduleJson as Record<string, any>;
+        const json = moduleJson as Record<string, unknown>;
         const requiredFields = ['name', 'displayName', 'version'];
         const missingFields: string[] = [];
 
@@ -72,7 +72,7 @@ export class ModuleJsonValidator {
      * Valida tipos de dados dos campos
      */
     private static validateFieldTypes(moduleJson: unknown): void {
-        const json = moduleJson as Record<string, any>;
+        const json = moduleJson as Record<string, unknown>;
 
         // name: string
         if (typeof json.name !== 'string') {
@@ -154,7 +154,7 @@ export class ModuleJsonValidator {
      * Valida valores específicos dos campos
      */
     private static validateFieldValues(moduleJson: unknown): void {
-        const json = moduleJson as Record<string, any>;
+        const json = moduleJson as Record<string, unknown>;
 
         // name: apenas letras, números, hífen e underscore
         const nameRegex = /^[a-zA-Z0-9_-]+$/;

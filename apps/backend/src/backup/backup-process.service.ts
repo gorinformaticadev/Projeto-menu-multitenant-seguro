@@ -10,6 +10,10 @@ export interface ProcessExecutionResult {
   commandLine: string;
 }
 
+type ProcessExecutionError = Error & {
+  result: ProcessExecutionResult;
+};
+
 @Injectable()
 export class BackupProcessService {
   async runCommand(params: {
@@ -87,8 +91,8 @@ export class BackupProcessService {
         }
 
         if (timedOut) {
-          const timeoutError = new Error(`Comando excedeu timeout de ${timeoutMs}ms`);
-          (timeoutError as any).result = {
+          const timeoutError = new Error(`Comando excedeu timeout de ${timeoutMs}ms`) as ProcessExecutionError;
+          timeoutError.result = {
             code,
             signal,
             stdout,
@@ -101,8 +105,8 @@ export class BackupProcessService {
         }
 
         if (code !== 0) {
-          const commandError = new Error(`Comando terminou com codigo ${code}`);
-          (commandError as any).result = {
+          const commandError = new Error(`Comando terminou com codigo ${code}`) as ProcessExecutionError;
+          commandError.result = {
             code,
             signal,
             stdout,

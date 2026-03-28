@@ -343,7 +343,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
         ipAddress,
         userAgent,
         env, // Passar env customizado para o admin service
-      } as any);
+      });
 
       await this.prisma.updateLog.update({
         where: { id: updateLog.id },
@@ -419,7 +419,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
       isConfigured: !!(settings.gitUsername && settings.gitRepository),
       checkEnabled: settings.updateCheckEnabled,
       mode: this.getInstallationMode(settings),
-      updateChannel: settings.updateChannel as any,
+      updateChannel: this.normalizeUpdateChannel(settings.updateChannel),
       updateLifecycle: this.buildLifecycleState(settings, systemState),
     };
   }
@@ -432,7 +432,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
       gitToken: settings.gitToken ? '********' : undefined,
       gitReleaseBranch: settings.gitReleaseBranch || 'main',
       packageManager: settings.packageManager || 'docker',
-      updateChannel: settings.updateChannel as any,
+      updateChannel: this.normalizeUpdateChannel(settings.updateChannel),
       updateCheckEnabled: settings.updateCheckEnabled,
       releaseTag: settings.releaseTag || undefined,
       composeFile: settings.composeFile || 'docker-compose.prod.yml',
@@ -838,6 +838,10 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
       return status;
     }
     return fallback;
+  }
+
+  private normalizeUpdateChannel(value: string | null | undefined): 'release' | 'tag' {
+    return value === 'tag' ? 'tag' : 'release';
   }
 
   private async getSystemSettings(): Promise<UpdateSystemSettings> {

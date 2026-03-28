@@ -13,6 +13,20 @@ import { extractAuditContext } from '../audit/audit-request-context.util';
 import { SystemTelemetryService } from '@common/services/system-telemetry.service';
 import { SystemOperationalAlertsService } from '@common/services/system-operational-alerts.service';
 
+type MaintenanceUserPayload = {
+  id?: string;
+  sub?: string;
+  email?: string;
+  role?: string;
+  tenantId?: string | null;
+};
+
+type MaintenanceRequest = Request & {
+  user?: MaintenanceUserPayload;
+  url?: string;
+  path?: string;
+};
+
 @Injectable()
 export class MaintenanceModeGuard implements CanActivate {
   private readonly logger = new Logger(MaintenanceModeGuard.name);
@@ -30,7 +44,7 @@ export class MaintenanceModeGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<MaintenanceRequest>();
     const method = this.normalizeMethod(request.method);
     const requestPath = this.normalizePath(request);
 
@@ -141,7 +155,7 @@ export class MaintenanceModeGuard implements CanActivate {
   }
 
   private async canBypass(
-    request: Request,
+    request: MaintenanceRequest,
     maintenance: MaintenanceState,
     method: string,
     requestPath: string,
@@ -165,9 +179,9 @@ export class MaintenanceModeGuard implements CanActivate {
 
     const allowedRoles = this.normalizeAllowedRoles(maintenance.allowedRoles);
 
-    const roleFromRequest = String((request as any)?.user?.role || '').trim().toUpperCase();
+    const roleFromRequest = String(request.user?.role || '').trim().toUpperCase();
     if (this.hasBypassRole(roleFromRequest, allowedRoles)) {
-      await this.logBypassUsage(request, method, requestPath, (request as any)?.user);
+      await this.logBypassUsage(request, method, requestPath, request.user);
       return true;
     }
 
@@ -214,8 +228,8 @@ export class MaintenanceModeGuard implements CanActivate {
     );
   }
 
-  private async canAccessDashboardDuringMaintenance(request: Request): Promise<boolean> {
-    const roleFromRequest = String((request as any)?.user?.role || '').trim().toUpperCase();
+  private async canAccessDashboardDuringMaintenance(request: MaintenanceRequest): Promise<boolean> {
+    const roleFromRequest = String(request.user?.role || '').trim().toUpperCase();
     if (this.isDashboardMaintenanceRole(roleFromRequest)) {
       return true;
     }
@@ -246,9 +260,9 @@ export class MaintenanceModeGuard implements CanActivate {
     return actualPath === expectedBasePath || actualPath.startsWith(`${expectedBasePath}/`);
   }
 
-  private normalizePath(request: Request): string {
+  private normalizePath(request: MaintenanceRequest): string {
     const rawPath = String(
-      request.originalUrl || (request as any).url || (request as any).path || '/',
+      request.originalUrl || request.url || request.path || '/',
     );
     const [pathWithoutQuery] = rawPath.split('?');
     const normalized = pathWithoutQuery.trim().toLowerCase();
@@ -320,10 +334,10 @@ export class MaintenanceModeGuard implements CanActivate {
   }
 
   private async logBypassUsage(
-    request: Request,
+    request: MaintenanceRequest,
     method: string,
     requestPath: string,
-    userPayload: any,
+    userPayload?: MaintenanceUserPayload,
   ): Promise<void> {
     const role = String(userPayload?.role || '').trim().toUpperCase();
     if (role !== 'SUPER_ADMIN') {
@@ -332,8 +346,8 @@ export class MaintenanceModeGuard implements CanActivate {
 
     const { actor, requestCtx, tenantId } = extractAuditContext({
       headers: request.headers,
-      ip: (request as any).ip,
-      socket: (request as any).socket,
+      ip: request.ip,
+      socket: request.socket,
       user: {
         id: userPayload?.id || userPayload?.sub,
         sub: userPayload?.sub || userPayload?.id,

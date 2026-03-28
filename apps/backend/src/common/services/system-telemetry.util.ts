@@ -1,4 +1,20 @@
-type RequestLike = Record<string, any>;
+export type TelemetryRequestLike = {
+  route?: {
+    path?: string | string[];
+  };
+  baseUrl?: unknown;
+  originalUrl?: unknown;
+  url?: unknown;
+  path?: unknown;
+  headers?: Record<string, unknown>;
+  ip?: unknown;
+  socket?: {
+    remoteAddress?: unknown;
+  };
+  connection?: {
+    remoteAddress?: unknown;
+  };
+};
 
 const REQUEST_EXCLUDED_PATHS = [
   '/api/health',
@@ -52,7 +68,7 @@ export function normalizeTelemetryPath(rawPath: unknown): string {
   return normalized.startsWith('/') ? normalized : `/${normalized}`;
 }
 
-export function resolveTelemetryRoute(request: RequestLike): string {
+export function resolveTelemetryRoute(request: TelemetryRequestLike): string {
   const routePath = request?.route?.path;
   const baseUrl = request?.baseUrl;
 
@@ -91,7 +107,7 @@ export function shouldCollectSecurityTelemetry(method: string, route: string): b
   return !SECURITY_EXCLUDED_PATHS.some((path) => matchesPath(route, path));
 }
 
-export function resolveTelemetryClientIp(request: RequestLike): string {
+export function resolveTelemetryClientIp(request: TelemetryRequestLike): string {
   const forwarded = readHeader(request, 'x-forwarded-for');
   if (forwarded) {
     const firstForwarded = forwarded
@@ -178,7 +194,7 @@ function matchesPath(actualPath: string, expectedBasePath: string): boolean {
   return actualPath === expectedBasePath || actualPath.startsWith(`${expectedBasePath}/`);
 }
 
-function readHeader(request: RequestLike, headerName: string): string | null {
+function readHeader(request: TelemetryRequestLike, headerName: string): string | null {
   const headers = request?.headers || {};
   const value = headers[headerName] || headers[headerName.toLowerCase()];
   const headerValue = Array.isArray(value) ? value[0] : value;
@@ -202,6 +218,5 @@ function normalizeIp(value: unknown): string {
 
   return normalized;
 }
-
 
 

@@ -2,6 +2,8 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { Pool, PoolClient } from 'pg';
 import { ConfigService } from '@nestjs/config';
 
+type QueryParam = string | number | boolean | Date | Buffer | null;
+
 /**
  * Serviço Executor de Banco de Dados para Módulos
  * Usa pg.Pool para execução segura de SQL com transações e rollback automático
@@ -13,6 +15,10 @@ export class ModuleDatabaseExecutorService {
 
     constructor(private configService: ConfigService) {
         this.initializePool();
+    }
+
+    private getErrorMessage(error: unknown): string {
+        return error instanceof Error ? error.message : String(error);
     }
 
     /**
@@ -60,7 +66,7 @@ export class ModuleDatabaseExecutorService {
             await client.query('COMMIT');
             this.logger.log('✅ Transação executada com sucesso');
 
-        } catch (error) {
+        } catch (error: unknown) {
             await client.query('ROLLBACK');
             this.logger.error('❌ Erro na transação, rollback executado:', error.message);
             throw new BadRequestException(`Erro ao executar SQL: ${error.message}`);
@@ -91,7 +97,7 @@ export class ModuleDatabaseExecutorService {
             await client.query('COMMIT');
             this.logger.log(`✅ ${queries.length} queries executadas em transação`);
 
-        } catch (error) {
+        } catch (error: unknown) {
             await client.query('ROLLBACK');
             this.logger.error('❌ Erro em transação múltipla, rollback executado:', error.message);
             throw new BadRequestException(`Erro ao executar queries: ${error.message}`);
@@ -103,7 +109,7 @@ export class ModuleDatabaseExecutorService {
     /**
      * Executa query e retorna resultados
      */
-    async executeQuery<T = any>(sql: string, params: any[] = [], tenantId?: string): Promise<T[]> {
+    async executeQuery<T = Record<string, unknown>>(sql: string, params: QueryParam[] = [], tenantId?: string): Promise<T[]> {
         const client = await this.pool.connect();
 
         try {
@@ -114,7 +120,7 @@ export class ModuleDatabaseExecutorService {
             const result = await client.query(sql, params);
             return result.rows;
 
-        } catch (error) {
+        } catch (error: unknown) {
             this.logger.error('❌ Erro ao executar query:', error.message);
             throw new BadRequestException(`Erro na query: ${error.message}`);
         } finally {
@@ -167,7 +173,7 @@ export class ModuleDatabaseExecutorService {
             await client.query('SELECT 1');
             client.release();
             return true;
-        } catch (error) {
+        } catch (error: unknown) {
             this.logger.error('❌ Health check do pool falhou:', error.message);
             return false;
         }

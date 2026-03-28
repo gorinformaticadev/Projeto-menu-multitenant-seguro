@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { CronExpression } from '@nestjs/schedule';
-import { BackupJobStatus } from '@prisma/client';
+import { BackupJobStatus, Prisma } from '@prisma/client';
 import Redis from 'ioredis';
 import { AuditService } from '../../audit/audit.service';
 import { CronService } from '../../core/cron/cron.service';
@@ -320,11 +320,11 @@ export class SystemOperationalAlertsService implements OnModuleInit {
       await this.prisma.notification.update({
         where: { id },
         data: {
-          data: {
+          data: this.toInputJson({
             ...this.normalizeAlertData(row.data),
             ...params.resolution,
             alertResolvedAt: resolvedAt.toISOString(),
-          } as any,
+          }),
           ...(markAsRead
             ? {
                 read: true,
@@ -634,6 +634,10 @@ export class SystemOperationalAlertsService implements OnModuleInit {
     }
 
     return value as Record<string, unknown>;
+  }
+
+  private toInputJson(value: Record<string, unknown>): Prisma.InputJsonValue {
+    return value as Prisma.InputJsonValue;
   }
 
 

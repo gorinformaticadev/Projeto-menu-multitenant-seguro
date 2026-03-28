@@ -4,6 +4,7 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import {
@@ -24,6 +25,12 @@ const EXCLUDED_SYSTEM_PATHS = [
   '/api/system/metrics',
 ];
 
+type ResponseMetricsRequest = Request & {
+  originalUrl?: string;
+  url?: string;
+  path?: string;
+};
+
 @Injectable()
 export class ResponseTimeMetricsInterceptor implements NestInterceptor {
   constructor(private readonly responseTimeMetricsService: ResponseTimeMetricsService) {}
@@ -33,7 +40,7 @@ export class ResponseTimeMetricsInterceptor implements NestInterceptor {
       return next.handle();
     }
 
-    const request = context.switchToHttp().getRequest<any>();
+    const request = context.switchToHttp().getRequest<ResponseMetricsRequest>();
     const method = String(request?.method || 'GET').trim().toUpperCase();
     if (method === 'OPTIONS') {
       return next.handle();
@@ -79,7 +86,7 @@ export class ResponseTimeMetricsInterceptor implements NestInterceptor {
     return 'business';
   }
 
-  private normalizePath(request: any): string {
+  private normalizePath(request: ResponseMetricsRequest): string {
     const rawPath = String(request?.originalUrl || request?.url || request?.path || '/');
     const [pathWithoutQuery] = rawPath.split('?');
     const normalized = pathWithoutQuery.trim().toLowerCase();

@@ -1,12 +1,18 @@
 ﻿import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { Request } from 'express';
+
+type NotificationsJwtPayload = Record<string, unknown>;
+type NotificationsSseRequest = Request & {
+  user?: NotificationsJwtPayload;
+};
 
 @Injectable()
 export class NotificationsSseJwtGuard implements CanActivate {
   constructor(private readonly jwtService: JwtService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<NotificationsSseRequest>();
     const token = this.extractToken(request);
 
     if (!token) {
@@ -14,7 +20,7 @@ export class NotificationsSseJwtGuard implements CanActivate {
     }
 
     try {
-      const payload = await this.jwtService.verifyAsync(token, {
+      const payload = await this.jwtService.verifyAsync<NotificationsJwtPayload>(token, {
         secret: process.env.JWT_SECRET,
         ignoreExpiration: false,
       });
@@ -26,7 +32,7 @@ export class NotificationsSseJwtGuard implements CanActivate {
     }
   }
 
-  private extractToken(request: any): string | null {
+  private extractToken(request: NotificationsSseRequest): string | null {
     const authHeader = request.headers?.authorization as string | undefined;
     if (authHeader?.startsWith('Bearer ')) {
       const bearerToken = authHeader.slice(7).trim();

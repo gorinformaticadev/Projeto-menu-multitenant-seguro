@@ -37,7 +37,7 @@ export class SecurityConfigService {
     const config = await this.getConfig();
     
     // Criptografar credenciais SMTP se fornecidas
-    const updateData: any = { ...dto, updatedBy: userId };
+    const updateData: Record<string, unknown> = { ...dto, updatedBy: userId };
     
     if (dto.smtpPassword) {
       updateData.smtpPassword = encryptSensitiveData(dto.smtpPassword);
@@ -149,7 +149,7 @@ export class SecurityConfigService {
    */
   async updateWebPushConfig(dto: UpdateWebPushConfigDto, userId: string) {
     const config = await this.getConfig();
-    const updateData: any = { updatedBy: userId };
+    const updateData: Record<string, unknown> = { updatedBy: userId };
 
     if (dto.webPushPublicKey !== undefined) {
       updateData.webPushPublicKey = this.normalizeString(dto.webPushPublicKey);
@@ -274,7 +274,7 @@ export class SecurityConfigService {
    * Obtém configuração de rate limiting para endpoints críticos
    */
   async getCriticalEndpointsRateLimit() {
-    const config: any = await this.getConfig();
+    const config = await this.getConfig();
     
     return {
       backupRateLimitPerHour: config.backupRateLimitPerHour || 5,

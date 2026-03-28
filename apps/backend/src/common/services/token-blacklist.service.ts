@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { UserSessionService } from '../../auth/user-session.service';
 
@@ -94,7 +95,7 @@ export class TokenBlacklistService {
             sessionVersion: {
               increment: 1,
             },
-          } as any,
+          } as Prisma.UserUncheckedUpdateInput,
         }),
       ]);
 

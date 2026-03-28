@@ -6,7 +6,13 @@ import * as fs from 'fs';
 export class DynamicModulesLoader {
   private static readonly logger = new Logger(DynamicModulesLoader.name);
 
-  static async load(prisma: PrismaService): Promise<Type<any>[]> {
+  static async load(prisma: PrismaService): Promise<Array<Type<unknown>>> {
+    const getErrorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
+    const getErrorCode = (error: unknown) =>
+      typeof error === 'object' && error !== null && 'code' in error
+        ? String((error as { code?: unknown }).code || '')
+        : '';
+
     try {
       const logFile = path.join(process.cwd(), 'module_loading_debug.log');
       const log = (msg: string) => {
@@ -28,7 +34,7 @@ export class DynamicModulesLoader {
         },
       });
 
-      const loaded: Type<any>[] = [];
+      const loaded: Array<Type<unknown>> = [];
 
       if (modules.length === 0) {
         log('Nenhum modulo ativo encontrado.');
@@ -70,9 +76,9 @@ export class DynamicModulesLoader {
               loaded.push(imported[fallbackExport]);
             }
           }
-        } catch (err: any) {
-          log(`Falha ao carregar modulo ${mod.slug}: ${err?.message ?? err}`);
-          if (err?.code === 'MODULE_NOT_FOUND') {
+        } catch (err: unknown) {
+          log(`Falha ao carregar modulo ${mod.slug}: ${getErrorMessage(err)}`);
+          if (getErrorCode(err) === 'MODULE_NOT_FOUND') {
             log(`Verifique se a pasta/arquivo existe em: src/modules/${mod.slug}/`);
 
             try {
@@ -82,8 +88,8 @@ export class DynamicModulesLoader {
                 data: { status: 'disabled' },
               });
               log(`Modulo ${mod.slug} foi marcado como disabled.`);
-            } catch (dbErr: any) {
-              log(`Nao foi possivel desabilitar o modulo ${mod.slug}: ${dbErr?.message ?? dbErr}`);
+            } catch (dbErr: unknown) {
+              log(`Nao foi possivel desabilitar o modulo ${mod.slug}: ${getErrorMessage(dbErr)}`);
             }
           }
         }
@@ -91,8 +97,8 @@ export class DynamicModulesLoader {
 
       log(`Carregamento finalizado. Modulos carregados: ${loaded.length}`);
       return loaded;
-    } catch (error: any) {
-      this.logger.error(`Erro fatal no loader de modulos: ${error?.message ?? error}`);
+    } catch (error: unknown) {
+      this.logger.error(`Erro fatal no loader de modulos: ${getErrorMessage(error)}`);
       return [];
     }
   }

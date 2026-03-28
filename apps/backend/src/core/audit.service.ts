@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '@core/prisma/prisma.service';
 
 export interface AuditLogData {
@@ -46,7 +47,7 @@ export class AuditService {
     const limit = params.limit || 50;
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: Prisma.AuditLogWhereInput = {};
 
     if (params.action) {
       where.action = params.action;
@@ -126,7 +127,7 @@ export class AuditService {
    * Estatísticas de logs
    */
   async getStats(params: { startDate?: Date; endDate?: Date; tenantId?: string }) {
-    const where: any = {};
+    const where: Prisma.AuditLogWhereInput = {};
 
     if (params.startDate || params.endDate) {
       where.createdAt = {};

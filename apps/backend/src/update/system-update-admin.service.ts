@@ -40,6 +40,7 @@ type RunOperationRequest = {
   version?: string;
   target?: string;
   legacyInplace?: boolean;
+  env?: NodeJS.ProcessEnv;
   userId: string;
   userEmail?: string;
   userRole?: string;
@@ -152,7 +153,7 @@ export class SystemUpdateAdminService {
       TARGET_TAG: version,
       RELEASE_TAG: version,
       PROJECT_ROOT: runtime.baseDir,
-      ...(request as any).env,
+      ...(request.env || {}),
     });
 
     await this.auditService.log({

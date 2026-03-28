@@ -8,7 +8,7 @@ export interface SecurityLogOptions {
   includeTenant?: boolean;
   includeIp?: boolean;
   includeUserAgent?: boolean;
-  customDetails?: Record<string, any>;
+  customDetails?: Record<string, unknown>;
 }
 
 /**

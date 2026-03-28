@@ -2,6 +2,7 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { BadRequestException } from '@nestjs/common';
+import { Request } from 'express';
 import { resolveTenantLogosDirPath } from '../paths/paths.service';
 
 // Assinaturas de arquivos válidas (magic numbers)
@@ -34,7 +35,13 @@ const getAllowedLogoMimeTypes = () => (
   process.env.ALLOWED_LOGO_MIME_TYPES || 'image/jpeg,image/jpg,image/pjpeg,image/png,image/x-png,image/webp,image/gif'
 ).split(',');
 
-function resolveTenantIdFromRequest(req: any): string {
+type TenantUploadRequest = Request & {
+  user?: {
+    tenantId?: string;
+  };
+};
+
+function resolveTenantIdFromRequest(req: TenantUploadRequest): string {
   const tenantIdFromParams = typeof req?.params?.id === 'string' ? req.params.id.trim() : '';
   if (tenantIdFromParams) {
     return tenantIdFromParams;

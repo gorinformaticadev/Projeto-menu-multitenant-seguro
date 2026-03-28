@@ -6,6 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { PathsService } from '@core/common/paths/paths.service';
 import { createReadStream, promises as fsPromises } from 'fs';
@@ -19,6 +20,14 @@ import {
 import { sanitizeFileName, validateFileSignature } from './config/secure-multer.config';
 import { ConfigResolverService } from '../../system-settings/config-resolver.service';
 import { AuthorizationService } from '@common/services/authorization.service';
+
+type SecureFileActor = {
+  id: string;
+  tenantId: string | null;
+  role: string | null;
+};
+
+type SecureFileActorInput = Partial<SecureFileActor> | null | undefined;
 
 @Injectable()
 export class SecureFilesService {
@@ -121,7 +130,7 @@ export class SecureFilesService {
     }
   }
 
-  async getFileStream(fileId: string, actorInput: any): Promise<SecureFileStream> {
+  async getFileStream(fileId: string, actorInput: SecureFileActorInput): Promise<SecureFileStream> {
     const actor = this.normalizeActor(actorInput);
     const file = await this.getAccessibleFileOrThrow(fileId, actor, 'read');
 
@@ -167,7 +176,7 @@ export class SecureFilesService {
     };
   }
 
-  async getFileMetadata(fileId: string, actorInput: any): Promise<SecureFileMetadata> {
+  async getFileMetadata(fileId: string, actorInput: SecureFileActorInput): Promise<SecureFileMetadata> {
     const actor = this.normalizeActor(actorInput);
     const file = await this.getAccessibleFileOrThrow(fileId, actor, 'read');
 
@@ -182,7 +191,7 @@ export class SecureFilesService {
     };
   }
 
-  async deleteFile(fileId: string, actorInput: any): Promise<void> {
+  async deleteFile(fileId: string, actorInput: SecureFileActorInput): Promise<void> {
     const actor = this.normalizeActor(actorInput);
     const file = await this.getAccessibleFileOrThrow(fileId, actor, 'delete');
     await this.assertTenantModuleAccess(file.tenantId, file.moduleName, 'write');
@@ -199,7 +208,7 @@ export class SecureFilesService {
     });
   }
 
-  async listFiles(actorInput: any, tenantId: string, moduleName?: string, documentType?: string) {
+  async listFiles(actorInput: SecureFileActorInput, tenantId: string, moduleName?: string, documentType?: string) {
     const actor = this.normalizeActor(actorInput);
     const safeTenantId = this.validatePathSegment(tenantId, 'tenantId');
     const safeModuleName = moduleName
@@ -216,7 +225,7 @@ export class SecureFilesService {
     const where = this.authorizationService.buildSecureFileListWhere(actor, {
       deletedAt: null,
       tenantId: safeTenantId,
-    }) as any;
+    }) as Prisma.SecureFileWhereInput;
 
     if (safeModuleName) {
       where.moduleName = safeModuleName;
@@ -377,7 +386,7 @@ export class SecureFilesService {
     }
   }
 
-  private normalizeActor(actorInput: any): { id: string; tenantId: string | null; role: string | null } {
+  private normalizeActor(actorInput: SecureFileActorInput): SecureFileActor {
     const id = typeof actorInput?.id === 'string' ? actorInput.id.trim() : '';
     if (!id) {
       throw new ForbiddenException('Usuario nao autenticado');
@@ -392,7 +401,7 @@ export class SecureFilesService {
 
   private async getAccessibleFileOrThrow(
     fileId: string,
-    actor: { id: string; tenantId: string | null; role: string | null },
+    actor: SecureFileActor,
     action: 'read' | 'delete',
   ) {
     const file = await this.prisma.secureFile.findFirst({
@@ -424,7 +433,7 @@ export class SecureFilesService {
     action: string,
     userId: string,
     tenantId: string,
-    details: any,
+    details: Record<string, unknown>,
   ): Promise<void> {
     try {
       await this.prisma.auditLog.create({

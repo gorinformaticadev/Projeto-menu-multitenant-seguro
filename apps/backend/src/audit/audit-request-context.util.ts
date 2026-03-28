@@ -1,3 +1,4 @@
+import { Request } from 'express';
 import { AuditActor, AuditRequestContext } from './audit.service';
 import { extractRequestContext } from '../common/interceptors/request-context.interceptor';
 
@@ -7,7 +8,19 @@ export interface ExtractedAuditContext {
   tenantId: string | null;
 }
 
-export const extractAuditContext = (request: any): ExtractedAuditContext => {
+type AuditRequestUser = {
+  sub?: string;
+  id?: string;
+  email?: string;
+  role?: string;
+  tenantId?: string;
+};
+
+type AuditRequest = Request & {
+  user?: AuditRequestUser;
+};
+
+export const extractAuditContext = (request: AuditRequest): ExtractedAuditContext => {
   const requestContext = extractRequestContext(request);
   const user = request?.user || {};
 

@@ -4,6 +4,7 @@
   Injectable,
   NestInterceptor,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { Observable } from 'rxjs';
 
 export interface RequestContextPayload {
@@ -11,7 +12,11 @@ export interface RequestContextPayload {
   userAgent: string | null;
 }
 
-export const extractRequestContext = (request: any): RequestContextPayload => {
+type RequestLike = Request & {
+  requestCtx?: RequestContextPayload;
+};
+
+export const extractRequestContext = (request: RequestLike): RequestContextPayload => {
   const realIp = request?.headers?.['x-real-ip'];
   const forwardedFor = request?.headers?.['x-forwarded-for'];
   
@@ -47,7 +52,7 @@ export class RequestContextInterceptor implements NestInterceptor {
       return next.handle();
     }
 
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<RequestLike>();
     if (request) {
       request.requestCtx = extractRequestContext(request);
     }

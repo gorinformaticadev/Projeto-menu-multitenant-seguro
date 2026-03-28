@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { Reflector } from '@nestjs/core';
 import { ConfigResolverService } from '../../system-settings/config-resolver.service';
 import {
@@ -12,6 +13,13 @@ import {
 } from '../utils/csrf-token.util';
 
 export const SKIP_CSRF_KEY = 'skipCsrf';
+
+type CsrfRequest = Request & {
+  cookies?: Record<string, string | undefined>;
+  connection?: {
+    remoteAddress?: string;
+  };
+};
 
 /**
  * CSRF Guard - Double submit cookie
@@ -42,8 +50,8 @@ export class CsrfGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest();
-    const response = context.switchToHttp().getResponse();
+    const request = context.switchToHttp().getRequest<CsrfRequest>();
+    const response = context.switchToHttp().getResponse<Response>();
     const method = String(request.method || 'GET').toUpperCase();
 
     if (!this.isValidOrigin(request)) {
@@ -87,11 +95,11 @@ export class CsrfGuard implements CanActivate {
     return true;
   }
 
-  private setCsrfToken(request: any, response: any): void {
+  private setCsrfToken(request: CsrfRequest, response: Response): void {
     ensureCsrfCookie(response, request.cookies?.[CSRF_COOKIE_NAME]);
   }
 
-  private isValidOrigin(request: any): boolean {
+  private isValidOrigin(request: CsrfRequest): boolean {
     const origin = request.headers.origin;
     const referer = request.headers.referer;
 
@@ -141,7 +149,7 @@ export class CsrfGuard implements CanActivate {
     return token.length === 64;
   }
 
-  private logSuspiciousActivity(request: any, reason: string): void {
+  private logSuspiciousActivity(request: CsrfRequest, reason: string): void {
     console.warn('Atividade suspeita detectada:', {
       reason,
       ip: request.ip || request.connection?.remoteAddress,

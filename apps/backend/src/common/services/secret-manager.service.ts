@@ -50,6 +50,32 @@ export interface SecretManager {
   getProviderName(): string;
 }
 
+type AwsSecretMetadata = {
+  Name?: string;
+  Description?: string;
+  VersionId?: string;
+  SecretString?: string;
+  CreatedDate?: string | number | Date;
+  LastChangedDate?: string | number | Date;
+};
+
+type AwsSecretsManagerLike = {
+  getSecretValue(params: { SecretId: string }): { promise(): Promise<AwsSecretMetadata> };
+  createSecret(params: {
+    Name: string;
+    SecretString: string;
+    Description?: string;
+  }): { promise(): Promise<AwsSecretMetadata> };
+  deleteSecret(params: {
+    SecretId: string;
+    ForceDeleteWithoutRecovery: boolean;
+  }): { promise(): Promise<unknown> };
+  listSecrets(params: {
+    MaxResults?: number;
+    Filters?: Array<{ Key: string; Values: string[] }>;
+  }): { promise(): Promise<{ SecretList: AwsSecretMetadata[] }> };
+};
+
 /**
  * Secret Manager Local - Para desenvolvimento e ambientes simples
  */
@@ -128,7 +154,7 @@ export class LocalSecretManager implements SecretManager {
  * AWS Secrets Manager Implementation
  */
 export class AWSSecretManager implements SecretManager {
-  private client: any; // AWS.SecretsManager
+  private client: AwsSecretsManagerLike | null;
 
   constructor() {
     try {
@@ -170,7 +196,11 @@ export class AWSSecretManager implements SecretManager {
       throw new Error('AWS Secrets Manager não disponível');
     }
 
-    const params: any = {
+    const params: {
+      Name: string;
+      SecretString: string;
+      Description?: string;
+    } = {
       Name: name,
       SecretString: value
     };
@@ -210,14 +240,16 @@ export class AWSSecretManager implements SecretManager {
     if (!this.client) return [];
 
     try {
-      const params: any = {};
+      const params: {
+        Filters?: Array<{ Key: string; Values: string[] }>;
+      } = {};
       if (prefix) {
         params.Filters = [{ Key: 'name', Values: [prefix] }];
       }
 
       const response = await this.client.listSecrets(params).promise();
 
-      return response.SecretList.map((secret: any) => ({
+      return response.SecretList.map((secret) => ({
         name: secret.Name,
         value: '', // Não retornamos o valor em listagens
         version: secret.LastChangedDate,

@@ -50,7 +50,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     (
       this as unknown as {
         $use?: (
-          middleware: (params: any, next: (params: any) => Promise<unknown>) => Promise<unknown>,
+          middleware: (
+            params: any,
+            next: (params: any) => Promise<unknown>,
+          ) => Promise<unknown>,
         ) => void;
       }
     ).$use?.((params, next) => this.applyTenantEnforcement(params, next));
@@ -347,7 +350,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     findFirst: (args: Record<string, unknown>) => Promise<unknown>;
   } {
     const delegateName = model.charAt(0).toLowerCase() + model.slice(1);
-    const delegate = (this as Record<string, any>)[delegateName];
+    const delegate = (this as unknown as Record<string, unknown>)[delegateName] as {
+      findFirst?: (args: Record<string, unknown>) => Promise<unknown>;
+    };
     if (!delegate?.findFirst) {
       throw new Error(`Prisma delegate not found for model ${model}`);
     }

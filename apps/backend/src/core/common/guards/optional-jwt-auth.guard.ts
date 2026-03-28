@@ -7,7 +7,7 @@ export class OptionalJwtAuthGuard extends AuthGuard('jwt') {
    * Sobrescreve o tratamento de requisição para NÃO lançar erro
    * se o token for inválido ou ausente.
    */
-  handleRequest(err: any, user: any) {
+  handleRequest(err: unknown, user: unknown) {
     if (err || !user) {
       return undefined;
     }

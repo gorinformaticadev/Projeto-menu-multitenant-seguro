@@ -18,7 +18,7 @@ export class TenantInterceptor implements NestInterceptor {
     private readonly systemTelemetryService: SystemTelemetryService,
   ) {}
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
 

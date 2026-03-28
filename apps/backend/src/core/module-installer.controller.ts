@@ -22,6 +22,15 @@ import { memoryStorage } from 'multer';
 import { SkipThrottle } from '@nestjs/throttler';
 import { ConfigResolverService } from '../system-settings/config-resolver.service';
 
+type ModuleInstallerRequest = {
+    user?: {
+        id?: string;
+        sub?: string;
+    };
+    ip?: string;
+    headers?: Record<string, string | string[] | undefined>;
+};
+
 type MutableModuleOpsStatus = {
     environment: string;
     overrideEnabled: boolean;
@@ -40,7 +49,7 @@ export class ModuleInstallerController {
         private readonly configResolver: ConfigResolverService,
     ) { }
 
-    private buildActorContext(req: Record<string, any> | undefined) {
+    private buildActorContext(req: ModuleInstallerRequest | undefined) {
         return {
             userId: req?.user?.id || req?.user?.sub,
             ipAddress: req?.ip,
@@ -115,7 +124,7 @@ export class ModuleInstallerController {
                     const bufferArray = Object.values(file.buffer);
                     file.buffer = Buffer.from(bufferArray as number[]);
                 } else {
-                    file.buffer = Buffer.from(file.buffer as any);
+                    file.buffer = Buffer.from(file.buffer);
                 }
             } catch (conversionError) {
                 throw new BadRequestException('Buffer invalido - nao foi possivel converter: ' + conversionError.message);

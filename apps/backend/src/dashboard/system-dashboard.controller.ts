@@ -1,10 +1,24 @@
 import { Body, Controller, Get, Put, Query, Request, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
+import { Request as ExpressRequest } from 'express';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { SystemDashboardQueryDto, UpdateSystemDashboardLayoutDto } from './dto/system-dashboard.dto';
 import { DashboardActor, DashboardModuleCardsResponse, SystemDashboardService } from './system-dashboard.service';
+
+type DashboardRequest = ExpressRequest & {
+  user?: {
+    id?: string;
+    sub?: string;
+    role?: string;
+    tenantId?: string | null;
+    name?: string;
+    email?: string;
+    tenant?: { nomeFantasia?: string | null };
+    tenantName?: string | null;
+  };
+};
 
 @Controller('system/dashboard')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -14,7 +28,7 @@ export class SystemDashboardController {
 
   @Get()
   @Roles(Role.SUPER_ADMIN)
-  async getDashboard(@Request() req: any, @Query() query: SystemDashboardQueryDto) {
+  async getDashboard(@Request() req: DashboardRequest, @Query() query: SystemDashboardQueryDto) {
     return this.dashboardService.getDashboard(this.getActor(req), {
       periodMinutes: this.parsePositiveInt(query.periodMinutes),
       tenantId: query.tenantId,
@@ -23,17 +37,17 @@ export class SystemDashboardController {
   }
 
   @Get('module-cards')
-  async getModuleCards(@Request() req: any): Promise<DashboardModuleCardsResponse> {
+  async getModuleCards(@Request() req: DashboardRequest): Promise<DashboardModuleCardsResponse> {
     return this.dashboardService.getModuleCards(this.getActor(req));
   }
 
   @Get('layout')
-  async getLayout(@Request() req: any) {
+  async getLayout(@Request() req: DashboardRequest) {
     return this.dashboardService.getLayout(this.getActor(req));
   }
 
   @Put('layout')
-  async saveLayout(@Request() req: any, @Body() body: UpdateSystemDashboardLayoutDto) {
+  async saveLayout(@Request() req: DashboardRequest, @Body() body: UpdateSystemDashboardLayoutDto) {
     return this.dashboardService.saveLayout(this.getActor(req), {
       layoutJson: body?.layoutJson,
       filtersJson: body?.filtersJson,
@@ -53,7 +67,7 @@ export class SystemDashboardController {
     return parsed;
   }
 
-  private getActor(req: any): DashboardActor {
+  private getActor(req: DashboardRequest): DashboardActor {
     const roleRaw = String(req?.user?.role || '').trim().toUpperCase();
     const roleValues = new Set(Object.values(Role));
     const role = roleValues.has(roleRaw as Role) ? (roleRaw as Role) : Role.USER;

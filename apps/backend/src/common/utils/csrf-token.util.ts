@@ -1,4 +1,5 @@
 import * as crypto from 'crypto';
+import { Response } from 'express';
 
 export const CSRF_COOKIE_NAME = 'XSRF-TOKEN';
 export const CSRF_HEADER_NAME = 'X-CSRF-Token';
@@ -14,7 +15,7 @@ export function buildCsrfCookieOptions() {
   } as const;
 }
 
-export function ensureCsrfCookie(response: any, existingToken?: string | null): string {
+export function ensureCsrfCookie(response: Pick<Response, 'cookie'>, existingToken?: string | null): string {
   const reusableToken =
     typeof existingToken === 'string' && /^[a-f0-9]{64}$/i.test(existingToken.trim())
       ? existingToken.trim()
@@ -27,7 +28,7 @@ export function ensureCsrfCookie(response: any, existingToken?: string | null): 
   return token;
 }
 
-export function clearCsrfCookie(response: any): void {
+export function clearCsrfCookie(response: Pick<Response, 'cookie'>): void {
   response.cookie(CSRF_COOKIE_NAME, '', {
     ...buildCsrfCookieOptions(),
     maxAge: 0,

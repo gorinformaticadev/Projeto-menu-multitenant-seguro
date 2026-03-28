@@ -8,12 +8,22 @@ import {
 import { Request, Response } from 'express';
 import * as Sentry from '@sentry/node';
 
+type RequestUser = {
+  id?: string;
+  email?: string;
+  role?: string;
+};
+
+type RequestWithUser = Request & {
+  user?: RequestUser;
+};
+
 @Catch()
 export class SentryExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
+    const request = ctx.getRequest<RequestWithUser>();
 
     const status =
       exception instanceof HttpException
@@ -35,11 +45,11 @@ export class SentryExceptionFilter implements ExceptionFilter {
             status_code: status,
           },
         },
-        user: (request as any).user
+        user: request.user
           ? {
-            id: (request as any).user.id,
-            email: (request as any).user.email,
-            role: (request as any).user.role,
+            id: request.user.id,
+            email: request.user.email,
+            role: request.user.role,
           }
           : undefined,
       });
@@ -50,7 +60,12 @@ export class SentryExceptionFilter implements ExceptionFilter {
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
-      message: typeof message === 'string' ? message : (message as any).message,
+      message: typeof message === 'string' ? message : this.readMessageFromResponse(message),
     });
+  }
+
+  private readMessageFromResponse(message: object): string {
+    const maybeMessage = (message as { message?: unknown }).message;
+    return typeof maybeMessage === 'string' ? maybeMessage : 'Internal server error';
   }
 }
