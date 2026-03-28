@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import "./globals.css";
 import "react-grid-layout/css/styles.css";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -16,19 +17,34 @@ import { APP_THEME_VALUES, PUBLIC_THEME_STORAGE_KEY } from "@/lib/app-theme";
 
 /** Valor padrão usado como fallback quando o backend não está acessível no SSR */
 const PLATFORM_NAME_FALLBACK = "Pluggor";
+const PLATFORM_NAME_FETCH_TIMEOUT_MS = 1500;
+
+function resolvePlatformApiBase(): string | null {
+  const rawApiUrl = process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_URL;
+  if (!rawApiUrl) {
+    return null;
+  }
+
+  const normalizedApiUrl = rawApiUrl.replace(/\/+$/, "");
+  return normalizedApiUrl.endsWith("/api") ? normalizedApiUrl : `${normalizedApiUrl}/api`;
+}
 
 /**
  * Busca o nome da plataforma diretamente no backend durante o SSR.
  * Usa a URL interna do servidor (NEXT_PUBLIC_API_URL) para evitar
  * depender do rewrite do Next.js, que só funciona no browser.
  */
-async function fetchPlatformNameSSR(): Promise<string> {
+const fetchPlatformNameSSR = cache(async (): Promise<string> => {
+  const apiBase = resolvePlatformApiBase();
+  if (!apiBase) {
+    return PLATFORM_NAME_FALLBACK;
+  }
+
   try {
-    const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
-    const apiBase = rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl}/api`;
     const res = await fetch(`${apiBase}/platform-config/name`, {
       // Revalidar a cada 60 segundos no cache do Next.js
       next: { revalidate: 60 },
+      signal: AbortSignal.timeout(PLATFORM_NAME_FETCH_TIMEOUT_MS),
     });
     if (!res.ok) return PLATFORM_NAME_FALLBACK;
     const data = (await res.json()) as { platformName?: unknown };
@@ -37,7 +53,7 @@ async function fetchPlatformNameSSR(): Promise<string> {
   } catch {
     return PLATFORM_NAME_FALLBACK;
   }
-}
+});
 
 export async function generateMetadata(): Promise<Metadata> {
   const platformName = await fetchPlatformNameSSR();
