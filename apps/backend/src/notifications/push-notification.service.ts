@@ -53,6 +53,36 @@ type NotificationRecipient = {
   tenantId: string | null;
 };
 
+export interface PushSubscriptionDiagnostic {
+  id: string;
+  endpoint: string;
+  endpointFull: string;
+  userAgent: string | null;
+  lastUsedAt: Date | null;
+  createdAt: Date;
+  tenantId: string | null;
+}
+
+export interface DeliveryLogSubscriptionResult {
+  subscriptionId: string;
+  endpoint: string;
+  status: 'success' | 'fail' | 'stale';
+  statusCode?: number;
+  error?: string;
+}
+
+export interface DeliveryLogEntry {
+  notificationId: string;
+  timestamp: Date;
+  userIds: string[];
+  tag: string;
+  totalSubscriptions: number;
+  successCount: number;
+  failCount: number;
+  staleCount: number;
+  details: DeliveryLogSubscriptionResult[];
+}
+
 @Injectable()
 export class PushNotificationService {
   private readonly logger = new Logger(PushNotificationService.name);
@@ -67,6 +97,10 @@ export class PushNotificationService {
   private warnedMissingDependency = false;
   private readonly pushToggleCacheTtlMs = 15 * 1000;
   private readonly configCacheTtlMs = 60 * 1000;
+
+  // Delivery log: últimos envios de push (em memória, limitado)
+  private readonly deliveryLog: DeliveryLogEntry[] = [];
+  private readonly maxDeliveryLogEntries = 50;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -157,6 +191,57 @@ export class PushNotificationService {
     });
   }
 
+  /**
+   * Retorna subscriptions do usuário atual para diagnóstico.
+   */
+  async getUserSubscriptions(userId: string): Promise<PushSubscriptionDiagnostic[]> {
+    if (!userId) {
+      return [];
+    }
+
+    const subs = await this.prisma.pushSubscription.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        endpoint: true,
+        userAgent: true,
+        lastUsedAt: true,
+        createdAt: true,
+        tenantId: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return subs.map((s) => ({
+      id: s.id,
+      endpoint: this.truncateEndpoint(s.endpoint),
+      endpointFull: s.endpoint,
+      userAgent: s.userAgent || null,
+      lastUsedAt: s.lastUsedAt,
+      createdAt: s.createdAt,
+      tenantId: s.tenantId,
+    }));
+  }
+
+  /**
+   * Retorna últimos envios de push (em memória) para diagnóstico.
+   */
+  getLastDeliveries(): DeliveryLogEntry[] {
+    return [...this.deliveryLog];
+  }
+
+  private truncateEndpoint(endpoint: string): string {
+    if (endpoint.length <= 50) return endpoint;
+    return `${endpoint.slice(0, 25)}...${endpoint.slice(-20)}`;
+  }
+
+  private recordDeliveryLog(entry: DeliveryLogEntry): void {
+    this.deliveryLog.unshift(entry);
+    if (this.deliveryLog.length > this.maxDeliveryLogEntries) {
+      this.deliveryLog.length = this.maxDeliveryLogEntries;
+    }
+  }
+
   async sendNotification(notification: Notification): Promise<void> {
     if (!(await this.isPushDeliveryEnabledCached())) {
       return;
@@ -216,13 +301,11 @@ export class PushNotificationService {
 
       const staleIds: string[] = [];
       const successIds: string[] = [];
-      const failedDetails: string[] = [];
+      const deliveryDetails: DeliveryLogSubscriptionResult[] = [];
 
       await Promise.all(
         uniqueSubscriptions.map(async (sub) => {
-          const endpointPreview = sub.endpoint.length > 50
-            ? `${sub.endpoint.slice(0, 25)}...${sub.endpoint.slice(-20)}`
-            : sub.endpoint;
+          const endpointPreview = this.truncateEndpoint(sub.endpoint);
 
           try {
             await this.validatePushEndpoint(sub.endpoint);
@@ -234,6 +317,11 @@ export class PushNotificationService {
               payload,
             );
             successIds.push(sub.id);
+            deliveryDetails.push({
+              subscriptionId: sub.id,
+              endpoint: endpointPreview,
+              status: 'success',
+            });
             this.logger.debug(
               `[PushSend] OK | sub=${sub.id} endpoint=${endpointPreview} user=${targetUserIds.join(',')}`,
             );
@@ -245,6 +333,12 @@ export class PushNotificationService {
 
             if (statusCode === 404 || statusCode === 410) {
               staleIds.push(sub.id);
+              deliveryDetails.push({
+                subscriptionId: sub.id,
+                endpoint: endpointPreview,
+                status: 'stale',
+                statusCode,
+              });
               this.logger.log(
                 `[PushSend] STALE (removendo) | sub=${sub.id} endpoint=${endpointPreview} status=${statusCode}`,
               );
@@ -252,7 +346,13 @@ export class PushNotificationService {
             }
 
             const errorMsg = (error as Error)?.message || String(error);
-            failedDetails.push(`sub=${sub.id} status=${statusCode || 'unknown'} err=${errorMsg.slice(0, 80)}`);
+            deliveryDetails.push({
+              subscriptionId: sub.id,
+              endpoint: endpointPreview,
+              status: 'fail',
+              statusCode: statusCode || undefined,
+              error: errorMsg.slice(0, 80),
+            });
             this.logger.warn(
               `[PushSend] FAIL | sub=${sub.id} endpoint=${endpointPreview} status=${statusCode || 'unknown'} err=${errorMsg}`,
             );
@@ -260,9 +360,21 @@ export class PushNotificationService {
         }),
       );
 
+      this.recordDeliveryLog({
+        notificationId: notification.id,
+        timestamp: new Date(),
+        userIds: targetUserIds,
+        tag: pushTag,
+        totalSubscriptions: uniqueSubscriptions.length,
+        successCount: successIds.length,
+        failCount: deliveryDetails.filter((d) => d.status === 'fail').length,
+        staleCount: staleIds.length,
+        details: deliveryDetails,
+      });
+
       this.logger.log(
         `[PushSend] Batch done | notif=${notification.id} tag=${pushTag} ` +
-        `total=${uniqueSubscriptions.length} ok=${successIds.length} stale=${staleIds.length} fail=${failedDetails.length} ` +
+        `total=${uniqueSubscriptions.length} ok=${successIds.length} stale=${staleIds.length} fail=${deliveryDetails.filter((d) => d.status === 'fail').length} ` +
         `users=${targetUserIds.join(',')}`,
       );
 

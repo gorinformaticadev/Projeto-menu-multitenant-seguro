@@ -181,3 +181,59 @@ self.addEventListener('notificationclick', (event) => {
 self.addEventListener('notificationclose', (event) => {
   console.log('[SW Close] Notification closed:', event.notification.tag);
 });
+
+// ---------------------------------------------------------------------------
+// MESSAGE — Recebe mensagens do frontend para teste local
+// ---------------------------------------------------------------------------
+
+self.addEventListener('message', (event) => {
+  const data = event.data;
+  if (!data || typeof data !== 'object') return;
+
+  if (data.type === 'TEST_NOTIFICATION') {
+    console.log('[SW Message] TEST_NOTIFICATION received');
+    const title = data.title || 'Teste local';
+    const options = {
+      body: data.body || 'Notificação de teste local (sem push)',
+      icon: '/android-chrome-192x192.png',
+      badge: '/favicon-32x32.png',
+      tag: `test-${Date.now()}`,
+      data: { url: data.url || '/notifications' },
+      renotify: true,
+      silent: false,
+    };
+
+    event.waitUntil(
+      self.registration
+        .showNotification(title, options)
+        .then(() => {
+          console.log('[SW Message] Local notification shown');
+          // Enviar resposta de volta para o cliente
+          if (event.source && event.source.postMessage) {
+            event.source.postMessage({ type: 'TEST_NOTIFICATION_RESULT', success: true });
+          }
+        })
+        .catch((err) => {
+          console.error('[SW Message] Local notification failed:', err);
+          if (event.source && event.source.postMessage) {
+            event.source.postMessage({
+              type: 'TEST_NOTIFICATION_RESULT',
+              success: false,
+              error: String(err),
+            });
+          }
+        }),
+    );
+  }
+
+  if (data.type === 'GET_SW_STATUS') {
+    console.log('[SW Message] GET_SW_STATUS received');
+    if (event.source && event.source.postMessage) {
+      event.source.postMessage({
+        type: 'SW_STATUS',
+        version: SW_VERSION,
+        state: 'active',
+      });
+    }
+  }
+});

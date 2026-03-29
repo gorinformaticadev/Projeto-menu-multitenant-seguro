@@ -24,8 +24,19 @@ import {
   AlertTriangle,
   ExternalLink,
   ListChecks,
+  Activity,
+  Smartphone,
+  Wifi,
+  WifiOff,
+  RefreshCw,
+  Monitor,
+  Smartphone as PhoneIcon,
+  Globe,
+  Clock,
+  Wrench,
 } from "lucide-react";
 import Link from "next/link";
+import { useCallback, useRef } from "react";
 
 interface WebPushConfigResponse {
   webPushPublicKey: string | null;
@@ -86,6 +97,49 @@ const DEFAULT_TEST_FORM: TestPushForm = {
   delayMs: 0,
   extraDataJson: "",
 };
+
+// --- Diagnostic Types ---
+
+interface DeviceDiagnostic {
+  https: boolean;
+  serviceWorkerSupported: boolean;
+  serviceWorkerRegistered: boolean;
+  serviceWorkerState: string | null;
+  notificationPermission: string;
+  pushManagerAvailable: boolean;
+  subscriptionExists: boolean;
+  subscriptionEndpoint: string | null;
+  subscriptionCreatedAt: string | null;
+  userAgent: string;
+}
+
+interface BackendSubscription {
+  id: string;
+  endpoint: string;
+  endpointFull: string;
+  userAgent: string | null;
+  lastUsedAt: string | null;
+  createdAt: string;
+  tenantId: string | null;
+}
+
+interface DeliveryLogItem {
+  notificationId: string;
+  timestamp: string;
+  userIds: string[];
+  tag: string;
+  totalSubscriptions: number;
+  successCount: number;
+  failCount: number;
+  staleCount: number;
+  details: {
+    subscriptionId: string;
+    endpoint: string;
+    status: "success" | "fail" | "stale";
+    statusCode?: number;
+    error?: string;
+  }[];
+}
 
 export default function PushNotificationsConfigPage() {
   const { user } = useAuth();
@@ -260,6 +314,217 @@ export default function PushNotificationsConfigPage() {
       setTestSending(false);
     }
   };
+
+  // --- Diagnostic Panel ---
+  const [deviceStatus, setDeviceStatus] = useState<DeviceDiagnostic | null>(null);
+  const [subscriptions, setSubscriptions] = useState<BackendSubscription[]>([]);
+  const [deliveries, setDeliveries] = useState<DeliveryLogItem[]>([]);
+  const [diagLoading, setDiagLoading] = useState(false);
+  const [diagAction, setDiagAction] = useState<string | null>(null);
+  const swMessageRef = useRef<{ resolve: (v: unknown) => void } | null>(null);
+
+  const collectDeviceStatus = useCallback(async (): Promise<DeviceDiagnostic> => {
+    const swSupported = typeof navigator !== "undefined" && "serviceWorker" in navigator;
+    let swRegistered = false;
+    let swState: string | null = null;
+    let hasSubscription = false;
+    let subEndpoint: string | null = null;
+    let subCreatedAt: string | null = null;
+
+    if (swSupported) {
+      try {
+        const reg = await navigator.serviceWorker.getRegistration();
+        swRegistered = !!reg;
+        swState = reg?.active?.state || null;
+
+        if (reg) {
+          const sub = await reg.pushManager.getSubscription();
+          hasSubscription = !!sub;
+          if (sub) {
+            subEndpoint = sub.endpoint.length > 50
+              ? `${sub.endpoint.slice(0, 25)}...${sub.endpoint.slice(-20)}`
+              : sub.endpoint;
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    return {
+      https: typeof window !== "undefined" && window.location.protocol === "https:",
+      serviceWorkerSupported: swSupported,
+      serviceWorkerRegistered: swRegistered,
+      serviceWorkerState: swState,
+      notificationPermission:
+        typeof window !== "undefined" && "Notification" in window
+          ? window.Notification.permission
+          : "unsupported",
+      pushManagerAvailable: swSupported,
+      subscriptionExists: hasSubscription,
+      subscriptionEndpoint: subEndpoint,
+      subscriptionCreatedAt: subCreatedAt,
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
+    };
+  }, []);
+
+  const refreshDiagnostics = useCallback(async () => {
+    setDiagLoading(true);
+    try {
+      const [device, subsRes, delivRes] = await Promise.all([
+        collectDeviceStatus(),
+        api.get<BackendSubscription[]>("/notifications/push/subscriptions/me").then((r) => r.data).catch(() => []),
+        api.get<DeliveryLogItem[]>("/notifications/push/last-deliveries").then((r) => r.data).catch(() => []),
+      ]);
+      setDeviceStatus(device);
+      setSubscriptions(subsRes);
+      setDeliveries(delivRes);
+    } catch {
+      // partial failure is fine
+    } finally {
+      setDiagLoading(false);
+    }
+  }, [collectDeviceStatus]);
+
+  const handleForceRegisterSW = useCallback(async () => {
+    setDiagAction("register");
+    try {
+      if ("serviceWorker" in navigator) {
+        await navigator.serviceWorker.register("/sw.js");
+        toast({ title: "Service Worker registrado com sucesso" });
+      }
+    } catch (err) {
+      toast({ title: "Erro ao registrar SW", description: String(err), variant: "destructive" });
+    } finally {
+      setDiagAction(null);
+      await refreshDiagnostics();
+    }
+  }, [toast, refreshDiagnostics]);
+
+  const handleRecreateSubscription = useCallback(async () => {
+    setDiagAction("resubscribe");
+    try {
+      if (!("serviceWorker" in navigator) || !("PushManager" in navigator)) {
+        toast({ title: "Push não suportado neste navegador", variant: "destructive" });
+        return;
+      }
+      const reg = await navigator.serviceWorker.ready;
+      const oldSub = await reg.pushManager.getSubscription();
+      if (oldSub) {
+        try {
+          const data = oldSub.toJSON() as { endpoint?: string };
+          if (data?.endpoint) {
+            await api.post("/notifications/push/unsubscribe", { endpoint: data.endpoint });
+          }
+        } catch { /* ignore */ }
+        await oldSub.unsubscribe();
+      }
+      const pubKeyRes = await api.get("/notifications/push/public-key");
+      const publicKey = pubKeyRes.data?.publicKey;
+      if (!publicKey) {
+        toast({ title: "Chave pública VAPID não disponível", variant: "destructive" });
+        return;
+      }
+      const urlBase64ToArrayBuffer = (b64: string): ArrayBuffer => {
+        const padding = "=".repeat((4 - (b64.length % 4)) % 4);
+        const base64 = (b64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+        const raw = window.atob(base64);
+        const arr = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; ++i) arr[i] = raw.charCodeAt(i);
+        return arr.buffer.slice(arr.byteOffset, arr.byteOffset + arr.byteLength);
+      };
+      const newSub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToArrayBuffer(publicKey),
+      });
+      const toJSON = newSub.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
+      if (toJSON?.endpoint && toJSON?.keys?.p256dh && toJSON?.keys?.auth) {
+        await api.post("/notifications/push/subscribe", {
+          endpoint: toJSON.endpoint,
+          keys: { p256dh: toJSON.keys.p256dh, auth: toJSON.keys.auth },
+        });
+      }
+      toast({ title: "Inscrição de push recriada com sucesso" });
+    } catch (err) {
+      toast({ title: "Erro ao recriar inscrição", description: String(err), variant: "destructive" });
+    } finally {
+      setDiagAction(null);
+      await refreshDiagnostics();
+    }
+  }, [toast, refreshDiagnostics]);
+
+  const handleLocalTestNotification = useCallback(async () => {
+    setDiagAction("localtest");
+    try {
+      if (!("serviceWorker" in navigator)) {
+        toast({ title: "Service Worker não suportado", variant: "destructive" });
+        return;
+      }
+      const reg = await navigator.serviceWorker.ready;
+      if (!reg.active) {
+        toast({ title: "Service Worker não está ativo", variant: "destructive" });
+        return;
+      }
+
+      const result = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+        swMessageRef.current = { resolve: resolve as (v: unknown) => void };
+        const channel = new MessageChannel();
+        channel.port1.onmessage = (event) => {
+          if (event.data?.type === "TEST_NOTIFICATION_RESULT") {
+            resolve({ success: event.data.success, error: event.data.error });
+          }
+        };
+        reg.active!.postMessage(
+          { type: "TEST_NOTIFICATION", title: "Teste local", body: "Notificação de teste (sem push)", url: "/notifications" },
+          [channel.port2],
+        );
+        // Timeout fallback
+        setTimeout(() => resolve({ success: false, error: "Timeout" }), 5000);
+      });
+
+      if (result.success) {
+        toast({ title: "Notificação local exibida com sucesso" });
+      } else {
+        toast({ title: "Falha na notificação local", description: result.error, variant: "destructive" });
+      }
+    } catch (err) {
+      toast({ title: "Erro no teste local", description: String(err), variant: "destructive" });
+    } finally {
+      setDiagAction(null);
+    }
+  }, [toast]);
+
+  const handleClearAndRestart = useCallback(async () => {
+    setDiagAction("clear");
+    try {
+      if ("serviceWorker" in navigator) {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) {
+          const sub = await reg.pushManager.getSubscription();
+          if (sub) {
+            try {
+              const data = sub.toJSON() as { endpoint?: string };
+              if (data?.endpoint) {
+                await api.post("/notifications/push/unsubscribe", { endpoint: data.endpoint });
+              }
+            } catch { /* */ }
+            await sub.unsubscribe();
+          }
+          await reg.unregister();
+        }
+      }
+      window.location.reload();
+    } catch (err) {
+      toast({ title: "Erro ao limpar", description: String(err), variant: "destructive" });
+      setDiagAction(null);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    if (user?.role === "SUPER_ADMIN") {
+      void refreshDiagnostics();
+    }
+  }, [user, refreshDiagnostics]);
 
   if (user?.role !== "SUPER_ADMIN") {
     return null;
@@ -610,6 +875,208 @@ export default function PushNotificationsConfigPage() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ---- Diagnóstico do Dispositivo ---- */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Diagnóstico de Push (Dispositivo Atual)
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void refreshDiagnostics()}
+                disabled={diagLoading}
+              >
+                <RefreshCw className={`h-4 w-4 mr-1 ${diagLoading ? "animate-spin" : ""}`} />
+                Atualizar
+              </Button>
+            </div>
+            <CardDescription>
+              Verifique o status do dispositivo atual para identificar falhas de push.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {deviceStatus ? (
+              <>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {[
+                    { label: "HTTPS", ok: deviceStatus.https, desc: deviceStatus.https ? "Ativo" : "Inativo — push requer HTTPS" },
+                    { label: "Service Worker suportado", ok: deviceStatus.serviceWorkerSupported, desc: deviceStatus.serviceWorkerSupported ? "Sim" : "Não" },
+                    { label: "Service Worker registrado", ok: deviceStatus.serviceWorkerRegistered, desc: deviceStatus.serviceWorkerState ? `Estado: ${deviceStatus.serviceWorkerState}` : "Não registrado" },
+                    { label: "Permissão de notificação", ok: deviceStatus.notificationPermission === "granted", desc: deviceStatus.notificationPermission },
+                    { label: "PushManager disponível", ok: deviceStatus.pushManagerAvailable, desc: deviceStatus.pushManagerAvailable ? "Sim" : "Não" },
+                    { label: "Subscription ativa", ok: deviceStatus.subscriptionExists, desc: deviceStatus.subscriptionEndpoint || "Nenhuma subscription encontrada" },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className={`flex items-start gap-2 rounded-lg border p-3 text-sm ${
+                        item.ok
+                          ? "border-skin-success/30 bg-skin-success/5"
+                          : "border-skin-danger/30 bg-skin-danger/5"
+                      }`}
+                    >
+                      {item.ok ? (
+                        <CheckCircle2 className="h-4 w-4 mt-0.5 text-skin-success flex-shrink-0" />
+                      ) : (
+                        <XCircle className="h-4 w-4 mt-0.5 text-skin-danger flex-shrink-0" />
+                      )}
+                      <div>
+                        <p className="font-medium">{item.label}</p>
+                        <p className="text-xs text-skin-text-muted">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="rounded-lg border border-skin-border bg-skin-background-elevated p-3 text-xs text-skin-text-muted">
+                  <span className="font-medium">User-Agent:</span>{" "}
+                  <code className="break-all">{deviceStatus.userAgent}</code>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-skin-text-muted">Carregando diagnóstico...</p>
+            )}
+
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Button variant="outline" size="sm" onClick={() => void handleForceRegisterSW()} disabled={!!diagAction}>
+                <Wrench className="h-3.5 w-3.5 mr-1" />
+                Forçar registro do SW
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => void handleRecreateSubscription()} disabled={!!diagAction}>
+                <RefreshCw className={`h-3.5 w-3.5 mr-1 ${diagAction === "resubscribe" ? "animate-spin" : ""}`} />
+                Recriar inscrição de push
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => void handleLocalTestNotification()} disabled={!!diagAction}>
+                <BellRing className="h-3.5 w-3.5 mr-1" />
+                Testar exibição local
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => void handleClearAndRestart()} disabled={!!diagAction}>
+                <Trash2 className="h-3.5 w-3.5 mr-1" />
+                Limpar e reiniciar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ---- Subscriptions do Usuário ---- */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Smartphone className="h-5 w-5" />
+              Subscriptions Registradas ({subscriptions.length})
+            </CardTitle>
+            <CardDescription>
+              Dispositivos inscritos em push para este usuário.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {subscriptions.length === 0 ? (
+              <div className="rounded-lg border border-skin-warning/30 bg-skin-warning/10 p-4 text-sm text-skin-warning flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <span>Nenhuma subscription encontrada. Este dispositivo pode não estar inscrito em push.</span>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {subscriptions.map((sub) => {
+                  const isAndroid = (sub.userAgent || "").toLowerCase().includes("android");
+                  const isMobile = isAndroid || (sub.userAgent || "").toLowerCase().includes("mobile");
+                  return (
+                    <div key={sub.id} className="rounded-lg border border-skin-border p-3 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          {isMobile ? (
+                            <PhoneIcon className="h-4 w-4 text-skin-text-muted" />
+                          ) : (
+                            <Monitor className="h-4 w-4 text-skin-text-muted" />
+                          )}
+                          <span className="font-mono text-xs">{sub.endpoint}</span>
+                        </div>
+                        <span className="text-xs text-skin-success flex items-center gap-1">
+                          <Wifi className="h-3 w-3" /> Ativo
+                        </span>
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-3 text-xs text-skin-text-muted">
+                        <span>UA: {(sub.userAgent || "—").slice(0, 80)}</span>
+                        {sub.createdAt && <span>Criado: {new Date(sub.createdAt).toLocaleString()}</span>}
+                        {sub.lastUsedAt && <span>Último uso: {new Date(sub.lastUsedAt).toLocaleString()}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ---- Últimos Envios de Push ---- */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5" />
+              Últimos Envios de Push
+            </CardTitle>
+            <CardDescription>
+              Histórico dos envios mais recentes (em memória, reiniciado ao reiniciar o servidor).
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {deliveries.length === 0 ? (
+              <p className="text-sm text-skin-text-muted">Nenhum envio de push registrado ainda.</p>
+            ) : (
+              <div className="space-y-3">
+                {deliveries.slice(0, 10).map((d, i) => (
+                  <div key={`${d.notificationId}-${i}`} className="rounded-lg border border-skin-border p-3 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-skin-text-muted" />
+                        <span className="font-mono text-xs">{d.notificationId.slice(0, 12)}...</span>
+                        <span className="text-xs text-skin-text-muted">({d.tag})</span>
+                      </div>
+                      <span className="text-xs text-skin-text-muted">
+                        {new Date(d.timestamp).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-3 text-xs">
+                      <span className="text-skin-text-muted">Total: {d.totalSubscriptions}</span>
+                      <span className="text-skin-success">OK: {d.successCount}</span>
+                      {d.failCount > 0 && <span className="text-skin-danger">Falha: {d.failCount}</span>}
+                      {d.staleCount > 0 && <span className="text-skin-warning">Stale: {d.staleCount}</span>}
+                    </div>
+                    {d.details.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {d.details.map((det, j) => (
+                          <div
+                            key={`${det.subscriptionId}-${j}`}
+                            className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${
+                              det.status === "success"
+                                ? "bg-skin-success/10 text-skin-success"
+                                : det.status === "stale"
+                                  ? "bg-skin-warning/10 text-skin-warning"
+                                  : "bg-skin-danger/10 text-skin-danger"
+                            }`}
+                          >
+                            {det.status === "success" ? (
+                              <CheckCircle2 className="h-3 w-3" />
+                            ) : det.status === "stale" ? (
+                              <WifiOff className="h-3 w-3" />
+                            ) : (
+                              <XCircle className="h-3 w-3" />
+                            )}
+                            <span className="font-mono">{det.endpoint}</span>
+                            {det.statusCode && <span>({det.statusCode})</span>}
+                            {det.error && <span>— {det.error}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </CardContent>

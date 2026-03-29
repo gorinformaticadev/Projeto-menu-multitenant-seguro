@@ -21,7 +21,11 @@ import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { NotificationService } from './notification.service';
 import { NotificationGateway } from './notification.gateway';
-import { PushNotificationService } from './push-notification.service';
+import {
+  PushNotificationService,
+  PushSubscriptionDiagnostic,
+  DeliveryLogEntry,
+} from './push-notification.service';
 import {
   CreateNotificationDto,
   NotificationFiltersDto,
@@ -71,6 +75,21 @@ export class NotificationsController {
   async unsubscribeFromPush(@Body() body: RemovePushSubscriptionDto, @Request() req) {
     const count = await this.pushNotificationService.removeSubscription(req.user, body.endpoint);
     return { success: count > 0, count };
+  }
+
+  /**
+   * Diagnóstico: retorna subscriptions do usuário autenticado
+   */
+  @Get('push/subscriptions/me')
+  async getMyPushSubscriptions(@Request() req): Promise<PushSubscriptionDiagnostic[]> {
+    return this.pushNotificationService.getUserSubscriptions(req.user.id);
+  }
+
+  @Get('push/last-deliveries')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  async getLastPushDeliveries(): Promise<DeliveryLogEntry[]> {
+    return this.pushNotificationService.getLastDeliveries();
   }
 
   /**
