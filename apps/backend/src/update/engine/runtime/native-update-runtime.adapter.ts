@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { spawnSync } from 'child_process';
 import * as fs from 'fs';
 import * as fsp from 'fs/promises';
 import * as path from 'path';
@@ -662,6 +663,29 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     runtimeDirRelativePath: string;
     buildDirRelativePath: string;
   }> {
+    const resolverScript = path.join(frontendDir, 'scripts', 'start-standalone.mjs');
+    if (await this.pathExists(resolverScript)) {
+      const resolvedByScript = spawnSync(process.execPath, [resolverScript, '--print-layout'], {
+        cwd: frontendDir,
+        encoding: 'utf8',
+      });
+      if (resolvedByScript.status === 0) {
+        const [label, entryRelativePath, runtimeDirRelativePath, buildDirRelativePath] = String(
+          resolvedByScript.stdout || '',
+        )
+          .trim()
+          .split('|');
+        if (label && entryRelativePath && runtimeDirRelativePath && buildDirRelativePath) {
+          return {
+            label,
+            entryRelativePath,
+            runtimeDirRelativePath,
+            buildDirRelativePath,
+          };
+        }
+      }
+    }
+
     const candidates = [
       {
         label: 'monorepo-nested',
@@ -681,7 +705,10 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       fs.existsSync(path.join(frontendDir, candidate.entryRelativePath)),
     );
     if (!resolved) {
-      throw new Error(`Entrypoint standalone do frontend nao encontrado em ${frontendDir}.`);
+      const checkedPaths = candidates.map((candidate) => path.join(frontendDir, candidate.entryRelativePath));
+      throw new Error(
+        `Entrypoint standalone do frontend nao encontrado em ${frontendDir}. Caminhos verificados: ${checkedPaths.join(' | ')}`,
+      );
     }
 
     return resolved;

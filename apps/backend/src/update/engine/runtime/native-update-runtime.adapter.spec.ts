@@ -51,6 +51,25 @@ function createMockFrontendStandaloneBuild(frontendDir: string) {
   fs.writeFileSync(path.join(standaloneServerDir, 'page_client-reference-manifest.js'), 'manifest');
 }
 
+function createMockRootStandaloneBuild(frontendDir: string) {
+  const sourceBuildDir = path.join(frontendDir, '.next');
+  const runtimeDir = path.join(sourceBuildDir, 'standalone');
+  const standaloneBuildDir = path.join(runtimeDir, '.next');
+  const sourceServerDir = path.join(sourceBuildDir, 'server', 'app', 'login');
+  const standaloneServerDir = path.join(standaloneBuildDir, 'server', 'app', 'login');
+
+  fs.mkdirSync(standaloneBuildDir, { recursive: true });
+  fs.mkdirSync(path.join(sourceBuildDir, 'static'), { recursive: true });
+  fs.mkdirSync(sourceServerDir, { recursive: true });
+  fs.mkdirSync(standaloneServerDir, { recursive: true });
+  fs.writeFileSync(path.join(sourceBuildDir, 'BUILD_ID'), 'build-root');
+  fs.writeFileSync(path.join(standaloneBuildDir, 'BUILD_ID'), 'build-root');
+  fs.writeFileSync(path.join(runtimeDir, 'server.js'), 'console.log("frontend-root");');
+  fs.writeFileSync(path.join(sourceBuildDir, 'static', 'main.js'), 'console.log("asset-root");');
+  fs.writeFileSync(path.join(sourceServerDir, 'page_client-reference-manifest.js'), 'manifest-root');
+  fs.writeFileSync(path.join(standaloneServerDir, 'page_client-reference-manifest.js'), 'manifest-root');
+}
+
 describe('NativeUpdateRuntimeAdapter', () => {
   let tmpDir: string;
   let sourceDir: string;
@@ -385,6 +404,29 @@ describe('NativeUpdateRuntimeAdapter', () => {
     ).toBe(true);
   });
 
+  it('package_frontend_assets encontra corretamente o layout root alternativo do standalone', async () => {
+    const adapter = createAdapter();
+    const targetReleaseDir = path.join(runtime.releasesDir, 'v1.2.3');
+    const frontendDir = path.join(targetReleaseDir, 'apps', 'frontend');
+    fs.mkdirSync(path.join(frontendDir, 'public'), { recursive: true });
+    fs.writeFileSync(path.join(frontendDir, 'public', 'clear-cache.html'), '<html></html>');
+    createMockRootStandaloneBuild(frontendDir);
+
+    const layout = await (adapter as any).resolveFrontendLayout(frontendDir);
+    await (adapter as any).copyFrontendRuntimeAssets(frontendDir, layout);
+
+    expect(layout).toMatchObject({
+      label: 'root',
+      entryRelativePath: path.join('.next', 'standalone', 'server.js'),
+    });
+    expect(
+      fs.existsSync(path.join(frontendDir, '.next', 'standalone', 'public', 'clear-cache.html')),
+    ).toBe(true);
+    expect(
+      fs.existsSync(path.join(frontendDir, '.next', 'standalone', '.next', 'static', 'main.js')),
+    ).toBe(true);
+  });
+
   it('validate_frontend_artifact aceita um artefato standalone valido do frontend', async () => {
     const adapter = createAdapter();
     const targetReleaseDir = path.join(runtime.releasesDir, 'v1.2.3');
@@ -409,6 +451,31 @@ describe('NativeUpdateRuntimeAdapter', () => {
 
     await expect((adapter as any).validateFrontendArtifactLayout(frontendDir, layout)).rejects.toThrow(
       'Diretorio .next/static nao foi copiado para o standalone do frontend.',
+    );
+  });
+
+  it('validate_frontend_artifact falha quando o standalone nao existe', async () => {
+    const adapter = createAdapter();
+    const targetReleaseDir = path.join(runtime.releasesDir, 'v1.2.3');
+    const frontendDir = path.join(targetReleaseDir, 'apps', 'frontend');
+    fs.mkdirSync(path.join(frontendDir, '.next'), { recursive: true });
+    fs.writeFileSync(path.join(frontendDir, '.next', 'BUILD_ID'), 'build-sem-standalone');
+
+    await expect(
+      (adapter as any).validateFrontendArtifactLayout(frontendDir, {
+        entryRelativePath: path.join('.next', 'standalone', 'apps', 'frontend', 'server.js'),
+        runtimeDirRelativePath: path.join('.next', 'standalone', 'apps', 'frontend'),
+        buildDirRelativePath: path.join('.next', 'standalone', 'apps', 'frontend', '.next'),
+      }),
+    ).rejects.toThrow(
+      `Artefato frontend incompleto: ${path.join(
+        frontendDir,
+        '.next',
+        'standalone',
+        'apps',
+        'frontend',
+        'server.js',
+      )}`,
     );
   });
 
