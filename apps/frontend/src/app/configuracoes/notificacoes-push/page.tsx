@@ -22,7 +22,10 @@ import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
+  ExternalLink,
+  ListChecks,
 } from "lucide-react";
+import Link from "next/link";
 
 interface WebPushConfigResponse {
   webPushPublicKey: string | null;
@@ -288,6 +291,51 @@ export default function PushNotificationsConfigPage() {
             {saving ? "Salvando..." : "Salvar Configuração"}
           </Button>
         </div>
+
+        <Card className="border-skin-info/30 bg-skin-info/10">
+          <CardContent className="pt-6">
+            <div className="flex gap-3">
+              <ListChecks className="mt-0.5 h-5 w-5 flex-shrink-0 text-skin-info" />
+              <div className="text-sm text-skin-text">
+                <p className="font-semibold mb-1">Pré-requisitos para notificações push</p>
+                <p className="mb-3 text-skin-text-muted">
+                  Para que as notificações push funcionem corretamente, é necessário que as configurações de
+                  segurança exigidas estejam habilitadas no sistema. Também é necessário que o
+                  navegador/dispositivo já esteja inscrito em push e com permissão de notificações concedida.
+                </p>
+                <Link
+                  href="/configuracoes/seguranca"
+                  className="inline-flex items-center gap-1 text-skin-info hover:underline text-sm font-medium"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Ir para Configurações de Segurança
+                </Link>
+                <ul className="mt-3 space-y-1 text-xs text-skin-text-muted">
+                  <li className="flex items-center gap-1.5">
+                    <span className="h-1 w-1 rounded-full bg-skin-text-muted" />
+                    HTTPS ativo
+                  </li>
+                  <li className="flex items-center gap-1.5">
+                    <span className="h-1 w-1 rounded-full bg-skin-text-muted" />
+                    Configurações de segurança habilitadas
+                  </li>
+                  <li className="flex items-center gap-1.5">
+                    <span className="h-1 w-1 rounded-full bg-skin-text-muted" />
+                    Permissão de notificações concedida no navegador
+                  </li>
+                  <li className="flex items-center gap-1.5">
+                    <span className="h-1 w-1 rounded-full bg-skin-text-muted" />
+                    Navegador/dispositivo inscrito em push
+                  </li>
+                  <li className="flex items-center gap-1.5">
+                    <span className="h-1 w-1 rounded-full bg-skin-text-muted" />
+                    No Android, validar inscrição do dispositivo e service worker ativo
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card className="border-skin-warning/30 bg-skin-warning/10">
           <CardContent className="pt-6">

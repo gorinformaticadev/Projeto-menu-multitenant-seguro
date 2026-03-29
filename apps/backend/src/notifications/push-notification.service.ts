@@ -123,6 +123,13 @@ export class PushNotificationService {
       },
     });
 
+    const endpointPreview = endpoint.length > 50
+      ? `${endpoint.slice(0, 25)}...${endpoint.slice(-20)}`
+      : endpoint;
+    this.logger.log(
+      `[PushSub] Saved | user=${user.id} tenant=${user.tenantId ?? '-'} endpoint=${endpointPreview} ua=${(userAgent || '-').slice(0, 60)}`,
+    );
+
     return true;
   }
 
@@ -209,19 +216,27 @@ export class PushNotificationService {
 
       const staleIds: string[] = [];
       const successIds: string[] = [];
+      const failedDetails: string[] = [];
 
       await Promise.all(
         uniqueSubscriptions.map(async (sub) => {
-            try {
-              await this.validatePushEndpoint(sub.endpoint);
-              await this.webPush!.sendNotification(
-                {
-                  endpoint: sub.endpoint,
-                  keys: { p256dh: sub.p256dh, auth: sub.auth },
-                },
-                payload,
-              );
-              successIds.push(sub.id);
+          const endpointPreview = sub.endpoint.length > 50
+            ? `${sub.endpoint.slice(0, 25)}...${sub.endpoint.slice(-20)}`
+            : sub.endpoint;
+
+          try {
+            await this.validatePushEndpoint(sub.endpoint);
+            await this.webPush!.sendNotification(
+              {
+                endpoint: sub.endpoint,
+                keys: { p256dh: sub.p256dh, auth: sub.auth },
+              },
+              payload,
+            );
+            successIds.push(sub.id);
+            this.logger.debug(
+              `[PushSend] OK | sub=${sub.id} endpoint=${endpointPreview} user=${targetUserIds.join(',')}`,
+            );
           } catch (error: unknown) {
             const statusCode =
               ((error as { statusCode?: number; status?: number })?.statusCode ??
@@ -230,14 +245,25 @@ export class PushNotificationService {
 
             if (statusCode === 404 || statusCode === 410) {
               staleIds.push(sub.id);
+              this.logger.log(
+                `[PushSend] STALE (removendo) | sub=${sub.id} endpoint=${endpointPreview} status=${statusCode}`,
+              );
               return;
             }
 
+            const errorMsg = (error as Error)?.message || String(error);
+            failedDetails.push(`sub=${sub.id} status=${statusCode || 'unknown'} err=${errorMsg.slice(0, 80)}`);
             this.logger.warn(
-              `Falha ao enviar push (subscriptionId=${sub.id}, status=${statusCode || 'unknown'})`,
+              `[PushSend] FAIL | sub=${sub.id} endpoint=${endpointPreview} status=${statusCode || 'unknown'} err=${errorMsg}`,
             );
           }
         }),
+      );
+
+      this.logger.log(
+        `[PushSend] Batch done | notif=${notification.id} tag=${pushTag} ` +
+        `total=${uniqueSubscriptions.length} ok=${successIds.length} stale=${staleIds.length} fail=${failedDetails.length} ` +
+        `users=${targetUserIds.join(',')}`,
       );
 
       if (successIds.length > 0) {
@@ -248,6 +274,7 @@ export class PushNotificationService {
       }
 
       if (staleIds.length > 0) {
+        this.logger.log(`[PushSend] Removendo ${staleIds.length} subscriptions stale: ${staleIds.join(', ')}`);
         await this.prisma.pushSubscription.deleteMany({
           where: { id: { in: staleIds } },
         });
