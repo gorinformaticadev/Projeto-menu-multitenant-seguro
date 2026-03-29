@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.105](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.104...v0.1.105) (2026-03-29)
+
+
+### Features
+
+* implement update service, controller, and unit tests for system version management ([c9759ab](https://github.com/gorinformaticadev/Pluggor/commit/c9759aba797d7d587063f9a3e7b4214aa71cd35f))
+
 ### [0.1.104](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.103...v0.1.104) (2026-03-29)
 
 ### [0.1.103](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.102...v0.1.103) (2026-03-29)
