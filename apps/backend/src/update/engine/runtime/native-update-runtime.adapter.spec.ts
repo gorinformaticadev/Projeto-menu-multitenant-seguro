@@ -39,12 +39,17 @@ describe('NativeUpdateRuntimeAdapter', () => {
   let metadata: Record<string, unknown>;
   let pm2JlistOutput: string;
   let failFrontendRestart: boolean;
+  let buildDependenciesInstalled: boolean;
 
   const commandRunnerMock = {
     run: jest.fn(async (request: any) => {
       const args = Array.isArray(request.args) ? request.args : [];
       const cwd = String(request.cwd || '');
       const joinedArgs = args.join(' ');
+
+      if (request.command === 'pnpm' && joinedArgs.includes('install --frozen-lockfile')) {
+        buildDependenciesInstalled = joinedArgs.includes('--prod=false');
+      }
 
       if (request.command === 'pm2' && joinedArgs === 'jlist') {
         return {
@@ -83,6 +88,17 @@ describe('NativeUpdateRuntimeAdapter', () => {
       }
 
       if (request.command === 'pnpm' && args.join(' ').includes('--filter backend build')) {
+        if (!buildDependenciesInstalled) {
+          return {
+            commandRunId: 'cmd-build-backend-fail',
+            exitCode: 1,
+            stdout: '',
+            stderr: 'sh: 1: nest: not found',
+            stdoutPath: null,
+            stderrPath: null,
+          };
+        }
+
         const backendDir = path.join(cwd, 'apps', 'backend', 'dist');
         fs.mkdirSync(backendDir, { recursive: true });
         fs.writeFileSync(path.join(backendDir, 'main.js'), 'console.log("backend");');
@@ -144,6 +160,7 @@ describe('NativeUpdateRuntimeAdapter', () => {
       },
     ]);
     failFrontendRestart = false;
+    buildDependenciesInstalled = false;
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pluggor-native-adapter-'));
     sourceDir = path.join(tmpDir, 'source');
     fs.mkdirSync(path.join(sourceDir, 'apps', 'backend'), { recursive: true });
@@ -251,6 +268,31 @@ describe('NativeUpdateRuntimeAdapter', () => {
         }),
       ]),
     );
+  });
+
+  it('install_dependencies native preserva devDependencies da release para o build local', async () => {
+    const adapter = createAdapter();
+    const execution = createExecution();
+    const targetReleaseDir = path.join(runtime.releasesDir, 'v1.2.3');
+    fs.mkdirSync(targetReleaseDir, { recursive: true });
+
+    await adapter.executeStep('install_dependencies', {
+      execution,
+      runtime,
+      metadata: {
+        targetReleaseDir,
+      },
+    });
+
+    expect(commandRunnerMock.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        step: 'install_dependencies',
+        command: 'pnpm',
+        args: ['install', '--frozen-lockfile', '--prod=false'],
+        cwd: targetReleaseDir,
+      }),
+    );
+    expect(buildDependenciesInstalled).toBe(true);
   });
 
   it('switch_release confirma a troca efetiva do ponteiro current', async () => {

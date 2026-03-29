@@ -1437,6 +1437,8 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
   private hasEffectiveLegacyMode(
     systemState: SystemUpdateStateSnapshot | null,
   ): systemState is SystemUpdateStateSnapshot & { mode: 'docker' | 'native' } {
+    // O modo operacional nao e transitorio: quando o status estruturado existe,
+    // ele e mais forte do que a configuracao salva ou do que a capacidade do host.
     return Boolean(systemState && (systemState.mode === 'docker' || systemState.mode === 'native'));
   }
 

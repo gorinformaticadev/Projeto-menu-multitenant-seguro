@@ -204,7 +204,7 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       context,
       'install_dependencies',
       'pnpm',
-      ['install', '--frozen-lockfile'],
+      ['install', '--frozen-lockfile', '--prod=false'],
       releaseDir,
     );
 
