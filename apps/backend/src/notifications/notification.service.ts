@@ -725,30 +725,32 @@ export class NotificationService {
     const accessibleIds = accessibleNotifications.map((n) => n.id);
 
     await this.prisma.$transaction(async (tx) => {
-      const groupIdsNeedingPreviewRecalc = new Set<string>();
-
-      for (const notif of accessibleNotifications) {
-        if (!notif.notificationGroupId) continue;
-        const group = await tx.notificationGroup.findUnique({
-          where: { id: notif.notificationGroupId },
-          select: { lastNotificationId: true },
-        });
-        if (group?.lastNotificationId === notif.id) {
-          groupIdsNeedingPreviewRecalc.add(notif.notificationGroupId);
-        }
-      }
-
-      await tx.notification.deleteMany({
-        where: { id: { in: accessibleIds } },
-      });
-
       const affectedGroupIds = [...new Set(
         accessibleNotifications
           .map((n) => n.notificationGroupId)
           .filter((id): id is string => Boolean(id)),
       )];
 
+      const groupLastNotifIds = new Map<string, string | null>();
       for (const groupId of affectedGroupIds) {
+        const g = await tx.notificationGroup.findUnique({
+          where: { id: groupId },
+          select: { lastNotificationId: true },
+        });
+        groupLastNotifIds.set(groupId, g?.lastNotificationId ?? null);
+      }
+
+      await tx.notification.deleteMany({
+        where: { id: { in: accessibleIds } },
+      });
+
+      for (const groupId of affectedGroupIds) {
+        const deletedIds = new Set(
+          accessibleNotifications
+            .filter((n) => n.notificationGroupId === groupId)
+            .map((n) => n.id),
+        );
+
         const { totalCount } = await this.syncGroupCounters(tx, groupId);
 
         if (totalCount === 0) {
@@ -757,13 +759,14 @@ export class NotificationService {
           continue;
         }
 
-        if (groupIdsNeedingPreviewRecalc.has(groupId)) {
+        const lastNotifId = groupLastNotifIds.get(groupId);
+        if (lastNotifId && deletedIds.has(lastNotifId)) {
           await this.syncGroupPreview(tx, groupId);
         }
 
         this.logGroupOperation('deleteMany', {
           groupId,
-          detail: `previewRecalc=${groupIdsNeedingPreviewRecalc.has(groupId)}`,
+          detail: `previewRecalc=${lastNotifId && deletedIds.has(lastNotifId)}`,
         });
       }
     });
@@ -1587,16 +1590,15 @@ export class NotificationService {
         await tx.notificationGroup.update({
           where: { id: group.id },
           data: {
-            totalCount: { increment: 1 },
             lastNotificationId: notification.id,
             lastNotificationAt: new Date(),
             lastTitle: notification.title,
             lastBody: previewBody,
           },
         });
-
-        await this.syncGroupCounters(tx, group.id);
       }
+
+      await this.syncGroupCounters(tx, group.id);
 
       this.logGroupOperation('assign', {
         tenantId,
@@ -1826,6 +1828,18 @@ export class NotificationService {
     const [groups, total] = await Promise.all([
       this.prisma.notificationGroup.findMany({
         where,
+        select: {
+          id: true,
+          tenantId: true,
+          userId: true,
+          scopeType: true,
+          scopeKey: true,
+          unreadCount: true,
+          totalCount: true,
+          lastNotificationAt: true,
+          lastTitle: true,
+          lastBody: true,
+        },
         orderBy: { lastNotificationAt: 'desc' },
         skip,
         take: limit,
@@ -1834,18 +1848,7 @@ export class NotificationService {
     ]);
 
     return {
-      groups: groups.map((g) => ({
-        id: g.id,
-        tenantId: g.tenantId,
-        userId: g.userId,
-        scopeType: g.scopeType,
-        scopeKey: g.scopeKey,
-        unreadCount: g.unreadCount,
-        totalCount: g.totalCount,
-        lastNotificationAt: g.lastNotificationAt,
-        lastTitle: g.lastTitle,
-        lastBody: g.lastBody,
-      })),
+      groups,
       total,
       page,
       limit,
@@ -1865,6 +1868,18 @@ export class NotificationService {
     const [groups, total] = await Promise.all([
       this.prisma.notificationGroup.findMany({
         where,
+        select: {
+          id: true,
+          tenantId: true,
+          userId: true,
+          scopeType: true,
+          scopeKey: true,
+          unreadCount: true,
+          totalCount: true,
+          lastNotificationAt: true,
+          lastTitle: true,
+          lastBody: true,
+        },
         orderBy: { lastNotificationAt: 'desc' },
         skip,
         take: limit,
@@ -1873,18 +1888,7 @@ export class NotificationService {
     ]);
 
     return {
-      groups: groups.map((g) => ({
-        id: g.id,
-        tenantId: g.tenantId,
-        userId: g.userId,
-        scopeType: g.scopeType,
-        scopeKey: g.scopeKey,
-        unreadCount: g.unreadCount,
-        totalCount: g.totalCount,
-        lastNotificationAt: g.lastNotificationAt,
-        lastTitle: g.lastTitle,
-        lastBody: g.lastBody,
-      })),
+      groups,
       total,
       page,
       limit,
@@ -1904,6 +1908,7 @@ export class NotificationService {
 
     const group = await this.prisma.notificationGroup.findUnique({
       where: { id: groupId },
+      select: { id: true },
     });
 
     if (!group) {
@@ -1929,6 +1934,22 @@ export class NotificationService {
     const [notifications, total] = await Promise.all([
       this.prisma.notification.findMany({
         where,
+        select: {
+          id: true,
+          title: true,
+          body: true,
+          message: true,
+          severity: true,
+          type: true,
+          read: true,
+          isRead: true,
+          readAt: true,
+          createdAt: true,
+          updatedAt: true,
+          data: true,
+          tenantId: true,
+          userId: true,
+        },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
@@ -1937,7 +1958,7 @@ export class NotificationService {
     ]);
 
     return {
-      notifications: notifications.map((n) => this.mapToEntity(n)),
+      notifications: notifications.map((n) => this.mapToEntity(n as PrismaNotification)),
       total,
       page,
       limit,

@@ -141,6 +141,15 @@ export class PushNotificationService {
     return result.count;
   }
 
+  async countUserSubscriptions(userId: string): Promise<number> {
+    if (!userId) {
+      return 0;
+    }
+    return this.prisma.pushSubscription.count({
+      where: { userId },
+    });
+  }
+
   async sendNotification(notification: Notification): Promise<void> {
     if (!(await this.isPushDeliveryEnabledCached())) {
       return;

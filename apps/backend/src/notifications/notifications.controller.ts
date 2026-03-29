@@ -30,6 +30,9 @@ import {
   RemovePushSubscriptionDto,
   BroadcastNotificationResponseDto,
   CreateNotificationResponseDto,
+  TestPushNotificationDto,
+  TestPushNotificationResponseDto,
+  TestPushNotificationResultItem,
 } from './notification.dto';
 
 @Controller('notifications')
@@ -284,5 +287,141 @@ export class NotificationsController {
   async markGroupAsRead(@Param('groupId') groupId: string, @Request() req) {
     const count = await this.notificationService.markGroupAsRead(groupId, req.user);
     return { success: true, count };
+  }
+
+  /**
+   * Endpoint de teste de notificações push
+   */
+  @Post('test-push')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  async testPush(@Body() dto: TestPushNotificationDto, @Request() req): Promise<TestPushNotificationResponseDto> {
+    const user = req.user;
+    const repeat = Math.max(1, Math.min(10, dto.repeat ?? 1));
+    const delayMs = Math.max(0, Math.min(2000, dto.delayMs ?? 0));
+
+    if (dto.mode === 'module' && !dto.module?.trim()) {
+      return {
+        success: false,
+        mode: dto.mode,
+        repeatRequested: repeat,
+        repeatSucceeded: 0,
+        repeatFailed: repeat,
+        targetUserId: user.id,
+        tenantId: user.tenantId ?? null,
+        generatedScopeSummary: 'module: (missing)',
+        results: Array.from({ length: repeat }, (_, i) => ({
+          index: i,
+          success: false,
+          error: 'module é obrigatório quando mode = "module"',
+        })),
+      };
+    }
+
+    const targetUserId = user.id;
+    const tenantId = user.tenantId ?? null;
+
+    if (dto.mode === 'self') {
+      const subCount = await this.pushNotificationService.countUserSubscriptions(targetUserId);
+      if (subCount === 0) {
+        return {
+          success: false,
+          mode: dto.mode,
+          repeatRequested: repeat,
+          repeatSucceeded: 0,
+          repeatFailed: repeat,
+          targetUserId,
+          tenantId,
+          generatedScopeSummary: 'self: no subscription',
+          results: [{
+            index: 0,
+            success: false,
+            error: 'Nenhuma PushSubscription ativa encontrada para este usuário. Registre uma subscription primeiro.',
+          }],
+        };
+      }
+    }
+
+    const scopeType = dto.mode === 'module' ? 'module' : 'system';
+    const scopeKey = dto.mode === 'module' ? dto.module!.trim() : 'general';
+    const generatedScopeSummary = `${scopeType}:${scopeKey}`;
+
+    const metadata: Record<string, unknown> = {
+      test: true,
+      origin: 'push-test-panel',
+      requestedMode: dto.mode,
+      requestedAt: new Date().toISOString(),
+      ...(dto.extraData || {}),
+    };
+
+    if (dto.mode === 'module' && dto.module) {
+      metadata.module = dto.module.trim();
+    }
+
+    const severityMap: Record<string, 'info' | 'success' | 'warning' | 'error'> = {
+      info: 'info',
+      success: 'success',
+      warning: 'warning',
+      error: 'error',
+    };
+
+    const results: TestPushNotificationResultItem[] = [];
+    let repeatSucceeded = 0;
+    let repeatFailed = 0;
+
+    for (let i = 0; i < repeat; i++) {
+      if (i > 0 && delayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+
+      try {
+        const itemMetadata = { ...metadata, repeatIndex: i };
+
+        const createDto: CreateNotificationDto = {
+          title: dto.title,
+          description: dto.message,
+          type: severityMap[dto.severity] || 'info',
+          userId: targetUserId,
+          tenantId: tenantId || undefined,
+          metadata: itemMetadata,
+        };
+
+        const notification = await this.notificationService.create(createDto, user);
+
+        if (!notification) {
+          results.push({ index: i, success: false, error: 'Falha ao criar notificação (serviço pode estar desabilitado)' });
+          repeatFailed++;
+          continue;
+        }
+
+        await this.notificationGateway.emitNewNotification(notification, { push: true });
+
+        results.push({
+          index: i,
+          success: true,
+          notificationId: notification.id,
+          scopeType,
+          scopeKey,
+        });
+        repeatSucceeded++;
+      } catch (error: unknown) {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        results.push({ index: i, success: false, error: errMsg });
+        repeatFailed++;
+      }
+    }
+
+    return {
+      success: repeatSucceeded > 0,
+      mode: dto.mode,
+      repeatRequested: repeat,
+      repeatSucceeded,
+      repeatFailed,
+      targetUserId,
+      tenantId,
+      generatedScopeSummary,
+      results,
+    };
   }
 }

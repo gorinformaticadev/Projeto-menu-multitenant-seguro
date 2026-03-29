@@ -3,7 +3,7 @@
  */
 
 import { Type } from 'class-transformer';
-import { IsString, IsOptional, IsEnum, IsObject, IsUUID, IsBoolean, ValidateNested, IsUrl } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsObject, IsUUID, IsBoolean, ValidateNested, IsUrl, IsInt, Min, Max } from 'class-validator';
 import { Notification } from './notification.entity';
 
 export class CreateNotificationDto {
@@ -136,4 +136,60 @@ export interface CreateNotificationResponseDto extends NotificationSuppressionMe
 
 export interface BroadcastNotificationResponseDto extends NotificationSuppressionMetaDto {
   count: number;
+}
+
+export class TestPushNotificationDto {
+  @IsEnum(['self', 'system', 'module'])
+  mode: 'self' | 'system' | 'module';
+
+  @IsString()
+  title: string;
+
+  @IsString()
+  message: string;
+
+  @IsEnum(['info', 'success', 'warning', 'error'])
+  severity: 'info' | 'success' | 'warning' | 'error';
+
+  @IsOptional()
+  @IsString()
+  module?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  repeat?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(2000)
+  delayMs?: number;
+
+  @IsOptional()
+  @IsObject()
+  extraData?: Record<string, unknown>;
+}
+
+export interface TestPushNotificationResultItem {
+  index: number;
+  success: boolean;
+  notificationId?: string;
+  groupId?: string | null;
+  scopeType?: string;
+  scopeKey?: string;
+  error?: string;
+}
+
+export interface TestPushNotificationResponseDto {
+  success: boolean;
+  mode: string;
+  repeatRequested: number;
+  repeatSucceeded: number;
+  repeatFailed: number;
+  targetUserId: string;
+  tenantId: string | null;
+  generatedScopeSummary: string;
+  results: TestPushNotificationResultItem[];
 }

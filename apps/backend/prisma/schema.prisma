@@ -500,6 +500,7 @@ model NotificationGroup {
 
   @@unique([tenantId, userId, scopeType, scopeKey])
   @@index([tenantId, userId])
+  @@index([tenantId, lastNotificationAt(sort: Desc)]) // listGroups: WHERE tenantId=X ORDER BY lastNotificationAt DESC
   @@index([scopeType, scopeKey])
   @@index([lastNotificationAt])
   @@map("notification_groups")
@@ -537,16 +538,15 @@ model Notification {
   @@index([targetRole])
   @@index([audience])
   @@index([severity])
-  @@index([source])
   @@index([module])
-  @@index([isRead])
-  @@index([read])
   @@index([createdAt])
   @@index([tenantId, audience, read])
   @@index([userId, read])
   @@index([targetRole, isRead, createdAt])
   @@index([targetUserId, isRead, createdAt])
-  @@index([notificationGroupId]) // Novo índice para agrupamento
+  @@index([notificationGroupId, createdAt(sort: Desc)]) // syncGroupPreview + listGroupItems: ORDER BY createdAt DESC
+  @@index([notificationGroupId, read])                  // syncGroupCounters unread: WHERE read=false per group
+  @@index([notificationGroupId, isRead])                // syncGroupCounters unread: WHERE isRead=false per group
   @@map("notifications")
 }
 
