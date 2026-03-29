@@ -145,23 +145,40 @@ export function useNotifications(): UseNotificationsReturn {
 
   const registerPushSubscription = useCallback(async () => {
     if (typeof window === 'undefined') return;
-    if (!('serviceWorker' in window.navigator) || !('PushManager' in window)) return;
-    if (!('Notification' in window) || window.Notification.permission !== 'granted') return;
-    if (!window.isSecureContext) return;
+    if (!('serviceWorker' in window.navigator) || !('PushManager' in window)) {
+      console.warn('[Push] Service Worker or PushManager not supported');
+      return;
+    }
+    if (!('Notification' in window) || window.Notification.permission !== 'granted') {
+      console.warn('[Push] Notification permission not granted:', window.Notification?.permission);
+      return;
+    }
+    if (!window.isSecureContext) {
+      console.warn('[Push] Not a secure context (HTTPS required)');
+      return;
+    }
 
     try {
       const registeredWorker =
         serviceWorkerRegistrationRef.current || (await window.navigator.serviceWorker.register('/sw.js'));
       serviceWorkerRegistrationRef.current = registeredWorker;
 
+      console.log('[Push] Service Worker registered, waiting for ready...');
+
       const readyWorker = await window.navigator.serviceWorker.ready;
       serviceWorkerRegistrationRef.current = readyWorker;
+
+      console.log('[Push] Service Worker ready, state:', readyWorker.active?.state);
 
       let subscription = await readyWorker.pushManager.getSubscription();
       if (!subscription) {
         const publicKey = await getPushPublicKey();
-        if (!publicKey) return;
+        if (!publicKey) {
+          console.warn('[Push] No public key available');
+          return;
+        }
 
+        console.log('[Push] Subscribing with VAPID key...');
         subscription = await readyWorker.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToArrayBuffer(publicKey),
@@ -169,10 +186,12 @@ export function useNotifications(): UseNotificationsReturn {
       }
 
       if (subscription) {
+        console.log('[Push] Subscription obtained, syncing to backend...');
         await syncPushSubscription(subscription);
+        console.log('[Push] Subscription synced successfully');
       }
     } catch (error) {
-      console.warn('Nao foi possivel registrar push no navegador:', error);
+      console.error('[Push] Failed to register push subscription:', error);
     }
   }, [getPushPublicKey, syncPushSubscription]);
 
