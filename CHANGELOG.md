@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.96](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.95...v0.1.96) (2026-03-29)
+
+
+### Features
+
+* UPDATE_ENGINE_V2 ([26813ee](https://github.com/gorinformaticadev/Pluggor/commit/26813eeb53af43a333e163bb19d6f60d56ea7e5a))
+
 ### [0.1.95](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.94...v0.1.95) (2026-03-29)
 
 ### [0.1.94](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.93...v0.1.94) (2026-03-29)
