@@ -20,6 +20,7 @@ import {
   SystemUpdateLogQueryDto,
 } from './dto/system-update-admin.dto';
 import { SystemUpdateAdminService } from './system-update-admin.service';
+import { UpdateEngineCapabilitiesService } from './engine/update-engine-capabilities.service';
 import { extractAuditContext } from '../audit/audit-request-context.util';
 import { CriticalRateLimit } from '@common/decorators/critical-rate-limit.decorator';
 
@@ -37,7 +38,10 @@ type AuthenticatedRequest = ExpressRequest & {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.SUPER_ADMIN)
 export class SystemUpdateController {
-  constructor(private readonly systemUpdateAdminService: SystemUpdateAdminService) {}
+  constructor(
+    private readonly systemUpdateAdminService: SystemUpdateAdminService,
+    private readonly updateEngineCapabilitiesService: UpdateEngineCapabilitiesService,
+  ) {}
 
   private rethrowPreservingHttp(error: unknown, fallbackMessage: string): never {
     if (error instanceof HttpException) {
@@ -73,6 +77,15 @@ export class SystemUpdateController {
       return await this.systemUpdateAdminService.getStatus();
     } catch (error) {
       this.rethrowPreservingHttp(error, 'Erro ao ler status de update');
+    }
+  }
+
+  @Get('capabilities')
+  async capabilities() {
+    try {
+      return this.updateEngineCapabilitiesService.getCapabilities();
+    } catch (error) {
+      this.rethrowPreservingHttp(error, 'Erro ao obter capacidades do engine de update');
     }
   }
 

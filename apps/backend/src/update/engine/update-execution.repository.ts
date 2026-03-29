@@ -50,6 +50,16 @@ type StepRunRow = {
   created_at: Date | string;
 };
 
+type RunnerLeaseRow = {
+  installation_id: string;
+  runner_id: string;
+  lease_token: string;
+  execution_id: string | null;
+  heartbeat_at: Date | string;
+  expires_at: Date | string;
+  metadata_json: unknown;
+};
+
 @Injectable()
 export class UpdateExecutionRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -130,6 +140,23 @@ export class UpdateExecutionRepository {
       SELECT *
       FROM ops_update.executions
       WHERE id = ${id}
+      LIMIT 1
+    `);
+
+    if (rows.length === 0) {
+      return null;
+    }
+
+    return this.mapExecutionRow(rows[0]);
+  }
+
+  async findNextRequestedExecution(installationId: string): Promise<UpdateExecutionRecord | null> {
+    const rows = await this.prisma.$queryRaw<ExecutionRow[]>(Prisma.sql`
+      SELECT *
+      FROM ops_update.executions
+      WHERE installation_id = ${installationId}
+        AND status = 'requested'
+      ORDER BY requested_at ASC
       LIMIT 1
     `);
 
@@ -256,6 +283,79 @@ export class UpdateExecutionRepository {
           finished_at = EXCLUDED.finished_at
       `);
     }
+  }
+
+  async tryAcquireRunnerLease(params: {
+    installationId: string;
+    runnerId: string;
+    leaseToken: string;
+    executionId?: string | null;
+    ttlSeconds: number;
+    metadata?: UpdateExecutionMetadata;
+  }): Promise<boolean> {
+    const rows = await this.prisma.$queryRaw<RunnerLeaseRow[]>(Prisma.sql`
+      INSERT INTO ops_update.runner_leases (
+        installation_id,
+        runner_id,
+        lease_token,
+        execution_id,
+        heartbeat_at,
+        expires_at,
+        metadata_json
+      )
+      VALUES (
+        ${params.installationId},
+        ${params.runnerId},
+        ${params.leaseToken},
+        ${params.executionId || null},
+        NOW(),
+        NOW() + (${params.ttlSeconds} * INTERVAL '1 second'),
+        ${this.jsonParam(params.metadata || {})}
+      )
+      ON CONFLICT (installation_id)
+      DO UPDATE SET
+        runner_id = EXCLUDED.runner_id,
+        lease_token = EXCLUDED.lease_token,
+        execution_id = EXCLUDED.execution_id,
+        heartbeat_at = NOW(),
+        expires_at = NOW() + (${params.ttlSeconds} * INTERVAL '1 second'),
+        metadata_json = EXCLUDED.metadata_json
+      WHERE ops_update.runner_leases.expires_at < NOW()
+         OR ops_update.runner_leases.runner_id = EXCLUDED.runner_id
+      RETURNING *
+    `);
+
+    return rows.length > 0;
+  }
+
+  async renewRunnerLease(params: {
+    installationId: string;
+    runnerId: string;
+    executionId?: string | null;
+    ttlSeconds: number;
+    metadata?: UpdateExecutionMetadata;
+  }): Promise<boolean> {
+    const rows = await this.prisma.$queryRaw<RunnerLeaseRow[]>(Prisma.sql`
+      UPDATE ops_update.runner_leases
+      SET
+        execution_id = ${params.executionId || null},
+        heartbeat_at = NOW(),
+        expires_at = NOW() + (${params.ttlSeconds} * INTERVAL '1 second'),
+        metadata_json = COALESCE(metadata_json, '{}'::jsonb) || ${this.jsonParam(params.metadata || {})}
+      WHERE installation_id = ${params.installationId}
+        AND runner_id = ${params.runnerId}
+      RETURNING *
+    `);
+
+    return rows.length > 0;
+  }
+
+  async releaseRunnerLease(installationId: string, runnerId: string): Promise<void> {
+    await this.prisma.$executeRaw(Prisma.sql`
+      DELETE FROM ops_update.runner_leases
+      WHERE installation_id = ${installationId}
+        AND runner_id = ${runnerId}
+    `);
   }
 
   private mapExecutionRow(row: ExecutionRow): UpdateExecutionRecord {

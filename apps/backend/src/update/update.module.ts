@@ -38,7 +38,14 @@ import { CronModule } from '@core/cron/cron.module';
     UpdateExecutionFacadeService,
     UpdateExecutionBridgeService,
   ],
-  exports: [UpdateService, SystemUpdateAdminService, UpdateExecutionFacadeService, UpdateExecutionBridgeService],
+  exports: [
+    UpdateService,
+    SystemUpdateAdminService,
+    UpdateExecutionRepository,
+    UpdateStateMachineService,
+    UpdateExecutionFacadeService,
+    UpdateExecutionBridgeService,
+  ],
 })
 export class UpdateModule {
   // Empty implementation
