@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.102](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.101...v0.1.102) (2026-03-29)
+
+
+### Bug Fixes
+
+* add system update management page and backend service support ([ac26497](https://github.com/gorinformaticadev/Pluggor/commit/ac2649723c5856c19b60d55e2445f929a6263e70))
+
 ### [0.1.101](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.100...v0.1.101) (2026-03-29)
 
 ### [0.1.100](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.99...v0.1.100) (2026-03-29)
