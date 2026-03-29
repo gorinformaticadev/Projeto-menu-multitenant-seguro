@@ -268,6 +268,71 @@ describe('CronService', () => {
     );
   });
 
+  it('oculta jobs suprimidos do runtime e preserva os demais jobs', async () => {
+    await service.suppressJobs(['system.update_canonical_sync']);
+
+    prismaMock.cronSchedule.findMany.mockResolvedValue([
+      {
+        modulo: 'system',
+        identificador: 'update_canonical_sync',
+        descricao: 'Sincronizacao canonica',
+        expressao: '*/30 * * * * *',
+        ativo: true,
+        origem: 'core',
+        editavel: true,
+      },
+      {
+        modulo: 'system',
+        identificador: 'update_check',
+        descricao: 'Verifica atualizacoes',
+        expressao: '0 0 * * *',
+        ativo: true,
+        origem: 'core',
+        editavel: true,
+      },
+    ]);
+    heartbeatServiceMock.list.mockResolvedValue(
+      new Map([
+        [
+          'system.update_check',
+          buildHeartbeat({
+            jobKey: 'system.update_check',
+            lastStatus: 'success',
+            lastStartedAt: new Date('2026-03-07T11:00:00.000Z'),
+            lastSucceededAt: new Date('2026-03-07T11:00:05.000Z'),
+            nextExpectedRunAt: new Date('2026-03-08T00:00:00.000Z'),
+          }),
+        ],
+      ]),
+    );
+
+    await service.onModuleInit();
+    const jobs = await service.getRuntimeJobs();
+
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]).toEqual(
+      expect.objectContaining({
+        key: 'system.update_check',
+        runtimeRegistered: false,
+        issue: 'runtime_not_registered',
+      }),
+    );
+    expect(jobs.some((job) => job.key === 'system.update_canonical_sync')).toBe(false);
+  });
+
+  it('remove um job ja registrado do runtime quando ele passa a ser suprimido', async () => {
+    await prepareRegisteredJob();
+
+    expect(await service.getRuntimeJobs()).toHaveLength(1);
+
+    await service.suppressJobs(['system.manual_test']);
+
+    await expect(service.trigger('system.manual_test')).rejects.toThrow(
+      'Cron job system.manual_test nao encontrado',
+    );
+    expect(await service.getRuntimeJobs()).toEqual([]);
+  });
+
   it('updates heartbeat when a registered job is triggered manually', async () => {
     await prepareRegisteredJob();
 

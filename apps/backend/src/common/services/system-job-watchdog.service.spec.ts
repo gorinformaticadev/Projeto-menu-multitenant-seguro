@@ -155,6 +155,51 @@ describe('SystemJobWatchdogService', () => {
     );
   });
 
+  it('nao considera os jobs canonicos de update como obrigatorios quando eles nao estao no runtime', async () => {
+    cronServiceMock.getRuntimeJobs.mockResolvedValue([
+      {
+        key: 'system.update_check',
+        name: 'Update check',
+        description: 'Checks for updates',
+        schedule: '0 * * * *',
+        enabled: true,
+        runtimeRegistered: true,
+        runtimeActive: true,
+        lastStatus: 'success',
+        lastStartedAt: new Date('2026-03-07T12:00:00.000Z'),
+        lastSucceededAt: new Date('2026-03-07T12:01:00.000Z'),
+        nextExpectedRunAt: new Date('2026-03-07T13:00:00.000Z'),
+        consecutiveFailureCount: 0,
+      },
+    ]);
+
+    const result = await service.evaluateWatchdog(new Date('2026-03-07T15:01:00.000Z'));
+
+    expect(result).toEqual({
+      emitted: ['JOB_NOT_RUNNING:system.update_check'],
+      skipped: [],
+    });
+    const alertPayloads = operationalAlertsServiceMock.dispatchOperationalAlert.mock.calls.map(
+      ([input]) => input,
+    );
+    expect(alertPayloads).toHaveLength(1);
+    expect(alertPayloads[0]).toEqual(
+      expect.objectContaining({
+        action: 'JOB_NOT_RUNNING',
+        data: expect.objectContaining({
+          jobKey: 'system.update_check',
+        }),
+      }),
+    );
+    expect(
+      alertPayloads.some((payload) =>
+        String((payload as { data?: { jobKey?: string } }).data?.jobKey || '').includes(
+          'update_canonical',
+        ),
+      ),
+    ).toBe(false);
+  });
+
   it('emits a critical alert for a materialized session cleanup slot that was never created', async () => {
     cronServiceMock.getRuntimeJobs.mockResolvedValue([
       {

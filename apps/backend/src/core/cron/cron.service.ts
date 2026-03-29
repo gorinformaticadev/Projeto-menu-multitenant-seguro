@@ -132,6 +132,7 @@ const DEFAULT_DATABASE_LEASE_RENEW_MS = 30 * 1000;
 export class CronService implements OnModuleInit {
   private readonly logger = new Logger(CronService.name);
   private readonly jobs = new Map<string, JobWrapper>();
+  private readonly suppressedJobKeys = new Set<string>();
   private maintenancePaused = false;
   private pausedCronJobs = new Set<string>();
 
@@ -155,6 +156,12 @@ export class CronService implements OnModuleInit {
     callback: CronJobCallback,
     meta: RegisterCronMeta,
   ): Promise<void> {
+    if (this.isSuppressedJobKey(key)) {
+      await this.clearSuppressedJobRuntime(key);
+      this.logger.log(`Cron job ${key} mantido fora do runtime por supressao explicita.`);
+      return;
+    }
+
     if (!schedule) {
       this.logger.error(`Tentativa de registrar cron ${key} sem expressao de agendamento.`);
       return;
@@ -257,7 +264,15 @@ export class CronService implements OnModuleInit {
     return this.buildRuntimeSnapshot();
   }
 
+  async suppressJobs(keys: Iterable<string>): Promise<void> {
+    for (const key of keys) {
+      this.suppressedJobKeys.add(key);
+      await this.clearSuppressedJobRuntime(key);
+    }
+  }
+
   async toggle(key: string, enable: boolean): Promise<void> {
+    this.assertJobIsVisibleInRuntime(key);
     const wrapper = this.jobs.get(key);
     if (!wrapper) {
       throw new Error(`Cron job ${key} nao encontrado`);
@@ -281,6 +296,7 @@ export class CronService implements OnModuleInit {
   }
 
   async updateSchedule(key: string, schedule: string): Promise<void> {
+    this.assertJobIsVisibleInRuntime(key);
     const wrapper = this.jobs.get(key);
     if (!wrapper) {
       throw new Error(`Cron job ${key} nao encontrado`);
@@ -308,6 +324,7 @@ export class CronService implements OnModuleInit {
   }
 
   async trigger(key: string): Promise<void> {
+    this.assertJobIsVisibleInRuntime(key);
     const wrapper = this.jobs.get(key);
     if (!wrapper) {
       throw new Error(`Cron job ${key} nao encontrado`);
@@ -406,7 +423,21 @@ export class CronService implements OnModuleInit {
 
   private async syncWithDatabase(): Promise<void> {
     try {
-      const dbJobs = await this.prisma.cronSchedule.findMany();
+      const persistedJobs = await this.prisma.cronSchedule.findMany();
+      const dbJobs: typeof persistedJobs = [];
+
+      for (const dbJob of persistedJobs) {
+        const modulo = dbJob.modulo || 'core';
+        const key = `${modulo}.${dbJob.identificador}`;
+
+        if (this.isSuppressedJobKey(key)) {
+          await this.clearSuppressedJobRuntime(key);
+          continue;
+        }
+
+        dbJobs.push(dbJob);
+      }
+
       const heartbeatMap = await this.heartbeatService.list(
         dbJobs.map((job) => `${job.modulo || 'core'}.${job.identificador}`),
       );
@@ -526,19 +557,21 @@ export class CronService implements OnModuleInit {
   }
 
   private async buildRuntimeSnapshot(): Promise<CronJobDefinition[]> {
-    const definitions = Array.from(this.jobs.values()).map((wrapper) => {
-      if (wrapper.job) {
-        wrapper.definition.nextRun = this.safeNextRun(wrapper.job);
-      }
+    const definitions = Array.from(this.jobs.values())
+      .filter((wrapper) => !this.isSuppressedJobKey(wrapper.definition.key))
+      .map((wrapper) => {
+        if (wrapper.job) {
+          wrapper.definition.nextRun = this.safeNextRun(wrapper.job);
+        }
 
-      const definition = { ...wrapper.definition };
-      definition.nextExpectedRunAt = definition.nextRun;
-      definition.runtimeRegistered = wrapper.runtimeRegistered;
-      definition.runtimeActive = Boolean(wrapper.job);
-      definition.sourceOfTruth = 'database';
-      definition.issue = wrapper.runtimeRegistered ? null : 'runtime_not_registered';
-      return definition;
-    });
+        const definition = { ...wrapper.definition };
+        definition.nextExpectedRunAt = definition.nextRun;
+        definition.runtimeRegistered = wrapper.runtimeRegistered;
+        definition.runtimeActive = Boolean(wrapper.job);
+        definition.sourceOfTruth = 'database';
+        definition.issue = wrapper.runtimeRegistered ? null : 'runtime_not_registered';
+        return definition;
+      });
 
     const directJobKeys = definitions
       .filter((definition) => definition.executionMode !== 'materialized')
@@ -1779,6 +1812,23 @@ export class CronService implements OnModuleInit {
       }
     } catch {
       // noop
+    }
+  }
+
+  private async clearSuppressedJobRuntime(key: string): Promise<void> {
+    this.deleteCronJobOnly(key);
+    this.pausedCronJobs.delete(key);
+    this.jobs.delete(key);
+    await this.heartbeatService.markScheduled(key, null);
+  }
+
+  private isSuppressedJobKey(key: string): boolean {
+    return this.suppressedJobKeys.has(key);
+  }
+
+  private assertJobIsVisibleInRuntime(key: string): void {
+    if (this.isSuppressedJobKey(key)) {
+      throw new Error(`Cron job ${key} nao encontrado`);
     }
   }
 

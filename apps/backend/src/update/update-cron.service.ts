@@ -6,6 +6,11 @@ import { CronService } from '@core/cron/cron.service';
 import { UpdateExecutionBridgeService } from './engine/update-execution-bridge.service';
 import { UpdateExecutionFacadeService } from './engine/update-execution.facade.service';
 
+export const CANONICAL_UPDATE_CRON_JOB_KEYS = [
+  'system.update_canonical_sync',
+  'system.update_canonical_cleanup',
+] as const;
+
 @Injectable()
 export class UpdateCronService implements OnModuleInit {
   private readonly logger = new Logger(UpdateCronService.name);
@@ -19,10 +24,9 @@ export class UpdateCronService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    await this.cronService.suppressJobs(CANONICAL_UPDATE_CRON_JOB_KEYS);
     await this.registerUpdateCheckJob();
     await this.registerLogCleanupJob();
-    await this.registerCanonicalSyncJob();
-    await this.registerCanonicalCleanupJob();
   }
 
   private async registerUpdateCheckJob(): Promise<void> {
