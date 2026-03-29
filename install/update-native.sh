@@ -848,6 +848,7 @@ restart_pm2_processes() {
   local backend_name="${PM2_BACKEND_NAME:-$BACKEND_PROC}"
   local frontend_name="${PM2_FRONTEND_NAME:-$FRONTEND_PROC}"
   local frontend_dir="$target_root/apps/frontend"
+  local frontend_start_target=""
 
   if [[ -z "$backend_name" ]]; then
     backend_name="multitenant-backend"
@@ -861,10 +862,15 @@ restart_pm2_processes() {
   pm2 delete "$frontend_name" >/dev/null 2>&1 || true
 
   pm2 start dist/main.js --name "$backend_name" --cwd "$target_root/apps/backend" --update-env || return 1
-  resolve_frontend_standalone_layout "$frontend_dir" || return 1
-  log "Entrypoint standalone do frontend detectado: ${FRONTEND_STANDALONE_LAYOUT} (${FRONTEND_STANDALONE_ENTRY_REL})"
+  frontend_start_target="$(resolve_frontend_start_target "$frontend_dir")" || return 1
+  if [[ -n "${FRONTEND_STANDALONE_LAYOUT:-}" ]] && [[ -n "${FRONTEND_STANDALONE_ENTRY_REL:-}" ]]; then
+    log "Entrypoint standalone do frontend detectado: ${FRONTEND_STANDALONE_LAYOUT} (${FRONTEND_STANDALONE_ENTRY_REL})"
+  else
+    log "Launcher canonico do frontend detectado: ${frontend_start_target}"
+  fi
+  load_frontend_runtime_env "$frontend_dir"
   PORT=5000 HOSTNAME=0.0.0.0 \
-    pm2 start "node ${FRONTEND_STANDALONE_ENTRY_REL}" --name "$frontend_name" --cwd "$frontend_dir" --update-env || return 1
+    pm2 start "node ${frontend_start_target}" --name "$frontend_name" --cwd "$frontend_dir" --update-env || return 1
   pm2 save
 
   BACKEND_PROC="$backend_name"
@@ -999,6 +1005,29 @@ resolve_frontend_standalone_layout() {
   return 0
 }
 
+resolve_frontend_start_target() {
+  local frontend_dir="$1"
+  if [[ -f "$frontend_dir/scripts/start-standalone.mjs" ]]; then
+    echo "scripts/start-standalone.mjs"
+    return 0
+  fi
+
+  resolve_frontend_standalone_layout "$frontend_dir" || return 1
+  echo "$FRONTEND_STANDALONE_ENTRY_REL"
+}
+
+load_frontend_runtime_env() {
+  local frontend_dir="$1"
+  if [[ ! -f "$frontend_dir/.env.local" ]]; then
+    return 0
+  fi
+
+  set -a
+  # shellcheck disable=SC1090
+  source "$frontend_dir/.env.local"
+  set +a
+}
+
 copy_frontend_runtime_assets() {
   local release_dir="$1"
   local frontend_dir="$release_dir/apps/frontend"
@@ -1127,7 +1156,7 @@ smoke_test_frontend_release() {
   local release_dir="$1"
   local port="${2:-5100}"
   local frontend_dir="$release_dir/apps/frontend"
-  local frontend_entry_rel=""
+  local frontend_start_target=""
   local stdout_file="$frontend_dir/.next/frontend-smoke.out"
   local stderr_file="$frontend_dir/.next/frontend-smoke.err"
   local root_html="$frontend_dir/.next/frontend-smoke-root.html"
@@ -1136,13 +1165,13 @@ smoke_test_frontend_release() {
   local status=0
 
   rm -f "$stdout_file" "$stderr_file" "$root_html" "$login_html"
-  resolve_frontend_standalone_layout "$frontend_dir" || return 1
-  frontend_entry_rel="$FRONTEND_STANDALONE_ENTRY_REL"
+  frontend_start_target="$(resolve_frontend_start_target "$frontend_dir")" || return 1
 
   (
     cd "$frontend_dir"
+    load_frontend_runtime_env "$frontend_dir"
     PORT="$port" HOSTNAME="127.0.0.1" NODE_ENV=production \
-      node "$frontend_entry_rel" > "$stdout_file" 2> "$stderr_file"
+      node "$frontend_start_target" > "$stdout_file" 2> "$stderr_file"
   ) &
   frontend_pid=$!
 
@@ -1393,7 +1422,7 @@ pnpm --filter backend build || fail_and_exit "$EXIT_BUILD_FAILED" "build_backend
 
 set_step "build_frontend" 54
 log "Compilando frontend..."
-pnpm --filter frontend build || fail_and_exit "$EXIT_BUILD_FAILED" "build_frontend" "UPDATE_BUILD_ERROR" "UPDATE_BUILD_ERROR" \
+NEXT_DIST_DIR=".next" pnpm --filter frontend build || fail_and_exit "$EXIT_BUILD_FAILED" "build_frontend" "UPDATE_BUILD_ERROR" "UPDATE_BUILD_ERROR" \
   "Falha ao compilar o frontend da nova release." "$(recent_failure_detail 'pnpm --filter frontend build falhou')"
 
 set_step "package_frontend_assets" 58

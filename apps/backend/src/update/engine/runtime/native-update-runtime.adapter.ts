@@ -247,6 +247,10 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       'pnpm',
       ['--filter', 'frontend', 'build'],
       releaseDir,
+      await this.buildFrontendCommandEnv(releaseDir, context.runtime, {
+        NEXT_DIST_DIR: '.next',
+        NODE_ENV: 'production',
+      }),
     );
 
     const frontendDir = path.join(releaseDir, 'apps', 'frontend');
@@ -264,6 +268,34 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
         frontendRuntimeDirRelative: layout.runtimeDirRelativePath,
         frontendBuildDirRelative: layout.buildDirRelativePath,
       },
+      evidence: [
+        {
+          code: 'frontend_build_concluido',
+          summary: 'O frontend foi compilado com o distDir canonico da release native.',
+          details: {
+            frontendDir,
+            distDir: '.next',
+          },
+        },
+        {
+          code: 'frontend_standalone_empacotado',
+          summary: 'Os assets de runtime do frontend foram copiados para o standalone.',
+          details: {
+            layout: layout.label,
+            runtimeDirRelativePath: layout.runtimeDirRelativePath,
+            buildDirRelativePath: layout.buildDirRelativePath,
+          },
+        },
+        {
+          code: 'frontend_standalone_validado',
+          summary: 'O artefato standalone do frontend passou pela validacao estrutural.',
+          details: {
+            entryRelativePath: layout.entryRelativePath,
+            runtimeDirRelativePath: layout.runtimeDirRelativePath,
+            buildDirRelativePath: layout.buildDirRelativePath,
+          },
+        },
+      ],
     };
   }
 
@@ -557,6 +589,33 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     };
   }
 
+  private async buildFrontendCommandEnv(
+    releaseDir: string,
+    runtime: UpdateStepExecutionContext['runtime'],
+    overrides: NodeJS.ProcessEnv = {},
+  ): Promise<NodeJS.ProcessEnv> {
+    const backendEnv = await this.buildNativeCommandEnv(runtime);
+    const frontendEnvPath = await this.resolveExistingPath([
+      path.join(releaseDir, 'apps', 'frontend', '.env.local'),
+      path.join(runtime.sharedDir, 'config', 'frontend.env'),
+      path.join(runtime.sharedDir, '.env.frontend.local'),
+    ]);
+
+    if (!frontendEnvPath) {
+      return {
+        ...backendEnv,
+        ...overrides,
+      };
+    }
+
+    const parsedFrontendEnv = this.parseEnvFile(await fsp.readFile(frontendEnvPath, 'utf8'));
+    return {
+      ...backendEnv,
+      ...parsedFrontendEnv,
+      ...overrides,
+    };
+  }
+
   private async runCommandOrThrow(
     context: UpdateStepExecutionContext,
     step: UpdateStepCode,
@@ -683,8 +742,27 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       throw new Error('BUILD_ID inconsistente entre build e standalone do frontend.');
     }
 
+    if (
+      (await this.pathExists(path.join(buildDir, 'static'))) &&
+      !(await this.pathExists(path.join(standaloneBuildDir, 'static')))
+    ) {
+      throw new Error('Diretorio .next/static nao foi copiado para o standalone do frontend.');
+    }
+
     if ((await this.pathExists(path.join(frontendDir, 'public'))) && !(await this.pathExists(path.join(runtimeDir, 'public')))) {
       throw new Error('Diretorio public nao foi copiado para o standalone do frontend.');
+    }
+
+    const sourceManifestCount = await this.countFrontendManifestFiles(path.join(buildDir, 'server'));
+    const standaloneManifestCount = await this.countFrontendManifestFiles(path.join(standaloneBuildDir, 'server'));
+    if (sourceManifestCount > 0 && standaloneManifestCount === 0) {
+      throw new Error('Standalone do frontend sem manifests de referencia obrigatorios.');
+    }
+
+    const source500Page = path.join(buildDir, 'server', 'pages', '500.html');
+    const standalone500Page = path.join(standaloneBuildDir, 'server', 'pages', '500.html');
+    if ((await this.pathExists(source500Page)) && !(await this.pathExists(standalone500Page))) {
+      throw new Error('Artefato do standalone nao contem a pagina estatica 500 esperada.');
     }
   }
 
@@ -695,21 +773,23 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     const frontendDir = path.join(releaseDir, 'apps', 'frontend');
     const layout = await this.resolveFrontendLayout(frontendDir);
     const port = Number(process.env.UPDATE_PRE_SWITCH_FRONTEND_PORT || 5100);
+    const startCommand = await this.resolveFrontendStartCommand(frontendDir, layout);
 
     const background = await this.commandRunner.startBackground({
       executionId: context.execution.id,
       step: 'pre_switch_validation',
-      command: 'node',
-      args: [layout.entryRelativePath],
+      command: startCommand.command,
+      args: startCommand.args,
       cwd: frontendDir,
-      env: {
+      env: await this.buildFrontendCommandEnv(releaseDir, context.runtime, {
         PORT: String(port),
         HOSTNAME: '127.0.0.1',
         NODE_ENV: 'production',
-      },
+      }),
       logDir: context.runtime.logsDir,
       metadata: {
         smokeTest: true,
+        launcher: startCommand.launcher,
       },
     });
 
@@ -730,10 +810,68 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       return {
         smokeFrontendPort: port,
         staticAsset,
+        launcher: startCommand.launcher,
+        startCommand: [startCommand.command, ...startCommand.args].join(' '),
       };
     } finally {
       await background.stop();
     }
+  }
+
+  private async resolveFrontendStartCommand(
+    frontendDir: string,
+    layout: {
+      entryRelativePath: string;
+    },
+  ): Promise<{
+    command: string;
+    args: string[];
+    launcher: 'start_standalone_script' | 'direct_standalone_entry';
+  }> {
+    const standaloneScriptRelativePath = path.join('scripts', 'start-standalone.mjs');
+    if (await this.pathExists(path.join(frontendDir, standaloneScriptRelativePath))) {
+      return {
+        command: 'node',
+        args: [standaloneScriptRelativePath],
+        launcher: 'start_standalone_script',
+      };
+    }
+
+    return {
+      command: 'node',
+      args: [layout.entryRelativePath],
+      launcher: 'direct_standalone_entry',
+    };
+  }
+
+  private async countFrontendManifestFiles(baseDir: string): Promise<number> {
+    if (!(await this.pathExists(baseDir))) {
+      return 0;
+    }
+
+    let total = 0;
+    const stack = [baseDir];
+    while (stack.length > 0) {
+      const currentDir = stack.pop();
+      if (!currentDir) {
+        continue;
+      }
+
+      const entries = await fsp.readdir(currentDir, { withFileTypes: true }).catch(() => []);
+      for (const entry of entries) {
+        const fullPath = path.join(currentDir, entry.name);
+        if (entry.isDirectory()) {
+          stack.push(fullPath);
+          continue;
+        }
+
+        if (/client-reference-manifest|server-reference-manifest/i.test(entry.name)) {
+          total += 1;
+        }
+      }
+    }
+
+    return total;
   }
 
   private async restartPm2(
@@ -748,6 +886,7 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       String(process.env.PM2_FRONTEND_NAME || 'multitenant-frontend');
     const frontendDir = path.join(releaseDir, 'apps', 'frontend');
     const layout = await this.resolveFrontendLayout(frontendDir);
+    const startCommand = await this.resolveFrontendStartCommand(frontendDir, layout);
 
     await this.commandRunner.run({
       executionId: context.execution.id,
@@ -796,13 +935,25 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       executionId: context.execution.id,
       step: 'restart_services',
       command: 'pm2',
-      args: ['start', `node ${layout.entryRelativePath}`, '--name', frontendName, '--cwd', frontendDir, '--update-env'],
+      args: [
+        'start',
+        `${startCommand.command} ${startCommand.args.join(' ')}`,
+        '--name',
+        frontendName,
+        '--cwd',
+        frontendDir,
+        '--update-env',
+      ],
       cwd: context.runtime.baseDir,
-      env: {
+      env: await this.buildFrontendCommandEnv(releaseDir, context.runtime, {
         PORT: String(process.env.FRONTEND_PORT || 5000),
         HOSTNAME: '0.0.0.0',
-      },
+        NODE_ENV: 'production',
+      }),
       logDir: context.runtime.logsDir,
+      metadata: {
+        launcher: startCommand.launcher,
+      },
     });
     if (frontendStart.exitCode === 0) {
       restartedServices.push({
