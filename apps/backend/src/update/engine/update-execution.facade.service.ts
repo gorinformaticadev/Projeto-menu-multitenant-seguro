@@ -2,6 +2,7 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import * as fs from 'fs';
 import * as os from 'os';
 import { SystemVersionService } from '@common/services/system-version.service';
+import { UpdateExecutionBridgeService } from './update-execution-bridge.service';
 import { UpdateExecutionRepository } from './update-execution.repository';
 import { UpdateStateMachineService } from './update-state-machine.service';
 import {
@@ -28,6 +29,7 @@ export class UpdateExecutionFacadeService {
     private readonly repository: UpdateExecutionRepository,
     private readonly stateMachine: UpdateStateMachineService,
     private readonly systemVersionService: SystemVersionService,
+    private readonly updateExecutionBridgeService?: UpdateExecutionBridgeService,
   ) {}
 
   async requestExecution(params: RequestExecutionParams): Promise<UpdateExecutionView> {
@@ -70,7 +72,12 @@ export class UpdateExecutionFacadeService {
       return null;
     }
 
-    return this.stateMachine.buildExecutionView(execution);
+    const view = this.stateMachine.buildExecutionView(execution);
+    if (!this.updateExecutionBridgeService?.isEnabled()) {
+      return view;
+    }
+
+    return await this.updateExecutionBridgeService.syncCurrentLegacyBridgeExecution(view);
   }
 
   async getExecutionView(id: string): Promise<UpdateExecutionView> {

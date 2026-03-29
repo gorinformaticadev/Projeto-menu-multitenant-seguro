@@ -5,6 +5,7 @@ import { UpdateCronService } from './update-cron.service';
 import { SystemUpdateController } from './system-update.controller';
 import { SystemUpdateAdminService } from './system-update-admin.service';
 import { UpdateExecutionController } from './engine/update-execution.controller';
+import { UpdateExecutionBridgeService } from './engine/update-execution-bridge.service';
 import { UpdateExecutionFacadeService } from './engine/update-execution.facade.service';
 import { UpdateExecutionRepository } from './engine/update-execution.repository';
 import { UpdateStateMachineService } from './engine/update-state-machine.service';
@@ -35,8 +36,9 @@ import { CronModule } from '@core/cron/cron.module';
     UpdateExecutionRepository,
     UpdateStateMachineService,
     UpdateExecutionFacadeService,
+    UpdateExecutionBridgeService,
   ],
-  exports: [UpdateService, SystemUpdateAdminService, UpdateExecutionFacadeService],
+  exports: [UpdateService, SystemUpdateAdminService, UpdateExecutionFacadeService, UpdateExecutionBridgeService],
 })
 export class UpdateModule {
   // Empty implementation

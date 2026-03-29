@@ -14,6 +14,7 @@ import { resolvePlatformUpdateStep } from './platform-update-steps';
 import type { PersistedUpdateDiagnostics } from './platform-update-state.persistence';
 import { UpdateExecutionFacadeService } from './engine/update-execution.facade.service';
 import type { UpdateExecutionView } from './engine/update-execution.types';
+import { UpdateExecutionBridgeService } from './engine/update-execution-bridge.service';
 
 type UpdateExecutionStatus = 'starting' | 'completed';
 type UpdateLifecycleStatus =
@@ -94,6 +95,7 @@ export class UpdateService implements OnModuleInit {
     private readonly systemVersionService: SystemVersionService,
     private readonly systemUpdateAdminService: SystemUpdateAdminService,
     private readonly updateExecutionFacadeService?: UpdateExecutionFacadeService,
+    private readonly updateExecutionBridgeService?: UpdateExecutionBridgeService,
   ) {
     this.encryptionKey = this.resolveEncryptionKey();
   }
@@ -233,6 +235,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
     userAgent?: string,
   ): Promise<{ success: boolean; logId: string; operationId?: string; status: UpdateExecutionStatus; message: string }> {
     let updateLog: UpdateLog | null = null;
+    let canonicalExecutionId: string | null = null;
     const normalizedCleanVersion = semver.clean(updateData.version);
     if (!normalizedCleanVersion) {
       throw new HttpException(
@@ -345,13 +348,42 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
         env.GIT_AUTH_HEADER = `http.extraHeader=AUTHORIZATION: Bearer ${decryptedToken}`;
       }
 
-      const startResult = await this.systemUpdateAdminService.runUpdate({
-        version: normalizedVersion,
-        userId: executedBy,
-        ipAddress,
-        userAgent,
-        env, // Passar env customizado para o admin service
-      });
+      let startResult: { operationId: string };
+      if (this.updateExecutionBridgeService?.isEnabled() && this.updateExecutionFacadeService) {
+        const canonicalExecution = await this.updateExecutionFacadeService.requestExecution({
+          targetVersion: normalizedVersion,
+          requestedBy: executedBy,
+          source: 'panel',
+          mode,
+          rollbackPolicy: 'code_only_safe',
+          metadata: {
+            triggeredFrom: 'legacy_execute_endpoint',
+            updateLogId: updateLog.id,
+            ipAddress: ipAddress || null,
+            userAgent: userAgent || null,
+          },
+        });
+        canonicalExecutionId = canonicalExecution.id;
+
+        const bridgeResult = await this.updateExecutionBridgeService.launchLegacyExecution({
+          execution: canonicalExecution,
+          version: normalizedVersion,
+          userId: executedBy,
+          ipAddress,
+          userAgent,
+          env,
+        });
+        startResult = { operationId: bridgeResult.operationId };
+      } else {
+        const legacyStartResult = await this.systemUpdateAdminService.runUpdate({
+          version: normalizedVersion,
+          userId: executedBy,
+          ipAddress,
+          userAgent,
+          env, // Passar env customizado para o admin service
+        });
+        startResult = { operationId: legacyStartResult.operationId };
+      }
 
       await this.prisma.updateLog.update({
         where: { id: updateLog.id },
@@ -363,6 +395,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
             requestedVersion: normalizedVersion,
             startedAt: startedAtIso,
             operationId: startResult.operationId,
+            canonicalExecutionId,
           }),
         },
       });
@@ -532,7 +565,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
   }
 
   private async safeGetCanonicalExecution(): Promise<UpdateExecutionView | null> {
-    if (!this.updateExecutionFacadeService) {
+    if (!this.updateExecutionFacadeService || !this.isCanonicalEngineReadEnabled()) {
       return null;
     }
 
@@ -542,6 +575,10 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
       this.logger.warn(`Falha ao obter execucao canonica de update: ${String(error)}`);
       return null;
     }
+  }
+
+  private isCanonicalEngineReadEnabled(): boolean {
+    return process.env.UPDATE_ENGINE_V2_ENABLED === 'true' || process.env.UPDATE_ENGINE_V2_READ_ENABLED === 'true';
   }
 
   private async reconcileRunningUpdateLogWithSystemState(

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@core/prisma/prisma.service';
 import {
@@ -6,6 +7,7 @@ import {
   type UpdateExecutionErrorSnapshot,
   type UpdateStepRunRecord,
   type UpdateExecutionMetadata,
+  type UpdateExecutionStepView,
 } from './update-execution.types';
 
 type ExecutionRow = {
@@ -147,6 +149,113 @@ export class UpdateExecutionRepository {
     `);
 
     return rows.map((row) => this.mapStepRunRow(row));
+  }
+
+  async updateExecution(
+    id: string,
+    patch: {
+      status?: UpdateExecutionRecord['status'];
+      currentStep?: UpdateExecutionRecord['currentStep'];
+      failedStep?: UpdateExecutionRecord['failedStep'];
+      progressUnitsDone?: number;
+      progressUnitsTotal?: number;
+      error?: UpdateExecutionErrorSnapshot | null;
+      metadata?: UpdateExecutionMetadata;
+      startedAt?: string | null;
+      finishedAt?: string | null;
+    },
+  ): Promise<UpdateExecutionRecord> {
+    const assignments: Prisma.Sql[] = [
+      Prisma.sql`revision = revision + 1`,
+      Prisma.sql`updated_at = NOW()`,
+    ];
+
+    if (patch.status !== undefined) {
+      assignments.push(Prisma.sql`status = ${patch.status}`);
+    }
+    if (patch.currentStep !== undefined) {
+      assignments.push(Prisma.sql`current_step = ${patch.currentStep}`);
+    }
+    if (patch.failedStep !== undefined) {
+      assignments.push(Prisma.sql`failed_step = ${patch.failedStep}`);
+    }
+    if (patch.progressUnitsDone !== undefined) {
+      assignments.push(Prisma.sql`progress_units_done = ${patch.progressUnitsDone}`);
+    }
+    if (patch.progressUnitsTotal !== undefined) {
+      assignments.push(Prisma.sql`progress_units_total = ${patch.progressUnitsTotal}`);
+    }
+    if (patch.error !== undefined) {
+      assignments.push(Prisma.sql`error_json = ${this.jsonParam(patch.error)}`);
+    }
+    if (patch.metadata !== undefined) {
+      assignments.push(
+        Prisma.sql`metadata_json = COALESCE(metadata_json, '{}'::jsonb) || ${this.jsonParam(patch.metadata)}`,
+      );
+    }
+    if (patch.startedAt !== undefined) {
+      assignments.push(Prisma.sql`started_at = ${this.timestampParam(patch.startedAt)}`);
+    }
+    if (patch.finishedAt !== undefined) {
+      assignments.push(Prisma.sql`finished_at = ${this.timestampParam(patch.finishedAt)}`);
+    }
+
+    const rows = await this.prisma.$queryRaw<ExecutionRow[]>(Prisma.sql`
+      UPDATE ops_update.executions
+      SET ${Prisma.join(assignments, ', ')}
+      WHERE id = ${id}
+      RETURNING *
+    `);
+
+    return this.mapExecutionRow(rows[0]);
+  }
+
+  async upsertProjectedSteps(
+    executionId: string,
+    steps: UpdateExecutionStepView[],
+  ): Promise<void> {
+    for (const step of steps) {
+      await this.prisma.$executeRaw(Prisma.sql`
+        INSERT INTO ops_update.step_runs (
+          id,
+          execution_id,
+          step,
+          ordinal,
+          attempt,
+          status,
+          progress_units_done,
+          progress_units_total,
+          result_json,
+          error_json,
+          started_at,
+          finished_at
+        )
+        VALUES (
+          ${randomUUID()},
+          ${executionId},
+          ${step.step},
+          ${step.ordinal},
+          1,
+          ${step.status},
+          ${step.progressUnitsDone},
+          ${step.progressUnitsTotal},
+          ${this.jsonParam(step.result)},
+          ${this.jsonParam(step.error)},
+          ${this.timestampParam(step.startedAt)},
+          ${this.timestampParam(step.finishedAt)}
+        )
+        ON CONFLICT (execution_id, step, attempt)
+        DO UPDATE SET
+          ordinal = EXCLUDED.ordinal,
+          status = EXCLUDED.status,
+          progress_units_done = EXCLUDED.progress_units_done,
+          progress_units_total = EXCLUDED.progress_units_total,
+          result_json = EXCLUDED.result_json,
+          error_json = EXCLUDED.error_json,
+          started_at = EXCLUDED.started_at,
+          finished_at = EXCLUDED.finished_at
+      `);
+    }
   }
 
   private mapExecutionRow(row: ExecutionRow): UpdateExecutionRecord {

@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '@core/prisma/prisma.service';
 import { SystemVersionService } from '@common/services/system-version.service';
 import { AuditService } from '../audit/audit.service';
+import { UpdateExecutionBridgeService } from './engine/update-execution-bridge.service';
+import { UpdateExecutionFacadeService } from './engine/update-execution.facade.service';
 import { SystemUpdateAdminService } from './system-update-admin.service';
 import { UpdateService } from './update.service';
 
@@ -130,11 +132,53 @@ function createService() {
     })),
   };
 
+  const updateExecutionFacadeServiceMock = {
+    requestExecution: jest.fn(async () => ({
+      id: 'execution-1',
+      installationId: 'host-1',
+      requestedBy: 'user-1',
+      source: 'panel',
+      mode: 'docker',
+      currentVersion: 'v1.0.0',
+      targetVersion: 'v1.2.3',
+      status: 'requested',
+      currentStep: 'precheck',
+      failedStep: null,
+      rollbackPolicy: 'code_only_safe',
+      progressUnitsDone: 0,
+      progressUnitsTotal: 14,
+      error: null,
+      metadata: {},
+      requestedAt: '2026-03-12T00:00:00.000Z',
+      startedAt: null,
+      finishedAt: null,
+      revision: 1,
+      createdAt: '2026-03-12T00:00:00.000Z',
+      updatedAt: '2026-03-12T00:00:00.000Z',
+      progressPercent: 0,
+      stepsPlanned: [],
+    })),
+    getCurrentExecutionView: jest.fn(async () => null),
+  };
+
+  const updateExecutionBridgeServiceMock = {
+    isEnabled: jest.fn(() => false),
+    launchLegacyExecution: jest.fn(async () => ({
+      operationId: 'bridge-123',
+      execution: {
+        id: 'execution-1',
+      },
+    })),
+    syncCurrentLegacyBridgeExecution: jest.fn(async (execution: unknown) => execution),
+  };
+
   const service = new UpdateService(
     prismaMock as unknown as PrismaService,
     auditMock as unknown as AuditService,
     systemVersionMock as unknown as SystemVersionService,
     systemUpdateAdminServiceMock as unknown as SystemUpdateAdminService,
+    updateExecutionFacadeServiceMock as unknown as UpdateExecutionFacadeService,
+    updateExecutionBridgeServiceMock as unknown as UpdateExecutionBridgeService,
   );
 
   return {
@@ -142,6 +186,8 @@ function createService() {
     prismaMock,
     auditMock,
     systemUpdateAdminServiceMock,
+    updateExecutionFacadeServiceMock,
+    updateExecutionBridgeServiceMock,
   };
 }
 
@@ -227,7 +273,7 @@ describe('UpdateService', () => {
   });
 
   it('executeUpdate inicia job assincrono e retorna operationId', async () => {
-    const { service, prismaMock, systemUpdateAdminServiceMock } = createService();
+    const { service, prismaMock, systemUpdateAdminServiceMock, updateExecutionBridgeServiceMock } = createService();
 
     const result = await service.executeUpdate({ version: 'v1.2.3' }, 'user-1', '127.0.0.1', 'jest');
 
@@ -250,6 +296,41 @@ describe('UpdateService', () => {
         where: { id: 'log-1' },
       }),
     );
+    expect(updateExecutionBridgeServiceMock.launchLegacyExecution).not.toHaveBeenCalled();
+  });
+
+  it('executeUpdate usa bridge canonico quando UPDATE_ENGINE_V2_ENABLED=true', async () => {
+    process.env.UPDATE_ENGINE_V2_ENABLED = 'true';
+    const {
+      service,
+      systemUpdateAdminServiceMock,
+      updateExecutionFacadeServiceMock,
+      updateExecutionBridgeServiceMock,
+      prismaMock,
+    } = createService();
+
+    updateExecutionBridgeServiceMock.isEnabled.mockReturnValue(true);
+
+    const result = await service.executeUpdate({ version: 'v1.2.3' }, 'user-1', '127.0.0.1', 'jest');
+
+    expect(result.operationId).toBe('bridge-123');
+    expect(updateExecutionFacadeServiceMock.requestExecution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        targetVersion: 'v1.2.3',
+        requestedBy: 'user-1',
+      }),
+    );
+    expect(updateExecutionBridgeServiceMock.launchLegacyExecution).toHaveBeenCalled();
+    expect(systemUpdateAdminServiceMock.runUpdate).not.toHaveBeenCalled();
+    expect(prismaMock.updateLog.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          executionLogs: expect.stringContaining('canonicalExecutionId'),
+        }),
+      }),
+    );
+
+    delete process.env.UPDATE_ENGINE_V2_ENABLED;
   });
 
   it('normalizeHttpStatus nao deixa exit code virar status HTTP', () => {
