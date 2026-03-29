@@ -94,6 +94,13 @@ type ResolvedInstallationMode = {
   source: InstallationModeSource;
 };
 
+type ActiveUpdateStartBlocker = {
+  source: 'update_log' | 'canonical_execution' | 'legacy_state';
+  referenceId: string | null;
+  status: string;
+  step: string | null;
+};
+
 @Injectable()
 export class UpdateService implements OnModuleInit {
   private readonly logger = new Logger(UpdateService.name);
@@ -267,32 +274,13 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
     const settings = await this.getSystemSettings();
     const mode = this.getInstallationMode(settings);
     const startedAtIso = new Date().toISOString();
+    let currentVersion = this.getComparableVersion(this.getRuntimeVersionInfo().version);
 
     try {
       await this.reconcileRunningUpdateLogWithSystemState();
+      currentVersion = await this.validateUpdateStart(normalizedVersion, normalizedCleanVersion);
 
-      const runningUpdate = await this.prisma.updateLog.findFirst({
-        where: { status: 'STARTED' },
-        orderBy: { startedAt: 'asc' },
-      });
-
-      if (runningUpdate) {
-        throw new HttpException(
-          {
-            message: 'Ja existe uma atualizacao em andamento',
-            code: 'UPDATE_CONFLICT_ERROR',
-            category: 'UPDATE_UNEXPECTED_ERROR',
-            stage: 'lock',
-            userMessage: 'Ja existe uma atualizacao em andamento. Aguarde a conclusao para iniciar outra.',
-            technicalMessage: `updateLogId=${runningUpdate.id}`,
-            updateLogId: runningUpdate.id,
-          },
-          HttpStatus.CONFLICT,
-        );
-      }
-
-      const currentVersion = this.getComparableVersion(this.getRuntimeVersionInfo().version);
-      if (!semver.gt(normalizedCleanVersion, currentVersion)) {
+      if (semver.lt(normalizedCleanVersion, currentVersion)) {
         updateLog = await this.prisma.updateLog.create({
           data: {
             version: normalizedVersion,
@@ -464,6 +452,59 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
     }
   }
 
+  private async validateUpdateStart(
+    normalizedVersion: string,
+    normalizedCleanVersion: string,
+  ): Promise<string> {
+    const currentVersion = this.getComparableVersion(this.getRuntimeVersionInfo().version);
+
+    if (semver.eq(normalizedCleanVersion, currentVersion)) {
+      throw new HttpException(
+        {
+          message: `A versao ${normalizedVersion} ja esta instalada.`,
+          code: 'UPDATE_VERSION_ALREADY_INSTALLED',
+          category: 'UPDATE_START_VALIDATION_ERROR',
+          stage: 'validation',
+          userMessage: `A versao ${normalizedVersion} ja esta instalada.`,
+          technicalMessage: `currentVersion=${currentVersion}; targetVersion=${normalizedVersion}`,
+        },
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    const activeExecution = await this.findActiveUpdateStartBlocker();
+    if (activeExecution) {
+      throw new HttpException(
+        {
+          message: 'Ja existe uma atualizacao em andamento.',
+          code: 'UPDATE_CONFLICT_ERROR',
+          category: 'UPDATE_START_VALIDATION_ERROR',
+          stage: 'lock',
+          userMessage: 'Ja existe uma atualizacao em andamento.',
+          technicalMessage: `source=${activeExecution.source}; referenceId=${activeExecution.referenceId || 'n/a'}; status=${activeExecution.status}; step=${activeExecution.step || 'n/a'}`,
+        },
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    const failedAttempts = await this.countFailedVersionAttempts(normalizedVersion);
+    if (failedAttempts >= 2) {
+      throw new HttpException(
+        {
+          message: `A versao ${normalizedVersion} foi bloqueada apos 2 falhas.`,
+          code: 'UPDATE_VERSION_BLOCKED',
+          category: 'UPDATE_START_VALIDATION_ERROR',
+          stage: 'validation',
+          userMessage: `A versao ${normalizedVersion} foi bloqueada apos 2 falhas.`,
+          technicalMessage: `targetVersion=${normalizedVersion}; failedAttempts=${failedAttempts}`,
+        },
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    return currentVersion;
+  }
+
   async getUpdateStatus(): Promise<UpdateStatusDto> {
     await this.reconcileRunningUpdateLogWithSystemState();
     const settings = await this.getSystemSettings();
@@ -600,8 +641,108 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
     }
   }
 
+  private async safeGetCanonicalExecutionForStartValidation(): Promise<UpdateExecutionView | null> {
+    if (!this.updateExecutionFacadeService) {
+      return null;
+    }
+
+    try {
+      return await this.updateExecutionFacadeService.getCurrentExecutionView();
+    } catch (error) {
+      this.logger.warn(`Falha ao obter execucao canonica para validar start do update: ${String(error)}`);
+      return null;
+    }
+  }
+
   private isCanonicalEngineReadEnabled(): boolean {
     return process.env.UPDATE_ENGINE_V2_ENABLED === 'true' || process.env.UPDATE_ENGINE_V2_READ_ENABLED === 'true';
+  }
+
+  private async findActiveUpdateStartBlocker(): Promise<ActiveUpdateStartBlocker | null> {
+    const runningUpdate = await this.prisma.updateLog.findFirst({
+      where: { status: 'STARTED' },
+      orderBy: { startedAt: 'asc' },
+    });
+    if (runningUpdate) {
+      return {
+        source: 'update_log',
+        referenceId: runningUpdate.id,
+        status: runningUpdate.status,
+        step: null,
+      };
+    }
+
+    const canonicalExecution = await this.safeGetCanonicalExecutionForStartValidation();
+    if (canonicalExecution) {
+      return {
+        source: 'canonical_execution',
+        referenceId: canonicalExecution.id,
+        status: canonicalExecution.status,
+        step: canonicalExecution.currentStep,
+      };
+    }
+
+    const systemState = await this.safeGetSystemUpdateState();
+    const hasRunningLegacyOperation =
+      systemState?.status === 'running' ||
+      systemState?.lock === true ||
+      systemState?.operation?.active === true;
+
+    if (systemState && hasRunningLegacyOperation) {
+      return {
+        source: 'legacy_state',
+        referenceId: systemState.operation?.operationId || null,
+        status: systemState.status,
+        step: systemState.step || null,
+      };
+    }
+
+    return null;
+  }
+
+  private async countFailedVersionAttempts(version: string): Promise<number> {
+    const failedLogs = await this.prisma.updateLog.findMany({
+      where: {
+        version,
+        status: {
+          in: ['FAILED', 'ROLLED_BACK'],
+        },
+      },
+      orderBy: { startedAt: 'desc' },
+    });
+
+    return failedLogs.filter((log) => this.isCountableFailedUpdateAttempt(log)).length;
+  }
+
+  private isCountableFailedUpdateAttempt(
+    log: Pick<UpdateLog, 'status' | 'executionLogs'>,
+  ): boolean {
+    if (log.status !== 'FAILED' && log.status !== 'ROLLED_BACK') {
+      return false;
+    }
+
+    const executionLog = this.parseExecutionLogs(log.executionLogs);
+    const step = String(executionLog.step || '').trim().toLowerCase();
+    const phase = String(executionLog.phase || '').trim().toLowerCase();
+    const code = String(executionLog.code || '').trim().toUpperCase();
+
+    if (step === 'start-error') {
+      return false;
+    }
+
+    if (phase === 'blocked') {
+      return false;
+    }
+
+    if (
+      code === 'UPDATE_CONFLICT_ERROR' ||
+      code === 'UPDATE_VERSION_ALREADY_INSTALLED' ||
+      code === 'UPDATE_VERSION_BLOCKED'
+    ) {
+      return false;
+    }
+
+    return true;
   }
 
   private async reconcileRunningUpdateLogWithSystemState(

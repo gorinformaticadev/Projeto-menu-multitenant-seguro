@@ -19,7 +19,6 @@ import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { ExecuteUpdateDto, UpdateConfigDto } from './dto/update.dto';
 import { UpdateService } from './update.service';
-import { CriticalRateLimit } from '@common/decorators/critical-rate-limit.decorator';
 
 @Controller('update')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -75,7 +74,6 @@ export class UpdateController {
 
   @Post('execute')
   @Roles(Role.SUPER_ADMIN)
-  @CriticalRateLimit('update')
   @HttpCode(HttpStatus.ACCEPTED)
   async executeUpdate(@Body() updateData: ExecuteUpdateDto, @Request() req) {
     try {

@@ -191,6 +191,30 @@ function createService() {
   };
 }
 
+function createHistoricalUpdateLog(overrides?: Record<string, unknown>) {
+  return {
+    id: 'historical-log',
+    version: 'v1.2.3',
+    status: 'FAILED',
+    startedAt: new Date('2026-03-12T00:00:00Z'),
+    completedAt: new Date('2026-03-12T00:05:00Z'),
+    duration: 300,
+    packageManager: 'native',
+    backupPath: null,
+    errorMessage: 'falha real',
+    rollbackReason: null,
+    executedBy: 'user-1',
+    ipAddress: null,
+    userAgent: null,
+    executionLogs: JSON.stringify({
+      phase: 'failed',
+      step: 'build_backend',
+      code: 'UPDATE_BUILD_ERROR',
+    }),
+    ...overrides,
+  };
+}
+
 describe('UpdateService', () => {
   it('repo publico sem token chama git ls-remote --tags', async () => {
     const { service } = createService();
@@ -297,6 +321,138 @@ describe('UpdateService', () => {
       }),
     );
     expect(updateExecutionBridgeServiceMock.launchLegacyExecution).not.toHaveBeenCalled();
+  });
+
+  it('bloqueia o start quando a versao alvo ja esta instalada', async () => {
+    const { service, prismaMock, systemUpdateAdminServiceMock } = createService();
+
+    await expect(service.executeUpdate({ version: 'v1.0.0' }, 'user-1')).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'UPDATE_VERSION_ALREADY_INSTALLED',
+        userMessage: 'A versao v1.0.0 ja esta instalada.',
+      }),
+      status: 409,
+    });
+
+    expect(prismaMock.updateLog.create).not.toHaveBeenCalled();
+    expect(systemUpdateAdminServiceMock.runUpdate).not.toHaveBeenCalled();
+  });
+
+  it('bloqueia o start quando ja existe uma execucao em andamento', async () => {
+    const { service, prismaMock, systemUpdateAdminServiceMock } = createService();
+
+    prismaMock.updateLog.findFirst.mockResolvedValueOnce({
+      id: 'log-running',
+      status: 'STARTED',
+      startedAt: new Date('2026-03-12T00:00:00Z'),
+    });
+
+    await expect(service.executeUpdate({ version: 'v1.2.3' }, 'user-1')).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'UPDATE_CONFLICT_ERROR',
+        userMessage: 'Ja existe uma atualizacao em andamento.',
+      }),
+      status: 409,
+    });
+
+    expect(prismaMock.updateLog.create).not.toHaveBeenCalled();
+    expect(systemUpdateAdminServiceMock.runUpdate).not.toHaveBeenCalled();
+  });
+
+  it('permite a segunda tentativa da mesma versao quando houve apenas 1 falha real', async () => {
+    const { service, prismaMock, systemUpdateAdminServiceMock } = createService();
+
+    prismaMock.updateLog.findMany.mockImplementation(async (args?: any) => {
+      if (args?.where?.version === 'v1.2.3') {
+        return [createHistoricalUpdateLog()];
+      }
+      return [];
+    });
+
+    const result = await service.executeUpdate({ version: 'v1.2.3' }, 'user-1');
+
+    expect(result.status).toBe('starting');
+    expect(prismaMock.updateLog.create).toHaveBeenCalled();
+    expect(systemUpdateAdminServiceMock.runUpdate).toHaveBeenCalled();
+  });
+
+  it('bloqueia a terceira tentativa da mesma versao apos 2 falhas reais', async () => {
+    const { service, prismaMock, systemUpdateAdminServiceMock } = createService();
+
+    prismaMock.updateLog.findMany.mockImplementation(async (args?: any) => {
+      if (args?.where?.version === 'v1.2.3') {
+        return [
+          createHistoricalUpdateLog({ id: 'failed-log-1' }),
+          createHistoricalUpdateLog({ id: 'failed-log-2', startedAt: new Date('2026-03-13T00:00:00Z') }),
+        ];
+      }
+      return [];
+    });
+
+    await expect(service.executeUpdate({ version: 'v1.2.3' }, 'user-1')).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'UPDATE_VERSION_BLOCKED',
+        userMessage: 'A versao v1.2.3 foi bloqueada apos 2 falhas.',
+      }),
+      status: 409,
+    });
+
+    expect(prismaMock.updateLog.create).not.toHaveBeenCalled();
+    expect(systemUpdateAdminServiceMock.runUpdate).not.toHaveBeenCalled();
+  });
+
+  it('permite outra versao mesmo que a anterior esteja bloqueada', async () => {
+    const { service, prismaMock, systemUpdateAdminServiceMock } = createService();
+
+    prismaMock.updateLog.findMany.mockImplementation(async (args?: any) => {
+      if (args?.where?.version === 'v1.2.3') {
+        return [
+          createHistoricalUpdateLog({ id: 'failed-log-1' }),
+          createHistoricalUpdateLog({ id: 'failed-log-2', startedAt: new Date('2026-03-13T00:00:00Z') }),
+        ];
+      }
+      return [];
+    });
+
+    const result = await service.executeUpdate({ version: 'v1.2.4' }, 'user-1');
+
+    expect(result.status).toBe('starting');
+    expect(prismaMock.updateLog.create).toHaveBeenCalled();
+    expect(systemUpdateAdminServiceMock.runUpdate).toHaveBeenCalled();
+  });
+
+  it('nao conta tentativas invalidas como falha da versao', async () => {
+    const { service, prismaMock, systemUpdateAdminServiceMock } = createService();
+
+    prismaMock.updateLog.findMany.mockImplementation(async (args?: any) => {
+      if (args?.where?.version === 'v1.2.3') {
+        return [
+          createHistoricalUpdateLog({
+            id: 'blocked-log-1',
+            executionLogs: JSON.stringify({
+              phase: 'failed',
+              step: 'start-error',
+              code: 'UPDATE_CONFLICT_ERROR',
+            }),
+          }),
+          createHistoricalUpdateLog({
+            id: 'blocked-log-2',
+            executionLogs: JSON.stringify({
+              phase: 'failed',
+              step: 'start-error',
+              code: 'UPDATE_VERSION_ALREADY_INSTALLED',
+            }),
+          }),
+        ];
+      }
+      return [];
+    });
+
+    const result = await service.executeUpdate({ version: 'v1.2.3' }, 'user-1');
+
+    expect(result.status).toBe('starting');
+    expect(prismaMock.updateLog.create).toHaveBeenCalled();
+    expect(systemUpdateAdminServiceMock.runUpdate).toHaveBeenCalled();
   });
 
   it('executeUpdate usa bridge canonico quando UPDATE_ENGINE_V2_ENABLED=true', async () => {
