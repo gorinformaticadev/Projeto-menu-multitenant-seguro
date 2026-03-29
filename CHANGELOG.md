@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.98](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.97...v0.1.98) (2026-03-29)
+
+
+### Features
+
+* implement system update engine with agent runner and command execution services ([5457ac9](https://github.com/gorinformaticadev/Pluggor/commit/5457ac9cc1ab5096dbb3390e32fc673ef229f765))
+
 ### [0.1.97](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.96...v0.1.97) (2026-03-29)
 
 ### [0.1.96](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.95...v0.1.96) (2026-03-29)
