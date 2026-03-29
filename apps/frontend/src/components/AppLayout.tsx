@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { usePlatformConfigContext } from "@/contexts/PlatformConfigContext";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { BottomNav } from "./BottomNav";
@@ -13,37 +12,10 @@ import { ModuleLoader } from "@/core/ModuleLoader";
 import { RouteGuard } from "./RouteGuard";
 import { ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Button } from "./ui/button";
-import { resolveTenantLogoSrc } from "@/lib/tenant-logo";
-
-const DEFAULT_APP_ICON_PATH = "/favicon.ico";
-
-function updateDocumentIcons(iconHref: string) {
-  const resolvedHref = iconHref || DEFAULT_APP_ICON_PATH;
-  const iconSelectors = [
-    "link[rel='icon']",
-    "link[rel='shortcut icon']",
-    "link[rel='apple-touch-icon']",
-  ];
-
-  iconSelectors.forEach((selector) => {
-    const links = document.querySelectorAll(selector);
-    links.forEach((link) => {
-      (link as HTMLLinkElement).href = resolvedHref;
-    });
-  });
-
-  if (!document.querySelector("link[rel='icon']")) {
-    const link = document.createElement("link");
-    link.rel = "icon";
-    link.href = resolvedHref;
-    document.head.appendChild(link);
-  }
-}
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
-  const { config: platformConfig } = usePlatformConfigContext();
   const { isInitialized, error } = useModuleRegistry();
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
 
@@ -66,15 +38,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       body.style.overflow = previousBodyOverflow;
     };
   }, [isPublicPage, loading, user]);
-
-  useEffect(() => {
-    const faviconSrc =
-      resolveTenantLogoSrc(platformConfig.platformBrandLogoUrl, {
-        fallbackToDefault: false,
-      }) || DEFAULT_APP_ICON_PATH;
-
-    updateDocumentIcons(faviconSrc);
-  }, [platformConfig.platformBrandLogoUrl]);
 
   // O tema do shell autenticado e aplicado exclusivamente pelo ThemeProvider.
   // Este layout nao deve sincronizar classes de tema nem disputar essa responsabilidade.
