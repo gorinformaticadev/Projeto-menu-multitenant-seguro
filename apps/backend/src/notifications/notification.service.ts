@@ -407,11 +407,8 @@ export class NotificationService {
           .filter((id): id is string => Boolean(id));
 
         for (const groupId of groupIds) {
-          await tx.notificationGroup.update({
-            where: { id: groupId },
-            data: { unreadCount: 0 },
-          });
-          this.logGroupOperation('markAllSystemRead', { groupId, detail: 'unreadCount=0' });
+          await this.syncGroupCounters(tx, groupId);
+          this.logGroupOperation('markAllSystemRead', { groupId });
         }
 
         return updateResult;
@@ -718,7 +715,7 @@ export class NotificationService {
 
     const accessibleNotifications = await this.prisma.notification.findMany({
       where,
-      select: { id: true, read: true, isRead: true, notificationGroupId: true },
+      select: { id: true, notificationGroupId: true },
     });
 
     if (accessibleNotifications.length === 0) {
@@ -728,82 +725,45 @@ export class NotificationService {
     const accessibleIds = accessibleNotifications.map((n) => n.id);
 
     await this.prisma.$transaction(async (tx) => {
+      const groupIdsNeedingPreviewRecalc = new Set<string>();
+
+      for (const notif of accessibleNotifications) {
+        if (!notif.notificationGroupId) continue;
+        const group = await tx.notificationGroup.findUnique({
+          where: { id: notif.notificationGroupId },
+          select: { lastNotificationId: true },
+        });
+        if (group?.lastNotificationId === notif.id) {
+          groupIdsNeedingPreviewRecalc.add(notif.notificationGroupId);
+        }
+      }
+
       await tx.notification.deleteMany({
         where: { id: { in: accessibleIds } },
       });
 
-      const groupUpdates = new Map<string, { deletedCount: number; unreadDeleted: number; lastDeletedId: string | null }>();
+      const affectedGroupIds = [...new Set(
+        accessibleNotifications
+          .map((n) => n.notificationGroupId)
+          .filter((id): id is string => Boolean(id)),
+      )];
 
-      for (const notif of accessibleNotifications) {
-        if (!notif.notificationGroupId) continue;
+      for (const groupId of affectedGroupIds) {
+        const { totalCount } = await this.syncGroupCounters(tx, groupId);
 
-        const existing = groupUpdates.get(notif.notificationGroupId) ??
-          { deletedCount: 0, unreadDeleted: 0, lastDeletedId: null };
-
-        existing.deletedCount++;
-        if (!notif.read && !notif.isRead) {
-          existing.unreadDeleted++;
-        }
-        existing.lastDeletedId = notif.id;
-
-        groupUpdates.set(notif.notificationGroupId, existing);
-      }
-
-      for (const [groupId, update] of groupUpdates) {
-        const group = await tx.notificationGroup.findUnique({
-          where: { id: groupId },
-          select: { totalCount: true, unreadCount: true, lastNotificationId: true },
-        });
-
-        if (!group) continue;
-
-        const newTotalCount = Math.max(0, group.totalCount - update.deletedCount);
-
-        if (newTotalCount === 0) {
-          await tx.notificationGroup.delete({ where: { id: groupId } });
-          this.logGroupOperation('deleteMany_emptyGroup', {
-            groupId,
-            detail: `removed ${update.deletedCount} notifs`,
-          });
+        if (totalCount === 0) {
+          await tx.notificationGroup.delete({ where: { id: groupId } }).catch(() => {});
+          this.logGroupOperation('deleteMany_emptyGroup', { groupId });
           continue;
         }
 
-        const data: Prisma.NotificationGroupUpdateInput = {
-          totalCount: { decrement: update.deletedCount },
-        };
-
-        if (update.unreadDeleted > 0) {
-          data.unreadCount = { decrement: update.unreadDeleted };
+        if (groupIdsNeedingPreviewRecalc.has(groupId)) {
+          await this.syncGroupPreview(tx, groupId);
         }
-
-        const previewNeedsRecalc = update.lastDeletedId &&
-          group.lastNotificationId === update.lastDeletedId;
-
-        if (previewNeedsRecalc) {
-          const latest = await tx.notification.findFirst({
-            where: { notificationGroupId: groupId },
-            orderBy: { createdAt: 'desc' },
-            select: { id: true, title: true, body: true, message: true, createdAt: true },
-          });
-
-          if (latest) {
-            data.lastNotificationId = latest.id;
-            data.lastNotificationAt = latest.createdAt;
-            data.lastTitle = latest.title;
-            data.lastBody = latest.body || latest.message;
-          } else {
-            data.lastNotificationId = null;
-          }
-        }
-
-        await tx.notificationGroup.update({
-          where: { id: groupId },
-          data,
-        });
 
         this.logGroupOperation('deleteMany', {
           groupId,
-          detail: `deleted=${update.deletedCount} unreadDel=${update.unreadDeleted} previewRecalc=${previewNeedsRecalc}`,
+          detail: `previewRecalc=${groupIdsNeedingPreviewRecalc.has(groupId)}`,
         });
       }
     });
@@ -1425,20 +1385,20 @@ export class NotificationService {
   }
 
   // ============================================================================
-  // AGRUPAMENTO DE NOTIFICACOES - CORRIGIDO
+  // AGRUPAMENTO DE NOTIFICACOES — CORREÇÃO DE CONCORRÊNCIA
   //
-  // Convencao adotada:
-  // - campo "read" como referencia principal de estado de leitura
-  // - campo "body" como preview textual; fallback para "message" se body vazio
+  // Estratégia:
+  // Os contadores unreadCount e totalCount são CAMPOS DERIVADOS.
+  // Nunca confiar em valor lido para decidir incremento/decremento.
+  // Sempre recalcular a partir dos dados reais (notifications table)
+  // após cada operação que modifica o grupo.
   //
-  // Correcoes aplicadas:
-  // - atomicidade via $transaction em create, markAsRead, delete
-  // - markAsUnread agora incrementa unreadCount corretamente
-  // - contadores nunca ficam negativos (clamp)
-  // - preview recalculado somente se a notificacao deletada == lastNotificationId
-  // - markAllAsRead recalcula do banco (nao confia em dados previos)
-  // - deleteMany agrupa por grupo e atualiza uma vez por grupo
-  // - logs estruturados com contexto
+  // Isso elimina TODOS os read-modify-write vulneráveis a lost update.
+  // A única operação atômica usada é { increment: N } para totalCount
+  // na criação (que é idempotente por causa do unique constraint).
+  //
+  // Preview é recalculado SOMENTE quando a notificação alterada/deletada
+  // era a lastNotificationId do grupo.
   // ============================================================================
 
   /**
@@ -1454,6 +1414,8 @@ export class NotificationService {
 
   /**
    * Log estruturado para operacoes de agrupamento.
+   * Usa DEBUG para operações normais de sincronização,
+   * LOG para operações de criação/modificação significativas.
    */
   private logGroupOperation(
     operation: string,
@@ -1498,10 +1460,88 @@ export class NotificationService {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // HELPERS DE RECÁLCULO — fonte de verdade: notifications table
+  // ---------------------------------------------------------------------------
+
   /**
-   * Associa uma notificacao ao grupo de agrupamento.
-   * ATOMICIDADE: upsert + update + incremento dentro de $transaction.
-   * Contra race conditions: upsert e incremento atomico com GREATEST clamp.
+   * Sincroniza totalCount e unreadCount do grupo a partir das notificações reais.
+   * Não depende de valor anterior lido. Elimina lost update.
+   */
+  private async syncGroupCounters(tx: Prisma.TransactionClient, groupId: string) {
+    const [totalCount, unreadCount] = await Promise.all([
+      tx.notification.count({ where: { notificationGroupId: groupId } }),
+      tx.notification.count({
+        where: {
+          notificationGroupId: groupId,
+          OR: [{ read: false }, { isRead: false }],
+        },
+      }),
+    ]);
+
+    await tx.notificationGroup.update({
+      where: { id: groupId },
+      data: {
+        totalCount: Math.max(0, totalCount),
+        unreadCount: Math.max(0, Math.min(unreadCount, totalCount)),
+      },
+    });
+
+    return { totalCount, unreadCount };
+  }
+
+  /**
+   * Sincroniza preview (lastNotification*) do grupo a partir da notificação mais recente.
+   * Chamado SOMENTE quando a notificação que era lastNotificationId foi alterada/deletada.
+   */
+  private async syncGroupPreview(tx: Prisma.TransactionClient, groupId: string) {
+    const latest = await tx.notification.findFirst({
+      where: { notificationGroupId: groupId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, title: true, body: true, message: true, createdAt: true },
+    });
+
+    if (latest) {
+      await tx.notificationGroup.update({
+        where: { id: groupId },
+        data: {
+          lastNotificationId: latest.id,
+          lastNotificationAt: latest.createdAt,
+          lastTitle: latest.title,
+          lastBody: latest.body || latest.message,
+        },
+      });
+    } else {
+      await tx.notificationGroup.update({
+        where: { id: groupId },
+        data: { lastNotificationId: null },
+      });
+    }
+  }
+
+  /**
+   * Sincronização completa de um grupo: contadores + preview.
+   * Usado quando não sabemos se a notificação afetada era a última.
+   */
+  private async syncGroupFull(tx: Prisma.TransactionClient, groupId: string) {
+    const { totalCount } = await this.syncGroupCounters(tx, groupId);
+
+    if (totalCount === 0) {
+      await tx.notificationGroup.delete({ where: { id: groupId } }).catch(() => {});
+      return;
+    }
+
+    await this.syncGroupPreview(tx, groupId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // OPERAÇÕES DE CRIAÇÃO
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Associa uma notificação ao grupo de agrupamento.
+   * Usa upsert (atómico pelo unique constraint) + incremento atômico para totalCount.
+   * unreadCount é sincronizado a partir dos dados reais para evitar drift.
    */
   private async assignNotificationToGroup(
     notification: PrismaNotification,
@@ -1543,23 +1583,19 @@ export class NotificationService {
         data: { notificationGroupId: group.id },
       });
 
-      if (group.totalCount > 0 && group.id) {
-        const updateData: Prisma.NotificationGroupUpdateInput = {
-          totalCount: { increment: 1 },
-          lastNotificationId: notification.id,
-          lastNotificationAt: new Date(),
-          lastTitle: notification.title,
-          lastBody: previewBody,
-        };
-
-        if (isUnread) {
-          updateData.unreadCount = { increment: 1 };
-        }
-
+      if (group.totalCount > 0) {
         await tx.notificationGroup.update({
           where: { id: group.id },
-          data: updateData,
+          data: {
+            totalCount: { increment: 1 },
+            lastNotificationId: notification.id,
+            lastNotificationAt: new Date(),
+            lastTitle: notification.title,
+            lastBody: previewBody,
+          },
         });
+
+        await this.syncGroupCounters(tx, group.id);
       }
 
       this.logGroupOperation('assign', {
@@ -1574,10 +1610,14 @@ export class NotificationService {
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // OPERAÇÕES DE LEITURA / MARCAÇÃO
+  // ---------------------------------------------------------------------------
+
   /**
-   * Marca notificacao como lida e decrementa unreadCount do grupo.
-   * ATOMICIDADE: update da notificacao + decremento do grupo dentro de $transaction.
-   * Protecao: unreadCount nunca fica < 0.
+   * Marca notificação como lida.
+   * Após atualizar a notificação, recalca unreadCount do grupo a partir dos dados reais.
+   * NÃO usa decremento baseado em valor lido.
    */
   private async markNotificationReadWithGroup(
     notificationId: string,
@@ -1594,33 +1634,20 @@ export class NotificationService {
       });
 
       if (existingGroupId) {
-        const group = await tx.notificationGroup.findUnique({
-          where: { id: existingGroupId },
-          select: { unreadCount: true },
-        });
-
-        if (group && group.unreadCount > 0) {
-          await tx.notificationGroup.update({
-            where: { id: existingGroupId },
-            data: {
-              unreadCount: { decrement: 1 },
-            },
-          });
-        }
+        await this.syncGroupCounters(tx, existingGroupId);
 
         this.logGroupOperation('markRead', {
           groupId: existingGroupId,
           notificationId,
-          detail: `unreadBefore=${group?.unreadCount ?? '?'}`,
         });
       }
     });
   }
 
   /**
-   * Marca notificacao como nao lida e incrementa unreadCount do grupo.
-   * ATOMICIDADE: update da notificacao + incremento do grupo dentro de $transaction.
-   * Protecao: unreadCount nunca ultrapassa totalCount.
+   * Marca notificação como não lida.
+   * Após atualizar a notificação, recalca unreadCount do grupo a partir dos dados reais.
+   * NÃO usa incremento baseado em valor lido.
    */
   private async markNotificationUnreadWithGroup(
     notificationId: string,
@@ -1637,37 +1664,29 @@ export class NotificationService {
       });
 
       if (existingGroupId) {
-        const group = await tx.notificationGroup.findUnique({
-          where: { id: existingGroupId },
-          select: { unreadCount: true, totalCount: true },
-        });
-
-        if (group && group.unreadCount < group.totalCount) {
-          await tx.notificationGroup.update({
-            where: { id: existingGroupId },
-            data: {
-              unreadCount: { increment: 1 },
-            },
-          });
-        }
+        await this.syncGroupCounters(tx, existingGroupId);
 
         this.logGroupOperation('markUnread', {
           groupId: existingGroupId,
           notificationId,
-          detail: `unread=${group?.unreadCount ?? '?'}/${group?.totalCount ?? '?'}`,
         });
       }
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // OPERAÇÕES DE EXCLUSÃO
+  // ---------------------------------------------------------------------------
+
   /**
-   * Deleta notificacao e atualiza grupo atomicamente.
+   * Deleta notificação e atualiza grupo.
+   * Recalca contadores a partir dos dados reais.
    * Preview recalculado SOMENTE se notificationId == lastNotificationId.
    * Grupo deletado se ficar vazio.
    */
   private async deleteNotificationWithGroup(
     notificationId: string,
-    wasRead: boolean,
+    _wasRead: boolean,
     groupId: string | null,
   ) {
     if (!groupId) {
@@ -1678,7 +1697,7 @@ export class NotificationService {
     await this.prisma.$transaction(async (tx) => {
       const group = await tx.notificationGroup.findUnique({
         where: { id: groupId },
-        select: { totalCount: true, unreadCount: true, lastNotificationId: true },
+        select: { lastNotificationId: true },
       });
 
       if (!group) {
@@ -1686,93 +1705,54 @@ export class NotificationService {
         return;
       }
 
+      const needsPreviewRecalc = group.lastNotificationId === notificationId;
+
       await tx.notification.delete({ where: { id: notificationId } });
 
-      const newTotalCount = Math.max(0, group.totalCount - 1);
+      const { totalCount } = await this.syncGroupCounters(tx, groupId);
 
-      if (newTotalCount === 0) {
+      if (totalCount === 0) {
         await tx.notificationGroup.delete({ where: { id: groupId } });
-        this.logGroupOperation('deleteGroup', { groupId, notificationId, detail: 'empty group removed' });
+        this.logGroupOperation('deleteGroup', { groupId, notificationId, detail: 'empty' });
         return;
       }
 
-      const updateData: Prisma.NotificationGroupUpdateInput = {
-        totalCount: { decrement: 1 },
-      };
-
-      if (!wasRead && group.unreadCount > 0) {
-        updateData.unreadCount = { decrement: 1 };
+      if (needsPreviewRecalc) {
+        await this.syncGroupPreview(tx, groupId);
       }
-
-      if (group.lastNotificationId === notificationId) {
-        const latest = await tx.notification.findFirst({
-          where: { notificationGroupId: groupId },
-          orderBy: { createdAt: 'desc' },
-          select: { id: true, title: true, body: true, message: true, createdAt: true },
-        });
-
-        if (latest) {
-          updateData.lastNotificationId = latest.id;
-          updateData.lastNotificationAt = latest.createdAt;
-          updateData.lastTitle = latest.title;
-          updateData.lastBody = latest.body || latest.message;
-        } else {
-          updateData.lastNotificationId = null;
-        }
-      }
-
-      await tx.notificationGroup.update({
-        where: { id: groupId },
-        data: updateData,
-      });
 
       this.logGroupOperation('delete', {
         groupId,
         notificationId,
-        detail: `wasRead=${wasRead} previewRecalc=${group.lastNotificationId === notificationId}`,
+        detail: `previewRecalc=${needsPreviewRecalc}`,
       });
     });
   }
 
   /**
    * Recalcula unreadCount de um grupo a partir do banco.
-   * Usado apos markAllAsRead para garantir consistencia.
+   * Wrapper sobre syncGroupCounters para compatibilidade.
    */
   private async recalculateGroupUnreadCount(
     tx: Prisma.TransactionClient,
     groupId: string,
   ) {
-    const unreadCount = await tx.notification.count({
-      where: {
-        notificationGroupId: groupId,
-        OR: [{ read: false }, { isRead: false }],
-      },
-    });
-
-    await tx.notificationGroup.update({
-      where: { id: groupId },
-      data: { unreadCount: Math.max(0, unreadCount) },
-    });
-
-    this.logGroupOperation('recalc', {
-      groupId,
-      detail: `unreadCount=${unreadCount}`,
-    });
+    await this.syncGroupCounters(tx, groupId);
   }
 
   /**
-   * Valida consistencia de um grupo (para debug).
-   * Compara contadores do grupo com contagens reais do banco.
-   * Loga warning se divergente.
+   * Valida consistência de um grupo (para debug/diagnóstico).
+   * Compara contadores armazenados com contagens reais do banco.
+   * Repara automaticamente se divergente.
    */
-  private async validateGroupConsistency(groupId: string): Promise<void> {
+  private async validateGroupConsistency(groupId: string): Promise<boolean> {
     try {
       const group = await this.prisma.notificationGroup.findUnique({
         where: { id: groupId },
         select: { totalCount: true, unreadCount: true },
       });
 
-      if (!group) return;
+      if (!group) return true;
 
       const [actualTotal, actualUnread] = await Promise.all([
         this.prisma.notification.count({
@@ -1786,7 +1766,10 @@ export class NotificationService {
         }),
       ]);
 
-      if (group.totalCount !== actualTotal || group.unreadCount !== actualUnread) {
+      const totalMismatch = group.totalCount !== actualTotal;
+      const unreadMismatch = group.unreadCount !== actualUnread;
+
+      if (totalMismatch || unreadMismatch) {
         this.logGroupWarning('consistency_mismatch', {
           groupId,
           detail: `stored(total=${group.totalCount},unread=${group.unreadCount}) ` +
@@ -1797,7 +1780,7 @@ export class NotificationService {
           where: { id: groupId },
           data: {
             totalCount: actualTotal,
-            unreadCount: actualUnread,
+            unreadCount: Math.max(0, Math.min(actualUnread, actualTotal)),
           },
         });
 
@@ -1805,9 +1788,14 @@ export class NotificationService {
           groupId,
           detail: `corrected to total=${actualTotal} unread=${actualUnread}`,
         });
+
+        return false;
       }
+
+      return true;
     } catch (error) {
       this.logGroupWarning('consistency_check_failed', { groupId, error });
+      return false;
     }
   }
 
@@ -1989,10 +1977,7 @@ export class NotificationService {
         },
       });
 
-      await tx.notificationGroup.update({
-        where: { id: groupId },
-        data: { unreadCount: 0 },
-      });
+      await this.syncGroupCounters(tx, groupId);
 
       return updateResult;
     });
