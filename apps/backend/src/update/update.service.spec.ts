@@ -377,7 +377,27 @@ describe('UpdateService', () => {
   });
 
   it('getUpdateStatus combina status persistido com lifecycle executando', async () => {
-    const { service, systemUpdateAdminServiceMock } = createService();
+    const { service, prismaMock, systemUpdateAdminServiceMock } = createService();
+
+    prismaMock.updateSystemSettings.findFirst.mockResolvedValueOnce({
+      id: 'settings-1',
+      appVersion: 'v1.0.0',
+      gitToken: null,
+      gitUsername: 'org',
+      gitRepository: 'repo',
+      gitReleaseBranch: 'main',
+      packageManager: 'docker',
+      updateCheckEnabled: true,
+      updateChannel: 'release',
+      lastUpdateCheck: null,
+      availableVersion: null,
+      updateAvailable: false,
+      releaseTag: 'latest',
+      composeFile: 'docker-compose.prod.yml',
+      envFile: 'install/.env.production',
+      updatedAt: new Date(),
+      updatedBy: null,
+    });
 
     systemUpdateAdminServiceMock.getStatus.mockResolvedValueOnce({
       status: 'running',
@@ -426,7 +446,10 @@ describe('UpdateService', () => {
 
     const status = await service.getUpdateStatus();
 
-    expect(status.mode).toBe('docker');
+    expect(status.mode).toBe('native');
+    expect(status.configuredMode).toBe('docker');
+    expect(status.effectiveMode).toBe('native');
+    expect(status.modeSource).toBe('legacy_state');
     expect(status.updateLifecycle).toMatchObject({
       status: 'restarting_services',
       step: 'healthcheck',
@@ -441,6 +464,228 @@ describe('UpdateService', () => {
         operationId: 'update-123',
       },
     });
+  });
+
+  it('getUpdateStatus prioriza o modo operacional legado mesmo em idle quando a configuracao salva diverge', async () => {
+    const { service, prismaMock, systemUpdateAdminServiceMock } = createService();
+
+    prismaMock.updateSystemSettings.findFirst.mockResolvedValueOnce({
+      id: 'settings-1',
+      appVersion: 'v1.0.0',
+      gitToken: null,
+      gitUsername: 'org',
+      gitRepository: 'repo',
+      gitReleaseBranch: 'main',
+      packageManager: 'docker',
+      updateCheckEnabled: true,
+      updateChannel: 'release',
+      lastUpdateCheck: null,
+      availableVersion: null,
+      updateAvailable: false,
+      releaseTag: 'latest',
+      composeFile: 'docker-compose.prod.yml',
+      envFile: 'install/.env.production',
+      updatedAt: new Date(),
+      updatedBy: null,
+    });
+    systemUpdateAdminServiceMock.getStatus.mockResolvedValueOnce({
+      status: 'idle',
+      mode: 'native',
+      startedAt: null,
+      finishedAt: null,
+      fromVersion: 'v1.0.0',
+      toVersion: 'unknown',
+      step: 'idle',
+      progress: 0,
+      lock: false,
+      lastError: null,
+      errorCode: null,
+      errorCategory: null,
+      errorStage: null,
+      exitCode: null,
+      userMessage: null,
+      technicalMessage: null,
+      rollback: {
+        attempted: false,
+        completed: false,
+        reason: null,
+      },
+      operation: {
+        active: false,
+        operationId: null,
+        type: null,
+      },
+      stale: false,
+      statePath: '/tmp/update-state.json',
+      logPath: '/tmp/update.log',
+      persistence: {
+        healthy: true,
+        source: 'state_file',
+        fallbackApplied: false,
+        progressKnown: true,
+        statePath: '/tmp/update-state.json',
+        logPath: '/tmp/update.log',
+        issueCode: null,
+        message: null,
+        technicalMessage: null,
+        rawExcerpt: null,
+        recoveredStepCode: 'idle',
+      },
+    });
+    service.detectHostInstallationMode = jest.fn(() => 'docker');
+
+    const status = await service.getUpdateStatus();
+
+    expect(status.mode).toBe('native');
+    expect(status.configuredMode).toBe('docker');
+    expect(status.effectiveMode).toBe('native');
+    expect(status.detectedHostMode).toBe('docker');
+    expect(status.modeSource).toBe('legacy_state');
+  });
+
+  it('getUpdateStatus nao promove docker apenas porque o host suporta container quando o status operacional nao esta disponivel', async () => {
+    const { service, prismaMock, systemUpdateAdminServiceMock } = createService();
+
+    prismaMock.updateSystemSettings.findFirst.mockResolvedValueOnce({
+      id: 'settings-1',
+      appVersion: 'v1.0.0',
+      gitToken: null,
+      gitUsername: 'org',
+      gitRepository: 'repo',
+      gitReleaseBranch: 'main',
+      packageManager: 'native',
+      updateCheckEnabled: true,
+      updateChannel: 'release',
+      lastUpdateCheck: null,
+      availableVersion: null,
+      updateAvailable: false,
+      releaseTag: 'latest',
+      composeFile: 'docker-compose.prod.yml',
+      envFile: 'install/.env.production',
+      updatedAt: new Date(),
+      updatedBy: null,
+    });
+    systemUpdateAdminServiceMock.getStatus.mockRejectedValueOnce(new Error('falha de leitura do status operacional'));
+    service.detectHostInstallationMode = jest.fn(() => 'docker');
+
+    const status = await service.getUpdateStatus();
+
+    expect(status.mode).toBe('native');
+    expect(status.configuredMode).toBe('native');
+    expect(status.effectiveMode).toBe('native');
+    expect(status.detectedHostMode).toBe('docker');
+    expect(status.modeSource).toBe('configured');
+  });
+
+  it('getUpdateStatus prioriza a execucao canonica quando ela diverge do fallback legado', async () => {
+    const { service, prismaMock, systemUpdateAdminServiceMock, updateExecutionFacadeServiceMock } = createService();
+    const previousReadFlag = process.env.UPDATE_ENGINE_V2_READ_ENABLED;
+
+    process.env.UPDATE_ENGINE_V2_READ_ENABLED = 'true';
+    prismaMock.updateSystemSettings.findFirst.mockResolvedValueOnce({
+      id: 'settings-1',
+      appVersion: 'v1.0.0',
+      gitToken: null,
+      gitUsername: 'org',
+      gitRepository: 'repo',
+      gitReleaseBranch: 'main',
+      packageManager: 'native',
+      updateCheckEnabled: true,
+      updateChannel: 'release',
+      lastUpdateCheck: null,
+      availableVersion: null,
+      updateAvailable: false,
+      releaseTag: 'latest',
+      composeFile: 'docker-compose.prod.yml',
+      envFile: 'install/.env.production',
+      updatedAt: new Date(),
+      updatedBy: null,
+    });
+    systemUpdateAdminServiceMock.getStatus.mockResolvedValueOnce({
+      status: 'running',
+      mode: 'native',
+      startedAt: '2026-03-12T10:00:00.000Z',
+      finishedAt: null,
+      fromVersion: 'v1.0.0',
+      toVersion: 'v1.2.3',
+      step: 'healthcheck',
+      progress: 82,
+      lock: true,
+      lastError: null,
+      errorCode: null,
+      errorCategory: null,
+      errorStage: null,
+      exitCode: null,
+      userMessage: null,
+      technicalMessage: null,
+      rollback: {
+        attempted: false,
+        completed: false,
+        reason: null,
+      },
+      operation: {
+        active: true,
+        operationId: 'update-123',
+        type: 'update',
+      },
+      stale: false,
+      statePath: '/tmp/update-state.json',
+      logPath: '/tmp/update.log',
+      persistence: {
+        healthy: true,
+        source: 'state_file',
+        fallbackApplied: false,
+        progressKnown: true,
+        statePath: '/tmp/update-state.json',
+        logPath: '/tmp/update.log',
+        issueCode: null,
+        message: null,
+        technicalMessage: null,
+        rawExcerpt: null,
+        recoveredStepCode: 'healthcheck',
+      },
+    });
+    updateExecutionFacadeServiceMock.getCurrentExecutionView.mockResolvedValueOnce({
+      id: 'execution-1',
+      installationId: 'host-1',
+      requestedBy: 'user-1',
+      source: 'panel',
+      mode: 'docker',
+      currentVersion: 'v1.0.0',
+      targetVersion: 'v1.2.3',
+      status: 'running',
+      currentStep: 'pull_images',
+      failedStep: null,
+      rollbackPolicy: 'code_only_safe',
+      progressUnitsDone: 3,
+      progressUnitsTotal: 14,
+      error: null,
+      metadata: {},
+      requestedAt: '2026-03-12T00:00:00.000Z',
+      startedAt: '2026-03-12T00:00:00.000Z',
+      finishedAt: null,
+      revision: 2,
+      createdAt: '2026-03-12T00:00:00.000Z',
+      updatedAt: '2026-03-12T00:00:00.000Z',
+      progressPercent: 21,
+      stepsPlanned: [],
+    });
+
+    try {
+      const status = await service.getUpdateStatus();
+
+      expect(status.mode).toBe('docker');
+      expect(status.effectiveMode).toBe('docker');
+      expect(status.configuredMode).toBe('native');
+      expect(status.modeSource).toBe('canonical_execution');
+      expect(status.updateLifecycle?.mode).toBe('docker');
+    } finally {
+      if (previousReadFlag === undefined) {
+        delete process.env.UPDATE_ENGINE_V2_READ_ENABLED;
+      } else {
+        process.env.UPDATE_ENGINE_V2_READ_ENABLED = previousReadFlag;
+      }
+    }
   });
 
   it('getUpdateStatus preserva falha de persistencia com fallback coerente', async () => {

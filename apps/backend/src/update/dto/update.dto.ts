@@ -77,6 +77,10 @@ export class UpdateStatusDto {
   isConfigured: boolean;
   checkEnabled: boolean;
   mode: 'docker' | 'native';
+  configuredMode: 'docker' | 'native' | null;
+  effectiveMode: 'docker' | 'native';
+  detectedHostMode: 'docker' | 'native';
+  modeSource: 'canonical_execution' | 'legacy_state' | 'configured' | 'host_detection';
   updateChannel: 'release' | 'tag';
   updateLifecycle?: {
     status:

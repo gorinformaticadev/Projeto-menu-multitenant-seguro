@@ -46,6 +46,10 @@ interface UpdateStatus {
   isConfigured: boolean;
   checkEnabled: boolean;
   mode: 'docker' | 'native';
+  configuredMode: 'docker' | 'native' | null;
+  effectiveMode: 'docker' | 'native';
+  detectedHostMode: 'docker' | 'native';
+  modeSource: 'canonical_execution' | 'legacy_state' | 'configured' | 'host_detection';
   updateChannel: 'release' | 'tag';
   updateLifecycle?: UpdateLifecyclePayload;
 }
@@ -143,6 +147,7 @@ export default function UpdatesPage() {
   const [activeTab, setActiveTab] = useState('status');
   const [hasSavedGitToken, setHasSavedGitToken] = useState(false);
   const lifecycle = status?.updateLifecycle;
+  const effectiveMode = status?.effectiveMode || status?.mode || 'native';
   const lifecycleView = buildUpdateLifecycleViewModel(lifecycle);
   const lifecycleStatus = lifecycle?.status || 'idle';
   const isUpdateRunning = isUpdateLifecycleRunning(lifecycleStatus) || loading.update;
@@ -401,7 +406,7 @@ export default function UpdatesPage() {
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Modo de Instalação</Label>
                       <div className="flex items-center gap-2">
-                        {status.mode === 'docker' ? (
+                        {effectiveMode === 'docker' ? (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-skin-info/15 text-skin-info"><Settings className="w-3 h-3 mr-1" />Container Docker</span>
                         ) : (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-skin-secondary/20 text-skin-text"><Monitor className="w-3 h-3 mr-1" />Nativo (PM2)</span>

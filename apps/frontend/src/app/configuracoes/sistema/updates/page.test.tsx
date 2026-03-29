@@ -148,6 +148,10 @@ describe('UpdatesPage', () => {
         isConfigured: true,
         checkEnabled: true,
         mode: 'native',
+        configuredMode: 'native',
+        effectiveMode: 'native',
+        detectedHostMode: 'native',
+        modeSource: 'configured',
         updateChannel: 'release',
         updateLifecycle: buildLifecycle(),
       },
@@ -159,6 +163,66 @@ describe('UpdatesPage', () => {
     expect(screen.getByText('48%')).toBeInTheDocument();
   });
 
+  it('exibe nativo usando effectiveMode mesmo quando mode legado e host detectado indicam docker', async () => {
+    setupApi([
+      {
+        currentVersion: 'v1.0.0',
+        availableVersion: 'v1.2.3',
+        updateAvailable: true,
+        isConfigured: true,
+        checkEnabled: true,
+        mode: 'docker',
+        configuredMode: 'native',
+        effectiveMode: 'native',
+        detectedHostMode: 'docker',
+        modeSource: 'legacy_state',
+        updateChannel: 'release',
+        updateLifecycle: buildLifecycle({
+          mode: 'native',
+        }),
+      },
+    ]);
+
+    render(<UpdatesPage />);
+
+    expect(await screen.findByText('Nativo (PM2)')).toBeInTheDocument();
+    expect(screen.queryByText('Container Docker')).not.toBeInTheDocument();
+  });
+
+  it('exibe docker quando o modo efetivo da execucao e docker', async () => {
+    setupApi([
+      {
+        currentVersion: 'v1.0.0',
+        availableVersion: 'v1.2.3',
+        updateAvailable: true,
+        isConfigured: true,
+        checkEnabled: true,
+        mode: 'native',
+        configuredMode: 'native',
+        effectiveMode: 'docker',
+        detectedHostMode: 'docker',
+        modeSource: 'canonical_execution',
+        updateChannel: 'release',
+        updateLifecycle: buildLifecycle({
+          mode: 'docker',
+          step: 'pull_images',
+          currentStep: {
+            code: 'pull_images',
+            label: 'Pull das imagens',
+            raw: 'pull_images',
+            source: 'canonical_db',
+            detail: null,
+            status: 'running',
+          },
+        }),
+      },
+    ]);
+
+    render(<UpdatesPage />);
+
+    expect(await screen.findByText('Container Docker')).toBeInTheDocument();
+  });
+
   it('renderiza falha de leitura do estado sem travar a tela', async () => {
     setupApi([
       {
@@ -168,6 +232,10 @@ describe('UpdatesPage', () => {
         isConfigured: true,
         checkEnabled: true,
         mode: 'docker',
+        configuredMode: 'docker',
+        effectiveMode: 'docker',
+        detectedHostMode: 'docker',
+        modeSource: 'configured',
         updateChannel: 'release',
         updateLifecycle: buildLifecycle({
           mode: 'docker',
@@ -231,6 +299,10 @@ describe('UpdatesPage', () => {
         isConfigured: true,
         checkEnabled: true,
         mode: 'native',
+        configuredMode: 'native',
+        effectiveMode: 'native',
+        detectedHostMode: 'native',
+        modeSource: 'configured',
         updateChannel: 'release',
         updateLifecycle: buildLifecycle(),
       },
@@ -241,6 +313,10 @@ describe('UpdatesPage', () => {
         isConfigured: true,
         checkEnabled: true,
         mode: 'native',
+        configuredMode: 'native',
+        effectiveMode: 'native',
+        detectedHostMode: 'native',
+        modeSource: 'configured',
         updateChannel: 'release',
         updateLifecycle: buildLifecycle({
           step: 'migrate',

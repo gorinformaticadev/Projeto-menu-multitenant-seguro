@@ -81,6 +81,19 @@ type StructuredUpdateErrorPayload = {
   exitCode: number | null;
 };
 
+type InstallationModeSource =
+  | 'canonical_execution'
+  | 'legacy_state'
+  | 'configured'
+  | 'host_detection';
+
+type ResolvedInstallationMode = {
+  configuredMode: 'docker' | 'native' | null;
+  effectiveMode: 'docker' | 'native';
+  detectedHostMode: 'docker' | 'native';
+  source: InstallationModeSource;
+};
+
 @Injectable()
 export class UpdateService implements OnModuleInit {
   private readonly logger = new Logger(UpdateService.name);
@@ -457,6 +470,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
     const canonicalExecution = await this.safeGetCanonicalExecution();
     const systemState = await this.safeGetSystemUpdateState();
     const runtime = this.getRuntimeVersionInfo();
+    const mode = this.resolveStatusInstallationMode(settings, canonicalExecution, systemState);
 
     return {
       currentVersion: runtime.version,
@@ -465,7 +479,11 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
       lastCheck: settings.lastUpdateCheck || undefined,
       isConfigured: !!(settings.gitUsername && settings.gitRepository),
       checkEnabled: settings.updateCheckEnabled,
-      mode: this.getInstallationMode(settings),
+      mode: mode.effectiveMode,
+      configuredMode: mode.configuredMode,
+      effectiveMode: mode.effectiveMode,
+      detectedHostMode: mode.detectedHostMode,
+      modeSource: mode.source,
       updateChannel: this.normalizeUpdateChannel(settings.updateChannel),
       updateLifecycle: canonicalExecution
         ? this.buildCanonicalLifecycleState(settings, canonicalExecution)
@@ -758,7 +776,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
       progressKnown: systemState?.persistence?.progressKnown !== false,
       startedAt: systemState?.startedAt || null,
       finishedAt: systemState?.finishedAt || null,
-      mode: systemState?.mode || this.getInstallationMode(settings),
+      mode: systemState?.mode || this.resolveConfiguredOrDetectedInstallationMode(settings),
       lock: Boolean(systemState?.lock),
       stale: Boolean(systemState?.stale),
       currentStep,
@@ -1373,7 +1391,101 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
     );
   }
 
+  private resolveStatusInstallationMode(
+    settings: UpdateSystemSettings,
+    canonicalExecution: UpdateExecutionView | null,
+    systemState: SystemUpdateStateSnapshot | null,
+  ): ResolvedInstallationMode {
+    const configuredMode = this.resolveConfiguredInstallationMode(settings);
+    const detectedHostMode = this.detectHostInstallationMode();
+
+    if (canonicalExecution) {
+      return {
+        configuredMode,
+        effectiveMode: canonicalExecution.mode,
+        detectedHostMode,
+        source: 'canonical_execution',
+      };
+    }
+
+    if (this.hasEffectiveLegacyMode(systemState)) {
+      return {
+        configuredMode,
+        effectiveMode: systemState.mode,
+        detectedHostMode,
+        source: 'legacy_state',
+      };
+    }
+
+    if (configuredMode) {
+      return {
+        configuredMode,
+        effectiveMode: configuredMode,
+        detectedHostMode,
+        source: 'configured',
+      };
+    }
+
+    return {
+      configuredMode: null,
+      effectiveMode: detectedHostMode,
+      detectedHostMode,
+      source: 'host_detection',
+    };
+  }
+
+  private hasEffectiveLegacyMode(
+    systemState: SystemUpdateStateSnapshot | null,
+  ): systemState is SystemUpdateStateSnapshot & { mode: 'docker' | 'native' } {
+    return Boolean(systemState && (systemState.mode === 'docker' || systemState.mode === 'native'));
+  }
+
+  private resolveConfiguredInstallationMode(
+    settings: UpdateSystemSettings,
+  ): 'docker' | 'native' | null {
+    if (settings.packageManager === 'docker' || settings.packageManager === 'native') {
+      return settings.packageManager;
+    }
+
+    return null;
+  }
+
+  private resolveConfiguredOrDetectedInstallationMode(
+    settings: UpdateSystemSettings,
+  ): 'docker' | 'native' {
+    return this.resolveConfiguredInstallationMode(settings) || this.detectHostInstallationMode();
+  }
+
+  private detectHostInstallationMode(): 'docker' | 'native' {
+    try {
+      if (process.env.IS_DOCKER === 'true') {
+        return 'docker';
+      }
+
+      if (fs.existsSync('/.dockerenv')) {
+        return 'docker';
+      }
+
+      const cgroupPath = '/proc/1/cgroup';
+      if (fs.existsSync(cgroupPath)) {
+        const cgroup = fs.readFileSync(cgroupPath, 'utf8');
+        if (/docker|containerd|kubepods/i.test(cgroup)) {
+          return 'docker';
+        }
+      }
+    } catch (error) {
+      this.logger.warn(`Falha ao detectar modo de instalaÃ§Ã£o automaticamente: ${String(error)}`);
+    }
+
+    return 'native';
+  }
+
   private getInstallationMode(settings: UpdateSystemSettings): 'docker' | 'native' {
+    const configuredMode = this.resolveConfiguredInstallationMode(settings);
+    if (configuredMode) {
+      return configuredMode;
+    }
+
     try {
       if (process.env.IS_DOCKER === 'true') {
         return 'docker';
