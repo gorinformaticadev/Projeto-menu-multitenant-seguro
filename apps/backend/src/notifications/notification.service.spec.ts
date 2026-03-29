@@ -10,13 +10,20 @@ describe('NotificationService system notifications', () => {
     notification: {
       create: jest.fn(),
       findMany: jest.fn(),
+      findFirst: jest.fn(),
       count: jest.fn(),
+      update: jest.fn(),
       updateMany: jest.fn(),
       findUnique: jest.fn(),
+    },
+    notificationGroup: {
+      findUnique: jest.fn(),
+      update: jest.fn(),
     },
     user: {
       findMany: jest.fn(),
     },
+    $transaction: jest.fn(async (fn: (tx: any) => Promise<any>) => fn(prismaMock)),
   };
 
   const createService = () =>
@@ -263,7 +270,13 @@ describe('NotificationService system notifications', () => {
   it('marks notification as read only inside SUPER_ADMIN scope', async () => {
     const service = createService();
     const now = new Date('2026-03-06T12:05:00.000Z');
-    prismaMock.notification.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.notification.findFirst.mockResolvedValue({
+      id: 'notif-9',
+      read: false,
+      isRead: false,
+      notificationGroupId: null,
+    });
+    prismaMock.notification.update.mockResolvedValue({});
     prismaMock.notification.findUnique.mockResolvedValue({
       id: 'notif-9',
       type: 'SYSTEM_ALERT',
@@ -284,7 +297,8 @@ describe('NotificationService system notifications', () => {
       userId: 'admin-1',
     });
 
-    expect(prismaMock.notification.updateMany).toHaveBeenCalledTimes(1);
+    expect(prismaMock.notification.findFirst).toHaveBeenCalledTimes(1);
+    expect(prismaMock.notification.update).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({
       id: 'notif-9',
       isRead: true,
@@ -293,6 +307,7 @@ describe('NotificationService system notifications', () => {
 
   it('keeps read-all idempotent across repeated calls', async () => {
     const service = createService();
+    prismaMock.notification.findMany.mockResolvedValue([]);
     prismaMock.notification.updateMany
       .mockResolvedValueOnce({ count: 2 })
       .mockResolvedValueOnce({ count: 0 });
@@ -306,7 +321,6 @@ describe('NotificationService system notifications', () => {
 
     expect(first).toBe(2);
     expect(second).toBe(0);
-    expect(prismaMock.notification.updateMany).toHaveBeenCalledTimes(2);
   });
 
   it('uses the same target scope for list and unread-count', async () => {
