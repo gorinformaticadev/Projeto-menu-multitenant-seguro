@@ -1966,6 +1966,75 @@ export class NotificationService {
     };
   }
 
+  /**
+   * Deleta todas as notificações lidas do usuário autenticado.
+   * Respeita escopo por tenant e por usuário.
+   * Limite máximo de 1000 por operação para evitar lock excessivo.
+   */
+  async deleteReadNotifications(user: unknown, maxLimit = 1000): Promise<number> {
+    const actor = this.normalizeNotificationActor(user);
+    const limit = this.clampNumber(maxLimit, 1, 1000, 1000);
+
+    const where: Prisma.NotificationWhereInput = {
+      AND: [
+        this.buildWhereClause(user),
+        {
+          OR: [{ read: true }, { isRead: true }],
+        },
+      ],
+    };
+
+    const candidates = await this.prisma.notification.findMany({
+      where,
+      select: { id: true, notificationGroupId: true },
+      orderBy: { createdAt: 'asc' },
+      take: limit,
+    });
+
+    if (candidates.length === 0) {
+      return 0;
+    }
+
+    const affectedGroupIds = [...new Set(
+      candidates
+        .map((n) => n.notificationGroupId)
+        .filter((id): id is string => Boolean(id)),
+    )];
+
+    const candidateIds = candidates.map((n) => n.id);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.notification.deleteMany({
+        where: { id: { in: candidateIds } },
+      });
+
+      for (const groupId of affectedGroupIds) {
+        const { totalCount } = await this.syncGroupCounters(tx, groupId);
+
+        if (totalCount === 0) {
+          await tx.notificationGroup.delete({ where: { id: groupId } }).catch(() => {});
+          this.logGroupOperation('deleteReadNotifications_emptyGroup', { groupId });
+          continue;
+        }
+
+        const group = await tx.notificationGroup.findUnique({
+          where: { id: groupId },
+          select: { lastNotificationId: true },
+        });
+
+        if (group?.lastNotificationId && candidateIds.includes(group.lastNotificationId)) {
+          await this.syncGroupPreview(tx, groupId);
+        }
+      }
+    });
+
+    this.logger.log(
+      `${candidateIds.length} notificacoes lidas deletadas | tenant=${actor.tenantId ?? '-'} user=${actor.id ?? '-'}`,
+    );
+
+    return candidateIds.length;
+  }
+
   async markGroupAsRead(groupId: string, user: unknown): Promise<number> {
     const actor = this.normalizeNotificationActor(user);
 

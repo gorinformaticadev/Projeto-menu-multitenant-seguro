@@ -762,4 +762,50 @@ export class AuditService {
   private toInputJson(value: Record<string, unknown>): Prisma.InputJsonValue {
     return value as Prisma.InputJsonValue;
   }
+
+  /**
+   * Remove logs de auditoria mais antigos que o número de dias especificado.
+   * Limite padrão de 5000 por operação para evitar lock excessivo.
+   * Registra auditoria da própria operação de limpeza.
+   */
+  async cleanupByRetentionDays(retentionDays: number, limit = 5000): Promise<number> {
+    const safeDays = Math.max(1, Math.min(retentionDays, 3650));
+    const safeLimit = Math.max(1, Math.min(limit, 100000));
+    const cutoff = new Date(Date.now() - safeDays * 24 * 60 * 60 * 1000);
+
+    const candidates = await this.prisma.auditLog.findMany({
+      where: { createdAt: { lt: cutoff } },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+      take: safeLimit,
+    });
+
+    if (candidates.length === 0) {
+      return 0;
+    }
+
+    const result = await this.prisma.auditLog.deleteMany({
+      where: { id: { in: candidates.map((row) => row.id) } },
+    });
+
+    const deleted = result.count || 0;
+
+    try {
+      await this.log({
+        action: 'AUDIT_LOGS_CLEANUP',
+        severity: 'info',
+        message: `Limpeza manual de logs: ${deleted} registros removidos (retencao ${safeDays} dias)`,
+        metadata: {
+          deletedCount: deleted,
+          retentionDays: safeDays,
+          cutoffDate: cutoff.toISOString(),
+        },
+      });
+    } catch {
+      // Falha na auditoria de limpeza não deve impedir a operação
+    }
+
+    this.logger.log(`Limpeza de logs: ${deleted} registros removidos (>${safeDays} dias)`);
+    return deleted;
+  }
 }

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Query, Request, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, Param, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { Roles } from '@core/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
@@ -106,6 +106,15 @@ export class SystemNotificationsController {
   @Post('groups/:groupId/read-all')
   async markGroupRead(@Param('groupId') groupId: string) {
     const count = await this.notificationService.markGroupAsRead(groupId, { role: 'SUPER_ADMIN' });
+    return { success: true, count };
+  }
+
+  /**
+   * Remove todas as notificações lidas do escopo SUPER_ADMIN
+   */
+  @Delete('read')
+  async deleteRead() {
+    const count = await this.notificationService.deleteReadNotifications({ role: 'SUPER_ADMIN' });
     return { success: true, count };
   }
 

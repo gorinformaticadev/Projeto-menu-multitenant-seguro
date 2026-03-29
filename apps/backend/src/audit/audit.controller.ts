@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, Param, Body, UseGuards } from '@nestjs/common';
 import { AuditService } from './audit.service';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
@@ -100,6 +100,35 @@ export class AuditController {
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.auditService.findOne(id);
+  }
+
+  /**
+   * POST /audit-logs/cleanup
+   * Remove logs de auditoria mais antigos que N dias.
+   * Apenas SUPER_ADMIN. Valores permitidos: 7, 15, 30, 60, 90, 180, 365.
+   */
+  @Post('cleanup')
+  async cleanup(
+    @Body('retentionDays') retentionDays: unknown,
+  ) {
+    const allowedDurations = [7, 15, 30, 60, 90, 180, 365];
+    const parsed = Number(retentionDays);
+
+    if (!Number.isFinite(parsed) || !allowedDurations.includes(parsed)) {
+      return {
+        success: false,
+        deletedCount: 0,
+        message: `retentionDays invalido. Permitidos: ${allowedDurations.join(', ')}`,
+      };
+    }
+
+    const deletedCount = await this.auditService.cleanupByRetentionDays(parsed);
+
+    return {
+      success: true,
+      deletedCount,
+      retentionDays: parsed,
+    };
   }
 
   private parsePositiveInt(value?: string): number | undefined {

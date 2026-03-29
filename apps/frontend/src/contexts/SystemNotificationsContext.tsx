@@ -40,6 +40,7 @@ export type ContextState = {
   refresh: () => Promise<void>;
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
+  deleteReadNotifications: () => Promise<number>;
 };
 
 interface BackendSystemNotification {
@@ -303,6 +304,33 @@ export function SystemNotificationsProvider({ children }: { children: React.Reac
     }
   }, [accessDenied, handleAccessDenied, isSuperAdmin]);
 
+  const deleteReadNotifications = useCallback(async (): Promise<number> => {
+    if (!isSuperAdmin || accessDenied) {
+      return 0;
+    }
+
+    try {
+      const response = await api.delete<{ success: boolean; count: number }>(
+        "/system/notifications/read",
+      );
+      const deleted = response.data?.count ?? 0;
+
+      if (deleted > 0) {
+        setItems((previous) => previous.filter((item) => !item.isRead));
+      }
+
+      return deleted;
+    } catch (requestError) {
+      if (axios.isAxiosError(requestError) && requestError.response?.status === 403) {
+        handleAccessDenied();
+        return 0;
+      }
+
+      setError(`Falha ao limpar notificacoes lidas: ${normalizeErrorMessage(requestError)}`);
+      return 0;
+    }
+  }, [accessDenied, handleAccessDenied, isSuperAdmin]);
+
   const openDrawer = useCallback(() => {
     if (!isEnabled) {
       return;
@@ -357,8 +385,9 @@ export function SystemNotificationsProvider({ children }: { children: React.Reac
       refresh,
       markAsRead,
       markAllAsRead,
+      deleteReadNotifications,
     }),
-    [closeDrawer, error, isDrawerOpen, isEnabled, items, loading, markAllAsRead, markAsRead, openDrawer, refresh, unreadCount],
+    [closeDrawer, deleteReadNotifications, error, isDrawerOpen, isEnabled, items, loading, markAllAsRead, markAsRead, openDrawer, refresh, unreadCount],
   );
 
   return <SystemNotificationsContext.Provider value={value}>{children}</SystemNotificationsContext.Provider>;

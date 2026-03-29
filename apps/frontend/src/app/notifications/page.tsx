@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Bell, CheckCheck, FolderOpen, List, RefreshCw, Search } from "lucide-react";
+import { Bell, CheckCheck, FolderOpen, List, RefreshCw, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import {
   type NotificationSeverityFilter,
 } from "@/components/system-notifications/systemNotifications.utils";
 import { useSystemNotificationsContext } from "@/contexts/SystemNotificationsContext";
+import { useToast } from "@/hooks/use-toast";
 
 const DEFAULT_READ_FILTER: NotificationReadFilter = "all";
 const DEFAULT_SEVERITY_FILTER: NotificationSeverityFilter = "all";
@@ -32,7 +33,11 @@ export default function NotificationsPage() {
     refresh,
     markAsRead,
     markAllAsRead,
+    deleteReadNotifications,
   } = useSystemNotificationsContext();
+
+  const { toast } = useToast();
+  const [deletingRead, setDeletingRead] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [readFilter, setReadFilter] = useState<NotificationReadFilter>(DEFAULT_READ_FILTER);
@@ -70,6 +75,30 @@ export default function NotificationsPage() {
     () => items.filter((item) => !item.isRead && item.severity === "critical").length,
     [items],
   );
+
+  const readCount = useMemo(
+    () => items.filter((item) => item.isRead).length,
+    [items],
+  );
+
+  const handleDeleteRead = async () => {
+    setDeletingRead(true);
+    try {
+      const count = await deleteReadNotifications();
+      toast({
+        title: "Limpeza concluida",
+        description: `${count} notificacao(oes) lida(s) removida(s).`,
+      });
+    } catch {
+      toast({
+        title: "Erro ao limpar notificacoes",
+        description: "Nao foi possivel remover as notificacoes lidas.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingRead(false);
+    }
+  };
 
   const hasActiveFilters =
     readFilter !== DEFAULT_READ_FILTER ||
@@ -159,6 +188,18 @@ export default function NotificationsPage() {
           >
             <CheckCheck className="h-4 w-4 mr-1" />
             Marcar todas lidas
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              void handleDeleteRead();
+            }}
+            disabled={readCount === 0 || deletingRead}
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            {deletingRead ? "Limpando..." : "Apagar lidas"}
           </Button>
         </div>
       </div>

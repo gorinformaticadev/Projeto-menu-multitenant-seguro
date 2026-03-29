@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Bell, CheckCheck, RefreshCw } from "lucide-react";
+import { Bell, CheckCheck, RefreshCw, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useSystemNotificationsContext } from "@/contexts/SystemNotificationsContext";
 import { SystemNotificationsList } from "@/components/system-notifications/SystemNotificationsList";
+import { useToast } from "@/hooks/use-toast";
 
 export function SystemNotificationsDrawer() {
   const {
@@ -25,7 +27,32 @@ export function SystemNotificationsDrawer() {
     refresh,
     markAsRead,
     markAllAsRead,
+    deleteReadNotifications,
   } = useSystemNotificationsContext();
+
+  const { toast } = useToast();
+  const [deletingRead, setDeletingRead] = useState(false);
+
+  const readCount = items.filter((item) => item.isRead).length;
+
+  const handleDeleteRead = async () => {
+    setDeletingRead(true);
+    try {
+      const count = await deleteReadNotifications();
+      toast({
+        title: "Limpeza concluida",
+        description: `${count} notificacao(oes) lida(s) removida(s).`,
+      });
+    } catch {
+      toast({
+        title: "Erro ao limpar notificacoes",
+        description: "Nao foi possivel remover as notificacoes lidas.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingRead(false);
+    }
+  };
 
   if (!isEnabled) {
     return null;
@@ -83,6 +110,18 @@ export function SystemNotificationsDrawer() {
               >
                 <CheckCheck className="h-3.5 w-3.5 mr-1" />
                 Marcar todas
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => {
+                  void handleDeleteRead();
+                }}
+                disabled={readCount === 0 || deletingRead}
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1" />
+                Apagar lidas
               </Button>
             </div>
           </div>

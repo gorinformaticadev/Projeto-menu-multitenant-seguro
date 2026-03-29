@@ -254,6 +254,15 @@ export class NotificationsController {
   }
 
   /**
+   * Deleta todas as notificações lidas do usuário autenticado
+   */
+  @Delete('read')
+  async deleteRead(@Request() req) {
+    const count = await this.notificationService.deleteReadNotifications(req.user);
+    return { success: true, count };
+  }
+
+  /**
    * Deleta uma notificação
    */
   @Delete(':id')

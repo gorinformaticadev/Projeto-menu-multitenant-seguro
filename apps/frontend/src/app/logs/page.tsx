@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Activity, FileText, Search, User } from "lucide-react";
+import { Activity, FileText, Search, Trash2, User } from "lucide-react";
 import {
   buildLogsQuery,
   buildLogsStatsQuery,
@@ -62,6 +62,8 @@ export default function LogsPage() {
     startDate: "",
     endDate: "",
   });
+  const [cleanupDays, setCleanupDays] = useState<number>(30);
+  const [cleaningUp, setCleaningUp] = useState(false);
 
   useEffect(() => {
     if (authLoading) {
@@ -135,6 +137,36 @@ export default function LogsPage() {
   const handleSearch = () => {
     setPage(1);
     setAppliedFilters({ ...draftFilters });
+  };
+
+  const handleCleanup = async () => {
+    if (!logsSource || user?.role !== "SUPER_ADMIN") return;
+
+    setCleaningUp(true);
+    try {
+      const response = await api.post("/audit-logs/cleanup", {
+        retentionDays: cleanupDays,
+      });
+
+      const deleted = response.data?.deletedCount ?? 0;
+      toast({
+        title: "Limpeza concluida",
+        description: `${deleted} registro(s) removido(s) (>${cleanupDays} dias).`,
+      });
+
+      void fetchLogs();
+      void fetchStats();
+    } catch (error: unknown) {
+      toast({
+        title: "Erro na limpeza",
+        description:
+          (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          "Nao foi possivel executar a limpeza.",
+        variant: "destructive",
+      });
+    } finally {
+      setCleaningUp(false);
+    }
   };
 
   const getActionBadgeColor = (action: string) => {
@@ -263,6 +295,49 @@ export default function LogsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {user?.role === "SUPER_ADMIN" && logsSource?.listEndpoint === "/audit-logs" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5" />
+              Limpeza de logs
+            </CardTitle>
+            <CardDescription>
+              Remove registros de auditoria mais antigos que o periodo selecionado.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <Label htmlFor="cleanupDays">Remover logs com mais de</Label>
+                <select
+                  id="cleanupDays"
+                  className="mt-1 h-9 rounded-md border border-skin-input-border bg-skin-input-background px-3 text-sm text-skin-text"
+                  value={cleanupDays}
+                  onChange={(e) => setCleanupDays(Number(e.target.value))}
+                >
+                  <option value={7}>7 dias</option>
+                  <option value={15}>15 dias</option>
+                  <option value={30}>30 dias</option>
+                  <option value={60}>60 dias</option>
+                  <option value={90}>90 dias</option>
+                  <option value={180}>180 dias</option>
+                  <option value={365}>365 dias</option>
+                </select>
+              </div>
+              <Button
+                variant="destructive"
+                onClick={() => void handleCleanup()}
+                disabled={cleaningUp}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                {cleaningUp ? "Limpando..." : "Executar limpeza"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
