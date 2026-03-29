@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.100](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.99...v0.1.100) (2026-03-29)
+
+
+### Features
+
+* implement system job watchdog and cron update services with associated unit tests ([aed8528](https://github.com/gorinformaticadev/Pluggor/commit/aed852847347fa17d5ff169024e4dfca20d69ab5))
+
 ### [0.1.99](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.98...v0.1.99) (2026-03-29)
 
 
