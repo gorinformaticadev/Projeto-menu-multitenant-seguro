@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -7,20 +7,7 @@ import { fileURLToPath } from 'node:url';
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const frontendDir = path.resolve(scriptDir, '..');
 
-const standaloneLayouts = [
-  {
-    label: 'monorepo-nested',
-    entryRelativePath: path.join('.next', 'standalone', 'apps', 'frontend', 'server.js'),
-    runtimeDirRelativePath: path.join('.next', 'standalone', 'apps', 'frontend'),
-    buildDirRelativePath: path.join('.next', 'standalone', 'apps', 'frontend', '.next'),
-  },
-  {
-    label: 'root',
-    entryRelativePath: path.join('.next', 'standalone', 'server.js'),
-    runtimeDirRelativePath: path.join('.next', 'standalone'),
-    buildDirRelativePath: path.join('.next', 'standalone', '.next'),
-  },
-];
+const standaloneLayouts = buildStandaloneLayouts();
 
 function toAbsolutePath(relativePath) {
   return path.resolve(frontendDir, relativePath);
@@ -28,6 +15,67 @@ function toAbsolutePath(relativePath) {
 
 function toPortablePath(relativePath) {
   return relativePath.split(path.sep).join('/');
+}
+
+function normalizeRelativeAppDir(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = path
+    .normalize(value)
+    .replace(/^[A-Za-z]:[\\/]/, '')
+    .replace(/^([.][\\/])+/, '')
+    .replace(/^[\\/]+/, '')
+    .replace(/[\\/]+$/, '');
+
+  if (!normalized || normalized === '.') {
+    return null;
+  }
+
+  return normalized;
+}
+
+function buildStandaloneLayouts() {
+  const layouts = [];
+  const requiredServerFilesPath = path.join(frontendDir, '.next', 'required-server-files.json');
+
+  if (existsSync(requiredServerFilesPath)) {
+    try {
+      const requiredServerFiles = JSON.parse(readFileSync(requiredServerFilesPath, 'utf8'));
+      const relativeAppDir = normalizeRelativeAppDir(requiredServerFiles?.relativeAppDir);
+      if (relativeAppDir) {
+        layouts.push({
+          label: 'required-server-files',
+          entryRelativePath: path.join('.next', 'standalone', relativeAppDir, 'server.js'),
+          runtimeDirRelativePath: path.join('.next', 'standalone', relativeAppDir),
+          buildDirRelativePath: path.join('.next', 'standalone', relativeAppDir, '.next'),
+        });
+      }
+    } catch {
+      // O fallback estrutural abaixo continua cobrindo layouts legados suportados.
+    }
+  }
+
+  layouts.push(
+    {
+      label: 'monorepo-nested',
+      entryRelativePath: path.join('.next', 'standalone', 'apps', 'frontend', 'server.js'),
+      runtimeDirRelativePath: path.join('.next', 'standalone', 'apps', 'frontend'),
+      buildDirRelativePath: path.join('.next', 'standalone', 'apps', 'frontend', '.next'),
+    },
+    {
+      label: 'root',
+      entryRelativePath: path.join('.next', 'standalone', 'server.js'),
+      runtimeDirRelativePath: path.join('.next', 'standalone'),
+      buildDirRelativePath: path.join('.next', 'standalone', '.next'),
+    },
+  );
+
+  return layouts.filter(
+    (layout, index, collection) =>
+      collection.findIndex((candidate) => candidate.entryRelativePath === layout.entryRelativePath) === index,
+  );
 }
 
 function resolveStandaloneLayout() {

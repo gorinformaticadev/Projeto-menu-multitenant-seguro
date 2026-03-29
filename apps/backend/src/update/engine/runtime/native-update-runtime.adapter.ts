@@ -687,6 +687,7 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     }
 
     const candidates = [
+      ...(await this.loadFrontendLayoutCandidatesFromRequiredServerFiles(frontendDir)),
       {
         label: 'monorepo-nested',
         entryRelativePath: path.join('.next', 'standalone', 'apps', 'frontend', 'server.js'),
@@ -701,17 +702,75 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       },
     ];
 
-    const resolved = candidates.find((candidate) =>
+    const uniqueCandidates = candidates.filter(
+      (candidate, index, collection) =>
+        collection.findIndex((current) => current.entryRelativePath === candidate.entryRelativePath) === index,
+    );
+
+    const resolved = uniqueCandidates.find((candidate) =>
       fs.existsSync(path.join(frontendDir, candidate.entryRelativePath)),
     );
     if (!resolved) {
-      const checkedPaths = candidates.map((candidate) => path.join(frontendDir, candidate.entryRelativePath));
+      const checkedPaths = uniqueCandidates.map((candidate) => path.join(frontendDir, candidate.entryRelativePath));
       throw new Error(
         `Entrypoint standalone do frontend nao encontrado em ${frontendDir}. Caminhos verificados: ${checkedPaths.join(' | ')}`,
       );
     }
 
     return resolved;
+  }
+
+  private async loadFrontendLayoutCandidatesFromRequiredServerFiles(frontendDir: string): Promise<
+    Array<{
+      label: string;
+      entryRelativePath: string;
+      runtimeDirRelativePath: string;
+      buildDirRelativePath: string;
+    }>
+  > {
+    const requiredServerFilesPath = path.join(frontendDir, '.next', 'required-server-files.json');
+    if (!(await this.pathExists(requiredServerFilesPath))) {
+      return [];
+    }
+
+    try {
+      const raw = await fsp.readFile(requiredServerFilesPath, 'utf8');
+      const parsed = JSON.parse(raw) as { relativeAppDir?: unknown };
+      const relativeAppDir = this.normalizeRequiredServerFilesAppDir(parsed.relativeAppDir);
+      if (!relativeAppDir) {
+        return [];
+      }
+
+      return [
+        {
+          label: 'required-server-files',
+          entryRelativePath: path.join('.next', 'standalone', relativeAppDir, 'server.js'),
+          runtimeDirRelativePath: path.join('.next', 'standalone', relativeAppDir),
+          buildDirRelativePath: path.join('.next', 'standalone', relativeAppDir, '.next'),
+        },
+      ];
+    } catch {
+      return [];
+    }
+  }
+
+  private normalizeRequiredServerFilesAppDir(value: unknown): string | null {
+    if (typeof value !== 'string') {
+      return null;
+    }
+
+    const normalized = path
+      .normalize(value)
+      .replace(/^[A-Za-z]:[\\/]/, '')
+      .replace(/^([.][\\/])+/, '')
+      .replace(/^[\\/]+/, '')
+      .replace(/[\\/]+$/, '');
+
+    if (!normalized || normalized === '.') {
+      return null;
+    }
+
+    return normalized;
   }
 
   private async copyFrontendRuntimeAssets(

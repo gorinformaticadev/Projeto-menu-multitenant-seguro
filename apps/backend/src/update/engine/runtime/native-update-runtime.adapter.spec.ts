@@ -70,6 +70,26 @@ function createMockRootStandaloneBuild(frontendDir: string) {
   fs.writeFileSync(path.join(standaloneServerDir, 'page_client-reference-manifest.js'), 'manifest-root');
 }
 
+function createMockReleaseNestedStandaloneBuild(frontendDir: string, relativeAppDir: string) {
+  const sourceBuildDir = path.join(frontendDir, '.next');
+  const runtimeDir = path.join(sourceBuildDir, 'standalone', relativeAppDir);
+  const standaloneBuildDir = path.join(runtimeDir, '.next');
+  const sourceServerDir = path.join(sourceBuildDir, 'server', 'app', 'login');
+  const standaloneServerDir = path.join(standaloneBuildDir, 'server', 'app', 'login');
+
+  fs.mkdirSync(standaloneBuildDir, { recursive: true });
+  fs.mkdirSync(path.join(sourceBuildDir, 'static'), { recursive: true });
+  fs.mkdirSync(sourceServerDir, { recursive: true });
+  fs.mkdirSync(standaloneServerDir, { recursive: true });
+  fs.writeFileSync(path.join(sourceBuildDir, 'BUILD_ID'), 'build-release-nested');
+  fs.writeFileSync(path.join(sourceBuildDir, 'required-server-files.json'), JSON.stringify({ relativeAppDir }, null, 2));
+  fs.writeFileSync(path.join(standaloneBuildDir, 'BUILD_ID'), 'build-release-nested');
+  fs.writeFileSync(path.join(runtimeDir, 'server.js'), 'console.log("frontend-release-nested");');
+  fs.writeFileSync(path.join(sourceBuildDir, 'static', 'main.js'), 'console.log("asset-release-nested");');
+  fs.writeFileSync(path.join(sourceServerDir, 'page_client-reference-manifest.js'), 'manifest-release-nested');
+  fs.writeFileSync(path.join(standaloneServerDir, 'page_client-reference-manifest.js'), 'manifest-release-nested');
+}
+
 describe('NativeUpdateRuntimeAdapter', () => {
   let tmpDir: string;
   let sourceDir: string;
@@ -78,6 +98,7 @@ describe('NativeUpdateRuntimeAdapter', () => {
   let pm2JlistOutput: string;
   let failFrontendRestart: boolean;
   let buildDependenciesInstalled: boolean;
+  let frontendBuildLayout: 'monorepo' | 'root' | 'release-nested';
 
   const commandRunnerMock = {
     run: jest.fn(async (request: any) => {
@@ -117,7 +138,13 @@ describe('NativeUpdateRuntimeAdapter', () => {
 
       if (request.command === 'pnpm' && joinedArgs.includes('--filter frontend build')) {
         const frontendDir = path.join(cwd, 'apps', 'frontend');
-        createMockFrontendStandaloneBuild(frontendDir);
+        if (frontendBuildLayout === 'root') {
+          createMockRootStandaloneBuild(frontendDir);
+        } else if (frontendBuildLayout === 'release-nested') {
+          createMockReleaseNestedStandaloneBuild(frontendDir, path.join('releases', 'v1.2.3', 'apps', 'frontend'));
+        } else {
+          createMockFrontendStandaloneBuild(frontendDir);
+        }
       }
 
       if (request.command === 'pnpm' && joinedArgs.includes('--filter backend build')) {
@@ -198,6 +225,7 @@ describe('NativeUpdateRuntimeAdapter', () => {
     ]);
     failFrontendRestart = false;
     buildDependenciesInstalled = false;
+    frontendBuildLayout = 'monorepo';
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pluggor-native-adapter-'));
     sourceDir = path.join(tmpDir, 'source');
     fs.mkdirSync(path.join(sourceDir, 'apps', 'backend'), { recursive: true });
@@ -383,6 +411,56 @@ describe('NativeUpdateRuntimeAdapter', () => {
         expect.objectContaining({ code: 'frontend_standalone_validado' }),
       ]),
     );
+  });
+
+  it('build_frontend native encontra o standalone gerado pelo relativeAppDir da release', async () => {
+    frontendBuildLayout = 'release-nested';
+    const adapter = createAdapter();
+    const execution = createExecution();
+    const targetReleaseDir = path.join(runtime.releasesDir, 'v1.2.3');
+    fs.mkdirSync(path.join(targetReleaseDir, 'apps', 'frontend', 'public'), { recursive: true });
+    fs.mkdirSync(path.join(targetReleaseDir, 'apps', 'frontend', 'scripts'), { recursive: true });
+    fs.writeFileSync(path.join(targetReleaseDir, 'apps', 'frontend', 'public', 'clear-cache.html'), '<html></html>');
+    fs.writeFileSync(path.join(targetReleaseDir, 'apps', 'frontend', 'scripts', 'start-standalone.mjs'), 'console.log("start");');
+
+    const result = await adapter.executeStep('build_frontend', {
+      execution,
+      runtime,
+      metadata: {
+        targetReleaseDir,
+      },
+    });
+
+    expect(result.result).toMatchObject({
+      standaloneLayout: 'required-server-files',
+    });
+    expect(result.metadata).toMatchObject({
+      frontendEntryRelative: path.join(
+        '.next',
+        'standalone',
+        'releases',
+        'v1.2.3',
+        'apps',
+        'frontend',
+        'server.js',
+      ),
+    });
+    expect(
+      fs.existsSync(
+        path.join(
+          targetReleaseDir,
+          'apps',
+          'frontend',
+          '.next',
+          'standalone',
+          'releases',
+          'v1.2.3',
+          'apps',
+          'frontend',
+          'server.js',
+        ),
+      ),
+    ).toBe(true);
   });
 
   it('package_frontend_assets gera o artefato standalone esperado no layout real', async () => {
