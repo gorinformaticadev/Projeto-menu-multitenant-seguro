@@ -127,14 +127,21 @@ export function GroupedNotificationsList({ endpoint = "/notifications" }: Groupe
 
         return (
           <div key={group.id} className="overflow-hidden">
-            <button
-              type="button"
-              className={`w-full text-left rounded-xl border p-4 transition-all duration-200 ${
+            <div
+              role="button"
+              tabIndex={0}
+              className={`w-full cursor-pointer text-left rounded-xl border p-4 transition-all duration-200 ${
                 hasUnread
                   ? "border-skin-info/25 ring-1 ring-skin-info/10 shadow-sm bg-skin-surface"
                   : "border-skin-border hover:border-skin-border-strong bg-skin-surface"
               }`}
               onClick={() => handleToggleGroup(group)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleToggleGroup(group);
+                }
+              }}
             >
               {hasUnread && (
                 <div className="absolute bottom-0 left-0 top-0 w-1 bg-skin-info" />
@@ -188,7 +195,7 @@ export function GroupedNotificationsList({ endpoint = "/notifications" }: Groupe
                   )}
                 </div>
               </div>
-            </button>
+            </div>
 
             {isExpanded && (
               <div className="ml-4 mt-1 space-y-1 border-l-2 border-skin-border pl-4">

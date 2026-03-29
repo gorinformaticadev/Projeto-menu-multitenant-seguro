@@ -8,7 +8,6 @@ import type {
   NotificationGroup,
   NotificationGroupListResponse,
   NotificationGroupItemsResponse,
-  Notification,
 } from '@/types/notifications';
 
 interface UseGroupedNotificationsReturn {

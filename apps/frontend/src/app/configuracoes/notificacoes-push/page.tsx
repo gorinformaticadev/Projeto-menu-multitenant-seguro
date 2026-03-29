@@ -324,7 +324,7 @@ export default function PushNotificationsConfigPage() {
   const swMessageRef = useRef<{ resolve: (v: unknown) => void } | null>(null);
 
   const collectDeviceStatus = useCallback(async (): Promise<DeviceDiagnostic> => {
-    const swSupported = typeof navigator !== "undefined" && "serviceWorker" in navigator;
+    const swSupported = typeof window !== "undefined" && typeof window.navigator !== "undefined" && "serviceWorker" in window.navigator;
     let swRegistered = false;
     let swState: string | null = null;
     let hasSubscription = false;
@@ -333,7 +333,7 @@ export default function PushNotificationsConfigPage() {
 
     if (swSupported) {
       try {
-        const reg = await navigator.serviceWorker.getRegistration();
+        const reg = await window.navigator.serviceWorker.getRegistration();
         swRegistered = !!reg;
         swState = reg?.active?.state || null;
 
@@ -364,7 +364,7 @@ export default function PushNotificationsConfigPage() {
       subscriptionExists: hasSubscription,
       subscriptionEndpoint: subEndpoint,
       subscriptionCreatedAt: subCreatedAt,
-      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
+      userAgent: typeof window !== "undefined" && typeof window.navigator !== "undefined" ? window.navigator.userAgent : "unknown",
     };
   }, []);
 
@@ -389,8 +389,8 @@ export default function PushNotificationsConfigPage() {
   const handleForceRegisterSW = useCallback(async () => {
     setDiagAction("register");
     try {
-      if ("serviceWorker" in navigator) {
-        await navigator.serviceWorker.register("/sw.js");
+      if ("serviceWorker" in window.navigator) {
+        await window.navigator.serviceWorker.register("/sw.js");
         toast({ title: "Service Worker registrado com sucesso" });
       }
     } catch (err) {
@@ -404,11 +404,11 @@ export default function PushNotificationsConfigPage() {
   const handleRecreateSubscription = useCallback(async () => {
     setDiagAction("resubscribe");
     try {
-      if (!("serviceWorker" in navigator) || !("PushManager" in navigator)) {
+      if (!("serviceWorker" in window.navigator) || !("PushManager" in window.navigator)) {
         toast({ title: "Push não suportado neste navegador", variant: "destructive" });
         return;
       }
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await window.navigator.serviceWorker.ready;
       const oldSub = await reg.pushManager.getSubscription();
       if (oldSub) {
         try {
@@ -456,11 +456,11 @@ export default function PushNotificationsConfigPage() {
   const handleLocalTestNotification = useCallback(async () => {
     setDiagAction("localtest");
     try {
-      if (!("serviceWorker" in navigator)) {
+      if (!("serviceWorker" in window.navigator)) {
         toast({ title: "Service Worker não suportado", variant: "destructive" });
         return;
       }
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await window.navigator.serviceWorker.ready;
       if (!reg.active) {
         toast({ title: "Service Worker não está ativo", variant: "destructive" });
         return;
@@ -497,8 +497,8 @@ export default function PushNotificationsConfigPage() {
   const handleClearAndRestart = useCallback(async () => {
     setDiagAction("clear");
     try {
-      if ("serviceWorker" in navigator) {
-        const reg = await navigator.serviceWorker.getRegistration();
+      if ("serviceWorker" in window.navigator) {
+        const reg = await window.navigator.serviceWorker.getRegistration();
         if (reg) {
           const sub = await reg.pushManager.getSubscription();
           if (sub) {

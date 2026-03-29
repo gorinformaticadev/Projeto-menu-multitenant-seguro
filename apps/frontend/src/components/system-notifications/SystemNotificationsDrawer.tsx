@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Bell, CheckCheck, RefreshCw, Trash2 } from "lucide-react";
+import { Bell, CheckCheck, ExternalLink, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -68,26 +68,28 @@ export function SystemNotificationsDrawer() {
       }}
     >
       <DialogContent className="left-auto right-0 top-0 translate-x-0 translate-y-0 h-[100dvh] max-h-[100dvh] w-full max-w-[30rem] rounded-none border-l border-border p-0 gap-0 sm:rounded-none">
-        <DialogHeader className="border-b border-skin-border px-4 py-3 text-left">
+        <DialogHeader className="border-b border-skin-border bg-gradient-to-r from-skin-info/5 to-skin-primary/5 px-4 py-3 text-left">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <Bell className="h-4 w-4 text-skin-info" />
-              <DialogTitle className="text-sm font-semibold text-skin-text">
-                Notificacoes do sistema
-              </DialogTitle>
-              {unreadCount > 0 && (
-                <span className="rounded-full bg-skin-danger/10 px-2 py-1 text-xs font-medium text-skin-danger">
-                  {unreadCount} nova{unreadCount === 1 ? "" : "s"}
-                </span>
-              )}
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-skin-info/10">
+                <Bell className="h-4 w-4 text-skin-info" />
+              </div>
+              <div className="min-w-0">
+                <DialogTitle className="text-sm font-semibold text-skin-text">
+                  Notificacoes do sistema
+                </DialogTitle>
+                {unreadCount > 0 ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-skin-text-muted">
+                    <Sparkles className="h-3 w-3 text-skin-warning" />
+                    {unreadCount} nao lida{unreadCount === 1 ? "" : "s"}
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-skin-text-muted">Tudo em dia</span>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center gap-1">
-              <Button asChild variant="ghost" size="sm" className="h-8 text-xs">
-                <Link href="/notifications" onClick={() => closeDrawer()}>
-                  Ver central
-                </Link>
-              </Button>
               <Button
                 variant="ghost"
                 size="icon"
@@ -101,27 +103,34 @@ export function SystemNotificationsDrawer() {
               </Button>
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-8 text-xs"
+                size="icon"
+                className="h-8 w-8"
                 onClick={() => {
                   void markAllAsRead();
                 }}
                 disabled={unreadCount === 0}
+                aria-label="Marcar todas como lidas"
+                title="Marcar todas como lidas"
               >
-                <CheckCheck className="h-3.5 w-3.5 mr-1" />
-                Marcar todas
+                <CheckCheck className="h-4 w-4" />
               </Button>
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-8 text-xs"
+                size="icon"
+                className="h-8 w-8"
                 onClick={() => {
                   void handleDeleteRead();
                 }}
                 disabled={readCount === 0 || deletingRead}
+                aria-label="Apagar notificacoes lidas"
+                title="Apagar lidas"
               >
-                <Trash2 className="h-3.5 w-3.5 mr-1" />
-                Apagar lidas
+                <Trash2 className={`h-4 w-4 ${deletingRead ? "animate-pulse" : ""}`} />
+              </Button>
+              <Button asChild variant="ghost" size="icon" className="h-8 w-8">
+                <Link href="/notifications" onClick={() => closeDrawer()} aria-label="Ver central de notificacoes">
+                  <ExternalLink className="h-4 w-4" />
+                </Link>
               </Button>
             </div>
           </div>

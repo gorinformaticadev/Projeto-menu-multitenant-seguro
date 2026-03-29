@@ -315,9 +315,7 @@ export function SystemNotificationsProvider({ children }: { children: React.Reac
       );
       const deleted = response.data?.count ?? 0;
 
-      if (deleted > 0) {
-        setItems((previous) => previous.filter((item) => !item.isRead));
-      }
+      await refresh();
 
       return deleted;
     } catch (requestError) {
@@ -329,7 +327,7 @@ export function SystemNotificationsProvider({ children }: { children: React.Reac
       setError(`Falha ao limpar notificacoes lidas: ${normalizeErrorMessage(requestError)}`);
       return 0;
     }
-  }, [accessDenied, handleAccessDenied, isSuperAdmin]);
+  }, [accessDenied, handleAccessDenied, isSuperAdmin, refresh]);
 
   const openDrawer = useCallback(() => {
     if (!isEnabled) {
