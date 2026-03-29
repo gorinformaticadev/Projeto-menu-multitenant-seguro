@@ -5,10 +5,17 @@ import { UpdateCronService } from './update-cron.service';
 import { SystemUpdateController } from './system-update.controller';
 import { SystemUpdateAdminService } from './system-update-admin.service';
 import { UpdateExecutionController } from './engine/update-execution.controller';
+import { UpdateAgentExecutionService } from './engine/update-agent-execution.service';
+import { UpdateCommandRunnerService } from './engine/update-command-runner.service';
 import { UpdateExecutionBridgeService } from './engine/update-execution-bridge.service';
 import { UpdateExecutionFacadeService } from './engine/update-execution.facade.service';
+import { UpdateHttpProbeService } from './engine/update-http-probe.service';
 import { UpdateExecutionRepository } from './engine/update-execution.repository';
+import { UpdateEngineCapabilitiesService } from './engine/update-engine-capabilities.service';
 import { UpdateStateMachineService } from './engine/update-state-machine.service';
+import { DockerUpdateRuntimeAdapter } from './engine/runtime/docker-update-runtime.adapter';
+import { NativeUpdateRuntimeAdapter } from './engine/runtime/native-update-runtime.adapter';
+import { UpdateRuntimeAdapterRegistryService } from './engine/runtime/update-runtime-adapter-registry.service';
 import { PrismaModule } from '@core/prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
 import { CommonModule } from '../common/common.module';
@@ -37,6 +44,13 @@ import { CronModule } from '@core/cron/cron.module';
     UpdateStateMachineService,
     UpdateExecutionFacadeService,
     UpdateExecutionBridgeService,
+    UpdateCommandRunnerService,
+    UpdateHttpProbeService,
+    NativeUpdateRuntimeAdapter,
+    DockerUpdateRuntimeAdapter,
+    UpdateRuntimeAdapterRegistryService,
+    UpdateEngineCapabilitiesService,
+    UpdateAgentExecutionService,
   ],
   exports: [
     UpdateService,
@@ -45,6 +59,11 @@ import { CronModule } from '@core/cron/cron.module';
     UpdateStateMachineService,
     UpdateExecutionFacadeService,
     UpdateExecutionBridgeService,
+    UpdateCommandRunnerService,
+    UpdateHttpProbeService,
+    UpdateRuntimeAdapterRegistryService,
+    UpdateEngineCapabilitiesService,
+    UpdateAgentExecutionService,
   ],
 })
 export class UpdateModule {

@@ -361,6 +361,11 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
             updateLogId: updateLog.id,
             ipAddress: ipAddress || null,
             userAgent: userAgent || null,
+            gitRepoUrl: env.GIT_REPO_URL || null,
+            gitAuthHeader: env.GIT_AUTH_HEADER || null,
+            updateChannel: settings.updateChannel || 'release',
+            composeFile: settings.composeFile || 'docker-compose.prod.yml',
+            envFile: settings.envFile || 'install/.env.production',
           },
         });
         canonicalExecutionId = canonicalExecution.id;

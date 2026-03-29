@@ -17,11 +17,17 @@ describe('UpdateAgentRunnerService', () => {
     launchLegacyExecution: jest.fn(async () => ({ operationId: 'op-1' })),
   };
 
-  const stateMachineMock = {
-    buildExecutionView: jest.fn((execution: unknown) => ({
-      ...(execution as object),
-      progressPercent: 0,
-      stepsPlanned: [],
+  const agentExecutionServiceMock = {
+    processExecution: jest.fn(async (params: any) => ({
+      kind: 'bridge',
+      execution: {
+        ...params.execution,
+        progressPercent: 14,
+        stepsPlanned: [],
+      },
+      bridgeEnv: {
+        UPDATE_EXECUTION_ID: params.execution.id,
+      },
     })),
   };
 
@@ -30,7 +36,7 @@ describe('UpdateAgentRunnerService', () => {
       leaseServiceMock as any,
       repositoryMock as any,
       bridgeServiceMock as any,
-      stateMachineMock as any,
+      agentExecutionServiceMock as any,
     );
 
   beforeEach(() => {
@@ -74,11 +80,19 @@ describe('UpdateAgentRunnerService', () => {
     expect(leaseServiceMock.tryAcquire).toHaveBeenCalled();
     expect(leaseServiceMock.renew).toHaveBeenCalled();
     expect(repositoryMock.findNextRequestedExecution).toHaveBeenCalledWith('host-1');
-    expect(stateMachineMock.buildExecutionView).toHaveBeenCalled();
+    expect(agentExecutionServiceMock.processExecution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runnerId: 'runner-1',
+      }),
+    );
     expect(bridgeServiceMock.launchLegacyExecution).toHaveBeenCalledWith(
       expect.objectContaining({
+        execution: expect.objectContaining({
+          id: 'execution-1',
+        }),
         version: 'v1.2.3',
         userId: 'super-1',
+        skipCanonicalBootstrap: true,
       }),
     );
     expect(leaseServiceMock.release).toHaveBeenCalledWith('host-1', 'runner-1');

@@ -6,6 +6,19 @@ export type UpdateExecutionSource = 'panel' | 'terminal' | 'system';
 
 export type UpdateRollbackPolicy = 'code_only_safe' | 'restore_required' | 'manual_only';
 
+export type UpdateEnvSnapshotScope =
+  | 'backend'
+  | 'frontend_runtime'
+  | 'docker'
+  | 'release_runtime';
+
+export type UpdateReleaseSnapshotKind =
+  | 'current_release'
+  | 'previous_release'
+  | 'target_release'
+  | 'current_images'
+  | 'previous_images';
+
 export type UpdateStepRunStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
 
 export type UpdateStepCode =
@@ -40,6 +53,33 @@ export type UpdateExecutionErrorSnapshot = {
 };
 
 export type UpdateExecutionMetadata = Record<string, unknown>;
+
+export type UpdateEnvSnapshotInput = {
+  scope: UpdateEnvSnapshotScope;
+  schemaVersion: string;
+  checksum: string;
+  contentEncrypted: string;
+};
+
+export type UpdateReleaseSnapshotInput = {
+  kind: UpdateReleaseSnapshotKind;
+  ref: string;
+  version: string | null;
+  digest: Record<string, unknown> | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type UpdateCommandRunInput = {
+  id?: string;
+  executionId: string;
+  stepRunId?: string | null;
+  command: string;
+  args: string[];
+  cwd?: string | null;
+  stdoutPath?: string | null;
+  stderrPath?: string | null;
+  metadata?: Record<string, unknown>;
+};
 
 export type UpdateExecutionRecord = {
   id: string;

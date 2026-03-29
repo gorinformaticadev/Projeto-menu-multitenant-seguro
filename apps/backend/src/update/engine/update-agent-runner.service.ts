@@ -1,9 +1,9 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import * as os from 'os';
+import { UpdateAgentExecutionService } from './update-agent-execution.service';
 import { UpdateExecutionBridgeService } from './update-execution-bridge.service';
 import { UpdateExecutionLeaseService } from './update-execution-lease.service';
 import { UpdateExecutionRepository } from './update-execution.repository';
-import { UpdateStateMachineService } from './update-state-machine.service';
 
 @Injectable()
 export class UpdateAgentRunnerService implements OnModuleInit, OnModuleDestroy {
@@ -19,7 +19,7 @@ export class UpdateAgentRunnerService implements OnModuleInit, OnModuleDestroy {
     private readonly leaseService: UpdateExecutionLeaseService,
     private readonly repository: UpdateExecutionRepository,
     private readonly bridgeService: UpdateExecutionBridgeService,
-    private readonly stateMachine: UpdateStateMachineService,
+    private readonly agentExecutionService: UpdateAgentExecutionService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -79,10 +79,6 @@ export class UpdateAgentRunnerService implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
-      if (!this.bridgeService.isEnabled() || process.env.UPDATE_AGENT_LEGACY_BRIDGE_ENABLED !== 'true') {
-        return;
-      }
-
       const pending = await this.repository.findNextRequestedExecution(this.installationId);
       if (!pending) {
         return;
@@ -95,14 +91,27 @@ export class UpdateAgentRunnerService implements OnModuleInit, OnModuleDestroy {
         ttlSeconds: this.ttlSeconds,
       });
 
+      const processed = await this.agentExecutionService.processExecution({
+        execution: pending,
+        runnerId: this.runnerIdentity.runnerId,
+        allowLegacyBridge:
+          this.bridgeService.isEnabled() && process.env.UPDATE_AGENT_LEGACY_BRIDGE_ENABLED === 'true',
+      });
+
+      if (processed.kind !== 'bridge') {
+        return;
+      }
+
       await this.bridgeService.launchLegacyExecution({
-        execution: this.stateMachine.buildExecutionView(pending),
+        execution: processed.execution,
         version: pending.targetVersion,
         userId: pending.requestedBy || 'system',
         userEmail: typeof pending.metadata?.['userEmail'] === 'string' ? String(pending.metadata['userEmail']) : undefined,
         userRole: typeof pending.metadata?.['userRole'] === 'string' ? String(pending.metadata['userRole']) : undefined,
         ipAddress: typeof pending.metadata?.['ipAddress'] === 'string' ? String(pending.metadata['ipAddress']) : undefined,
         userAgent: typeof pending.metadata?.['userAgent'] === 'string' ? String(pending.metadata['userAgent']) : undefined,
+        env: processed.bridgeEnv,
+        skipCanonicalBootstrap: true,
       });
     } catch (error) {
       this.logger.warn(`Falha no loop do update-agent: ${String(error)}`);

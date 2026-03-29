@@ -21,6 +21,7 @@ type BridgeLaunchParams = {
   ipAddress?: string;
   userAgent?: string;
   env?: NodeJS.ProcessEnv;
+  skipCanonicalBootstrap?: boolean;
 };
 
 type LegacySystemStateSnapshot = {
@@ -68,22 +69,26 @@ export class UpdateExecutionBridgeService {
     operationId: string;
     execution: UpdateExecutionView;
   }> {
-    const executionRecord = await this.repository.updateExecution(params.execution.id, {
-      status: 'running',
-      currentStep: 'precheck',
-      progressUnitsDone: 0,
-      progressUnitsTotal: getPrimaryExecutionStepsForMode(params.execution.mode).length,
-      startedAt: new Date().toISOString(),
-      metadata: {
-        bridgeMode: 'legacy_system_update_admin',
-        bridgeStatus: 'launching',
-      },
-    });
+    const executionRecord = params.skipCanonicalBootstrap
+      ? (await this.repository.findExecutionById(params.execution.id)) || params.execution
+      : await this.repository.updateExecution(params.execution.id, {
+          status: 'running',
+          currentStep: 'precheck',
+          progressUnitsDone: 0,
+          progressUnitsTotal: getPrimaryExecutionStepsForMode(params.execution.mode).length,
+          startedAt: new Date().toISOString(),
+          metadata: {
+            bridgeMode: 'legacy_system_update_admin',
+            bridgeStatus: 'launching',
+          },
+        });
 
-    await this.repository.upsertProjectedSteps(
-      executionRecord.id,
-      this.stateMachine.buildStepPlan(executionRecord, []),
-    );
+    if (!params.skipCanonicalBootstrap) {
+      await this.repository.upsertProjectedSteps(
+        executionRecord.id,
+        this.stateMachine.buildStepPlan(executionRecord, []),
+      );
+    }
 
     try {
       const launchResult = await this.systemUpdateAdminService.runUpdate({

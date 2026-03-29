@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { DockerUpdateRuntimeAdapter } from './docker-update-runtime.adapter';
 import { NativeUpdateRuntimeAdapter } from './native-update-runtime.adapter';
 import type { UpdateExecutionMode } from '../update-execution.types';
-import type { UpdateRuntimeAdapterDescriptor } from './update-runtime-adapter.interface';
+import type {
+  UpdateRuntimeAdapter,
+  UpdateRuntimeAdapterDescriptor,
+} from './update-runtime-adapter.interface';
 
 @Injectable()
 export class UpdateRuntimeAdapterRegistryService {
@@ -17,5 +20,9 @@ export class UpdateRuntimeAdapterRegistryService {
 
   get(mode: UpdateExecutionMode): UpdateRuntimeAdapterDescriptor {
     return mode === 'docker' ? this.dockerAdapter.describe() : this.nativeAdapter.describe();
+  }
+
+  resolve(mode: UpdateExecutionMode): UpdateRuntimeAdapter {
+    return mode === 'docker' ? this.dockerAdapter : this.nativeAdapter;
   }
 }

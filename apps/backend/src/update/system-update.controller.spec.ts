@@ -14,7 +14,20 @@ describe('SystemUpdateController platform boundary', () => {
     listReleases: jest.fn(),
   };
 
-  const createController = () => new SystemUpdateController(serviceMock as any);
+  const capabilitiesServiceMock = {
+    getCapabilities: jest.fn(() => ({
+      sourceOfTruth: 'canonical_db',
+      updateAgent: {
+        enabled: true,
+        legacyBridgeEnabled: true,
+      },
+      canonicalReadEnabled: true,
+      runtimeAdapters: [],
+    })),
+  };
+
+  const createController = () =>
+    new SystemUpdateController(serviceMock as any, capabilitiesServiceMock as any);
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -61,5 +74,13 @@ describe('SystemUpdateController platform boundary', () => {
         userRole: Role.SUPER_ADMIN,
       }),
     );
+  });
+
+  it('expõe as capacidades do engine canonico sem depender do controller legado', async () => {
+    const controller = createController();
+
+    await controller.capabilities();
+
+    expect(capabilitiesServiceMock.getCapabilities).toHaveBeenCalled();
   });
 });

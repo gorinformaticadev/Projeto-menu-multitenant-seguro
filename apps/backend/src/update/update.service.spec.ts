@@ -318,6 +318,11 @@ describe('UpdateService', () => {
       expect.objectContaining({
         targetVersion: 'v1.2.3',
         requestedBy: 'user-1',
+        metadata: expect.objectContaining({
+          gitRepoUrl: 'https://github.com/org/repo.git',
+          composeFile: 'docker-compose.prod.yml',
+          envFile: 'install/.env.production',
+        }),
       }),
     );
     expect(updateExecutionBridgeServiceMock.launchLegacyExecution).toHaveBeenCalled();

@@ -3,8 +3,11 @@ import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@core/prisma/prisma.service';
 import {
+  type UpdateCommandRunInput,
+  type UpdateEnvSnapshotInput,
   type UpdateExecutionRecord,
   type UpdateExecutionErrorSnapshot,
+  type UpdateReleaseSnapshotInput,
   type UpdateStepRunRecord,
   type UpdateExecutionMetadata,
   type UpdateExecutionStepView,
@@ -283,6 +286,133 @@ export class UpdateExecutionRepository {
           finished_at = EXCLUDED.finished_at
       `);
     }
+  }
+
+  async replaceEnvSnapshots(
+    executionId: string,
+    snapshots: UpdateEnvSnapshotInput[],
+  ): Promise<void> {
+    const operations: Prisma.PrismaPromise<unknown>[] = [
+      this.prisma.$executeRaw(Prisma.sql`
+        DELETE FROM ops_update.env_snapshots
+        WHERE execution_id = ${executionId}
+      `),
+    ];
+
+    for (const snapshot of snapshots) {
+      operations.push(
+        this.prisma.$executeRaw(Prisma.sql`
+          INSERT INTO ops_update.env_snapshots (
+            id,
+            execution_id,
+            scope,
+            schema_version,
+            checksum,
+            content_encrypted
+          )
+          VALUES (
+            ${randomUUID()},
+            ${executionId},
+            ${snapshot.scope},
+            ${snapshot.schemaVersion},
+            ${snapshot.checksum},
+            ${snapshot.contentEncrypted}
+          )
+        `),
+      );
+    }
+
+    await this.prisma.$transaction(operations);
+  }
+
+  async replaceReleaseSnapshots(
+    executionId: string,
+    snapshots: UpdateReleaseSnapshotInput[],
+  ): Promise<void> {
+    const operations: Prisma.PrismaPromise<unknown>[] = [
+      this.prisma.$executeRaw(Prisma.sql`
+        DELETE FROM ops_update.release_snapshots
+        WHERE execution_id = ${executionId}
+      `),
+    ];
+
+    for (const snapshot of snapshots) {
+      operations.push(
+        this.prisma.$executeRaw(Prisma.sql`
+          INSERT INTO ops_update.release_snapshots (
+            id,
+            execution_id,
+            kind,
+            ref,
+            version,
+            digest_json,
+            metadata_json
+          )
+          VALUES (
+            ${randomUUID()},
+            ${executionId},
+            ${snapshot.kind},
+            ${snapshot.ref},
+            ${snapshot.version},
+            ${this.jsonParam(snapshot.digest)},
+            ${this.jsonParam(snapshot.metadata || {})}
+          )
+        `),
+      );
+    }
+
+    await this.prisma.$transaction(operations);
+  }
+
+  async createCommandRun(input: UpdateCommandRunInput): Promise<string> {
+    const id = input.id || randomUUID();
+    await this.prisma.$executeRaw(Prisma.sql`
+      INSERT INTO ops_update.command_runs (
+        id,
+        execution_id,
+        step_run_id,
+        command,
+        args_json,
+        cwd,
+        exit_code,
+        stdout_path,
+        stderr_path,
+        metadata_json,
+        started_at,
+        finished_at
+      )
+      VALUES (
+        ${id},
+        ${input.executionId},
+        ${input.stepRunId || null},
+        ${input.command},
+        ${this.jsonParam(input.args || [])},
+        ${input.cwd || null},
+        NULL,
+        ${input.stdoutPath || null},
+        ${input.stderrPath || null},
+        ${this.jsonParam(input.metadata || {})},
+        NOW(),
+        NULL
+      )
+    `);
+
+    return id;
+  }
+
+  async finishCommandRun(params: {
+    id: string;
+    exitCode: number | null;
+    metadata?: Record<string, unknown>;
+  }): Promise<void> {
+    await this.prisma.$executeRaw(Prisma.sql`
+      UPDATE ops_update.command_runs
+      SET
+        exit_code = ${params.exitCode},
+        metadata_json = COALESCE(metadata_json, '{}'::jsonb) || ${this.jsonParam(params.metadata || {})},
+        finished_at = NOW()
+      WHERE id = ${params.id}
+    `);
   }
 
   async tryAcquireRunnerLease(params: {
