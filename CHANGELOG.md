@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.99](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.98...v0.1.99) (2026-03-29)
+
+
+### Features
+
+* implement native and docker update runtime adapters and core execution services ([f8d5507](https://github.com/gorinformaticadev/Pluggor/commit/f8d5507a9e684c53e12d85f3c3876a343fe9471d))
+
 ### [0.1.98](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.97...v0.1.98) (2026-03-29)
 
 
