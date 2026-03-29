@@ -44,4 +44,15 @@ describe('UpdateStateMachineService', () => {
     expect(steps[steps.length - 1].step).toBe('rollback');
     expect(steps[steps.length - 1].status).toBe('pending');
   });
+
+  it('aceita transicao valida para a proxima etapa planejada', () => {
+    expect(() => service.assertStepTransition('native', 'prepare', 'fetch_code')).not.toThrow();
+    expect(() => service.assertStepTransition('docker', 'prepare', 'pull_images')).not.toThrow();
+  });
+
+  it('rejeita transicao invalida fora da ordem canônica', () => {
+    expect(() => service.assertStepTransition('native', 'prepare', 'build_frontend')).toThrow(
+      'Transicao invalida para o pipeline de update',
+    );
+  });
 });

@@ -35,6 +35,12 @@ describe('DockerUpdateRuntimeAdapter', () => {
   let tmpDir: string;
   let runtime: UpdateRuntimePaths;
   let metadata: Record<string, unknown>;
+  let frontendContainerSnapshots: string[];
+  let backendContainerSnapshots: string[];
+  let frontendConfigImage: string;
+  let backendConfigImage: string;
+  let frontendHealthStatus: string;
+  let backendHealthStatus: string;
 
   const commandRunnerMock = {
     run: jest.fn(async (request: any) => {
@@ -72,7 +78,7 @@ describe('DockerUpdateRuntimeAdapter', () => {
         return {
           commandRunId: 'cmd-ps-frontend',
           exitCode: 0,
-          stdout: 'frontend-container\n',
+          stdout: `${frontendContainerSnapshots.shift() || frontendContainerSnapshots[0] || ''}\n`,
           stderr: '',
           stdoutPath: null,
           stderrPath: null,
@@ -83,7 +89,7 @@ describe('DockerUpdateRuntimeAdapter', () => {
         return {
           commandRunId: 'cmd-ps-backend',
           exitCode: 0,
-          stdout: 'backend-container\n',
+          stdout: `${backendContainerSnapshots.shift() || backendContainerSnapshots[0] || ''}\n`,
           stderr: '',
           stdoutPath: null,
           stderrPath: null,
@@ -105,9 +111,9 @@ describe('DockerUpdateRuntimeAdapter', () => {
         return {
           commandRunId: 'cmd-config-image',
           exitCode: 0,
-          stdout: args.includes('frontend-container')
-            ? 'ghcr.io/test/frontend:v1.0.0\n'
-            : 'ghcr.io/test/backend:v1.0.0\n',
+          stdout: args.includes('frontend')
+            ? `${frontendConfigImage}\n`
+            : `${backendConfigImage}\n`,
           stderr: '',
           stdoutPath: null,
           stderrPath: null,
@@ -118,7 +124,7 @@ describe('DockerUpdateRuntimeAdapter', () => {
         return {
           commandRunId: 'cmd-health',
           exitCode: 0,
-          stdout: 'healthy\n',
+          stdout: args.includes('frontend') ? `${frontendHealthStatus}\n` : `${backendHealthStatus}\n`,
           stderr: '',
           stdoutPath: null,
           stderrPath: null,
@@ -157,6 +163,22 @@ describe('DockerUpdateRuntimeAdapter', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    frontendContainerSnapshots = [
+      'frontend-container-before',
+      'frontend-container-before',
+      'frontend-container-after',
+      'frontend-container-after',
+    ];
+    backendContainerSnapshots = [
+      'backend-container-before',
+      'backend-container-before',
+      'backend-container-after',
+      'backend-container-after',
+    ];
+    frontendConfigImage = 'ghcr.io/test/frontend:v1.2.3';
+    backendConfigImage = 'ghcr.io/test/backend:v1.2.3';
+    frontendHealthStatus = 'healthy';
+    backendHealthStatus = 'healthy';
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pluggor-docker-adapter-'));
     fs.mkdirSync(path.join(tmpDir, 'shared'), { recursive: true });
     fs.mkdirSync(path.join(tmpDir, 'install'), { recursive: true });
@@ -229,5 +251,133 @@ describe('DockerUpdateRuntimeAdapter', () => {
     expect(fs.existsSync(String(metadata.activeComposeOverride))).toBe(true);
     expect(probeServiceMock.waitForReady).toHaveBeenCalled();
     expect(commandRunnerMock.run).toHaveBeenCalled();
+  });
+
+  it('pull_images retorna evidência estruturada da imagem alvo preparada', async () => {
+    const adapter = createAdapter();
+    const execution = createExecution();
+
+    const result = await adapter.executeStep('pull_images', {
+      execution,
+      runtime,
+      metadata,
+    });
+
+    expect(result.metadata).toMatchObject({
+      targetFrontendImageRef: 'ghcr.io/test/frontend:v1.2.3',
+      targetBackendImageRef: 'ghcr.io/test/backend:v1.2.3',
+    });
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'imagens_alvo_resolvidas',
+        }),
+      ]),
+    );
+  });
+
+  it('restart_services docker retorna os containers efetivamente recriados', async () => {
+    frontendContainerSnapshots = ['frontend-container-before', 'frontend-container-after'];
+    backendContainerSnapshots = ['backend-container-before', 'backend-container-after'];
+    const adapter = createAdapter();
+    const execution = createExecution();
+
+    const result = await adapter.executeStep('restart_services', {
+      execution,
+      runtime,
+      metadata: {
+        ...metadata,
+        activeComposeOverride: path.join(tmpDir, 'shared', 'update-engine', 'compose-overrides', 'execution-docker-1-target.override.yml'),
+      },
+    });
+
+    expect(result.result).toMatchObject({
+      restartedServices: expect.arrayContaining([
+        expect.objectContaining({
+          service: 'frontend',
+          beforeContainerId: 'frontend-container-before',
+          afterContainerId: 'frontend-container-after',
+        }),
+        expect.objectContaining({
+          service: 'backend',
+          beforeContainerId: 'backend-container-before',
+          afterContainerId: 'backend-container-after',
+        }),
+      ]),
+    });
+  });
+
+  it('restart_services docker falha de forma parcial quando um container não é recriado', async () => {
+    frontendContainerSnapshots = ['frontend-container-before', 'frontend-container-before'];
+    backendContainerSnapshots = ['backend-container-before', 'backend-container-after'];
+    const adapter = createAdapter();
+    const execution = createExecution();
+
+    await expect(
+      adapter.executeStep('restart_services', {
+        execution,
+        runtime,
+        metadata: {
+          ...metadata,
+          activeComposeOverride: path.join(tmpDir, 'shared', 'update-engine', 'compose-overrides', 'execution-docker-1-target.override.yml'),
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: 'UPDATE_RESTART_PARTIAL_FAILURE',
+      details: expect.objectContaining({
+        serviceFailures: expect.arrayContaining([
+          expect.objectContaining({
+            service: 'frontend',
+            reason: 'container_not_recreated',
+          }),
+        ]),
+      }),
+    });
+  });
+
+  it('healthcheck docker valida containers, probes HTTP e imagem observada', async () => {
+    frontendContainerSnapshots = ['frontend-container-after'];
+    backendContainerSnapshots = ['backend-container-after'];
+    const adapter = createAdapter();
+    const execution = createExecution();
+
+    const result = await adapter.executeStep('healthcheck', {
+      execution,
+      runtime,
+      metadata: {
+        ...metadata,
+        targetFrontendImageRef: 'ghcr.io/test/frontend:v1.2.3',
+        targetBackendImageRef: 'ghcr.io/test/backend:v1.2.3',
+      },
+    });
+
+    expect(result.result).toMatchObject({
+      frontendContainerId: 'frontend-container-after',
+      backendContainerId: 'backend-container-after',
+      observedFrontendImage: 'ghcr.io/test/frontend:v1.2.3',
+      observedBackendImage: 'ghcr.io/test/backend:v1.2.3',
+    });
+  });
+
+  it('healthcheck docker falha de forma estruturada quando um container fica unhealthy', async () => {
+    frontendContainerSnapshots = ['frontend-container-after'];
+    backendContainerSnapshots = ['backend-container-after'];
+    frontendHealthStatus = 'unhealthy';
+    const adapter = createAdapter();
+    const execution = createExecution();
+
+    await expect(
+      adapter.executeStep('healthcheck', {
+        execution,
+        runtime,
+        metadata: {
+          ...metadata,
+          targetFrontendImageRef: 'ghcr.io/test/frontend:v1.2.3',
+          targetBackendImageRef: 'ghcr.io/test/backend:v1.2.3',
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: 'UPDATE_HEALTHCHECK_CONTAINER_UNHEALTHY',
+    });
   });
 });

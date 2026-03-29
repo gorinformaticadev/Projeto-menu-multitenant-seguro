@@ -11,6 +11,7 @@ import {
   type UpdateStepCode,
 } from '../update-execution.types';
 import {
+  UpdateRuntimeStepError,
   type UpdateRollbackExecutionResult,
   type UpdateRuntimeAdapter,
   type UpdateRuntimeAdapterDescriptor,
@@ -18,6 +19,19 @@ import {
   type UpdateStepExecutionContext,
   type UpdateStepExecutionResult,
 } from './update-runtime-adapter.interface';
+
+type NativePm2ProcessEvidence = {
+  processName: string;
+  found: boolean;
+  status: string;
+  pid: number;
+  online: boolean;
+};
+
+type NativePm2StatusEvidence = {
+  backend: NativePm2ProcessEvidence;
+  frontend: NativePm2ProcessEvidence;
+};
 
 @Injectable()
 export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
@@ -151,15 +165,36 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
 
     await this.linkSharedIntoRelease(releaseDir, context.runtime);
     await this.resetReleaseBuildOutputs(releaseDir);
+    await this.assertRequiredReleaseFiles(releaseDir);
 
     return {
       result: {
         releaseDir,
         sourceType: localSourcePath ? 'local_source_path' : 'git_clone',
+        resolvedVersion: context.execution.targetVersion,
       },
       metadata: {
         targetReleaseDir: releaseDir,
+        targetReleaseResolvedVersion: context.execution.targetVersion,
       },
+      evidence: [
+        {
+          code: 'release_preparada',
+          summary: 'A release alvo foi materializada no diretório de releases.',
+          details: {
+            releaseDir,
+            sourceType: localSourcePath ? 'local_source_path' : 'git_clone',
+          },
+        },
+        {
+          code: 'manifestos_detectados',
+          summary: 'Os manifestos mínimos do backend e frontend foram encontrados.',
+          details: {
+            backendPackageJson: path.join(releaseDir, 'apps', 'backend', 'package.json'),
+            frontendPackageJson: path.join(releaseDir, 'apps', 'frontend', 'package.json'),
+          },
+        },
+      ],
     };
   }
 
@@ -286,16 +321,45 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
 
     await this.writeBuildMetadataFiles(releaseDir, context);
     await this.createDirSymlink(releaseDir, context.runtime.currentDir);
+    const observedCurrentReleaseRef = await this.safeRealpath(context.runtime.currentDir);
+    const expectedCurrentReleaseRef = (await this.safeRealpath(releaseDir)) || releaseDir;
+    if (!observedCurrentReleaseRef || !this.isSameResolvedPath(observedCurrentReleaseRef, expectedCurrentReleaseRef)) {
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_SWITCH_RELEASE_CONFIRMATION_FAILED',
+        category: 'UPDATE_SWITCH_RELEASE_FAILED',
+        stage: 'switch_release',
+        userMessage: 'A troca da release nao foi confirmada no ponteiro current.',
+        technicalMessage: `current aponta para ${observedCurrentReleaseRef || 'null'} em vez de ${expectedCurrentReleaseRef}.`,
+        rollbackEligible: true,
+        retryable: false,
+        details: {
+          releaseDir: expectedCurrentReleaseRef,
+          observedCurrentReleaseRef,
+          previousReleaseRef: currentReleaseRef,
+        },
+      });
+    }
 
     return {
       result: {
         currentReleaseRef: releaseDir,
         previousReleaseRef: currentReleaseRef,
+        observedCurrentReleaseRef,
       },
       metadata: {
         currentReleaseRef: releaseDir,
         previousReleaseRef: currentReleaseRef || null,
       },
+      evidence: [
+        {
+          code: 'ponteiro_current_atualizado',
+          summary: 'O ponteiro current foi trocado para a nova release.',
+          details: {
+            previousReleaseRef: currentReleaseRef,
+            observedCurrentReleaseRef,
+          },
+        },
+      ],
     };
   }
 
@@ -305,6 +369,14 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     return {
       result: restartResult,
       metadata: restartResult,
+      evidence: [
+        {
+          code: 'servicos_pm2_reiniciados',
+          summary: 'Os serviços do PM2 foram reiniciados e revalidados pelo adapter.',
+          details: restartResult,
+        },
+      ],
+      retryable: true,
     };
   }
 
@@ -313,6 +385,13 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     const result = await this.performHealthcheck(releaseDir, context);
     return {
       result,
+      evidence: [
+        {
+          code: 'runtime_native_saudavel',
+          summary: 'Processos PM2, endpoints HTTP e versão observada ficaram consistentes.',
+          details: result,
+        },
+      ],
     };
   }
 
@@ -480,7 +559,7 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
 
   private async runCommandOrThrow(
     context: UpdateStepExecutionContext,
-    step: string,
+    step: UpdateStepCode,
     command: string,
     args: string[],
     cwd: string,
@@ -497,9 +576,22 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     });
 
     if (result.exitCode !== 0) {
-      throw new Error(
-        `${command} ${args.join(' ')} falhou com exitCode=${result.exitCode}. ${result.stderr || result.stdout}`.trim(),
-      );
+      throw new UpdateRuntimeStepError({
+        code: `UPDATE_${step.toUpperCase()}_COMMAND_FAILED`,
+        category: `UPDATE_${step.toUpperCase()}_FAILED`,
+        stage: step,
+        userMessage: `Falha ao executar ${command} na etapa ${step}.`,
+        technicalMessage: `${command} ${args.join(' ')} falhou com exitCode=${result.exitCode}. ${result.stderr || result.stdout}`.trim(),
+        exitCode: result.exitCode,
+        commandRunId: result.commandRunId,
+        retryable: step === 'restart_services' || step === 'healthcheck',
+        rollbackEligible: step !== 'fetch_code',
+        details: {
+          command,
+          args,
+          cwd,
+        },
+      });
     }
 
     return result;
@@ -674,29 +766,102 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       logDir: context.runtime.logsDir,
     });
 
-    await this.runCommandOrThrow(
-      context,
-      'restart_services',
-      'pm2',
-      ['start', 'dist/main.js', '--name', backendName, '--cwd', path.join(releaseDir, 'apps', 'backend'), '--update-env'],
-      context.runtime.baseDir,
-    );
-    await this.runCommandOrThrow(
-      context,
-      'restart_services',
-      'pm2',
-      ['start', `node ${layout.entryRelativePath}`, '--name', frontendName, '--cwd', frontendDir, '--update-env'],
-      context.runtime.baseDir,
-      {
+    const restartedServices: Array<Record<string, unknown>> = [];
+    const serviceFailures: Array<Record<string, unknown>> = [];
+
+    const backendStart = await this.commandRunner.run({
+      executionId: context.execution.id,
+      step: 'restart_services',
+      command: 'pm2',
+      args: ['start', 'dist/main.js', '--name', backendName, '--cwd', path.join(releaseDir, 'apps', 'backend'), '--update-env'],
+      cwd: context.runtime.baseDir,
+      logDir: context.runtime.logsDir,
+    });
+    if (backendStart.exitCode === 0) {
+      restartedServices.push({
+        service: 'backend',
+        processName: backendName,
+        commandRunId: backendStart.commandRunId,
+      });
+    } else {
+      serviceFailures.push({
+        service: 'backend',
+        processName: backendName,
+        exitCode: backendStart.exitCode,
+        commandRunId: backendStart.commandRunId,
+      });
+    }
+
+    const frontendStart = await this.commandRunner.run({
+      executionId: context.execution.id,
+      step: 'restart_services',
+      command: 'pm2',
+      args: ['start', `node ${layout.entryRelativePath}`, '--name', frontendName, '--cwd', frontendDir, '--update-env'],
+      cwd: context.runtime.baseDir,
+      env: {
         PORT: String(process.env.FRONTEND_PORT || 5000),
         HOSTNAME: '0.0.0.0',
       },
-    );
+      logDir: context.runtime.logsDir,
+    });
+    if (frontendStart.exitCode === 0) {
+      restartedServices.push({
+        service: 'frontend',
+        processName: frontendName,
+        commandRunId: frontendStart.commandRunId,
+      });
+    } else {
+      serviceFailures.push({
+        service: 'frontend',
+        processName: frontendName,
+        exitCode: frontendStart.exitCode,
+        commandRunId: frontendStart.commandRunId,
+      });
+    }
+
+    if (serviceFailures.length > 0) {
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_RESTART_PARTIAL_FAILURE',
+        category: 'UPDATE_RESTART_FAILED',
+        stage: 'restart_services',
+        userMessage: 'Falha parcial ao reiniciar os serviços publicados.',
+        technicalMessage: serviceFailures.map((failure) => JSON.stringify(failure)).join('; '),
+        retryable: true,
+        rollbackEligible: true,
+        commandRunId: String(serviceFailures[0]?.commandRunId || ''),
+        details: {
+          restartedServices,
+          serviceFailures,
+        },
+      });
+    }
+
     await this.runCommandOrThrow(context, 'restart_services', 'pm2', ['save'], context.runtime.baseDir);
+    const pm2Processes = await this.inspectPm2Processes(context, 'restart_services');
+    const observed = this.collectPm2Evidence(pm2Processes, {
+      backendName,
+      frontendName,
+    });
+
+    if (!observed.backend.online || !observed.frontend.online) {
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_RESTART_CONFIRMATION_FAILED',
+        category: 'UPDATE_RESTART_FAILED',
+        stage: 'restart_services',
+        userMessage: 'Os serviços foram iniciados, mas o PM2 não confirmou ambos como online.',
+        technicalMessage: `backend=${observed.backend.status}; frontend=${observed.frontend.status}`,
+        retryable: true,
+        rollbackEligible: true,
+        details: observed,
+      });
+    }
 
     return {
       pm2BackendName: backendName,
       pm2FrontendName: frontendName,
+      restartedServices,
+      serviceFailures,
+      pm2Status: observed,
     };
   }
 
@@ -704,6 +869,30 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     releaseDir: string,
     context: UpdateStepExecutionContext,
   ): Promise<Record<string, unknown>> {
+    const backendName =
+      this.getMetadataString(context.metadata, 'pm2BackendName') ||
+      String(process.env.PM2_BACKEND_NAME || 'multitenant-backend');
+    const frontendName =
+      this.getMetadataString(context.metadata, 'pm2FrontendName') ||
+      String(process.env.PM2_FRONTEND_NAME || 'multitenant-frontend');
+    const pm2Processes = await this.inspectPm2Processes(context, 'healthcheck');
+    const pm2Status = this.collectPm2Evidence(pm2Processes, {
+      backendName,
+      frontendName,
+    });
+    if (!pm2Status.backend.online || !pm2Status.frontend.online) {
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_HEALTHCHECK_PM2_NOT_ONLINE',
+        category: 'UPDATE_HEALTHCHECK_FAILED',
+        stage: 'healthcheck',
+        userMessage: 'Os processos publicados não ficaram online no PM2.',
+        technicalMessage: `backend=${pm2Status.backend.status}; frontend=${pm2Status.frontend.status}`,
+        retryable: true,
+        rollbackEligible: true,
+        details: pm2Status,
+      });
+    }
+
     const env = await this.buildNativeCommandEnv(context.runtime);
     const backendPort = Number(env.PORT || process.env.PORT || 4000);
     const frontendPort = Number(process.env.FRONTEND_PORT || 5000);
@@ -719,8 +908,48 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       timeoutMs: Number(process.env.UPDATE_LIVE_HEALTH_TIMEOUT_MS || 120_000),
     });
 
+    const observedCurrentReleaseRef = await this.safeRealpath(context.runtime.currentDir);
+    const expectedCurrentReleaseRef = (await this.safeRealpath(releaseDir)) || releaseDir;
+    if (!observedCurrentReleaseRef || !this.isSameResolvedPath(observedCurrentReleaseRef, expectedCurrentReleaseRef)) {
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_HEALTHCHECK_RELEASE_MISMATCH',
+        category: 'UPDATE_HEALTHCHECK_FAILED',
+        stage: 'healthcheck',
+        userMessage: 'A release ativa observada não corresponde à release alvo publicada.',
+        technicalMessage: `current=${observedCurrentReleaseRef || 'null'} expected=${expectedCurrentReleaseRef}`,
+        retryable: false,
+        rollbackEligible: true,
+        details: {
+          observedCurrentReleaseRef,
+          expectedReleaseRef: expectedCurrentReleaseRef,
+        },
+      });
+    }
+
+    const observedVersion = await this.readObservedVersion(releaseDir);
+    if (observedVersion && observedVersion !== context.execution.targetVersion) {
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_HEALTHCHECK_VERSION_MISMATCH',
+        category: 'UPDATE_HEALTHCHECK_FAILED',
+        stage: 'healthcheck',
+        userMessage: 'A versão observada após o publish não corresponde à versão alvo.',
+        technicalMessage: `observed=${observedVersion} expected=${context.execution.targetVersion}`,
+        retryable: false,
+        rollbackEligible: true,
+        details: {
+          observedVersion,
+          expectedVersion: context.execution.targetVersion,
+        },
+      });
+    }
+
+    // Dependencias externas com efeito de dados ficam em post_validation, onde ja existe sonda confiavel de storage compartilhado.
+
     return {
       releaseDir,
+      observedCurrentReleaseRef,
+      observedVersion: observedVersion || null,
+      pm2Status,
       backendUrl,
       frontendUrl,
     };
@@ -897,5 +1126,126 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     } catch {
       return false;
     }
+  }
+
+  private async assertRequiredReleaseFiles(releaseDir: string): Promise<void> {
+    const requiredPaths = [
+      path.join(releaseDir, 'apps', 'backend', 'package.json'),
+      path.join(releaseDir, 'apps', 'frontend', 'package.json'),
+    ];
+
+    for (const requiredPath of requiredPaths) {
+      if (!(await this.pathExists(requiredPath))) {
+        throw new UpdateRuntimeStepError({
+          code: 'UPDATE_FETCH_CODE_RELEASE_INCOMPLETE',
+          category: 'UPDATE_FETCH_CODE_FAILED',
+          stage: 'fetch_code',
+          userMessage: 'A release obtida não contém os artefatos mínimos esperados.',
+          technicalMessage: `Arquivo obrigatório ausente: ${requiredPath}`,
+          retryable: false,
+          rollbackEligible: false,
+          details: {
+            releaseDir,
+            missingPath: requiredPath,
+          },
+        });
+      }
+    }
+  }
+
+  private async inspectPm2Processes(
+    context: UpdateStepExecutionContext,
+    step: 'restart_services' | 'healthcheck',
+  ): Promise<Array<Record<string, unknown>>> {
+    const result = await this.runCommandOrThrow(
+      context,
+      step,
+      'pm2',
+      ['jlist'],
+      context.runtime.baseDir,
+    );
+
+    try {
+      return JSON.parse(result.stdout) as Array<Record<string, unknown>>;
+    } catch (error) {
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_PM2_JLIST_INVALID',
+        category: step === 'healthcheck' ? 'UPDATE_HEALTHCHECK_FAILED' : 'UPDATE_RESTART_FAILED',
+        stage: step,
+        userMessage: 'O PM2 não retornou um inventário estruturado válido.',
+        technicalMessage: error instanceof Error ? error.message : String(error),
+        retryable: true,
+        rollbackEligible: true,
+        commandRunId: result.commandRunId,
+        details: {
+          rawOutput: result.stdout,
+        },
+      });
+    }
+  }
+
+  private collectPm2Evidence(
+    processes: Array<Record<string, unknown>>,
+    names: {
+      backendName: string;
+      frontendName: string;
+    },
+  ): NativePm2StatusEvidence {
+    const resolveProcess = (name: string) => {
+      const found = processes.find((entry) => String(entry.name || '') === name);
+      const pm2Env =
+        found && typeof found.pm2_env === 'object' && found.pm2_env !== null
+          ? (found.pm2_env as Record<string, unknown>)
+          : {};
+
+      return {
+        processName: name,
+        found: Boolean(found),
+        status: String(pm2Env.status || 'missing'),
+        pid: Number(pm2Env.pm_id || -1),
+        online: String(pm2Env.status || '') === 'online',
+      };
+    };
+
+    return {
+      backend: resolveProcess(names.backendName),
+      frontend: resolveProcess(names.frontendName),
+    };
+  }
+
+  private async readObservedVersion(releaseDir: string): Promise<string | null> {
+    const candidates = [
+      path.join(releaseDir, 'VERSION'),
+      path.join(releaseDir, 'BUILD_INFO.json'),
+    ];
+
+    for (const candidate of candidates) {
+      if (!(await this.pathExists(candidate))) {
+        continue;
+      }
+
+      if (candidate.endsWith('.json')) {
+        try {
+          const parsed = JSON.parse(await fsp.readFile(candidate, 'utf8')) as Record<string, unknown>;
+          const version = typeof parsed.version === 'string' ? parsed.version.trim() : '';
+          if (version) {
+            return version;
+          }
+        } catch {
+          continue;
+        }
+      } else {
+        const version = (await fsp.readFile(candidate, 'utf8')).trim();
+        if (version) {
+          return version;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private isSameResolvedPath(left: string, right: string): boolean {
+    return path.normalize(left).toLowerCase() === path.normalize(right).toLowerCase();
   }
 }

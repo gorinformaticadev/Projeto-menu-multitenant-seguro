@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as fsp from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import { NativeUpdateRuntimeAdapter } from './native-update-runtime.adapter';
@@ -36,11 +37,40 @@ describe('NativeUpdateRuntimeAdapter', () => {
   let sourceDir: string;
   let runtime: UpdateRuntimePaths;
   let metadata: Record<string, unknown>;
+  let pm2JlistOutput: string;
+  let failFrontendRestart: boolean;
 
   const commandRunnerMock = {
     run: jest.fn(async (request: any) => {
       const args = Array.isArray(request.args) ? request.args : [];
       const cwd = String(request.cwd || '');
+      const joinedArgs = args.join(' ');
+
+      if (request.command === 'pm2' && joinedArgs === 'jlist') {
+        return {
+          commandRunId: 'cmd-pm2-jlist',
+          exitCode: 0,
+          stdout: pm2JlistOutput,
+          stderr: '',
+          stdoutPath: null,
+          stderrPath: null,
+        };
+      }
+
+      if (
+        request.command === 'pm2' &&
+        joinedArgs.includes('--name multitenant-frontend') &&
+        failFrontendRestart
+      ) {
+        return {
+          commandRunId: 'cmd-pm2-frontend-fail',
+          exitCode: 1,
+          stdout: '',
+          stderr: 'frontend restart failed',
+          stdoutPath: null,
+          stderrPath: null,
+        };
+      }
 
       if (request.command === 'pnpm' && args.join(' ').includes('--filter frontend build')) {
         const frontendDir = path.join(cwd, 'apps', 'frontend');
@@ -97,6 +127,23 @@ describe('NativeUpdateRuntimeAdapter', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    pm2JlistOutput = JSON.stringify([
+      {
+        name: 'multitenant-backend',
+        pm2_env: {
+          status: 'online',
+          pm_id: 0,
+        },
+      },
+      {
+        name: 'multitenant-frontend',
+        pm2_env: {
+          status: 'online',
+          pm_id: 1,
+        },
+      },
+    ]);
+    failFrontendRestart = false;
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pluggor-native-adapter-'));
     sourceDir = path.join(tmpDir, 'source');
     fs.mkdirSync(path.join(sourceDir, 'apps', 'backend'), { recursive: true });
@@ -178,5 +225,224 @@ describe('NativeUpdateRuntimeAdapter', () => {
     expect(fs.existsSync(String(metadata.currentReleaseRef))).toBe(true);
     expect(commandRunnerMock.startBackground).toHaveBeenCalled();
     expect(probeServiceMock.waitForReady).toHaveBeenCalled();
+  });
+
+  it('fetch_code retorna evidencias estruturadas da release preparada', async () => {
+    const adapter = createAdapter();
+    const execution = createExecution();
+
+    const result = await adapter.executeStep('fetch_code', {
+      execution,
+      runtime,
+      metadata,
+    });
+
+    expect(result.metadata).toMatchObject({
+      targetReleaseDir: expect.stringContaining(path.join('releases', 'v1.2.3')),
+      targetReleaseResolvedVersion: 'v1.2.3',
+    });
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'release_preparada',
+        }),
+        expect.objectContaining({
+          code: 'manifestos_detectados',
+        }),
+      ]),
+    );
+  });
+
+  it('switch_release confirma a troca efetiva do ponteiro current', async () => {
+    const adapter = createAdapter();
+    const execution = createExecution();
+    const targetReleaseDir = path.join(runtime.releasesDir, 'v1.2.3');
+    fs.mkdirSync(targetReleaseDir, { recursive: true });
+
+    const result = await adapter.executeStep('switch_release', {
+      execution,
+      runtime,
+      metadata: {
+        targetReleaseDir,
+      },
+    });
+    const observedCurrentReleaseRef = fs.realpathSync(runtime.currentDir);
+
+    expect(result.result).toMatchObject({
+      currentReleaseRef: targetReleaseDir,
+    });
+    expect(String((result.result as Record<string, unknown>).observedCurrentReleaseRef)).toContain(
+      path.join('releases', 'v1.2.3'),
+    );
+    expect(observedCurrentReleaseRef).toContain(path.join('releases', 'v1.2.3'));
+  });
+
+  it('switch_release falha antes da confirmação quando o ponteiro observado diverge', async () => {
+    const adapter = createAdapter();
+    const execution = createExecution();
+    const targetReleaseDir = path.join(runtime.releasesDir, 'v1.2.3');
+    const unexpectedDir = path.join(runtime.releasesDir, 'unexpected-release');
+    fs.mkdirSync(targetReleaseDir, { recursive: true });
+    fs.mkdirSync(unexpectedDir, { recursive: true });
+    const originalRealpath = fsp.realpath.bind(fsp);
+
+    const realpathSpy = jest.spyOn(fsp, 'realpath').mockImplementation(async (targetPath: any) => {
+      if (String(targetPath) === runtime.currentDir) {
+        return unexpectedDir;
+      }
+
+      return await originalRealpath(targetPath);
+    });
+
+    await expect(
+      adapter.executeStep('switch_release', {
+        execution,
+        runtime,
+        metadata: {
+          targetReleaseDir,
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: 'UPDATE_SWITCH_RELEASE_CONFIRMATION_FAILED',
+    });
+
+    realpathSpy.mockRestore();
+  });
+
+  it('restart_services native retorna serviços reiniciados com evidência estrutural', async () => {
+    const adapter = createAdapter();
+    const execution = createExecution();
+    const targetReleaseDir = path.join(runtime.releasesDir, 'v1.2.3');
+    fs.mkdirSync(path.join(targetReleaseDir, 'apps', 'backend', 'dist'), { recursive: true });
+    fs.mkdirSync(path.join(targetReleaseDir, 'apps', 'frontend', '.next', 'standalone'), {
+      recursive: true,
+    });
+    fs.writeFileSync(path.join(targetReleaseDir, 'apps', 'frontend', '.next', 'standalone', 'server.js'), 'console.log("frontend");');
+
+    const result = await adapter.executeStep('restart_services', {
+      execution,
+      runtime,
+      metadata: {
+        targetReleaseDir,
+      },
+    });
+
+    expect(result.result).toMatchObject({
+      restartedServices: expect.arrayContaining([
+        expect.objectContaining({
+          service: 'backend',
+        }),
+        expect.objectContaining({
+          service: 'frontend',
+        }),
+      ]),
+    });
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'servicos_pm2_reiniciados',
+        }),
+      ]),
+    );
+  });
+
+  it('restart_services native falha de forma parcial quando um serviço não sobe', async () => {
+    failFrontendRestart = true;
+    const adapter = createAdapter();
+    const execution = createExecution();
+    const targetReleaseDir = path.join(runtime.releasesDir, 'v1.2.3');
+    fs.mkdirSync(path.join(targetReleaseDir, 'apps', 'backend', 'dist'), { recursive: true });
+    fs.mkdirSync(path.join(targetReleaseDir, 'apps', 'frontend', '.next', 'standalone'), {
+      recursive: true,
+    });
+    fs.writeFileSync(path.join(targetReleaseDir, 'apps', 'frontend', '.next', 'standalone', 'server.js'), 'console.log("frontend");');
+
+    await expect(
+      adapter.executeStep('restart_services', {
+        execution,
+        runtime,
+        metadata: {
+          targetReleaseDir,
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: 'UPDATE_RESTART_PARTIAL_FAILURE',
+      details: expect.objectContaining({
+        restartedServices: expect.arrayContaining([
+          expect.objectContaining({
+            service: 'backend',
+          }),
+        ]),
+        serviceFailures: expect.arrayContaining([
+          expect.objectContaining({
+            service: 'frontend',
+          }),
+        ]),
+      }),
+    });
+  });
+
+  it('healthcheck native valida PM2, release ativa e versão observada', async () => {
+    const adapter = createAdapter();
+    const execution = createExecution();
+    const targetReleaseDir = path.join(runtime.releasesDir, 'v1.2.3');
+    fs.mkdirSync(targetReleaseDir, { recursive: true });
+    fs.writeFileSync(path.join(targetReleaseDir, 'VERSION'), 'v1.2.3\n');
+    fs.rmSync(runtime.currentDir, { recursive: true, force: true });
+    fs.symlinkSync(targetReleaseDir, runtime.currentDir, 'junction');
+
+    const result = await adapter.executeStep('healthcheck', {
+      execution,
+      runtime,
+      metadata: {
+        targetReleaseDir,
+      },
+    });
+    const observedCurrentReleaseRef = fs.realpathSync(runtime.currentDir);
+
+    expect(result.result).toMatchObject({
+      observedVersion: 'v1.2.3',
+    });
+    expect(String((result.result as Record<string, unknown>).observedCurrentReleaseRef)).toContain(
+      path.join('releases', 'v1.2.3'),
+    );
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'runtime_native_saudavel',
+        }),
+      ]),
+    );
+  });
+
+  it('healthcheck native falha de forma estruturada quando os processos não ficam online', async () => {
+    pm2JlistOutput = JSON.stringify([
+      {
+        name: 'multitenant-backend',
+        pm2_env: {
+          status: 'errored',
+          pm_id: 0,
+        },
+      },
+    ]);
+    const adapter = createAdapter();
+    const execution = createExecution();
+    const targetReleaseDir = path.join(runtime.releasesDir, 'v1.2.3');
+    fs.mkdirSync(targetReleaseDir, { recursive: true });
+    fs.writeFileSync(path.join(targetReleaseDir, 'VERSION'), 'v1.2.3\n');
+    fs.rmSync(runtime.currentDir, { recursive: true, force: true });
+    fs.symlinkSync(targetReleaseDir, runtime.currentDir, 'junction');
+
+    await expect(
+      adapter.executeStep('healthcheck', {
+        execution,
+        runtime,
+        metadata: {
+          targetReleaseDir,
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: 'UPDATE_HEALTHCHECK_PM2_NOT_ONLINE',
+    });
   });
 });

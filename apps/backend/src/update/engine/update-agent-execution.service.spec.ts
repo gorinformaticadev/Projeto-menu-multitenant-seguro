@@ -86,6 +86,7 @@ describe('UpdateAgentExecutionService', () => {
           : ['precheck', 'prepare', 'fetch_code', 'rollback'];
       return plan.indexOf(step) + 1;
     }),
+    assertStepTransition: jest.fn(() => undefined),
     buildExecutionView: jest.fn((execution: UpdateExecutionRecord) => ({
       ...execution,
       progressPercent: 14,
@@ -112,12 +113,12 @@ describe('UpdateAgentExecutionService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    adapterMock.executeStep.mockImplementation(async (step: string) => ({
+    (adapterMock.executeStep as jest.Mock).mockImplementation(async (step: string) => ({
       result: {
         step,
       },
     }));
-    adapterMock.executeRollback.mockImplementation(async () => ({
+    (adapterMock.executeRollback as jest.Mock).mockImplementation(async () => ({
       result: {
         rolledBack: true,
       },
@@ -253,6 +254,7 @@ describe('UpdateAgentExecutionService', () => {
     );
     expect(adapterMock.executeStep).toHaveBeenCalledWith('cleanup', expect.anything());
     expect(adapterMock.executeRollback).not.toHaveBeenCalled();
+    expect(stateMachineMock.assertStepTransition).toHaveBeenCalledWith('native', 'fetch_code', 'fetch_code');
     expect(result.execution).toMatchObject({
       status: 'completed',
       currentStep: 'cleanup',
@@ -264,7 +266,7 @@ describe('UpdateAgentExecutionService', () => {
       ...adapterDescriptor,
       executionStrategy: 'native_agent',
     };
-    adapterMock.executeStep.mockImplementation(async (step: string) => {
+    (adapterMock.executeStep as jest.Mock).mockImplementation(async (step: string) => {
       if (step === 'healthcheck') {
         throw new Error('healthcheck failed');
       }
@@ -335,5 +337,89 @@ describe('UpdateAgentExecutionService', () => {
       status: 'completed',
       currentStep: 'cleanup',
     });
+  });
+
+  it('persiste evidencias estruturadas do adapter no repositório canônico', async () => {
+    adapterDescriptor = {
+      ...adapterDescriptor,
+      executionStrategy: 'native_agent',
+      plannedSteps: [
+        'precheck',
+        'prepare',
+        'fetch_code',
+        'install_dependencies',
+        'build_backend',
+        'build_frontend',
+        'migrate',
+        'seed',
+        'pre_switch_validation',
+        'switch_release',
+        'restart_services',
+        'healthcheck',
+        'post_validation',
+        'cleanup',
+      ],
+    };
+    (adapterMock.executeStep as jest.Mock).mockImplementation(async (step: string) => {
+      if (step === 'fetch_code') {
+        return {
+          result: {
+            releaseDir: '/tmp/releases/v1.2.3',
+          },
+          metadata: {
+            targetReleaseDir: '/tmp/releases/v1.2.3',
+          },
+          evidence: [
+            {
+              code: 'release_preparada',
+              summary: 'release pronta',
+            },
+          ],
+          retryable: false,
+        };
+      }
+
+      return {
+        result: {
+          step,
+        },
+      };
+    });
+
+    const service = createService();
+    await service.processExecution({
+      execution: currentExecution,
+      runnerId: 'runner-1',
+      allowLegacyBridge: false,
+    });
+
+    expect(repositoryMock.upsertProjectedSteps).toHaveBeenCalledWith(
+      'execution-1',
+      expect.arrayContaining([
+        expect.objectContaining({
+          step: 'fetch_code',
+          status: 'completed',
+          result: expect.objectContaining({
+            releaseDir: '/tmp/releases/v1.2.3',
+            evidence: expect.arrayContaining([
+              expect.objectContaining({
+                code: 'release_preparada',
+              }),
+            ]),
+            retryable: false,
+          }),
+        }),
+      ]),
+    );
+
+    expect(repositoryMock.updateExecution).toHaveBeenCalledWith(
+      'execution-1',
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          targetReleaseDir: '/tmp/releases/v1.2.3',
+          lastCompletedStep: 'fetch_code',
+        }),
+      }),
+    );
   });
 });

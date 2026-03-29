@@ -18,7 +18,11 @@ import {
   type UpdateStepCode,
   getPrimaryExecutionStepsForMode,
 } from './update-execution.types';
-import type { UpdateRuntimePaths } from './runtime/update-runtime-adapter.interface';
+import {
+  UpdateRuntimeStepError,
+  type UpdateRuntimePaths,
+  type UpdateStepExecutionResult,
+} from './runtime/update-runtime-adapter.interface';
 
 type ProcessExecutionParams = {
   execution: UpdateExecutionRecord;
@@ -128,6 +132,8 @@ export class UpdateAgentExecutionService {
       const startedAt = new Date().toISOString();
       const currentMetadata = execution.metadata || {};
 
+      this.stateMachine.assertStepTransition(execution.mode, execution.currentStep, step);
+
       await this.persistStep(execution, step, 'running', startedAt, null, null, {
         runnerStep: step,
       });
@@ -149,6 +155,7 @@ export class UpdateAgentExecutionService {
         const nextStep = this.resolveNextStep(execution.mode, step);
         const normalizedStatus = result.status || 'completed';
         const progressIncrement = 1;
+        const persistedResult = this.buildPersistedStepResult(step, result);
 
         await this.persistStep(
           execution,
@@ -157,14 +164,17 @@ export class UpdateAgentExecutionService {
           startedAt,
           finishedAt,
           null,
-          result.result || null,
+          persistedResult,
         );
 
         execution = await this.repository.updateExecution(execution.id, {
           currentStep: nextStep || step,
           progressUnitsDone: execution.progressUnitsDone + progressIncrement,
           progressUnitsTotal: getPrimaryExecutionStepsForMode(execution.mode).length,
-          metadata: result.metadata || {},
+          metadata: {
+            lastCompletedStep: step,
+            ...(result.metadata || {}),
+          },
           finishedAt: step === 'cleanup' ? finishedAt : undefined,
           status: step === 'cleanup' ? 'completed' : undefined,
         });
@@ -197,6 +207,7 @@ export class UpdateAgentExecutionService {
   ): Promise<boolean> {
     const adapter = this.registry.resolve(execution.mode);
     const startedAt = new Date().toISOString();
+    this.stateMachine.assertStepTransition(execution.mode, execution.currentStep, 'rollback');
     await this.persistStep(execution, 'rollback', 'running', startedAt, null, null, {
       triggeredBy: error.stage,
     });
@@ -229,7 +240,7 @@ export class UpdateAgentExecutionService {
         startedAt,
         finishedAt,
         null,
-        result.result || null,
+        this.buildPersistedStepResult('rollback', result),
       );
       await this.repository.updateExecution(execution.id, {
         status: 'rollback',
@@ -303,6 +314,10 @@ export class UpdateAgentExecutionService {
   }
 
   private buildStepFailure(step: UpdateStepCode, error: unknown): UpdateExecutionErrorSnapshot {
+    if (error instanceof UpdateRuntimeStepError) {
+      return error.toSnapshot();
+    }
+
     const technicalMessage = error instanceof Error ? error.message : String(error);
     const codeByStep: Record<UpdateStepCode, string> = {
       precheck: 'UPDATE_PRECHECK_FAILED',
@@ -332,8 +347,24 @@ export class UpdateAgentExecutionService {
       {
         step,
       },
-      true,
+      false,
     );
+  }
+
+  private buildPersistedStepResult(
+    step: UpdateStepCode,
+    result: Pick<UpdateStepExecutionResult, 'result' | 'evidence' | 'retryable'>,
+  ): Record<string, unknown> | null {
+    if (!result.result && !result.evidence?.length && result.retryable === undefined) {
+      return null;
+    }
+
+    return {
+      step,
+      ...(result.result || {}),
+      evidence: result.evidence || [],
+      retryable: result.retryable ?? false,
+    };
   }
 
   private resolveNextStep(mode: UpdateExecutionMode, currentStep: UpdateStepCode): UpdateStepCode | null {
@@ -383,6 +414,7 @@ export class UpdateAgentExecutionService {
   ): Promise<UpdateExecutionRecord> {
     const step: UpdateStepCode = 'precheck';
     const startedAt = new Date().toISOString();
+    this.stateMachine.assertStepTransition(execution.mode, execution.currentStep, step);
     await this.persistStep(
       execution,
       step,
@@ -435,6 +467,7 @@ export class UpdateAgentExecutionService {
   ): Promise<UpdateExecutionRecord> {
     const step: UpdateStepCode = 'prepare';
     const startedAt = new Date().toISOString();
+    this.stateMachine.assertStepTransition(execution.mode, execution.currentStep, step);
     await this.persistStep(
       execution,
       step,

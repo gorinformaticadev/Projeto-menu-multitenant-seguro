@@ -10,6 +10,7 @@ import {
   type UpdateStepCode,
 } from '../update-execution.types';
 import {
+  UpdateRuntimeStepError,
   type UpdateRollbackExecutionResult,
   type UpdateRuntimeAdapter,
   type UpdateRuntimeAdapterDescriptor,
@@ -123,18 +124,53 @@ export class DockerUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     const currentBackend = await this.captureServiceImageSnapshot(context, 'backend');
 
     await this.runCompose(context, 'pull_images', [...this.composeFileArgs(context), 'pull', 'frontend', 'backend']);
+    const frontendImage = await this.resolveTargetServiceImage(context, 'frontend');
+    const backendImage = await this.resolveTargetServiceImage(context, 'backend');
+    await this.inspectTargetImage(context, 'pull_images', frontendImage);
+    await this.inspectTargetImage(context, 'pull_images', backendImage);
 
     return {
       result: {
         pulled: ['frontend', 'backend'],
+        frontendImage,
+        backendImage,
       },
       metadata: {
         currentFrontendImageRef: currentFrontend.configImage || currentFrontend.imageId || null,
         currentFrontendImageId: currentFrontend.imageId || null,
         currentBackendImageRef: currentBackend.configImage || currentBackend.imageId || null,
         currentBackendImageId: currentBackend.imageId || null,
+        targetFrontendImageRef: frontendImage,
+        targetBackendImageRef: backendImage,
       },
+      evidence: [
+        {
+          code: 'imagens_alvo_resolvidas',
+          summary: 'As imagens alvo foram resolvidas no compose e inspecionadas localmente.',
+          details: {
+            frontendImage,
+            backendImage,
+          },
+        },
+        {
+          code: 'snapshot_imagens_atuais_capturado',
+          summary: 'As referências atuais foram capturadas para rollback futuro.',
+          details: {
+            currentFrontend: currentFrontend.configImage || currentFrontend.imageId || null,
+            currentBackend: currentBackend.configImage || currentBackend.imageId || null,
+          },
+        },
+      ],
+      retryable: true,
     };
+  }
+
+  private async inspectTargetImage(
+    context: UpdateStepExecutionContext,
+    step: 'pull_images' | 'build_backend' | 'build_frontend',
+    imageRef: string,
+  ): Promise<void> {
+    await this.runCommandOrThrow(context, step, 'docker', ['image', 'inspect', imageRef], context.runtime.baseDir);
   }
 
   private async validatePulledImage(
@@ -142,20 +178,18 @@ export class DockerUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     service: 'frontend' | 'backend',
     step: 'build_backend' | 'build_frontend',
   ): Promise<UpdateStepExecutionResult> {
-    const imageRef = await this.resolveTargetServiceImage(context, service);
-    const inspect = await this.runCommandOrThrow(
-      context,
-      step,
-      'docker',
-      ['image', 'inspect', imageRef],
-      context.runtime.baseDir,
-    );
+    const imageRef =
+      this.getMetadataString(
+        context.metadata,
+        service === 'frontend' ? 'targetFrontendImageRef' : 'targetBackendImageRef',
+      ) || (await this.resolveTargetServiceImage(context, service));
+    await this.inspectTargetImage(context, step, imageRef);
 
     return {
       result: {
         service,
         imageRef,
-        inspected: inspect.stdout.length > 0,
+        inspected: true,
       },
       metadata:
         service === 'frontend'
@@ -165,6 +199,16 @@ export class DockerUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
           : {
               targetBackendImageRef: imageRef,
             },
+      evidence: [
+        {
+          code: `imagem_${service}_validada`,
+          summary: `A imagem do serviço ${service} foi inspecionada e está disponível localmente.`,
+          details: {
+            service,
+            imageRef,
+          },
+        },
+      ],
     };
   }
 
@@ -237,6 +281,23 @@ export class DockerUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       backendImage,
       label: 'target',
     });
+    const overrideContent = await fsp.readFile(overrideFile, 'utf8');
+    if (!overrideContent.includes(frontendImage) || !overrideContent.includes(backendImage)) {
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_SWITCH_RELEASE_OVERRIDE_INVALID',
+        category: 'UPDATE_SWITCH_RELEASE_FAILED',
+        stage: 'switch_release',
+        userMessage: 'O override do compose foi gerado, mas não contém as imagens alvo esperadas.',
+        technicalMessage: `overrideFile=${overrideFile}`,
+        retryable: false,
+        rollbackEligible: true,
+        details: {
+          overrideFile,
+          frontendImage,
+          backendImage,
+        },
+      });
+    }
 
     return {
       result: {
@@ -247,11 +308,24 @@ export class DockerUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       metadata: {
         activeComposeOverride: overrideFile,
       },
+      evidence: [
+        {
+          code: 'override_compose_gerado',
+          summary: 'O compose override canônico foi escrito com as imagens alvo.',
+          details: {
+            overrideFile,
+            frontendImage,
+            backendImage,
+          },
+        },
+      ],
     };
   }
 
   private async restartServices(context: UpdateStepExecutionContext): Promise<UpdateStepExecutionResult> {
     const overrideFile = this.requireMetadataString(context.metadata, 'activeComposeOverride');
+    const beforeFrontend = await this.captureServiceImageSnapshot(context, 'frontend');
+    const beforeBackend = await this.captureServiceImageSnapshot(context, 'backend');
     await this.runCompose(context, 'restart_services', [
       ...this.composeFileArgs(context),
       '-f',
@@ -263,17 +337,101 @@ export class DockerUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       'frontend',
       'backend',
     ]);
+    const afterFrontend = await this.captureServiceImageSnapshot(context, 'frontend');
+    const afterBackend = await this.captureServiceImageSnapshot(context, 'backend');
+    const restartedServices: Array<Record<string, unknown>> = [];
+    const serviceFailures: Array<Record<string, unknown>> = [];
+
+    for (const serviceState of [
+      {
+        service: 'frontend',
+        before: beforeFrontend,
+        after: afterFrontend,
+      },
+      {
+        service: 'backend',
+        before: beforeBackend,
+        after: afterBackend,
+      },
+    ]) {
+      if (!serviceState.after.containerId) {
+        serviceFailures.push({
+          service: serviceState.service,
+          reason: 'container_not_found_after_restart',
+          beforeContainerId: serviceState.before.containerId,
+        });
+        continue;
+      }
+
+      if (
+        serviceState.before.containerId &&
+        serviceState.before.containerId === serviceState.after.containerId
+      ) {
+        serviceFailures.push({
+          service: serviceState.service,
+          reason: 'container_not_recreated',
+          beforeContainerId: serviceState.before.containerId,
+          afterContainerId: serviceState.after.containerId,
+        });
+        continue;
+      }
+
+      restartedServices.push({
+        service: serviceState.service,
+        beforeContainerId: serviceState.before.containerId,
+        afterContainerId: serviceState.after.containerId,
+        imageRef: serviceState.after.configImage,
+      });
+    }
+
+    if (serviceFailures.length > 0) {
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_RESTART_PARTIAL_FAILURE',
+        category: 'UPDATE_RESTART_FAILED',
+        stage: 'restart_services',
+        userMessage: 'Falha parcial ao recriar os containers publicados.',
+        technicalMessage: JSON.stringify(serviceFailures),
+        retryable: true,
+        rollbackEligible: true,
+        details: {
+          overrideFile,
+          restartedServices,
+          serviceFailures,
+        },
+      });
+    }
 
     return {
       result: {
         overrideFile,
+        restartedServices,
+        serviceFailures,
       },
+      evidence: [
+        {
+          code: 'containers_recriados',
+          summary: 'Os containers publicados foram recriados com novas referências de runtime.',
+          details: {
+            restartedServices,
+            overrideFile,
+          },
+        },
+      ],
+      retryable: true,
     };
   }
 
   private async healthcheck(context: UpdateStepExecutionContext): Promise<UpdateStepExecutionResult> {
+    const result = await this.performHealthcheck(context);
     return {
-      result: await this.performHealthcheck(context),
+      result,
+      evidence: [
+        {
+          code: 'runtime_docker_saudavel',
+          summary: 'Containers, probes HTTP e imagens observadas ficaram consistentes.',
+          details: result,
+        },
+      ],
     };
   }
 
@@ -349,7 +507,7 @@ export class DockerUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
 
   private async runCompose(
     context: UpdateStepExecutionContext,
-    step: string,
+    step: UpdateStepCode,
     args: string[],
   ) {
     const result = await this.runCommandOrThrow(context, step, 'docker', args, context.runtime.baseDir);
@@ -456,7 +614,7 @@ export class DockerUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
 
   private async inspectDockerValue(
     context: UpdateStepExecutionContext,
-    step: string,
+    step: UpdateStepCode,
     args: string[],
   ): Promise<string | null> {
     const result = await this.runCommandOrThrow(context, step, 'docker', args, context.runtime.baseDir);
@@ -508,11 +666,55 @@ export class DockerUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     const frontendContainerId = await this.resolveCurrentContainerId(context, 'frontend');
     const backendContainerId = await this.resolveCurrentContainerId(context, 'backend');
     if (!frontendContainerId || !backendContainerId) {
-      throw new Error('Containers frontend/backend nao encontrados apos restart.');
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_HEALTHCHECK_CONTAINER_NOT_FOUND',
+        category: 'UPDATE_HEALTHCHECK_FAILED',
+        stage: 'healthcheck',
+        userMessage: 'Os containers publicados não foram encontrados após o restart.',
+        technicalMessage: 'Containers frontend/backend nao encontrados apos restart.',
+        retryable: true,
+        rollbackEligible: true,
+        details: {
+          frontendContainerId,
+          backendContainerId,
+        },
+      });
     }
 
     await this.waitForContainerHealthy(context, 'frontend', frontendContainerId);
     await this.waitForContainerHealthy(context, 'backend', backendContainerId);
+
+    const observedFrontendImage = await this.inspectDockerValue(context, 'healthcheck', [
+      'inspect',
+      '--format',
+      '{{.Config.Image}}',
+      frontendContainerId,
+    ]);
+    const observedBackendImage = await this.inspectDockerValue(context, 'healthcheck', [
+      'inspect',
+      '--format',
+      '{{.Config.Image}}',
+      backendContainerId,
+    ]);
+    const expectedFrontendImage = this.requireMetadataString(context.metadata, 'targetFrontendImageRef');
+    const expectedBackendImage = this.requireMetadataString(context.metadata, 'targetBackendImageRef');
+    if (observedFrontendImage !== expectedFrontendImage || observedBackendImage !== expectedBackendImage) {
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_HEALTHCHECK_IMAGE_MISMATCH',
+        category: 'UPDATE_HEALTHCHECK_FAILED',
+        stage: 'healthcheck',
+        userMessage: 'As imagens observadas nos containers não correspondem ao release alvo.',
+        technicalMessage: `frontend=${observedFrontendImage} expectedFrontend=${expectedFrontendImage}; backend=${observedBackendImage} expectedBackend=${expectedBackendImage}`,
+        retryable: false,
+        rollbackEligible: true,
+        details: {
+          observedFrontendImage,
+          observedBackendImage,
+          expectedFrontendImage,
+          expectedBackendImage,
+        },
+      });
+    }
 
     const backendUrl = `http://127.0.0.1:${Number(process.env.PORT || 4000)}/api/health`;
     const frontendUrl = `http://127.0.0.1:${Number(process.env.FRONTEND_PORT || 5000)}/api/health`;
@@ -528,6 +730,8 @@ export class DockerUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     return {
       backendContainerId,
       frontendContainerId,
+      observedFrontendImage,
+      observedBackendImage,
       backendUrl,
       frontendUrl,
     };
@@ -575,13 +779,38 @@ export class DockerUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       }
 
       if (healthStatus === 'unhealthy' || healthStatus === 'no-healthcheck') {
-        throw new Error(`Servico ${service} em estado invalido: ${healthStatus}`);
+        throw new UpdateRuntimeStepError({
+          code: 'UPDATE_HEALTHCHECK_CONTAINER_UNHEALTHY',
+          category: 'UPDATE_HEALTHCHECK_FAILED',
+          stage: 'healthcheck',
+          userMessage: `O serviço ${service} ficou em estado inválido após o restart.`,
+          technicalMessage: `Servico ${service} em estado invalido: ${healthStatus}`,
+          retryable: true,
+          rollbackEligible: true,
+          details: {
+            service,
+            containerId,
+            healthStatus,
+          },
+        });
       }
 
       await new Promise((resolve) => setTimeout(resolve, 5_000));
     }
 
-    throw new Error(`Timeout aguardando healthcheck do servico ${service}.`);
+    throw new UpdateRuntimeStepError({
+      code: 'UPDATE_HEALTHCHECK_TIMEOUT',
+      category: 'UPDATE_HEALTHCHECK_FAILED',
+      stage: 'healthcheck',
+      userMessage: `O serviço ${service} não ficou saudável dentro do tempo limite.`,
+      technicalMessage: `Timeout aguardando healthcheck do servico ${service}.`,
+      retryable: true,
+      rollbackEligible: true,
+      details: {
+        service,
+        containerId,
+      },
+    });
   }
 
   private async resolveCurrentContainerId(
@@ -617,7 +846,7 @@ export class DockerUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
 
   private async runCommandOrThrow(
     context: UpdateStepExecutionContext,
-    step: string,
+    step: UpdateStepCode,
     command: string,
     args: string[],
     cwd: string,
@@ -632,9 +861,22 @@ export class DockerUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     });
 
     if (result.exitCode !== 0) {
-      throw new Error(
-        `${command} ${args.join(' ')} falhou com exitCode=${result.exitCode}. ${result.stderr || result.stdout}`.trim(),
-      );
+      throw new UpdateRuntimeStepError({
+        code: `UPDATE_${step.toUpperCase()}_COMMAND_FAILED`,
+        category: `UPDATE_${step.toUpperCase()}_FAILED`,
+        stage: step,
+        userMessage: `Falha ao executar ${command} na etapa ${step}.`,
+        technicalMessage: `${command} ${args.join(' ')} falhou com exitCode=${result.exitCode}. ${result.stderr || result.stdout}`.trim(),
+        exitCode: result.exitCode,
+        commandRunId: result.commandRunId,
+        retryable: step === 'restart_services' || step === 'healthcheck' || step === 'pull_images',
+        rollbackEligible: step !== 'pull_images',
+        details: {
+          command,
+          args,
+          cwd,
+        },
+      });
     }
 
     return result;

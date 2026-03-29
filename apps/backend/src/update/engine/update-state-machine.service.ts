@@ -96,6 +96,32 @@ export class UpdateStateMachineService {
     return index >= 0 ? index + 1 : plan.length + 1;
   }
 
+  assertStepTransition(
+    mode: UpdateExecutionRecord['mode'],
+    fromStep: UpdateStepCode,
+    toStep: UpdateStepCode,
+  ): void {
+    const plan = getExecutionPlanForMode(mode);
+    const fromIndex = plan.indexOf(fromStep);
+    const toIndex = plan.indexOf(toStep);
+
+    if (fromIndex < 0 || toIndex < 0) {
+      throw new Error(`Transicao invalida: etapa desconhecida (${fromStep} -> ${toStep}).`);
+    }
+
+    if (toStep === 'rollback' && fromStep !== 'rollback') {
+      return;
+    }
+
+    if (fromStep === toStep) {
+      return;
+    }
+
+    if (toIndex !== fromIndex + 1) {
+      throw new Error(`Transicao invalida para o pipeline de update (${fromStep} -> ${toStep}).`);
+    }
+  }
+
   calculateProgressPercent(done: number, total: number): number | null {
     if (!Number.isFinite(total) || total <= 0) {
       return null;
