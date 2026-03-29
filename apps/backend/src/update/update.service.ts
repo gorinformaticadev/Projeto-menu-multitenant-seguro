@@ -12,6 +12,8 @@ import { SystemVersionService } from '@common/services/system-version.service';
 import { SystemUpdateAdminService } from './system-update-admin.service';
 import { resolvePlatformUpdateStep } from './platform-update-steps';
 import type { PersistedUpdateDiagnostics } from './platform-update-state.persistence';
+import { UpdateExecutionFacadeService } from './engine/update-execution.facade.service';
+import type { UpdateExecutionView } from './engine/update-execution.types';
 
 type UpdateExecutionStatus = 'starting' | 'completed';
 type UpdateLifecycleStatus =
@@ -91,6 +93,7 @@ export class UpdateService implements OnModuleInit {
     private auditService: AuditService,
     private readonly systemVersionService: SystemVersionService,
     private readonly systemUpdateAdminService: SystemUpdateAdminService,
+    private readonly updateExecutionFacadeService?: UpdateExecutionFacadeService,
   ) {
     this.encryptionKey = this.resolveEncryptionKey();
   }
@@ -413,6 +416,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
   async getUpdateStatus(): Promise<UpdateStatusDto> {
     await this.reconcileRunningUpdateLogWithSystemState();
     const settings = await this.getSystemSettings();
+    const canonicalExecution = await this.safeGetCanonicalExecution();
     const systemState = await this.safeGetSystemUpdateState();
     const runtime = this.getRuntimeVersionInfo();
 
@@ -425,7 +429,9 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
       checkEnabled: settings.updateCheckEnabled,
       mode: this.getInstallationMode(settings),
       updateChannel: this.normalizeUpdateChannel(settings.updateChannel),
-      updateLifecycle: this.buildLifecycleState(settings, systemState),
+      updateLifecycle: canonicalExecution
+        ? this.buildCanonicalLifecycleState(settings, canonicalExecution)
+        : this.buildLifecycleState(settings, systemState),
     };
   }
 
@@ -521,6 +527,19 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
       return state as SystemUpdateStateSnapshot;
     } catch (error) {
       this.logger.warn(`Falha ao obter status do update admin: ${String(error)}`);
+      return null;
+    }
+  }
+
+  private async safeGetCanonicalExecution(): Promise<UpdateExecutionView | null> {
+    if (!this.updateExecutionFacadeService) {
+      return null;
+    }
+
+    try {
+      return await this.updateExecutionFacadeService.getCurrentExecutionView();
+    } catch (error) {
+      this.logger.warn(`Falha ao obter execucao canonica de update: ${String(error)}`);
       return null;
     }
   }
@@ -737,6 +756,117 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
             exitCode: systemState?.exitCode ?? null,
           }
         : null,
+    };
+  }
+
+  private buildCanonicalLifecycleState(
+    settings: UpdateSystemSettings,
+    execution: UpdateExecutionView,
+  ): UpdateStatusDto['updateLifecycle'] {
+    const rawStatus =
+      execution.status === 'completed'
+        ? 'success'
+        : execution.status === 'failed'
+          ? 'failed'
+          : execution.status === 'rollback'
+            ? 'rolled_back'
+            : execution.status === 'requested' || execution.status === 'running'
+              ? 'running'
+              : 'idle';
+    const lifecycleStatus =
+      execution.status === 'requested'
+        ? 'starting'
+        : execution.status === 'running' || execution.status === 'rollback'
+          ? 'running'
+          : execution.status === 'completed'
+            ? 'completed'
+            : execution.status === 'failed'
+              ? 'failed'
+              : 'idle';
+
+    return {
+      status: lifecycleStatus,
+      availabilityStatus: settings.updateAvailable ? 'available' : 'not_available',
+      rawStatus,
+      step: execution.currentStep,
+      progress: execution.progressPercent ?? 0,
+      progressPercent: execution.progressPercent,
+      progressKnown: execution.progressPercent !== null,
+      startedAt: execution.startedAt,
+      finishedAt: execution.finishedAt,
+      mode: execution.mode,
+      lock: execution.status === 'requested' || execution.status === 'running' || execution.status === 'rollback',
+      stale: false,
+      currentStep: this.buildCanonicalStepView(
+        execution.currentStep,
+        lifecycleStatus === 'completed' ? 'completed' : lifecycleStatus === 'failed' ? 'failed' : 'running',
+        'canonical_db',
+      ),
+      lastCompletedStep:
+        execution.status === 'completed'
+          ? this.buildCanonicalStepView(execution.currentStep, 'completed', 'canonical_db')
+          : null,
+      failedStep:
+        execution.failedStep || execution.error
+          ? this.buildCanonicalStepView(
+              execution.failedStep || execution.currentStep,
+              'failed',
+              'canonical_db',
+              execution.error?.technicalMessage || null,
+            )
+          : null,
+      operation: {
+        active: execution.status === 'requested' || execution.status === 'running' || execution.status === 'rollback',
+        operationId: execution.id,
+        type: execution.status === 'rollback' ? 'rollback' : 'update',
+      },
+      rollback: {
+        attempted: execution.status === 'rollback',
+        completed: execution.status === 'rollback' && execution.finishedAt !== null,
+        reason: execution.error?.userMessage || null,
+      },
+      persistence: {
+        healthy: true,
+        source: 'canonical_db',
+        fallbackApplied: false,
+        progressKnown: execution.progressPercent !== null,
+        statePath: '',
+        logPath: null,
+        issueCode: null,
+        message: null,
+        technicalMessage: null,
+        rawExcerpt: null,
+        recoveredStepCode: execution.currentStep,
+      },
+      persistenceError: null,
+      error: execution.error
+        ? {
+            code: execution.error.code,
+            category: execution.error.category,
+            stage: execution.error.stage,
+            userMessage: execution.error.userMessage,
+            technicalMessage: execution.error.technicalMessage,
+            exitCode: execution.error.exitCode,
+          }
+        : null,
+    };
+  }
+
+  private buildCanonicalStepView(
+    stepCode: string,
+    status: 'idle' | 'running' | 'completed' | 'failed' | 'unknown',
+    source: string,
+    detail: string | null = null,
+  ): NonNullable<UpdateStatusDto['updateLifecycle']>['currentStep'] {
+    const resolved = resolvePlatformUpdateStep(stepCode);
+
+    return {
+      code: resolved?.code || stepCode || 'unknown',
+      label: resolved?.label || stepCode || 'Etapa desconhecida',
+      raw: stepCode || null,
+      source,
+      detail,
+      status,
     };
   }
 
