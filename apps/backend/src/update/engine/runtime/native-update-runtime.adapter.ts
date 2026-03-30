@@ -25,13 +25,20 @@ type NativePm2ProcessEvidence = {
   processName: string;
   found: boolean;
   status: string;
-  pid: number;
+  pmId: number;
   online: boolean;
+  cwd: string | null;
+  execPath: string | null;
+  args: string[];
+  port: number | null;
+  pointsToExpectedRelease: boolean | null;
 };
 
 type NativePm2StatusEvidence = {
   backend: NativePm2ProcessEvidence;
   frontend: NativePm2ProcessEvidence;
+  backendConflicts: NativePm2ProcessEvidence[];
+  frontendConflicts: NativePm2ProcessEvidence[];
 };
 
 @Injectable()
@@ -1053,32 +1060,32 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     releaseDir: string,
     context: UpdateStepExecutionContext,
   ): Promise<Record<string, unknown>> {
-    const backendName =
-      this.getMetadataString(context.metadata, 'pm2BackendName') ||
-      String(process.env.PM2_BACKEND_NAME || 'multitenant-backend');
-    const frontendName =
-      this.getMetadataString(context.metadata, 'pm2FrontendName') ||
-      String(process.env.PM2_FRONTEND_NAME || 'multitenant-frontend');
+    const pm2Names = this.resolvePm2ProcessNames(context);
+    const backendName = pm2Names.backendName;
+    const frontendName = pm2Names.frontendName;
+    const backendDir = path.join(releaseDir, 'apps', 'backend');
     const frontendDir = path.join(releaseDir, 'apps', 'frontend');
     const layout = await this.resolveFrontendLayout(frontendDir);
     const startCommand = await this.resolveFrontendStartCommand(frontendDir, layout);
+    const pm2ProcessesBeforeRestart = await this.inspectPm2Processes(context, 'restart_services');
+    const pm2ConflictingNames = this.collectConflictingPm2ProcessNames(pm2ProcessesBeforeRestart, {
+      backendName,
+      frontendName,
+      baseDir: context.runtime.baseDir,
+      expectedBackendDir: backendDir,
+      expectedFrontendDir: frontendDir,
+    });
 
-    await this.commandRunner.run({
-      executionId: context.execution.id,
-      step: 'restart_services',
-      command: 'pm2',
-      args: ['delete', backendName],
-      cwd: context.runtime.baseDir,
-      logDir: context.runtime.logsDir,
-    });
-    await this.commandRunner.run({
-      executionId: context.execution.id,
-      step: 'restart_services',
-      command: 'pm2',
-      args: ['delete', frontendName],
-      cwd: context.runtime.baseDir,
-      logDir: context.runtime.logsDir,
-    });
+    for (const processName of [backendName, frontendName, ...pm2ConflictingNames]) {
+      await this.commandRunner.run({
+        executionId: context.execution.id,
+        step: 'restart_services',
+        command: 'pm2',
+        args: ['delete', processName],
+        cwd: context.runtime.baseDir,
+        logDir: context.runtime.logsDir,
+      });
+    }
 
     const restartedServices: Array<Record<string, unknown>> = [];
     const serviceFailures: Array<Record<string, unknown>> = [];
@@ -1087,7 +1094,7 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       executionId: context.execution.id,
       step: 'restart_services',
       command: 'pm2',
-      args: ['start', 'dist/main.js', '--name', backendName, '--cwd', path.join(releaseDir, 'apps', 'backend'), '--update-env'],
+      args: ['start', 'dist/main.js', '--name', backendName, '--cwd', backendDir, '--update-env'],
       cwd: context.runtime.baseDir,
       logDir: context.runtime.logsDir,
     });
@@ -1167,6 +1174,9 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     const observed = this.collectPm2Evidence(pm2Processes, {
       backendName,
       frontendName,
+      baseDir: context.runtime.baseDir,
+      expectedBackendDir: backendDir,
+      expectedFrontendDir: frontendDir,
     });
 
     if (!observed.backend.online || !observed.frontend.online) {
@@ -1182,9 +1192,41 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       });
     }
 
+    if (observed.backendConflicts.length > 0 || observed.frontendConflicts.length > 0) {
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_RESTART_PM2_CONFLICTING_PROCESSES',
+        category: 'UPDATE_RESTART_FAILED',
+        stage: 'restart_services',
+        userMessage: 'O PM2 manteve processos legados concorrendo com a release publicada.',
+        technicalMessage:
+          `backendConflicts=${observed.backendConflicts.map((process) => process.processName).join(',') || 'nenhum'}; ` +
+          `frontendConflicts=${observed.frontendConflicts.map((process) => process.processName).join(',') || 'nenhum'}`,
+        retryable: true,
+        rollbackEligible: true,
+        details: observed,
+      });
+    }
+
+    if (observed.backend.pointsToExpectedRelease !== true || observed.frontend.pointsToExpectedRelease !== true) {
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_RESTART_RELEASE_PROCESS_MISMATCH',
+        category: 'UPDATE_RESTART_FAILED',
+        stage: 'restart_services',
+        userMessage: 'Os processos reiniciados nao apontam para a release publicada.',
+        technicalMessage:
+          `backendExpected=${backendDir}; backendObserved=${observed.backend.cwd || observed.backend.execPath || 'desconhecido'}; ` +
+          `frontendExpected=${frontendDir}; frontendObserved=${observed.frontend.cwd || observed.frontend.execPath || 'desconhecido'}`,
+        retryable: true,
+        rollbackEligible: true,
+        details: observed,
+      });
+    }
+
     return {
       pm2BackendName: backendName,
       pm2FrontendName: frontendName,
+      pm2NameSource: pm2Names.source,
+      purgedConflictingProcesses: pm2ConflictingNames,
       restartedServices,
       serviceFailures,
       pm2Status: observed,
@@ -1195,16 +1237,18 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     releaseDir: string,
     context: UpdateStepExecutionContext,
   ): Promise<Record<string, unknown>> {
-    const backendName =
-      this.getMetadataString(context.metadata, 'pm2BackendName') ||
-      String(process.env.PM2_BACKEND_NAME || 'multitenant-backend');
-    const frontendName =
-      this.getMetadataString(context.metadata, 'pm2FrontendName') ||
-      String(process.env.PM2_FRONTEND_NAME || 'multitenant-frontend');
+    const pm2Names = this.resolvePm2ProcessNames(context);
+    const backendName = pm2Names.backendName;
+    const frontendName = pm2Names.frontendName;
+    const backendDir = path.join(releaseDir, 'apps', 'backend');
+    const frontendDir = path.join(releaseDir, 'apps', 'frontend');
     const pm2Processes = await this.inspectPm2Processes(context, 'healthcheck');
     const pm2Status = this.collectPm2Evidence(pm2Processes, {
       backendName,
       frontendName,
+      baseDir: context.runtime.baseDir,
+      expectedBackendDir: backendDir,
+      expectedFrontendDir: frontendDir,
     });
     if (!pm2Status.backend.online || !pm2Status.frontend.online) {
       throw new UpdateRuntimeStepError({
@@ -1214,6 +1258,36 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
         userMessage: 'Os processos publicados não ficaram online no PM2.',
         technicalMessage: `backend=${pm2Status.backend.status}; frontend=${pm2Status.frontend.status}`,
         retryable: true,
+        rollbackEligible: true,
+        details: pm2Status,
+      });
+    }
+
+    if (pm2Status.backendConflicts.length > 0 || pm2Status.frontendConflicts.length > 0) {
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_HEALTHCHECK_PM2_CONFLICT',
+        category: 'UPDATE_HEALTHCHECK_FAILED',
+        stage: 'healthcheck',
+        userMessage: 'Ainda existem processos PM2 legados concorrendo com a release ativa.',
+        technicalMessage:
+          `backendConflicts=${pm2Status.backendConflicts.map((process) => process.processName).join(',') || 'nenhum'}; ` +
+          `frontendConflicts=${pm2Status.frontendConflicts.map((process) => process.processName).join(',') || 'nenhum'}`,
+        retryable: true,
+        rollbackEligible: true,
+        details: pm2Status,
+      });
+    }
+
+    if (pm2Status.backend.pointsToExpectedRelease !== true || pm2Status.frontend.pointsToExpectedRelease !== true) {
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_HEALTHCHECK_RELEASE_PROCESS_MISMATCH',
+        category: 'UPDATE_HEALTHCHECK_FAILED',
+        stage: 'healthcheck',
+        userMessage: 'Os processos online do PM2 nao correspondem a release publicada.',
+        technicalMessage:
+          `backendExpected=${backendDir}; backendObserved=${pm2Status.backend.cwd || pm2Status.backend.execPath || 'desconhecido'}; ` +
+          `frontendExpected=${frontendDir}; frontendObserved=${pm2Status.frontend.cwd || pm2Status.frontend.execPath || 'desconhecido'}`,
+        retryable: false,
         rollbackEligible: true,
         details: pm2Status,
       });
@@ -1269,6 +1343,13 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       });
     }
 
+    const runtimeVersionEvidence = await this.validateLiveRuntimeIdentity(
+      context,
+      'healthcheck',
+      backendPort,
+      context.execution.targetVersion,
+    );
+
     // Dependencias externas com efeito de dados ficam em post_validation, onde ja existe sonda confiavel de storage compartilhado.
 
     return {
@@ -1278,6 +1359,7 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       pm2Status,
       backendUrl,
       frontendUrl,
+      runtimeVersionEvidence,
     };
   }
 
@@ -1289,6 +1371,58 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     const env = await this.buildNativeCommandEnv(context.runtime);
     const backendPort = Number(env.PORT || process.env.PORT || 4000);
     const frontendPort = Number(process.env.FRONTEND_PORT || 5000);
+    const pm2Names = this.resolvePm2ProcessNames(context);
+    const pm2Processes = await this.inspectPm2Processes(context, 'post_validation');
+    const pm2Status = this.collectPm2Evidence(pm2Processes, {
+      backendName: pm2Names.backendName,
+      frontendName: pm2Names.frontendName,
+      baseDir: context.runtime.baseDir,
+      expectedBackendDir: path.join(releaseDir, 'apps', 'backend'),
+      expectedFrontendDir: path.join(releaseDir, 'apps', 'frontend'),
+    });
+    if (!pm2Status.backend.online || !pm2Status.frontend.online) {
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_POST_DEPLOY_PM2_NOT_ONLINE',
+        category: 'UPDATE_POST_DEPLOY_VALIDATION_FAILED',
+        stage: 'post_validation',
+        userMessage: 'Os processos PM2 nao permaneceram online apos a publicacao da release.',
+        technicalMessage: `backend=${pm2Status.backend.status}; frontend=${pm2Status.frontend.status}`,
+        retryable: true,
+        rollbackEligible: true,
+        details: pm2Status,
+      });
+    }
+
+    if (pm2Status.backendConflicts.length > 0 || pm2Status.frontendConflicts.length > 0) {
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_POST_DEPLOY_PM2_CONFLICT',
+        category: 'UPDATE_POST_DEPLOY_VALIDATION_FAILED',
+        stage: 'post_validation',
+        userMessage: 'Persistiram processos PM2 legados concorrendo com a release publicada.',
+        technicalMessage:
+          `backendConflicts=${pm2Status.backendConflicts.map((process) => process.processName).join(',') || 'nenhum'}; ` +
+          `frontendConflicts=${pm2Status.frontendConflicts.map((process) => process.processName).join(',') || 'nenhum'}`,
+        retryable: false,
+        rollbackEligible: true,
+        details: pm2Status,
+      });
+    }
+
+    if (pm2Status.backend.pointsToExpectedRelease !== true || pm2Status.frontend.pointsToExpectedRelease !== true) {
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_POST_DEPLOY_RELEASE_PROCESS_MISMATCH',
+        category: 'UPDATE_POST_DEPLOY_VALIDATION_FAILED',
+        stage: 'post_validation',
+        userMessage: 'O PM2 nao esta servindo a release publicada como instancia unica.',
+        technicalMessage:
+          `backendObserved=${pm2Status.backend.cwd || pm2Status.backend.execPath || 'desconhecido'}; ` +
+          `frontendObserved=${pm2Status.frontend.cwd || pm2Status.frontend.execPath || 'desconhecido'}`,
+        retryable: false,
+        rollbackEligible: true,
+        details: pm2Status,
+      });
+    }
+
     const backendUrl = `http://127.0.0.1:${backendPort}/api/health`;
     const frontendHealthUrl = `http://127.0.0.1:${frontendPort}/api/health`;
     const rootHtml = await this.assertHttpOk(`http://127.0.0.1:${frontendPort}/`, 'rota / em runtime');
@@ -1303,12 +1437,23 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     await this.assertHttpOk(`http://127.0.0.1:${frontendPort}${staticAsset}`, `asset estatico ${staticAsset}`);
 
     await this.validateBackendSharedStorage(releaseDir, context);
+    const expectedVersion = rollback
+      ? (await this.readObservedVersion(releaseDir)) || context.execution.currentVersion
+      : context.execution.targetVersion;
+    const runtimeVersionEvidence = await this.validateLiveRuntimeIdentity(
+      context,
+      'post_validation',
+      backendPort,
+      expectedVersion,
+    );
 
     return {
       rollback,
       backendUrl,
       frontendHealthUrl,
       staticAsset,
+      pm2Status,
+      runtimeVersionEvidence,
     };
   }
 
@@ -1481,7 +1626,7 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
 
   private async inspectPm2Processes(
     context: UpdateStepExecutionContext,
-    step: 'restart_services' | 'healthcheck',
+    step: 'restart_services' | 'healthcheck' | 'post_validation',
   ): Promise<Array<Record<string, unknown>>> {
     const result = await this.runCommandOrThrow(
       context,
@@ -1494,9 +1639,15 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     try {
       return JSON.parse(result.stdout) as Array<Record<string, unknown>>;
     } catch (error) {
+      const category =
+        step === 'restart_services'
+          ? 'UPDATE_RESTART_FAILED'
+          : step === 'healthcheck'
+            ? 'UPDATE_HEALTHCHECK_FAILED'
+            : 'UPDATE_POST_DEPLOY_VALIDATION_FAILED';
       throw new UpdateRuntimeStepError({
         code: 'UPDATE_PM2_JLIST_INVALID',
-        category: step === 'healthcheck' ? 'UPDATE_HEALTHCHECK_FAILED' : 'UPDATE_RESTART_FAILED',
+        category,
         stage: step,
         userMessage: 'O PM2 não retornou um inventário estruturado válido.',
         technicalMessage: error instanceof Error ? error.message : String(error),
@@ -1512,31 +1663,426 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
 
   private collectPm2Evidence(
     processes: Array<Record<string, unknown>>,
-    names: {
+    options: {
       backendName: string;
       frontendName: string;
+      baseDir: string;
+      expectedBackendDir: string;
+      expectedFrontendDir: string;
     },
   ): NativePm2StatusEvidence {
-    const resolveProcess = (name: string) => {
-      const found = processes.find((entry) => String(entry.name || '') === name);
-      const pm2Env =
-        found && typeof found.pm2_env === 'object' && found.pm2_env !== null
-          ? (found.pm2_env as Record<string, unknown>)
-          : {};
+    const backendCandidates: NativePm2ProcessEvidence[] = [];
+    const frontendCandidates: NativePm2ProcessEvidence[] = [];
+    const exactEntries = new Map<string, Record<string, unknown>>();
 
-      return {
-        processName: name,
-        found: Boolean(found),
-        status: String(pm2Env.status || 'missing'),
-        pid: Number(pm2Env.pm_id || -1),
-        online: String(pm2Env.status || '') === 'online',
-      };
-    };
+    for (const entry of processes) {
+      const processName = String(entry.name || '').trim();
+      if (processName) {
+        exactEntries.set(processName, entry);
+      }
+
+      const role = this.detectPm2ProcessRole(entry, options.baseDir);
+      if (role === 'backend') {
+        backendCandidates.push(this.toPm2ProcessEvidence(entry, options.expectedBackendDir));
+      } else if (role === 'frontend') {
+        frontendCandidates.push(this.toPm2ProcessEvidence(entry, options.expectedFrontendDir));
+      }
+    }
+
+    const resolveProcess = (name: string, expectedDir: string) =>
+      this.toPm2ProcessEvidence(exactEntries.get(name) || null, expectedDir, name);
 
     return {
-      backend: resolveProcess(names.backendName),
-      frontend: resolveProcess(names.frontendName),
+      backend: resolveProcess(options.backendName, options.expectedBackendDir),
+      frontend: resolveProcess(options.frontendName, options.expectedFrontendDir),
+      backendConflicts: backendCandidates.filter(
+        (candidate) => candidate.processName !== options.backendName && candidate.online,
+      ),
+      frontendConflicts: frontendCandidates.filter(
+        (candidate) => candidate.processName !== options.frontendName && candidate.online,
+      ),
     };
+  }
+
+  private collectConflictingPm2ProcessNames(
+    processes: Array<Record<string, unknown>>,
+    options: {
+      backendName: string;
+      frontendName: string;
+      baseDir: string;
+      expectedBackendDir: string;
+      expectedFrontendDir: string;
+    },
+  ): string[] {
+    const evidence = this.collectPm2Evidence(processes, options);
+    return Array.from(
+      new Set([
+        ...evidence.backendConflicts.map((process) => process.processName),
+        ...evidence.frontendConflicts.map((process) => process.processName),
+      ]),
+    );
+  }
+
+  private resolvePm2ProcessNames(context: UpdateStepExecutionContext): {
+    backendName: string;
+    frontendName: string;
+    source: 'metadata' | 'environment' | 'runtime_default' | 'mixed';
+  } {
+    const metadataBackendName = this.getMetadataString(context.metadata, 'pm2BackendName');
+    const metadataFrontendName = this.getMetadataString(context.metadata, 'pm2FrontendName');
+    const envBackendName = String(process.env.PM2_BACKEND_NAME || '').trim() || null;
+    const envFrontendName = String(process.env.PM2_FRONTEND_NAME || '').trim() || null;
+    const runtimeDefaultNames = this.buildDefaultPm2ProcessNames(context.runtime.baseDir);
+
+    const backendName = metadataBackendName || envBackendName || runtimeDefaultNames.backendName;
+    const frontendName = metadataFrontendName || envFrontendName || runtimeDefaultNames.frontendName;
+
+    if (metadataBackendName || metadataFrontendName) {
+      return {
+        backendName,
+        frontendName,
+        source: metadataBackendName && metadataFrontendName ? 'metadata' : 'mixed',
+      };
+    }
+
+    if (envBackendName || envFrontendName) {
+      return {
+        backendName,
+        frontendName,
+        source: envBackendName && envFrontendName ? 'environment' : 'mixed',
+      };
+    }
+
+    return {
+      backendName,
+      frontendName,
+      source: 'runtime_default',
+    };
+  }
+
+  private buildDefaultPm2ProcessNames(baseDir: string): { backendName: string; frontendName: string } {
+    const instanceName =
+      String(path.basename(path.resolve(baseDir)) || '')
+        .trim()
+        .replace(/[^a-zA-Z0-9._-]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'multitenant';
+
+    return {
+      backendName: `${instanceName}-backend`,
+      frontendName: `${instanceName}-frontend`,
+    };
+  }
+
+  private detectPm2ProcessRole(
+    entry: Record<string, unknown>,
+    baseDir: string,
+  ): 'backend' | 'frontend' | null {
+    const evidence = this.toPm2ProcessEvidence(entry, null);
+    const comparableBaseDir = this.normalizeComparablePath(baseDir);
+    const comparableCwd = this.normalizeComparablePath(evidence.cwd);
+    const comparableExecPath = this.normalizeComparablePath(evidence.execPath);
+    const comparableArgs = evidence.args.map((value) => this.normalizeComparablePath(value));
+    const name = evidence.processName.toLowerCase();
+
+    const belongsToBaseDir =
+      this.isPathInsideComparableBase(comparableCwd, comparableBaseDir) ||
+      this.isPathInsideComparableBase(comparableExecPath, comparableBaseDir);
+    if (!belongsToBaseDir) {
+      return null;
+    }
+
+    const backendSignal =
+      name.includes('backend') ||
+      comparableCwd.includes('/apps/backend') ||
+      comparableExecPath.includes('/apps/backend') ||
+      comparableExecPath.endsWith('/dist/main.js') ||
+      comparableArgs.some((value) => value.includes('/apps/backend') || value.endsWith('/dist/main.js'));
+
+    const frontendSignal =
+      name.includes('frontend') ||
+      comparableCwd.includes('/apps/frontend') ||
+      comparableExecPath.includes('/apps/frontend') ||
+      comparableExecPath.endsWith('/scripts/start-standalone.mjs') ||
+      comparableExecPath.includes('/.next/standalone/') ||
+      comparableArgs.some(
+        (value) =>
+          value.includes('/apps/frontend') ||
+          value.endsWith('/scripts/start-standalone.mjs') ||
+          value.includes('/.next/standalone/'),
+      );
+
+    if (backendSignal && !frontendSignal) {
+      return 'backend';
+    }
+
+    if (frontendSignal && !backendSignal) {
+      return 'frontend';
+    }
+
+    if (backendSignal) {
+      return 'backend';
+    }
+
+    if (frontendSignal) {
+      return 'frontend';
+    }
+
+    return null;
+  }
+
+  private toPm2ProcessEvidence(
+    entry: Record<string, unknown> | null,
+    expectedReleaseDir: string | null,
+    fallbackName?: string,
+  ): NativePm2ProcessEvidence {
+    const pm2Env =
+      entry && typeof entry.pm2_env === 'object' && entry.pm2_env !== null
+        ? (entry.pm2_env as Record<string, unknown>)
+        : {};
+    const processName = fallbackName || String(entry?.name || '').trim();
+    const rawArgs = entry?.args ?? pm2Env.args ?? [];
+    const args = Array.isArray(rawArgs)
+      ? rawArgs.map((value) => String(value))
+      : typeof rawArgs === 'string' && rawArgs.trim()
+        ? rawArgs
+            .split(/\s+/)
+            .map((value) => value.trim())
+            .filter(Boolean)
+        : [];
+    const status = String(pm2Env.status || 'missing');
+    const cwd = this.pickFirstString(entry, ['pm_cwd', 'cwd']) || this.pickFirstString(pm2Env, ['pm_cwd', 'cwd']);
+    const execPath =
+      this.pickFirstString(entry, ['pm_exec_path', 'exec_path']) ||
+      this.pickFirstString(pm2Env, ['pm_exec_path', 'exec_path']) ||
+      null;
+    const port =
+      this.pickFirstNumber(pm2Env.env as Record<string, unknown> | undefined, ['PORT', 'port']) ??
+      this.pickFirstNumber(pm2Env, ['PORT', 'port']) ??
+      this.pickFirstNumber(entry, ['PORT', 'port']);
+
+    return {
+      processName,
+      found: Boolean(entry),
+      status,
+      pmId: this.pickFirstNumber(pm2Env, ['pm_id']) ?? this.pickFirstNumber(entry, ['pm_id']) ?? -1,
+      online: status === 'online',
+      cwd,
+      execPath,
+      args,
+      port,
+      pointsToExpectedRelease: expectedReleaseDir
+        ? this.pm2ProcessPointsToExpectedRelease({ cwd, execPath, args }, expectedReleaseDir)
+        : null,
+    };
+  }
+
+  private pm2ProcessPointsToExpectedRelease(
+    process: {
+      cwd: string | null;
+      execPath: string | null;
+      args: string[];
+    },
+    expectedReleaseDir: string,
+  ): boolean {
+    const comparableExpectedDir = this.normalizeComparablePath(expectedReleaseDir);
+    const comparableCwd = this.normalizeComparablePath(process.cwd);
+    const comparableExecPath = this.normalizeComparablePath(process.execPath);
+
+    if (comparableCwd && this.isSameComparablePath(comparableCwd, comparableExpectedDir)) {
+      return true;
+    }
+
+    if (comparableExecPath && this.isPathInsideComparableBase(comparableExecPath, comparableExpectedDir)) {
+      return true;
+    }
+
+    return process.args.some((value) =>
+      this.isPathInsideComparableBase(this.normalizeComparablePath(value), comparableExpectedDir),
+    );
+  }
+
+  private async validateLiveRuntimeIdentity(
+    context: UpdateStepExecutionContext,
+    stage: 'healthcheck' | 'post_validation',
+    backendPort: number,
+    expectedVersion: string,
+  ): Promise<Record<string, unknown>> {
+    const systemVersionUrl = `http://127.0.0.1:${backendPort}/api/system/version`;
+    const updateStatusUrl = `http://127.0.0.1:${backendPort}/api/update/status`;
+    const systemVersion = await this.fetchJsonResponse(systemVersionUrl, 'versao do sistema em runtime');
+    const updateStatus = await this.fetchJsonResponse(updateStatusUrl, 'status do update em runtime');
+    const category =
+      stage === 'healthcheck' ? 'UPDATE_HEALTHCHECK_FAILED' : 'UPDATE_POST_DEPLOY_VALIDATION_FAILED';
+
+    if (
+      !this.versionMatchesTarget(
+        expectedVersion,
+        this.getRecordString(systemVersion, 'installedVersionRaw') || this.getRecordString(systemVersion, 'version'),
+        this.getRecordString(systemVersion, 'installedBaseTag'),
+        this.getRecordString(systemVersion, 'installedVersionNormalized'),
+      )
+    ) {
+      throw new UpdateRuntimeStepError({
+        code:
+          stage === 'healthcheck'
+            ? 'UPDATE_HEALTHCHECK_RUNTIME_VERSION_MISMATCH'
+            : 'UPDATE_POST_DEPLOY_RUNTIME_VERSION_MISMATCH',
+        category,
+        stage,
+        userMessage: 'A release servida em runtime nao corresponde a versao alvo do update.',
+        technicalMessage:
+          `systemVersion=${JSON.stringify(systemVersion)} expected=${expectedVersion}; ` +
+          `updateStatus=${JSON.stringify(updateStatus)}`,
+        retryable: false,
+        rollbackEligible: true,
+        details: {
+          expectedVersion,
+          systemVersion,
+          updateStatus,
+        },
+      });
+    }
+
+    if (
+      !this.versionMatchesTarget(
+        expectedVersion,
+        this.getRecordString(updateStatus, 'installedVersionRaw') || this.getRecordString(updateStatus, 'currentVersion'),
+        this.getRecordString(updateStatus, 'installedBaseTag'),
+        this.getRecordString(updateStatus, 'installedVersionNormalized'),
+      )
+    ) {
+      throw new UpdateRuntimeStepError({
+        code:
+          stage === 'healthcheck'
+            ? 'UPDATE_HEALTHCHECK_UPDATE_STATUS_MISMATCH'
+            : 'UPDATE_POST_DEPLOY_UPDATE_STATUS_MISMATCH',
+        category,
+        stage,
+        userMessage: 'O status operacional ainda indica uma versao diferente da release publicada.',
+        technicalMessage: `updateStatus=${JSON.stringify(updateStatus)} expected=${expectedVersion}`,
+        retryable: false,
+        rollbackEligible: true,
+        details: {
+          expectedVersion,
+          systemVersion,
+          updateStatus,
+        },
+      });
+    }
+
+    const availableVersion = this.getRecordString(updateStatus, 'availableVersion');
+    const updateAvailable = updateStatus.updateAvailable === true;
+    if (updateAvailable && availableVersion && this.versionMatchesTarget(expectedVersion, availableVersion, null, null)) {
+      throw new UpdateRuntimeStepError({
+        code:
+          stage === 'healthcheck'
+            ? 'UPDATE_HEALTHCHECK_TARGET_STILL_AVAILABLE'
+            : 'UPDATE_POST_DEPLOY_TARGET_STILL_AVAILABLE',
+        category,
+        stage,
+        userMessage: 'A release publicada ainda aparece como atualizacao pendente no runtime.',
+        technicalMessage: `availableVersion=${availableVersion}; expected=${expectedVersion}`,
+        retryable: false,
+        rollbackEligible: true,
+        details: {
+          expectedVersion,
+          systemVersion,
+          updateStatus,
+        },
+      });
+    }
+
+    return {
+      systemVersion,
+      updateStatus,
+    };
+  }
+
+  private async fetchJsonResponse(url: string, label: string): Promise<Record<string, unknown>> {
+    const body = await this.assertHttpOk(url, label);
+
+    try {
+      const parsed = JSON.parse(body) as Record<string, unknown>;
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (error) {
+      throw new Error(`${label} retornou JSON invalido em ${url}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private versionMatchesTarget(
+    targetVersion: string,
+    rawVersion: string | null,
+    baseTag: string | null,
+    normalizedVersion: string | null,
+  ): boolean {
+    const expected = this.normalizeComparableVersion(targetVersion);
+    const candidates = [rawVersion, baseTag, normalizedVersion]
+      .map((value) => this.normalizeComparableVersion(value))
+      .filter((value): value is string => Boolean(value));
+
+    return candidates.includes(expected);
+  }
+
+  private normalizeComparableVersion(value: string | null | undefined): string {
+    return String(value || '')
+      .trim()
+      .replace(/^v/i, '')
+      .replace(/\+.*$/, '');
+  }
+
+  private pickFirstString(record: Record<string, unknown> | null | undefined, keys: string[]): string | null {
+    if (!record) {
+      return null;
+    }
+
+    for (const key of keys) {
+      const value = record[key];
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+    }
+
+    return null;
+  }
+
+  private getRecordString(record: Record<string, unknown>, key: string): string | null {
+    const value = record[key];
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+  }
+
+  private pickFirstNumber(record: Record<string, unknown> | null | undefined, keys: string[]): number | null {
+    if (!record) {
+      return null;
+    }
+
+    for (const key of keys) {
+      const parsed = Number(record[key]);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+
+    return null;
+  }
+
+  private normalizeComparablePath(value: string | null | undefined): string {
+    return String(value || '')
+      .trim()
+      .replace(/\\/g, '/')
+      .replace(/\/+$/, '')
+      .toLowerCase();
+  }
+
+  private isSameComparablePath(left: string, right: string): boolean {
+    return this.normalizeComparablePath(left) === this.normalizeComparablePath(right);
+  }
+
+  private isPathInsideComparableBase(candidate: string, baseDir: string): boolean {
+    if (!candidate || !baseDir) {
+      return false;
+    }
+
+    return candidate === baseDir || candidate.startsWith(`${baseDir}/`);
   }
 
   private async readObservedVersion(releaseDir: string): Promise<string | null> {

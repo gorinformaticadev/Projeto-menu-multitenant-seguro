@@ -106,6 +106,7 @@ SEED_COMMAND_BIN=""
 SEED_COMMAND_SOURCE=""
 SEED_COMMAND_ARGS=()
 LAST_SEED_RESOLUTION_ERROR=""
+LAST_PM2_RUNTIME_ERROR=""
 
 now_iso() {
   date -u +%Y-%m-%dT%H:%M:%SZ
@@ -847,23 +848,290 @@ link_shared_into_release() {
   ln -sfn "$SHARED_DIR/backups" "$release_dir/backups"
 }
 
+default_pm2_name_for_role() {
+  local role="$1"
+  local instance_name=""
+  instance_name="$(basename "$BASE_DIR" | tr -cs '[:alnum:]._-' '-' | sed 's/^-*//; s/-*$//')"
+  [[ -n "$instance_name" ]] || instance_name="multitenant"
+  printf '%s-%s\n' "$instance_name" "$role"
+}
+
+resolve_pm2_process_names() {
+  RESOLVED_PM2_BACKEND_NAME="${PM2_BACKEND_NAME:-$BACKEND_PROC}"
+  RESOLVED_PM2_FRONTEND_NAME="${PM2_FRONTEND_NAME:-$FRONTEND_PROC}"
+
+  if [[ -z "$RESOLVED_PM2_BACKEND_NAME" ]]; then
+    RESOLVED_PM2_BACKEND_NAME="$(default_pm2_name_for_role backend)"
+  fi
+  if [[ -z "$RESOLVED_PM2_FRONTEND_NAME" ]]; then
+    RESOLVED_PM2_FRONTEND_NAME="$(default_pm2_name_for_role frontend)"
+  fi
+}
+
+collect_conflicting_pm2_names() {
+  local base_dir="$1"
+  local backend_name="$2"
+  local frontend_name="$3"
+  local pm2_output=""
+  pm2_output="$(pm2 jlist 2>/dev/null || true)"
+
+  printf '%s' "$pm2_output" | node - "$base_dir" "$backend_name" "$frontend_name" <<'EOF'
+const fs = require('node:fs');
+const [, , baseDirArg, backendName, frontendName] = process.argv;
+const raw = fs.readFileSync(0, 'utf8').trim();
+const processes = raw ? JSON.parse(raw) : [];
+
+function normalizePath(value) {
+  return String(value || '').trim().replace(/\\/g, '/').replace(/\/+$/g, '').toLowerCase();
+}
+
+function isInside(candidate, baseDir) {
+  return !!candidate && !!baseDir && (candidate === baseDir || candidate.startsWith(`${baseDir}/`));
+}
+
+function pickString(record, keys) {
+  if (!record || typeof record !== 'object') return null;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function evidence(entry) {
+  const env = entry?.pm2_env && typeof entry.pm2_env === 'object' ? entry.pm2_env : {};
+  const rawArgs = entry?.args ?? env.args ?? [];
+  const args = Array.isArray(rawArgs)
+    ? rawArgs.map((value) => String(value))
+    : typeof rawArgs === 'string' && rawArgs.trim()
+      ? rawArgs.split(/\s+/).map((value) => value.trim()).filter(Boolean)
+      : [];
+  return {
+    name: String(entry?.name || '').trim(),
+    status: String(env.status || 'missing'),
+    cwd: pickString(entry, ['pm_cwd', 'cwd']) || pickString(env, ['pm_cwd', 'cwd']) || '',
+    execPath: pickString(entry, ['pm_exec_path', 'exec_path']) || pickString(env, ['pm_exec_path', 'exec_path']) || '',
+    args,
+  };
+}
+
+function resolveRole(process, baseDir) {
+  const cwd = normalizePath(process.cwd);
+  const execPath = normalizePath(process.execPath);
+  const args = process.args.map(normalizePath);
+  const name = String(process.name || '').toLowerCase();
+  const belongsToBaseDir = isInside(cwd, baseDir) || isInside(execPath, baseDir);
+  if (!belongsToBaseDir) return null;
+
+  const backendSignal =
+    name.includes('backend') ||
+    cwd.includes('/apps/backend') ||
+    execPath.includes('/apps/backend') ||
+    execPath.endsWith('/dist/main.js') ||
+    args.some((value) => value.includes('/apps/backend') || value.endsWith('/dist/main.js'));
+
+  const frontendSignal =
+    name.includes('frontend') ||
+    cwd.includes('/apps/frontend') ||
+    execPath.includes('/apps/frontend') ||
+    execPath.endsWith('/scripts/start-standalone.mjs') ||
+    execPath.includes('/.next/standalone/') ||
+    args.some(
+      (value) =>
+        value.includes('/apps/frontend') ||
+        value.endsWith('/scripts/start-standalone.mjs') ||
+        value.includes('/.next/standalone/'),
+    );
+
+  if (backendSignal && !frontendSignal) return 'backend';
+  if (frontendSignal && !backendSignal) return 'frontend';
+  if (backendSignal) return 'backend';
+  if (frontendSignal) return 'frontend';
+  return null;
+}
+
+const baseDir = normalizePath(baseDirArg);
+const conflicts = [];
+for (const entry of processes) {
+  const process = evidence(entry);
+  if (process.status !== 'online') continue;
+  const role = resolveRole(process, baseDir);
+  if (role === 'backend' && process.name !== backendName) conflicts.push(process.name);
+  if (role === 'frontend' && process.name !== frontendName) conflicts.push(process.name);
+}
+
+process.stdout.write(Array.from(new Set(conflicts.filter(Boolean))).join('\n'));
+EOF
+}
+
+assert_pm2_release_state() {
+  local base_dir="$1"
+  local target_root="$2"
+  local backend_name="$3"
+  local frontend_name="$4"
+  local pm2_output=""
+  pm2_output="$(pm2 jlist 2>/dev/null || true)"
+
+  printf '%s' "$pm2_output" | node - "$base_dir" "$target_root" "$backend_name" "$frontend_name" <<'EOF'
+const fs = require('node:fs');
+const [, , baseDirArg, targetRootArg, backendName, frontendName] = process.argv;
+const raw = fs.readFileSync(0, 'utf8').trim();
+const processes = raw ? JSON.parse(raw) : [];
+
+function normalizePath(value) {
+  return String(value || '').trim().replace(/\\/g, '/').replace(/\/+$/g, '').toLowerCase();
+}
+
+function isInside(candidate, baseDir) {
+  return !!candidate && !!baseDir && (candidate === baseDir || candidate.startsWith(`${baseDir}/`));
+}
+
+function pickString(record, keys) {
+  if (!record || typeof record !== 'object') return null;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function pickNumber(record, keys) {
+  if (!record || typeof record !== 'object') return null;
+  for (const key of keys) {
+    const parsed = Number(record[key]);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function evidence(entry, expectedDir, fallbackName) {
+  const env = entry?.pm2_env && typeof entry.pm2_env === 'object' ? entry.pm2_env : {};
+  const rawArgs = entry?.args ?? env.args ?? [];
+  const args = Array.isArray(rawArgs)
+    ? rawArgs.map((value) => String(value))
+    : typeof rawArgs === 'string' && rawArgs.trim()
+      ? rawArgs.split(/\s+/).map((value) => value.trim()).filter(Boolean)
+      : [];
+  const cwd = pickString(entry, ['pm_cwd', 'cwd']) || pickString(env, ['pm_cwd', 'cwd']) || '';
+  const execPath = pickString(entry, ['pm_exec_path', 'exec_path']) || pickString(env, ['pm_exec_path', 'exec_path']) || '';
+  const normalizedExpectedDir = normalizePath(expectedDir);
+  const pointsToExpectedRelease =
+    (!!normalizedExpectedDir && normalizePath(cwd) === normalizedExpectedDir) ||
+    isInside(normalizePath(execPath), normalizedExpectedDir) ||
+    args.some((value) => isInside(normalizePath(value), normalizedExpectedDir));
+
+  return {
+    name: fallbackName || String(entry?.name || '').trim(),
+    status: String(env.status || 'missing'),
+    online: String(env.status || 'missing') === 'online',
+    pmId: pickNumber(env, ['pm_id']) ?? pickNumber(entry, ['pm_id']) ?? -1,
+    cwd,
+    execPath,
+    port: pickNumber(env.env, ['PORT', 'port']) ?? pickNumber(env, ['PORT', 'port']) ?? pickNumber(entry, ['PORT', 'port']),
+    pointsToExpectedRelease: normalizedExpectedDir ? pointsToExpectedRelease : null,
+  };
+}
+
+function resolveRole(process, baseDir) {
+  const cwd = normalizePath(process.cwd);
+  const execPath = normalizePath(process.execPath);
+  const name = String(process.name || '').toLowerCase();
+  const belongsToBaseDir = isInside(cwd, baseDir) || isInside(execPath, baseDir);
+  if (!belongsToBaseDir) return null;
+
+  const backendSignal =
+    name.includes('backend') ||
+    cwd.includes('/apps/backend') ||
+    execPath.includes('/apps/backend') ||
+    execPath.endsWith('/dist/main.js');
+
+  const frontendSignal =
+    name.includes('frontend') ||
+    cwd.includes('/apps/frontend') ||
+    execPath.includes('/apps/frontend') ||
+    execPath.endsWith('/scripts/start-standalone.mjs') ||
+    execPath.includes('/.next/standalone/');
+
+  if (backendSignal && !frontendSignal) return 'backend';
+  if (frontendSignal && !backendSignal) return 'frontend';
+  if (backendSignal) return 'backend';
+  if (frontendSignal) return 'frontend';
+  return null;
+}
+
+const baseDir = normalizePath(baseDirArg);
+const targetRoot = normalizePath(targetRootArg);
+const backendExpectedDir = `${targetRoot}/apps/backend`;
+const frontendExpectedDir = `${targetRoot}/apps/frontend`;
+
+const byName = new Map();
+const backendConflicts = [];
+const frontendConflicts = [];
+
+for (const entry of processes) {
+  const processName = String(entry?.name || '').trim();
+  if (processName) byName.set(processName, entry);
+
+  const process = evidence(entry, null, processName);
+  const role = resolveRole(process, baseDir);
+  if (role === 'backend' && process.online && processName !== backendName) backendConflicts.push(processName);
+  if (role === 'frontend' && process.online && processName !== frontendName) frontendConflicts.push(processName);
+}
+
+const backend = evidence(byName.get(backendName) || null, backendExpectedDir, backendName);
+const frontend = evidence(byName.get(frontendName) || null, frontendExpectedDir, frontendName);
+
+const summary = JSON.stringify({
+  backend,
+  frontend,
+  backendConflicts: Array.from(new Set(backendConflicts)),
+  frontendConflicts: Array.from(new Set(frontendConflicts)),
+});
+
+if (!backend.online || !frontend.online) {
+  console.error(`Processos PM2 nao ficaram online apos o restart. ${summary}`);
+  process.exit(1);
+}
+
+if (!backend.pointsToExpectedRelease || !frontend.pointsToExpectedRelease) {
+  console.error(`Processos PM2 nao apontam para a release publicada. ${summary}`);
+  process.exit(1);
+}
+
+if (backendConflicts.length > 0 || frontendConflicts.length > 0) {
+  console.error(`Persistiram aliases PM2 conflitantes apos o restart. ${summary}`);
+  process.exit(1);
+}
+
+console.log(summary);
+EOF
+}
+
 restart_pm2_processes() {
   local target_root="$1"
-  local backend_name="${PM2_BACKEND_NAME:-$BACKEND_PROC}"
-  local frontend_name="${PM2_FRONTEND_NAME:-$FRONTEND_PROC}"
+  local backend_name=""
+  local frontend_name=""
   local frontend_dir="$target_root/apps/frontend"
   local frontend_start_target=""
+  local pm2_validation=""
+  local conflicting_names=()
+  local delete_candidates=()
+  local process_name=""
 
-  if [[ -z "$backend_name" ]]; then
-    backend_name="multitenant-backend"
-  fi
-  if [[ -z "$frontend_name" ]]; then
-    frontend_name="multitenant-frontend"
-  fi
+  resolve_pm2_process_names
+  backend_name="$RESOLVED_PM2_BACKEND_NAME"
+  frontend_name="$RESOLVED_PM2_FRONTEND_NAME"
+  mapfile -t conflicting_names < <(collect_conflicting_pm2_names "$BASE_DIR" "$backend_name" "$frontend_name" || true)
+  delete_candidates=("$backend_name" "$frontend_name" "${conflicting_names[@]}")
 
   log "Reiniciando PM2 com codigo em ${target_root}"
-  pm2 delete "$backend_name" >/dev/null 2>&1 || true
-  pm2 delete "$frontend_name" >/dev/null 2>&1 || true
+  if (( ${#conflicting_names[@]} > 0 )); then
+    log "Removendo aliases PM2 conflitantes: ${conflicting_names[*]}"
+  fi
+  for process_name in "${delete_candidates[@]}"; do
+    [[ -n "$process_name" ]] || continue
+    pm2 delete "$process_name" >/dev/null 2>&1 || true
+  done
 
   pm2 start dist/main.js --name "$backend_name" --cwd "$target_root/apps/backend" --update-env || return 1
   frontend_start_target="$(resolve_frontend_start_target "$frontend_dir")" || return 1
@@ -876,6 +1144,14 @@ restart_pm2_processes() {
   PORT=5000 HOSTNAME=0.0.0.0 \
     pm2 start "node ${frontend_start_target}" --name "$frontend_name" --cwd "$frontend_dir" --update-env || return 1
   pm2 save
+
+  if ! pm2_validation="$(assert_pm2_release_state "$BASE_DIR" "$target_root" "$backend_name" "$frontend_name" 2>&1)"; then
+    LAST_PM2_RUNTIME_ERROR="$pm2_validation"
+    log_err "$LAST_PM2_RUNTIME_ERROR"
+    return 1
+  fi
+  LAST_PM2_RUNTIME_ERROR=""
+  log "Estado do PM2 validado apos o restart: $pm2_validation"
 
   BACKEND_PROC="$backend_name"
   FRONTEND_PROC="$frontend_name"
@@ -1204,6 +1480,94 @@ check_frontend_http_endpoint() {
   return 0
 }
 
+validate_runtime_version_identity() {
+  local backend_port="$1"
+  local expected_version="$2"
+  local tmp_dir="$3"
+  local validation_output=""
+  local system_version_file="$tmp_dir/system-version.json"
+  local update_status_file="$tmp_dir/update-status.json"
+
+  if ! curl -fsS --max-time 10 "http://127.0.0.1:${backend_port}/api/system/version" -o "$system_version_file"; then
+    log_err "Falha ao consultar /api/system/version apos o deploy."
+    return 1
+  fi
+
+  if ! curl -fsS --max-time 10 "http://127.0.0.1:${backend_port}/api/update/status" -o "$update_status_file"; then
+    log_err "Falha ao consultar /api/update/status apos o deploy."
+    return 1
+  fi
+
+  if ! validation_output="$(node - "$expected_version" "$system_version_file" "$update_status_file" <<'EOF'
+const fs = require('node:fs');
+const [, , expectedVersion, systemVersionFile, updateStatusFile] = process.argv;
+const systemVersion = JSON.parse(fs.readFileSync(systemVersionFile, 'utf8'));
+const updateStatus = JSON.parse(fs.readFileSync(updateStatusFile, 'utf8'));
+
+function normalizeVersion(value) {
+  return String(value || '').trim().replace(/^v/i, '').replace(/\+.*$/, '');
+}
+
+function matchesTarget(target, ...candidates) {
+  const normalizedTarget = normalizeVersion(target);
+  return candidates
+    .map(normalizeVersion)
+    .filter(Boolean)
+    .includes(normalizedTarget);
+}
+
+if (
+  !matchesTarget(
+    expectedVersion,
+    systemVersion.installedVersionRaw,
+    systemVersion.installedBaseTag,
+    systemVersion.installedVersionNormalized,
+    systemVersion.version,
+  )
+) {
+  console.error(
+    `Runtime backend ainda nao serve a release alvo. systemVersion=${JSON.stringify(systemVersion)} expected=${expectedVersion}`,
+  );
+  process.exit(1);
+}
+
+if (
+  !matchesTarget(
+    expectedVersion,
+    updateStatus.installedVersionRaw,
+    updateStatus.installedBaseTag,
+    updateStatus.installedVersionNormalized,
+    updateStatus.currentVersion,
+  )
+) {
+  console.error(
+    `Status do update ainda nao reflete a release publicada. updateStatus=${JSON.stringify(updateStatus)} expected=${expectedVersion}`,
+  );
+  process.exit(1);
+}
+
+if (updateStatus.updateAvailable === true && matchesTarget(expectedVersion, updateStatus.availableVersion)) {
+  console.error(
+    `A release publicada ainda aparece como atualizacao pendente. updateStatus=${JSON.stringify(updateStatus)}`,
+  );
+  process.exit(1);
+}
+
+console.log(
+  JSON.stringify({
+    systemVersion,
+    updateStatus,
+  }),
+);
+EOF
+)"; then
+    log_err "$validation_output"
+    return 1
+  fi
+
+  log "Identidade do runtime validada: $validation_output"
+}
+
 smoke_test_frontend_release() {
   local release_dir="$1"
   local port="${2:-5100}"
@@ -1265,8 +1629,11 @@ smoke_test_frontend_release() {
 validate_live_runtime() {
   local backend_port="${1:-4000}"
   local frontend_port="${2:-5000}"
+  local expected_release_dir="${3:-$CURRENT_LINK}"
+  local expected_version="${4:-$TARGET_TAG}"
   local tmp_dir=""
   local status=0
+  local pm2_validation=""
   tmp_dir="$(mktemp -d)"
 
   cleanup_live_validation() {
@@ -1278,6 +1645,12 @@ validate_live_runtime() {
     status=1
   elif ! wait_for_http_url "http://127.0.0.1:${frontend_port}/api/health" "$HEALTH_TIMEOUT"; then
     log_err "Frontend nao respondeu ao healthcheck apos o deploy."
+    status=1
+  elif ! resolve_pm2_process_names; then
+    log_err "Falha ao resolver os nomes PM2 esperados para validacao pos-deploy."
+    status=1
+  elif ! pm2_validation="$(assert_pm2_release_state "$BASE_DIR" "$expected_release_dir" "$RESOLVED_PM2_BACKEND_NAME" "$RESOLVED_PM2_FRONTEND_NAME" 2>&1)"; then
+    log_err "$pm2_validation"
     status=1
   elif ! check_frontend_http_endpoint "http://127.0.0.1:${backend_port}/api/health" "healthcheck do backend" "$tmp_dir/backend-health.json"; then
     status=1
@@ -1300,6 +1673,8 @@ validate_live_runtime() {
       status=1
     elif [[ -f "$CURRENT_LINK/apps/frontend/public/clear-cache.html" ]] && \
       ! check_frontend_http_endpoint "http://127.0.0.1:${frontend_port}/clear-cache.html" "asset publico clear-cache publicado" "$tmp_dir/frontend-clear-cache.html"; then
+      status=1
+    elif ! validate_runtime_version_identity "$backend_port" "$expected_version" "$tmp_dir"; then
       status=1
     fi
   fi
@@ -1535,7 +1910,7 @@ validate_backend_shared_storage "$NEW_RELEASE_DIR" || fail_and_exit "$EXIT_POST_
 
 set_step "post_deploy_validation" 97
 log "Validando backend, frontend, assets estaticos e rotas criticas apos o swap..."
-if validate_live_runtime 4000 5000; then
+if validate_live_runtime 4000 5000 "$NEW_RELEASE_DIR" "$TARGET_TAG"; then
   log "Sistema saudavel."
 else
   log_err "Validacao pos-deploy falhou. Iniciando rollback..."

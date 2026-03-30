@@ -96,9 +96,15 @@ describe('NativeUpdateRuntimeAdapter', () => {
   let runtime: UpdateRuntimePaths;
   let metadata: Record<string, unknown>;
   let pm2JlistOutput: string;
+  let pm2JlistOutputs: string[];
   let failFrontendRestart: boolean;
+  let frontendRestartFailureName: string | null;
   let buildDependenciesInstalled: boolean;
   let frontendBuildLayout: 'monorepo' | 'root' | 'release-nested';
+  let defaultBackendName: string;
+  let defaultFrontendName: string;
+  let runtimeSystemVersionPayload: Record<string, unknown>;
+  let runtimeUpdateStatusPayload: Record<string, unknown>;
 
   const commandRunnerMock = {
     run: jest.fn(async (request: any) => {
@@ -111,10 +117,11 @@ describe('NativeUpdateRuntimeAdapter', () => {
       }
 
       if (request.command === 'pm2' && joinedArgs === 'jlist') {
+        const nextJlistOutput = pm2JlistOutputs.length > 0 ? pm2JlistOutputs.shift() : null;
         return {
           commandRunId: 'cmd-pm2-jlist',
           exitCode: 0,
-          stdout: pm2JlistOutput,
+          stdout: nextJlistOutput ?? pm2JlistOutput,
           stderr: '',
           stdoutPath: null,
           stderrPath: null,
@@ -123,9 +130,21 @@ describe('NativeUpdateRuntimeAdapter', () => {
 
       if (
         request.command === 'pm2' &&
-        joinedArgs.includes('--name multitenant-frontend') &&
+        Array.isArray(request.args) &&
+        request.args.includes('--name') &&
         failFrontendRestart
       ) {
+        const processName = String(request.args[request.args.indexOf('--name') + 1] || '');
+        if (processName !== (frontendRestartFailureName || defaultFrontendName)) {
+          return {
+            commandRunId: `cmd-${request.step}`,
+            exitCode: 0,
+            stdout: 'ok',
+            stderr: '',
+            stdoutPath: null,
+            stderrPath: null,
+          };
+        }
         return {
           commandRunId: 'cmd-pm2-frontend-fail',
           exitCode: 1,
@@ -190,6 +209,14 @@ describe('NativeUpdateRuntimeAdapter', () => {
         return '{"ok":true}';
       }
 
+      if (url.includes('/api/system/version')) {
+        return JSON.stringify(runtimeSystemVersionPayload);
+      }
+
+      if (url.includes('/api/update/status')) {
+        return JSON.stringify(runtimeUpdateStatusPayload);
+      }
+
       if (url.includes('/clear-cache.html')) {
         return '<html>clear-cache</html>';
       }
@@ -207,26 +234,56 @@ describe('NativeUpdateRuntimeAdapter', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    pm2JlistOutput = JSON.stringify([
-      {
-        name: 'multitenant-backend',
-        pm2_env: {
-          status: 'online',
-          pm_id: 0,
-        },
-      },
-      {
-        name: 'multitenant-frontend',
-        pm2_env: {
-          status: 'online',
-          pm_id: 1,
-        },
-      },
-    ]);
+    pm2JlistOutputs = [];
     failFrontendRestart = false;
+    frontendRestartFailureName = null;
     buildDependenciesInstalled = false;
     frontendBuildLayout = 'monorepo';
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pluggor-native-adapter-'));
+    defaultBackendName = `${path.basename(tmpDir)}-backend`;
+    defaultFrontendName = `${path.basename(tmpDir)}-frontend`;
+    pm2JlistOutput = JSON.stringify([
+      {
+        name: defaultBackendName,
+        pm2_env: {
+          status: 'online',
+          pm_id: 0,
+          pm_cwd: path.join(tmpDir, 'releases', 'v1.2.3', 'apps', 'backend'),
+          pm_exec_path: path.join(tmpDir, 'releases', 'v1.2.3', 'apps', 'backend', 'dist', 'main.js'),
+          env: {
+            PORT: '4000',
+          },
+        },
+      },
+      {
+        name: defaultFrontendName,
+        pm2_env: {
+          status: 'online',
+          pm_id: 1,
+          pm_cwd: path.join(tmpDir, 'releases', 'v1.2.3', 'apps', 'frontend'),
+          pm_exec_path: path.join(tmpDir, 'releases', 'v1.2.3', 'apps', 'frontend', 'scripts', 'start-standalone.mjs'),
+          env: {
+            PORT: '5000',
+          },
+        },
+      },
+    ]);
+    runtimeSystemVersionPayload = {
+      version: 'v1.2.3',
+      installedVersionRaw: 'v1.2.3',
+      installedBaseTag: 'v1.2.3',
+      installedVersionNormalized: '1.2.3',
+      isExactTaggedRelease: true,
+      versionSource: 'git_exact_tag',
+    };
+    runtimeUpdateStatusPayload = {
+      currentVersion: 'v1.2.3',
+      installedVersionRaw: 'v1.2.3',
+      installedBaseTag: 'v1.2.3',
+      installedVersionNormalized: '1.2.3',
+      updateAvailable: false,
+      availableVersion: null,
+    };
     sourceDir = path.join(tmpDir, 'source');
     fs.mkdirSync(path.join(sourceDir, 'apps', 'backend'), { recursive: true });
     fs.mkdirSync(path.join(sourceDir, 'apps', 'backend', 'prisma'), { recursive: true });
@@ -753,7 +810,7 @@ describe('NativeUpdateRuntimeAdapter', () => {
           request.command === 'pm2' &&
           Array.isArray(request.args) &&
           request.args.includes('--name') &&
-          request.args.includes('multitenant-frontend'),
+          request.args.includes(defaultFrontendName),
       );
 
     expect(frontendRestartCall).toEqual(
@@ -806,6 +863,141 @@ describe('NativeUpdateRuntimeAdapter', () => {
             service: 'frontend',
           }),
         ]),
+      }),
+    });
+  });
+
+  it('restart_services remove aliases legados do PM2 e mantem apenas a nova release ativa', async () => {
+    const adapter = createAdapter();
+    const execution = createExecution();
+    const targetReleaseDir = path.join(runtime.releasesDir, 'v1.2.3');
+    const backendDir = path.join(targetReleaseDir, 'apps', 'backend');
+    const frontendDir = path.join(targetReleaseDir, 'apps', 'frontend');
+    const pm2BackendName = 'gpluggor-backend';
+    const pm2FrontendName = 'gpluggor-frontend';
+    fs.mkdirSync(path.join(backendDir, 'dist'), { recursive: true });
+    fs.mkdirSync(path.join(frontendDir, 'scripts'), { recursive: true });
+    fs.writeFileSync(path.join(frontendDir, 'scripts', 'start-standalone.mjs'), 'console.log("frontend");');
+    createMockFrontendStandaloneBuild(frontendDir);
+
+    pm2JlistOutputs = [
+      JSON.stringify([
+        {
+          name: pm2BackendName,
+          pm2_env: {
+            status: 'online',
+            pm_id: 0,
+            pm_cwd: path.join(runtime.releasesDir, 'legacy-release', 'apps', 'backend'),
+            pm_exec_path: path.join(runtime.releasesDir, 'legacy-release', 'apps', 'backend', 'dist', 'main.js'),
+          },
+        },
+        {
+          name: pm2FrontendName,
+          pm2_env: {
+            status: 'online',
+            pm_id: 1,
+            pm_cwd: path.join(runtime.releasesDir, 'legacy-release', 'apps', 'frontend'),
+            pm_exec_path: path.join(
+              runtime.releasesDir,
+              'legacy-release',
+              'apps',
+              'frontend',
+              'scripts',
+              'start-standalone.mjs',
+            ),
+          },
+        },
+        {
+          name: 'multitenant-backend',
+          pm2_env: {
+            status: 'online',
+            pm_id: 2,
+            pm_cwd: path.join(runtime.releasesDir, 'legacy-release', 'apps', 'backend'),
+            pm_exec_path: path.join(runtime.releasesDir, 'legacy-release', 'apps', 'backend', 'dist', 'main.js'),
+          },
+        },
+        {
+          name: 'multitenant-frontend',
+          pm2_env: {
+            status: 'online',
+            pm_id: 3,
+            pm_cwd: path.join(runtime.releasesDir, 'legacy-release', 'apps', 'frontend'),
+            pm_exec_path: path.join(
+              runtime.releasesDir,
+              'legacy-release',
+              'apps',
+              'frontend',
+              'scripts',
+              'start-standalone.mjs',
+            ),
+          },
+        },
+      ]),
+      JSON.stringify([
+        {
+          name: pm2BackendName,
+          pm2_env: {
+            status: 'online',
+            pm_id: 4,
+            pm_cwd: backendDir,
+            pm_exec_path: path.join(backendDir, 'dist', 'main.js'),
+            env: {
+              PORT: '4000',
+            },
+          },
+        },
+        {
+          name: pm2FrontendName,
+          pm2_env: {
+            status: 'online',
+            pm_id: 5,
+            pm_cwd: frontendDir,
+            pm_exec_path: path.join(frontendDir, 'scripts', 'start-standalone.mjs'),
+            env: {
+              PORT: '5000',
+            },
+          },
+        },
+      ]),
+    ];
+
+    const result = await adapter.executeStep('restart_services', {
+      execution,
+      runtime,
+      metadata: {
+        targetReleaseDir,
+        pm2BackendName,
+        pm2FrontendName,
+      },
+    });
+
+    const deleteCalls = commandRunnerMock.run.mock.calls
+      .map(([request]) => request)
+      .filter((request) => request.command === 'pm2' && Array.isArray(request.args) && request.args[0] === 'delete');
+
+    expect(deleteCalls).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ args: ['delete', pm2BackendName] }),
+        expect.objectContaining({ args: ['delete', pm2FrontendName] }),
+        expect.objectContaining({ args: ['delete', 'multitenant-backend'] }),
+        expect.objectContaining({ args: ['delete', 'multitenant-frontend'] }),
+      ]),
+    );
+    expect(result.result).toMatchObject({
+      pm2BackendName,
+      pm2FrontendName,
+      purgedConflictingProcesses: expect.arrayContaining(['multitenant-backend', 'multitenant-frontend']),
+      pm2Status: expect.objectContaining({
+        backend: expect.objectContaining({
+          processName: pm2BackendName,
+          pointsToExpectedRelease: true,
+        }),
+        frontend: expect.objectContaining({
+          processName: pm2FrontendName,
+          pointsToExpectedRelease: true,
+        }),
+        backendConflicts: [],
+        frontendConflicts: [],
       }),
     });
   });
@@ -890,10 +1082,11 @@ describe('NativeUpdateRuntimeAdapter', () => {
   it('healthcheck native falha de forma estruturada quando os processos nao ficam online', async () => {
     pm2JlistOutput = JSON.stringify([
       {
-        name: 'multitenant-backend',
+        name: defaultBackendName,
         pm2_env: {
           status: 'errored',
           pm_id: 0,
+          pm_cwd: path.join(tmpDir, 'releases', 'v1.2.3', 'apps', 'backend'),
         },
       },
     ]);
@@ -916,5 +1109,55 @@ describe('NativeUpdateRuntimeAdapter', () => {
     ).rejects.toMatchObject({
       code: 'UPDATE_HEALTHCHECK_PM2_NOT_ONLINE',
     });
+  });
+
+  it('post_validation nao conclui sucesso quando o runtime ainda serve a versao antiga', async () => {
+    const adapter = createAdapter();
+    const execution = createExecution();
+    const targetReleaseDir = path.join(runtime.releasesDir, 'v1.2.3');
+    const backendDir = path.join(targetReleaseDir, 'apps', 'backend');
+    const frontendDir = path.join(targetReleaseDir, 'apps', 'frontend');
+    fs.mkdirSync(path.join(backendDir, 'dist'), { recursive: true });
+    fs.mkdirSync(path.join(frontendDir, 'scripts'), { recursive: true });
+    fs.writeFileSync(path.join(frontendDir, 'scripts', 'start-standalone.mjs'), 'console.log("frontend");');
+    createMockFrontendStandaloneBuild(frontendDir);
+    runtimeSystemVersionPayload = {
+      version: 'v1.0.0',
+      installedVersionRaw: 'v1.0.0',
+      installedBaseTag: 'v1.0.0',
+      installedVersionNormalized: '1.0.0',
+      isExactTaggedRelease: true,
+      versionSource: 'git_exact_tag',
+    };
+    runtimeUpdateStatusPayload = {
+      currentVersion: 'v1.0.0',
+      installedVersionRaw: 'v1.0.0',
+      installedBaseTag: 'v1.0.0',
+      installedVersionNormalized: '1.0.0',
+      updateAvailable: true,
+      availableVersion: 'v1.2.3',
+    };
+
+    await expect(
+      adapter.executeStep('post_validation', {
+        execution,
+        runtime,
+        metadata: {
+          targetReleaseDir,
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: 'UPDATE_POST_DEPLOY_RUNTIME_VERSION_MISMATCH',
+    });
+  });
+
+  it('script legado remove aliases PM2 conflitantes e valida a release ativa publicada', () => {
+    const scriptPath = path.resolve(process.cwd(), '..', '..', 'install', 'update-native.sh');
+    const scriptContent = fs.readFileSync(scriptPath, 'utf8');
+
+    expect(scriptContent).toContain('collect_conflicting_pm2_names');
+    expect(scriptContent).toContain('assert_pm2_release_state');
+    expect(scriptContent).toContain('/api/system/version');
+    expect(scriptContent).toContain('/api/update/status');
   });
 });
