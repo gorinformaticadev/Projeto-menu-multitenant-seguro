@@ -584,7 +584,7 @@ describe('NativeUpdateRuntimeAdapter', () => {
     );
   });
 
-  it('build_frontend native encontra o standalone gerado pelo relativeAppDir da release', async () => {
+  it('build_frontend native rejeita standalone contaminado pelo relativeAppDir da release', async () => {
     frontendBuildLayout = 'release-nested';
     const adapter = createAdapter();
     const execution = createExecution();
@@ -594,44 +594,15 @@ describe('NativeUpdateRuntimeAdapter', () => {
     fs.writeFileSync(path.join(targetReleaseDir, 'apps', 'frontend', 'public', 'clear-cache.html'), '<html></html>');
     fs.writeFileSync(path.join(targetReleaseDir, 'apps', 'frontend', 'scripts', 'start-standalone.mjs'), 'console.log("start");');
 
-    const result = await adapter.executeStep('build_frontend', {
-      execution,
-      runtime,
-      metadata: {
-        targetReleaseDir,
-      },
-    });
-
-    expect(result.result).toMatchObject({
-      standaloneLayout: 'required-server-files',
-    });
-    expect(result.metadata).toMatchObject({
-      frontendEntryRelative: path.join(
-        '.next',
-        'standalone',
-        'releases',
-        'v1.2.3',
-        'apps',
-        'frontend',
-        'server.js',
-      ),
-    });
-    expect(
-      fs.existsSync(
-        path.join(
+    await expect(
+      adapter.executeStep('build_frontend', {
+        execution,
+        runtime,
+        metadata: {
           targetReleaseDir,
-          'apps',
-          'frontend',
-          '.next',
-          'standalone',
-          'releases',
-          'v1.2.3',
-          'apps',
-          'frontend',
-          'server.js',
-        ),
-      ),
-    ).toBe(true);
+        },
+      }),
+    ).rejects.toThrow(/relativeAppDir contaminado/i);
   });
 
   it('seed e resolvido pelo comando canonico do package.json no fluxo native', async () => {

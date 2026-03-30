@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const frontendDir = path.resolve(scriptDir, '..');
+const canonicalRelativeAppDir = path.join('apps', 'frontend');
 
 const standaloneLayouts = buildStandaloneLayouts();
 
@@ -36,24 +37,37 @@ function normalizeRelativeAppDir(value) {
   return normalized;
 }
 
+function isCanonicalRelativeAppDir(value) {
+  return path.normalize(value) === path.normalize(canonicalRelativeAppDir);
+}
+
 function buildStandaloneLayouts() {
   const layouts = [];
   const requiredServerFilesPath = path.join(frontendDir, '.next', 'required-server-files.json');
 
   if (existsSync(requiredServerFilesPath)) {
+    let requiredServerFiles = null;
+
     try {
-      const requiredServerFiles = JSON.parse(readFileSync(requiredServerFilesPath, 'utf8'));
-      const relativeAppDir = normalizeRelativeAppDir(requiredServerFiles?.relativeAppDir);
-      if (relativeAppDir) {
-        layouts.push({
-          label: 'required-server-files',
-          entryRelativePath: path.join('.next', 'standalone', relativeAppDir, 'server.js'),
-          runtimeDirRelativePath: path.join('.next', 'standalone', relativeAppDir),
-          buildDirRelativePath: path.join('.next', 'standalone', relativeAppDir, '.next'),
-        });
-      }
+      requiredServerFiles = JSON.parse(readFileSync(requiredServerFilesPath, 'utf8'));
     } catch {
       // O fallback estrutural abaixo continua cobrindo layouts legados suportados.
+    }
+
+    const relativeAppDir = normalizeRelativeAppDir(requiredServerFiles?.relativeAppDir);
+    if (relativeAppDir) {
+      if (!isCanonicalRelativeAppDir(relativeAppDir)) {
+        throw new Error(
+          `O standalone do frontend foi gerado com relativeAppDir contaminado (${toPortablePath(relativeAppDir)}). Esperado: ${toPortablePath(canonicalRelativeAppDir)}. Revise outputFileTracingRoot e o cwd do build da release.`,
+        );
+      }
+
+      layouts.push({
+        label: 'required-server-files',
+        entryRelativePath: path.join('.next', 'standalone', relativeAppDir, 'server.js'),
+        runtimeDirRelativePath: path.join('.next', 'standalone', relativeAppDir),
+        buildDirRelativePath: path.join('.next', 'standalone', relativeAppDir, '.next'),
+      });
     }
   }
 

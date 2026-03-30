@@ -976,25 +976,35 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       return [];
     }
 
+    let parsed: { relativeAppDir?: unknown } | null = null;
+
     try {
       const raw = await fsp.readFile(requiredServerFilesPath, 'utf8');
-      const parsed = JSON.parse(raw) as { relativeAppDir?: unknown };
-      const relativeAppDir = this.normalizeRequiredServerFilesAppDir(parsed.relativeAppDir);
-      if (!relativeAppDir) {
-        return [];
-      }
-
-      return [
-        {
-          label: 'required-server-files',
-          entryRelativePath: path.join('.next', 'standalone', relativeAppDir, 'server.js'),
-          runtimeDirRelativePath: path.join('.next', 'standalone', relativeAppDir),
-          buildDirRelativePath: path.join('.next', 'standalone', relativeAppDir, '.next'),
-        },
-      ];
+      parsed = JSON.parse(raw) as { relativeAppDir?: unknown };
     } catch {
       return [];
     }
+
+    const relativeAppDir = this.normalizeRequiredServerFilesAppDir(parsed.relativeAppDir);
+    if (!relativeAppDir) {
+      return [];
+    }
+
+    const canonicalRelativeAppDir = path.join('apps', 'frontend');
+    if (!this.isSameComparablePath(relativeAppDir, canonicalRelativeAppDir)) {
+      throw new Error(
+        `O standalone do frontend foi gerado com relativeAppDir contaminado (${this.toPortablePath(relativeAppDir)}). Esperado: ${this.toPortablePath(canonicalRelativeAppDir)}. Revise outputFileTracingRoot e o cwd do build da release.`,
+      );
+    }
+
+    return [
+      {
+        label: 'required-server-files',
+        entryRelativePath: path.join('.next', 'standalone', relativeAppDir, 'server.js'),
+        runtimeDirRelativePath: path.join('.next', 'standalone', relativeAppDir),
+        buildDirRelativePath: path.join('.next', 'standalone', relativeAppDir, '.next'),
+      },
+    ];
   }
 
   private normalizeRequiredServerFilesAppDir(value: unknown): string | null {
@@ -1014,6 +1024,10 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     }
 
     return normalized;
+  }
+
+  private toPortablePath(value: string): string {
+    return value.split(path.sep).join('/');
   }
 
   private async copyFrontendRuntimeAssets(
@@ -2263,4 +2277,3 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     return path.normalize(left).toLowerCase() === path.normalize(right).toLowerCase();
   }
 }
-

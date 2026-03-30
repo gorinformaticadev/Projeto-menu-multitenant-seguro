@@ -1,6 +1,13 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const frontendDir = path.dirname(fileURLToPath(import.meta.url));
+const monorepoRoot = path.resolve(frontendDir, "..", "..");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  outputFileTracingRoot: monorepoRoot,
   reactStrictMode: false,
   poweredByHeader: false,
   compress: true,
