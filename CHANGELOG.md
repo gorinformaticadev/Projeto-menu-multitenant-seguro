@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.114](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.113...v0.1.114) (2026-03-30)
+
+
+### Features
+
+* implement system version tracking utility and API endpoints with frontend hooks ([ca6c49b](https://github.com/gorinformaticadev/Pluggor/commit/ca6c49b6c8f214255209d4df5a313c456d5975f8))
+
 ### [0.1.113](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.112...v0.1.113) (2026-03-29)
 
 ### [0.1.112](https://github.com/gorinformaticadev/Pluggor/compare/v0.1.111...v0.1.112) (2026-03-29)
