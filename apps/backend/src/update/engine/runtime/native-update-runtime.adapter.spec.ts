@@ -285,6 +285,10 @@ describe('NativeUpdateRuntimeAdapter', () => {
       availableVersion: null,
     };
     sourceDir = path.join(tmpDir, 'source');
+    fs.mkdirSync(sourceDir, { recursive: true });
+    fs.writeFileSync(path.join(sourceDir, 'package.json'), '{}');
+    fs.writeFileSync(path.join(sourceDir, 'pnpm-workspace.yaml'), 'packages:\n  - apps/*\n');
+    fs.writeFileSync(path.join(sourceDir, 'pnpm-lock.yaml'), 'lockfileVersion: 9.0\n');
     fs.mkdirSync(path.join(sourceDir, 'apps', 'backend'), { recursive: true });
     fs.mkdirSync(path.join(sourceDir, 'apps', 'backend', 'prisma'), { recursive: true });
     fs.mkdirSync(path.join(sourceDir, 'apps', 'frontend', 'public'), { recursive: true });
@@ -412,6 +416,103 @@ describe('NativeUpdateRuntimeAdapter', () => {
         }),
       ]),
     );
+    expect(result.result).toMatchObject({
+      sourceType: 'local_source_path',
+      releasePreparation: {
+        action: 'created',
+      },
+    });
+  });
+
+  it('fetch_code reutiliza a release alvo quando ela ja existe com estrutura integra', async () => {
+    const adapter = createAdapter();
+    const execution = createExecution();
+    const existingReleaseDir = path.join(runtime.releasesDir, 'v1.2.3');
+    fs.mkdirSync(path.join(existingReleaseDir, 'apps', 'backend'), { recursive: true });
+    fs.mkdirSync(path.join(existingReleaseDir, 'apps', 'frontend'), { recursive: true });
+    fs.writeFileSync(path.join(existingReleaseDir, 'package.json'), '{}');
+    fs.writeFileSync(path.join(existingReleaseDir, 'pnpm-workspace.yaml'), 'packages:\n  - apps/*\n');
+    fs.writeFileSync(path.join(existingReleaseDir, 'pnpm-lock.yaml'), 'lockfileVersion: 9.0\n');
+    fs.writeFileSync(path.join(existingReleaseDir, 'apps', 'backend', 'package.json'), '{}');
+    fs.writeFileSync(path.join(existingReleaseDir, 'apps', 'frontend', 'package.json'), '{}');
+    fs.writeFileSync(path.join(existingReleaseDir, 'keep.txt'), 'preserve');
+
+    const result = await adapter.executeStep('fetch_code', {
+      execution,
+      runtime,
+      metadata,
+    });
+
+    expect(result.result).toMatchObject({
+      sourceType: 'existing_release',
+      releasePreparation: {
+        action: 'reused',
+      },
+    });
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'release_existente_reutilizada',
+        }),
+      ]),
+    );
+    expect(fs.existsSync(path.join(existingReleaseDir, 'keep.txt'))).toBe(true);
+    expect(commandRunnerMock.recordInternalOperation).not.toHaveBeenCalled();
+  });
+
+  it('fetch_code reconstrui a release alvo quando encontra estrutura parcial de tentativa anterior', async () => {
+    const adapter = createAdapter();
+    const execution = createExecution();
+    const existingReleaseDir = path.join(runtime.releasesDir, 'v1.2.3');
+    fs.mkdirSync(path.join(existingReleaseDir, 'apps', 'backend'), { recursive: true });
+    fs.writeFileSync(path.join(existingReleaseDir, 'apps', 'backend', 'package.json'), '{}');
+    fs.writeFileSync(path.join(existingReleaseDir, 'stale.tmp'), 'stale');
+
+    const result = await adapter.executeStep('fetch_code', {
+      execution,
+      runtime,
+      metadata,
+    });
+
+    expect(result.result).toMatchObject({
+      sourceType: 'local_source_path',
+      releasePreparation: {
+        action: 'recreated',
+      },
+    });
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'release_existente_reconstruida',
+        }),
+      ]),
+    );
+    expect(fs.existsSync(path.join(existingReleaseDir, 'stale.tmp'))).toBe(false);
+    expect(fs.existsSync(path.join(existingReleaseDir, 'package.json'))).toBe(true);
+    expect(commandRunnerMock.recordInternalOperation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        step: 'fetch_code',
+        metadata: expect.objectContaining({
+          releasePreparationAction: 'recreated',
+        }),
+      }),
+    );
+  });
+
+  it('fetch_code falha com erro estruturado quando nenhuma origem de release esta configurada', async () => {
+    const adapter = createAdapter();
+    const execution = createExecution();
+
+    await expect(
+      adapter.executeStep('fetch_code', {
+        execution,
+        runtime,
+        metadata: {},
+      }),
+    ).rejects.toMatchObject({
+      code: 'UPDATE_FETCH_CODE_SOURCE_NOT_CONFIGURED',
+      category: 'UPDATE_FETCH_CODE_FAILED',
+    });
   });
 
   it('install_dependencies native preserva devDependencies da release para o build local', async () => {
@@ -613,6 +714,17 @@ describe('NativeUpdateRuntimeAdapter', () => {
     expect(scriptContent.indexOf('SEED_COMMAND_ARGS=(run seed:deploy)')).toBeLessThan(
       scriptContent.indexOf('SEED_COMMAND_ARGS=(dist/prisma/seed.js deploy)'),
     );
+  });
+
+  it('script legado trata retry da mesma release com reutilizacao ou reconstrucao estruturada', () => {
+    const scriptPath = path.resolve(process.cwd(), '..', '..', 'install', 'update-native.sh');
+    const scriptContent = fs.readFileSync(scriptPath, 'utf8');
+
+    expect(scriptContent).toContain('RELEASE_PREPARATION_ACTION="reused"');
+    expect(scriptContent).toContain('RELEASE_PREPARATION_ACTION="recreated"');
+    expect(scriptContent).toContain('validate_release_dir "$release_dir"');
+    expect(scriptContent).toContain('LAST_RELEASE_PREPARATION_ERROR=');
+    expect(scriptContent).toContain('ensure_release_code "$TARGET_TAG" "$NEW_RELEASE_DIR" || fail_and_exit');
   });
 
   it('package_frontend_assets gera o artefato standalone esperado no layout real', async () => {

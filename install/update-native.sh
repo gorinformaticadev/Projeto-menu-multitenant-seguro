@@ -107,6 +107,8 @@ SEED_COMMAND_SOURCE=""
 SEED_COMMAND_ARGS=()
 LAST_SEED_RESOLUTION_ERROR=""
 LAST_PM2_RUNTIME_ERROR=""
+RELEASE_PREPARATION_ACTION=""
+LAST_RELEASE_PREPARATION_ERROR=""
 
 now_iso() {
   date -u +%Y-%m-%dT%H:%M:%SZ
@@ -723,11 +725,37 @@ download_release_git_clone() {
   fi
 }
 
+reset_release_preparation_state() {
+  RELEASE_PREPARATION_ACTION=""
+  LAST_RELEASE_PREPARATION_ERROR=""
+}
+
 validate_release_dir() {
   local dir="$1"
-  if [[ ! -d "$dir" ]]; then return 1; fi
+  local checked_paths=(
+    "$dir/package.json"
+    "$dir/pnpm-workspace.yaml"
+    "$dir/pnpm-lock.yaml"
+    "$dir/apps/backend/package.json"
+    "$dir/apps/frontend/package.json"
+  )
+  local missing_paths=()
+
+  LAST_RELEASE_PREPARATION_ERROR=""
+
+  if [[ ! -d "$dir" ]]; then
+    LAST_RELEASE_PREPARATION_ERROR="Diretorio da release nao encontrado em $dir"
+    return 1
+  fi
   # Validação básica de estrutura
-  if [[ ! -d "$dir/apps/backend" ]] && [[ ! -f "$dir/package.json" ]]; then
+  for required_path in "${checked_paths[@]}"; do
+    if [[ ! -e "$required_path" ]]; then
+      missing_paths+=("$required_path")
+    fi
+  done
+
+  if (( ${#missing_paths[@]} > 0 )); then
+    LAST_RELEASE_PREPARATION_ERROR="Release sem estrutura minima valida. Arquivos ausentes: $(IFS=', '; echo "${missing_paths[*]}")"
     return 1
   fi
   return 0
@@ -736,20 +764,35 @@ validate_release_dir() {
 ensure_release_code() {
   local target_tag="$1"
   local release_dir="$2"
+  local current_target=""
+  local previous_target=""
+
+  reset_release_preparation_state
+  current_target="$(get_link_target "$CURRENT_LINK")"
+  previous_target="$(get_link_target "$PREVIOUS_LINK")"
 
   if [[ -d "$release_dir" ]]; then
-    local current_target=""
-    local previous_target=""
-    current_target="$(get_link_target "$CURRENT_LINK")"
-    previous_target="$(get_link_target "$PREVIOUS_LINK")"
-
     if [[ "$release_dir" == "$current_target" ]] || [[ "$release_dir" == "$previous_target" ]]; then
-      log_err "Release ${release_dir} esta protegida por current/previous e nao pode ser recriada."
+      LAST_RELEASE_PREPARATION_ERROR="Release ${release_dir} esta protegida por current/previous e nao pode ser recriada."
+      log_err "$LAST_RELEASE_PREPARATION_ERROR"
       return 1
     fi
 
-    log "Release ${target_tag} ja existe em ${release_dir}. Removendo para reconstruir do zero."
-    rm -rf "$release_dir"
+    if validate_release_dir "$release_dir"; then
+      RELEASE_PREPARATION_ACTION="reused"
+      log "Release ${target_tag} ja existe em ${release_dir} e sera reutilizada."
+      return 0
+    fi
+
+    log "Release ${target_tag} ja existe em ${release_dir}, mas esta parcial ou invalida. Reconstruindo do zero."
+    if ! rm -rf "$release_dir"; then
+      LAST_RELEASE_PREPARATION_ERROR="Falha ao remover a release invalida em $release_dir"
+      log_err "$LAST_RELEASE_PREPARATION_ERROR"
+      return 1
+    fi
+    RELEASE_PREPARATION_ACTION="recreated"
+  else
+    RELEASE_PREPARATION_ACTION="created"
   fi
 
   log "Iniciando obtenção do código via canal: $UPDATE_CHANNEL"
@@ -766,14 +809,24 @@ ensure_release_code() {
     else
       log "Tarball indisponível ou falhou. Tentando git clone..."
       if ! download_release_git_clone "$target_tag" "$release_dir"; then
-        fail_and_exit "$EXIT_DOWNLOAD_FAILED" "Falha ao obter código via tag (tarball e git clone falharam)."
+        fail_and_exit "$EXIT_DOWNLOAD_FAILED" "download" "UPDATE_DOWNLOAD_ERROR" "UPDATE_DOWNLOAD_ERROR" \
+          "Falha ao baixar a release alvo." "Falha ao obter codigo via tag apos tentar tarball e git clone."
       fi
     fi
   fi
 
   if ! validate_release_dir "$release_dir"; then
-    log_err "Release ${target_tag} baixada sem estrutura valida."
+    if [[ -z "$LAST_RELEASE_PREPARATION_ERROR" ]]; then
+      LAST_RELEASE_PREPARATION_ERROR="Release ${target_tag} baixada sem estrutura minima valida."
+    fi
+    log_err "$LAST_RELEASE_PREPARATION_ERROR"
     return 1
+  fi
+
+  if [[ "$RELEASE_PREPARATION_ACTION" == "recreated" ]]; then
+    log "Release ${target_tag} foi reconstruida do zero apos detectar estrutura invalida na tentativa anterior."
+  else
+    log "Release ${target_tag} foi preparada do zero."
   fi
   return 0
 }
@@ -1830,7 +1883,8 @@ set_step "prepare" 10
 NEW_RELEASE_DIR="${RELEASES_DIR}/$(sanitize_release_name "$TARGET_TAG")"
 
 set_step "download" 20
-ensure_release_code "$TARGET_TAG" "$NEW_RELEASE_DIR"
+ensure_release_code "$TARGET_TAG" "$NEW_RELEASE_DIR" || fail_and_exit "$EXIT_DOWNLOAD_FAILED" "download" "UPDATE_DOWNLOAD_ERROR" "UPDATE_DOWNLOAD_ERROR" \
+  "Falha ao preparar a release alvo." "${LAST_RELEASE_PREPARATION_ERROR:-Falha ao preparar a release alvo para o retry da mesma versao.}"
 link_shared_into_release "$NEW_RELEASE_DIR" || fail_and_exit "$EXIT_PUBLISH_FAILED" "prepare" "UPDATE_PUBLISH_ERROR" "UPDATE_PUBLISH_ERROR" \
   "Falha ao preparar os links compartilhados da release." "Nao foi possivel vincular shared/.env/uploads/backups na nova release"
 reset_release_build_outputs "$NEW_RELEASE_DIR"
@@ -1939,3 +1993,4 @@ cleanup_old_releases
 disable_maintenance_mode "Update concluido com sucesso"
 finish_success
 exit "$EXIT_SUCCESS"
+

@@ -137,7 +137,7 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       context.runtime.releasesDir,
       this.sanitizeReleaseName(context.execution.targetVersion),
     );
-    await this.prepareTargetReleaseDir(releaseDir, context.runtime);
+    const releasePreparation = await this.prepareTargetReleaseDir(releaseDir, context.runtime);
 
     const localSourcePath =
       this.getMetadataString(context.metadata, 'localSourcePath') ||
@@ -149,37 +149,78 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       this.getMetadataString(context.metadata, 'gitAuthHeader') ||
       String(process.env.GIT_AUTH_HEADER || '').trim();
 
-    if (localSourcePath) {
-      await this.copySourceTree(localSourcePath, releaseDir);
-      await this.commandRunner.recordInternalOperation({
-        executionId: context.execution.id,
-        step: 'fetch_code',
-        command: 'internal:copy_source_tree',
-        args: [localSourcePath, releaseDir],
-        cwd: context.runtime.baseDir,
-        logDir: context.runtime.logsDir,
-        metadata: {
-          source: 'local_source_path',
+    try {
+      if (releasePreparation.action !== 'reused') {
+        if (localSourcePath) {
+          await this.copySourceTree(localSourcePath, releaseDir);
+          await this.commandRunner.recordInternalOperation({
+            executionId: context.execution.id,
+            step: 'fetch_code',
+            command: 'internal:copy_source_tree',
+            args: [localSourcePath, releaseDir],
+            cwd: context.runtime.baseDir,
+            logDir: context.runtime.logsDir,
+            metadata: {
+              source: 'local_source_path',
+              releasePreparationAction: releasePreparation.action,
+            },
+          });
+        } else if (gitRepoUrl) {
+          const args = gitAuthHeader
+            ? ['-c', gitAuthHeader, 'clone', '--depth', '1', '--branch', context.execution.targetVersion, gitRepoUrl, releaseDir]
+            : ['clone', '--depth', '1', '--branch', context.execution.targetVersion, gitRepoUrl, releaseDir];
+          await this.runCommandOrThrow(context, 'fetch_code', 'git', args, context.runtime.baseDir);
+        } else {
+          throw new UpdateRuntimeStepError({
+            code: 'UPDATE_FETCH_CODE_SOURCE_NOT_CONFIGURED',
+            category: 'UPDATE_FETCH_CODE_FAILED',
+            stage: 'fetch_code',
+            userMessage: 'Nenhuma origem de release foi configurada para a etapa de download.',
+            technicalMessage: 'localSourcePath e gitRepoUrl estao ausentes para fetch_code.',
+            retryable: false,
+            rollbackEligible: false,
+            details: {
+              releaseDir,
+              releasePreparation,
+            },
+          });
+        }
+      }
+
+      await this.linkSharedIntoRelease(releaseDir, context.runtime);
+      await this.resetReleaseBuildOutputs(releaseDir);
+      await this.assertRequiredReleaseFiles(releaseDir);
+    } catch (error) {
+      if (error instanceof UpdateRuntimeStepError) {
+        throw error;
+      }
+
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_FETCH_CODE_PREPARATION_FAILED',
+        category: 'UPDATE_FETCH_CODE_FAILED',
+        stage: 'fetch_code',
+        userMessage: 'Falha ao preparar a release alvo do update.',
+        technicalMessage: error instanceof Error ? error.message : String(error),
+        retryable: false,
+        rollbackEligible: false,
+        details: {
+          releaseDir,
+          releasePreparation,
+          localSourcePath: localSourcePath || null,
+          gitRepoUrl: gitRepoUrl || null,
         },
       });
-    } else if (gitRepoUrl) {
-      const args = gitAuthHeader
-        ? ['-c', gitAuthHeader, 'clone', '--depth', '1', '--branch', context.execution.targetVersion, gitRepoUrl, releaseDir]
-        : ['clone', '--depth', '1', '--branch', context.execution.targetVersion, gitRepoUrl, releaseDir];
-      await this.runCommandOrThrow(context, 'fetch_code', 'git', args, context.runtime.baseDir);
-    } else {
-      throw new Error('Nenhuma origem de release configurada para fetch_code (localSourcePath/gitRepoUrl).');
     }
 
-    await this.linkSharedIntoRelease(releaseDir, context.runtime);
-    await this.resetReleaseBuildOutputs(releaseDir);
-    await this.assertRequiredReleaseFiles(releaseDir);
+    const sourceType =
+      releasePreparation.action === 'reused' ? 'existing_release' : localSourcePath ? 'local_source_path' : 'git_clone';
 
     return {
       result: {
         releaseDir,
-        sourceType: localSourcePath ? 'local_source_path' : 'git_clone',
+        sourceType,
         resolvedVersion: context.execution.targetVersion,
+        releasePreparation,
       },
       metadata: {
         targetReleaseDir: releaseDir,
@@ -191,17 +232,34 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
           summary: 'A release alvo foi materializada no diretório de releases.',
           details: {
             releaseDir,
-            sourceType: localSourcePath ? 'local_source_path' : 'git_clone',
+            sourceType,
+            releasePreparation,
           },
         },
         {
           code: 'manifestos_detectados',
           summary: 'Os manifestos mínimos do backend e frontend foram encontrados.',
           details: {
-            backendPackageJson: path.join(releaseDir, 'apps', 'backend', 'package.json'),
-            frontendPackageJson: path.join(releaseDir, 'apps', 'frontend', 'package.json'),
+            checkedPaths: this.getReleaseIntegrityRequiredPaths(releaseDir),
           },
         },
+        ...(releasePreparation.action === 'reused'
+          ? [
+              {
+                code: 'release_existente_reutilizada',
+                summary: 'A release alvo ja existia e foi reutilizada porque a estrutura minima estava integra.',
+                details: releasePreparation,
+              },
+            ]
+          : releasePreparation.action === 'recreated'
+            ? [
+                {
+                  code: 'release_existente_reconstruida',
+                  summary: 'A release alvo ja existia, estava invalida e foi reconstruida do zero.',
+                  details: releasePreparation,
+                },
+              ]
+            : []),
       ],
     };
   }
@@ -528,16 +586,74 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
   private async prepareTargetReleaseDir(
     releaseDir: string,
     runtime: UpdateStepExecutionContext['runtime'],
-  ): Promise<void> {
+  ): Promise<{
+    action: 'created' | 'reused' | 'recreated';
+    checkedPaths: string[];
+    missingPaths: string[];
+  }> {
     const currentTarget = await this.safeRealpath(runtime.currentDir);
     const previousTarget = await this.safeRealpath(runtime.previousDir);
 
     if (releaseDir === currentTarget || releaseDir === previousTarget) {
-      throw new Error(`Release protegida por current/previous: ${releaseDir}`);
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_FETCH_CODE_RELEASE_PROTECTED',
+        category: 'UPDATE_FETCH_CODE_FAILED',
+        stage: 'fetch_code',
+        userMessage: 'A release alvo esta protegida pelos ponteiros current/previous e nao pode ser recriada.',
+        technicalMessage: `Release protegida por current/previous: ${releaseDir}`,
+        retryable: false,
+        rollbackEligible: false,
+        details: {
+          releaseDir,
+          currentTarget,
+          previousTarget,
+        },
+      });
     }
 
-    await fsp.rm(releaseDir, { recursive: true, force: true });
-    await fsp.mkdir(releaseDir, { recursive: true });
+    if (!(await this.pathExists(releaseDir))) {
+      await fsp.mkdir(releaseDir, { recursive: true });
+      return {
+        action: 'created',
+        checkedPaths: [],
+        missingPaths: [],
+      };
+    }
+
+    const inspection = await this.inspectReleaseDirectoryIntegrity(releaseDir);
+    if (inspection.valid) {
+      return {
+        action: 'reused',
+        checkedPaths: inspection.checkedPaths,
+        missingPaths: [],
+      };
+    }
+
+    try {
+      await fsp.rm(releaseDir, { recursive: true, force: true });
+      await fsp.mkdir(releaseDir, { recursive: true });
+    } catch (error) {
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_FETCH_CODE_RELEASE_RESET_FAILED',
+        category: 'UPDATE_FETCH_CODE_FAILED',
+        stage: 'fetch_code',
+        userMessage: 'A release alvo existente estava invalida e nao pode ser reconstruida.',
+        technicalMessage: error instanceof Error ? error.message : String(error),
+        retryable: false,
+        rollbackEligible: false,
+        details: {
+          releaseDir,
+          checkedPaths: inspection.checkedPaths,
+          missingPaths: inspection.missingPaths,
+        },
+      });
+    }
+
+    return {
+      action: 'recreated',
+      checkedPaths: inspection.checkedPaths,
+      missingPaths: inspection.missingPaths,
+    };
   }
 
   private async copySourceTree(sourceRoot: string, targetDir: string): Promise<void> {
@@ -555,6 +671,37 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
         return !['node_modules', '.next', 'dist', 'releases', 'shared', 'current', 'previous'].includes(topLevel);
       },
     });
+  }
+
+  private async inspectReleaseDirectoryIntegrity(releaseDir: string): Promise<{
+    valid: boolean;
+    checkedPaths: string[];
+    missingPaths: string[];
+  }> {
+    const checkedPaths = this.getReleaseIntegrityRequiredPaths(releaseDir);
+    const missingPaths: string[] = [];
+
+    for (const requiredPath of checkedPaths) {
+      if (!(await this.pathExists(requiredPath))) {
+        missingPaths.push(requiredPath);
+      }
+    }
+
+    return {
+      valid: missingPaths.length === 0,
+      checkedPaths,
+      missingPaths,
+    };
+  }
+
+  private getReleaseIntegrityRequiredPaths(releaseDir: string): string[] {
+    return [
+      path.join(releaseDir, 'package.json'),
+      path.join(releaseDir, 'pnpm-workspace.yaml'),
+      path.join(releaseDir, 'pnpm-lock.yaml'),
+      path.join(releaseDir, 'apps', 'backend', 'package.json'),
+      path.join(releaseDir, 'apps', 'frontend', 'package.json'),
+    ];
   }
 
   private async linkSharedIntoRelease(
@@ -1600,27 +1747,22 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
   }
 
   private async assertRequiredReleaseFiles(releaseDir: string): Promise<void> {
-    const requiredPaths = [
-      path.join(releaseDir, 'apps', 'backend', 'package.json'),
-      path.join(releaseDir, 'apps', 'frontend', 'package.json'),
-    ];
-
-    for (const requiredPath of requiredPaths) {
-      if (!(await this.pathExists(requiredPath))) {
-        throw new UpdateRuntimeStepError({
-          code: 'UPDATE_FETCH_CODE_RELEASE_INCOMPLETE',
-          category: 'UPDATE_FETCH_CODE_FAILED',
-          stage: 'fetch_code',
-          userMessage: 'A release obtida não contém os artefatos mínimos esperados.',
-          technicalMessage: `Arquivo obrigatório ausente: ${requiredPath}`,
-          retryable: false,
-          rollbackEligible: false,
-          details: {
-            releaseDir,
-            missingPath: requiredPath,
-          },
-        });
-      }
+    const inspection = await this.inspectReleaseDirectoryIntegrity(releaseDir);
+    if (!inspection.valid) {
+      throw new UpdateRuntimeStepError({
+        code: 'UPDATE_FETCH_CODE_RELEASE_INCOMPLETE',
+        category: 'UPDATE_FETCH_CODE_FAILED',
+        stage: 'fetch_code',
+        userMessage: 'A release obtida nao contem a estrutura minima esperada.',
+        technicalMessage: `Arquivos obrigatorios ausentes: ${inspection.missingPaths.join(', ')}`,
+        retryable: false,
+        rollbackEligible: false,
+        details: {
+          releaseDir,
+          checkedPaths: inspection.checkedPaths,
+          missingPaths: inspection.missingPaths,
+        },
+      });
     }
   }
 
@@ -2121,3 +2263,4 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     return path.normalize(left).toLowerCase() === path.normalize(right).toLowerCase();
   }
 }
+
