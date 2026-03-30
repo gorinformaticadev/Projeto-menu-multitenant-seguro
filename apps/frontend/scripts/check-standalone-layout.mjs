@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
+import { createServer } from 'node:net';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -19,6 +20,8 @@ const expectedLayoutOutput = [
   toPortablePath(canonicalRuntimeDirRelativePath),
   toPortablePath(canonicalBuildDirRelativePath),
 ].join('|');
+const defaultSmokePort = 5100;
+const defaultSmokeTimeoutMs = 12_000;
 
 function toAbsolutePath(relativePath) {
   return path.join(frontendDir, relativePath);
@@ -56,38 +59,60 @@ function normalizeRelativeAppDir(value) {
   return normalized;
 }
 
+function resolveSmokePort() {
+  const rawPort = String(process.env.STANDALONE_SMOKE_PORT || defaultSmokePort).trim();
+  const parsedPort = Number(rawPort);
+
+  if (!Number.isInteger(parsedPort) || parsedPort < 1 || parsedPort > 65_535) {
+    throw new Error(`Porta de smoke invalida: ${rawPort}.`);
+  }
+
+  return parsedPort;
+}
+
+function resolveSmokeTimeoutMs() {
+  const rawTimeout = String(process.env.STANDALONE_SMOKE_TIMEOUT_MS || defaultSmokeTimeoutMs).trim();
+  const parsedTimeout = Number(rawTimeout);
+
+  if (!Number.isInteger(parsedTimeout) || parsedTimeout < 1) {
+    throw new Error(`Timeout de smoke invalido: ${rawTimeout}.`);
+  }
+
+  return parsedTimeout;
+}
+
 function validateCanonicalLayout() {
   const canonicalEntryAbsolutePath = toAbsolutePath(canonicalEntryRelativePath);
   if (!existsSync(canonicalEntryAbsolutePath)) {
-    fail(`Entrypoint standalone canonico ausente em ${canonicalEntryAbsolutePath}.`);
+    throw new Error(`Entrypoint standalone canonico ausente em ${canonicalEntryAbsolutePath}.`);
   }
 
   const contaminatedStandaloneDirAbsolutePath = toAbsolutePath(contaminatedStandaloneDirRelativePath);
   if (existsSync(contaminatedStandaloneDirAbsolutePath)) {
-    fail(`Diretorio contaminado detectado em ${contaminatedStandaloneDirAbsolutePath}.`);
+    throw new Error(`Diretorio contaminado detectado em ${contaminatedStandaloneDirAbsolutePath}.`);
   }
 
   const requiredServerFilesAbsolutePath = toAbsolutePath(requiredServerFilesRelativePath);
   if (!existsSync(requiredServerFilesAbsolutePath)) {
-    fail(`Arquivo obrigatorio ausente: ${requiredServerFilesAbsolutePath}.`);
+    throw new Error(`Arquivo obrigatorio ausente: ${requiredServerFilesAbsolutePath}.`);
   }
 
   let parsedRequiredServerFiles;
   try {
     parsedRequiredServerFiles = JSON.parse(readFileSync(requiredServerFilesAbsolutePath, 'utf8'));
   } catch (error) {
-    fail(
+    throw new Error(
       `Nao foi possivel ler ${requiredServerFilesAbsolutePath}: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 
   const relativeAppDir = normalizeRelativeAppDir(parsedRequiredServerFiles?.relativeAppDir);
   if (!relativeAppDir) {
-    fail(`required-server-files.json nao informou relativeAppDir valido em ${requiredServerFilesAbsolutePath}.`);
+    throw new Error(`required-server-files.json nao informou relativeAppDir valido em ${requiredServerFilesAbsolutePath}.`);
   }
 
   if (path.normalize(relativeAppDir) !== path.normalize(canonicalRelativeAppDir)) {
-    fail(
+    throw new Error(
       `required-server-files.json informou relativeAppDir invalido (${toPortablePath(relativeAppDir)}). Esperado: ${toPortablePath(canonicalRelativeAppDir)}.`,
     );
   }
@@ -102,14 +127,14 @@ function validateCanonicalLayout() {
       resolvedLayout.error?.message ||
       String(resolvedLayout.stderr || resolvedLayout.stdout || '').trim() ||
       `exit code ${resolvedLayout.status}`;
-    fail(
+    throw new Error(
       `O resolver do standalone falhou: ${resolverFailureDetail}.`,
     );
   }
 
   const observedLayout = String(resolvedLayout.stdout || '').trim();
   if (observedLayout !== expectedLayoutOutput) {
-    fail(
+    throw new Error(
       `O resolver do standalone retornou layout divergente. Esperado: ${expectedLayoutOutput}. Recebido: ${observedLayout || 'vazio'}.`,
     );
   }
@@ -120,6 +145,13 @@ function validateCanonicalLayout() {
 
 function sleep(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function formatChildFailureContext(stderrBuffer, childError) {
+  const childErrorMessage = childError instanceof Error ? childError.message.trim() : '';
+  const stderrMessage = String(stderrBuffer || '').trim();
+  const details = [childErrorMessage, stderrMessage].filter(Boolean);
+  return details.length > 0 ? ` Detalhes: ${details.join(' | ')}` : '';
 }
 
 async function stopChildProcess(child) {
@@ -142,57 +174,141 @@ async function stopChildProcess(child) {
   }
 }
 
+async function assertSmokePortIsFree(port) {
+  await new Promise((resolve, reject) => {
+    const probe = createServer();
+
+    probe.once('error', (error) => {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'EADDRINUSE') {
+        reject(new Error(`Porta de smoke ${port} ja esta em uso.`));
+        return;
+      }
+
+      reject(new Error(`Nao foi possivel validar a porta de smoke ${port}: ${error instanceof Error ? error.message : String(error)}`));
+    });
+
+    probe.listen(port, '127.0.0.1', () => {
+      probe.close((error) => {
+        if (error) {
+          reject(new Error(`Nao foi possivel liberar a sonda da porta de smoke ${port}: ${error.message}`));
+          return;
+        }
+
+        resolve(undefined);
+      });
+    });
+  });
+
+  logSuccess(`Porta de smoke ${port} livre.`);
+}
+
+function registerInterruptionCleanup(child) {
+  let handled = false;
+
+  const handleSignal = (signal) => {
+    if (handled) {
+      return;
+    }
+
+    handled = true;
+    void (async () => {
+      try {
+        await stopChildProcess(child);
+      } finally {
+        console.error(`ERRO: Smoke do standalone interrompido por ${signal}.`);
+        process.exit(1);
+      }
+    })();
+  };
+
+  process.once('SIGINT', handleSignal);
+  process.once('SIGTERM', handleSignal);
+
+  return () => {
+    process.removeListener('SIGINT', handleSignal);
+    process.removeListener('SIGTERM', handleSignal);
+  };
+}
+
 async function runSmokeTest(canonicalEntryAbsolutePath) {
-  const port = String(process.env.STANDALONE_SMOKE_PORT || '5100').trim() || '5100';
+  const port = resolveSmokePort();
+  const timeoutMs = resolveSmokeTimeoutMs();
+  const healthcheckUrl = `http://127.0.0.1:${port}/api/health`;
+
+  await assertSmokePortIsFree(port);
+
   const child = spawn(process.execPath, [canonicalEntryAbsolutePath], {
     cwd: frontendDir,
     env: {
       ...process.env,
-      PORT: port,
+      PORT: String(port),
       HOSTNAME: process.env.HOSTNAME || '127.0.0.1',
       NODE_ENV: 'production',
     },
-    stdio: 'ignore',
+    stdio: ['ignore', 'ignore', 'pipe'],
+  });
+  const unregisterInterruptionCleanup = registerInterruptionCleanup(child);
+  let childError = null;
+  let stderrBuffer = '';
+  child.once('error', (error) => {
+    childError = error;
+  });
+  child.stderr?.on('data', (chunk) => {
+    stderrBuffer = `${stderrBuffer}${chunk.toString()}`.slice(-4_000);
   });
 
-  let lastError = null;
+  logSuccess(`Standalone iniciado para smoke test em ${healthcheckUrl}.`);
 
   try {
-    for (let attempt = 0; attempt < 30; attempt += 1) {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < timeoutMs) {
+      if (childError) {
+        throw new Error(`Falha ao iniciar o frontend standalone.${formatChildFailureContext(stderrBuffer, childError)}`);
+      }
+
       if (child.exitCode !== null) {
-        fail(`O standalone encerrou antes do smoke test concluir. Exit code: ${child.exitCode}.`);
+        throw new Error(
+          `O frontend standalone encerrou antes do healthcheck. Exit code: ${child.exitCode}.${formatChildFailureContext(stderrBuffer, childError)}`,
+        );
       }
 
       try {
-        const response = await fetch(`http://127.0.0.1:${port}/api/health`);
+        const response = await fetch(healthcheckUrl);
         if (!response.ok) {
-          throw new Error(`status HTTP ${response.status}`);
+          throw new Error(`Healthcheck respondeu com status inesperado: ${response.status}.`);
         }
 
         const payload = await response.json();
         if (payload?.status !== 'ok') {
-          throw new Error(`payload inesperado: ${JSON.stringify(payload)}`);
+          throw new Error(`Healthcheck respondeu com payload inesperado: ${JSON.stringify(payload)}.`);
         }
 
-        logSuccess(`Smoke do standalone aprovado em http://127.0.0.1:${port}/api/health.`);
+        logSuccess(`Smoke do standalone aprovado em ${healthcheckUrl}.`);
         return;
       } catch (error) {
-        lastError = error;
+        if (error instanceof Error && error.message.startsWith('Healthcheck respondeu')) {
+          throw error;
+        }
+
         await sleep(500);
       }
     }
 
-    fail(
-      `Smoke do standalone falhou em http://127.0.0.1:${port}/api/health: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
-    );
+    throw new Error(`Timeout aguardando healthcheck do standalone em ${healthcheckUrl}.`);
   } finally {
+    unregisterInterruptionCleanup();
     await stopChildProcess(child);
   }
 }
 
-const shouldRunSmoke = process.argv.includes('--smoke');
-const canonicalEntryAbsolutePath = validateCanonicalLayout();
+try {
+  const shouldRunSmoke = process.argv.includes('--smoke');
+  const canonicalEntryAbsolutePath = validateCanonicalLayout();
 
-if (shouldRunSmoke) {
-  await runSmokeTest(canonicalEntryAbsolutePath);
+  if (shouldRunSmoke) {
+    await runSmokeTest(canonicalEntryAbsolutePath);
+  }
+} catch (error) {
+  fail(error instanceof Error ? error.message : String(error));
 }
