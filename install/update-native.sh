@@ -102,6 +102,10 @@ FRONTEND_STANDALONE_ENTRY_REL=""
 FRONTEND_STANDALONE_RUNTIME_DIR=""
 FRONTEND_STANDALONE_BUILD_DIR=""
 LAST_FRONTEND_ARTIFACT_ERROR=""
+SEED_COMMAND_BIN=""
+SEED_COMMAND_SOURCE=""
+SEED_COMMAND_ARGS=()
+LAST_SEED_RESOLUTION_ERROR=""
 
 now_iso() {
   date -u +%Y-%m-%dT%H:%M:%SZ
@@ -1061,6 +1065,54 @@ count_frontend_manifest_files() {
   find "$base_dir" -type f \( -name '*client-reference-manifest*' -o -name '*server-reference-manifest*' \) | wc -l | tr -d ' '
 }
 
+reset_seed_resolution() {
+  SEED_COMMAND_BIN=""
+  SEED_COMMAND_SOURCE=""
+  SEED_COMMAND_ARGS=()
+  LAST_SEED_RESOLUTION_ERROR=""
+}
+
+has_seed_deploy_script() {
+  local package_json_path="$1"
+  [[ -f "$package_json_path" ]] || return 1
+
+  node - "$package_json_path" <<'EOF'
+const fs = require('node:fs');
+const packageJsonPath = process.argv[2];
+const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+process.exit(typeof pkg?.scripts?.['seed:deploy'] === 'string' && pkg.scripts['seed:deploy'].trim() ? 0 : 1);
+EOF
+}
+
+resolve_seed_command() {
+  local backend_dir="$1"
+  reset_seed_resolution
+
+  if has_seed_deploy_script "$backend_dir/package.json"; then
+    SEED_COMMAND_BIN="pnpm"
+    SEED_COMMAND_ARGS=(run seed:deploy)
+    SEED_COMMAND_SOURCE="package_json_script"
+    return 0
+  fi
+
+  if [[ -f "$backend_dir/prisma/seed.ts" ]]; then
+    SEED_COMMAND_BIN="pnpm"
+    SEED_COMMAND_ARGS=(exec tsx prisma/seed.ts deploy)
+    SEED_COMMAND_SOURCE="prisma_seed_ts"
+    return 0
+  fi
+
+  if [[ -f "$backend_dir/dist/prisma/seed.js" ]]; then
+    SEED_COMMAND_BIN="node"
+    SEED_COMMAND_ARGS=(dist/prisma/seed.js deploy)
+    SEED_COMMAND_SOURCE="dist_seed_js_legacy"
+    return 0
+  fi
+
+  LAST_SEED_RESOLUTION_ERROR="Nenhum comando de seed executavel foi encontrado em $backend_dir. Verificado: scripts.seed:deploy, prisma/seed.ts, dist/prisma/seed.js"
+  return 1
+}
+
 validate_frontend_artifact_layout() {
   local release_dir="$1"
   local frontend_dir="$release_dir/apps/frontend"
@@ -1263,7 +1315,12 @@ run_seed_deploy() {
     cd "$backend_dir"
     # shellcheck disable=SC1091
     source ./.env
-    node dist/prisma/seed.js deploy
+    resolve_seed_command "$backend_dir" || {
+      log_err "$LAST_SEED_RESOLUTION_ERROR"
+      return 1
+    }
+    log "Seed versionado resolvido via ${SEED_COMMAND_SOURCE}: ${SEED_COMMAND_BIN} ${SEED_COMMAND_ARGS[*]}"
+    "$SEED_COMMAND_BIN" "${SEED_COMMAND_ARGS[@]}"
   )
 }
 
@@ -1451,7 +1508,7 @@ pnpm prisma migrate deploy --schema prisma/schema.prisma || fail_and_exit "$EXIT
 
 set_step "seed" 78
 run_seed_deploy "$NEW_RELEASE_DIR" || fail_and_exit "$EXIT_SEED_FAILED" "seed" "UPDATE_SEED_ERROR" "UPDATE_SEED_ERROR" \
-  "Falha ao aplicar o seed versionado da nova release." "$(recent_failure_detail 'node dist/prisma/seed.js deploy falhou')"
+  "Falha ao aplicar o seed versionado da nova release." "$(recent_failure_detail "${LAST_SEED_RESOLUTION_ERROR:-Falha ao executar o seed versionado da release}")"
 
 set_step "publish_release" 84
 enable_maintenance_mode "Atualizando sistema para versao ${TARGET_TAG}"

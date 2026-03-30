@@ -229,9 +229,22 @@ describe('NativeUpdateRuntimeAdapter', () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pluggor-native-adapter-'));
     sourceDir = path.join(tmpDir, 'source');
     fs.mkdirSync(path.join(sourceDir, 'apps', 'backend'), { recursive: true });
+    fs.mkdirSync(path.join(sourceDir, 'apps', 'backend', 'prisma'), { recursive: true });
     fs.mkdirSync(path.join(sourceDir, 'apps', 'frontend', 'public'), { recursive: true });
     fs.mkdirSync(path.join(sourceDir, 'apps', 'frontend', 'scripts'), { recursive: true });
-    fs.writeFileSync(path.join(sourceDir, 'apps', 'backend', 'package.json'), '{}');
+    fs.writeFileSync(
+      path.join(sourceDir, 'apps', 'backend', 'package.json'),
+      JSON.stringify(
+        {
+          scripts: {
+            'seed:deploy': 'tsx prisma/seed.ts deploy',
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    fs.writeFileSync(path.join(sourceDir, 'apps', 'backend', 'prisma', 'seed.ts'), 'console.log("seed");\n');
     fs.writeFileSync(path.join(sourceDir, 'apps', 'frontend', 'package.json'), '{}');
     fs.writeFileSync(path.join(sourceDir, 'apps', 'frontend', 'public', 'clear-cache.html'), '<html></html>');
     fs.writeFileSync(
@@ -461,6 +474,88 @@ describe('NativeUpdateRuntimeAdapter', () => {
         ),
       ),
     ).toBe(true);
+  });
+
+  it('seed e resolvido pelo comando canonico do package.json no fluxo native', async () => {
+    const adapter = createAdapter();
+    const execution = createExecution();
+    const targetReleaseDir = path.join(runtime.releasesDir, 'v1.2.3');
+    const backendDir = path.join(targetReleaseDir, 'apps', 'backend');
+    fs.mkdirSync(path.join(backendDir, 'prisma'), { recursive: true });
+    fs.writeFileSync(
+      path.join(backendDir, 'package.json'),
+      JSON.stringify(
+        {
+          scripts: {
+            'seed:deploy': 'tsx prisma/seed.ts deploy',
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    fs.writeFileSync(path.join(backendDir, 'prisma', 'seed.ts'), 'console.log("seed");\n');
+
+    const result = await adapter.executeStep('seed', {
+      execution,
+      runtime,
+      metadata: {
+        targetReleaseDir,
+      },
+    });
+
+    expect(commandRunnerMock.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        step: 'seed',
+        command: 'pnpm',
+        args: ['run', 'seed:deploy'],
+        cwd: backendDir,
+      }),
+    );
+    expect(result.result).toMatchObject({
+      commandSource: 'package_json_script',
+      resolvedCommand: 'pnpm run seed:deploy',
+    });
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'seed_entrypoint_resolvido',
+        }),
+      ]),
+    );
+  });
+
+  it('seed falha explicitamente quando a release nao possui entrypoint executavel', async () => {
+    const adapter = createAdapter();
+    const execution = createExecution();
+    const targetReleaseDir = path.join(runtime.releasesDir, 'v1.2.3');
+    const backendDir = path.join(targetReleaseDir, 'apps', 'backend');
+    fs.mkdirSync(backendDir, { recursive: true });
+    fs.writeFileSync(path.join(backendDir, 'package.json'), '{}');
+
+    await expect(
+      adapter.executeStep('seed', {
+        execution,
+        runtime,
+        metadata: {
+          targetReleaseDir,
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: 'UPDATE_SEED_ENTRYPOINT_NOT_FOUND',
+    });
+  });
+
+  it('script legado segue o mesmo contrato canonico de seed do adapter native', () => {
+    const scriptPath = path.resolve(process.cwd(), '..', '..', 'install', 'update-native.sh');
+    const scriptContent = fs.readFileSync(scriptPath, 'utf8');
+
+    expect(scriptContent).toContain('SEED_COMMAND_ARGS=(run seed:deploy)');
+    expect(scriptContent).toContain('SEED_COMMAND_ARGS=(exec tsx prisma/seed.ts deploy)');
+    expect(scriptContent).toContain('SEED_COMMAND_ARGS=(dist/prisma/seed.js deploy)');
+    expect(scriptContent.indexOf('SEED_COMMAND_ARGS=(run seed:deploy)')).toBeLessThan(
+      scriptContent.indexOf('SEED_COMMAND_ARGS=(dist/prisma/seed.js deploy)'),
+    );
   });
 
   it('package_frontend_assets gera o artefato standalone esperado no layout real', async () => {

@@ -320,11 +320,12 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
 
   private async seed(context: UpdateStepExecutionContext): Promise<UpdateStepExecutionResult> {
     const backendDir = path.join(this.requireTargetReleaseDir(context.metadata), 'apps', 'backend');
+    const seedCommand = await this.resolveNativeSeedCommand(backendDir);
     await this.runCommandOrThrow(
       context,
       'seed',
-      'node',
-      ['dist/prisma/seed.js', 'deploy'],
+      seedCommand.command,
+      seedCommand.args,
       backendDir,
       await this.buildNativeCommandEnv(context.runtime),
     );
@@ -332,7 +333,24 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
     return {
       result: {
         backendDir,
+        commandSource: seedCommand.source,
+        resolvedCommand: [seedCommand.command, ...seedCommand.args].join(' '),
       },
+      metadata: {
+        seedCommandSource: seedCommand.source,
+        seedCommand: [seedCommand.command, ...seedCommand.args].join(' '),
+      },
+      evidence: [
+        {
+          code: 'seed_entrypoint_resolvido',
+          summary: 'O seed versionado foi resolvido a partir do contrato canonico da release.',
+          details: {
+            source: seedCommand.source,
+            resolvedCommand: [seedCommand.command, ...seedCommand.args].join(' '),
+            backendDir,
+          },
+        },
+      ],
     };
   }
 
@@ -615,6 +633,77 @@ export class NativeUpdateRuntimeAdapter implements UpdateRuntimeAdapter {
       ...parsedFrontendEnv,
       ...overrides,
     };
+  }
+
+  private async resolveNativeSeedCommand(backendDir: string): Promise<{
+    command: string;
+    args: string[];
+    source: 'package_json_script' | 'prisma_seed_ts' | 'dist_seed_js_legacy';
+  }> {
+    const packageJsonPath = path.join(backendDir, 'package.json');
+    const prismaSeedSourcePath = path.join(backendDir, 'prisma', 'seed.ts');
+    const legacyDistSeedPath = path.join(backendDir, 'dist', 'prisma', 'seed.js');
+
+    const packageJson = await this.readJsonFile(packageJsonPath);
+    const seedDeployScript =
+      packageJson && typeof packageJson.scripts?.['seed:deploy'] === 'string'
+        ? packageJson.scripts['seed:deploy'].trim()
+        : '';
+    if (seedDeployScript) {
+      return {
+        command: 'pnpm',
+        args: ['run', 'seed:deploy'],
+        source: 'package_json_script',
+      };
+    }
+
+    if (await this.pathExists(prismaSeedSourcePath)) {
+      return {
+        command: 'pnpm',
+        args: ['exec', 'tsx', 'prisma/seed.ts', 'deploy'],
+        source: 'prisma_seed_ts',
+      };
+    }
+
+    if (await this.pathExists(legacyDistSeedPath)) {
+      return {
+        command: 'node',
+        args: ['dist/prisma/seed.js', 'deploy'],
+        source: 'dist_seed_js_legacy',
+      };
+    }
+
+    throw new UpdateRuntimeStepError({
+      code: 'UPDATE_SEED_ENTRYPOINT_NOT_FOUND',
+      category: 'UPDATE_SEED_ERROR',
+      stage: 'seed',
+      userMessage: 'A release nao possui um entrypoint executavel para o seed versionado.',
+      technicalMessage:
+        `Nenhum comando de seed executavel foi encontrado em ${backendDir}. ` +
+        'Verificado: scripts.seed:deploy, prisma/seed.ts, dist/prisma/seed.js.',
+      rollbackEligible: true,
+      retryable: false,
+      details: {
+        backendDir,
+        checked: {
+          packageJsonPath,
+          prismaSeedSourcePath,
+          legacyDistSeedPath,
+        },
+      },
+    });
+  }
+
+  private async readJsonFile(filePath: string): Promise<Record<string, any> | null> {
+    if (!(await this.pathExists(filePath))) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(await fsp.readFile(filePath, 'utf8')) as Record<string, any>;
+    } catch {
+      return null;
+    }
   }
 
   private async runCommandOrThrow(
