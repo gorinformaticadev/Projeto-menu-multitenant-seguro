@@ -25,6 +25,7 @@ import { JwtAuthGuard } from '../../src/core/common/guards/jwt-auth.guard';
 import { IS_PUBLIC_KEY } from '../../src/core/decorators/public.decorator';
 import { SystemUpdateController } from '../../src/update/system-update.controller';
 import { SystemUpdateAdminService } from '../../src/update/system-update-admin.service';
+import { UpdateEngineCapabilitiesService } from '../../src/update/engine/update-engine-capabilities.service';
 import { NotificationService } from '../../src/notifications/notification.service';
 import { SystemNotificationsController } from '../../src/notifications/system-notifications.controller';
 import { AuditService } from '../../src/audit/audit.service';
@@ -103,6 +104,18 @@ const systemUpdateAdminServiceMock = {
   listReleases: jest.fn(),
   runUpdate: jest.fn(),
   runRollback: jest.fn(),
+};
+
+const updateEngineCapabilitiesServiceMock = {
+  getCapabilities: jest.fn(() => ({
+    sourceOfTruth: 'canonical_db',
+    updateAgent: {
+      enabled: false,
+      legacyBridgeEnabled: false,
+    },
+    canonicalReadEnabled: false,
+    runtimeAdapters: [],
+  })),
 };
 
 const notificationServiceMock = {
@@ -268,6 +281,10 @@ class DummyTenantsController {
       useValue: systemUpdateAdminServiceMock,
     },
     {
+      provide: UpdateEngineCapabilitiesService,
+      useValue: updateEngineCapabilitiesServiceMock,
+    },
+    {
       provide: NotificationService,
       useValue: notificationServiceMock,
     },
@@ -333,6 +350,7 @@ describe('System contract smoke', () => {
     systemUpdateAdminServiceMock.getStatus.mockResolvedValue({
       ...UPDATE_STATUS_RESPONSE,
     });
+    updateEngineCapabilitiesServiceMock.getCapabilities.mockClear();
     notificationServiceMock.list.mockClear();
     notificationServiceMock.list.mockResolvedValue({
       ...SYSTEM_NOTIFICATIONS_FIXTURE,
