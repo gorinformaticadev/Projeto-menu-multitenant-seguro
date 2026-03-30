@@ -928,10 +928,9 @@ collect_conflicting_pm2_names() {
   local pm2_output=""
   pm2_output="$(pm2 jlist 2>/dev/null || true)"
 
-  printf '%s' "$pm2_output" | node - "$base_dir" "$backend_name" "$frontend_name" <<'EOF'
-const fs = require('node:fs');
+  PM2_JLIST="$pm2_output" node - "$base_dir" "$backend_name" "$frontend_name" <<'EOF'
 const [, , baseDirArg, backendName, frontendName] = process.argv;
-const raw = fs.readFileSync(0, 'utf8').trim();
+const raw = String(process.env.PM2_JLIST || '').trim();
 const processes = raw ? JSON.parse(raw) : [];
 
 function normalizePath(value) {
@@ -1025,10 +1024,9 @@ assert_pm2_release_state() {
   local pm2_output=""
   pm2_output="$(pm2 jlist 2>/dev/null || true)"
 
-  printf '%s' "$pm2_output" | node - "$base_dir" "$target_root" "$backend_name" "$frontend_name" <<'EOF'
-const fs = require('node:fs');
+  PM2_JLIST="$pm2_output" node - "$base_dir" "$target_root" "$backend_name" "$frontend_name" <<'EOF'
 const [, , baseDirArg, targetRootArg, backendName, frontendName] = process.argv;
-const raw = fs.readFileSync(0, 'utf8').trim();
+const raw = String(process.env.PM2_JLIST || '').trim();
 const processes = raw ? JSON.parse(raw) : [];
 
 function normalizePath(value) {
@@ -1993,4 +1991,3 @@ cleanup_old_releases
 disable_maintenance_mode "Update concluido com sucesso"
 finish_success
 exit "$EXIT_SUCCESS"
-

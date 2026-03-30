@@ -15,6 +15,7 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
 import { Roles } from '@core/common/decorators/roles.decorator';
+import { CriticalRateLimit } from '@common/decorators/critical-rate-limit.decorator';
 import { JwtAuthGuard } from '@core/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@core/common/guards/roles.guard';
 import { ExecuteUpdateDto, UpdateConfigDto } from './dto/update.dto';
@@ -75,6 +76,7 @@ export class UpdateController {
   @Post('execute')
   @Roles(Role.SUPER_ADMIN)
   @HttpCode(HttpStatus.ACCEPTED)
+  @CriticalRateLimit('update')
   async executeUpdate(@Body() updateData: ExecuteUpdateDto, @Request() req) {
     try {
       const userId = req.user.sub;
