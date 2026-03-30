@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.1](https://github.com/gorinformaticadev/Pluggor/compare/v0.2.0...v0.2.1) (2026-03-30)
+
+
+### Features
+
+* add native update shell script and corresponding runtime adapter for backend deployments ([c73a4d0](https://github.com/gorinformaticadev/Pluggor/commit/c73a4d039614b26239a358d89a3ec30464c5c7aa))
+
 ## 0.2.0 (2026-03-30)
 
 
