@@ -6,10 +6,12 @@
   "scripts": {
     "dev": "next dev --webpack -p 5000",
     "build": "next build --webpack",
-    "build:ci": "cross-env NEXT_DIST_DIR=.next-ci next build --webpack",
+    "build:ci": "node ./scripts/clean-next-output.mjs && next build --webpack",
     "typecheck": "tsc --noEmit --pretty false",
     "clean:next": "node ./scripts/clean-next-output.mjs",
     "start": "node scripts/start-standalone.mjs",
+    "check:standalone": "node ./scripts/check-standalone-layout.mjs",
+    "check:standalone:smoke": "node ./scripts/check-standalone-layout.mjs --smoke",
     "check:theming": "node ../../Scripts/check-no-hardcoded-colors.js",
     "lint": "eslint src --config ./eslint.config.js",
     "test": "vitest run",

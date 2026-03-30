@@ -1908,6 +1908,8 @@ set_step "build_frontend" 54
 log "Compilando frontend..."
 NEXT_DIST_DIR=".next" pnpm --filter frontend build || fail_and_exit "$EXIT_BUILD_FAILED" "build_frontend" "UPDATE_BUILD_ERROR" "UPDATE_BUILD_ERROR" \
   "Falha ao compilar o frontend da nova release." "$(recent_failure_detail 'pnpm --filter frontend build falhou')"
+node "$NEW_RELEASE_DIR/apps/frontend/scripts/check-standalone-layout.mjs" || fail_and_exit "$EXIT_BUILD_FAILED" "build_frontend" "UPDATE_BUILD_ERROR" "UPDATE_BUILD_ERROR" \
+  "O build do frontend concluiu sem respeitar o layout standalone canonico." "$(recent_failure_detail 'check-standalone-layout.mjs falhou apos o build do frontend')"
 resolve_frontend_standalone_layout "$NEW_RELEASE_DIR/apps/frontend" || fail_and_exit "$EXIT_BUILD_FAILED" "build_frontend" "UPDATE_BUILD_ERROR" "UPDATE_BUILD_ERROR" \
   "O build do frontend concluiu sem gerar um entrypoint standalone valido." "${LAST_FRONTEND_ARTIFACT_ERROR:-Standalone do frontend nao encontrado apos o build}"
 log "Entrypoint standalone do frontend gerado: ${FRONTEND_STANDALONE_LAYOUT} (${FRONTEND_STANDALONE_ENTRY_REL})"

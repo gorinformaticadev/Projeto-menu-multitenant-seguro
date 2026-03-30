@@ -31,11 +31,11 @@
     "security:full-scan": "ts-node ../../scripts/backend/security-check.ts",
     "security:snyk": "powershell -ExecutionPolicy Bypass -File ../../scripts/backend/snyk-test.ps1",
     "pre-deploy": "pnpm run security:check && pnpm run build",
-    "ci:local": "pnpm install --frozen-lockfile && pnpm run ci:backend && pnpm run ci:frontend && pnpm run ci:scripts && pnpm run ci:smoke",
-    "ci:backend": "pnpm -C apps/backend build && pnpm -C apps/backend test && pnpm -C apps/backend run security:guardrails && pnpm -C apps/backend run test:security-regression && pnpm -C apps/backend run lint",
-    "ci:frontend": "pnpm check:theming && pnpm -C apps/frontend build && pnpm -C apps/frontend run --if-present lint",
-    "ci:scripts": "node Scripts/ci-local-scripts-check.mjs",
-    "ci:smoke": "pnpm -C apps/backend run test:smoke"
+    "ci:local": "corepack pnpm --dir ../.. install --frozen-lockfile && corepack pnpm run ci:backend && corepack pnpm run ci:frontend && corepack pnpm run ci:scripts && corepack pnpm run ci:smoke",
+    "ci:backend": "corepack pnpm build && corepack pnpm test && corepack pnpm run security:guardrails && corepack pnpm run test:security-regression && corepack pnpm run lint",
+    "ci:frontend": "corepack pnpm --dir ../.. check:theming && corepack pnpm -C ../frontend run build:ci && corepack pnpm -C ../frontend run check:standalone && corepack pnpm -C ../frontend run check:standalone:smoke && corepack pnpm -C ../frontend run --if-present lint",
+    "ci:scripts": "node ../../Scripts/ci-local-scripts-check.mjs",
+    "ci:smoke": "corepack pnpm run test:smoke"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.14",

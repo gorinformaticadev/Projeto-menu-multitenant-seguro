@@ -78,6 +78,12 @@ jobs:
       - name: Frontend build
         run: pnpm -C apps/frontend build:ci
 
+      - name: Frontend standalone layout check
+        run: pnpm -C apps/frontend run check:standalone
+
+      - name: Frontend standalone smoke
+        run: pnpm -C apps/frontend run check:standalone:smoke
+
       - name: Frontend lint
         run: pnpm -C apps/frontend run --if-present lint
 

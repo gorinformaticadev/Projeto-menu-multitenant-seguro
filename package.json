@@ -15,7 +15,7 @@
     "release": "pnpm dlx standard-version",
     "versao": "pnpm run release && git push --follow-tags",
     "install:all": "pnpm install",
-    "ci:local": "corepack pnpm install --frozen-lockfile && corepack pnpm -C apps/backend build && corepack pnpm -C apps/backend test && corepack pnpm -C apps/backend run security:guardrails && corepack pnpm -C apps/backend run test:security-regression && corepack pnpm -C apps/backend run lint && corepack pnpm check:theming && corepack pnpm -C apps/frontend run build:ci && corepack pnpm -C apps/frontend run --if-present lint && node Scripts/ci-local-scripts-check.mjs && corepack pnpm -C apps/backend run test:smoke",
+    "ci:local": "corepack pnpm install --frozen-lockfile && corepack pnpm -C apps/backend build && corepack pnpm -C apps/backend test && corepack pnpm -C apps/backend run security:guardrails && corepack pnpm -C apps/backend run test:security-regression && corepack pnpm -C apps/backend run lint && corepack pnpm check:theming && corepack pnpm -C apps/frontend run build:ci && corepack pnpm -C apps/frontend run check:standalone && corepack pnpm -C apps/frontend run check:standalone:smoke && corepack pnpm -C apps/frontend run --if-present lint && node Scripts/ci-local-scripts-check.mjs && corepack pnpm -C apps/backend run test:smoke",
     "check:theming": "node Scripts/check-no-hardcoded-colors.js",
     "dev:backend": "pnpm --filter backend start:dev",
     "dev:frontend": "pnpm --filter frontend dev",
