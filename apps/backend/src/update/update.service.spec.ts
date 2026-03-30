@@ -75,6 +75,12 @@ function createService() {
   const systemVersionMock = {
     getVersionInfo: jest.fn(() => ({
       version: 'v1.0.0',
+      source: 'git_exact_tag',
+      versionSource: 'git_exact_tag',
+      installedVersionRaw: 'v1.0.0',
+      installedBaseTag: 'v1.0.0',
+      installedVersionNormalized: '1.0.0',
+      isExactTaggedRelease: true,
       commitSha: 'test-sha',
       buildDate: '2026-01-01T00:00:00Z',
     })),
@@ -185,6 +191,7 @@ function createService() {
     service: service as unknown as any,
     prismaMock,
     auditMock,
+    systemVersionMock,
     systemUpdateAdminServiceMock,
     updateExecutionFacadeServiceMock,
     updateExecutionBridgeServiceMock,
@@ -325,6 +332,33 @@ describe('UpdateService', () => {
 
   it('bloqueia o start quando a versao alvo ja esta instalada', async () => {
     const { service, prismaMock, systemUpdateAdminServiceMock } = createService();
+
+    await expect(service.executeUpdate({ version: 'v1.0.0' }, 'user-1')).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'UPDATE_VERSION_ALREADY_INSTALLED',
+        userMessage: 'A versao v1.0.0 ja esta instalada.',
+      }),
+      status: 409,
+    });
+
+    expect(prismaMock.updateLog.create).not.toHaveBeenCalled();
+    expect(systemUpdateAdminServiceMock.runUpdate).not.toHaveBeenCalled();
+  });
+
+  it('usa a versao normalizada para reconhecer a mesma release quando o build instalado esta acima da tag', async () => {
+    const { service, prismaMock, systemUpdateAdminServiceMock, systemVersionMock } = createService();
+
+    systemVersionMock.getVersionInfo.mockReturnValue({
+      version: 'v1.0.0+abc1234',
+      source: 'git_describe',
+      versionSource: 'git_describe',
+      installedVersionRaw: 'v1.0.0+abc1234',
+      installedBaseTag: 'v1.0.0',
+      installedVersionNormalized: '1.0.0',
+      isExactTaggedRelease: false,
+      commitSha: 'abc1234',
+      buildDate: '2026-01-01T00:00:00Z',
+    });
 
     await expect(service.executeUpdate({ version: 'v1.0.0' }, 'user-1')).rejects.toMatchObject({
       response: expect.objectContaining({
@@ -620,6 +654,11 @@ describe('UpdateService', () => {
         operationId: 'update-123',
       },
     });
+    expect(status.installedVersionRaw).toBe('v1.0.0');
+    expect(status.installedBaseTag).toBe('v1.0.0');
+    expect(status.installedVersionNormalized).toBe('1.0.0');
+    expect(status.isExactTaggedRelease).toBe(true);
+    expect(status.versionSource).toBe('git_exact_tag');
   });
 
   it('getUpdateStatus prioriza o modo operacional legado mesmo em idle quando a configuracao salva diverge', async () => {

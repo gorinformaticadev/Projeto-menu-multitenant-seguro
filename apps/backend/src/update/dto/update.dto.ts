@@ -71,6 +71,12 @@ export class UpdateConfigDto {
  */
 export class UpdateStatusDto {
   currentVersion: string;
+  installedVersionRaw: string;
+  installedBaseTag: string | null;
+  installedVersionNormalized: string | null;
+  isExactTaggedRelease: boolean;
+  commitSha?: string;
+  versionSource: string;
   availableVersion?: string;
   updateAvailable: boolean;
   lastCheck?: Date;

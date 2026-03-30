@@ -9,8 +9,16 @@ export class SystemVersionController {
   getVersion() {
     const info = this.systemVersionService.getVersionInfo();
     return {
-      version: info.version,
-      source: info.source,
+      version: info.installedVersionRaw,
+      source: info.versionSource,
+      versionSource: info.versionSource,
+      installedVersionRaw: info.installedVersionRaw,
+      installedBaseTag: info.installedBaseTag,
+      installedVersionNormalized: info.installedVersionNormalized,
+      isExactTaggedRelease: info.isExactTaggedRelease,
+      commitSha: info.commitSha,
+      buildDate: info.buildDate,
+      branch: info.branch,
     };
   }
 }

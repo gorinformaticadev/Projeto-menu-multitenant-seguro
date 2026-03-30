@@ -164,7 +164,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
         .map(tag => semver.clean(tag))
         .filter((tag): tag is string => !!tag && !!semver.valid(tag));
 
-      const currentClean = this.getComparableVersion(this.getRuntimeVersionInfo().version);
+      const currentClean = this.getComparableRuntimeVersion();
       const uniqueCleanTags = this.selectCandidateReleaseTags(cleanTags, currentClean);
 
       if (uniqueCleanTags.length === 0) {
@@ -223,7 +223,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
         .map(tag => semver.clean(tag))
         .filter((tag): tag is string => !!tag && !!semver.valid(tag));
 
-      const currentClean = this.getComparableVersion(this.getRuntimeVersionInfo().version);
+      const currentClean = this.getComparableRuntimeVersion();
       const uniqueCleanTags = this.selectCandidateReleaseTags(cleanTags, currentClean);
       if (uniqueCleanTags.length === 0) {
         return { connected: true, updateAvailable: false };
@@ -274,7 +274,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
     const settings = await this.getSystemSettings();
     const mode = this.getInstallationMode(settings);
     const startedAtIso = new Date().toISOString();
-    let currentVersion = this.getComparableVersion(this.getRuntimeVersionInfo().version);
+    let currentVersion = this.getComparableRuntimeVersion();
 
     try {
       await this.reconcileRunningUpdateLogWithSystemState();
@@ -456,7 +456,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
     normalizedVersion: string,
     normalizedCleanVersion: string,
   ): Promise<string> {
-    const currentVersion = this.getComparableVersion(this.getRuntimeVersionInfo().version);
+    const currentVersion = this.getComparableRuntimeVersion();
 
     if (semver.eq(normalizedCleanVersion, currentVersion)) {
       throw new HttpException(
@@ -514,7 +514,13 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
     const mode = this.resolveStatusInstallationMode(settings, canonicalExecution, systemState);
 
     return {
-      currentVersion: runtime.version,
+      currentVersion: runtime.installedVersionRaw,
+      installedVersionRaw: runtime.installedVersionRaw,
+      installedBaseTag: runtime.installedBaseTag,
+      installedVersionNormalized: runtime.installedVersionNormalized,
+      isExactTaggedRelease: runtime.isExactTaggedRelease,
+      commitSha: runtime.commitSha,
+      versionSource: runtime.versionSource,
       availableVersion: settings.availableVersion || undefined,
       updateAvailable: settings.updateAvailable,
       lastCheck: settings.lastUpdateCheck || undefined,
@@ -1724,6 +1730,11 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
 
   private getRuntimeVersionInfo() {
     return this.systemVersionService.getVersionInfo();
+  }
+
+  private getComparableRuntimeVersion(): string {
+    const runtime = this.getRuntimeVersionInfo();
+    return this.getComparableVersion(runtime.installedVersionNormalized || runtime.version);
   }
 
   private getComparableVersion(version: string): string {

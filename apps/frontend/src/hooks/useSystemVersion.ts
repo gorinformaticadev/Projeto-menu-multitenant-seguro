@@ -1,11 +1,24 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 
-type VersionSource = 'env' | 'file' | 'build_info' | 'unknown';
+type VersionSource =
+  | 'git_exact_tag'
+  | 'git_describe'
+  | 'git_base_tag'
+  | 'env'
+  | 'file'
+  | 'build_info'
+  | 'package_json'
+  | 'unknown';
 
 interface VersionResponse {
   version?: string;
   source?: string;
+  versionSource?: string;
+  installedVersionRaw?: string;
+  installedBaseTag?: string | null;
+  installedVersionNormalized?: string | null;
+  isExactTaggedRelease?: boolean;
   commitSha?: string;
   buildDate?: string;
   branch?: string;
@@ -14,6 +27,11 @@ interface VersionResponse {
 export interface SystemVersionInfo {
   version: string;
   source: VersionSource;
+  versionSource: VersionSource;
+  installedVersionRaw: string;
+  installedBaseTag: string | null;
+  installedVersionNormalized: string | null;
+  isExactTaggedRelease: boolean;
   commitSha?: string;
   buildDate?: string;
   branch?: string;
@@ -22,21 +40,49 @@ export interface SystemVersionInfo {
 const FALLBACK_VERSION: SystemVersionInfo = {
   version: 'unknown',
   source: 'unknown',
+  versionSource: 'unknown',
+  installedVersionRaw: 'unknown',
+  installedBaseTag: null,
+  installedVersionNormalized: null,
+  isExactTaggedRelease: false,
 };
 
-function normalizeVersionResponse(payload: VersionResponse | null | undefined): SystemVersionInfo {
-  const rawSource = String(payload?.source || '').trim();
-  const source: VersionSource =
-    rawSource === 'env' || rawSource === 'file' || rawSource === 'build_info' || rawSource === 'unknown'
-      ? rawSource
-      : 'unknown';
+function normalizeVersionSource(rawSource: string): VersionSource {
+  return rawSource === 'git_exact_tag' ||
+    rawSource === 'git_describe' ||
+    rawSource === 'git_base_tag' ||
+    rawSource === 'env' ||
+    rawSource === 'file' ||
+    rawSource === 'build_info' ||
+    rawSource === 'package_json' ||
+    rawSource === 'unknown'
+    ? rawSource
+    : 'unknown';
+}
 
-  const version = String(payload?.version || '').trim() || 'unknown';
+function normalizeVersionResponse(payload: VersionResponse | null | undefined): SystemVersionInfo {
+  const rawSource = String(payload?.versionSource || payload?.source || '').trim();
+  const source = normalizeVersionSource(rawSource);
+  const installedVersionRaw =
+    String(payload?.installedVersionRaw || payload?.version || '').trim() || 'unknown';
+  const installedBaseTag = String(payload?.installedBaseTag || '').trim() || null;
+  const installedVersionNormalized = String(payload?.installedVersionNormalized || '').trim() || null;
   const commitSha = String(payload?.commitSha || '').trim() || undefined;
   const buildDate = String(payload?.buildDate || '').trim() || undefined;
   const branch = String(payload?.branch || '').trim() || undefined;
 
-  return { version, source, commitSha, buildDate, branch };
+  return {
+    version: installedVersionRaw,
+    source,
+    versionSource: source,
+    installedVersionRaw,
+    installedBaseTag,
+    installedVersionNormalized,
+    isExactTaggedRelease: Boolean(payload?.isExactTaggedRelease),
+    commitSha,
+    buildDate,
+    branch,
+  };
 }
 
 export function useSystemVersion() {
