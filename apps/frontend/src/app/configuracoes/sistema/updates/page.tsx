@@ -50,7 +50,7 @@ interface UpdateStatus {
   effectiveMode: 'docker' | 'native';
   detectedHostMode: 'docker' | 'native';
   modeSource: 'canonical_execution' | 'legacy_state' | 'configured' | 'host_detection';
-  updateChannel: 'release' | 'tag' | 'commit';
+  updateChannel: 'stable' | 'rc' | 'dev';
   updateLifecycle?: UpdateLifecyclePayload;
 }
 
@@ -413,9 +413,9 @@ export default function UpdatesPage() {
                         )}
                       </div>
                     </div>
-                    <div className="space-y-2">
+                     <div className="space-y-2">
                        <Label className="text-sm font-medium">Canal de Atualização</Label>
-                       <div className="text-sm font-mono text-skin-text-muted">{status.updateChannel === 'release' ? 'Stable' : status.updateChannel === 'tag' ? 'RC' : 'Dev'}</div>
+                       <div className="text-sm font-mono text-skin-text-muted">{status.updateChannel === 'stable' ? 'Stable' : status.updateChannel === 'rc' ? 'RC' : status.updateChannel === 'dev' ? 'Dev' : status.updateChannel}</div>
                      </div>
                    </div>
                  )}

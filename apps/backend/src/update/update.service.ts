@@ -141,7 +141,7 @@ export class UpdateService implements OnModuleInit {
     }
   }
 
-async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: string }> {
+  async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: string }> {
     let decryptedTokenForSanitizer = '';
     try {
       this.logger.log('Iniciando verificação de atualizações...');
@@ -154,35 +154,28 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
 
       const repoUrl = this.buildPublicGitRepoUrl(settings);
       decryptedTokenForSanitizer = this.tryDecryptToken(settings.gitToken);
-      const stdout = await this.getRemoteTagsOutput(repoUrl, settings.gitToken, settings.gitReleaseBranch);
-
-      const cleanTags = stdout
-        .split('\n')
-        .map(line => line.split('\t')[1])
-        .filter(ref => ref && ref.includes('refs/tags/'))
-        .map(ref => ref.replace('refs/tags/', '').replace('^{}', ''))
-        .map(tag => semver.clean(tag))
-        .filter((tag): tag is string => !!tag && !!semver.valid(tag));
+      
+      const channel = this.normalizeUpdateChannel(settings.updateChannel);
+      const branchName = settings.gitReleaseBranch || 'main';
+      const stdout = await this.getRemoteRefsOutput(repoUrl, settings.gitToken);
 
       const currentClean = this.getComparableRuntimeVersion();
-      const uniqueCleanTags = this.selectCandidateReleaseTags(cleanTags, currentClean);
+      const currentRaw = this.getRuntimeVersionInfo().version;
 
-      if (uniqueCleanTags.length === 0) {
-        this.logger.warn('Nenhuma tag válida encontrada no repositório');
+      const candidate = this.resolveCandidateVersion(stdout, channel, branchName, currentClean, currentRaw);
+
+      if (!candidate.latestVersion) {
+        this.logger.warn(`Nenhuma versão válida (ou commit) encontada no repositório para o canal ${channel}`);
         return { updateAvailable: false };
       }
 
-      const latestClean = uniqueCleanTags[0];
-      const latestVersion = this.formatVersion(latestClean);
-      const updateAvailable = semver.gt(latestClean, currentClean);
-
       await this.updateSystemSettings({
-        availableVersion: latestVersion,
-        updateAvailable,
+        availableVersion: candidate.latestVersion,
+        updateAvailable: candidate.updateAvailable,
         lastUpdateCheck: new Date(),
       });
 
-      return { updateAvailable, availableVersion: latestVersion };
+      return { updateAvailable: candidate.updateAvailable, availableVersion: candidate.latestVersion };
     } catch (error: unknown) {
       const parsedError = this.asUpdateExecutionError(error);
       const detail = this.sanitizeGitError(
@@ -213,29 +206,23 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
 
       const repoUrl = this.buildPublicGitRepoUrl(mergedSettings);
       decryptedTokenForSanitizer = providedToken || this.tryDecryptToken(mergedSettings.gitToken);
-      const stdout = await this.getRemoteTagsOutput(repoUrl, mergedSettings.gitToken, mergedSettings.gitReleaseBranch);
+      const stdout = await this.getRemoteRefsOutput(repoUrl, mergedSettings.gitToken);
 
-      const cleanTags = stdout
-        .split('\n')
-        .map(line => line.split('\t')[1])
-        .filter(ref => ref && ref.includes('refs/tags/'))
-        .map(ref => ref.replace('refs/tags/', '').replace('^{}', ''))
-        .map(tag => semver.clean(tag))
-        .filter((tag): tag is string => !!tag && !!semver.valid(tag));
-
+      const channel = this.normalizeUpdateChannel(config?.updateChannel || mergedSettings.updateChannel);
+      const branchName = mergedSettings.gitReleaseBranch || 'main';
       const currentClean = this.getComparableRuntimeVersion();
-      const uniqueCleanTags = this.selectCandidateReleaseTags(cleanTags, currentClean);
-      if (uniqueCleanTags.length === 0) {
+      const currentRaw = this.getRuntimeVersionInfo().version;
+
+      const candidate = this.resolveCandidateVersion(stdout, channel, branchName, currentClean, currentRaw);
+
+      if (!candidate.latestVersion) {
         return { connected: true, updateAvailable: false };
       }
 
-      const latestClean = uniqueCleanTags[0];
-      const latestVersion = this.formatVersion(latestClean);
-
       return {
         connected: true,
-        updateAvailable: semver.gt(latestClean, currentClean),
-        availableVersion: latestVersion,
+        updateAvailable: candidate.updateAvailable,
+        availableVersion: candidate.latestVersion,
       };
     } catch (error: unknown) {
       const parsedError = this.asUpdateExecutionError(error);
@@ -256,31 +243,50 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
   ): Promise<{ success: boolean; logId: string; operationId?: string; status: UpdateExecutionStatus; message: string }> {
     let updateLog: UpdateLog | null = null;
     let canonicalExecutionId: string | null = null;
-    const normalizedCleanVersion = semver.clean(updateData.version);
-    if (!normalizedCleanVersion) {
+    let normalizedCleanVersion = semver.clean(updateData.version);
+    const isCommitHash = !normalizedCleanVersion && /^[a-fA-F0-9]{7,40}$/.test(updateData.version || '');
+
+    const settings = await this.getSystemSettings();
+    const channel = this.normalizeUpdateChannel(settings.updateChannel);
+    const mode = this.getInstallationMode(settings);
+
+    if (!normalizedCleanVersion && !(channel === 'dev' && isCommitHash)) {
       throw new HttpException(
         {
-          message: 'Versao invalida',
+          message: 'Versão inválida',
           code: 'UPDATE_UNEXPECTED_ERROR',
           category: 'UPDATE_UNEXPECTED_ERROR',
           stage: 'validation',
-          userMessage: 'Versao invalida. Informe uma versao semver valida.',
+          userMessage: 'Versão inválida. Informe uma versão semver válida ou (apenas em dev) um hash de commit.',
           technicalMessage: `version=${String(updateData.version || '')}`,
         },
         HttpStatus.BAD_REQUEST,
       );
     }
+
+    if (!normalizedCleanVersion) {
+      normalizedCleanVersion = updateData.version.trim();
+    }
+
     const normalizedVersion = this.formatVersion(normalizedCleanVersion);
-    const settings = await this.getSystemSettings();
-    const mode = this.getInstallationMode(settings);
     const startedAtIso = new Date().toISOString();
     let currentVersion = this.getComparableRuntimeVersion();
+    const currentRaw = this.getRuntimeVersionInfo().version;
 
     try {
       await this.reconcileRunningUpdateLogWithSystemState();
-      currentVersion = await this.validateUpdateStart(normalizedVersion, normalizedCleanVersion);
+      
+      // Valida versão se for semver estrito
+      let skipUpdate = false;
+      if (!isCommitHash) {
+        currentVersion = await this.validateUpdateStart(normalizedVersion, normalizedCleanVersion);
+        skipUpdate = semver.lt(normalizedCleanVersion, currentVersion);
+      } else {
+        skipUpdate = currentRaw.includes(normalizedCleanVersion);
+        currentVersion = currentRaw; // Fallback audit version
+      }
 
-      if (semver.lt(normalizedCleanVersion, currentVersion)) {
+      if (skipUpdate) {
         updateLog = await this.prisma.updateLog.create({
           data: {
             version: normalizedVersion,
@@ -1792,19 +1798,61 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
     return sameLine.length > 0 ? sameLine : uniqueSorted;
   }
 
+  private resolveCandidateVersion(
+    stdout: string,
+    channel: 'stable' | 'rc' | 'dev',
+    branch: string,
+    currentClean: string,
+    currentRaw: string
+  ): { latestVersion: string | null; updateAvailable: boolean; isCommit: boolean } {
+    const lines = stdout.split('\n');
+    let latestVersion: string | null = null;
+    let updateAvailable = false;
+    let isCommit = false;
+
+    if (channel === 'dev') {
+      const targetRef = `refs/heads/${branch}`;
+      const branchLine = lines.find(line => line.includes(targetRef));
+      if (branchLine) {
+        const fullHash = branchLine.split('\t')[0].trim();
+        if (fullHash) {
+          latestVersion = fullHash.substring(0, 7);
+          isCommit = true;
+          updateAvailable = !currentRaw.includes(latestVersion);
+        }
+      }
+    } else {
+      let cleanTags = lines
+        .map(line => line.split('\t')[1])
+        .filter(ref => ref && ref.includes('refs/tags/'))
+        .map(ref => ref.replace('refs/tags/', '').replace('^{}', ''))
+        .map(tag => semver.clean(tag))
+        .filter((tag): tag is string => !!tag && !!semver.valid(tag));
+
+      if (channel === 'stable') {
+        cleanTags = cleanTags.filter(tag => semver.prerelease(tag) === null);
+      }
+
+      const uniqueSorted = Array.from(new Set(cleanTags)).sort((a, b) => semver.rcompare(a, b));
+      if (uniqueSorted.length > 0) {
+        const latestClean = uniqueSorted[0];
+        latestVersion = this.formatVersion(latestClean);
+        updateAvailable = semver.gt(latestClean, currentClean);
+      }
+    }
+
+    return { latestVersion, updateAvailable, isCommit };
+  }
+
   private buildPublicGitRepoUrl(settings: UpdateSystemSettings): string {
     const repository = String(settings.gitRepository || '').replace(/\.git$/i, '');
     return `https://github.com/${settings.gitUsername}/${repository}.git`;
   }
 
-  private async getRemoteTagsOutput(repoUrl: string, encryptedGitToken?: string, branch?: string): Promise<string> {
+  private async getRemoteRefsOutput(repoUrl: string, encryptedGitToken?: string): Promise<string> {
     const options = { timeout: 60_000, cwd: process.cwd(), maxBuffer: 10 * 1024 * 1024 };
-    const gitArgs = ['ls-remote', '--tags', repoUrl];
-    if (branch) {
-      // Se uma branch for especificada, poderíamos tentar filtrar, 
-      // mas ls-remote --tags geralmente retorna todas as tags do repositório.
-      // No entanto, manter o parâmetro permite futuras expansões de lógica.
-    }
+    // Remove --tags força consultar refs/heads também, permitindo commits
+    const gitArgs = ['ls-remote', repoUrl];
 
     if (!encryptedGitToken) {
       const { stdout } = await this.execFileAsync('git', gitArgs, options);
