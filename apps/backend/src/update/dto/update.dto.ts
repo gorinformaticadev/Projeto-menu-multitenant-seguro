@@ -48,7 +48,7 @@ export class UpdateConfigDto {
 
   @IsOptional()
   @IsString()
-  updateChannel?: 'release' | 'tag' = 'release';
+  updateChannel?: 'stable' | 'rc' | 'dev' = 'stable';
 
   @IsOptional()
   updateCheckEnabled?: boolean = true;
@@ -87,7 +87,7 @@ export class UpdateStatusDto {
   effectiveMode: 'docker' | 'native';
   detectedHostMode: 'docker' | 'native';
   modeSource: 'canonical_execution' | 'legacy_state' | 'configured' | 'host_detection';
-  updateChannel: 'release' | 'tag';
+  updateChannel: 'stable' | 'rc' | 'dev';
   updateLifecycle?: {
     status:
       | 'idle'

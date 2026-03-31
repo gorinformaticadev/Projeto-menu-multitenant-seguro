@@ -341,7 +341,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
       const decryptedToken = this.tryDecryptToken(settings.gitToken);
       const env: Record<string, string> = {
         GIT_REPO_URL: this.buildPublicGitRepoUrl(settings),
-        UPDATE_CHANNEL: settings.updateChannel,
+        UPDATE_CHANNEL: this.mapChannelForSystem(this.normalizeUpdateChannel(settings.updateChannel)),
       };
 
       if (decryptedToken) {
@@ -364,7 +364,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
             userAgent: userAgent || null,
             gitRepoUrl: env.GIT_REPO_URL || null,
             gitAuthHeader: env.GIT_AUTH_HEADER || null,
-            updateChannel: settings.updateChannel || 'release',
+            updateChannel: env.UPDATE_CHANNEL,
             composeFile: settings.composeFile || 'docker-compose.prod.yml',
             envFile: settings.envFile || 'install/.env.production',
           },
@@ -563,7 +563,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
       gitReleaseBranch: data.gitReleaseBranch,
       packageManager: data.packageManager,
       updateCheckEnabled: data.updateCheckEnabled,
-      updateChannel: data.updateChannel,
+      updateChannel: this.normalizeUpdateChannel(data.updateChannel),
       releaseTag: data.releaseTag,
       composeFile: data.composeFile,
       envFile: data.envFile,
@@ -1287,8 +1287,17 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
     return fallback;
   }
 
-  private normalizeUpdateChannel(value: string | null | undefined): 'release' | 'tag' {
-    return value === 'tag' ? 'tag' : 'release';
+  private normalizeUpdateChannel(value: string | null | undefined): 'stable' | 'rc' | 'dev' {
+    const val = String(value || '').toLowerCase().trim();
+    if (val === 'dev' || val === 'commit') return 'dev';
+    if (val === 'rc' || val === 'tag') return 'rc';
+    return 'stable';
+  }
+
+  private mapChannelForSystem(channel: 'stable' | 'rc' | 'dev'): string {
+    if (channel === 'dev') return 'commit';
+    if (channel === 'rc') return 'tag';
+    return 'release';
   }
 
   private async getSystemSettings(): Promise<UpdateSystemSettings> {
@@ -1356,22 +1365,22 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
   private normalizeRawUpdateSystemSettings(raw: Record<string, unknown>): UpdateSystemSettings {
     return {
       id: this.pickRawValue<string>(raw, ['id']) || 'default',
-      appVersion: this.pickRawValue<string>(raw, ['appVersion', 'app_version']) || '1.0.0',
-      gitToken: this.pickRawValue<string | null>(raw, ['gitToken', 'git_token']) || null,
-      gitUsername: this.pickRawValue<string | null>(raw, ['gitUsername', 'git_username']) || null,
-      gitRepository: this.pickRawValue<string | null>(raw, ['gitRepository', 'git_repository']) || null,
-      gitReleaseBranch: this.pickRawValue<string>(raw, ['gitReleaseBranch', 'git_release_branch']) || 'main',
-      packageManager: this.pickRawValue<string>(raw, ['packageManager', 'package_manager']) || 'docker',
-      updateCheckEnabled: this.pickRawValue<boolean>(raw, ['updateCheckEnabled', 'update_check_enabled']) ?? true,
-      updateChannel: this.pickRawValue<string>(raw, ['updateChannel', 'update_channel']) || 'release',
-      lastUpdateCheck: this.asDateOrNull(this.pickRawValue(raw, ['lastUpdateCheck', 'last_update_check'])),
-      availableVersion: this.pickRawValue<string | null>(raw, ['availableVersion', 'available_version']) || null,
-      updateAvailable: this.pickRawValue<boolean>(raw, ['updateAvailable', 'update_available']) ?? false,
-      releaseTag: this.pickRawValue<string | null>(raw, ['releaseTag', 'release_tag']) || 'latest',
-      composeFile: this.pickRawValue<string | null>(raw, ['composeFile', 'compose_file']) || 'docker-compose.prod.yml',
-      envFile: this.pickRawValue<string | null>(raw, ['envFile', 'env_file']) || 'install/.env.production',
-      updatedAt: this.asDateOrNull(this.pickRawValue(raw, ['updatedAt', 'updated_at'])) || new Date(),
-      updatedBy: this.pickRawValue<string | null>(raw, ['updatedBy', 'updated_by']) || null,
+      appVersion: this.pickRawValue<string>(raw, ['appVersion', 'appversion', 'app_version']) || '1.0.0',
+      gitToken: this.pickRawValue<string | null>(raw, ['gitToken', 'gittoken', 'git_token']) || null,
+      gitUsername: this.pickRawValue<string | null>(raw, ['gitUsername', 'gitusername', 'git_username']) || null,
+      gitRepository: this.pickRawValue<string | null>(raw, ['gitRepository', 'gitrepository', 'git_repository']) || null,
+      gitReleaseBranch: this.pickRawValue<string>(raw, ['gitReleaseBranch', 'gitreleasebranch', 'git_release_branch']) || 'main',
+      packageManager: this.pickRawValue<string>(raw, ['packageManager', 'packagemanager', 'package_manager']) || 'docker',
+      updateCheckEnabled: this.pickRawValue<boolean>(raw, ['updateCheckEnabled', 'updatecheckenabled', 'update_check_enabled']) ?? true,
+      updateChannel: this.pickRawValue<string>(raw, ['updateChannel', 'updatechannel', 'update_channel']) || 'release',
+      lastUpdateCheck: this.asDateOrNull(this.pickRawValue(raw, ['lastUpdateCheck', 'lastupdatecheck', 'last_update_check'])),
+      availableVersion: this.pickRawValue<string | null>(raw, ['availableVersion', 'availableversion', 'available_version']) || null,
+      updateAvailable: this.pickRawValue<boolean>(raw, ['updateAvailable', 'updateavailable', 'update_available']) ?? false,
+      releaseTag: this.pickRawValue<string | null>(raw, ['releaseTag', 'releasetag', 'release_tag']) || 'latest',
+      composeFile: this.pickRawValue<string | null>(raw, ['composeFile', 'composefile', 'compose_file']) || 'docker-compose.prod.yml',
+      envFile: this.pickRawValue<string | null>(raw, ['envFile', 'envfile', 'env_file']) || 'install/.env.production',
+      updatedAt: this.asDateOrNull(this.pickRawValue(raw, ['updatedAt', 'updatedat', 'updated_at'])) || new Date(),
+      updatedBy: this.pickRawValue<string | null>(raw, ['updatedBy', 'updatedby', 'updated_by']) || null,
     } as UpdateSystemSettings;
   }
 
@@ -1507,8 +1516,15 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
       ['updatedBy', 'updatedBy'],
     ];
 
-    for (const [field, column] of fieldMap) {
-      if (!columns.has(column.toLowerCase())) {
+    for (const [field, baseColumn] of fieldMap) {
+      const snakeColumn = baseColumn.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+      let mappedColumn = '';
+
+      if (columns.has(baseColumn.toLowerCase())) {
+        mappedColumn = baseColumn.toLowerCase(); // must be exact lowercase if DB threw away case
+      } else if (columns.has(snakeColumn.toLowerCase())) {
+        mappedColumn = snakeColumn.toLowerCase(); // exact snake_case
+      } else {
         continue;
       }
 
@@ -1517,7 +1533,7 @@ async checkForUpdates(): Promise<{ updateAvailable: boolean; availableVersion?: 
         continue;
       }
 
-      assignments.push(Prisma.sql`${Prisma.raw(`"${column}"`)} = ${value}`);
+      assignments.push(Prisma.sql`${Prisma.raw(`"${mappedColumn}"`)} = ${value}`);
     }
 
     if (columns.has('updatedat')) {

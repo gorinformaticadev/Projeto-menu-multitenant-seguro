@@ -50,7 +50,7 @@ interface UpdateStatus {
   effectiveMode: 'docker' | 'native';
   detectedHostMode: 'docker' | 'native';
   modeSource: 'canonical_execution' | 'legacy_state' | 'configured' | 'host_detection';
-  updateChannel: 'release' | 'tag';
+  updateChannel: 'release' | 'tag' | 'commit';
   updateLifecycle?: UpdateLifecyclePayload;
 }
 
@@ -73,7 +73,7 @@ interface UpdateConfig {
   gitToken: string;
   gitReleaseBranch: string;
   packageManager: string;
-  updateChannel: 'release' | 'tag';
+  updateChannel: 'stable' | 'rc' | 'dev';
   updateCheckEnabled: boolean;
 }
 
@@ -82,7 +82,7 @@ interface UpdateConfigResponse {
   gitRepository?: string;
   gitReleaseBranch?: string;
   packageManager?: string;
-  updateChannel?: 'release' | 'tag';
+  updateChannel?: 'stable' | 'rc' | 'dev';
   updateCheckEnabled?: boolean;
   hasGitToken?: boolean;
 }
@@ -131,7 +131,7 @@ export default function UpdatesPage() {
     gitToken: '',
     gitReleaseBranch: 'main',
     packageManager: 'docker',
-    updateChannel: 'release',
+    updateChannel: 'stable',
     updateCheckEnabled: true,
   });
 
@@ -189,7 +189,7 @@ export default function UpdatesPage() {
         gitRepository: data.gitRepository || '',
         gitReleaseBranch: data.gitReleaseBranch || 'main',
         packageManager: data.packageManager || 'docker',
-        updateChannel: data.updateChannel || 'release',
+        updateChannel: data.updateChannel || 'stable',
         updateCheckEnabled: data.updateCheckEnabled ?? true,
         gitToken: '',
       }));
@@ -414,11 +414,11 @@ export default function UpdatesPage() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Canal de Atualização</Label>
-                      <div className="text-sm font-mono text-skin-text-muted">{status.updateChannel === 'release' ? 'Releases Formais' : 'Tags de Código'}</div>
-                    </div>
-                  </div>
-                )}
+                       <Label className="text-sm font-medium">Canal de Atualização</Label>
+                       <div className="text-sm font-mono text-skin-text-muted">{status.updateChannel === 'release' ? 'Stable' : status.updateChannel === 'tag' ? 'RC' : 'Dev'}</div>
+                     </div>
+                   </div>
+                 )}
                 <div className="flex gap-4 pt-4 border-t">
                   <Button onClick={checkForUpdates} disabled={loading.check || isUpdateRunning || !status?.isConfigured} variant="outline">
                     <RefreshCw className={`w-4 h-4 mr-2 ${loading.check ? 'animate-spin' : ''}`} />
@@ -548,17 +548,21 @@ export default function UpdatesPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="updateChannel">Canal de Atualização</Label>
-                    <select id="updateChannel" value={config.updateChannel} onChange={(e) => setConfig(prev => ({ ...prev, updateChannel: e.target.value as 'release' | 'tag' }))} className="w-full px-3 py-2 border border-skin-border-strong rounded-md">
-                      <option value="release">Release (Apenas versões formais)</option>
-                      <option value="tag">Tag (Qualquer tag do repositório)</option>
+                    <select id="updateChannel" value={config.updateChannel} onChange={(e) => setConfig(prev => ({ ...prev, updateChannel: e.target.value as 'stable' | 'rc' | 'dev' }))} className="w-full px-3 py-2 border border-skin-border-strong rounded-md">
+                      <option value="stable">Stable (Pegará apenas releases criadas)</option>
+                      <option value="rc">RC (Pegará apenas Tags criadas no formato vX.X.X)</option>
+                      <option value="dev">Dev (Pegará qualquer commit que não se encaixe nos demais)</option>
                     </select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="packageManager">Modo de Instalação</Label>
-                    <select id="packageManager" value={config.packageManager} onChange={(e) => setConfig(prev => ({ ...prev, packageManager: e.target.value }))} className="w-full px-3 py-2 border border-skin-border-strong rounded-md">
-                      <option value="docker">Docker</option>
-                      <option value="native">Native (PM2)</option>
-                    </select>
+                    <div className="flex items-center gap-2 px-3 py-2 border border-skin-border-strong rounded-md bg-skin-background-subtle">
+                      {effectiveMode === 'docker' ? (
+                        <span className="flex items-center text-sm font-medium"><Settings className="w-4 h-4 mr-2 text-skin-info" />Container Docker (Auto-detectado)</span>
+                      ) : (
+                        <span className="flex items-center text-sm font-medium"><Monitor className="w-4 h-4 mr-2 text-skin-text" />Nativo / PM2 (Auto-detectado)</span>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-2 flex items-center gap-2 pt-8">
                     <input type="checkbox" checked={config.updateCheckEnabled} onChange={(e) => setConfig(prev => ({ ...prev, updateCheckEnabled: e.target.checked }))} className="rounded" />
