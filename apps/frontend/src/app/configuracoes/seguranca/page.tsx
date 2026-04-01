@@ -311,17 +311,17 @@ export default function SecurityConfigPage() {
                   Defina quantas tentativas falhas sao aceitas e por quanto tempo a conta fica bloqueada.
                 </p>
               </div>
-              <InfoButton label="Ajuda da seÃ§Ã£o de controle de tentativas de login">
-                <p>Configure o bloqueio automÃ¡tico de contas apÃ³s mÃºltiplas tentativas de login falhas.</p>
+              <InfoButton label="Ajuda da seção de controle de tentativas de login">
+                <p>Configure o bloqueio automático de contas para múltiplas tentativas de login falhas.</p>
               </InfoButton>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <div className="mb-2 flex items-center gap-2">
-                  <Label htmlFor="loginMaxAttempts">MÃ¡ximo de Tentativas de Login</Label>
-                  <InfoButton label="Ajuda do campo mÃ¡ximo de tentativas de login">
-                    <p>NÃºmero de tentativas antes de bloquear a conta. Faixa recomendada: 1 a 100.</p>
+                  <Label htmlFor="loginMaxAttempts">Máximo de Tentativas de Login</Label>
+                  <InfoButton label="Ajuda do campo máximo de tentativas de login">
+                    <p>Numero de tentativas antes de bloquear a conta. Faixa recomendada: 1 a 100.</p>
                   </InfoButton>
                 </div>
                 <Input
@@ -338,9 +338,9 @@ export default function SecurityConfigPage() {
 
               <div>
                 <div className="mb-2 flex items-center gap-2">
-                  <Label htmlFor="loginLockDurationMinutes">DuraÃ§Ã£o do Bloqueio (minutos)</Label>
-                  <InfoButton label="Ajuda do campo duraÃ§Ã£o do bloqueio">
-                    <p>Tempo que a conta ficarÃ¡ bloqueada apÃ³s atingir o limite de tentativas. Faixa: 5 a 1440 minutos.</p>
+                  <Label htmlFor="loginLockDurationMinutes">Duração do Bloqueio (minutos)</Label>
+                  <InfoButton label="Ajuda do campo duração do bloqueio">
+                    <p>Tempo que a conta ficara bloqueada apos atingir o limite de tentativas. Faixa: 5 a 1440 minutos.</p>
                   </InfoButton>
                 </div>
                 <Input
@@ -445,9 +445,9 @@ export default function SecurityConfigPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <div className="mb-2 flex items-center gap-2">
-                  <Label htmlFor="loginMaxAttempts">MÃ¡ximo de Tentativas de Login</Label>
-                  <InfoButton label="Ajuda do campo mÃ¡ximo de tentativas de login">
-                    <p>NÃºmero de tentativas antes de bloquear a conta. Faixa recomendada: 1 a 100.</p>
+                  <Label htmlFor="loginMaxAttempts">Maximo de Tentativas de Login</Label>
+                  <InfoButton label="Ajuda do campo maximo de tentativas de login">
+                    <p>Numero de tentativas antes de bloquear a conta. Faixa recomendada: 1 a 100.</p>
                   </InfoButton>
                 </div>
                 <Input
@@ -464,9 +464,9 @@ export default function SecurityConfigPage() {
 
               <div>
                 <div className="mb-2 flex items-center gap-2">
-                  <Label htmlFor="loginLockDurationMinutes">DuraÃ§Ã£o do Bloqueio (minutos)</Label>
-                  <InfoButton label="Ajuda do campo duraÃ§Ã£o do bloqueio">
-                    <p>Tempo que a conta ficarÃ¡ bloqueada apÃ³s atingir o limite de tentativas. Faixa: 5 a 1440 minutos.</p>
+                  <Label htmlFor="loginLockDurationMinutes">Duracao do Bloqueio (minutos)</Label>
+                  <InfoButton label="Ajuda do campo duracao do bloqueio">
+                    <p>Tempo que a conta ficara bloqueada apos atingir o limite de tentativas. Faixa: 5 a 1440 minutos.</p>
                   </InfoButton>
                 </div>
                 <Input
