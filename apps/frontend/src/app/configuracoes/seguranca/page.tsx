@@ -543,6 +543,60 @@ export default function SecurityConfigPage() {
             </div>
           </div>
 
+          <div className="rounded-2xl border border-skin-border/70 bg-skin-surface/70 p-4">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <h3 className="text-sm font-semibold text-skin-text">Controle de Tentativas de Update</h3>
+                <p className="text-xs text-skin-text-muted">
+                  Defina quantos updates podem ser disparados antes do bloqueio e por quanto tempo o bloqueio permanece ativo.
+                </p>
+              </div>
+              <InfoButton label="Ajuda da secao de controle de tentativas de update">
+                <p>Esses campos controlam o rate limiting das rotas de update acessadas pelo SUPER_ADMIN.</p>
+              </InfoButton>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <div className="mb-2 flex items-center gap-2">
+                  <Label htmlFor="updateRateLimitPerHour">Tentativas de Update</Label>
+                  <InfoButton label="Ajuda do campo tentativas de update">
+                    <p>Quantidade maxima de execucoes de update permitidas antes do bloqueio.</p>
+                  </InfoButton>
+                </div>
+                <Input
+                  id="updateRateLimitPerHour"
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={config?.updateRateLimitPerHour ?? ""}
+                  onChange={(e) =>
+                    updateConfig("updateRateLimitPerHour", e.target.value === "" ? "" : parseInt(e.target.value))
+                  }
+                />
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center gap-2">
+                  <Label htmlFor="updateRateLimitWindowMinutes">Tempo de Bloqueio de Update (minutos)</Label>
+                  <InfoButton label="Ajuda do campo tempo de bloqueio de update">
+                    <p>Janela em minutos usada para manter o bloqueio depois que o limite de updates e atingido.</p>
+                  </InfoButton>
+                </div>
+                <Input
+                  id="updateRateLimitWindowMinutes"
+                  type="number"
+                  min="1"
+                  max="1440"
+                  value={config?.updateRateLimitWindowMinutes ?? ""}
+                  onChange={(e) =>
+                    updateConfig("updateRateLimitWindowMinutes", e.target.value === "" ? "" : parseInt(e.target.value))
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="grid gap-4 border-t border-skin-border/60 pt-4 md:grid-cols-2">
             <div>
               <div className="flex items-center gap-2 mb-2">
