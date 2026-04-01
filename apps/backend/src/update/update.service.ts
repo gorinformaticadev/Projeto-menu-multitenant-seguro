@@ -157,14 +157,26 @@ export class UpdateService implements OnModuleInit {
       
       const channel = this.normalizeUpdateChannel(settings.updateChannel);
       const branchName = settings.gitReleaseBranch || 'main';
-      const stdout = await this.getRemoteRefsOutput(repoUrl, settings.gitToken);
-
       const currentClean = this.getComparableRuntimeVersion();
       const currentRaw = this.getRuntimeVersionInfo().version;
 
-      const candidate = this.resolveCandidateVersion(stdout, channel, branchName, currentClean, currentRaw);
+      let latestVersion: string | null = null;
+      let updateAvailable = false;
 
-      if (!candidate.latestVersion) {
+      if (channel === 'stable') {
+        const release = await this.getLatestGithubRelease(settings.gitUsername, settings.gitRepository, settings.gitToken);
+        latestVersion = release.version;
+        if (latestVersion) {
+          updateAvailable = semver.gt(this.getComparableVersion(latestVersion), currentClean);
+        }
+      } else {
+        const stdout = await this.getRemoteRefsOutput(repoUrl, settings.gitToken);
+        const candidate = this.resolveCandidateVersion(stdout, channel, branchName, currentClean, currentRaw);
+        latestVersion = candidate.latestVersion;
+        updateAvailable = candidate.updateAvailable;
+      }
+
+      if (!latestVersion) {
         this.logger.warn(`Nenhuma versão válida (ou commit) encontada no repositório para o canal ${channel}`);
         await this.updateSystemSettings({
           availableVersion: null,
@@ -175,12 +187,12 @@ export class UpdateService implements OnModuleInit {
       }
 
       await this.updateSystemSettings({
-        availableVersion: candidate.latestVersion,
-        updateAvailable: candidate.updateAvailable,
+        availableVersion: latestVersion,
+        updateAvailable: updateAvailable,
         lastUpdateCheck: new Date(),
       });
 
-      return { updateAvailable: candidate.updateAvailable, availableVersion: candidate.latestVersion };
+      return { updateAvailable: updateAvailable, availableVersion: latestVersion };
     } catch (error: unknown) {
       const parsedError = this.asUpdateExecutionError(error);
       const detail = this.sanitizeGitError(
@@ -211,23 +223,35 @@ export class UpdateService implements OnModuleInit {
 
       const repoUrl = this.buildPublicGitRepoUrl(mergedSettings);
       decryptedTokenForSanitizer = providedToken || this.tryDecryptToken(mergedSettings.gitToken);
-      const stdout = await this.getRemoteRefsOutput(repoUrl, mergedSettings.gitToken);
-
       const channel = this.normalizeUpdateChannel(config?.updateChannel || mergedSettings.updateChannel);
       const branchName = mergedSettings.gitReleaseBranch || 'main';
       const currentClean = this.getComparableRuntimeVersion();
       const currentRaw = this.getRuntimeVersionInfo().version;
 
-      const candidate = this.resolveCandidateVersion(stdout, channel, branchName, currentClean, currentRaw);
+      let latestVersion: string | null = null;
+      let updateAvailable = false;
 
-      if (!candidate.latestVersion) {
+      if (channel === 'stable') {
+        const release = await this.getLatestGithubRelease(mergedSettings.gitUsername, mergedSettings.gitRepository, mergedSettings.gitToken);
+        latestVersion = release.version;
+        if (latestVersion) {
+          updateAvailable = semver.gt(this.getComparableVersion(latestVersion), currentClean);
+        }
+      } else {
+        const stdout = await this.getRemoteRefsOutput(repoUrl, mergedSettings.gitToken);
+        const candidate = this.resolveCandidateVersion(stdout, channel, branchName, currentClean, currentRaw);
+        latestVersion = candidate.latestVersion;
+        updateAvailable = candidate.updateAvailable;
+      }
+
+      if (!latestVersion) {
         return { connected: true, updateAvailable: false };
       }
 
       return {
         connected: true,
-        updateAvailable: candidate.updateAvailable,
-        availableVersion: candidate.latestVersion,
+        updateAvailable: updateAvailable,
+        availableVersion: latestVersion,
       };
     } catch (error: unknown) {
       const parsedError = this.asUpdateExecutionError(error);
@@ -1852,6 +1876,38 @@ export class UpdateService implements OnModuleInit {
   private buildPublicGitRepoUrl(settings: UpdateSystemSettings): string {
     const repository = String(settings.gitRepository || '').replace(/\.git$/i, '');
     return `https://github.com/${settings.gitUsername}/${repository}.git`;
+  }
+
+  private async getLatestGithubRelease(
+    username: string,
+    repository: string,
+    encryptedToken?: string,
+  ): Promise<{ version: string | null; isCommit: boolean }> {
+    const url = `https://api.github.com/repos/${username}/${repository}/releases/latest`;
+    const headers: Record<string, string> = {
+      'User-Agent': 'Pluggor-Update-Service',
+      'Accept': 'application/vnd.github.v3+json',
+    };
+
+    const token = this.tryDecryptToken(encryptedToken);
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    try {
+      const response = await fetch(url, { headers, method: 'GET' });
+      if (!response.ok) {
+        if (response.status === 404) {
+          return { version: null, isCommit: false };
+        }
+        throw new Error(`GitHub API HTTP ${response.status}`);
+      }
+      const data = await response.json() as { tag_name: string };
+      return { version: this.formatVersion(data.tag_name), isCommit: false };
+    } catch (err) {
+      this.logger.warn(`Falha na API do GitHub para obter latest release: ${String(err)}`);
+      return { version: null, isCommit: false };
+    }
   }
 
   private async getRemoteRefsOutput(repoUrl: string, encryptedGitToken?: string): Promise<string> {
