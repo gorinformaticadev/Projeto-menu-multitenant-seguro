@@ -2,6 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { SecurityConfig } from '@prisma/client';
 import { PrismaService } from '@core/prisma/prisma.service';
 
+type SecurityConfigRecord = SecurityConfig & {
+  updateRateLimitWindowMinutes?: number | null;
+};
+
 export type LoginPolicy = {
   maxAttempts: number;
   lockDurationMinutes: number;
@@ -24,6 +28,7 @@ export type CriticalRateLimitPolicy = {
   backupPerHour: number;
   restorePerHour: number;
   updatePerHour: number;
+  updateWindowMinutes: number;
 };
 
 export type PasswordPolicy = {
@@ -58,16 +63,16 @@ export class SecurityRuntimeConfigService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async getSecurityConfig(): Promise<SecurityConfig> {
-    let config = await this.prisma.securityConfig.findFirst();
+  async getSecurityConfig(): Promise<SecurityConfigRecord> {
+    let config = (await this.prisma.securityConfig.findFirst()) as SecurityConfigRecord | null;
 
     if (!config) {
       this.logger.warn(
         'Nenhuma linha em security_config encontrada; criando configuracao padrao segura.',
       );
-      config = await this.prisma.securityConfig.create({
+      config = (await this.prisma.securityConfig.create({
         data: {},
-      });
+      })) as SecurityConfigRecord;
     }
 
     return config;
@@ -106,6 +111,7 @@ export class SecurityRuntimeConfigService {
       backupPerHour: this.readPositiveInteger(config.backupRateLimitPerHour, 5),
       restorePerHour: this.readPositiveInteger(config.restoreRateLimitPerHour, 3),
       updatePerHour: this.readPositiveInteger(config.updateRateLimitPerHour, 5),
+      updateWindowMinutes: this.readPositiveInteger(config.updateRateLimitWindowMinutes, 60),
     };
   }
 

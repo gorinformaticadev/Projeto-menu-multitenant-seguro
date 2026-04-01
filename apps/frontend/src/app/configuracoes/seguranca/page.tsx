@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils";
 
 interface SecurityConfig {
   id: string;
+  updateRateLimitPerHour?: number;
+  updateRateLimitWindowMinutes?: number;
   loginMaxAttempts: number;
   loginLockDurationMinutes: number;
   loginWindowMinutes: number;
@@ -143,6 +145,8 @@ export default function SecurityConfigPage() {
     }> = [
       { field: "loginMaxAttempts", label: "Máximo de Tentativas de Login", min: 1, max: 100 },
       { field: "loginLockDurationMinutes", label: "Duração do Bloqueio", min: 5, max: 1440 },
+      { field: "updateRateLimitPerHour", label: "Tentativas de Update", min: 1, max: 20 },
+      { field: "updateRateLimitWindowMinutes", label: "Tempo de Bloqueio de Update", min: 1, max: 1440 },
       { field: "loginWindowMinutes", label: "Janela de Tentativas", min: 1, max: 60 },
       { field: "globalMaxRequests", label: "Requisições Globais por período", min: 10, max: 100000 },
       { field: "globalWindowMinutes", label: "Janela Global", min: 1, max: 60 },
@@ -179,6 +183,8 @@ export default function SecurityConfigPage() {
       const updateData = {
         loginMaxAttempts: Number(config.loginMaxAttempts),
         loginLockDurationMinutes: Number(config.loginLockDurationMinutes),
+        updateRateLimitPerHour: Number(config.updateRateLimitPerHour),
+        updateRateLimitWindowMinutes: Number(config.updateRateLimitWindowMinutes),
         loginWindowMinutes: Number(config.loginWindowMinutes),
         globalMaxRequests: Number(config.globalMaxRequests),
         globalWindowMinutes: Number(config.globalWindowMinutes),
@@ -351,6 +357,60 @@ export default function SecurityConfigPage() {
                   value={config?.loginLockDurationMinutes ?? ""}
                   onChange={(e) =>
                     updateConfig("loginLockDurationMinutes", e.target.value === "" ? "" : parseInt(e.target.value))
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-skin-border/70 bg-skin-surface/70 p-4">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <h3 className="text-sm font-semibold text-skin-text">Controle de Tentativas de Update</h3>
+                <p className="text-xs text-skin-text-muted">
+                  Defina quantos updates podem ser disparados antes do bloqueio e por quanto tempo o bloqueio permanece ativo.
+                </p>
+              </div>
+              <InfoButton label="Ajuda da secao de controle de tentativas de update">
+                <p>Esses campos controlam o rate limiting das rotas de update acessadas pelo SUPER_ADMIN.</p>
+              </InfoButton>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <div className="mb-2 flex items-center gap-2">
+                  <Label htmlFor="updateRateLimitPerHour">Tentativas de Update</Label>
+                  <InfoButton label="Ajuda do campo tentativas de update">
+                    <p>Quantidade maxima de execucoes de update permitidas antes do bloqueio.</p>
+                  </InfoButton>
+                </div>
+                <Input
+                  id="updateRateLimitPerHour"
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={config?.updateRateLimitPerHour ?? ""}
+                  onChange={(e) =>
+                    updateConfig("updateRateLimitPerHour", e.target.value === "" ? "" : parseInt(e.target.value))
+                  }
+                />
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center gap-2">
+                  <Label htmlFor="updateRateLimitWindowMinutes">Tempo de Bloqueio de Update (minutos)</Label>
+                  <InfoButton label="Ajuda do campo tempo de bloqueio de update">
+                    <p>Janela em minutos usada para manter o bloqueio depois que o limite de updates e atingido.</p>
+                  </InfoButton>
+                </div>
+                <Input
+                  id="updateRateLimitWindowMinutes"
+                  type="number"
+                  min="1"
+                  max="1440"
+                  value={config?.updateRateLimitWindowMinutes ?? ""}
+                  onChange={(e) =>
+                    updateConfig("updateRateLimitWindowMinutes", e.target.value === "" ? "" : parseInt(e.target.value))
                   }
                 />
               </div>

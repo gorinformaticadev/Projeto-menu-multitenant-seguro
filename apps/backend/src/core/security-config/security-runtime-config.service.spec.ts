@@ -58,6 +58,7 @@ describe('SecurityRuntimeConfigService regression guards', () => {
       backupRateLimitPerHour: 5,
       restoreRateLimitPerHour: 3,
       updateRateLimitPerHour: 5,
+      updateRateLimitWindowMinutes: 60,
       passwordMinLength: 8,
       passwordRequireUppercase: true,
       passwordRequireLowercase: true,
@@ -91,6 +92,7 @@ describe('SecurityRuntimeConfigService regression guards', () => {
       backupRateLimitPerHour: 9,
       restoreRateLimitPerHour: 7,
       updateRateLimitPerHour: 4,
+      updateRateLimitWindowMinutes: 45,
     });
 
     const service = createService();
@@ -102,6 +104,7 @@ describe('SecurityRuntimeConfigService regression guards', () => {
         backupPerHour: 9,
         restorePerHour: 7,
         updatePerHour: 4,
+        updateWindowMinutes: 45,
       }),
     );
   });

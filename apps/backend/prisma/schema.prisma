@@ -276,6 +276,7 @@ model SecurityConfig {
   backupRateLimitPerHour     Int      @default(5)
   restoreRateLimitPerHour    Int      @default(3)
   updateRateLimitPerHour     Int      @default(5)
+  updateRateLimitWindowMinutes Int    @default(60)
   updatedAt                  DateTime @updatedAt
   updatedBy                  String?
 

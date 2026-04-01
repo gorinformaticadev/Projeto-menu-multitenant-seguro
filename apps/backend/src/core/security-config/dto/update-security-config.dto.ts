@@ -38,6 +38,30 @@ export class UpdateSecurityConfigDto {
   @IsOptional()
   @IsInt()
   @Min(1)
+  @Max(20)
+  backupRateLimitPerHour?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  restoreRateLimitPerHour?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  updateRateLimitPerHour?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1440)
+  updateRateLimitWindowMinutes?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
   @Max(100)
   loginMaxAttempts?: number;
 

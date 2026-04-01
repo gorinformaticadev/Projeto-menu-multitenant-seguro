@@ -266,7 +266,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
         tracker: this.resolveCriticalTracker(req),
         keyPrefix: `critical:${criticalAction}`,
         limit: this.resolveCriticalLimit(criticalAction, criticalPolicy),
-        ttl: criticalPolicy.windowMinutes * 60000,
+        ttl: this.resolveCriticalWindowMinutes(criticalAction, criticalPolicy) * 60000,
       };
     }
 
@@ -313,6 +313,20 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
         return policy.updatePerHour;
       default:
         return policy.updatePerHour;
+    }
+  }
+
+  private resolveCriticalWindowMinutes(
+    action: CriticalRateLimitAction,
+    policy: Awaited<ReturnType<SecurityRuntimeConfigService['getCriticalRateLimitPolicy']>>,
+  ): number {
+    switch (action) {
+      case 'update':
+        return policy.updateWindowMinutes;
+      case 'backup':
+      case 'restore':
+      default:
+        return policy.windowMinutes;
     }
   }
 
