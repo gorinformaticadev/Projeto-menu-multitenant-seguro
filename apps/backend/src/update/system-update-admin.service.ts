@@ -1,5 +1,5 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
-import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
+import { spawn, execFileSync, ChildProcessWithoutNullStreams } from 'child_process';
 import * as fs from 'fs';
 import * as fsp from 'fs/promises';
 import * as path from 'path';
@@ -80,24 +80,17 @@ export class SystemUpdateAdminService {
     }
 
     const mode = this.detectInstallationMode();
-    const runtime = this.resolveRuntimePaths(mode);
+    let runtime = this.resolveRuntimePaths(mode);
     
     // Auto-update isolado da pasta install/ antes de prosseguir
     if (mode === 'native') {
       try {
-        const { execSync } = require('child_process');
-        this.logger.log(`[Auto-Update] Baixando scripts de instalação otimizados da tag ${version}...`);
-        
-        // Puxa a referência da tag alvo
-        execSync(`git fetch origin tag ${version} --no-tags --depth=1`, { cwd: runtime.baseDir, stdio: 'ignore' });
-        
-        // Sobrescreve localmente SOMENTE a pasta install/ e descarta mudanças da area de staging
-        execSync(`git checkout ${version} -- install/`, { cwd: runtime.baseDir, stdio: 'ignore' });
-        execSync(`git reset HEAD install/`, { cwd: runtime.baseDir, stdio: 'ignore' });
-        
-        this.logger.log(`[Auto-Update] Instalador pré-atualizado para a tag ${version}. Trazendo as últimas modificações no script!`);
-      } catch (err) {
-        this.logger.warn(`[Auto-Update] Falhou ao atualizar o script de deploy preventivamente (esperado em simuladores ou auth falha): ${err.message}`);
+        runtime = this.refreshNativeInstallerScripts(version, runtime, request.env);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `[Auto-Update] Falhou ao atualizar o script de deploy preventivamente (esperado em simuladores ou auth falha): ${detail}`,
+        );
       }
     }
 
@@ -455,6 +448,55 @@ export class SystemUpdateAdminService {
     };
   }
 
+  private refreshNativeInstallerScripts(
+    version: string,
+    runtime: RuntimePaths,
+    extraEnv?: NodeJS.ProcessEnv,
+  ): RuntimePaths {
+    const repoRoot = this.resolveInstallerRepoRoot(runtime);
+    if (!repoRoot) {
+      this.logger.warn(
+        `[Auto-Update] Nenhum worktree Git elegível foi encontrado para atualizar install/ antes do update. script=${runtime.updateScriptPath}`,
+      );
+      return runtime;
+    }
+
+    const gitAuthHeader = String(extraEnv?.GIT_AUTH_HEADER || '').trim();
+    const gitBaseArgs = gitAuthHeader ? ['-c', gitAuthHeader] : [];
+    const gitEnv: NodeJS.ProcessEnv = {
+      ...process.env,
+      ...(extraEnv || {}),
+    };
+
+    this.logger.log(
+      `[Auto-Update] Baixando scripts de instalação otimizados da tag ${version} no repositório ${repoRoot}...`,
+    );
+
+    execFileSync('git', [...gitBaseArgs, 'fetch', 'origin', 'tag', version, '--no-tags', '--depth=1'], {
+      cwd: repoRoot,
+      env: gitEnv,
+      stdio: 'ignore',
+    });
+
+    execFileSync('git', [...gitBaseArgs, 'checkout', version, '--', 'install/'], {
+      cwd: repoRoot,
+      env: gitEnv,
+      stdio: 'ignore',
+    });
+
+    execFileSync('git', ['reset', 'HEAD', '--', 'install/'], {
+      cwd: repoRoot,
+      env: gitEnv,
+      stdio: 'ignore',
+    });
+
+    const refreshedRuntime = this.resolveRuntimePaths(runtime.mode);
+    this.logger.log(
+      `[Auto-Update] Instalador pré-atualizado para a tag ${version}. Script efetivo: ${refreshedRuntime.updateScriptPath}`,
+    );
+    return refreshedRuntime;
+  }
+
   private detectInstallationMode(): UpdateMode {
     try {
       if (process.env.IS_DOCKER === 'true') {
@@ -499,6 +541,23 @@ export class SystemUpdateAdminService {
       }
     }
     return candidates[0];
+  }
+
+  private resolveInstallerRepoRoot(runtime: RuntimePaths): string | null {
+    const candidates = [
+      path.resolve(path.dirname(runtime.updateScriptPath), '..'),
+      path.resolve(this.pathsService.getProjectRoot()),
+      path.resolve(runtime.baseDir, 'current'),
+      path.resolve(runtime.baseDir),
+    ];
+
+    for (const candidate of candidates) {
+      if (fs.existsSync(path.join(candidate, '.git'))) {
+        return candidate;
+      }
+    }
+
+    return null;
   }
 
   private ensureScriptExists(scriptPath: string, label: string): void {
