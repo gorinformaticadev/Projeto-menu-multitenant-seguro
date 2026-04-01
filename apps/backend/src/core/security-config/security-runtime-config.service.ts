@@ -105,7 +105,7 @@ export class SecurityRuntimeConfigService {
       windowMinutes: 60,
       backupPerHour: this.readPositiveInteger(config.backupRateLimitPerHour, 5),
       restorePerHour: this.readPositiveInteger(config.restoreRateLimitPerHour, 3),
-      updatePerHour: this.readPositiveInteger(config.updateRateLimitPerHour, 2),
+      updatePerHour: this.readPositiveInteger(config.updateRateLimitPerHour, 5),
     };
   }
 

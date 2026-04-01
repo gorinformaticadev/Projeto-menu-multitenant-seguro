@@ -279,7 +279,7 @@ export class SecurityConfigService {
     return {
       backupRateLimitPerHour: config.backupRateLimitPerHour || 5,
       restoreRateLimitPerHour: config.restoreRateLimitPerHour || 3,
-      updateRateLimitPerHour: config.updateRateLimitPerHour || 2,
+      updateRateLimitPerHour: config.updateRateLimitPerHour || 5,
     };
   }
 

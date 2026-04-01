@@ -325,6 +325,25 @@ describe("/configuracoes/seguranca", () => {
     expect(apiMock.get).toHaveBeenCalledWith("/email-config/smtp-credentials");
   });
 
+  it("agrupa o controle de tentativas de login dentro do card de Rate Limiting Global", async () => {
+    installDefaultGetHandlers();
+
+    render(<SecuritySettingsPage />);
+
+    const rateLimitCard = await screen.findByTestId("global-rate-limiting-card");
+
+    expect(within(rateLimitCard).getByText(/Controle de Tentativas de Login/i)).toBeInTheDocument();
+    expect(
+      within(rateLimitCard).getByRole("spinbutton", { name: /MÃ¡ximo de Tentativas de Login/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(rateLimitCard).getByRole("spinbutton", { name: /DuraÃ§Ã£o do Bloqueio/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(rateLimitCard).getByRole("spinbutton", { name: /RequisiÃ§Ãµes Globais/i }),
+    ).toBeInTheDocument();
+  });
+
   it("mantem o endpoint antigo /security-config para salvar as configuracoes existentes", async () => {
     installDefaultGetHandlers();
     apiMock.put.mockImplementation((url: string, payload: unknown) => {

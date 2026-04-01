@@ -275,7 +275,7 @@ model SecurityConfig {
   refreshTokenRotation       Boolean  @default(true)
   backupRateLimitPerHour     Int      @default(5)
   restoreRateLimitPerHour    Int      @default(3)
-  updateRateLimitPerHour     Int      @default(2)
+  updateRateLimitPerHour     Int      @default(5)
   updatedAt                  DateTime @updatedAt
   updatedBy                  String?
 

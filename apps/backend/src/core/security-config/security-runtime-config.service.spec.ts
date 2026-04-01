@@ -57,7 +57,7 @@ describe('SecurityRuntimeConfigService regression guards', () => {
       rateLimitProdEnabled: false,
       backupRateLimitPerHour: 5,
       restoreRateLimitPerHour: 3,
-      updateRateLimitPerHour: 2,
+      updateRateLimitPerHour: 5,
       passwordMinLength: 8,
       passwordRequireUppercase: true,
       passwordRequireLowercase: true,

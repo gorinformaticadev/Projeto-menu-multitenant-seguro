@@ -292,7 +292,7 @@ export default function SecurityConfigPage() {
         </Card>
       ) : (
         <>
-      {/* Controle de Login */}
+      {false && (
       <Card className={cn(dashboardCardBaseClassName, dashboardCardToneClassName.info)}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -303,7 +303,61 @@ export default function SecurityConfigPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-skin-border/70 bg-skin-surface/70 p-4">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <h3 className="text-sm font-semibold text-skin-text">Controle de Tentativas de Login</h3>
+                <p className="text-xs text-skin-text-muted">
+                  Defina quantas tentativas falhas sao aceitas e por quanto tempo a conta fica bloqueada.
+                </p>
+              </div>
+              <InfoButton label="Ajuda da seÃ§Ã£o de controle de tentativas de login">
+                <p>Configure o bloqueio automÃ¡tico de contas apÃ³s mÃºltiplas tentativas de login falhas.</p>
+              </InfoButton>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <div className="mb-2 flex items-center gap-2">
+                  <Label htmlFor="loginMaxAttempts">MÃ¡ximo de Tentativas de Login</Label>
+                  <InfoButton label="Ajuda do campo mÃ¡ximo de tentativas de login">
+                    <p>NÃºmero de tentativas antes de bloquear a conta. Faixa recomendada: 1 a 100.</p>
+                  </InfoButton>
+                </div>
+                <Input
+                  id="loginMaxAttempts"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={config?.loginMaxAttempts ?? ""}
+                  onChange={(e) =>
+                    updateConfig("loginMaxAttempts", e.target.value === "" ? "" : parseInt(e.target.value))
+                  }
+                />
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center gap-2">
+                  <Label htmlFor="loginLockDurationMinutes">DuraÃ§Ã£o do Bloqueio (minutos)</Label>
+                  <InfoButton label="Ajuda do campo duraÃ§Ã£o do bloqueio">
+                    <p>Tempo que a conta ficarÃ¡ bloqueada apÃ³s atingir o limite de tentativas. Faixa: 5 a 1440 minutos.</p>
+                  </InfoButton>
+                </div>
+                <Input
+                  id="loginLockDurationMinutes"
+                  type="number"
+                  min="5"
+                  max="1440"
+                  value={config?.loginLockDurationMinutes ?? ""}
+                  onChange={(e) =>
+                    updateConfig("loginLockDurationMinutes", e.target.value === "" ? "" : parseInt(e.target.value))
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 border-t border-skin-border/60 pt-4 md:grid-cols-2">
             <div>
               <div className="mb-2 flex items-center gap-2">
                 <Label htmlFor="loginMaxAttempts">Máximo de Tentativas de Login</Label>
@@ -316,7 +370,7 @@ export default function SecurityConfigPage() {
                 type="number"
                 min="1"
                 max="100"
-                value={config.loginMaxAttempts}
+                value={config?.loginMaxAttempts ?? ""}
                 onChange={(e) =>
                   updateConfig("loginMaxAttempts", e.target.value === "" ? "" : parseInt(e.target.value))
                 }
@@ -335,7 +389,7 @@ export default function SecurityConfigPage() {
                 type="number"
                 min="5"
                 max="1440"
-                value={config.loginLockDurationMinutes}
+                value={config?.loginLockDurationMinutes ?? ""}
                 onChange={(e) =>
                   updateConfig("loginLockDurationMinutes", e.target.value === "" ? "" : parseInt(e.target.value))
                 }
@@ -344,9 +398,13 @@ export default function SecurityConfigPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Rate Limiting Global */}
-      <Card className={cn(dashboardCardBaseClassName, dashboardCardToneClassName.info)}>
+      <Card
+        data-testid="global-rate-limiting-card"
+        className={cn(dashboardCardBaseClassName, dashboardCardToneClassName.info)}
+      >
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2">
@@ -371,7 +429,61 @@ export default function SecurityConfigPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-skin-border/70 bg-skin-surface/70 p-4">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <h3 className="text-sm font-semibold text-skin-text">Controle de Tentativas de Login</h3>
+                <p className="text-xs text-skin-text-muted">
+                  Defina quantas tentativas falhas sao aceitas e por quanto tempo a conta fica bloqueada.
+                </p>
+              </div>
+              <InfoButton label="Ajuda da seÃ§Ã£o de controle de tentativas de login">
+                <p>Configure o bloqueio automÃ¡tico de contas apÃ³s mÃºltiplas tentativas de login falhas.</p>
+              </InfoButton>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <div className="mb-2 flex items-center gap-2">
+                  <Label htmlFor="loginMaxAttempts">MÃ¡ximo de Tentativas de Login</Label>
+                  <InfoButton label="Ajuda do campo mÃ¡ximo de tentativas de login">
+                    <p>NÃºmero de tentativas antes de bloquear a conta. Faixa recomendada: 1 a 100.</p>
+                  </InfoButton>
+                </div>
+                <Input
+                  id="loginMaxAttempts"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={config?.loginMaxAttempts ?? ""}
+                  onChange={(e) =>
+                    updateConfig("loginMaxAttempts", e.target.value === "" ? "" : parseInt(e.target.value))
+                  }
+                />
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center gap-2">
+                  <Label htmlFor="loginLockDurationMinutes">DuraÃ§Ã£o do Bloqueio (minutos)</Label>
+                  <InfoButton label="Ajuda do campo duraÃ§Ã£o do bloqueio">
+                    <p>Tempo que a conta ficarÃ¡ bloqueada apÃ³s atingir o limite de tentativas. Faixa: 5 a 1440 minutos.</p>
+                  </InfoButton>
+                </div>
+                <Input
+                  id="loginLockDurationMinutes"
+                  type="number"
+                  min="5"
+                  max="1440"
+                  value={config?.loginLockDurationMinutes ?? ""}
+                  onChange={(e) =>
+                    updateConfig("loginLockDurationMinutes", e.target.value === "" ? "" : parseInt(e.target.value))
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 border-t border-skin-border/60 pt-4 md:grid-cols-2">
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Label htmlFor="globalMaxRequests">
@@ -401,7 +513,7 @@ export default function SecurityConfigPage() {
                 type="number"
                 min="10"
                 max="1000"
-                value={config.globalMaxRequests}
+                value={config?.globalMaxRequests ?? ""}
                 onChange={(e) =>
                   updateConfig("globalMaxRequests", e.target.value === "" ? "" : parseInt(e.target.value))
                 }
@@ -437,7 +549,7 @@ export default function SecurityConfigPage() {
                 type="number"
                 min="1"
                 max="60"
-                value={config.globalWindowMinutes}
+                value={config?.globalWindowMinutes ?? ""}
                 onChange={(e) =>
                   updateConfig("globalWindowMinutes", e.target.value === "" ? "" : parseInt(e.target.value))
                 }
@@ -470,7 +582,7 @@ export default function SecurityConfigPage() {
               type="number"
               min="6"
               max="32"
-              value={config.passwordMinLength}
+              value={config?.passwordMinLength ?? ""}
               onChange={(e) =>
                 updateConfig("passwordMinLength", e.target.value === "" ? "" : parseInt(e.target.value))
               }
@@ -648,7 +760,7 @@ export default function SecurityConfigPage() {
                 id="accessTokenExpiresIn"
                 type="text"
                 placeholder="15m, 1h, 1d"
-                value={config.accessTokenExpiresIn}
+                value={config?.accessTokenExpiresIn ?? ""}
                 onChange={(e) =>
                   updateConfig("accessTokenExpiresIn", e.target.value)
                 }
@@ -666,7 +778,7 @@ export default function SecurityConfigPage() {
                 id="refreshTokenExpiresIn"
                 type="text"
                 placeholder="7d, 30d"
-                value={config.refreshTokenExpiresIn}
+                value={config?.refreshTokenExpiresIn ?? ""}
                 onChange={(e) =>
                   updateConfig("refreshTokenExpiresIn", e.target.value)
                 }
@@ -685,7 +797,7 @@ export default function SecurityConfigPage() {
                 type="number"
                 min="5"
                 max="1440"
-                value={config.sessionTimeoutMinutes}
+                value={config?.sessionTimeoutMinutes ?? ""}
                 onChange={(e) =>
                   updateConfig("sessionTimeoutMinutes", e.target.value === "" ? "" : parseInt(e.target.value))
                 }
@@ -715,4 +827,3 @@ export default function SecurityConfigPage() {
     </div>
   );
 }
-
