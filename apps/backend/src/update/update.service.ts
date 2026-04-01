@@ -166,6 +166,11 @@ export class UpdateService implements OnModuleInit {
 
       if (!candidate.latestVersion) {
         this.logger.warn(`Nenhuma versão válida (ou commit) encontada no repositório para o canal ${channel}`);
+        await this.updateSystemSettings({
+          availableVersion: null,
+          updateAvailable: false,
+          lastUpdateCheck: new Date(),
+        });
         return { updateAvailable: false };
       }
 
