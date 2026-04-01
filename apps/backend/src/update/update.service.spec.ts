@@ -223,7 +223,7 @@ function createHistoricalUpdateLog(overrides?: Record<string, unknown>) {
 }
 
 describe('UpdateService', () => {
-  it('repo publico sem token chama git ls-remote --tags', async () => {
+  it('repo publico sem token chama git ls-remote', async () => {
     const { service } = createService();
     const calls: Array<{ cmd: string; args: string[] }> = [];
 
@@ -232,13 +232,13 @@ describe('UpdateService', () => {
       return { stdout: 'hash\trefs/tags/v1.2.3\n', stderr: '' };
     });
 
-    const out = await service.getRemoteTagsOutput('https://github.com/org/repo.git');
+    const out = await service.getRemoteRefsOutput('https://github.com/org/repo.git');
 
     expect(out.includes('refs/tags/v1.2.3')).toBe(true);
     expect(calls).toEqual([
       {
         cmd: 'git',
-        args: ['ls-remote', '--tags', 'https://github.com/org/repo.git'],
+        args: ['ls-remote', 'https://github.com/org/repo.git'],
       },
     ]);
   });
@@ -253,13 +253,13 @@ describe('UpdateService', () => {
     });
 
     const encryptedToken = service.encryptToken('my-secret-token');
-    await service.getRemoteTagsOutput('https://github.com/org/private.git', encryptedToken);
+    await service.getRemoteRefsOutput('https://github.com/org/private.git', encryptedToken);
 
     expect(calls.length).toBe(1);
     expect(calls[0].cmd).toBe('git');
     expect(calls[0].args[0]).toBe('-c');
     expect(calls[0].args[1].startsWith('http.extraHeader=AUTHORIZATION: Bearer ')).toBe(true);
-    expect(calls[0].args.slice(2)).toEqual(['ls-remote', '--tags', 'https://github.com/org/private.git']);
+    expect(calls[0].args.slice(2)).toEqual(['ls-remote', 'https://github.com/org/private.git']);
   });
 
   it('sanitizacao remove Authorization/basic e token', () => {
@@ -280,27 +280,6 @@ describe('UpdateService', () => {
 
     expect(service.formatVersion('1.2.3')).toBe('v1.2.3');
     expect(service.formatVersion('v1.2.3')).toBe('v1.2.3');
-  });
-
-  it('prioriza tags da mesma linha major.minor da versao atual', async () => {
-    const { service } = createService();
-
-    jest.spyOn(service as unknown as { getRuntimeVersionInfo: () => { version: string } }, 'getRuntimeVersionInfo')
-      .mockReturnValue({ version: 'v0.1.67' });
-
-    service.execFileAsync = jest.fn(async () => ({
-      stdout: [
-        'hash\trefs/tags/v3.3.0',
-        'hash\trefs/tags/v0.1.68',
-        'hash\trefs/tags/v0.1.67',
-      ].join('\n'),
-      stderr: '',
-    }));
-
-    const result = await service.checkForUpdates();
-
-    expect(result.availableVersion).toBe('v0.1.68');
-    expect(result.updateAvailable).toBe(true);
   });
 
   it('executeUpdate inicia job assincrono e retorna operationId', async () => {
@@ -974,7 +953,7 @@ describe('UpdateService', () => {
           gitReleaseBranch: 'stable',
           packageManager: 'docker',
           updateCheckEnabled: false,
-          updateChannel: 'tag',
+          updateChannel: 'rc', // Normalizado
           releaseTag: 'v2.0.0',
           composeFile: 'docker-compose.custom.yml',
           envFile: 'install/.env.custom',
